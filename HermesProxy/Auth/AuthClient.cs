@@ -75,7 +75,7 @@ namespace HermesProxy.Auth
                 _response.SetResult(AuthResult.FAIL_INTERNAL_ERROR);
             }
 
-            _response.Task.Wait();
+            _response.Task.ConfigureAwait(false).GetAwaiter().GetResult();
 
             return _response.Task.Result;
         }
@@ -101,7 +101,7 @@ namespace HermesProxy.Auth
                 _response.SetResult(AuthResult.FAIL_INTERNAL_ERROR);
             }
 
-            _response.Task.Wait();
+            _response.Task.ConfigureAwait(false).GetAwaiter().GetResult();
 
             return _response.Task.Result;
         }
@@ -609,7 +609,7 @@ namespace HermesProxy.Auth
         {
             if (!_realmlistRequestIsPending || !_hasRealmlist.Task.Wait(TimeSpan.FromSeconds(2)))
                 SendRealmListUpdateRequest();
-            _hasRealmlist.Task.Wait();
+            _hasRealmlist.Task.ConfigureAwait(false).GetAwaiter().GetResult();
         }
     }
 }
