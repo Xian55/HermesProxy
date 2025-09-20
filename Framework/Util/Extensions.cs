@@ -147,7 +147,7 @@ namespace System
         public static string ToHexString(this byte[] byteArray, bool reverse = false)
         {
             if (reverse)
-                return byteArray.Reverse().Aggregate("", (current, b) => current + b.ToString("X2"));
+                return byteArray.AsEnumerable().Reverse().Aggregate("", (current, b) => current + b.ToString("X2"));
             else
                 return byteArray.Aggregate("", (current, b) => current + b.ToString("X2"));
         }
