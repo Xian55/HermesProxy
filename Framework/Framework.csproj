@@ -8,8 +8,6 @@
 
   <ItemGroup>
     <PackageReference Include="Google.Protobuf" />
-    <PackageReference Include="Microsoft.CSharp" />
-    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" />
     <PackageReference Include="System.Configuration.ConfigurationManager" />
   </ItemGroup>
 
