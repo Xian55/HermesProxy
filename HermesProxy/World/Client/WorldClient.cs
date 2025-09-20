@@ -13,6 +13,7 @@ using Framework.Logging;
 using HermesProxy.World.Enums;
 using System.Reflection;
 using System.Threading.Tasks;
+using System.Threading;
 using Framework.Networking;
 using HermesProxy.World.Server;
 
@@ -73,7 +74,9 @@ namespace HermesProxy.World.Client
             }
 
             while (_isSuccessful == null)
-            { }
+            {
+                Thread.Sleep(1);
+            }
 
             return (bool)_isSuccessful;
         }
