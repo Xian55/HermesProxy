@@ -6,6 +6,8 @@ using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 
+using static HermesProxy.World.GameData;
+
 namespace HermesProxy.World.Server
 {
     public partial class WorldSocket

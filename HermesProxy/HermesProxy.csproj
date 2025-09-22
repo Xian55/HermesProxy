@@ -28,6 +28,7 @@
     <PackageReference Include="GitVersion.MsBuild">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Sep" />
     <PackageReference Include="System.CommandLine" />
   </ItemGroup>
 
