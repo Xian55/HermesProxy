@@ -1,15 +1,18 @@
 ﻿using Framework;
-using HermesProxy.World.Enums;
+using Framework.Logging;
+
 using HermesProxy.Enums;
+using HermesProxy.World.Enums;
+using HermesProxy.World.Objects;
+
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-using Framework.Logging;
-using HermesProxy.World.Objects;
 
 namespace HermesProxy
 {
@@ -134,18 +137,12 @@ namespace HermesProxy
             UpdateFieldNameDictionary = new Dictionary<Type, Dictionary<string, int>>();
             if (!LoadUFDictionariesInto(UpdateFieldDictionary, UpdateFieldNameDictionary))
                 Log.Print(LogType.Error, "Could not load update fields for current legacy version.");
-            if (!LoadOpcodeDictionaries())
-                Log.Print(LogType.Error, "Could not load opcodes for current legacy version.");
-        }
 
-        private static readonly Dictionary<uint, Opcode> CurrentToUniversalOpcodeDictionary = new();
-        private static readonly Dictionary<Opcode, uint> UniversalToCurrentOpcodeDictionary = new();
-
-        private static bool LoadOpcodeDictionaries()
-        {
             Type enumType = Opcodes.GetOpcodesEnumForVersion(Build);
             if (enumType == null)
-                return false;
+                Log.Print(LogType.Error, "1 Could not load opcodes for current legacy version.");
+
+            var dict1 = new Dictionary<uint, Opcode>();
 
             foreach (var item in Enum.GetValues(enumType))
             {
@@ -158,16 +155,23 @@ namespace HermesProxy
                     continue;
                 }
 
-                CurrentToUniversalOpcodeDictionary.Add((uint)item, universalOpcode);
-                UniversalToCurrentOpcodeDictionary.Add(universalOpcode, (uint)item);
+                dict1.Add((uint)item, universalOpcode);
             }
 
-            if (CurrentToUniversalOpcodeDictionary.Count < 1)
-                return false;
+            if (dict1.Count < 1)
+            {
+                Log.Print(LogType.Error, "1 Could not load opcodes for current legacy version.");
+                return;
+            }
+
+            CurrentToUniversalOpcodeDictionary = dict1.ToFrozenDictionary();
+            UniversalToCurrentOpcodeDictionary = dict1.ToFrozenDictionary(kvp => kvp.Value, kvp => kvp.Key);
 
             Log.Print(LogType.Server, $"Loaded {CurrentToUniversalOpcodeDictionary.Count} legacy opcodes.");
-            return true;
         }
+
+        private static readonly FrozenDictionary<uint, Opcode> CurrentToUniversalOpcodeDictionary = FrozenDictionary<uint, Opcode>.Empty;
+        private static readonly FrozenDictionary<Opcode, uint> UniversalToCurrentOpcodeDictionary = FrozenDictionary<Opcode, uint>.Empty;
 
         public static Opcode GetUniversalOpcode(uint opcode)
         {
