@@ -350,25 +350,27 @@ namespace HermesProxy
 
         private static byte GetExpansionVersion()
         {
-            string str = VersionString;
-            str = str.Replace("V", "");
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = VersionString.AsSpan(1); // Skip 'V'
+            int underscoreIndex = span.IndexOf('_');
+            return byte.Parse(span[..underscoreIndex]);
         }
         private static byte GetMajorPatchVersion()
         {
-            string str = VersionString;
-            str = str.Substring(str.IndexOf('_') + 1);
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = VersionString.AsSpan();
+            int firstUnderscore = span.IndexOf('_');
+            span = span[(firstUnderscore + 1)..];
+            int secondUnderscore = span.IndexOf('_');
+            return byte.Parse(span[..secondUnderscore]);
         }
         private static byte GetMinorPatchVersion()
         {
-            string str = VersionString;
-            str = str.Substring(str.IndexOf('_') + 1);
-            str = str.Substring(str.IndexOf('_') + 1);
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = VersionString.AsSpan();
+            int firstUnderscore = span.IndexOf('_');
+            span = span[(firstUnderscore + 1)..];
+            int secondUnderscore = span.IndexOf('_');
+            span = span[(secondUnderscore + 1)..];
+            int thirdUnderscore = span.IndexOf('_');
+            return byte.Parse(span[..thirdUnderscore]);
         }
 
         public static bool InVersion(ClientVersionBuild build1, ClientVersionBuild build2)
@@ -725,25 +727,27 @@ namespace HermesProxy
 
         private static byte GetExpansionVersion()
         {
-            string str = VersionString;
-            str = str.Replace("V", "");
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = VersionString.AsSpan(1); // Skip 'V'
+            int underscoreIndex = span.IndexOf('_');
+            return byte.Parse(span[..underscoreIndex]);
         }
         private static byte GetMajorPatchVersion()
         {
-            string str = VersionString;
-            str = str.Substring(str.IndexOf('_') + 1);
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = VersionString.AsSpan();
+            int firstUnderscore = span.IndexOf('_');
+            span = span[(firstUnderscore + 1)..];
+            int secondUnderscore = span.IndexOf('_');
+            return byte.Parse(span[..secondUnderscore]);
         }
         private static byte GetMinorPatchVersion()
         {
-            string str = VersionString;
-            str = str.Substring(str.IndexOf('_') + 1);
-            str = str.Substring(str.IndexOf('_') + 1);
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = VersionString.AsSpan();
+            int firstUnderscore = span.IndexOf('_');
+            span = span[(firstUnderscore + 1)..];
+            int secondUnderscore = span.IndexOf('_');
+            span = span[(secondUnderscore + 1)..];
+            int thirdUnderscore = span.IndexOf('_');
+            return byte.Parse(span[..thirdUnderscore]);
         }
 
         public static bool AddedInVersion(byte expansion, byte major, byte minor)
