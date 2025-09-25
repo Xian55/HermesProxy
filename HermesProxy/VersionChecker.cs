@@ -110,10 +110,9 @@ namespace HermesProxy
 
         private static byte GetExpansionVersion(ClientVersionBuild version)
         {
-            string str = version.ToString();
-            str = str.Replace("V", "");
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = version.ToString().AsSpan(1); // Skip 'V'
+            int underscoreIndex = span.IndexOf('_');
+            return byte.Parse(span[..underscoreIndex]);
         }
     }
     public class UpdateFieldInfo
