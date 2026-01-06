@@ -38,12 +38,12 @@ namespace HermesProxy.World.Objects
     }
     public class ActivePlayerData
     {
-        public WowGuid128[] InvSlots = new WowGuid128[23]; // equipped gear and bags
-        public WowGuid128[] PackSlots = new WowGuid128[24]; // main bag 16 default + 8 vulpera racial
-        public WowGuid128[] BankSlots = new WowGuid128[28]; // only 24 in vanilla
-        public WowGuid128[] BankBagSlots = new WowGuid128[7]; // only 6 in vanilla
-        public WowGuid128[] BuyBackSlots = new WowGuid128[12];
-        public WowGuid128[] KeyringSlots = new WowGuid128[32];
+        public WowGuid128?[] InvSlots = new WowGuid128?[23]; // equipped gear and bags
+        public WowGuid128?[] PackSlots = new WowGuid128?[24]; // main bag 16 default + 8 vulpera racial
+        public WowGuid128?[] BankSlots = new WowGuid128?[28]; // only 24 in vanilla
+        public WowGuid128?[] BankBagSlots = new WowGuid128?[7]; // only 6 in vanilla
+        public WowGuid128?[] BuyBackSlots = new WowGuid128?[12];
+        public WowGuid128?[] KeyringSlots = new WowGuid128?[32];
         public WowGuid128 FarsightObject;
         public WowGuid128 ComboTarget;
         public WowGuid128 SummonedBattlePetGUID;

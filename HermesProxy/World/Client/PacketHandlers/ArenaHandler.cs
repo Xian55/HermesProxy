@@ -149,8 +149,6 @@ namespace HermesProxy.World.Client
             arena.PlayerName = packet.ReadCString();
             arena.TeamName = packet.ReadCString();
             arena.PlayerGuid = GetSession().GameState.GetPlayerGuidByName(arena.PlayerName);
-            if (arena.PlayerGuid == null)
-                arena.PlayerGuid = WowGuid128.Empty;
             arena.PlayerVirtualAddress = GetSession().RealmId.GetAddress();
             arena.TeamGuid = WowGuid128.Create(HighGuidType703.ArenaTeam, 1);
             SendPacketToClient(arena);

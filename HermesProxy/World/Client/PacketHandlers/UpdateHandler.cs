@@ -765,7 +765,13 @@ namespace HermesProxy.World.Client
             return dict;
         }
 
-        void ReadMovementUpdateBlock(WorldPacket packet, WowGuid guid, ObjectUpdate updateData, object index)
+        // Overload for WowGuid64 - converts to WowGuid128
+        void ReadMovementUpdateBlock(WorldPacket packet, WowGuid64 guid, ObjectUpdate updateData, object index)
+        {
+            ReadMovementUpdateBlock(packet, guid.To128(GetSession().GameState), updateData, index);
+        }
+
+        void ReadMovementUpdateBlock(WorldPacket packet, WowGuid128 guid, ObjectUpdate updateData, object index)
         {
             MovementInfo moveInfo = null ;
 
@@ -812,7 +818,7 @@ namespace HermesProxy.World.Client
                     moveInfo.HasSplineData = true;
                     ServerSideMovement monsterMove = new ServerSideMovement();
 
-                    if (moveInfo.TransportGuid != null)
+                    if (moveInfo.TransportGuid != default)
                         monsterMove.TransportGuid = moveInfo.TransportGuid;
                     monsterMove.TransportSeat = moveInfo.TransportSeat;
 
@@ -1001,31 +1007,44 @@ namespace HermesProxy.World.Client
             }
         }
 
-        private static WowGuid GetGuidValue<T>(Dictionary<int, UpdateField> UpdateFields, T field) where T : System.Enum
+        private WowGuid64 GetGuidValue64<T>(Dictionary<int, UpdateField> UpdateFields, T field) where T : System.Enum
         {
-            if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V6_0_2_19033))
-            {
-                var parts = UpdateFields.GetArray<T, uint>(field, 2);
-                return new WowGuid64(MathFunctions.MakePair64(parts[0], parts[1]));
-            }
-            else
-            {
-                var parts = UpdateFields.GetArray<T, uint>(field, 4);
-                return new WowGuid128(MathFunctions.MakePair64(parts[0], parts[1]), MathFunctions.MakePair64(parts[2], parts[3]));
-            }
+            var parts = UpdateFields.GetArray<T, uint>(field, 2);
+            return new WowGuid64(MathFunctions.MakePair64(parts[0], parts[1]));
         }
-        private static WowGuid GetGuidValue(Dictionary<int, UpdateField> UpdateFields, int field)
+
+        private WowGuid128 GetGuidValue128<T>(Dictionary<int, UpdateField> UpdateFields, T field) where T : System.Enum
+        {
+            var parts = UpdateFields.GetArray<T, uint>(field, 4);
+            return new WowGuid128(MathFunctions.MakePair64(parts[2], parts[3]), MathFunctions.MakePair64(parts[0], parts[1]));
+        }
+
+        private WowGuid128 GetGuidValue<T>(Dictionary<int, UpdateField> UpdateFields, T field) where T : System.Enum
         {
             if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V6_0_2_19033))
-            {
-                var parts = UpdateFields.GetArray<uint>(field, 2);
-                return new WowGuid64(MathFunctions.MakePair64(parts[0], parts[1]));
-            }
+                return GetGuidValue64(UpdateFields, field).To128(GetSession().GameState);
             else
-            {
-                var parts = UpdateFields.GetArray<uint>(field, 4);
-                return new WowGuid128(MathFunctions.MakePair64(parts[0], parts[1]), MathFunctions.MakePair64(parts[2], parts[3]));
-            }
+                return GetGuidValue128(UpdateFields, field);
+        }
+
+        private WowGuid64 GetGuidValue64(Dictionary<int, UpdateField> UpdateFields, int field)
+        {
+            var parts = UpdateFields.GetArray<uint>(field, 2);
+            return new WowGuid64(MathFunctions.MakePair64(parts[0], parts[1]));
+        }
+
+        private WowGuid128 GetGuidValue128(Dictionary<int, UpdateField> UpdateFields, int field)
+        {
+            var parts = UpdateFields.GetArray<uint>(field, 4);
+            return new WowGuid128(MathFunctions.MakePair64(parts[2], parts[3]), MathFunctions.MakePair64(parts[0], parts[1]));
+        }
+
+        private WowGuid128 GetGuidValue(Dictionary<int, UpdateField> UpdateFields, int field)
+        {
+            if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V6_0_2_19033))
+                return GetGuidValue64(UpdateFields, field).To128(GetSession().GameState);
+            else
+                return GetGuidValue128(UpdateFields, field);
         }
 
         public QuestLog ReadQuestLogEntry(int i, BitArray updateMaskArray, Dictionary<int, UpdateField> updates)

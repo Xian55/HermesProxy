@@ -185,7 +185,7 @@ namespace HermesProxy.World
             var loLength = ReadUInt8();
             var hiLength = ReadUInt8();
             var low = ReadPackedUInt64(loLength);
-            return new WowGuid128(ReadPackedUInt64(hiLength), low);
+            return new WowGuid128(low, ReadPackedUInt64(hiLength));
         }
 
         private ulong ReadPackedUInt64(byte length)

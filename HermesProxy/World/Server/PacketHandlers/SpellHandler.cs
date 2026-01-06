@@ -17,7 +17,7 @@ namespace HermesProxy.World.Server
         SpellCastTargetFlags ConvertSpellTargetFlags(SpellTargetData target)
         {
             SpellCastTargetFlags targetFlags = SpellCastTargetFlags.None;
-            if (target.Unit != null && !target.Unit.IsEmpty())
+            if (target.Unit != default && !target.Unit.IsEmpty())
             {
                 if (target.Flags.HasFlag(SpellCastTargetFlags.Unit))
                     targetFlags |= SpellCastTargetFlags.Unit;
@@ -30,7 +30,7 @@ namespace HermesProxy.World.Server
                 if (target.Flags.HasFlag(SpellCastTargetFlags.UnitMinipet))
                     targetFlags |= SpellCastTargetFlags.UnitMinipet;
             }
-            if (target.Item != null & !target.Item.IsEmpty())
+            if (target.Item != default & !target.Item.IsEmpty())
             {
                 if (target.Flags.HasFlag(SpellCastTargetFlags.Item))
                     targetFlags |= SpellCastTargetFlags.Item;

@@ -226,7 +226,7 @@ namespace HermesProxy.World.Server
                         data = new();
                         ulong guidLow = reader.ReadUInt64();
                         ulong guidHigh = reader.ReadUInt64();
-                        data.Guid = new WowGuid128(guidHigh, guidLow);
+                        data.Guid = new WowGuid128(guidLow, guidHigh);
 
                         if (!IsGlobalDataType(type))
                             System.Diagnostics.Trace.Assert(guid == data.Guid);

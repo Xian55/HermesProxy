@@ -287,7 +287,7 @@ namespace HermesProxy.World.Server.Packets
             data.WriteUInt16(CastLevel);
             data.WriteUInt8(Applications);
             data.WriteInt32(ContentTuningID);
-            data.WriteBit(CastUnit != null);
+            data.WriteBit(CastUnit != default);
             data.WriteBit(Duration.HasValue);
             data.WriteBit(Remaining.HasValue);
             data.WriteBit(TimeMod.HasValue);
@@ -298,7 +298,7 @@ namespace HermesProxy.World.Server.Packets
             if (ContentTuning != null)
                 ContentTuning.Write(data);
 
-            if (CastUnit != null)
+            if (CastUnit != default)
                 data.WritePackedGuid128(CastUnit);
 
             if (Duration.HasValue)
@@ -1559,7 +1559,7 @@ namespace HermesProxy.World.Server.Packets
             Guid = _worldPacket.ReadPackedGuid128();
         }
         public byte Slot;
-        public WowGuid Guid;
+        public WowGuid128 Guid;
     }
 
     public class SetSpellModifier : ServerPacket

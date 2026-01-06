@@ -220,10 +220,10 @@ namespace HermesProxy.World.Server.Packets
             data.WriteBit(CensorServerSideInfo);
             data.WriteBit(CensorBidInfo);
             data.WriteBit(AuctionBucketKey != null);
-            data.WriteBit(Creator != null);
+            data.WriteBit(Creator != default);
             if (!CensorBidInfo)
             {
-                data.WriteBit(Bidder != null);
+                data.WriteBit(Bidder != default);
                 data.WriteBit(BidAmount.HasValue);
             }
 
@@ -262,12 +262,12 @@ namespace HermesProxy.World.Server.Packets
                 data.WriteUInt32(EndTime);
             }
 
-            if (Creator != null)
+            if (Creator != default)
                 data.WritePackedGuid128(Creator);
 
             if (!CensorBidInfo)
             {
-                if (Bidder != null)
+                if (Bidder != default)
                     data.WritePackedGuid128(Bidder);
 
                 if (BidAmount.HasValue)

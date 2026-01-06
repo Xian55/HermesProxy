@@ -685,7 +685,7 @@ namespace HermesProxy.World.Client
         {
             CooldownEvent cooldown = new();
             cooldown.SpellID = packet.ReadUInt32();
-            WowGuid guid = packet.ReadGuid();
+            WowGuid64 guid = packet.ReadGuid();
             cooldown.IsPet = guid.GetHighType() == HighGuidType.Pet;
             SendPacketToClient(cooldown);
         }
@@ -695,7 +695,7 @@ namespace HermesProxy.World.Client
         {
             ClearCooldown cooldown = new();
             cooldown.SpellID = packet.ReadUInt32();
-            WowGuid guid = packet.ReadGuid();
+            WowGuid64 guid = packet.ReadGuid();
             cooldown.IsPet = guid.GetHighType() == HighGuidType.Pet;
             SendPacketToClient(cooldown);
         }
@@ -1041,7 +1041,7 @@ namespace HermesProxy.World.Client
             int duration = packet.ReadInt32();
 
             WowGuid128 guid = GetSession().GameState.CurrentPlayerGuid;
-            if (guid == null)
+            if (guid == default)
                 return;
 
             GetSession().GameState.StoreAuraDurationLeft(guid, slot, duration, (int)packet.GetReceivedTime());

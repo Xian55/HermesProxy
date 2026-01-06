@@ -159,12 +159,12 @@ namespace HermesProxy.World.Server.Packets
             {
                 if (CorpseData.ClassId == null)
                 {
-                    if (CorpseData.Owner != null)
+                    if (CorpseData.Owner != default)
                         CorpseData.ClassId = (byte)GlobalSession.GameState.GetUnitClass(CorpseData.Owner);
                     else
                         CorpseData.ClassId = 1;
                 }
-                if (CorpseData.FactionTemplate == null && CorpseData.Owner != null)
+                if (CorpseData.FactionTemplate == null && CorpseData.Owner != default)
                 {
                     int ownerFaction = GlobalSession.GameState.GetLegacyFieldValueInt32(CorpseData.Owner, UnitField.UNIT_FIELD_FACTIONTEMPLATE);
                     if (ownerFaction != 0)
@@ -202,13 +202,13 @@ namespace HermesProxy.World.Server.Packets
                     UnitData.ScaleDuration = 100;
                 if (UnitData.LookAtControllerID == null)
                     UnitData.LookAtControllerID = -1;
-                if (UnitData.ChannelObject == null &&
+                if (UnitData.ChannelObject == default &&
                     Guid == GlobalSession.GameState.CurrentPlayerGuid)
                     UnitData.ChannelObject = WowGuid128.Empty;
             }
             if (PlayerData != null)
             {
-                if (PlayerData.WowAccount == null)
+                if (PlayerData.WowAccount == default)
                 {
                     if (CreateData.ThisIsYou == true)
                         PlayerData.WowAccount = WowGuid128.Create(HighGuidType703.WowAccount, GlobalSession.GameAccountInfo.Id);

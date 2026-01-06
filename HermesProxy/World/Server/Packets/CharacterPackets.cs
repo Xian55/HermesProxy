@@ -1128,11 +1128,11 @@ namespace HermesProxy.World.Server.Packets
         public override void Write()
         {
             _worldPacket.WriteUInt8(Result);
-            _worldPacket.WriteBit(Guid != null);
+            _worldPacket.WriteBit(Guid != default);
             _worldPacket.WriteBits(Name.GetByteCount(), 6);
             _worldPacket.FlushBits();
 
-            if (Guid != null)
+            if (Guid != default)
                 _worldPacket.WritePackedGuid128(Guid);
 
             _worldPacket.WriteString(Name);

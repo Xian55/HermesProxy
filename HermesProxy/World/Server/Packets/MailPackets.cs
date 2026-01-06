@@ -111,7 +111,7 @@ namespace HermesProxy.World.Server.Packets
             data.WriteInt32(MailTemplateID);
             data.WriteInt32(Attachments.Count);
 
-            data.WriteBit(SenderCharacter != null);
+            data.WriteBit(SenderCharacter != default);
             data.WriteBit(AltSenderID.HasValue);
             data.WriteBits(Subject.GetByteCount(), 8);
             data.WriteBits(Body.GetByteCount(), 13);
@@ -119,7 +119,7 @@ namespace HermesProxy.World.Server.Packets
 
             Attachments.ForEach(p => p.Write(data));
 
-            if (SenderCharacter != null)
+            if (SenderCharacter != default)
                 data.WritePackedGuid128(SenderCharacter);
 
             if (AltSenderID.HasValue)

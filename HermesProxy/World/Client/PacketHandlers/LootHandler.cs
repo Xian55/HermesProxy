@@ -193,7 +193,7 @@ namespace HermesProxy.World.Client
         [PacketHandler(Opcode.SMSG_LOOT_MASTER_LIST)]
         void HandleLootMasterList(WorldPacket packet)
         {
-            if (GetSession().GameState.LastLootTargetGuid == null)
+            if (GetSession().GameState.LastLootTargetGuid == default)
                 return;
 
             LootList list = new LootList();

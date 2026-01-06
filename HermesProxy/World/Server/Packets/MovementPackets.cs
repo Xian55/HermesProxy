@@ -107,7 +107,7 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(MoveSpline.SplineTimeFull);
             _worldPacket.WriteUInt32(0); // FadeObjectTime
             _worldPacket.WriteUInt8(MoveSpline.SplineMode);
-            _worldPacket.WritePackedGuid128(MoveSpline.TransportGuid != null ? MoveSpline.TransportGuid : WowGuid128.Empty);
+            _worldPacket.WritePackedGuid128(MoveSpline.TransportGuid); // != default ? MoveSpline.TransportGuid : WowGuid128.Empty
             _worldPacket.WriteInt8(MoveSpline.TransportSeat);
             _worldPacket.WriteBits((byte)MoveSpline.SplineType, 2);
             _worldPacket.WriteBits(Points.Count, 16);
@@ -185,7 +185,7 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteFloat(Orientation);
             _worldPacket.WriteUInt8(PreloadWorld);
 
-            _worldPacket.WriteBit(TransportGUID != null);
+            _worldPacket.WriteBit(TransportGUID != default);
             _worldPacket.WriteBit(Vehicle != null);
             _worldPacket.FlushBits();
 
@@ -197,7 +197,7 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.FlushBits();
             }
 
-            if (TransportGUID != null)
+            if (TransportGUID != default)
                 _worldPacket.WritePackedGuid128(TransportGUID);
         }
 

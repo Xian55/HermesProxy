@@ -327,7 +327,7 @@ namespace HermesProxy.World.Client
             {
                 quest.LaunchQuest = false;
 
-                if (GetSession().GameState.CurrentInteractedWithNPC != null)
+                if (GetSession().GameState.CurrentInteractedWithNPC != default)
                 {
                     uint npcFlags = GetSession().GameState.GetLegacyFieldValueUInt32(GetSession().GameState.CurrentInteractedWithNPC, UnitField.UNIT_NPC_FLAGS);
                     if (npcFlags.HasAnyFlag(NPCFlags.Gossip))

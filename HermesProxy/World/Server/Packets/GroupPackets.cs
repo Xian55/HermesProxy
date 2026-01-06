@@ -862,7 +862,7 @@ namespace HermesProxy.World.Server.Packets
     {
         public void WritePartial(WorldPacket data)
         {
-            data.WriteBit(NewPetGuid != null);
+            data.WriteBit(NewPetGuid != default);
             data.WriteBit(NewPetName != null);
             data.WriteBit(DisplayID.HasValue);
             data.WriteBit(MaxHealth.HasValue);
@@ -875,7 +875,7 @@ namespace HermesProxy.World.Server.Packets
                 data.WriteBits(NewPetName.GetByteCount(), 8);
                 data.WriteString(NewPetName);
             }
-            if (NewPetGuid != null)
+            if (NewPetGuid != default)
                 data.WritePackedGuid128(NewPetGuid);
             if (DisplayID.HasValue)
                 data.WriteUInt32(DisplayID.Value);
@@ -893,7 +893,7 @@ namespace HermesProxy.World.Server.Packets
 
         public void WriteFull(WorldPacket data)
         {
-            if (NewPetGuid == null)
+            if (NewPetGuid == default)
                 NewPetGuid = WowGuid128.Empty;
             if (NewPetName == null)
                 NewPetName = "";

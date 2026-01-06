@@ -242,7 +242,7 @@ namespace HermesProxy.World.Client
                     break;
                 }
             }
-            if (enchantment.ItemGUID == null)
+            if (enchantment.ItemGUID == default)
                 return;
 
             enchantment.Enchantment = packet.ReadInt32();
