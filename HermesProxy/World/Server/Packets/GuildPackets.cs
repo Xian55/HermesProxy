@@ -1144,7 +1144,7 @@ namespace HermesProxy.World.Server.Packets
                 ContainerSlot = _worldPacket.ReadUInt8();
         }
 
-        public WowGuid BankGuid;
+        public WowGuid128 BankGuid;
         public byte BankTab;
         public byte BankSlot;
         public byte? ContainerSlot;

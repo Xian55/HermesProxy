@@ -13,7 +13,7 @@ namespace HermesProxy.World.Client
         [PacketHandler(Opcode.SMSG_PET_SPELLS_MESSAGE)]
         void HandlePetSpellsMessage(WorldPacket packet)
         {
-            WowGuid guid = packet.ReadGuid();
+            WowGuid64 guid = packet.ReadGuid();
             GetSession().GameState.CurrentPetGuid = guid.To128(GetSession().GameState);
             GetSession().GameState.CurrentClientPetCast = null;
 

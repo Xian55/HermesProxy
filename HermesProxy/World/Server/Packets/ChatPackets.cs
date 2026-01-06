@@ -290,7 +290,7 @@ namespace HermesProxy.World.Server.Packets
 
     public class ChatPkt : ServerPacket
     {
-        public ChatPkt(GlobalSessionData globalSession, ChatMessageTypeModern chatType, string message, uint language = 0, WowGuid128 sender = null, string senderName = "", WowGuid128 receiver = null, string receiverName = "", string channelName = "", ChatFlags chatFlags = ChatFlags.None, string addonPrefix = "", uint achievementId = 0) : base(Opcode.SMSG_CHAT)
+        public ChatPkt(GlobalSessionData globalSession, ChatMessageTypeModern chatType, string message, uint language = 0, WowGuid128 sender = default, string senderName = "", WowGuid128 receiver = default, string receiverName = "", string channelName = "", ChatFlags chatFlags = ChatFlags.None, string addonPrefix = "", uint achievementId = 0) : base(Opcode.SMSG_CHAT)
         {
             SlashCmd = chatType;
             _Language = language;
@@ -300,18 +300,18 @@ namespace HermesProxy.World.Server.Packets
             AchievementID = achievementId;
             Prefix = addonPrefix;
 
-            SenderGUID = sender != null ? sender : WowGuid128.Empty;
-            if (String.IsNullOrEmpty(senderName) && sender != null)
+            SenderGUID = sender;
+            if (String.IsNullOrEmpty(senderName) && sender != default)
                 SenderName = globalSession.GameState.GetPlayerName(sender);
             else
                 SenderName = senderName;
 
-            SenderAccountGUID = sender != null ? globalSession.GetGameAccountGuidForPlayer(sender) : WowGuid128.Empty;
+            SenderAccountGUID = sender != default ? globalSession.GetGameAccountGuidForPlayer(sender) : default;
             SenderGuildGUID = WowGuid128.Empty;
             PartyGUID = WowGuid128.Empty;
 
-            TargetGUID = receiver != null ? receiver : WowGuid128.Empty;
-            if (String.IsNullOrEmpty(receiverName) && receiver != null)
+            TargetGUID = receiver;
+            if (String.IsNullOrEmpty(receiverName) && receiver != default)
                 TargetName = globalSession.GameState.GetPlayerName(receiver);
             else
                 TargetName = receiverName;
@@ -363,7 +363,7 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteBit(HideChatLog);
             _worldPacket.WriteBit(FakeSenderName);
             _worldPacket.WriteBit(Unused_801.HasValue);
-            _worldPacket.WriteBit(ChannelGUID != null);
+            _worldPacket.WriteBit(ChannelGUID != default);
             _worldPacket.FlushBits();
 
             _worldPacket.WriteString(SenderName);
@@ -375,7 +375,7 @@ namespace HermesProxy.World.Server.Packets
             if (Unused_801.HasValue)
                 _worldPacket.WriteUInt32(Unused_801.Value);
 
-            if (ChannelGUID != null)
+            if (ChannelGUID != default)
                 _worldPacket.WritePackedGuid128(ChannelGUID);
         }
 

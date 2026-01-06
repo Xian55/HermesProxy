@@ -406,14 +406,14 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(Owner);
             _worldPacket.WritePackedGuid128(LootObj);
 
-            _worldPacket.WriteBit(Master != null);
-            _worldPacket.WriteBit(RoundRobinWinner != null);
+            _worldPacket.WriteBit(Master != default);
+            _worldPacket.WriteBit(RoundRobinWinner != default);
             _worldPacket.FlushBits();
 
-            if (Master != null)
+            if (Master != default)
                 _worldPacket.WritePackedGuid128(Master);
 
-            if (RoundRobinWinner != null)
+            if (RoundRobinWinner != default)
                 _worldPacket.WritePackedGuid128(RoundRobinWinner);
         }
 

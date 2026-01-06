@@ -46,9 +46,8 @@ namespace HermesProxy.World.Client
 
             party.InviterName = packet.ReadCString();
             party.InviterGUID = GetSession().GameState.GetPlayerGuidByName(party.InviterName);
-            if (party.InviterGUID == null)
+            if (party.InviterGUID == default)
             {
-                party.InviterGUID = WowGuid128.Empty;
                 party.InviterBNetAccountId = WowGuid128.Empty;
             }
             else

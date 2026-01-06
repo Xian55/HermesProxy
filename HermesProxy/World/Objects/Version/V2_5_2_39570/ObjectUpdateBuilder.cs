@@ -131,10 +131,10 @@ namespace HermesProxy.World.Objects.Version.V2_5_2_39570
             m_createBits.Clear();
             m_createBits.PlayHoverAnim = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && m_updateData.CreateData.MoveInfo.Hover;
             m_createBits.MovementUpdate = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && m_objectTypeMask.HasAnyFlag(Enums.ObjectTypeMask.Unit);
-            m_createBits.MovementTransport = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && m_updateData.CreateData.MoveInfo.TransportGuid != null && m_objectType == Enums.ObjectTypeBCC.GameObject;
+            m_createBits.MovementTransport = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && m_updateData.CreateData.MoveInfo.TransportGuid != default && m_objectType == Enums.ObjectTypeBCC.GameObject;
             m_createBits.Stationary = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && !m_objectTypeMask.HasAnyFlag(Enums.ObjectTypeMask.Unit);
             m_createBits.ServerTime = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && m_updateData.Guid.GetHighType() == Enums.HighGuidType.Transport;
-            m_createBits.CombatVictim = m_updateData.CreateData != null && m_updateData.CreateData.AutoAttackVictim != null;
+            m_createBits.CombatVictim = m_updateData.CreateData != null && m_updateData.CreateData.AutoAttackVictim != default;
             m_createBits.Vehicle = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && m_updateData.CreateData.MoveInfo.VehicleId != 0;
             m_createBits.Rotation = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && m_objectType == Enums.ObjectTypeBCC.GameObject;
             m_createBits.ThisIsYou = m_createBits.ActivePlayer = m_objectType == Enums.ObjectTypeBCC.ActivePlayer;
@@ -684,7 +684,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_2_39570
                 return;
 
             ObjectData objectData = m_updateData.ObjectData;
-            if (objectData.Guid != null)
+            if (objectData.Guid != default)
                 m_fields.SetUpdateField<WowGuid128>(ObjectField.OBJECT_FIELD_GUID, objectData.Guid);
             if (objectData.EntryID != null)
                 m_fields.SetUpdateField<int>(ObjectField.OBJECT_FIELD_ENTRY, (int)objectData.EntryID);
@@ -696,13 +696,13 @@ namespace HermesProxy.World.Objects.Version.V2_5_2_39570
             ItemData itemData = m_updateData.ItemData;
             if (itemData != null)
             {
-                if (itemData.Owner != null)
+                if (itemData.Owner != default)
                     m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_OWNER, itemData.Owner);
-                if (itemData.ContainedIn != null)
+                if (itemData.ContainedIn != default)
                     m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_CONTAINED, itemData.ContainedIn);
-                if (itemData.Creator != null)
+                if (itemData.Creator != default)
                     m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_CREATOR, itemData.Creator);
-                if (itemData.GiftCreator != null)
+                if (itemData.GiftCreator != default)
                     m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_GIFTCREATOR, itemData.GiftCreator);
                 if (itemData.StackCount != null)
                     m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_STACK_COUNT, (uint)itemData.StackCount);
@@ -772,7 +772,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_2_39570
                     int sizePerEntry = 4;
                     if (containerData.Slots[i] != null)
                     {
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, containerData.Slots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, containerData.Slots[i].Value);
                     }
                 }
                 if (containerData.NumSlots != null)
@@ -782,25 +782,25 @@ namespace HermesProxy.World.Objects.Version.V2_5_2_39570
             UnitData unitData = m_updateData.UnitData;
             if (unitData != null)
             {
-                if (unitData.Charm != null)
+                if (unitData.Charm != default)
                     m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CHARM, unitData.Charm);
-                if (unitData.Summon != null)
+                if (unitData.Summon != default)
                     m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_SUMMON, unitData.Summon);
-                if (unitData.Critter != null)
+                if (unitData.Critter != default)
                     m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CRITTER, unitData.Critter);
-                if (unitData.CharmedBy != null)
+                if (unitData.CharmedBy != default)
                     m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CHARMEDBY, unitData.CharmedBy);
-                if (unitData.SummonedBy != null)
+                if (unitData.SummonedBy != default)
                     m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_SUMMONEDBY, unitData.SummonedBy);
-                if (unitData.CreatedBy != null)
+                if (unitData.CreatedBy != default)
                     m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CREATEDBY, unitData.CreatedBy);
-                if (unitData.DemonCreator != null)
+                if (unitData.DemonCreator != default)
                     m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_DEMON_CREATOR, unitData.DemonCreator);
-                if (unitData.LookAtControllerTarget != null)
+                if (unitData.LookAtControllerTarget != default)
                     m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_LOOK_AT_CONTROLLER_TARGET, unitData.LookAtControllerTarget);
-                if (unitData.Target != null)
+                if (unitData.Target != default)
                     m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_TARGET, unitData.Target);
-                if (unitData.BattlePetCompanionGUID != null)
+                if (unitData.BattlePetCompanionGUID != default)
                     m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_BATTLE_PET_COMPANION_GUID, unitData.BattlePetCompanionGUID);
                 if (unitData.BattlePetDBID != null)
                     m_fields.SetUpdateField<ulong>(UnitField.UNIT_FIELD_BATTLE_PET_DB_ID, (ulong)unitData.BattlePetDBID);
@@ -1083,22 +1083,22 @@ namespace HermesProxy.World.Objects.Version.V2_5_2_39570
                     m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_LOOKS_LIKE_CREATURE_ID, (int)unitData.LooksLikeCreatureID);
                 if (unitData.LookAtControllerID != null)
                     m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_LOOK_AT_CONTROLLER_ID, (int)unitData.LookAtControllerID);
-                if (unitData.GuildGUID != null)
+                if (unitData.GuildGUID != default)
                     m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_GUILD_GUID, unitData.GuildGUID);
 
                 // Dynamic Fields
-                if (unitData.ChannelObject != null)
+                if (unitData.ChannelObject != default)
                     m_dynamicFields.SetUpdateField<WowGuid128>(UnitDynamicField.UNIT_DYNAMIC_FIELD_CHANNEL_OBJECTS, unitData.ChannelObject, DynamicFieldChangeType.ValueAndSizeChanged);
             }
 
             PlayerData playerData = m_updateData.PlayerData;
             if (playerData != null)
             {
-                if (playerData.DuelArbiter != null)
+                if (playerData.DuelArbiter != default)
                     m_fields.SetUpdateField<WowGuid128>(PlayerField.PLAYER_DUEL_ARBITER, playerData.DuelArbiter);
-                if (playerData.WowAccount != null)
+                if (playerData.WowAccount != default)
                     m_fields.SetUpdateField<WowGuid128>(PlayerField.PLAYER_WOW_ACCOUNT, playerData.WowAccount);
-                if (playerData.LootTargetGUID != null)
+                if (playerData.LootTargetGUID != default)
                     m_fields.SetUpdateField<WowGuid128>(PlayerField.PLAYER_LOOT_TARGET_GUID, playerData.LootTargetGUID);
                 if (playerData.PlayerFlags != null)
                     m_fields.SetUpdateField<uint>(PlayerField.PLAYER_FLAGS, (uint)playerData.PlayerFlags);
@@ -1206,48 +1206,48 @@ namespace HermesProxy.World.Objects.Version.V2_5_2_39570
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD;
                     int sizePerEntry = 4;
                     if (activeData.InvSlots[i] != null)
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.InvSlots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.InvSlots[i].Value);
                 }
                 for (int i = 0; i < 24; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.ItemStart * 4;
                     int sizePerEntry = 4;
                     if (activeData.PackSlots[i] != null)
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.PackSlots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.PackSlots[i].Value);
                 }
                 for (int i = 0; i < 28; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.BankItemStart * 4;
                     int sizePerEntry = 4;
                     if (activeData.BankSlots[i] != null)
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BankSlots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BankSlots[i].Value);
                 }
                 for (int i = 0; i < 7; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.BankBagStart * 4;
                     int sizePerEntry = 4;
                     if (activeData.BankBagSlots[i] != null)
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BankBagSlots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BankBagSlots[i].Value);
                 }
                 for (int i = 0; i < 12; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.BuyBackStart * 4;
                     int sizePerEntry = 4;
                     if (activeData.BuyBackSlots[i] != null)
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BuyBackSlots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BuyBackSlots[i].Value);
                 }
                 for (int i = 0; i < 32; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.KeyringStart * 4;
                     int sizePerEntry = 4;
                     if (activeData.KeyringSlots[i] != null)
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.KeyringSlots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.KeyringSlots[i].Value);
                 }
-                if (activeData.FarsightObject != null)
+                if (activeData.FarsightObject != default)
                     m_fields.SetUpdateField<WowGuid128>(ActivePlayerField.ACTIVE_PLAYER_FIELD_FARSIGHT, activeData.FarsightObject);
-                if (activeData.ComboTarget != null)
+                if (activeData.ComboTarget != default)
                     m_fields.SetUpdateField<WowGuid128>(ActivePlayerField.ACTIVE_PLAYER_FIELD_COMBO_TARGET, activeData.ComboTarget);
-                if (activeData.SummonedBattlePetGUID != null)
+                if (activeData.SummonedBattlePetGUID != default)
                     m_fields.SetUpdateField<WowGuid128>(ActivePlayerField.ACTIVE_PLAYER_FIELD_SUMMONED_BATTLE_PET_ID, activeData.SummonedBattlePetGUID);
                 for (int i = 0; i < 12; i++)
                 {
@@ -1606,7 +1606,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_2_39570
             GameObjectData goData = m_updateData.GameObjectData;
             if (goData != null)
             {
-                if (goData.CreatedBy != null)
+                if (goData.CreatedBy != default)
                     m_fields.SetUpdateField<WowGuid128>(GameObjectField.GAMEOBJECT_FIELD_CREATED_BY, goData.CreatedBy);
                 if (goData.DisplayID != null)
                     m_fields.SetUpdateField<int>(GameObjectField.GAMEOBJECT_DISPLAYID, (int)goData.DisplayID);
@@ -1654,7 +1654,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_2_39570
             DynamicObjectData dynData = m_updateData.DynamicObjectData;
             if (dynData != null)
             {
-                if (dynData.Caster != null)
+                if (dynData.Caster != default)
                     m_fields.SetUpdateField<WowGuid128>(DynamicObjectField.DYNAMICOBJECT_CASTER, dynData.Caster);
                 if (dynData.Type != null)
                     m_fields.SetUpdateField<uint>(DynamicObjectField.DYNAMICOBJECT_TYPE, (uint)dynData.Type);
@@ -1671,11 +1671,11 @@ namespace HermesProxy.World.Objects.Version.V2_5_2_39570
             CorpseData corpseData = m_updateData.CorpseData;
             if (corpseData != null)
             {
-                if (corpseData.Owner != null)
+                if (corpseData.Owner != default)
                     m_fields.SetUpdateField<WowGuid128>(CorpseField.CORPSE_FIELD_OWNER, corpseData.Owner);
-                if (corpseData.PartyGUID != null)
+                if (corpseData.PartyGUID != default)
                     m_fields.SetUpdateField<WowGuid128>(CorpseField.CORPSE_FIELD_PARTY_GUID, corpseData.PartyGUID);
-                if (corpseData.GuildGUID != null)
+                if (corpseData.GuildGUID != default)
                     m_fields.SetUpdateField<WowGuid128>(CorpseField.CORPSE_FIELD_GUILD_GUID, corpseData.GuildGUID);
                 if (corpseData.DisplayID != null)
                     m_fields.SetUpdateField<uint>(CorpseField.CORPSE_FIELD_DISPLAY_ID, (uint)corpseData.DisplayID);

@@ -137,10 +137,30 @@ namespace HermesProxy.World.Objects
                 uint => (T)Convert.ChangeType(m_updateValues[(int)index].UnsignedValue, typeof(T)),
                 float => (T)Convert.ChangeType(m_updateValues[(int)index].FloatValue, typeof(T)),
                 ulong => (T)Convert.ChangeType((ulong)m_updateValues[(int)index + 1].UnsignedValue << 32 | m_updateValues[(int)index].UnsignedValue, typeof(T)),
-                WowGuid128 => (T)Convert.ChangeType(new WowGuid128(GetUpdateField<ulong>((int)index + 2), GetUpdateField<ulong>(index)), typeof(T)),
+                WowGuid128 => (T)Convert.ChangeType(new WowGuid128(GetUpdateField<ulong>(index), GetUpdateField<ulong>((int)index + 2)), typeof(T)),
                 _ => throw new Exception($"{typeof(T)} is not implemented in GetUpdateField<T>"),
             };
 
+/*
+        public T GetUpdateField<T>(object index, byte offset = 0)
+        {
+            int idx = (int)index;
+
+            return default(T) switch
+            {
+                byte => (T)Convert.ChangeType((byte)(m_updateValues[idx].UnsignedValue >> (offset * 8)) & 0xFF, typeof(T)),
+                ushort => (T)Convert.ChangeType((ushort)(m_updateValues[idx].UnsignedValue >> (offset * 16)) & 0xFFFF, typeof(T)),
+                int => (T)Convert.ChangeType(m_updateValues[idx].SignedValue, typeof(T)),
+                uint => (T)Convert.ChangeType(m_updateValues[idx].UnsignedValue, typeof(T)),
+                float => (T)Convert.ChangeType(m_updateValues[idx].FloatValue, typeof(T)),
+                ulong => (idx + 1 >= m_updateValues.Length)
+                    ? (T)Convert.ChangeType(0UL, typeof(T))
+                    : (T)Convert.ChangeType((ulong)m_updateValues[idx + 1].UnsignedValue << 32 | m_updateValues[idx].UnsignedValue, typeof(T)),
+                WowGuid128 => (T)Convert.ChangeType(new WowGuid128(GetUpdateField<ulong>(index), GetUpdateField<ulong>((int)index + 2)), typeof(T)),
+                _ => throw new Exception($"{typeof(T)} is not implemented in GetUpdateField<T>")
+            };
+        }
+*/
 
         public void _LoadIntoDataField(string data, uint startOffset, uint count)
         {

@@ -44,7 +44,7 @@ namespace HermesProxy.World.Client
                     WowGuid128 officer = GetSession().GameState.GetPlayerGuidByName(strings[0]);
                     WowGuid128 player = GetSession().GameState.GetPlayerGuidByName(strings[1]);
                     uint rankId = GetSession().GetGuildRankIdByName(GetSession().GameState.GetPlayerGuildId(GetSession().GameState.CurrentPlayerGuid), strings[2]);
-                    if (officer != null && player != null)
+                    if (officer != default && player != default)
                     {
                         GuildSendRankChange promote = new GuildSendRankChange();
                         promote.Officer = officer;
@@ -102,7 +102,7 @@ namespace HermesProxy.World.Client
                 {
                     WowGuid128 oldLeader = GetSession().GameState.GetPlayerGuidByName(strings[0]);
                     WowGuid128 newLeader = GetSession().GameState.GetPlayerGuidByName(strings[1]);
-                    if (oldLeader != null && newLeader != null)
+                    if (oldLeader != default && newLeader != default)
                     {
                         GuildEventNewLeader leader = new GuildEventNewLeader();
                         leader.OldLeaderGUID = oldLeader;

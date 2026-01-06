@@ -538,7 +538,7 @@ namespace HermesProxy.World.Client
         {
             uint petNumber = packet.ReadUInt32();
             WowGuid128 guid = GetSession().GameState.GetPetGuidByNumber(petNumber);
-            if (guid == null)
+            if (guid == default)
             {
                 Log.Print(LogType.Error, $"Pet name query response for unknown pet {petNumber}!");
                 return;
@@ -600,7 +600,7 @@ namespace HermesProxy.World.Client
                 player.AreaID = packet.ReadInt32();
 
                 player.PlayerData.GuidActual = GetSession().GameState.GetPlayerGuidByName(player.PlayerData.Name);
-                if (player.PlayerData.GuidActual == null)
+                if (player.PlayerData.GuidActual == default)
                     player.PlayerData.GuidActual = WowGuid128.CreateUnknownPlayerGuid();
                 player.PlayerData.AccountID = GetSession().GetGameAccountGuidForPlayer(player.PlayerData.GuidActual);
                 player.PlayerData.BnetAccountID = GetSession().GetBnetAccountGuidForPlayer(player.PlayerData.GuidActual);

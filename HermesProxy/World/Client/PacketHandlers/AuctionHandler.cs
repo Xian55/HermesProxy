@@ -146,7 +146,7 @@ namespace HermesProxy.World.Client
             info.AuctionID = packet.ReadUInt32();
             info.BidAmount = packet.ReadUInt32();
             uint minIncrement = packet.ReadUInt32();
-            WowGuid buyer = packet.ReadGuid();
+            WowGuid64 buyer = packet.ReadGuid();
             info.Item.ItemID = packet.ReadUInt32();
             info.Item.RandomPropertiesID = packet.ReadUInt32();
 

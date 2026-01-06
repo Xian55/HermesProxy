@@ -275,11 +275,9 @@ namespace HermesProxy
 
         public static int GetUpdateField<T>(T field) where T: System.Enum // C# 7.3
         {
-            Dictionary<string, int> byNamesDict;
-            if (UpdateFieldNameDictionary.TryGetValue(typeof(T), out byNamesDict))
+            if (UpdateFieldNameDictionary.TryGetValue(typeof(T), out Dictionary<string, int> byNamesDict))
             {
-                int fieldValue;
-                if (byNamesDict.TryGetValue(field.ToString(), out fieldValue))
+                if (byNamesDict.TryGetValue(field.ToString(), out int fieldValue))
                     return fieldValue;
             }
 

@@ -182,7 +182,7 @@ namespace HermesProxy.World.Objects
             else
                 flags = (uint)(((MovementFlagModern)info.Flags).CastFlags<MovementFlagVanilla>());
 
-            if (info.TransportGuid != null)
+            if (info.TransportGuid != default)
             {
                 if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                     flags |= (uint)MovementFlagWotLK.OnTransport;
@@ -401,7 +401,7 @@ namespace HermesProxy.World.Objects
                 data.WriteBits(moveInfo.FlagsExtra, 18);
             }
                 
-            data.WriteBit(moveInfo.TransportGuid != null);                 // HasTransport
+            data.WriteBit(moveInfo.TransportGuid != default);                 // HasTransport
             data.WriteBit(hasFall);                                        // HasFall
             data.WriteBit(HasSplineData);                                  // HasSpline - marks that the unit uses spline movement
             data.WriteBit(false);                                          // HeightChangeFailed
@@ -410,7 +410,7 @@ namespace HermesProxy.World.Objects
                 data.WriteBit(false);                                      // HasInertia
             data.FlushBits();
 
-            if (moveInfo.TransportGuid != null)
+            if (moveInfo.TransportGuid != default)
                 WriteTransportInfoModern(data);
 
             /*

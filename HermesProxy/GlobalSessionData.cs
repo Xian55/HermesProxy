@@ -274,8 +274,7 @@ namespace HermesProxy
         }
         public ushort GetObjectSpawnCounter(WowGuid64 guid)
         {
-            ushort count;
-            if (ObjectSpawnCount.TryGetValue(guid, out count))
+            if (ObjectSpawnCount.TryGetValue(guid, out ushort count))
                 return count;
             return 0;
         }
@@ -462,15 +461,15 @@ namespace HermesProxy
                 UnitAuraCaster[target].ContainsKey(slot))
                 return UnitAuraCaster[target][slot];
 
-            return null;
+            return default;
         }
         public WowGuid128 GetAuraCaster(WowGuid128 target, byte slot, uint spellId)
         {
             WowGuid128 caster = GetAuraCaster(target, slot);
-            if (caster == null)
+            if (caster == default)
             {
                 caster = GetLastAuraCasterOnTarget(target, spellId);
-                if (caster != null)
+                if (caster != default)
                     StoreAuraCaster(target, slot, caster);
             }
 
@@ -503,8 +502,8 @@ namespace HermesProxy
                     return caster;
                 }
             }
-            
-            return null;
+
+            return default;
         }
         public void StorePlayerGuildId(WowGuid128 guid, uint guildId)
         {
@@ -552,10 +551,10 @@ namespace HermesProxy
                 {
                     ObjectCacheMutex.ReleaseMutex();
                     return itr.Key;
-                }  
+                }
             }
             ObjectCacheMutex.ReleaseMutex();
-            return null;
+            return default;
         }
         public void StoreOriginalObjectType(WowGuid128 guid, ObjectType type)
         {
@@ -633,7 +632,7 @@ namespace HermesProxy
             return "";
         }
 
-        public WowGuid128? GetPlayerGuidByName(string name)
+        public WowGuid128 GetPlayerGuidByName(string name)
         {
             name = name.Trim().Replace("\0", "");
             foreach (var player in CachedPlayers)
@@ -641,7 +640,7 @@ namespace HermesProxy
                 if (player.Value.Name == name && !WowGuid128.IsUnknownPlayerGuid(player.Key))
                     return player.Key;
             }
-            return null;
+            return default;
         }
 
         public void UpdatePlayerCache(WowGuid128 guid, PlayerCache data)

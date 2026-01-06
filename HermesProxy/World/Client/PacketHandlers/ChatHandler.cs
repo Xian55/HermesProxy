@@ -161,8 +161,8 @@ namespace HermesProxy.World.Client
             ChatMessageTypeVanilla chatType = (ChatMessageTypeVanilla)packet.ReadUInt8();
             uint language = packet.ReadUInt32();
             string senderName = "";
-            WowGuid128 sender = null;
-            WowGuid128 receiver = null;
+            WowGuid128 sender = default;
+            WowGuid128 receiver = default;
             string channelName = "";
 
             switch (chatType)
@@ -502,8 +502,7 @@ namespace HermesProxy.World.Client
             emote.SoundIndex = packet.ReadInt32();
             uint nameLength = packet.ReadUInt32();
             string targetName = packet.ReadString(nameLength);
-            WowGuid128 targetGuid = GetSession().GameState.GetPlayerGuidByName(targetName);
-            emote.TargetGUID = targetGuid != null ? targetGuid : WowGuid128.Empty;
+            emote.TargetGUID = GetSession().GameState.GetPlayerGuidByName(targetName);
             SendPacketToClient(emote);
         }
 
