@@ -112,6 +112,44 @@ namespace Framework.IO
         public string ReadCString()
         {
             ResetBitPos();
+
+            var stream = readStream.BaseStream;
+            long startPos = stream.Position;
+
+            // Scan for null terminator
+            int b;
+            while ((b = stream.ReadByte()) > 0) { }
+
+            int length = (int)(stream.Position - startPos - 1);
+
+            if (length <= 0)
+                return string.Empty;
+
+            // Seek back and read the string bytes
+            stream.Position = startPos;
+
+            // Use stackalloc for small strings to avoid heap allocation
+            if (length <= 256)
+            {
+                Span<byte> buffer = stackalloc byte[length];
+                stream.ReadExactly(buffer);
+                stream.ReadByte(); // consume null terminator
+                return Encoding.UTF8.GetString(buffer);
+            }
+            else
+            {
+                var buffer = readStream.ReadBytes(length);
+                stream.ReadByte(); // consume null terminator
+                return Encoding.UTF8.GetString(buffer);
+            }
+        }
+
+        /// <summary>
+        /// Original implementation for benchmarking comparison. DO NOT USE.
+        /// </summary>
+        internal string ReadCStringOriginal()
+        {
+            ResetBitPos();
             StringBuilder tmpString = new StringBuilder();
             char tmpChar = readStream.ReadChar();
             char tmpEndChar = Convert.ToChar(Encoding.UTF8.GetString(new byte[] { 0 }));
