@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="HermesProxy.Tests" />
+    <InternalsVisibleTo Include="HermesProxy.Benchmarks" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <StartupObject>HermesProxy.Program</StartupObject>
