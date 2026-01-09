@@ -188,6 +188,32 @@ namespace System
 
         public static byte[] Combine(this byte[] data, params byte[][] pData)
         {
+            // Pre-calculate total size to allocate once instead of resizing per array
+            int totalLength = data.Length;
+            foreach (var arr in pData)
+                totalLength += arr.Length;
+
+            var combined = new byte[totalLength];
+
+            // Copy initial data
+            Buffer.BlockCopy(data, 0, combined, 0, data.Length);
+
+            // Copy each additional array
+            int offset = data.Length;
+            foreach (var arr in pData)
+            {
+                Buffer.BlockCopy(arr, 0, combined, offset, arr.Length);
+                offset += arr.Length;
+            }
+
+            return combined;
+        }
+
+        /// <summary>
+        /// Original implementation for benchmarking comparison. DO NOT USE.
+        /// </summary>
+        internal static byte[] CombineOriginal(this byte[] data, params byte[][] pData)
+        {
             var combined = data;
 
             foreach (var arr in pData)
