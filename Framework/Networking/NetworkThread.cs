@@ -16,6 +16,7 @@
  */
 
 using Framework.Logging;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 
@@ -29,7 +30,7 @@ namespace Framework.Networking
         Thread _thread;
 
         List<TSocketType> _Sockets = new List<TSocketType>();
-        List<TSocketType> _newSockets = new List<TSocketType>();
+        ConcurrentQueue<TSocketType> _newSockets = new ConcurrentQueue<TSocketType>();
 
         public void Stop()
         {
@@ -60,7 +61,7 @@ namespace Framework.Networking
         public virtual void AddSocket(TSocketType sock)
         {
             Interlocked.Increment(ref _connections);
-            _newSockets.Add(sock);
+            _newSockets.Enqueue(sock);
             SocketAdded(sock);
         }
 
@@ -70,22 +71,19 @@ namespace Framework.Networking
 
         void AddNewSockets()
         {
-            if (_newSockets.Empty())
-                return;
-
-            foreach (var socket in _newSockets.ToArray())
+            // Drain the queue - lock-free, no allocations
+            while (_newSockets.TryDequeue(out var socket))
             {
                 if (!socket.IsOpen())
                 {
                     SocketRemoved(socket);
-
                     Interlocked.Decrement(ref _connections);
                 }
                 else
+                {
                     _Sockets.Add(socket);
+                }
             }
-
-            _newSockets.Clear();
         }
 
         void Run()
@@ -101,7 +99,8 @@ namespace Framework.Networking
 
                 AddNewSockets();
 
-                for (var i =0; i < _Sockets.Count; ++i)
+                // Iterate backwards to allow O(1) removal without skipping elements
+                for (int i = _Sockets.Count - 1; i >= 0; i--)
                 {
                     TSocketType socket = _Sockets[i];
                     if (!socket.Update())
@@ -112,7 +111,14 @@ namespace Framework.Networking
                         SocketRemoved(socket);
 
                         --_connections;
-                        _Sockets.Remove(socket);
+
+                        // O(1) removal: swap with last element and remove from end
+                        int lastIndex = _Sockets.Count - 1;
+                        if (i != lastIndex)
+                        {
+                            _Sockets[i] = _Sockets[lastIndex];
+                        }
+                        _Sockets.RemoveAt(lastIndex);
                     }
                 }
 
@@ -121,7 +127,9 @@ namespace Framework.Networking
             }
 
             Log.Print(LogType.Network, "Network Thread exits");
-            _newSockets.Clear();
+
+            // Drain remaining new sockets
+            while (_newSockets.TryDequeue(out _)) { }
             _Sockets.Clear();
         }
     }
