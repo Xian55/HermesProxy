@@ -4,6 +4,7 @@ using HermesProxy.World.Client;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -83,11 +84,9 @@ namespace HermesProxy
         public uint LastWhoRequestId;
         public WowGuid128 CurrentPetGuid;
         public uint[] CurrentArenaTeamIds = new uint[3];
-        public ClientCastRequest CurrentClientNormalCast;  // regular spell casts
-        public ClientCastRequest CurrentClientSpecialCast; // next melee or auto repeat spells
-        public ClientCastRequest CurrentClientPetCast;
-        public List<ClientCastRequest> PendingClientCasts = new List<ClientCastRequest>();
-        public List<ClientCastRequest> PendingClientPetCasts = new List<ClientCastRequest>();
+        public ConcurrentQueue<ClientCastRequest> PendingNormalCasts = new();  // regular spell casts (queue for proper FIFO handling)
+        public ClientCastRequest CurrentClientSpecialCast; // next melee or auto repeat spells (exclusive, only one at a time)
+        public ConcurrentQueue<ClientCastRequest> PendingPetCasts = new();  // pet spell casts (queue for proper FIFO handling)
         public WowGuid64 LastLootTargetGuid;
         public List<int> ActionButtons = new();
         public Dictionary<WowGuid128, Dictionary<byte, int>> UnitAuraDurationUpdateTime = new();
@@ -505,6 +504,211 @@ namespace HermesProxy
 
             return default;
         }
+
+        // Spell Cast Queue Helper Methods
+
+        /// <summary>
+        /// Try to find and dequeue a pending cast by SpellId.
+        /// Uses FIFO order since TCP guarantees packet ordering.
+        /// </summary>
+        public bool TryDequeuePendingNormalCast(uint spellId, out ClientCastRequest cast)
+        {
+            // Since TCP preserves order, the first matching SpellId is the correct one
+            var pending = new List<ClientCastRequest>();
+            cast = null;
+
+            while (PendingNormalCasts.TryDequeue(out var current))
+            {
+                if (cast == null && current.SpellId == spellId)
+                {
+                    cast = current;
+                }
+                else
+                {
+                    pending.Add(current);
+                }
+            }
+
+            // Re-enqueue non-matching casts
+            foreach (var item in pending)
+            {
+                PendingNormalCasts.Enqueue(item);
+            }
+
+            return cast != null;
+        }
+
+        /// <summary>
+        /// Try to find a pending cast by SpellId and mark it as started (for SPELL_START).
+        /// </summary>
+        public bool TryMarkPendingNormalCastStarted(uint spellId, out ClientCastRequest cast)
+        {
+            // Peek through queue to find matching SpellId
+            var items = PendingNormalCasts.ToArray();
+            cast = null;
+
+            foreach (var item in items)
+            {
+                if (item.SpellId == spellId && !item.HasStarted)
+                {
+                    item.HasStarted = true;
+                    cast = item;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Clear all pending normal casts (used on timeout or disconnect).
+        /// </summary>
+        public void ClearPendingNormalCasts()
+        {
+            while (PendingNormalCasts.TryDequeue(out _)) { }
+        }
+
+        /// <summary>
+        /// Clear only pending normal casts that haven't started yet.
+        /// Keeps started casts so SPELL_GO can dequeue them later.
+        /// Returns the cleared casts so they can be failed.
+        /// </summary>
+        public List<ClientCastRequest> ClearNonStartedNormalCasts()
+        {
+            var cleared = new List<ClientCastRequest>();
+            var keep = new List<ClientCastRequest>();
+
+            while (PendingNormalCasts.TryDequeue(out var current))
+            {
+                if (current.HasStarted)
+                    keep.Add(current);
+                else
+                    cleared.Add(current);
+            }
+
+            // Re-enqueue started casts
+            foreach (var item in keep)
+            {
+                PendingNormalCasts.Enqueue(item);
+            }
+
+            return cleared;
+        }
+
+        /// <summary>
+        /// Try to find and dequeue a pending pet cast by SpellId.
+        /// </summary>
+        public bool TryDequeuePendingPetCast(uint spellId, out ClientCastRequest cast)
+        {
+            var pending = new List<ClientCastRequest>();
+            cast = null;
+
+            while (PendingPetCasts.TryDequeue(out var current))
+            {
+                if (cast == null && current.SpellId == spellId)
+                {
+                    cast = current;
+                }
+                else
+                {
+                    pending.Add(current);
+                }
+            }
+
+            foreach (var item in pending)
+            {
+                PendingPetCasts.Enqueue(item);
+            }
+
+            return cast != null;
+        }
+
+        /// <summary>
+        /// Try to find a pending pet cast by SpellId and mark it as started.
+        /// </summary>
+        public bool TryMarkPendingPetCastStarted(uint spellId, out ClientCastRequest cast)
+        {
+            var items = PendingPetCasts.ToArray();
+            cast = null;
+
+            foreach (var item in items)
+            {
+                if (item.SpellId == spellId && !item.HasStarted)
+                {
+                    item.HasStarted = true;
+                    cast = item;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Clear all pending pet casts.
+        /// </summary>
+        public void ClearPendingPetCasts()
+        {
+            while (PendingPetCasts.TryDequeue(out _)) { }
+        }
+
+        /// <summary>
+        /// Clear only pending pet casts that haven't started yet.
+        /// Keeps started casts so SPELL_GO can dequeue them later.
+        /// Returns the cleared casts so they can be failed.
+        /// </summary>
+        public List<ClientCastRequest> ClearNonStartedPetCasts()
+        {
+            var cleared = new List<ClientCastRequest>();
+            var keep = new List<ClientCastRequest>();
+
+            while (PendingPetCasts.TryDequeue(out var current))
+            {
+                if (current.HasStarted)
+                    keep.Add(current);
+                else
+                    cleared.Add(current);
+            }
+
+            // Re-enqueue started casts
+            foreach (var item in keep)
+            {
+                PendingPetCasts.Enqueue(item);
+            }
+
+            return cleared;
+        }
+
+        /// <summary>
+        /// Try to find and dequeue a pending cast by ItemGUID (for item use failures).
+        /// Only matches casts that haven't started yet.
+        /// </summary>
+        public bool TryDequeueItemCast(WowGuid128 itemGuid, out ClientCastRequest cast)
+        {
+            var pending = new List<ClientCastRequest>();
+            cast = null;
+
+            while (PendingNormalCasts.TryDequeue(out var current))
+            {
+                if (cast == null && !current.HasStarted && current.ItemGUID == itemGuid)
+                {
+                    cast = current;
+                }
+                else
+                {
+                    pending.Add(current);
+                }
+            }
+
+            // Re-enqueue non-matching casts
+            foreach (var item in pending)
+            {
+                PendingNormalCasts.Enqueue(item);
+            }
+
+            return cast != null;
+        }
+
         public void StorePlayerGuildId(WowGuid128 guid, uint guildId)
         {
             if (PlayerGuildIds.ContainsKey(guid))

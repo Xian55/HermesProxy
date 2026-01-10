@@ -3,7 +3,7 @@ using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
 using System;
-using System.Threading;
+using System.Linq;
 
 namespace HermesProxy.World.Client
 {
@@ -126,11 +126,6 @@ namespace HermesProxy.World.Client
         [PacketHandler(Opcode.SMSG_CAST_FAILED)]
         void HandleCastFailed(WorldPacket packet)
         {
-            // Artificial lag is needed for spell packets,
-            // or spells will bug out and glow if spammed.
-            if (Settings.ClientSpellDelay > 0)
-                Thread.Sleep(Settings.ClientSpellDelay);
-
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 packet.ReadUInt8(); // cast count
 
@@ -152,6 +147,7 @@ namespace HermesProxy.World.Client
             if (packet.CanRead())
                 arg2 = packet.ReadInt32();
 
+            // Check special casts first (next melee / auto repeat)
             if (GetSession().GameState.CurrentClientSpecialCast != null &&
                 GetSession().GameState.CurrentClientSpecialCast.SpellId == spellId)
             {
@@ -165,55 +161,45 @@ namespace HermesProxy.World.Client
                 SendPacketToClient(failed);
                 GetSession().GameState.CurrentClientSpecialCast = null;
             }
-            else if (GetSession().GameState.CurrentClientNormalCast != null &&
-                    GetSession().GameState.CurrentClientNormalCast.SpellId == spellId)
+            // Look up pending normal cast by SpellId (queue-based, FIFO order)
+            else if (GetSession().GameState.TryDequeuePendingNormalCast(spellId, out var pendingCast))
             {
-                if (!GetSession().GameState.CurrentClientNormalCast.HasStarted)
+                if (!pendingCast.HasStarted)
                 {
                     SpellPrepare prepare2 = new SpellPrepare();
-                    prepare2.ClientCastID = GetSession().GameState.CurrentClientNormalCast.ClientGUID;
-                    prepare2.ServerCastID = GetSession().GameState.CurrentClientNormalCast.ServerGUID;
+                    prepare2.ClientCastID = pendingCast.ClientGUID;
+                    prepare2.ServerCastID = pendingCast.ServerGUID;
                     SendPacketToClient(prepare2);
                 }
 
                 CastFailed failed = new();
-                failed.SpellID = GetSession().GameState.CurrentClientNormalCast.SpellId;
-                failed.SpellXSpellVisualID = GetSession().GameState.CurrentClientNormalCast.SpellXSpellVisualId;
+                failed.SpellID = pendingCast.SpellId;
+                failed.SpellXSpellVisualID = pendingCast.SpellXSpellVisualId;
                 failed.Reason = LegacyVersion.ConvertSpellCastResult(reason);
-                failed.CastID = GetSession().GameState.CurrentClientNormalCast.ServerGUID;
+                failed.CastID = pendingCast.ServerGUID;
                 failed.FailedArg1 = arg1;
                 failed.FailedArg2 = arg2;
                 SendPacketToClient(failed);
-
-                GetSession().GameState.CurrentClientNormalCast = null;
-                foreach (var pending in GetSession().GameState.PendingClientCasts)
-                    GetSession().InstanceSocket.SendCastRequestFailed(pending, false);
-                GetSession().GameState.PendingClientCasts.Clear();
             }
         }
 
         [PacketHandler(Opcode.SMSG_PET_CAST_FAILED, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
         void HandlePetCastFailed(WorldPacket packet)
         {
-            // Artificial lag is needed for spell packets,
-            // or spells will bug out and glow if spammed.
-            if (Settings.ClientSpellDelay > 0)
-                Thread.Sleep(Settings.ClientSpellDelay);
-
             uint spellId = packet.ReadUInt32();
             var status = packet.ReadUInt8();
             if (status != 2)
                 return;
 
-            if (GetSession().GameState.CurrentClientPetCast == null ||
-                GetSession().GameState.CurrentClientPetCast.SpellId != spellId)
+            // Look up pending pet cast by SpellId (queue-based, FIFO order)
+            if (!GetSession().GameState.TryDequeuePendingPetCast(spellId, out var pendingCast))
                 return;
 
-            if (!GetSession().GameState.CurrentClientPetCast.HasStarted)
+            if (!pendingCast.HasStarted)
             {
                 SpellPrepare prepare2 = new SpellPrepare();
-                prepare2.ClientCastID = GetSession().GameState.CurrentClientPetCast.ClientGUID;
-                prepare2.ServerCastID = GetSession().GameState.CurrentClientPetCast.ServerGUID;
+                prepare2.ClientCastID = pendingCast.ClientGUID;
+                prepare2.ServerCastID = pendingCast.ServerGUID;
                 SendPacketToClient(prepare2);
             }
 
@@ -221,36 +207,27 @@ namespace HermesProxy.World.Client
             spell.SpellID = spellId;
             uint reason = packet.ReadUInt8();
             spell.Reason = LegacyVersion.ConvertSpellCastResult(reason);
-            spell.CastID = GetSession().GameState.CurrentClientPetCast.ServerGUID;
+            spell.CastID = pendingCast.ServerGUID;
             SendPacketToClient(spell);
-
-            foreach (var pending in GetSession().GameState.PendingClientPetCasts)
-                GetSession().InstanceSocket.SendCastRequestFailed(pending, true);
-            GetSession().GameState.PendingClientPetCasts.Clear();
         }
 
         [PacketHandler(Opcode.SMSG_PET_CAST_FAILED, ClientVersionBuild.V2_0_1_6180)]
         void HandlePetCastFailedTBC(WorldPacket packet)
         {
-            // Artificial lag is needed for spell packets,
-            // or spells will bug out and glow if spammed.
-            if (Settings.ClientSpellDelay > 0)
-                Thread.Sleep(Settings.ClientSpellDelay);
-
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 packet.ReadUInt8(); // cast count
 
             uint spellId = packet.ReadUInt32();
 
-            if (GetSession().GameState.CurrentClientPetCast == null ||
-                GetSession().GameState.CurrentClientPetCast.SpellId != spellId)
+            // Look up pending pet cast by SpellId (queue-based, FIFO order)
+            if (!GetSession().GameState.TryDequeuePendingPetCast(spellId, out var pendingCast))
                 return;
 
-            if (!GetSession().GameState.CurrentClientPetCast.HasStarted)
+            if (!pendingCast.HasStarted)
             {
                 SpellPrepare prepare2 = new SpellPrepare();
-                prepare2.ClientCastID = GetSession().GameState.CurrentClientPetCast.ClientGUID;
-                prepare2.ServerCastID = GetSession().GameState.CurrentClientPetCast.ServerGUID;
+                prepare2.ClientCastID = pendingCast.ClientGUID;
+                prepare2.ServerCastID = pendingCast.ServerGUID;
                 SendPacketToClient(prepare2);
             }
 
@@ -258,7 +235,7 @@ namespace HermesProxy.World.Client
             failed.SpellID = spellId;
             uint reason = packet.ReadUInt8();
             failed.Reason = LegacyVersion.ConvertSpellCastResult(reason);
-            failed.CastID = GetSession().GameState.CurrentClientPetCast.ServerGUID;
+            failed.CastID = pendingCast.ServerGUID;
 
             if (packet.CanRead())
                 failed.FailedArg1 = packet.ReadInt32();
@@ -266,10 +243,6 @@ namespace HermesProxy.World.Client
                 failed.FailedArg2 = packet.ReadInt32();
 
             SendPacketToClient(failed);
-
-            foreach (var pending in GetSession().GameState.PendingClientPetCasts)
-                GetSession().InstanceSocket.SendCastRequestFailed(pending, true);
-            GetSession().GameState.PendingClientPetCasts.Clear();
         }
 
         [PacketHandler(Opcode.SMSG_SPELL_FAILED_OTHER)]
@@ -281,14 +254,6 @@ namespace HermesProxy.World.Client
             else
                 casterUnit = packet.ReadGuid().To128(GetSession().GameState);
 
-            if (casterUnit == GetSession().GameState.CurrentPlayerGuid)
-            {
-                // Artificial lag is needed for spell packets,
-                // or spells will bug out and glow if spammed.
-                if (Settings.ClientSpellDelay > 0)
-                    Thread.Sleep(Settings.ClientSpellDelay);
-            }
-
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 packet.ReadUInt8(); // Cast Count
 
@@ -299,19 +264,18 @@ namespace HermesProxy.World.Client
 
             WowGuid128 castId;
             uint spellVisual;
+            // Try to find pending cast info (peek, don't remove - this is informational)
             if (GetSession().GameState.CurrentPlayerGuid == casterUnit &&
-                GetSession().GameState.CurrentClientNormalCast != null &&
-                GetSession().GameState.CurrentClientNormalCast.SpellId == spellId)
+                GetSession().GameState.PendingNormalCasts.ToArray().FirstOrDefault(c => c.SpellId == spellId) is { } pendingNormal)
             {
-                castId = GetSession().GameState.CurrentClientNormalCast.ServerGUID;
-                spellVisual = GetSession().GameState.CurrentClientNormalCast.SpellXSpellVisualId;
+                castId = pendingNormal.ServerGUID;
+                spellVisual = pendingNormal.SpellXSpellVisualId;
             }
             else if (GetSession().GameState.CurrentPetGuid == casterUnit &&
-                     GetSession().GameState.CurrentClientPetCast != null &&
-                     GetSession().GameState.CurrentClientPetCast.SpellId == spellId)
+                     GetSession().GameState.PendingPetCasts.ToArray().FirstOrDefault(c => c.SpellId == spellId) is { } pendingPet)
             {
-                castId = GetSession().GameState.CurrentClientPetCast.ServerGUID;
-                spellVisual = GetSession().GameState.CurrentClientPetCast.SpellXSpellVisualId;
+                castId = pendingPet.ServerGUID;
+                spellVisual = pendingPet.SpellXSpellVisualId;
             }
             else
             {
@@ -345,34 +309,39 @@ namespace HermesProxy.World.Client
             SpellStart spell = new SpellStart();
             spell.Cast = HandleSpellStartOrGo(packet, false);
 
-            byte failPending = 0;
+            // Mark pending cast as started (queue-based, FIFO order)
             if (GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit &&
-                GetSession().GameState.CurrentClientNormalCast != null &&
-                GetSession().GameState.CurrentClientNormalCast.SpellId == spell.Cast.SpellID)
+                GetSession().GameState.TryMarkPendingNormalCastStarted((uint)spell.Cast.SpellID, out var pendingCast))
             {
-                spell.Cast.CastID = GetSession().GameState.CurrentClientNormalCast.ServerGUID;
-                spell.Cast.SpellXSpellVisualID = GetSession().GameState.CurrentClientNormalCast.SpellXSpellVisualId;
-                GetSession().GameState.CurrentClientNormalCast.HasStarted = true;
+                spell.Cast.CastID = pendingCast.ServerGUID;
+                spell.Cast.SpellXSpellVisualID = pendingCast.SpellXSpellVisualId;
 
                 SpellPrepare prepare = new();
-                prepare.ClientCastID = GetSession().GameState.CurrentClientNormalCast.ClientGUID;
+                prepare.ClientCastID = pendingCast.ClientGUID;
                 prepare.ServerCastID = spell.Cast.CastID;
                 SendPacketToClient(prepare);
-                failPending = 1;
+
+                // Clear non-started casts and send failures for them
+                // (keeps the started cast so SPELL_GO can dequeue it)
+                var failedCasts = GetSession().GameState.ClearNonStartedNormalCasts();
+                foreach (var failed in failedCasts)
+                    GetSession().InstanceSocket.SendCastRequestFailed(failed, false);
             }
             else if (GetSession().GameState.CurrentPetGuid == spell.Cast.CasterUnit &&
-                     GetSession().GameState.CurrentClientPetCast != null &&
-                     GetSession().GameState.CurrentClientPetCast.SpellId == spell.Cast.SpellID)
+                     GetSession().GameState.TryMarkPendingPetCastStarted((uint)spell.Cast.SpellID, out var pendingPetCast))
             {
-                spell.Cast.CastID = GetSession().GameState.CurrentClientPetCast.ServerGUID;
-                spell.Cast.SpellXSpellVisualID = GetSession().GameState.CurrentClientPetCast.SpellXSpellVisualId;
-                GetSession().GameState.CurrentClientPetCast.HasStarted = true;
+                spell.Cast.CastID = pendingPetCast.ServerGUID;
+                spell.Cast.SpellXSpellVisualID = pendingPetCast.SpellXSpellVisualId;
 
                 SpellPrepare prepare = new();
-                prepare.ClientCastID = GetSession().GameState.CurrentClientPetCast.ClientGUID;
+                prepare.ClientCastID = pendingPetCast.ClientGUID;
                 prepare.ServerCastID = spell.Cast.CastID;
                 SendPacketToClient(prepare);
-                failPending = 2;
+
+                // Clear non-started pet casts and send failures for them
+                var failedPetCasts = GetSession().GameState.ClearNonStartedPetCasts();
+                foreach (var failed in failedPetCasts)
+                    GetSession().InstanceSocket.SendCastRequestFailed(failed, true);
             }
 
             if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
@@ -383,19 +352,6 @@ namespace HermesProxy.World.Client
             }
 
             SendPacketToClient(spell);
-
-            if (failPending == 1)
-            {
-                foreach (var pending in GetSession().GameState.PendingClientCasts)
-                    GetSession().InstanceSocket.SendCastRequestFailed(pending, false);
-                GetSession().GameState.PendingClientCasts.Clear();
-            }
-            else if (failPending == 2)
-            {
-                foreach (var pending in GetSession().GameState.PendingClientPetCasts)
-                    GetSession().InstanceSocket.SendCastRequestFailed(pending, true);
-                GetSession().GameState.PendingClientPetCasts.Clear();
-            }
         }
 
         [PacketHandler(Opcode.SMSG_SPELL_GO)]
@@ -406,14 +362,23 @@ namespace HermesProxy.World.Client
 
             SpellGo spell = new SpellGo();
             spell.Cast = HandleSpellStartOrGo(packet, true);
-            if (GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit &&
-                GetSession().GameState.CurrentClientNormalCast != null &&
-                GetSession().GameState.CurrentClientNormalCast.SpellId == spell.Cast.SpellID)
-            {
-                spell.Cast.CastID = GetSession().GameState.CurrentClientNormalCast.ServerGUID;
-                spell.Cast.SpellXSpellVisualID = GetSession().GameState.CurrentClientNormalCast.SpellXSpellVisualId;
-                GetSession().GameState.CurrentClientNormalCast = null;
 
+            // Dequeue completed cast (queue-based, FIFO order)
+            if (GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit &&
+                GetSession().GameState.TryDequeuePendingNormalCast((uint)spell.Cast.SpellID, out var pendingCast))
+            {
+                spell.Cast.CastID = pendingCast.ServerGUID;
+                spell.Cast.SpellXSpellVisualID = pendingCast.SpellXSpellVisualId;
+
+                // For instant spells that skip SPELL_START, we need to send SpellPrepare
+                // before SpellGo so the client knows which cast completed
+                if (!pendingCast.HasStarted)
+                {
+                    SpellPrepare prepare = new();
+                    prepare.ClientCastID = pendingCast.ClientGUID;
+                    prepare.ServerCastID = spell.Cast.CastID;
+                    SendPacketToClient(prepare);
+                }
             }
             else if (GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit &&
                 GetSession().GameState.CurrentClientSpecialCast != null &&
@@ -422,22 +387,29 @@ namespace HermesProxy.World.Client
                 spell.Cast.CastID = GetSession().GameState.CurrentClientSpecialCast.ServerGUID;
                 spell.Cast.SpellXSpellVisualID = GetSession().GameState.CurrentClientSpecialCast.SpellXSpellVisualId;
                 GetSession().GameState.CurrentClientSpecialCast = null;
-
             }
             else if (GetSession().GameState.CurrentPetGuid == spell.Cast.CasterUnit &&
-                     GetSession().GameState.CurrentClientPetCast != null &&
-                     GetSession().GameState.CurrentClientPetCast.SpellId == spell.Cast.SpellID)
+                     GetSession().GameState.TryDequeuePendingPetCast((uint)spell.Cast.SpellID, out var pendingPetCast))
             {
-                spell.Cast.CastID = GetSession().GameState.CurrentClientPetCast.ServerGUID;
-                spell.Cast.SpellXSpellVisualID = GetSession().GameState.CurrentClientPetCast.SpellXSpellVisualId;
-                GetSession().GameState.CurrentClientPetCast = null;
+                spell.Cast.CastID = pendingPetCast.ServerGUID;
+                spell.Cast.SpellXSpellVisualID = pendingPetCast.SpellXSpellVisualId;
+
+                // For instant pet spells that skip SPELL_START
+                if (!pendingPetCast.HasStarted)
+                {
+                    SpellPrepare prepare = new();
+                    prepare.ClientCastID = pendingPetCast.ClientGUID;
+                    prepare.ServerCastID = spell.Cast.CastID;
+                    SendPacketToClient(prepare);
+                }
             }
+
             if (!spell.Cast.CasterUnit.IsEmpty() && GameData.AuraSpells.Contains((uint)spell.Cast.SpellID))
             {
                 foreach (WowGuid128 target in spell.Cast.HitTargets)
                     GetSession().GameState.StoreLastAuraCasterOnTarget(target, (uint)spell.Cast.SpellID, spell.Cast.CasterUnit);
             }
-                
+
             SendPacketToClient(spell);
         }
 
@@ -448,13 +420,9 @@ namespace HermesProxy.World.Client
             dbdata.CasterGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
             dbdata.CasterUnit = packet.ReadPackedGuid().To128(GetSession().GameState);
 
-            if (dbdata.CasterUnit == GetSession().GameState.CurrentPlayerGuid)
-            {
-                // Artificial lag is needed for spell packets,
-                // or spells will bug out and glow if spammed.
-                if (Settings.ClientSpellDelay > 0)
-                    Thread.Sleep(Settings.ClientSpellDelay);
-            }
+            // Queue-based spell tracking replaces the need for artificial delay.
+            // The old Thread.Sleep workaround was needed because single-variable tracking
+            // would get overwritten when spamming spells, causing CastID mismatches.
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 packet.ReadUInt8(); // cast count
@@ -630,10 +598,7 @@ namespace HermesProxy.World.Client
         [PacketHandler(Opcode.SMSG_CANCEL_AUTO_REPEAT)]
         void HandleCancelAutoRepeat(WorldPacket packet)
         {
-            // Artificial lag is needed for spell packets,
-            // or spells will bug out and glow if spammed.
-            if (Settings.ClientSpellDelay > 0)
-                Thread.Sleep(Settings.ClientSpellDelay);
+            // Queue-based spell tracking replaces the need for artificial delay.
 
             if (GetSession().GameState.CurrentClientSpecialCast != null &&
                 GameData.AutoRepeatSpells.Contains(GetSession().GameState.CurrentClientSpecialCast.SpellId))

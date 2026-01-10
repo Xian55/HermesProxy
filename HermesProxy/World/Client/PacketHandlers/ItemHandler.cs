@@ -134,12 +134,10 @@ namespace HermesProxy.World.Client
 
             SendPacketToClient(failure);
 
-            if (GetSession().GameState.CurrentClientNormalCast != null &&
-               !GetSession().GameState.CurrentClientNormalCast.HasStarted &&
-                GetSession().GameState.CurrentClientNormalCast.ItemGUID == failure.Item[0])
+            // Check if item use cast failed (queue-based)
+            if (GetSession().GameState.TryDequeueItemCast(failure.Item[0], out var pendingCast))
             {
-                GetSession().InstanceSocket.SendCastRequestFailed(GetSession().GameState.CurrentClientNormalCast, false);
-                GetSession().GameState.CurrentClientNormalCast = null;
+                GetSession().InstanceSocket.SendCastRequestFailed(pendingCast, false);
             }
         }
         [PacketHandler(Opcode.SMSG_INVENTORY_CHANGE_FAILURE, ClientVersionBuild.V2_0_1_6180)]
@@ -173,12 +171,10 @@ namespace HermesProxy.World.Client
             }
             SendPacketToClient(failure);
 
-            if (GetSession().GameState.CurrentClientNormalCast != null &&
-               !GetSession().GameState.CurrentClientNormalCast.HasStarted &&
-                GetSession().GameState.CurrentClientNormalCast.ItemGUID == failure.Item[0])
+            // Check if item use cast failed (queue-based)
+            if (GetSession().GameState.TryDequeueItemCast(failure.Item[0], out var pendingCast))
             {
-                GetSession().InstanceSocket.SendCastRequestFailed(GetSession().GameState.CurrentClientNormalCast, false);
-                GetSession().GameState.CurrentClientNormalCast = null;
+                GetSession().InstanceSocket.SendCastRequestFailed(pendingCast, false);
             }
         }
         [PacketHandler(Opcode.SMSG_DURABILITY_DAMAGE_DEATH)]
