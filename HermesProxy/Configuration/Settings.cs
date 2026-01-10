@@ -27,8 +27,6 @@ namespace Framework
         public static int InstancePort;
         public static bool DebugOutput;
         public static bool PacketsLog;
-        public static int ServerSpellDelay;
-        public static int ClientSpellDelay;
 
         public static bool LoadAndVerifyFrom(ConfigurationParser config)
         {
@@ -50,8 +48,6 @@ namespace Framework
             InstancePort = config.GetInt("InstancePort", 8086);
             DebugOutput = config.GetBoolean("DebugOutput", false);
             PacketsLog = config.GetBoolean("PacketsLog", true);
-            ServerSpellDelay = config.GetInt("ServerSpellDelay", 0);
-            ClientSpellDelay = config.GetInt("ClientSpellDelay", 0);
 
             return VerifyConfig();
         }
@@ -103,18 +99,6 @@ namespace Framework
             if (!IsValidPortNumber(InstancePort))
             {
                 Log.Print(LogType.Server, $"Specified battle.net port ({InstancePort}) out of allowed range (1-65535)");
-                return false;
-            }
-
-            if (ServerSpellDelay < 0)
-            {
-                Log.Print(LogType.Server, "ServerSpellDelay must be larger than or equal to 0");
-                return false;
-            }
-
-            if (ClientSpellDelay < 0)
-            {
-                Log.Print(LogType.Server, "ClientSpellDelay must be larger than or equal to 0");
                 return false;
             }
 
