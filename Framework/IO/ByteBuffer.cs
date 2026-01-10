@@ -426,10 +426,12 @@ namespace Framework.IO
 
         public void WritePackXYZ(Vector3 pos)
         {
+            // Cast to int first to preserve negative values (two's complement),
+            // then mask to extract the correct number of bits
             uint packed = 0;
-            packed |= ((uint)(pos.X / 0.25f) & 0x7FF);
-            packed |= ((uint)(pos.Y / 0.25f) & 0x7FF) << 11;
-            packed |= ((uint)(pos.Z / 0.25f) & 0x3FF) << 22;
+            packed |= (uint)((int)(pos.X / 0.25f)) & 0x7FF;
+            packed |= ((uint)((int)(pos.Y / 0.25f)) & 0x7FF) << 11;
+            packed |= ((uint)((int)(pos.Z / 0.25f)) & 0x3FF) << 22;
             WriteUInt32(packed);
         }
 
