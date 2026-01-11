@@ -16,6 +16,7 @@
  */
 
 using System;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Collections.Generic;
 using System.Reflection;
@@ -24,8 +25,8 @@ using System.Collections.Concurrent;
 using Framework.Constants;
 using Framework.Cryptography;
 using Framework.IO;
-using Framework.Networking;
 using Framework.Logging;
+using Framework.Networking;
 using Framework.Realm;
 
 using HermesProxy.World.Enums;
@@ -325,7 +326,18 @@ namespace HermesProxy.World.Server
             Opcode universalOpcode = packet.GetUniversalOpcode(isModern: true);
             var handler = GetHandler(universalOpcode);
             if (handler != null)
-                handler.Invoke(this, packet);
+            {
+                if (HermesProxy.Server.MetricsEnabled)
+                {
+                    long startTimestamp = Stopwatch.GetTimestamp();
+                    handler.Invoke(this, packet);
+                    HermesProxy.Server.Metrics.RecordClientToServerLatency(universalOpcode, Stopwatch.GetElapsedTime(startTimestamp).Ticks);
+                }
+                else
+                {
+                    handler.Invoke(this, packet);
+                }
+            }
             else
                 Log.PrintNet(LogType.Warn, LogNetDir.C2P, $"No handler for opcode {universalOpcode} ({packet.GetOpcode()}) (Got unknown packet from ModernClient)");
         }
