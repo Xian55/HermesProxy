@@ -29,6 +29,18 @@ namespace HermesProxy.World.Client
             spells.PetGUID = guid.To128(GetSession().GameState);
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
                 spells.CreatureFamily = packet.ReadUInt16();
+            else
+            {
+                // For pre-3.1.0 servers (Vanilla/TBC), CreatureFamily is not in the packet.
+                // Look it up from the creature template using the pet's entry ID.
+                uint creatureEntry = GetSession().GameState.GetItemId(spells.PetGUID);
+                if (creatureEntry != 0)
+                {
+                    CreatureTemplate template = GameData.GetCreatureTemplate(creatureEntry);
+                    if (template != null)
+                        spells.CreatureFamily = (ushort)template.Family;
+                }
+            }
 
             spells.TimeLimit = packet.ReadUInt32();
             spells.ReactState = (ReactStates)packet.ReadUInt8();

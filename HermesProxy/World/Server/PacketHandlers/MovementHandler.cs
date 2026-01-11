@@ -157,6 +157,14 @@ namespace HermesProxy.World.Server
             SendPacketToServer(packet);
         }
 
+        [PacketHandler(Opcode.CMSG_MOVE_SET_COLLISION_HEIGHT_ACK)]
+        void HandleMoveSetCollisionHeightAck(MoveSetCollisionHeightAck collisionHeightAck)
+        {
+            // This opcode doesn't exist in legacy servers (Vanilla/TBC/WotLK).
+            // The modern client sends it in response to SMSG_MOVE_SET_COLLISION_HEIGHT,
+            // but legacy servers don't expect or need it. Simply discard the packet.
+        }
+
         [PacketHandler(Opcode.CMSG_SET_ACTIVE_MOVER)]
         void HandleMoveSetActiveMover(SetActiveMover move)
         {

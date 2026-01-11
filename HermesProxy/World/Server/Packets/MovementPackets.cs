@@ -415,6 +415,26 @@ namespace HermesProxy.World.Server.Packets
         public MovementAck Ack;
     }
 
+    public class MoveSetCollisionHeightAck : ClientPacket
+    {
+        public MoveSetCollisionHeightAck(WorldPacket packet) : base(packet) { }
+
+        public override void Read()
+        {
+            MoverGUID = _worldPacket.ReadPackedGuid128();
+            Ack.Read(_worldPacket);
+            Height = _worldPacket.ReadFloat();
+            MountDisplayID = _worldPacket.ReadUInt32();
+            Reason = _worldPacket.ReadUInt8();
+        }
+
+        public WowGuid128 MoverGUID;
+        public MovementAck Ack;
+        public float Height;
+        public uint MountDisplayID;
+        public byte Reason;
+    }
+
     class MoveSetCollisionHeight : ServerPacket
     {
         public MoveSetCollisionHeight() : base(Opcode.SMSG_MOVE_SET_COLLISION_HEIGHT) { }

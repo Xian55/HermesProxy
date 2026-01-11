@@ -1076,6 +1076,15 @@ namespace HermesProxy.World.Client
             SendPacketToClient(update);
         }
 
+        [PacketHandler(Opcode.SMSG_CLEAR_EXTRA_AURA_INFO)]
+        void HandleClearExtraAuraInfo(WorldPacket packet)
+        {
+            // This TBC opcode clears aura duration info for a target.
+            // The modern client doesn't use this mechanism - it uses update fields instead.
+            // Simply acknowledge the packet without forwarding to the client.
+            packet.ReadPackedGuid(); // target guid
+        }
+
         [PacketHandler(Opcode.SMSG_RESURRECT_REQUEST)]
         void HandleResurrectRequest(WorldPacket packet)
         {
