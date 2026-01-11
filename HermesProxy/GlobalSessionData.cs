@@ -543,11 +543,9 @@ namespace HermesProxy
         /// </summary>
         public bool TryMarkPendingNormalCastStarted(uint spellId, out ClientCastRequest cast)
         {
-            // Peek through queue to find matching SpellId
-            var items = PendingNormalCasts.ToArray();
             cast = null;
 
-            foreach (var item in items)
+            foreach (var item in PendingNormalCasts)
             {
                 if (item.SpellId == spellId && !item.HasStarted)
                 {
@@ -566,6 +564,20 @@ namespace HermesProxy
         public void ClearPendingNormalCasts()
         {
             while (PendingNormalCasts.TryDequeue(out _)) { }
+        }
+
+        /// <summary>
+        /// Check if there's a normal cast that has already started (is in progress).
+        /// Used to reject new casts without forwarding to server.
+        /// </summary>
+        public bool HasStartedNormalCast()
+        {
+            foreach (var item in PendingNormalCasts)
+            {
+                if (item.HasStarted)
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -628,10 +640,9 @@ namespace HermesProxy
         /// </summary>
         public bool TryMarkPendingPetCastStarted(uint spellId, out ClientCastRequest cast)
         {
-            var items = PendingPetCasts.ToArray();
             cast = null;
 
-            foreach (var item in items)
+            foreach (var item in PendingPetCasts)
             {
                 if (item.SpellId == spellId && !item.HasStarted)
                 {
@@ -650,6 +661,20 @@ namespace HermesProxy
         public void ClearPendingPetCasts()
         {
             while (PendingPetCasts.TryDequeue(out _)) { }
+        }
+
+        /// <summary>
+        /// Check if there's a pet cast that has already started (is in progress).
+        /// Used to reject new casts without forwarding to server.
+        /// </summary>
+        public bool HasStartedPetCast()
+        {
+            foreach (var item in PendingPetCasts)
+            {
+                if (item.HasStarted)
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>

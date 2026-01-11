@@ -147,6 +147,14 @@ namespace HermesProxy.World.Server
                 castRequest.ClientGUID = cast.Cast.CastID;
                 castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId, cast.Cast.SpellID, 10000 + cast.Cast.CastID.GetCounter());
 
+                // Check if there's already a cast in progress - reject without forwarding to server
+                // This prevents interrupting the current cast (player gets "Another action is in progress")
+                if (GetSession().GameState.HasStartedNormalCast())
+                {
+                    SendCastRequestFailed(castRequest, false);
+                    return;
+                }
+
                 // Enqueue the cast - responses will be matched by SpellId in FIFO order
                 GetSession().GameState.PendingNormalCasts.Enqueue(castRequest);
             }
@@ -182,6 +190,13 @@ namespace HermesProxy.World.Server
             castRequest.SpellXSpellVisualId = cast.Cast.SpellXSpellVisualID;
             castRequest.ClientGUID = cast.Cast.CastID;
             castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId, cast.Cast.SpellID, 10000 + cast.Cast.CastID.GetCounter());
+
+            // Check if there's already a pet cast in progress - reject without forwarding to server
+            if (GetSession().GameState.HasStartedPetCast())
+            {
+                SendCastRequestFailed(castRequest, true);
+                return;
+            }
 
             // Enqueue the cast - responses will be matched by SpellId in FIFO order
             GetSession().GameState.PendingPetCasts.Enqueue(castRequest);
