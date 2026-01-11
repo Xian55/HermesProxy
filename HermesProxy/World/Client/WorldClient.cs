@@ -17,6 +17,7 @@ using System.Threading;
 using Framework.Networking;
 using HermesProxy.World.Server;
 using System.Collections.Frozen;
+using System.Diagnostics;
 
 namespace HermesProxy.World.Client
 {
@@ -390,6 +391,8 @@ namespace HermesProxy.World.Client
             Opcode universalOpcode = packet.GetUniversalOpcode(false);
             Log.PrintNet(LogType.Debug, LogNetDir.S2P, $"Received opcode {universalOpcode} ({packet.GetOpcode()}).");
 
+            long startTimestamp = HermesProxy.Server.MetricsEnabled ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
+
             switch (universalOpcode)
             {
                 case Opcode.SMSG_AUTH_CHALLENGE:
@@ -412,6 +415,11 @@ namespace HermesProxy.World.Client
                             _isSuccessful = false;
                     }
                     break;
+            }
+
+            if (HermesProxy.Server.MetricsEnabled)
+            {
+                HermesProxy.Server.Metrics.RecordServerToClientLatency(universalOpcode, Stopwatch.GetElapsedTime(startTimestamp).Ticks);
             }
 
             SendDelayedPacketsToServerOnOpcode(universalOpcode);

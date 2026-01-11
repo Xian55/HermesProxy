@@ -23,6 +23,7 @@ public class Program
             CommandLineArgumentsTemplate.ConfigFileLocation,
             CommandLineArgumentsTemplate.DisableVersionCheck,
             CommandLineArgumentsTemplate.OverwrittenConfigValues,
+            CommandLineArgumentsTemplate.EnableMetrics,
         };
 
         var parser = new CommandLineBuilder(commandTree)
@@ -37,6 +38,7 @@ public class Program
                 ConfigFileLocation = result.GetValueForOption(CommandLineArgumentsTemplate.ConfigFileLocation),
                 DisableVersionCheck = result.GetValueForOption(CommandLineArgumentsTemplate.DisableVersionCheck),
                 OverwrittenConfigValues = ParseMultiArgument(result.GetValueForOption(CommandLineArgumentsTemplate.OverwrittenConfigValues)),
+                EnableMetrics = result.GetValueForOption(CommandLineArgumentsTemplate.EnableMetrics),
             };
             Server.ServerMain(commandLineArguments);
         });
@@ -108,6 +110,10 @@ public class Program
             name: "--set",
             description: "Overwrites a specific config value. Example: --set ServerAddress=logon.example.com"
             );
+        public static readonly Option<bool> EnableMetrics = new(
+            name: "--metrics",
+            description: "Enables per-opcode latency metrics collection"
+            );
     }
 }
 
@@ -116,6 +122,7 @@ public class CommandLineArguments
     public string? ConfigFileLocation { init; get; }
     public bool DisableVersionCheck { init; get; }
     public Dictionary<string, string> OverwrittenConfigValues { init; get; }
+    public bool EnableMetrics { init; get; }
 }
 
 internal static class OsSpecific

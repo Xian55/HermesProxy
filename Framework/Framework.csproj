@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="HermesProxy.Benchmarks" />
+    <InternalsVisibleTo Include="HermesProxy.Tests" />
   </ItemGroup>
 
   <PropertyGroup>
