@@ -2664,19 +2664,19 @@ namespace HermesProxy.World
 
         public static void UpdateHotfix(object obj, bool remove = false)
         {
-            void DoStuff(uint recordId, DB2Hash table, Action<ByteBuffer> writer)
+            void DoStuff(uint recordId, DB2Hash table, Action<ByteBuffer>? writer)
             {
                 List<HotfixRecord> oldRecords = FindHotfixesByRecordIdAndTable(recordId, table, HotfixItemBegin);
                 if (oldRecords.Count == 0)
                 {
                     // We have a new entry
                     HotfixRecord record = new HotfixRecord();
-                    record.Status = HotfixStatus.Valid;
+                    record.Status = remove ? HotfixStatus.RecordRemoved : HotfixStatus.Valid;
                     record.TableHash = table;
                     record.HotfixId = GetFirstFreeId(Hotfixes, HotfixItemBegin);
                     record.UniqueId = record.HotfixId;
                     record.RecordId = recordId;
-                    writer(record.HotfixContent);
+                    writer?.Invoke(record.HotfixContent);
                     Hotfixes.Add(record.HotfixId, record);
                 }
                 else
@@ -2690,32 +2690,32 @@ namespace HermesProxy.World
                     }
 
                     HotfixRecord recordToOverwrite = oldRecords.Last();
+                    recordToOverwrite.Status = remove ? HotfixStatus.RecordRemoved : HotfixStatus.Valid;
                     recordToOverwrite.HotfixContent = new();
-                    writer(recordToOverwrite.HotfixContent);
+                    writer?.Invoke(recordToOverwrite.HotfixContent);
                     Hotfixes[recordToOverwrite.HotfixId] = recordToOverwrite;
                 }
             }
 
             if (obj is ItemRecord item)
             {
-                DoStuff((uint)item.Id, DB2Hash.Item, writer: (hotfixContentTargetBuffer) => WriteItemHotfix(item, hotfixContentTargetBuffer));
-
+                DoStuff((uint)item.Id, DB2Hash.Item, remove ? null : (hotfixContentTargetBuffer) => WriteItemHotfix(item, hotfixContentTargetBuffer));
             }
             if (obj is ItemSparseRecord itemSparse)
             {
-                DoStuff((uint)itemSparse.Id, DB2Hash.ItemSparse, writer: (hotfixContentTargetBuffer) => WriteItemSparseHotfix(itemSparse, hotfixContentTargetBuffer));
+                DoStuff((uint)itemSparse.Id, DB2Hash.ItemSparse, remove ? null : (hotfixContentTargetBuffer) => WriteItemSparseHotfix(itemSparse, hotfixContentTargetBuffer));
             }
             if (obj is ItemEffect effect)
             {
-                DoStuff((uint)effect.Id, DB2Hash.ItemEffect, writer: (hotfixContentTargetBuffer) => WriteItemEffectHotfix(effect, hotfixContentTargetBuffer));
+                DoStuff((uint)effect.Id, DB2Hash.ItemEffect, remove ? null : (hotfixContentTargetBuffer) => WriteItemEffectHotfix(effect, hotfixContentTargetBuffer));
             }
             if (obj is ItemAppearance appearance)
             {
-                DoStuff((uint)appearance.Id, DB2Hash.ItemAppearance, writer: (hotfixContentTargetBuffer) => WriteItemAppearanceHotfix(appearance, hotfixContentTargetBuffer));
+                DoStuff((uint)appearance.Id, DB2Hash.ItemAppearance, remove ? null : (hotfixContentTargetBuffer) => WriteItemAppearanceHotfix(appearance, hotfixContentTargetBuffer));
             }
             if (obj is ItemModifiedAppearance modAppearance)
             {
-                DoStuff((uint)modAppearance.Id, DB2Hash.ItemModifiedAppearance, writer: (hotfixContentTargetBuffer) => WriteItemModifiedAppearanceHotfix(modAppearance, hotfixContentTargetBuffer));
+                DoStuff((uint)modAppearance.Id, DB2Hash.ItemModifiedAppearance, remove ? null : (hotfixContentTargetBuffer) => WriteItemModifiedAppearanceHotfix(modAppearance, hotfixContentTargetBuffer));
             }
         }
 
@@ -3448,7 +3448,6 @@ namespace HermesProxy.World
                 LegacySlotIndex = slot
             };
             UpdateItemEffectRecord(record, item);
-            ItemEffectStore.Add((uint)record.Id, record);
             Log.Print(LogType.Storage, $"ItemEffect #{record.Id} created for item #{item.Entry} slot #{slot}.");
             return record;
         }
