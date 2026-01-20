@@ -42,10 +42,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="obj\GitVersionInformation.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Content Include="HermesProxy.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
