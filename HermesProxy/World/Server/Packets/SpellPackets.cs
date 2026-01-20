@@ -100,9 +100,10 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteUInt32(spellId);
         }
 
-        // MaxSize: bit(1) + 2 counts(8) + max spells (1024) * 4 + max favorites (128) * 4 = 4617
-        private const int MaxKnownSpells = 1024;
-        private const int MaxFavoriteSpells = 128;
+        // MaxSize: bit(1) + 2 counts(8) + spells + favorites
+        // Reduced from 1024/128 to 256/16 based on typical usage (161-165 bytes = ~40 spells)
+        private const int MaxKnownSpells = 256;
+        private const int MaxFavoriteSpells = 16;
         public int MaxSize => 1 + 8 + MaxKnownSpells * 4 + MaxFavoriteSpells * 4;
 
         public int WriteToSpan(Span<byte> buffer)

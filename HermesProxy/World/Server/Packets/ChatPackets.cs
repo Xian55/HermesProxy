@@ -64,8 +64,9 @@ namespace HermesProxy.World.Server.Packets
         }
 
         // Cap for channel name and welcome message
+        // Reduced MaxWelcomeMsgBytes from 256 to 64 based on typical usage (~50 bytes)
         private const int MaxChannelBytes = 64;
-        private const int MaxWelcomeMsgBytes = 256;
+        private const int MaxWelcomeMsgBytes = 64;
         // 18 bits(3) + uint(4) + int(4) + ulong(8) + GUID(18) + channel + msg
         public int MaxSize => 3 + 4 + 4 + 8 + PackedGuidHelper.MaxPackedGuid128Size + MaxChannelBytes + MaxWelcomeMsgBytes;
 
@@ -459,11 +460,13 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WritePackedGuid128(ChannelGUID);
         }
 
-        // MaxSize: byte(1) + uint(4) + 5 GUIDs(90) + 2 uints(8) + GUID(18) + uint(4) + float(4)
-        // + bits(8) + strings: sender(2048) + target(2048) + prefix(32) + channel(128) + chat(4096)
-        // + opt uint(4) + opt GUID(18) = 8511
-        private const int MaxSenderNameBytes = 2048;
-        private const int MaxChatTextBytes = 4096;
+        // MaxSize: byte(1) + uint(4) + 6 GUIDs(108) + 2 uints(8) + uint(4) + float(4)
+        // + bits(8) + strings: sender(128) + target(128) + prefix(32) + channel(128) + chat(512)
+        // + opt uint(4) + opt GUID(18) = ~430 bytes
+        // Note: Real player names are max 24 bytes, typical chat is <200 bytes.
+        // If exceeded, WriteToSpan returns -1 to trigger fallback to Write().
+        private const int MaxSenderNameBytes = 128;
+        private const int MaxChatTextBytes = 512;
         public int MaxSize => 1 + 4 + PackedGuidHelper.MaxPackedGuid128Size * 6 + 16 + 8 +
             MaxSenderNameBytes * 2 + 32 + 128 + MaxChatTextBytes + 22;
 
@@ -475,9 +478,10 @@ namespace HermesProxy.World.Server.Packets
             int channelBytes = Encoding.UTF8.GetByteCount(Channel ?? "");
             int chatTextBytes = Encoding.UTF8.GetByteCount(ChatText ?? "");
 
-            // Check bit limits
-            if (senderNameBytes > 2047 || targetNameBytes > 2047 || prefixBytes > 31 ||
-                channelBytes > 127 || chatTextBytes > 4095)
+            // Check against our reduced MaxSize limits - fallback to Write() for oversized messages
+            // Protocol limits are larger (2047/4095) but we optimize for typical usage
+            if (senderNameBytes > MaxSenderNameBytes || targetNameBytes > MaxSenderNameBytes ||
+                prefixBytes > 31 || channelBytes > 127 || chatTextBytes > MaxChatTextBytes)
                 return -1;
 
             var writer = new SpanPacketWriter(buffer);

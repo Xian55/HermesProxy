@@ -56,8 +56,8 @@ namespace HermesProxy.World.Server.Packets
                 contact.Write(_worldPacket);
         }
 
-        // Cap for contacts (8 bits = 256 max, using 200)
-        private const int MaxContacts = 200;
+        // Cap for contacts (8 bits = 256 max, reduced from 200 to 16 based on typical usage)
+        private const int MaxContacts = 16;
         // Cap for note string (10 bits = 1024, using 128)
         private const int MaxNoteBytes = 128;
         // Per contact: 2 GUIDs(36) + 4 uints(16) + byte(1) + bits(2) + note = 183 bytes max

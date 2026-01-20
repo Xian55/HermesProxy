@@ -552,7 +552,31 @@ namespace HermesProxy.World.Server.Packets
         public ItemInstance Item = new ItemInstance();
     }
 
-    class AuctionClosedNotification : ServerPacket
+    internal static class AuctionPacketHelpers
+    {
+        // AuctionOwnerNotification: uint(4) + ulong(8) + ItemInstance
+        public const int AuctionOwnerNotificationMaxSize = 12 + ItemPacketHelpers.ItemInstanceMaxSize;
+
+        // AuctionBidderNotification: 2 uints(8) + PackedGuid128(18) + ItemInstance
+        public const int AuctionBidderNotificationMaxSize = 8 + PackedGuidHelper.MaxPackedGuid128Size + ItemPacketHelpers.ItemInstanceMaxSize;
+
+        public static bool WriteAuctionOwnerNotification(ref SpanPacketWriter writer, AuctionOwnerNotification info)
+        {
+            writer.WriteUInt32(info.AuctionID);
+            writer.WriteUInt64(info.BidAmount);
+            return ItemPacketHelpers.WriteItemInstance(ref writer, info.Item);
+        }
+
+        public static bool WriteAuctionBidderNotification(ref SpanPacketWriter writer, AuctionBidderNotification info)
+        {
+            writer.WriteUInt32(info.Command);
+            writer.WriteUInt32(info.AuctionID);
+            writer.WritePackedGuid128(info.Bidder.Low, info.Bidder.High);
+            return ItemPacketHelpers.WriteItemInstance(ref writer, info.Item);
+        }
+    }
+
+    class AuctionClosedNotification : ServerPacket, ISpanWritable
     {
         public AuctionClosedNotification() : base(Opcode.SMSG_AUCTION_CLOSED_NOTIFICATION) { }
 
@@ -564,12 +588,26 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        // AuctionOwnerNotification + float(4) + bit(1)
+        public int MaxSize => AuctionPacketHelpers.AuctionOwnerNotificationMaxSize + 5;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            if (!AuctionPacketHelpers.WriteAuctionOwnerNotification(ref writer, Info))
+                return -1;
+            writer.WriteFloat(ProceedsMailDelay);
+            writer.WriteBit(Sold);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public AuctionOwnerNotification Info;
         public float ProceedsMailDelay = 3600;
         public bool Sold = true;
     }
 
-    class AuctionOwnerBidNotification : ServerPacket
+    class AuctionOwnerBidNotification : ServerPacket, ISpanWritable
     {
         public AuctionOwnerBidNotification() : base(Opcode.SMSG_AUCTION_OWNER_BID_NOTIFICATION) { }
 
@@ -578,6 +616,19 @@ namespace HermesProxy.World.Server.Packets
             Info.Write(_worldPacket);
             _worldPacket.WriteUInt64(MinIncrement);
             _worldPacket.WritePackedGuid128(Bidder);
+        }
+
+        // AuctionOwnerNotification + ulong(8) + PackedGuid128(18)
+        public int MaxSize => AuctionPacketHelpers.AuctionOwnerNotificationMaxSize + 8 + PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            if (!AuctionPacketHelpers.WriteAuctionOwnerNotification(ref writer, Info))
+                return -1;
+            writer.WriteUInt64(MinIncrement);
+            writer.WritePackedGuid128(Bidder.Low, Bidder.High);
+            return writer.Position;
         }
 
         public AuctionOwnerNotification Info;
@@ -601,7 +652,7 @@ namespace HermesProxy.World.Server.Packets
         public ItemInstance Item = new ItemInstance();
     }
 
-    class AuctionWonNotification : ServerPacket
+    class AuctionWonNotification : ServerPacket, ISpanWritable
     {
         public AuctionWonNotification() : base(Opcode.SMSG_AUCTION_WON_NOTIFICATION) { }
 
@@ -610,10 +661,20 @@ namespace HermesProxy.World.Server.Packets
             Info.Write(_worldPacket);
         }
 
+        public int MaxSize => AuctionPacketHelpers.AuctionBidderNotificationMaxSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            if (!AuctionPacketHelpers.WriteAuctionBidderNotification(ref writer, Info))
+                return -1;
+            return writer.Position;
+        }
+
         public AuctionBidderNotification Info;
     }
 
-    class AuctionOutbidNotification : ServerPacket
+    class AuctionOutbidNotification : ServerPacket, ISpanWritable
     {
         public AuctionOutbidNotification() : base(Opcode.SMSG_AUCTION_OUTBID_NOTIFICATION) { }
 
@@ -622,6 +683,19 @@ namespace HermesProxy.World.Server.Packets
             Info.Write(_worldPacket);
             _worldPacket.WriteUInt64(BidAmount);
             _worldPacket.WriteUInt64(MinIncrement);
+        }
+
+        // AuctionBidderNotification + 2 ulongs(16)
+        public int MaxSize => AuctionPacketHelpers.AuctionBidderNotificationMaxSize + 16;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            if (!AuctionPacketHelpers.WriteAuctionBidderNotification(ref writer, Info))
+                return -1;
+            writer.WriteUInt64(BidAmount);
+            writer.WriteUInt64(MinIncrement);
+            return writer.Position;
         }
 
         public AuctionBidderNotification Info;

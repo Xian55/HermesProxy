@@ -404,8 +404,8 @@ namespace HermesProxy.World.Server.Packets
             }
         }
 
-        // Cap for MOTD lines (4 bits = max 16 lines)
-        private const int MaxLines = 16;
+        // Cap for MOTD lines - reduced from 16 to 4 based on typical usage (1 byte = empty)
+        private const int MaxLines = 4;
         // Cap per line (7 bits = max 128 chars)
         private const int MaxLineBytes = 128;
         // 4 bits(1) + per line: 7 bits(1) + text

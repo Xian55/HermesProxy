@@ -468,9 +468,10 @@ namespace HermesProxy.World.Objects
 
         /// <summary>
         /// Maximum size for movement info when written with Span writer.
-        /// Includes: GUID(18) + flags(12) + times/positions(40) + bits(6) + transport(48) + inertia(34) + fall(21) + padding
+        /// Includes: GUID(18) + flags(12) + times/positions(40) + bits(6) + transport(48) + inertia(34) + fall(21) = ~179
+        /// Reduced from 256 to 192 based on actual usage data (54-75 bytes typical, theoretical max ~179)
         /// </summary>
-        public const int MaxMovementInfoSize = 256;
+        public const int MaxMovementInfoSize = 192;
 
         /// <summary>
         /// Writes movement info using SpanPacketWriter for zero-allocation hot path.

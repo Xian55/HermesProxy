@@ -64,8 +64,9 @@ namespace HermesProxy.World.Server.Packets
     {
         // Practical cap for spline points - covers real-world movement patterns
         // Real usage: Points=0-2 (next destination), PackedDeltas=0-15 (obstacle smoothing)
+        // Reduced from 64 to 16 based on actual usage data (74-116 bytes observed)
         // If exceeded, WriteToSpan returns -1 to trigger fallback to Write()
-        private const int MaxSplinePoints = 64;
+        private const int MaxSplinePoints = 16;
 
         public MonsterMove(WowGuid128 guid, ServerSideMovement moveSpline) : base(Opcode.SMSG_ON_MONSTER_MOVE, ConnectionType.Instance)
         {

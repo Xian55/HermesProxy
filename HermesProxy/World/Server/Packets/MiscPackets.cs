@@ -201,8 +201,8 @@ namespace HermesProxy.World.Server.Packets
             }
         }
 
-        // Cap for currencies - players typically have ~50-100 currencies
-        private const int MaxCurrencies = 128;
+        // Cap for currencies - reduced from 128 to 16 based on typical usage (0 observed at login)
+        private const int MaxCurrencies = 16;
         // Per currency max: 2 uints(8) + bits(2) + 5 optional uints(20) = 30 bytes
         private const int MaxRecordSize = 30;
         // count(4) + currencies
@@ -269,8 +269,8 @@ namespace HermesProxy.World.Server.Packets
                 progress.Write(_worldPacket);
         }
 
-        // Cap for account criteria - reasonable limit
-        private const int MaxCriteria = 256;
+        // Cap for account criteria - reduced from 256 to 32 based on typical usage (0 observed)
+        private const int MaxCriteria = 32;
         // Per criteria: uint(4) + ulong(8) + GUID(18) + PackedTime(4) + 2 uints(8) + bits(1) + optional ulong(8) = 51 bytes max
         private const int MaxCriteriaSize = 51;
         // count(4) + criteria
@@ -602,8 +602,8 @@ namespace HermesProxy.World.Server.Packets
                 task.Write(_worldPacket);
         }
 
-        // Cap for tasks
-        private const int MaxTasks = 64;
+        // Cap for tasks - reduced from 64 to 8 based on typical usage (0 observed)
+        private const int MaxTasks = 8;
         // Cap for progress items per task
         private const int MaxProgressPerTask = 16;
         // Per task: 4 uints(16) + count(4) + progress items(2 each) = 52 bytes max
@@ -1128,8 +1128,8 @@ namespace HermesProxy.World.Server.Packets
                 entry.Write(_worldPacket);
         }
 
-        // Cap for blacklist entries
-        private const int MaxBlacklistEntries = 128;
+        // Cap for blacklist entries - reduced from 128 to 16 based on typical usage (0 observed)
+        private const int MaxBlacklistEntries = 16;
         // Per entry: 2 ints = 8 bytes
         public int MaxSize => 4 + MaxBlacklistEntries * 8;
 

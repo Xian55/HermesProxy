@@ -124,8 +124,9 @@ namespace HermesProxy.World.Server.Packets
             }
         }
 
-        // MaxSize: GUID(18) + long(8) + uint(4) + bits(1) + length(4) + max compressed data (16KB)
-        private const int MaxCompressedDataSize = 16384;
+        // MaxSize: GUID(18) + long(8) + uint(4) + bits(1) + length(4) + max compressed data
+        // Reduced from 16KB to 2KB based on typical usage (235 bytes observed)
+        private const int MaxCompressedDataSize = 2048;
         public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 17 + MaxCompressedDataSize;
 
         public int WriteToSpan(Span<byte> buffer)
@@ -222,8 +223,8 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteBytes(Data);
         }
 
-        // Cap for CUF profile data
-        private const int MaxDataSize = 2048;
+        // Cap for CUF profile data - reduced from 2048 to 256 based on typical usage (30 bytes observed)
+        private const int MaxDataSize = 256;
         public int MaxSize => MaxDataSize;
 
         public int WriteToSpan(Span<byte> buffer)
