@@ -22,7 +22,6 @@ using System;
 using System.Buffers;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Client;
-using Ionic.Zlib;
 using System.Collections.Generic;
 
 namespace HermesProxy.World
@@ -246,21 +245,7 @@ namespace HermesProxy.World
         public WorldPacket Inflate(int inflatedSize)
         {
             var arr = ReadToEnd();
-            var newarr = new byte[inflatedSize];
-
-            var stream = new ZlibCodec(Ionic.Zlib.CompressionMode.Decompress)
-            {
-                InputBuffer = arr,
-                NextIn = 0,
-                AvailableBytesIn = arr.Length,
-                OutputBuffer = newarr,
-                NextOut = 0,
-                AvailableBytesOut = inflatedSize
-            };
-
-            stream.Inflate(FlushType.None);
-            stream.Inflate(FlushType.Finish);
-            stream.EndInflate();
+            var newarr = ZLib.Decompress(arr, (uint)inflatedSize);
 
             // Cannot use "using" here
             var pkt = new WorldPacket(GetOpcode(), newarr);
