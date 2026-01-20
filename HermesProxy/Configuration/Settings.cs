@@ -27,6 +27,7 @@ namespace Framework
         public static int InstancePort;
         public static bool DebugOutput;
         public static bool PacketsLog;
+        public static bool SpanStatsLog;
 
         public static bool LoadAndVerifyFrom(ConfigurationParser config)
         {
@@ -48,6 +49,7 @@ namespace Framework
             InstancePort = config.GetInt("InstancePort", 8086);
             DebugOutput = config.GetBoolean("DebugOutput", false);
             PacketsLog = config.GetBoolean("PacketsLog", true);
+            SpanStatsLog = config.GetBoolean("SpanStatsLog", false);
 
             return VerifyConfig();
         }

@@ -18,10 +18,12 @@
 
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace HermesProxy.World.Server.Packets
 {
@@ -98,13 +100,17 @@ namespace HermesProxy.World.Server.Packets
         public sbyte ConsumedCharges;
     }
 
-    public class PetClearSpells : ServerPacket
+    public class PetClearSpells : ServerPacket, ISpanWritable
     {
         public PetClearSpells() : base(Opcode.SMSG_PET_CLEAR_SPELLS, ConnectionType.Instance) { }
 
         public override void Write()
         {
         }
+
+        public int MaxSize => 0;
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 
     class PetAction : ClientPacket
@@ -156,7 +162,7 @@ namespace HermesProxy.World.Server.Packets
         public uint Action;
     }
 
-    class PetActionSound : ServerPacket
+    class PetActionSound : ServerPacket, ISpanWritable
     {
         public PetActionSound() : base(Opcode.SMSG_PET_ACTION_SOUND) { }
 
@@ -164,6 +170,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WritePackedGuid128(UnitGUID);
             _worldPacket.WriteUInt32(Action);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4; // GUID + uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(UnitGUID.Low, UnitGUID.High);
+            writer.WriteUInt32(Action);
+            return writer.Position;
         }
 
         public WowGuid128 UnitGUID;
@@ -232,7 +248,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 StableMaster;
     }
 
-    class PetStableList : ServerPacket
+    class PetStableList : ServerPacket, ISpanWritable
     {
         public PetStableList() : base(Opcode.SMSG_PET_STABLE_LIST, ConnectionType.Instance) { }
 
@@ -252,6 +268,45 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteBits(pet.PetName.GetByteCount(), 8);
                 _worldPacket.WriteString(pet.PetName);
             }
+        }
+
+        // Cap for stable slots - max 5 stable slots + active
+        private const int MaxPets = 6;
+        // Cap for pet name - 8 bits = max 256
+        private const int MaxPetNameBytes = 64;
+        // Per pet: 4 uints(16) + 2 bytes(2) + bits(1) + name
+        private const int PetInfoSize = 16 + 2 + 1 + MaxPetNameBytes;
+        // GUID(18) + count(4) + byte(1) + pets
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + 1 + MaxPets * PetInfoSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Pets.Count > MaxPets)
+                return -1;
+
+            // Pre-validate name lengths
+            foreach (var pet in Pets)
+            {
+                if (Encoding.UTF8.GetByteCount(pet.PetName) > MaxPetNameBytes)
+                    return -1;
+            }
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(StableMaster.Low, StableMaster.High);
+            writer.WriteInt32(Pets.Count);
+            writer.WriteUInt8(NumStableSlots);
+            foreach (PetStableInfo pet in Pets)
+            {
+                writer.WriteUInt32(pet.PetNumber);
+                writer.WriteUInt32(pet.CreatureID);
+                writer.WriteUInt32(pet.DisplayID);
+                writer.WriteUInt32(pet.ExperienceLevel);
+                writer.WriteUInt8(pet.LoyaltyLevel);
+                writer.WriteUInt8(pet.PetFlags);
+                writer.WriteBits((uint)Encoding.UTF8.GetByteCount(pet.PetName), 8);
+                writer.WriteString(pet.PetName);
+            }
+            return writer.Position;
         }
 
         public WowGuid128 StableMaster;
@@ -282,7 +337,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 StableMaster;
     }
 
-    public class PetGuids : ServerPacket
+    public class PetGuids : ServerPacket, ISpanWritable
     {
         public PetGuids() : base(Opcode.SMSG_PET_GUIDS, ConnectionType.Instance) { }
 
@@ -293,16 +348,42 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WritePackedGuid128(guid);
         }
 
+        // Cap for pet GUIDs - max 5 stable slots + active pet
+        private const int MaxPets = 6;
+        // count(4) + GUIDs(18 each)
+        public int MaxSize => 4 + MaxPets * PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Guids.Count > MaxPets)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Guids.Count);
+            foreach (var guid in Guids)
+                writer.WritePackedGuid128(guid.Low, guid.High);
+            return writer.Position;
+        }
+
         public List<WowGuid128> Guids = new List<WowGuid128>();
     }
 
-    class PetStableResult : ServerPacket
+    class PetStableResult : ServerPacket, ISpanWritable
     {
         public PetStableResult() : base(Opcode.SMSG_PET_STABLE_RESULT, ConnectionType.Instance) { }
 
         public override void Write()
         {
             _worldPacket.WriteUInt8(Result);
+        }
+
+        public int MaxSize => 1; // byte
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt8(Result);
+            return writer.Position;
         }
 
         public byte Result;

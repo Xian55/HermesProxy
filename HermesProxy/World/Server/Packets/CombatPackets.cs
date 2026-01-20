@@ -16,12 +16,13 @@
  */
 
 
-using Framework.Constants;
-using Framework.GameMath;
-using HermesProxy.World.Enums;
-using HermesProxy.World.Objects;
 using System;
 using System.Collections.Generic;
+using Framework.Constants;
+using Framework.GameMath;
+using Framework.IO;
+using HermesProxy.World.Enums;
+using HermesProxy.World.Objects;
 
 namespace HermesProxy.World.Server.Packets
 {
@@ -37,7 +38,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 Victim;
     }
 
-    public class AttackSwingError : ServerPacket
+    public class AttackSwingError : ServerPacket, ISpanWritable
     {
         public AttackSwingError() : base(Opcode.SMSG_ATTACK_SWING_ERROR) { }
 
@@ -45,6 +46,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WriteBits((uint)Reason, 3);
             _worldPacket.FlushBits();
+        }
+
+        public int MaxSize => 1; // 3 bits packed into 1 byte
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)Reason, 3);
+            writer.FlushBits();
+            return writer.Position;
         }
 
         public AttackSwingErr Reason;
@@ -57,7 +68,7 @@ namespace HermesProxy.World.Server.Packets
         public override void Read() { }
     }
 
-    public class SAttackStart : ServerPacket
+    public class SAttackStart : ServerPacket, ISpanWritable
     {
         public SAttackStart() : base(Opcode.SMSG_ATTACK_START, ConnectionType.Instance) { }
 
@@ -67,11 +78,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(Victim);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2; // 2 packed GUIDs
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Attacker.Low, Attacker.High);
+            writer.WritePackedGuid128(Victim.Low, Victim.High);
+            return writer.Position;
+        }
+
         public WowGuid128 Attacker;
         public WowGuid128 Victim;
     }
 
-    public class SAttackStop : ServerPacket
+    public class SAttackStop : ServerPacket, ISpanWritable
     {
         public SAttackStop() : base(Opcode.SMSG_ATTACK_STOP, ConnectionType.Instance) { }
 
@@ -81,6 +102,18 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(Victim);
             _worldPacket.WriteBit(NowDead);
             _worldPacket.FlushBits();
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 1; // 2 packed GUIDs + 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Attacker.Low, Attacker.High);
+            writer.WritePackedGuid128(Victim.Low, Victim.High);
+            writer.WriteBit(NowDead);
+            writer.FlushBits();
+            return writer.Position;
         }
 
         public WowGuid128 Attacker;
@@ -220,11 +253,11 @@ namespace HermesProxy.World.Server.Packets
             }
         }
 
-        long Health;
-        int AttackPower;
-        int SpellPower;
-        uint Armor;
-        List<SpellLogPowerData> PowerData = new();
+        public long Health;
+        public int AttackPower;
+        public int SpellPower;
+        public uint Armor;
+        public List<SpellLogPowerData> PowerData = new();
     }
 
     public struct SpellLogPowerData
@@ -234,11 +267,15 @@ namespace HermesProxy.World.Server.Packets
         public int Cost;
     }
 
-    public class CancelCombat : ServerPacket
+    public class CancelCombat : ServerPacket, ISpanWritable
     {
         public CancelCombat() : base(Opcode.SMSG_CANCEL_COMBAT) { }
 
         public override void Write() { }
+
+        public int MaxSize => 0; // Empty packet
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 
     public class SetSheathed : ClientPacket
@@ -255,7 +292,7 @@ namespace HermesProxy.World.Server.Packets
         public bool Animate = true;
     }
 
-    public class AIReaction : ServerPacket
+    public class AIReaction : ServerPacket, ISpanWritable
     {
         public AIReaction() : base(Opcode.SMSG_AI_REACTION, ConnectionType.Instance) { }
 
@@ -265,11 +302,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(Reaction);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4; // Packed GUID + uint32
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(UnitGUID.Low, UnitGUID.High);
+            writer.WriteUInt32(Reaction);
+            return writer.Position;
+        }
+
         public WowGuid128 UnitGUID;
         public uint Reaction;
     }
 
-    class PartyKillLog : ServerPacket
+    class PartyKillLog : ServerPacket, ISpanWritable
     {
         public PartyKillLog() : base(Opcode.SMSG_PARTY_KILL_LOG) { }
 
@@ -277,6 +324,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WritePackedGuid128(Player);
             _worldPacket.WritePackedGuid128(Victim);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2; // 2 packed GUIDs
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Player.Low, Player.High);
+            writer.WritePackedGuid128(Victim.Low, Victim.High);
+            return writer.Position;
         }
 
         public WowGuid128 Player;

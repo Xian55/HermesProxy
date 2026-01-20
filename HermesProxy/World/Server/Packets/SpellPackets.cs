@@ -18,14 +18,72 @@
 
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace HermesProxy.World.Server.Packets
 {
-    public class SendKnownSpells : ServerPacket
+    /// <summary>
+    /// Helper methods for writing combat-related structures to SpanPacketWriter.
+    /// </summary>
+    internal static class SpellPacketHelpers
+    {
+        /// <summary>
+        /// Writes SpellCastLogData to a SpanPacketWriter.
+        /// Returns false if PowerData exceeds maxPowerEntries (triggers fallback).
+        /// </summary>
+        public static bool WriteSpellCastLogData(ref SpanPacketWriter writer, SpellCastLogData logData, int maxPowerEntries)
+        {
+            if (logData.PowerData.Count > maxPowerEntries)
+                return false;
+
+            writer.WriteInt64(logData.Health);
+            writer.WriteInt32(logData.AttackPower);
+            writer.WriteInt32(logData.SpellPower);
+            writer.WriteUInt32(logData.Armor);
+            writer.WriteBits((uint)logData.PowerData.Count, 9);
+            writer.FlushBits();
+
+            foreach (var powerData in logData.PowerData)
+            {
+                writer.WriteInt32(powerData.PowerType);
+                writer.WriteInt32(powerData.Amount);
+                writer.WriteInt32(powerData.Cost);
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Writes ContentTuningParams to a SpanPacketWriter.
+        /// </summary>
+        public static void WriteContentTuningParams(ref SpanPacketWriter writer, ContentTuningParams tuning)
+        {
+            writer.WriteFloat(tuning.PlayerItemLevel);
+            writer.WriteFloat(tuning.TargetItemLevel);
+            writer.WriteInt16(tuning.PlayerLevelDelta);
+            writer.WriteUInt16(tuning.ScalingHealthItemLevelCurveID);
+            writer.WriteUInt8(tuning.TargetLevel);
+            writer.WriteUInt8(tuning.Expansion);
+            writer.WriteUInt8(tuning.TargetMinScalingLevel);
+            writer.WriteUInt8(tuning.TargetMaxScalingLevel);
+            writer.WriteInt8(tuning.TargetScalingLevelDelta);
+            writer.WriteUInt32((uint)tuning.Flags);
+            writer.WriteBits((uint)tuning.TuningType, 4);
+            writer.FlushBits();
+        }
+
+        // Size constants for MaxSize calculations
+        public const int SpellCastLogDataFixedSize = 22; // 8 + 4 + 4 + 4 + 2 (bits flushed)
+        public const int SpellLogPowerDataSize = 12;     // 3 ints
+        public const int ContentTuningParamsSize = 22;   // 8 + 2 + 2 + 5 + 4 + 1 (bits flushed)
+    }
+
+    public class SendKnownSpells : ServerPacket, ISpanWritable
     {
         public SendKnownSpells() : base(Opcode.SMSG_SEND_KNOWN_SPELLS, ConnectionType.Instance) { }
 
@@ -42,12 +100,37 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteUInt32(spellId);
         }
 
+        // MaxSize: bit(1) + 2 counts(8) + spells + favorites
+        // Reduced from 1024/128 to 256/16 based on typical usage (161-165 bytes = ~40 spells)
+        private const int MaxKnownSpells = 256;
+        private const int MaxFavoriteSpells = 16;
+        public int MaxSize => 1 + 8 + MaxKnownSpells * 4 + MaxFavoriteSpells * 4;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (KnownSpells.Count > MaxKnownSpells || FavoriteSpells.Count > MaxFavoriteSpells)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBit(InitialLogin);
+            writer.WriteInt32(KnownSpells.Count);
+            writer.WriteInt32(FavoriteSpells.Count);
+
+            foreach (var spellId in KnownSpells)
+                writer.WriteUInt32(spellId);
+
+            foreach (var spellId in FavoriteSpells)
+                writer.WriteUInt32(spellId);
+
+            return writer.Position;
+        }
+
         public bool InitialLogin;
         public List<uint> KnownSpells = new();
         public List<uint> FavoriteSpells = new(); // tradeskill recipes
     }
 
-    public class SupercededSpells : ServerPacket
+    public class SupercededSpells : ServerPacket, ISpanWritable
     {
         public SupercededSpells() : base(Opcode.SMSG_SUPERCEDED_SPELLS, ConnectionType.Instance) { }
 
@@ -67,13 +150,45 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteInt32(spellId);
         }
 
+        // Cap for spell lists - usually 1 spell superceded at a time
+        private const int MaxSpellsPerList = 8;
+        // 3 counts(12) + 3 lists of spells(96)
+        public int MaxSize => 12 + MaxSpellsPerList * 4 * 3;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (SpellID.Count > MaxSpellsPerList ||
+                Superceded.Count > MaxSpellsPerList ||
+                FavoriteSpellID.Count > MaxSpellsPerList)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(SpellID.Count);
+            writer.WriteInt32(Superceded.Count);
+            writer.WriteInt32(FavoriteSpellID.Count);
+
+            foreach (var spellId in SpellID)
+                writer.WriteUInt32(spellId);
+
+            foreach (var spellId in Superceded)
+                writer.WriteUInt32(spellId);
+
+            foreach (var spellId in FavoriteSpellID)
+                writer.WriteInt32(spellId);
+
+            return writer.Position;
+        }
+
         public List<uint> SpellID = new();
         public List<uint> Superceded = new();
         public List<int> FavoriteSpellID = new();
     }
 
-    public class LearnedSpells : ServerPacket
+    public class LearnedSpells : ServerPacket, ISpanWritable
     {
+        // Practical cap - usually 1 spell per trainer click, hunter pet quest ~5
+        private const int MaxSpells = 8;
+
         public LearnedSpells() : base(Opcode.SMSG_LEARNED_SPELLS, ConnectionType.Instance) { }
 
         public override void Write()
@@ -92,14 +207,40 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        // MaxSize: 3 int32 (12) + 2 lists capped at 8 (64) + 1 bit byte = 77
+        public int MaxSize => 12 + MaxSpells * 4 * 2 + 1;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Spells.Count > MaxSpells || FavoriteSpellID.Count > MaxSpells)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Spells.Count);
+            writer.WriteInt32(FavoriteSpellID.Count);
+            writer.WriteUInt32(SpecializationID);
+
+            foreach (uint spell in Spells)
+                writer.WriteUInt32(spell);
+
+            foreach (int spell in FavoriteSpellID)
+                writer.WriteInt32(spell);
+
+            writer.WriteBit(SuppressMessaging);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public List<uint> Spells = new();
         public List<int> FavoriteSpellID = new();
         public uint SpecializationID;
         public bool SuppressMessaging;
     }
 
-    public class SendUnlearnSpells : ServerPacket
+    public class SendUnlearnSpells : ServerPacket, ISpanWritable
     {
+        private const int MaxSpells = 8;
+
         public SendUnlearnSpells() : base(Opcode.SMSG_SEND_UNLEARN_SPELLS, ConnectionType.Instance) { }
 
         public override void Write()
@@ -108,11 +249,29 @@ namespace HermesProxy.World.Server.Packets
             foreach (var spell in Spells)
                 _worldPacket.WriteUInt32(spell);
         }
+
+        // MaxSize: int32 count (4) + 8 spells (32) = 36
+        public int MaxSize => 4 + MaxSpells * 4;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Spells.Count > MaxSpells)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Spells.Count);
+            foreach (var spell in Spells)
+                writer.WriteUInt32(spell);
+            return writer.Position;
+        }
+
         public List<uint> Spells = new();
     }
 
-    public class UnlearnedSpells : ServerPacket
+    public class UnlearnedSpells : ServerPacket, ISpanWritable
     {
+        private const int MaxSpells = 8;
+
         public UnlearnedSpells() : base(Opcode.SMSG_UNLEARNED_SPELLS, ConnectionType.Instance) { }
 
         public override void Write()
@@ -125,18 +284,67 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        // MaxSize: int32 count (4) + 8 spells (32) + 1 bit byte = 37
+        public int MaxSize => 4 + MaxSpells * 4 + 1;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Spells.Count > MaxSpells)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Spells.Count);
+            foreach (uint spellId in Spells)
+                writer.WriteUInt32(spellId);
+            writer.WriteBit(SuppressMessaging);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public List<uint> Spells = new();
         public bool SuppressMessaging;
     }
 
-    public class SendSpellHistory : ServerPacket
+    public class SendSpellHistory : ServerPacket, ISpanWritable
     {
+        // Practical cap for spell history at login
+        private const int MaxEntries = 64;
+        // Each entry: 6 fixed fields (24) + bits (1) = 25 bytes (unused optionals)
+        private const int MaxEntrySize = 25;
+
         public SendSpellHistory() : base(Opcode.SMSG_SEND_SPELL_HISTORY, ConnectionType.Instance) { }
 
         public override void Write()
         {
             _worldPacket.WriteInt32(Entries.Count);
             Entries.ForEach(p => p.Write(_worldPacket));
+        }
+
+        // MaxSize: count (4) + 64 entries (25 each) = 1604
+        public int MaxSize => 4 + MaxEntries * MaxEntrySize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Entries.Count > MaxEntries)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Entries.Count);
+            foreach (var entry in Entries)
+            {
+                writer.WriteUInt32(entry.SpellID);
+                writer.WriteUInt32(entry.ItemID);
+                writer.WriteUInt32(entry.Category);
+                writer.WriteInt32(entry.RecoveryTime);
+                writer.WriteInt32(entry.CategoryRecoveryTime);
+                writer.WriteFloat(entry.ModRate);
+                writer.WriteBit(false); // unused622_1
+                writer.WriteBit(false); // unused622_2
+                writer.WriteBit(entry.OnHold);
+                writer.FlushBits();
+                // unused622_1 and unused622_2 are never set
+            }
+            return writer.Position;
         }
 
         public List<SpellHistoryEntry> Entries = new();
@@ -174,14 +382,39 @@ namespace HermesProxy.World.Server.Packets
         uint? unused622_2;   // This field is not used for anything in the client in 6.2.2.20444
     }
 
-    public class SendSpellCharges : ServerPacket
+    public class SendSpellCharges : ServerPacket, ISpanWritable
     {
+        // Practical cap for spell charges - limited charge categories
+        private const int MaxEntries = 16;
+        // Each entry: uint + uint + float + byte = 13 bytes
+        private const int EntrySize = 13;
+
         public SendSpellCharges() : base(Opcode.SMSG_SEND_SPELL_CHARGES, ConnectionType.Instance) { }
 
         public override void Write()
         {
             _worldPacket.WriteInt32(Entries.Count);
             Entries.ForEach(p => p.Write(_worldPacket));
+        }
+
+        // MaxSize: count (4) + 16 entries (13 each) = 212
+        public int MaxSize => 4 + MaxEntries * EntrySize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Entries.Count > MaxEntries)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Entries.Count);
+            foreach (var entry in Entries)
+            {
+                writer.WriteUInt32(entry.Category);
+                writer.WriteUInt32(entry.NextRecoveryTime);
+                writer.WriteFloat(entry.ChargeModRate);
+                writer.WriteUInt8(entry.ConsumedCharges);
+            }
+            return writer.Position;
         }
 
         public List<SpellChargeEntry> Entries = new();
@@ -224,13 +457,22 @@ namespace HermesProxy.World.Server.Packets
         public override void Read() { }
     }
 
-    public class CancelAutoRepeat : ServerPacket
+    public class CancelAutoRepeat : ServerPacket, ISpanWritable
     {
         public CancelAutoRepeat() : base(Opcode.SMSG_CANCEL_AUTO_REPEAT) { }
 
         public override void Write()
         {
             _worldPacket.WritePackedGuid128(Guid);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Guid.Low, Guid.High);
+            return writer.Position;
         }
 
         public WowGuid128 Guid;
@@ -570,7 +812,7 @@ namespace HermesProxy.World.Server.Packets
                                  // does not match SpellCastResult enum
     }
 
-    class SpellPrepare : ServerPacket
+    class SpellPrepare : ServerPacket, ISpanWritable
     {
         public SpellPrepare() : base(Opcode.SMSG_SPELL_PREPARE) { }
 
@@ -580,11 +822,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(ServerCastID);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2; // 2 packed GUIDs
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(ClientCastID.Low, ClientCastID.High);
+            writer.WritePackedGuid128(ServerCastID.Low, ServerCastID.High);
+            return writer.Position;
+        }
+
         public WowGuid128 ClientCastID;
         public WowGuid128 ServerCastID;
     }
 
-    class CastFailed : ServerPacket
+    class CastFailed : ServerPacket, ISpanWritable
     {
         public CastFailed() : base(Opcode.SMSG_CAST_FAILED, ConnectionType.Instance) { }
 
@@ -598,6 +850,20 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(FailedArg2);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 * 4 + 4 * 2; // GUID + 4 uint32 + 2 int32
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(CastID.Low, CastID.High);
+            writer.WriteUInt32(SpellID);
+            writer.WriteUInt32(SpellXSpellVisualID);
+            writer.WriteUInt32(Reason);
+            writer.WriteInt32(FailedArg1);
+            writer.WriteInt32(FailedArg2);
+            return writer.Position;
+        }
+
         public WowGuid128 CastID;
         public uint SpellID;
         public uint Reason;
@@ -606,7 +872,7 @@ namespace HermesProxy.World.Server.Packets
         public uint SpellXSpellVisualID;
     }
 
-    class PetCastFailed : ServerPacket
+    class PetCastFailed : ServerPacket, ISpanWritable
     {
         public PetCastFailed() : base(Opcode.SMSG_PET_CAST_FAILED, ConnectionType.Instance) { }
 
@@ -619,6 +885,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(FailedArg2);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 * 3 + 4 * 2; // GUID + 3 uint32 + 2 int32
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(CastID.Low, CastID.High);
+            writer.WriteUInt32(SpellID);
+            writer.WriteUInt32(Reason);
+            writer.WriteInt32(FailedArg1);
+            writer.WriteInt32(FailedArg2);
+            return writer.Position;
+        }
+
         public WowGuid128 CastID;
         public uint SpellID;
         public uint Reason;
@@ -626,7 +905,7 @@ namespace HermesProxy.World.Server.Packets
         public int FailedArg2 = -1;
     }
 
-    public class SpellFailure : ServerPacket
+    public class SpellFailure : ServerPacket, ISpanWritable
     {
         public SpellFailure() : base(Opcode.SMSG_SPELL_FAILURE, ConnectionType.Instance) { }
 
@@ -639,6 +918,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt16(Reason);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 4 * 2 + 2; // 2 GUIDs + 2 uint32 + ushort
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(CasterUnit.Low, CasterUnit.High);
+            writer.WritePackedGuid128(CastID.Low, CastID.High);
+            writer.WriteUInt32(SpellID);
+            writer.WriteUInt32(SpellXSpellVisualID);
+            writer.WriteUInt16(Reason);
+            return writer.Position;
+        }
+
         public WowGuid128 CasterUnit;
         public WowGuid128 CastID;
         public uint SpellID;
@@ -646,7 +938,7 @@ namespace HermesProxy.World.Server.Packets
         public ushort Reason;
     }
 
-    public class SpellFailedOther : ServerPacket
+    public class SpellFailedOther : ServerPacket, ISpanWritable
     {
         public SpellFailedOther() : base(Opcode.SMSG_SPELL_FAILED_OTHER, ConnectionType.Instance) { }
 
@@ -657,6 +949,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(SpellID);
             _worldPacket.WriteUInt32(SpellXSpellVisualID);
             _worldPacket.WriteUInt8(Reason);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 4 * 2 + 1; // 2 GUIDs + 2 uint32 + byte
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(CasterUnit.Low, CasterUnit.High);
+            writer.WritePackedGuid128(CastID.Low, CastID.High);
+            writer.WriteUInt32(SpellID);
+            writer.WriteUInt32(SpellXSpellVisualID);
+            writer.WriteUInt8(Reason);
+            return writer.Position;
         }
 
         public WowGuid128 CasterUnit;
@@ -972,8 +1277,11 @@ namespace HermesProxy.World.Server.Packets
         public ushort Rank;
     }
 
-    public class SpellCooldownPkt : ServerPacket
+    public class SpellCooldownPkt : ServerPacket, ISpanWritable
     {
+        // Practical cap for cooldowns at login
+        private const int MaxCooldowns = 64;
+
         public SpellCooldownPkt() : base(Opcode.SMSG_SPELL_COOLDOWN, ConnectionType.Instance) { }
 
         public override void Write()
@@ -983,6 +1291,27 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(SpellCooldowns.Count);
             foreach (var cd in SpellCooldowns)
                 cd.Write(_worldPacket);
+        }
+
+        // MaxSize: GUID (18) + byte (1) + count (4) + 64 cooldowns (12 each) = 791
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 1 + 4 + MaxCooldowns * 12;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (SpellCooldowns.Count > MaxCooldowns)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Caster.Low, Caster.High);
+            writer.WriteUInt8(Flags);
+            writer.WriteInt32(SpellCooldowns.Count);
+            foreach (var cd in SpellCooldowns)
+            {
+                writer.WriteUInt32(cd.SpellID);
+                writer.WriteUInt32(cd.ForcedCooldown);
+                writer.WriteFloat(cd.ModRate);
+            }
+            return writer.Position;
         }
 
         public List<SpellCooldownStruct> SpellCooldowns = new();
@@ -1004,7 +1333,7 @@ namespace HermesProxy.World.Server.Packets
         public float ModRate = 1.0f;
     }
 
-    public class CooldownEvent : ServerPacket
+    public class CooldownEvent : ServerPacket, ISpanWritable
     {
         public CooldownEvent() : base(Opcode.SMSG_COOLDOWN_EVENT, ConnectionType.Instance) { }
 
@@ -1015,11 +1344,22 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => 5; // uint + 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(SpellID);
+            writer.WriteBit(IsPet);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public bool IsPet;
         public uint SpellID;
     }
 
-    public class ClearCooldown : ServerPacket
+    public class ClearCooldown : ServerPacket, ISpanWritable
     {
         public ClearCooldown() : base(Opcode.SMSG_CLEAR_COOLDOWN, ConnectionType.Instance) { }
 
@@ -1031,12 +1371,24 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => 5; // uint + 1 byte for 2 bits
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(SpellID);
+            writer.WriteBit(ClearOnHold);
+            writer.WriteBit(IsPet);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public bool IsPet;
         public uint SpellID;
         public bool ClearOnHold;
     }
 
-    public class CooldownCheat : ServerPacket
+    public class CooldownCheat : ServerPacket, ISpanWritable
     {
         public CooldownCheat() : base(Opcode.SMSG_COOLDOWN_CHEAT, ConnectionType.Instance) { }
 
@@ -1045,11 +1397,22 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(Guid);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Guid.Low, Guid.High);
+            return writer.Position;
+        }
+
         public WowGuid128 Guid;
     }
 
-    class SpellNonMeleeDamageLog : ServerPacket
+    class SpellNonMeleeDamageLog : ServerPacket, ISpanWritable
     {
+        private const int MaxPowerDataEntries = 10;
+
         public SpellNonMeleeDamageLog() : base(Opcode.SMSG_SPELL_NON_MELEE_DAMAGE_LOG, ConnectionType.Instance) { }
 
         public override void Write()
@@ -1082,6 +1445,46 @@ namespace HermesProxy.World.Server.Packets
                 ContentTuning.Write(_worldPacket);
         }
 
+        // MaxSize: 3 GUIDs (54) + fixed values (33) + bits (2) + SpellCastLogData (142) + ContentTuning (22) = 253
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 3 + 33 + 2 +
+            SpellPacketHelpers.SpellCastLogDataFixedSize + MaxPowerDataEntries * SpellPacketHelpers.SpellLogPowerDataSize +
+            SpellPacketHelpers.ContentTuningParamsSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(TargetGUID.Low, TargetGUID.High);
+            writer.WritePackedGuid128(CasterGUID.Low, CasterGUID.High);
+            writer.WritePackedGuid128(CastID.Low, CastID.High);
+            writer.WriteUInt32(SpellID);
+            writer.WriteUInt32(SpellXSpellVisualID);
+            writer.WriteInt32(Damage);
+            writer.WriteInt32(OriginalDamage);
+            writer.WriteInt32(Overkill);
+            writer.WriteUInt8(SchoolMask);
+            writer.WriteInt32(Absorbed);
+            writer.WriteInt32(Resisted);
+            writer.WriteInt32(ShieldBlock);
+
+            writer.WriteBit(Periodic);
+            writer.WriteBits((uint)Flags, 7);
+            writer.WriteBit(false); // Debug info
+            writer.WriteBit(LogData != null);
+            writer.WriteBit(ContentTuning != null);
+            writer.FlushBits();
+
+            if (LogData != null)
+            {
+                if (!SpellPacketHelpers.WriteSpellCastLogData(ref writer, LogData, MaxPowerDataEntries))
+                    return -1;
+            }
+
+            if (ContentTuning != null)
+                SpellPacketHelpers.WriteContentTuningParams(ref writer, ContentTuning);
+
+            return writer.Position;
+        }
+
         public WowGuid128 TargetGUID;
         public WowGuid128 CasterGUID;
         public WowGuid128 CastID;
@@ -1100,8 +1503,10 @@ namespace HermesProxy.World.Server.Packets
         public ContentTuningParams ContentTuning;
     }
 
-    class SpellHealLog : ServerPacket
+    class SpellHealLog : ServerPacket, ISpanWritable
     {
+        private const int MaxPowerDataEntries = 10;
+
         public SpellHealLog() : base(Opcode.SMSG_SPELL_HEAL_LOG, ConnectionType.Instance) { }
 
         public override void Write()
@@ -1136,6 +1541,47 @@ namespace HermesProxy.World.Server.Packets
                 ContentTuning.Write(_worldPacket);
         }
 
+        // MaxSize: 2 GUIDs (36) + 5 values (20) + bits (1) + SpellCastLogData (142) + 2 floats (8) + ContentTuning (22) = 229
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 20 + 1 +
+            SpellPacketHelpers.SpellCastLogDataFixedSize + MaxPowerDataEntries * SpellPacketHelpers.SpellLogPowerDataSize +
+            8 + SpellPacketHelpers.ContentTuningParamsSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(TargetGUID.Low, TargetGUID.High);
+            writer.WritePackedGuid128(CasterGUID.Low, CasterGUID.High);
+            writer.WriteUInt32(SpellID);
+            writer.WriteInt32(HealAmount);
+            writer.WriteInt32(OriginalHealAmount);
+            writer.WriteUInt32(OverHeal);
+            writer.WriteUInt32(Absorbed);
+
+            writer.WriteBit(Crit);
+            writer.WriteBit(CritRollMade.HasValue);
+            writer.WriteBit(CritRollNeeded.HasValue);
+            writer.WriteBit(LogData != null);
+            writer.WriteBit(ContentTuning != null);
+            writer.FlushBits();
+
+            if (LogData != null)
+            {
+                if (!SpellPacketHelpers.WriteSpellCastLogData(ref writer, LogData, MaxPowerDataEntries))
+                    return -1;
+            }
+
+            if (CritRollMade.HasValue)
+                writer.WriteFloat(CritRollMade.Value);
+
+            if (CritRollNeeded.HasValue)
+                writer.WriteFloat(CritRollNeeded.Value);
+
+            if (ContentTuning != null)
+                SpellPacketHelpers.WriteContentTuningParams(ref writer, ContentTuning);
+
+            return writer.Position;
+        }
+
         public WowGuid128 CasterGUID;
         public WowGuid128 TargetGUID;
         public uint SpellID;
@@ -1150,7 +1596,7 @@ namespace HermesProxy.World.Server.Packets
         public ContentTuningParams ContentTuning;
     }
 
-    public class SpellDelayed : ServerPacket
+    public class SpellDelayed : ServerPacket, ISpanWritable
     {
         public SpellDelayed() : base(Opcode.SMSG_SPELL_DELAYED, ConnectionType.Instance) { }
 
@@ -1160,11 +1606,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(Delay);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4; // GUID + int
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(CasterGUID.Low, CasterGUID.High);
+            writer.WriteInt32(Delay);
+            return writer.Position;
+        }
+
         public WowGuid128 CasterGUID;
         public int Delay;
     }
 
-    public class SpellChannelStart : ServerPacket
+    public class SpellChannelStart : ServerPacket, ISpanWritable
     {
         public SpellChannelStart() : base(Opcode.SMSG_SPELL_CHANNEL_START, ConnectionType.Instance) { }
 
@@ -1183,6 +1639,38 @@ namespace HermesProxy.World.Server.Packets
 
             if (HealPrediction != null)
                 HealPrediction.Write(_worldPacket);
+        }
+
+        // MaxSize: GUID (18) + 3 uints (12) + bits (1) + InterruptImmunities (8) + HealPrediction (41) = 80
+        // HealPrediction: TargetGUID (18) + Points (4) + Type (1) + BeaconGUID (18) = 41
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 12 + 1 + 8 + 41;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(CasterGUID.Low, CasterGUID.High);
+            writer.WriteUInt32(SpellID);
+            writer.WriteUInt32(SpellXSpellVisualID);
+            writer.WriteUInt32(Duration);
+            writer.WriteBit(InterruptImmunities != null);
+            writer.WriteBit(HealPrediction != null);
+            writer.FlushBits();
+
+            if (InterruptImmunities != null)
+            {
+                writer.WriteInt32(InterruptImmunities.SchoolImmunities);
+                writer.WriteInt32(InterruptImmunities.Immunities);
+            }
+
+            if (HealPrediction != null)
+            {
+                writer.WritePackedGuid128(HealPrediction.TargetGUID.Low, HealPrediction.TargetGUID.High);
+                writer.WriteUInt32(HealPrediction.Predict.Points);
+                writer.WriteUInt8(HealPrediction.Predict.Type);
+                writer.WritePackedGuid128(HealPrediction.Predict.BeaconGUID.Low, HealPrediction.Predict.BeaconGUID.High);
+            }
+
+            return writer.Position;
         }
 
         public WowGuid128 CasterGUID;
@@ -1217,7 +1705,7 @@ namespace HermesProxy.World.Server.Packets
         public SpellHealPrediction Predict;
     }
 
-    public class SpellChannelUpdate : ServerPacket
+    public class SpellChannelUpdate : ServerPacket, ISpanWritable
     {
         public SpellChannelUpdate() : base(Opcode.SMSG_SPELL_CHANNEL_UPDATE, ConnectionType.Instance) { }
 
@@ -1225,6 +1713,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WritePackedGuid128(CasterGUID);
             _worldPacket.WriteInt32(TimeRemaining);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4; // GUID + int
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(CasterGUID.Low, CasterGUID.High);
+            writer.WriteInt32(TimeRemaining);
+            return writer.Position;
         }
 
         public WowGuid128 CasterGUID;
@@ -1303,8 +1801,11 @@ namespace HermesProxy.World.Server.Packets
         }
     }
 
-    class SpellEnergizeLog : ServerPacket
+    class SpellEnergizeLog : ServerPacket, ISpanWritable
     {
+        // Cap for power types in SpellCastLogData
+        private const int MaxPowerDataEntries = 10;
+
         public SpellEnergizeLog() : base(Opcode.SMSG_SPELL_ENERGIZE_LOG, ConnectionType.Instance) { }
 
         public override void Write()
@@ -1324,6 +1825,30 @@ namespace HermesProxy.World.Server.Packets
                 LogData.Write(_worldPacket);
         }
 
+        // MaxSize: 2 GUIDs (36) + 4 ints (16) + bit (1) + SpellCastLogData (22 + 10*12) = 195
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 16 + 1 + 22 + MaxPowerDataEntries * 12;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(TargetGUID.Low, TargetGUID.High);
+            writer.WritePackedGuid128(CasterGUID.Low, CasterGUID.High);
+            writer.WriteUInt32(SpellID);
+            writer.WriteUInt32((uint)Type);
+            writer.WriteInt32(Amount);
+            writer.WriteInt32(OverEnergize);
+            writer.WriteBit(LogData != null);
+            writer.FlushBits();
+
+            if (LogData != null)
+            {
+                if (!SpellPacketHelpers.WriteSpellCastLogData(ref writer, LogData, MaxPowerDataEntries))
+                    return -1;
+            }
+
+            return writer.Position;
+        }
+
         public WowGuid128 TargetGUID;
         public WowGuid128 CasterGUID;
         public uint SpellID;
@@ -1333,8 +1858,10 @@ namespace HermesProxy.World.Server.Packets
         public SpellCastLogData LogData;
     }
 
-    class SpellDamageShield : ServerPacket
+    class SpellDamageShield : ServerPacket, ISpanWritable
     {
+        private const int MaxPowerDataEntries = 10;
+
         public SpellDamageShield() : base(Opcode.SMSG_SPELL_DAMAGE_SHIELD, ConnectionType.Instance) { }
 
         public override void Write()
@@ -1355,6 +1882,33 @@ namespace HermesProxy.World.Server.Packets
                 LogData.Write(_worldPacket);
         }
 
+        // MaxSize: 2 GUIDs (36) + 6 ints (24) + bit (1) + SpellCastLogData (22 + 10*12) = 203
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 24 + 1 +
+            SpellPacketHelpers.SpellCastLogDataFixedSize + MaxPowerDataEntries * SpellPacketHelpers.SpellLogPowerDataSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(VictimGUID.Low, VictimGUID.High);
+            writer.WritePackedGuid128(CasterGUID.Low, CasterGUID.High);
+            writer.WriteUInt32(SpellID);
+            writer.WriteInt32(Damage);
+            writer.WriteInt32(OriginalDamage);
+            writer.WriteUInt32(OverKill);
+            writer.WriteUInt32(SchoolMask);
+            writer.WriteUInt32(LogAbsorbed);
+            writer.WriteBit(LogData != null);
+            writer.FlushBits();
+
+            if (LogData != null)
+            {
+                if (!SpellPacketHelpers.WriteSpellCastLogData(ref writer, LogData, MaxPowerDataEntries))
+                    return -1;
+            }
+
+            return writer.Position;
+        }
+
         public WowGuid128 VictimGUID;
         public WowGuid128 CasterGUID;
         public uint SpellID;
@@ -1366,8 +1920,10 @@ namespace HermesProxy.World.Server.Packets
         public SpellCastLogData LogData;
     }
 
-    class EnvironmentalDamageLog : ServerPacket
+    class EnvironmentalDamageLog : ServerPacket, ISpanWritable
     {
+        private const int MaxPowerDataEntries = 10;
+
         public EnvironmentalDamageLog() : base(Opcode.SMSG_ENVIRONMENTAL_DAMAGE_LOG) { }
 
         public override void Write()
@@ -1385,6 +1941,30 @@ namespace HermesProxy.World.Server.Packets
                 LogData.Write(_worldPacket);
         }
 
+        // MaxSize: 1 GUID (18) + byte + 3 ints (13) + bit (1) + SpellCastLogData (22 + 10*12) = 174
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 13 + 1 +
+            SpellPacketHelpers.SpellCastLogDataFixedSize + MaxPowerDataEntries * SpellPacketHelpers.SpellLogPowerDataSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Victim.Low, Victim.High);
+            writer.WriteUInt8((byte)Type);
+            writer.WriteInt32(Amount);
+            writer.WriteInt32(Resisted);
+            writer.WriteInt32(Absorbed);
+            writer.WriteBit(LogData != null);
+            writer.FlushBits();
+
+            if (LogData != null)
+            {
+                if (!SpellPacketHelpers.WriteSpellCastLogData(ref writer, LogData, MaxPowerDataEntries))
+                    return -1;
+            }
+
+            return writer.Position;
+        }
+
         public WowGuid128 Victim;
         public EnvironmentalDamage Type;
         public int Amount;
@@ -1393,7 +1973,7 @@ namespace HermesProxy.World.Server.Packets
         public SpellCastLogData LogData;
     }
 
-    public class SpellInstakillLog : ServerPacket
+    public class SpellInstakillLog : ServerPacket, ISpanWritable
     {
         public SpellInstakillLog() : base(Opcode.SMSG_SPELL_INSTAKILL_LOG, ConnectionType.Instance) { }
 
@@ -1404,12 +1984,23 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(SpellID);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 4; // 2 GUIDs + uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(TargetGUID.Low, TargetGUID.High);
+            writer.WritePackedGuid128(CasterGUID.Low, CasterGUID.High);
+            writer.WriteUInt32(SpellID);
+            return writer.Position;
+        }
+
         public WowGuid128 TargetGUID;
         public WowGuid128 CasterGUID;
         public uint SpellID;
     }
 
-    class SpellDispellLog : ServerPacket
+    class SpellDispellLog : ServerPacket, ISpanWritable
     {
         public SpellDispellLog() : base(Opcode.SMSG_SPELL_DISPELL_LOG, ConnectionType.Instance) { }
 
@@ -1437,6 +2028,41 @@ namespace HermesProxy.World.Server.Packets
             }
         }
 
+        // Cap for dispells - typically 1-3 auras dispelled at once
+        private const int MaxDispells = 8;
+        // 1 byte (2 bits) + 2 GUIDs(36) + uint(4) + count(4) + entries(13 max each)
+        // Each entry: SpellID(4) + 1 byte (3 bits flushed) + Rolled(4) + Needed(4) = 13
+        public int MaxSize => 1 + PackedGuidHelper.MaxPackedGuid128Size * 2 + 4 + 4 + MaxDispells * 13;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (DispellData.Count > MaxDispells)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBit(IsSteal);
+            writer.WriteBit(IsBreak);
+            writer.WritePackedGuid128(TargetGUID.Low, TargetGUID.High);
+            writer.WritePackedGuid128(CasterGUID.Low, CasterGUID.High);
+            writer.WriteUInt32(DispelledBySpellID);
+
+            writer.WriteInt32(DispellData.Count);
+            foreach (var data in DispellData)
+            {
+                writer.WriteUInt32(data.SpellID);
+                writer.WriteBit(data.Harmful);
+                writer.WriteBit(data.Rolled.HasValue);
+                writer.WriteBit(data.Needed.HasValue);
+                if (data.Rolled.HasValue)
+                    writer.WriteInt32(data.Rolled.Value);
+                if (data.Needed.HasValue)
+                    writer.WriteInt32(data.Needed.Value);
+
+                writer.FlushBits();
+            }
+            return writer.Position;
+        }
+
         public bool IsSteal;
         public bool IsBreak;
         public WowGuid128 TargetGUID;
@@ -1453,7 +2079,7 @@ namespace HermesProxy.World.Server.Packets
         public int? Needed;
     }
 
-    class PlaySpellVisualKit : ServerPacket
+    class PlaySpellVisualKit : ServerPacket, ISpanWritable
     {
         public PlaySpellVisualKit() : base(Opcode.SMSG_PLAY_SPELL_VISUAL_KIT) { }
 
@@ -1467,6 +2093,20 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 13; // GUID + 3 uint + 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Unit.Low, Unit.High);
+            writer.WriteUInt32(KitRecID);
+            writer.WriteUInt32(KitType);
+            writer.WriteUInt32(Duration);
+            writer.WriteBit(MountedVisual);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public WowGuid128 Unit;
         public uint KitRecID;
         public uint KitType;
@@ -1474,7 +2114,7 @@ namespace HermesProxy.World.Server.Packets
         public bool MountedVisual = false;
     }
 
-    class ResurrectRequest : ServerPacket
+    class ResurrectRequest : ServerPacket, ISpanWritable
     {
         public ResurrectRequest() : base(Opcode.SMSG_RESURRECT_REQUEST) { }
 
@@ -1490,6 +2130,25 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
 
             _worldPacket.WriteString(Name);
+        }
+
+        // MaxSize: GUID (18) + 3 uints (12) + bits (11+1+1=13 -> 2) + name (24) = 56
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 12 + 2 + GameLimits.MaxPlayerNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(CasterGUID.Low, CasterGUID.High);
+            writer.WriteUInt32(CasterVirtualRealmAddress);
+            writer.WriteUInt32(PetNumber);
+            writer.WriteUInt32(SpellID);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Name), 11);
+            writer.WriteBit(UseTimer);
+            writer.WriteBit(Sickness);
+            writer.FlushBits();
+
+            writer.WriteString(Name);
+            return writer.Position;
         }
 
         public WowGuid128 CasterGUID;
@@ -1527,7 +2186,7 @@ namespace HermesProxy.World.Server.Packets
         public uint SpellId;
     }
 
-    class TotemCreated : ServerPacket
+    class TotemCreated : ServerPacket, ISpanWritable
     {
         public TotemCreated() : base(Opcode.SMSG_TOTEM_CREATED) { }
 
@@ -1541,6 +2200,22 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteBit(CannotDismiss);
             _worldPacket.FlushBits();
         }
+
+        public int MaxSize => 1 + PackedGuidHelper.MaxPackedGuid128Size + 12 + 1; // byte + GUID + 2 uint + float + 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt8(Slot);
+            writer.WritePackedGuid128(Totem.Low, Totem.High);
+            writer.WriteUInt32(Duration);
+            writer.WriteUInt32(SpellId);
+            writer.WriteFloat(TimeMod);
+            writer.WriteBit(CannotDismiss);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public byte Slot;
         public WowGuid128 Totem;
         public uint Duration;
@@ -1562,7 +2237,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 Guid;
     }
 
-    public class SetSpellModifier : ServerPacket
+    public class SetSpellModifier : ServerPacket, ISpanWritable
     {
         public SetSpellModifier(Opcode opcode) : base(opcode, ConnectionType.Instance) { }
 
@@ -1571,6 +2246,34 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(Modifiers.Count);
             foreach (SpellModifierInfo spellMod in Modifiers)
                 spellMod.Write(_worldPacket);
+        }
+
+        private const int MaxModifiers = 8;
+        private const int MaxDataPerModifier = 8;
+        // 4 (count) + 8 * (1 + 4 + 8 * 5) = 4 + 8 * 45 = 364 bytes
+        public int MaxSize => 4 + MaxModifiers * (1 + 4 + MaxDataPerModifier * 5);
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Modifiers.Count > MaxModifiers)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Modifiers.Count);
+            foreach (SpellModifierInfo spellMod in Modifiers)
+            {
+                if (spellMod.ModifierData.Count > MaxDataPerModifier)
+                    return -1;
+
+                writer.WriteUInt8(spellMod.ModIndex);
+                writer.WriteInt32(spellMod.ModifierData.Count);
+                foreach (SpellModifierData modData in spellMod.ModifierData)
+                {
+                    writer.WriteInt32(modData.ModifierValue);
+                    writer.WriteUInt8(modData.ClassIndex);
+                }
+            }
+            return writer.Position;
         }
 
         public List<SpellModifierInfo> Modifiers = new();

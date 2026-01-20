@@ -81,6 +81,7 @@ namespace HermesProxy
             }
             Log.DebugLogEnabled = Settings.DebugOutput;
             Log.Print(LogType.Debug, "Debug logging enabled");
+            Log.SpanStatsEnabled = Settings.SpanStatsLog;
 
             if (!AesGcm.IsSupported)
             {

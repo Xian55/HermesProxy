@@ -18,6 +18,7 @@
 
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -25,7 +26,7 @@ using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets
 {
-    class BattlefieldList : ServerPacket
+    class BattlefieldList : ServerPacket, ISpanWritable
     {
         public BattlefieldList() : base(Opcode.SMSG_BATTLEFIELD_LIST) { }
 
@@ -44,6 +45,33 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteBit(PvpAnywhere);
             _worldPacket.WriteBit(HasRandomWinToday);
             _worldPacket.FlushBits();
+        }
+
+        // Cap for battlefield instances - rarely more than a few
+        private const int MaxInstances = 10;
+        // GUID(18) + int + uint + 2 bytes + count(4) + instances(4 each) + 1 byte bits
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + 4 + 2 + 4 + MaxInstances * 4 + 1;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (BattlefieldInstances.Count > MaxInstances)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(BattlemasterGuid.Low, BattlemasterGuid.High);
+            writer.WriteInt32(Verification);
+            writer.WriteUInt32(BattlemasterListID);
+            writer.WriteUInt8(MinLevel);
+            writer.WriteUInt8(MaxLevel);
+            writer.WriteInt32(BattlefieldInstances.Count);
+
+            foreach (var field in BattlefieldInstances)
+                writer.WriteInt32(field);
+
+            writer.WriteBit(PvpAnywhere);
+            writer.WriteBit(HasRandomWinToday);
+            writer.FlushBits();
+            return writer.Position;
         }
 
         public WowGuid128 BattlemasterGuid;
@@ -83,7 +111,7 @@ namespace HermesProxy.World.Server.Packets
         public bool JoinAsGroup;
     }
 
-    public class BattlefieldStatusNeedConfirmation : ServerPacket
+    public class BattlefieldStatusNeedConfirmation : ServerPacket, ISpanWritable
     {
         public BattlefieldStatusNeedConfirmation() : base(Opcode.SMSG_BATTLEFIELD_STATUS_NEED_CONFIRMATION) { }
 
@@ -95,13 +123,56 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt8(Role);
         }
 
+        // MaxSize: BattlefieldStatusHeader + 2 uints(8) + byte(1)
+        // BattlefieldStatusHeader: RideTicket(34) + opt byte(1) + int(4) + 3 bytes(3) + uint(4) + max 4 bgIds(32) + bits(2 -> 1) = 79
+        private const int MaxBattlefieldIds = 4;
+        private const int HeaderSize = 34 + 1 + 4 + 3 + 4 + MaxBattlefieldIds * 8 + 1;
+        public int MaxSize => HeaderSize + 9;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Hdr.BattlefieldListIDs.Count > MaxBattlefieldIds)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            // Inline BattlefieldStatusHeader write
+            writer.WritePackedGuid128(Hdr.Ticket.RequesterGuid.Low, Hdr.Ticket.RequesterGuid.High);
+            writer.WriteUInt32(Hdr.Ticket.Id);
+            writer.WriteUInt32((uint)Hdr.Ticket.Type);
+            writer.WriteInt64(Hdr.Ticket.Time);
+
+            if (ModernVersion.AddedInClassicVersion(1, 14, 3, 2, 5, 4))
+                writer.WriteUInt8(Hdr.Unk254);
+
+            writer.WriteInt32(Hdr.BattlefieldListIDs.Count);
+            writer.WriteUInt8(Hdr.RangeMin);
+            writer.WriteUInt8(Hdr.RangeMax);
+            writer.WriteUInt8(Hdr.ArenaTeamSize);
+            writer.WriteUInt32(Hdr.InstanceID);
+
+            foreach (ulong bgId in Hdr.BattlefieldListIDs)
+            {
+                ulong queueID = bgId | 0x1F10000000000000;
+                writer.WriteUInt64(queueID);
+            }
+
+            writer.WriteBit(Hdr.IsArena);
+            writer.WriteBit(Hdr.TournamentRules);
+            writer.FlushBits();
+
+            writer.WriteUInt32(Mapid);
+            writer.WriteUInt32(Timeout);
+            writer.WriteUInt8(Role);
+            return writer.Position;
+        }
+
         public BattlefieldStatusHeader Hdr = new();
         public uint Mapid;
         public uint Timeout;
         public byte Role;
     }
 
-    public class BattlefieldStatusQueued : ServerPacket
+    public class BattlefieldStatusQueued : ServerPacket, ISpanWritable
     {
         public BattlefieldStatusQueued() : base(Opcode.SMSG_BATTLEFIELD_STATUS_QUEUED) { }
 
@@ -120,6 +191,55 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        // MaxSize: BattlefieldStatusHeader(79) + 2 uints(8) + opt int(4) + 3 bits(1) = 92
+        private const int MaxBattlefieldIds = 4;
+        private const int HeaderSize = 34 + 1 + 4 + 3 + 4 + MaxBattlefieldIds * 8 + 1;
+        public int MaxSize => HeaderSize + 13;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Hdr.BattlefieldListIDs.Count > MaxBattlefieldIds)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            // Inline BattlefieldStatusHeader write
+            writer.WritePackedGuid128(Hdr.Ticket.RequesterGuid.Low, Hdr.Ticket.RequesterGuid.High);
+            writer.WriteUInt32(Hdr.Ticket.Id);
+            writer.WriteUInt32((uint)Hdr.Ticket.Type);
+            writer.WriteInt64(Hdr.Ticket.Time);
+
+            if (ModernVersion.AddedInClassicVersion(1, 14, 3, 2, 5, 4))
+                writer.WriteUInt8(Hdr.Unk254);
+
+            writer.WriteInt32(Hdr.BattlefieldListIDs.Count);
+            writer.WriteUInt8(Hdr.RangeMin);
+            writer.WriteUInt8(Hdr.RangeMax);
+            writer.WriteUInt8(Hdr.ArenaTeamSize);
+            writer.WriteUInt32(Hdr.InstanceID);
+
+            foreach (ulong bgId in Hdr.BattlefieldListIDs)
+            {
+                ulong queueID = bgId | 0x1F10000000000000;
+                writer.WriteUInt64(queueID);
+            }
+
+            writer.WriteBit(Hdr.IsArena);
+            writer.WriteBit(Hdr.TournamentRules);
+            writer.FlushBits();
+
+            writer.WriteUInt32(AverageWaitTime);
+            writer.WriteUInt32(WaitTime);
+
+            if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 3, 2, 5, 4))
+                writer.WriteInt32(Unk254);
+
+            writer.WriteBit(AsGroup);
+            writer.WriteBit(EligibleForMatchmaking);
+            writer.WriteBit(SuspendedQueue);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public BattlefieldStatusHeader Hdr = new();
         public uint AverageWaitTime;
         public uint WaitTime;
@@ -129,7 +249,7 @@ namespace HermesProxy.World.Server.Packets
         public bool SuspendedQueue;
     }
 
-    public class BattlefieldStatusFailed : ServerPacket
+    public class BattlefieldStatusFailed : ServerPacket, ISpanWritable
     {
         public BattlefieldStatusFailed() : base(Opcode.SMSG_BATTLEFIELD_STATUS_FAILED) { }
 
@@ -141,6 +261,26 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt64(queueID);
             _worldPacket.WriteInt32(Reason);
             _worldPacket.WritePackedGuid128(ClientID);
+        }
+
+        // RideTicket: GUID(18) + uint(4) + uint(4) + long(8) = 34
+        // Rest: ulong(8) + int(4) + GUID(18) = 30
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 16 + 8 + 4 + PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            // Inline RideTicket write
+            writer.WritePackedGuid128(Ticket.RequesterGuid.Low, Ticket.RequesterGuid.High);
+            writer.WriteUInt32(Ticket.Id);
+            writer.WriteUInt32((uint)Ticket.Type);
+            writer.WriteInt64(Ticket.Time);
+
+            ulong queueID = BattlefieldListId | 0x1F10000000000000;
+            writer.WriteUInt64(queueID);
+            writer.WriteInt32(Reason);
+            writer.WritePackedGuid128(ClientID.Low, ClientID.High);
+            return writer.Position;
         }
 
         public RideTicket Ticket = new();
@@ -232,7 +372,7 @@ namespace HermesProxy.World.Server.Packets
         public bool AcceptedInvite;
     }
 
-    public class BattlefieldStatusActive : ServerPacket
+    public class BattlefieldStatusActive : ServerPacket, ISpanWritable
     {
         public BattlefieldStatusActive() : base(Opcode.SMSG_BATTLEFIELD_STATUS_ACTIVE) { }
 
@@ -247,6 +387,51 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        // MaxSize: BattlefieldStatusHeader(79) + 3 uints(12) + 2 bits(1) = 92
+        private const int MaxBattlefieldIds = 4;
+        private const int HeaderSize = 34 + 1 + 4 + 3 + 4 + MaxBattlefieldIds * 8 + 1;
+        public int MaxSize => HeaderSize + 13;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Hdr.BattlefieldListIDs.Count > MaxBattlefieldIds)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            // Inline BattlefieldStatusHeader write
+            writer.WritePackedGuid128(Hdr.Ticket.RequesterGuid.Low, Hdr.Ticket.RequesterGuid.High);
+            writer.WriteUInt32(Hdr.Ticket.Id);
+            writer.WriteUInt32((uint)Hdr.Ticket.Type);
+            writer.WriteInt64(Hdr.Ticket.Time);
+
+            if (ModernVersion.AddedInClassicVersion(1, 14, 3, 2, 5, 4))
+                writer.WriteUInt8(Hdr.Unk254);
+
+            writer.WriteInt32(Hdr.BattlefieldListIDs.Count);
+            writer.WriteUInt8(Hdr.RangeMin);
+            writer.WriteUInt8(Hdr.RangeMax);
+            writer.WriteUInt8(Hdr.ArenaTeamSize);
+            writer.WriteUInt32(Hdr.InstanceID);
+
+            foreach (ulong bgId in Hdr.BattlefieldListIDs)
+            {
+                ulong queueID = bgId | 0x1F10000000000000;
+                writer.WriteUInt64(queueID);
+            }
+
+            writer.WriteBit(Hdr.IsArena);
+            writer.WriteBit(Hdr.TournamentRules);
+            writer.FlushBits();
+
+            writer.WriteUInt32(Mapid);
+            writer.WriteUInt32(ShutdownTimer);
+            writer.WriteUInt32(StartTimer);
+            writer.WriteBit(ArenaFaction != 0);
+            writer.WriteBit(LeftEarly);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public BattlefieldStatusHeader Hdr = new();
         public uint Mapid;
         public uint ShutdownTimer;
@@ -255,7 +440,7 @@ namespace HermesProxy.World.Server.Packets
         public bool LeftEarly;
     }
 
-    public class BattlegroundInit : ServerPacket
+    public class BattlegroundInit : ServerPacket, ISpanWritable
     {
         public BattlegroundInit() : base(Opcode.SMSG_BATTLEGROUND_INIT) { }
 
@@ -263,6 +448,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WriteUInt32(Milliseconds);
             _worldPacket.WriteUInt16(BattlegroundPoints);
+        }
+
+        public int MaxSize => 6; // uint + ushort
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(Milliseconds);
+            writer.WriteUInt16(BattlegroundPoints);
+            return writer.Position;
         }
 
         public uint Milliseconds;
@@ -443,7 +638,7 @@ namespace HermesProxy.World.Server.Packets
         public override void Read() { }
     }
 
-    class BattlegroundPlayerPositions : ServerPacket
+    class BattlegroundPlayerPositions : ServerPacket, ISpanWritable
     {
         public BattlegroundPlayerPositions() : base(Opcode.SMSG_BATTLEGROUND_PLAYER_POSITIONS, ConnectionType.Instance) { }
 
@@ -452,6 +647,29 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(FlagCarriers.Count);
             foreach (var pos in FlagCarriers)
                 pos.Write(_worldPacket);
+        }
+
+        // Cap for flag carriers - typically 2 (one per team), max 4 for safety
+        private const int MaxFlagCarriers = 4;
+        // Each position: GUID(18) + Vector2(8) + 2 bytes = 28
+        private const int PositionSize = PackedGuidHelper.MaxPackedGuid128Size + 8 + 2;
+        public int MaxSize => 4 + MaxFlagCarriers * PositionSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (FlagCarriers.Count > MaxFlagCarriers)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(FlagCarriers.Count);
+            foreach (var pos in FlagCarriers)
+            {
+                writer.WritePackedGuid128(pos.Guid.Low, pos.Guid.High);
+                writer.WriteVector2(pos.Pos);
+                writer.WriteInt8(pos.IconID);
+                writer.WriteInt8(pos.ArenaSlot);
+            }
+            return writer.Position;
         }
 
         public List<BattlegroundPlayerPosition> FlagCarriers = new();
@@ -473,7 +691,7 @@ namespace HermesProxy.World.Server.Packets
         public sbyte ArenaSlot;
     }
 
-    class BattlegroundPlayerLeftOrJoined : ServerPacket
+    class BattlegroundPlayerLeftOrJoined : ServerPacket, ISpanWritable
     {
         public BattlegroundPlayerLeftOrJoined(Opcode opcode) : base(opcode, ConnectionType.Instance) { }
 
@@ -482,10 +700,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(Guid);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Guid.Low, Guid.High);
+            return writer.Position;
+        }
+
         public WowGuid128 Guid;
     }
 
-    public class AreaSpiritHealerTime : ServerPacket
+    public class AreaSpiritHealerTime : ServerPacket, ISpanWritable
     {
         public AreaSpiritHealerTime() : base(Opcode.SMSG_AREA_SPIRIT_HEALER_TIME) { }
 
@@ -495,11 +722,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(TimeLeft);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4; // GUID + uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(HealerGuid.Low, HealerGuid.High);
+            writer.WriteUInt32(TimeLeft);
+            return writer.Position;
+        }
+
         public WowGuid128 HealerGuid;
         public uint TimeLeft;
     }
 
-    class PvPCredit : ServerPacket
+    class PvPCredit : ServerPacket, ISpanWritable
     {
         public PvPCredit() : base(Opcode.SMSG_PVP_CREDIT) { }
 
@@ -511,13 +748,25 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(Rank);
         }
 
+        public int MaxSize => 12 + PackedGuidHelper.MaxPackedGuid128Size; // 2 ints + GUID + uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(OriginalHonor);
+            writer.WriteInt32(Honor);
+            writer.WritePackedGuid128(Target.Low, Target.High);
+            writer.WriteUInt32(Rank);
+            return writer.Position;
+        }
+
         public int OriginalHonor;
         public int Honor;
         public WowGuid128 Target;
         public uint Rank;
     }
 
-    class PlayerSkinned : ServerPacket
+    class PlayerSkinned : ServerPacket, ISpanWritable
     {
         public PlayerSkinned() : base(Opcode.SMSG_PLAYER_SKINNED, ConnectionType.Instance) { }
 
@@ -525,6 +774,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WriteBit(FreeRepop);
             _worldPacket.FlushBits();
+        }
+
+        public int MaxSize => 1; // 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBit(FreeRepop);
+            writer.FlushBits();
+            return writer.Position;
         }
 
         public bool FreeRepop;

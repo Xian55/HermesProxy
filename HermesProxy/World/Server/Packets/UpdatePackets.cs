@@ -18,6 +18,7 @@
 
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -349,8 +350,12 @@ namespace HermesProxy.World.Server.Packets
         public List<ObjectUpdate> ObjectUpdates = new List<ObjectUpdate>();
     }
 
-    public class PowerUpdate : ServerPacket
+    public class PowerUpdate : ServerPacket, ISpanWritable
     {
+        // WoW has ~20 power types (mana, rage, focus, energy, combo points, runes, etc.)
+        // Practical cap is much lower since a unit only has a few power types
+        private const int MaxPowerTypes = 16;
+
         public PowerUpdate(WowGuid128 guid) : base(Opcode.SMSG_POWER_UPDATE)
         {
             Guid = guid;
@@ -366,6 +371,27 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteInt32(power.Power);
                 _worldPacket.WriteUInt8(power.PowerType);
             }
+        }
+
+        // MaxSize: PackedGuid128 (18) + int (4) + 16 * (int (4) + byte (1)) = 102
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + MaxPowerTypes * 5;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Powers.Count > MaxPowerTypes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Guid.Low, Guid.High);
+            writer.WriteInt32(Powers.Count);
+
+            foreach (var power in Powers)
+            {
+                writer.WriteInt32(power.Power);
+                writer.WriteUInt8(power.PowerType);
+            }
+
+            return writer.Position;
         }
 
         public WowGuid128 Guid;

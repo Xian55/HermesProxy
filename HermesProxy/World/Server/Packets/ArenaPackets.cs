@@ -18,10 +18,12 @@
 
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace HermesProxy.World.Server.Packets
 {
@@ -49,7 +51,7 @@ namespace HermesProxy.World.Server.Packets
         public uint TeamId;
     }
 
-    class ArenaTeamRosterResponse : ServerPacket
+    class ArenaTeamRosterResponse : ServerPacket, ISpanWritable
     {
         public ArenaTeamRosterResponse() : base(Opcode.SMSG_ARENA_TEAM_ROSTER) { }
 
@@ -71,6 +73,67 @@ namespace HermesProxy.World.Server.Packets
             }
             foreach (var member in Members)
                 member.Write(_worldPacket);
+        }
+
+        // Cap for arena team members (max 5 for 5v5, but allow some buffer)
+        private const int MaxMembers = 10;
+        // Per member: GUID(18) + bool(1) + int(4) + 2 bytes(2) + 5 uints(20) + bits(1) + name(48) + 2 floats(8) = 102 bytes max
+        private const int MaxMemberSize = 102;
+        // 8 uints(32) + count(4) + bit(1) + members
+        public int MaxSize => 32 + 4 + 1 + MaxMembers * MaxMemberSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Members.Count > MaxMembers)
+                return -1;
+
+            // Pre-validate name lengths
+            foreach (var member in Members)
+            {
+                if (Encoding.UTF8.GetByteCount(member.Name) > GameLimits.MaxPlayerNameBytes)
+                    return -1;
+            }
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(TeamId);
+            writer.WriteUInt32(TeamSize);
+            writer.WriteUInt32(TeamPlayed);
+            writer.WriteUInt32(TeamWins);
+            writer.WriteUInt32(SeasonPlayed);
+            writer.WriteUInt32(SeasonWins);
+            writer.WriteUInt32(TeamRating);
+            writer.WriteUInt32(PlayerRating);
+            writer.WriteInt32(Members.Count);
+            if (ModernVersion.AddedInClassicVersion(1, 14, 2, 2, 5, 3))
+            {
+                writer.WriteBit(UnkBit);
+                writer.FlushBits();
+            }
+            foreach (var member in Members)
+            {
+                writer.WritePackedGuid128(member.MemberGUID.Low, member.MemberGUID.High);
+                writer.WriteBool(member.Online);
+                writer.WriteInt32(member.Captain);
+                writer.WriteUInt8(member.Level);
+                writer.WriteUInt8((byte)member.ClassId);
+                writer.WriteUInt32(member.WeekGamesPlayed);
+                writer.WriteUInt32(member.WeekGamesWon);
+                writer.WriteUInt32(member.SeasonGamesPlayed);
+                writer.WriteUInt32(member.SeasonGamesWon);
+                writer.WriteUInt32(member.PersonalRating);
+
+                writer.WriteBits((uint)Encoding.UTF8.GetByteCount(member.Name), 6);
+                writer.WriteBit(member.dword60 != null);
+                writer.WriteBit(member.dword68 != null);
+                writer.FlushBits();
+
+                writer.WriteString(member.Name);
+                if (member.dword60 != null)
+                    writer.WriteFloat((float)member.dword60);
+                if (member.dword68 != null)
+                    writer.WriteFloat((float)member.dword68);
+            }
+            return writer.Position;
         }
 
         public uint TeamId;
@@ -127,7 +190,7 @@ namespace HermesProxy.World.Server.Packets
         public float? dword68;
     }
 
-    class ArenaTeamQueryResponse : ServerPacket
+    class ArenaTeamQueryResponse : ServerPacket, ISpanWritable
     {
         public ArenaTeamQueryResponse() : base(Opcode.SMSG_QUERY_ARENA_TEAM_RESPONSE) { }
 
@@ -139,6 +202,35 @@ namespace HermesProxy.World.Server.Packets
 
             if (Emblem != null)
                 Emblem.Write(_worldPacket);
+        }
+
+        // uint(4) + bit(1) + optional ArenaTeamEmblem: 7 uints(28) + bits(1) + team name(48) = 82 bytes max
+        public int MaxSize => 4 + 1 + 28 + 1 + GameLimits.MaxArenaTeamNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Emblem != null && Encoding.UTF8.GetByteCount(Emblem.TeamName) > GameLimits.MaxArenaTeamNameBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(TeamId);
+            writer.WriteBit(Emblem != null);
+            writer.FlushBits();
+
+            if (Emblem != null)
+            {
+                writer.WriteUInt32(Emblem.TeamId);
+                writer.WriteUInt32(Emblem.TeamSize);
+                writer.WriteUInt32(Emblem.BackgroundColor);
+                writer.WriteUInt32(Emblem.EmblemStyle);
+                writer.WriteUInt32(Emblem.EmblemColor);
+                writer.WriteUInt32(Emblem.BorderStyle);
+                writer.WriteUInt32(Emblem.BorderColor);
+                writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Emblem.TeamName), 7);
+                writer.FlushBits();
+                writer.WriteString(Emblem.TeamName);
+            }
+            return writer.Position;
         }
 
         public uint TeamId;
@@ -233,7 +325,7 @@ namespace HermesProxy.World.Server.Packets
         public uint TeamId;
     }
 
-    class ArenaTeamEvent : ServerPacket
+    class ArenaTeamEvent : ServerPacket, ISpanWritable
     {
         public ArenaTeamEvent() : base(Opcode.SMSG_ARENA_TEAM_EVENT) { }
 
@@ -249,13 +341,38 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(Param3);
         }
 
+        // Cap for param strings - usually player/team names
+        private const int MaxParamBytes = 64;
+        // byte(1) + 27 bits(4) + 3 strings
+        public int MaxSize => 1 + 4 + MaxParamBytes * 3;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int param1Bytes = Encoding.UTF8.GetByteCount(Param1);
+            int param2Bytes = Encoding.UTF8.GetByteCount(Param2);
+            int param3Bytes = Encoding.UTF8.GetByteCount(Param3);
+            if (param1Bytes > MaxParamBytes || param2Bytes > MaxParamBytes || param3Bytes > MaxParamBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt8((byte)Event);
+            writer.WriteBits((uint)param1Bytes, 9);
+            writer.WriteBits((uint)param2Bytes, 9);
+            writer.WriteBits((uint)param3Bytes, 9);
+            writer.FlushBits();
+            writer.WriteString(Param1);
+            writer.WriteString(Param2);
+            writer.WriteString(Param3);
+            return writer.Position;
+        }
+
         public ArenaTeamEventModern Event;
         public string Param1 = "";
         public string Param2 = "";
         public string Param3 = "";
     }
 
-    class ArenaTeamCommandResult : ServerPacket
+    class ArenaTeamCommandResult : ServerPacket, ISpanWritable
     {
         public ArenaTeamCommandResult() : base(Opcode.SMSG_ARENA_TEAM_COMMAND_RESULT) { }
 
@@ -270,13 +387,29 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(PlayerName);
         }
 
+        // MaxSize: 2 bytes + bits (7+6=13 -> 2) + team name (48) + player name (24) = 76
+        public int MaxSize => 2 + 2 + GameLimits.MaxArenaTeamNameBytes + GameLimits.MaxPlayerNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt8((byte)Action);
+            writer.WriteUInt8((byte)Error);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(TeamName), 7);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(PlayerName), 6);
+            writer.FlushBits();
+            writer.WriteString(TeamName);
+            writer.WriteString(PlayerName);
+            return writer.Position;
+        }
+
         public ArenaTeamCommandType Action;
         public ArenaTeamCommandErrorModern Error;
         public string TeamName;
         public string PlayerName;
     }
 
-    class ArenaTeamInvite : ServerPacket
+    class ArenaTeamInvite : ServerPacket, ISpanWritable
     {
         public ArenaTeamInvite() : base(Opcode.SMSG_ARENA_TEAM_INVITE) { }
 
@@ -290,6 +423,23 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
             _worldPacket.WriteString(PlayerName);
             _worldPacket.WriteString(TeamName);
+        }
+
+        // MaxSize: 2 GUIDs (36) + uint (4) + bits (6+7=13 -> 2) + player name (24) + team name (48) = 114
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 4 + 2 + GameLimits.MaxPlayerNameBytes + GameLimits.MaxArenaTeamNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(PlayerGuid.Low, PlayerGuid.High);
+            writer.WriteUInt32(PlayerVirtualAddress);
+            writer.WritePackedGuid128(TeamGuid.Low, TeamGuid.High);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(PlayerName), 6);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(TeamName), 7);
+            writer.FlushBits();
+            writer.WriteString(PlayerName);
+            writer.WriteString(TeamName);
+            return writer.Position;
         }
 
         public WowGuid128 PlayerGuid;

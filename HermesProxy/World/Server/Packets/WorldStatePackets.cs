@@ -16,15 +16,17 @@
  */
 
 
+using System;
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets
 {
-    public class InitWorldStates : ServerPacket
+    public class InitWorldStates : ServerPacket, ISpanWritable
     {
         public InitWorldStates() : base(Opcode.SMSG_INIT_WORLD_STATES, ConnectionType.Instance) { }
 
@@ -40,6 +42,29 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteUInt32(wsi.VariableID);
                 _worldPacket.WriteInt32(wsi.Value);
             }
+        }
+
+        // Cap for world states - battlegrounds can have many, classic adds ~30
+        private const int MaxWorldStates = 128;
+        // 3 uints(12) + count(4) + states(8 each)
+        public int MaxSize => 12 + 4 + MaxWorldStates * 8;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Worldstates.Count > MaxWorldStates)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(MapID);
+            writer.WriteUInt32(ZoneID);
+            writer.WriteUInt32(AreaID);
+            writer.WriteInt32(Worldstates.Count);
+            foreach (WorldStateInfo wsi in Worldstates)
+            {
+                writer.WriteUInt32(wsi.VariableID);
+                writer.WriteInt32(wsi.Value);
+            }
+            return writer.Position;
         }
 
         public void AddState(uint variableID, int value)
@@ -168,7 +193,7 @@ namespace HermesProxy.World.Server.Packets
         }
     }
 
-    public class UpdateWorldState : ServerPacket
+    public class UpdateWorldState : ServerPacket, ISpanWritable
     {
         public UpdateWorldState() : base(Opcode.SMSG_UPDATE_WORLD_STATE, ConnectionType.Instance) { }
 
@@ -178,6 +203,18 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(Value);
             _worldPacket.WriteBit(Hidden);
             _worldPacket.FlushBits();
+        }
+
+        public int MaxSize => 9; // uint + int + 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(VariableID);
+            writer.WriteInt32(Value);
+            writer.WriteBit(Hidden);
+            writer.FlushBits();
+            return writer.Position;
         }
 
         public uint VariableID;

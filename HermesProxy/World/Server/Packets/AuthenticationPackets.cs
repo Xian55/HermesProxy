@@ -40,7 +40,7 @@ namespace HermesProxy.World.Server.Packets
         public uint Latency;
     }
 
-    class Pong : ServerPacket
+    class Pong : ServerPacket, ISpanWritable
     {
         public Pong(uint serial) : base(Opcode.SMSG_PONG)
         {
@@ -52,10 +52,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(Serial);
         }
 
+        public int MaxSize => 4; // uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(Serial);
+            return writer.Position;
+        }
+
         uint Serial;
     }
 
-    class AuthChallenge : ServerPacket
+    class AuthChallenge : ServerPacket, ISpanWritable
     {
         public AuthChallenge() : base(Opcode.SMSG_AUTH_CHALLENGE) { }
 
@@ -64,6 +73,18 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteBytes(DosChallenge);
             _worldPacket.WriteBytes(Challenge);
             _worldPacket.WriteUInt8(DosZeroBits);
+        }
+
+        // Fixed size: DosChallenge(32) + Challenge(16) + byte(1) = 49
+        public int MaxSize => 32 + 16 + 1;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBytes(DosChallenge);
+            writer.WriteBytes(Challenge);
+            writer.WriteUInt8(DosZeroBits);
+            return writer.Position;
         }
 
         public byte[] Challenge = new byte[16];
@@ -282,7 +303,7 @@ namespace HermesProxy.World.Server.Packets
         }
     }
 
-    class WaitQueueUpdate : ServerPacket
+    class WaitQueueUpdate : ServerPacket, ISpanWritable
     {
         public WaitQueueUpdate() : base(Opcode.SMSG_WAIT_QUEUE_UPDATE) { }
 
@@ -291,14 +312,31 @@ namespace HermesProxy.World.Server.Packets
             WaitInfo.Write(_worldPacket);
         }
 
+        // AuthWaitInfo: 2 uints(8) + 1 bit(1) = 9 bytes
+        public int MaxSize => 9;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(WaitInfo.WaitCount);
+            writer.WriteUInt32(WaitInfo.WaitTime);
+            writer.WriteBit(WaitInfo.HasFCM);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public AuthWaitInfo WaitInfo = new AuthWaitInfo();
     }
 
-    class WaitQueueFinish : ServerPacket
+    class WaitQueueFinish : ServerPacket, ISpanWritable
     {
         public WaitQueueFinish() : base(Opcode.SMSG_WAIT_QUEUE_FINISH) { }
 
         public override void Write() { }
+
+        public int MaxSize => 0;
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 
     class ConnectTo : ServerPacket
@@ -390,11 +428,15 @@ namespace HermesProxy.World.Server.Packets
         public byte[] Digest = new byte[24];
     }
 
-    class ResumeComms : ServerPacket
+    class ResumeComms : ServerPacket, ISpanWritable
     {
         public ResumeComms(ConnectionType connection) : base(Opcode.SMSG_RESUME_COMMS, connection) { }
 
         public override void Write() { }
+
+        public int MaxSize => 0;
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 
     class ConnectToFailed : ClientPacket

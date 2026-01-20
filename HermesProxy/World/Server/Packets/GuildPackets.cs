@@ -16,16 +16,18 @@
  */
 
 
+using System;
+using System.Text;
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
-using System;
 using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets
 {
-    public class GuildCommandResult : ServerPacket
+    public class GuildCommandResult : ServerPacket, ISpanWritable
     {
         public GuildCommandResult() : base(Opcode.SMSG_GUILD_COMMAND_RESULT) { }
 
@@ -36,6 +38,19 @@ namespace HermesProxy.World.Server.Packets
 
             _worldPacket.WriteBits(Name.GetByteCount(), 8);
             _worldPacket.WriteString(Name);
+        }
+
+        // MaxSize: 2 uints (8) + bits (8 -> 1) + guild name (48) = 57
+        public int MaxSize => 8 + 1 + GameLimits.MaxGuildNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32((uint)Result);
+            writer.WriteUInt32((uint)Command);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Name), 8);
+            writer.WriteString(Name);
+            return writer.Position;
         }
 
         public string Name;
@@ -301,7 +316,7 @@ namespace HermesProxy.World.Server.Packets
         public uint[] TabWithdrawItemLimit = new uint[GuildConst.MaxBankTabs];
     }
 
-    public class GuildSendRankChange : ServerPacket
+    public class GuildSendRankChange : ServerPacket, ISpanWritable
     {
         public GuildSendRankChange() : base(Opcode.SMSG_GUILD_SEND_RANK_CHANGE) { }
 
@@ -315,13 +330,26 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 5; // 2 GUIDs + uint + bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Officer.Low, Officer.High);
+            writer.WritePackedGuid128(Other.Low, Other.High);
+            writer.WriteUInt32(RankID);
+            writer.WriteBit(Promote);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public WowGuid128 Other;
         public WowGuid128 Officer;
         public bool Promote;
         public uint RankID;
     }
 
-    public class GuildEventMotd : ServerPacket
+    public class GuildEventMotd : ServerPacket, ISpanWritable
     {
         public GuildEventMotd() : base(Opcode.SMSG_GUILD_EVENT_MOTD) { }
 
@@ -331,10 +359,27 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(MotdText);
         }
 
+        // Cap for MOTD text - usually short messages
+        private const int MaxMotdBytes = 256;
+        // 11 bits(2) + text
+        public int MaxSize => 2 + MaxMotdBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int motdBytes = Encoding.UTF8.GetByteCount(MotdText);
+            if (motdBytes > MaxMotdBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)motdBytes, 11);
+            writer.WriteString(MotdText);
+            return writer.Position;
+        }
+
         public string MotdText;
     }
 
-    public class GuildEventPlayerJoined : ServerPacket
+    public class GuildEventPlayerJoined : ServerPacket, ISpanWritable
     {
         public GuildEventPlayerJoined() : base(Opcode.SMSG_GUILD_EVENT_PLAYER_JOINED) { }
 
@@ -347,12 +392,25 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(Name);
         }
 
+        // MaxSize: GUID (18) + uint (4) + 6 bits (1) + player name bytes (24) = 47
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + 1 + GameLimits.MaxPlayerNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Guid.Low, Guid.High);
+            writer.WriteUInt32(VirtualRealmAddress);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Name), 6);
+            writer.WriteString(Name);
+            return writer.Position;
+        }
+
         public WowGuid128 Guid;
         public uint VirtualRealmAddress;
         public string Name;
     }
 
-    public class GuildEventPlayerLeft : ServerPacket
+    public class GuildEventPlayerLeft : ServerPacket, ISpanWritable
     {
         public GuildEventPlayerLeft() : base(Opcode.SMSG_GUILD_EVENT_PLAYER_LEFT) { }
 
@@ -374,6 +432,31 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(LeaverName);
         }
 
+        // MaxSize (worst case with Removed=true):
+        // bits (1+6+6=13 -> 2 bytes) + RemoverGUID (18) + uint (4) + RemoverName (24)
+        // + LeaverGUID (18) + uint (4) + LeaverName (24) = 94
+        public int MaxSize => 2 + PackedGuidHelper.MaxPackedGuid128Size * 2 + 8 + GameLimits.MaxPlayerNameBytes * 2;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBit(Removed);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(LeaverName), 6);
+
+            if (Removed)
+            {
+                writer.WriteBits((uint)Encoding.UTF8.GetByteCount(RemoverName), 6);
+                writer.WritePackedGuid128(RemoverGUID.Low, RemoverGUID.High);
+                writer.WriteUInt32(RemoverVirtualRealmAddress);
+                writer.WriteString(RemoverName);
+            }
+
+            writer.WritePackedGuid128(LeaverGUID.Low, LeaverGUID.High);
+            writer.WriteUInt32(LeaverVirtualRealmAddress);
+            writer.WriteString(LeaverName);
+            return writer.Position;
+        }
+
         public bool Removed;
         public WowGuid128 RemoverGUID;
         public uint RemoverVirtualRealmAddress;
@@ -383,7 +466,7 @@ namespace HermesProxy.World.Server.Packets
         public string LeaverName;
     }
 
-    public class GuildEventNewLeader : ServerPacket
+    public class GuildEventNewLeader : ServerPacket, ISpanWritable
     {
         public GuildEventNewLeader() : base(Opcode.SMSG_GUILD_EVENT_NEW_LEADER) { }
 
@@ -402,6 +485,26 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(NewLeaderName);
         }
 
+        // MaxSize: bits (1+6+6=13 -> 2 bytes) + 2 GUIDs (36) + 2 uints (8) + 2 names (48) = 94
+        public int MaxSize => 2 + PackedGuidHelper.MaxPackedGuid128Size * 2 + 8 + GameLimits.MaxPlayerNameBytes * 2;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBit(SelfPromoted);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(OldLeaderName), 6);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(NewLeaderName), 6);
+
+            writer.WritePackedGuid128(OldLeaderGUID.Low, OldLeaderGUID.High);
+            writer.WriteUInt32(OldLeaderVirtualRealmAddress);
+            writer.WritePackedGuid128(NewLeaderGUID.Low, NewLeaderGUID.High);
+            writer.WriteUInt32(NewLeaderVirtualRealmAddress);
+
+            writer.WriteString(OldLeaderName);
+            writer.WriteString(NewLeaderName);
+            return writer.Position;
+        }
+
         public bool SelfPromoted;
         public WowGuid128 NewLeaderGUID;
         public uint NewLeaderVirtualRealmAddress;
@@ -411,21 +514,29 @@ namespace HermesProxy.World.Server.Packets
         public string OldLeaderName;
     }
 
-    public class GuildEventDisbanded : ServerPacket
+    public class GuildEventDisbanded : ServerPacket, ISpanWritable
     {
         public GuildEventDisbanded() : base(Opcode.SMSG_GUILD_EVENT_DISBANDED) { }
 
         public override void Write() { }
+
+        public int MaxSize => 0;
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 
-    public class GuildEventRanksUpdated : ServerPacket
+    public class GuildEventRanksUpdated : ServerPacket, ISpanWritable
     {
         public GuildEventRanksUpdated() : base(Opcode.SMSG_GUILD_EVENT_RANKS_UPDATED) { }
 
         public override void Write() { }
+
+        public int MaxSize => 0;
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 
-    public class GuildEventPresenceChange : ServerPacket
+    public class GuildEventPresenceChange : ServerPacket, ISpanWritable
     {
         public GuildEventPresenceChange() : base(Opcode.SMSG_GUILD_EVENT_PRESENCE_CHANGE) { }
 
@@ -441,6 +552,23 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(Name);
         }
 
+        // MaxSize: GUID (18) + uint (4) + bits (6+1+1=8 -> 1 byte) + name (24) = 47
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + 1 + GameLimits.MaxPlayerNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Guid.Low, Guid.High);
+            writer.WriteUInt32(VirtualRealmAddress);
+
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Name), 6);
+            writer.WriteBit(LoggedOn);
+            writer.WriteBit(Mobile);
+
+            writer.WriteString(Name);
+            return writer.Position;
+        }
+
         public WowGuid128 Guid;
         public uint VirtualRealmAddress;
         public bool LoggedOn;
@@ -448,14 +576,18 @@ namespace HermesProxy.World.Server.Packets
         public string Name;
     }
 
-    public class GuildEventTabAdded : ServerPacket
+    public class GuildEventTabAdded : ServerPacket, ISpanWritable
     {
         public GuildEventTabAdded() : base(Opcode.SMSG_GUILD_EVENT_TAB_ADDED) { }
 
         public override void Write() { }
+
+        public int MaxSize => 0;
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 
-    public class GuildEventTabModified : ServerPacket
+    public class GuildEventTabModified : ServerPacket, ISpanWritable
     {
         public GuildEventTabModified() : base(Opcode.SMSG_GUILD_EVENT_TAB_MODIFIED) { }
 
@@ -471,12 +603,35 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(Icon);
         }
 
+        // Cap for tab name and icon path
+        private const int MaxNameBytes = 64;
+        private const int MaxIconBytes = 256;
+        // int(4) + 16 bits(2) + name + icon
+        public int MaxSize => 4 + 2 + MaxNameBytes + MaxIconBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int nameBytes = Encoding.UTF8.GetByteCount(Name);
+            int iconBytes = Encoding.UTF8.GetByteCount(Icon);
+            if (nameBytes > MaxNameBytes || iconBytes > MaxIconBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Tab);
+            writer.WriteBits((uint)nameBytes, 7);
+            writer.WriteBits((uint)iconBytes, 9);
+            writer.FlushBits();
+            writer.WriteString(Name);
+            writer.WriteString(Icon);
+            return writer.Position;
+        }
+
         public int Tab;
         public string Name;
         public string Icon;
     }
 
-    public class GuildEventBankMoneyChanged : ServerPacket
+    public class GuildEventBankMoneyChanged : ServerPacket, ISpanWritable
     {
         public GuildEventBankMoneyChanged() : base(Opcode.SMSG_GUILD_EVENT_BANK_MONEY_CHANGED) { }
 
@@ -485,16 +640,34 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt64(Money);
         }
 
+        public int MaxSize => 8; // ulong
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt64(Money);
+            return writer.Position;
+        }
+
         public ulong Money;
     }
 
-    public class GuildEventTabTextChanged : ServerPacket
+    public class GuildEventTabTextChanged : ServerPacket, ISpanWritable
     {
         public GuildEventTabTextChanged() : base(Opcode.SMSG_GUILD_EVENT_TAB_TEXT_CHANGED) { }
 
         public override void Write()
         {
             _worldPacket.WriteInt32(Tab);
+        }
+
+        public int MaxSize => 4; // int
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Tab);
+            return writer.Position;
         }
 
         public int Tab;
@@ -600,7 +773,7 @@ namespace HermesProxy.World.Server.Packets
         public uint ArenaTeamId;
     }
 
-    public class GuildInvite : ServerPacket
+    public class GuildInvite : ServerPacket, ISpanWritable
     {
         public GuildInvite() : base(Opcode.SMSG_GUILD_INVITE) { }
 
@@ -625,6 +798,36 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(InviterName);
             _worldPacket.WriteString(GuildName);
             _worldPacket.WriteString(OldGuildName);
+        }
+
+        // MaxSize: bits (6+7+7=20 -> 3 bytes) + 3 uints (12) + 2 GUIDs (36) + 6 uints (24)
+        // + player name (24) + guild name (48) + old guild name (48) = 195
+        public int MaxSize => 3 + 12 + PackedGuidHelper.MaxPackedGuid128Size * 2 + 24 +
+            GameLimits.MaxPlayerNameBytes + GameLimits.MaxGuildNameBytes * 2;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(InviterName), 6);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(GuildName), 7);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(OldGuildName), 7);
+
+            writer.WriteUInt32(InviterVirtualRealmAddress);
+            writer.WriteUInt32(GuildVirtualRealmAddress);
+            writer.WritePackedGuid128(GuildGUID.Low, GuildGUID.High);
+            writer.WriteUInt32(OldGuildVirtualRealmAddress);
+            writer.WritePackedGuid128(OldGuildGUID.Low, OldGuildGUID.High);
+            writer.WriteUInt32(EmblemStyle);
+            writer.WriteUInt32(EmblemColor);
+            writer.WriteUInt32(BorderStyle);
+            writer.WriteUInt32(BorderColor);
+            writer.WriteUInt32(BackgroundColor);
+            writer.WriteInt32(AchievementPoints);
+
+            writer.WriteString(InviterName);
+            writer.WriteString(GuildName);
+            writer.WriteString(OldGuildName);
+            return writer.Position;
         }
 
         public WowGuid128 GuildGUID;
@@ -657,7 +860,7 @@ namespace HermesProxy.World.Server.Packets
         public override void Read() { }
     }
 
-    public class GuildInviteDeclined : ServerPacket
+    public class GuildInviteDeclined : ServerPacket, ISpanWritable
     {
         public GuildInviteDeclined() : base(Opcode.SMSG_GUILD_INVITE_DECLINED) { }
 
@@ -670,6 +873,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(InviterVirtualRealmAddress);
             _worldPacket.WriteString(InviterName);
 
+        }
+
+        // MaxSize: bits (6+1=7 -> 1 byte) + uint (4) + player name (24) = 29
+        public int MaxSize => 1 + 4 + GameLimits.MaxPlayerNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(InviterName), 6);
+            writer.WriteBit(AutoDecline);
+            writer.FlushBits();
+
+            writer.WriteUInt32(InviterVirtualRealmAddress);
+            writer.WriteString(InviterName);
+            return writer.Position;
         }
 
         public bool AutoDecline;
@@ -767,13 +985,22 @@ namespace HermesProxy.World.Server.Packets
         public override void Read() { }
     }
 
-    public class PlayerTabardVendorActivate : ServerPacket
+    public class PlayerTabardVendorActivate : ServerPacket, ISpanWritable
     {
         public PlayerTabardVendorActivate() : base(Opcode.SMSG_PLAYER_TABARD_VENDOR_ACTIVATE) { }
 
         public override void Write()
         {
             _worldPacket.WritePackedGuid128(DesignerGUID);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(DesignerGUID.Low, DesignerGUID.High);
+            return writer.Position;
         }
 
         public WowGuid128 DesignerGUID;
@@ -801,13 +1028,22 @@ namespace HermesProxy.World.Server.Packets
         public uint BackgroundColor;
     }
 
-    public class PlayerSaveGuildEmblem : ServerPacket
+    public class PlayerSaveGuildEmblem : ServerPacket, ISpanWritable
     {
         public PlayerSaveGuildEmblem() : base(Opcode.SMSG_PLAYER_SAVE_GUILD_EMBLEM) { }
 
         public override void Write()
         {
             _worldPacket.WriteUInt32((uint)Error);
+        }
+
+        public int MaxSize => 4; // uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32((uint)Error);
+            return writer.Position;
         }
 
         public GuildEmblemError Error;
@@ -965,7 +1201,7 @@ namespace HermesProxy.World.Server.Packets
         public int Tab;
     }
 
-    public class GuildBankTextQueryResult : ServerPacket
+    public class GuildBankTextQueryResult : ServerPacket, ISpanWritable
     {
         public GuildBankTextQueryResult() : base(Opcode.SMSG_GUILD_BANK_TEXT_QUERY_RESULT) { }
 
@@ -975,6 +1211,25 @@ namespace HermesProxy.World.Server.Packets
 
             _worldPacket.WriteBits(Text.GetByteCount(), 14);
             _worldPacket.WriteString(Text);
+        }
+
+        // Cap for bank tab text - usually short descriptions
+        private const int MaxTextBytes = 512;
+        // int(4) + 14 bits(2) + text
+        public int MaxSize => 4 + 2 + MaxTextBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int textBytes = Text != null ? Encoding.UTF8.GetByteCount(Text) : 0;
+            if (textBytes > MaxTextBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Tab);
+            writer.WriteBits((uint)textBytes, 14);
+            if (Text != null)
+                writer.WriteString(Text);
+            return writer.Position;
         }
 
         public int Tab;
@@ -1103,13 +1358,22 @@ namespace HermesProxy.World.Server.Packets
         public byte BankTab;
     }
 
-    public class GuildBankRemainingWithdrawMoney : ServerPacket
+    public class GuildBankRemainingWithdrawMoney : ServerPacket, ISpanWritable
     {
         public GuildBankRemainingWithdrawMoney() : base(Opcode.SMSG_GUILD_BANK_REMAINING_WITHDRAW_MONEY) { }
 
         public override void Write()
         {
             _worldPacket.WriteInt64(RemainingWithdrawMoney);
+        }
+
+        public int MaxSize => 8; // long
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt64(RemainingWithdrawMoney);
+            return writer.Position;
         }
 
         public long RemainingWithdrawMoney;

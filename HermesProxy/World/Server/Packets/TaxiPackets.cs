@@ -16,15 +16,17 @@
  */
 
 
+using System;
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets
 {
-    class TaxiNodeStatusPkt : ServerPacket
+    class TaxiNodeStatusPkt : ServerPacket, ISpanWritable
     {
         public TaxiNodeStatusPkt() : base(Opcode.SMSG_TAXI_NODE_STATUS) { }
 
@@ -35,11 +37,22 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 1; // GUID + 1 byte for 2 bits
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(FlightMaster.Low, FlightMaster.High);
+            writer.WriteBits((uint)Status, 2);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public WowGuid128 FlightMaster;
         public TaxiNodeStatus Status;
     }
 
-    public class ShowTaxiNodes : ServerPacket
+    public class ShowTaxiNodes : ServerPacket, ISpanWritable
     {
         public ShowTaxiNodes() : base(Opcode.SMSG_SHOW_TAXI_NODES) { }
 
@@ -60,12 +73,60 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WritePackedGuid128(WindowInfo.UnitGUID);
                 _worldPacket.WriteUInt32(WindowInfo.CurrentNode);
             }
-            
+
             foreach (var node in canLandNodes)
                 _worldPacket.WriteUInt8(node);
-            
+
             foreach (var node in canUseNodes)
                 _worldPacket.WriteUInt8(node);
+        }
+
+        // Cap for taxi node bitmasks - enough for all taxi nodes
+        private const int MaxNodeBytes = 128;
+        // 1 bit(1) + 2 ints(8) + optional WindowInfo (GUID(18)+uint(4)) + 2 node lists
+        public int MaxSize => 1 + 8 + PackedGuidHelper.MaxPackedGuid128Size + 4 + MaxNodeBytes * 2;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            // Calculate cleaned lengths (don't modify originals)
+            int landLength = GetCleanedLength(CanLandNodes);
+            int useLength = GetCleanedLength(CanUseNodes);
+
+            if (landLength > MaxNodeBytes || useLength > MaxNodeBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBit(WindowInfo != null);
+            writer.FlushBits();
+
+            writer.WriteInt32(landLength);
+            writer.WriteInt32(useLength);
+
+            if (WindowInfo != null)
+            {
+                writer.WritePackedGuid128(WindowInfo.UnitGUID.Low, WindowInfo.UnitGUID.High);
+                writer.WriteUInt32(WindowInfo.CurrentNode);
+            }
+
+            for (int i = 0; i < landLength; i++)
+                writer.WriteUInt8(CanLandNodes[i]);
+
+            for (int i = 0; i < useLength; i++)
+                writer.WriteUInt8(CanUseNodes[i]);
+
+            return writer.Position;
+        }
+
+        // Get cleaned length without modifying the list
+        private static int GetCleanedLength(List<byte> nodes)
+        {
+            int lastNonZero = -1;
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                if (nodes[i] != 0)
+                    lastNonZero = i;
+            }
+            return lastNonZero + 1;
         }
 
         // remove extra zeroes after last node
@@ -119,14 +180,18 @@ namespace HermesProxy.World.Server.Packets
         public uint FlyingMountID;
     }
 
-    class NewTaxiPath : ServerPacket
+    class NewTaxiPath : ServerPacket, ISpanWritable
     {
         public NewTaxiPath() : base(Opcode.SMSG_NEW_TAXI_PATH) { }
 
         public override void Write() { }
+
+        public int MaxSize => 0;
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 
-    class ActivateTaxiReplyPkt : ServerPacket
+    class ActivateTaxiReplyPkt : ServerPacket, ISpanWritable
     {
         public ActivateTaxiReplyPkt() : base(Opcode.SMSG_ACTIVATE_TAXI_REPLY) { }
 
@@ -134,6 +199,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WriteBits(Reply, 4);
             _worldPacket.FlushBits();
+        }
+
+        public int MaxSize => 1; // 1 byte for 4 bits
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)Reply, 4);
+            writer.FlushBits();
+            return writer.Position;
         }
 
         public ActivateTaxiReply Reply;

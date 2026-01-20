@@ -16,8 +16,10 @@
  */
 
 
+using System;
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
@@ -36,7 +38,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 Unit;
     }
 
-    public class LootResponse : ServerPacket
+    public class LootResponse : ServerPacket, ISpanWritable
     {
         public LootResponse() : base(Opcode.SMSG_LOOT_RESPONSE, ConnectionType.Instance) { }
 
@@ -66,6 +68,63 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteBits(currency.UIType, 3);
                 _worldPacket.FlushBits();
             }
+        }
+
+        private const int MaxItems = 16;
+        private const int MaxCurrencies = 4;
+        // LootItemData: 1 (bits) + ItemInstance + 4 + 1 + 1 = 7 + ItemInstanceMaxSize
+        private const int LootItemDataSize = 7 + ItemPacketHelpers.ItemInstanceMaxSize;
+        // LootCurrency: 4 + 4 + 1 + 1 = 10
+        private const int LootCurrencySize = 10;
+
+        // 2 GUIDs + 4 bytes + uint + 2 ints + 1 byte bits + items + currencies
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 4 + 4 + 8 + 1 +
+                              MaxItems * LootItemDataSize + MaxCurrencies * LootCurrencySize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Items.Count > MaxItems || Currencies.Count > MaxCurrencies)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Owner.Low, Owner.High);
+            writer.WritePackedGuid128(LootObj.Low, LootObj.High);
+            writer.WriteUInt8((byte)FailureReason);
+            writer.WriteUInt8((byte)AcquireReason);
+            writer.WriteUInt8((byte)LootMethod);
+            writer.WriteUInt8(Threshold);
+            writer.WriteUInt32(Coins);
+            writer.WriteInt32(Items.Count);
+            writer.WriteInt32(Currencies.Count);
+            writer.WriteBit(Acquired);
+            writer.WriteBit(AELooting);
+            writer.FlushBits();
+
+            foreach (LootItemData item in Items)
+            {
+                writer.WriteBits(item.Type, 2);
+                writer.WriteBits((byte)item.UIType, 3);
+                writer.WriteBit(item.CanTradeToTapList);
+                writer.FlushBits();
+
+                if (!ItemPacketHelpers.WriteItemInstance(ref writer, item.Loot))
+                    return -1;
+
+                writer.WriteUInt32(item.Quantity);
+                writer.WriteUInt8(item.LootItemType);
+                writer.WriteUInt8(item.LootListID);
+            }
+
+            foreach (LootCurrency currency in Currencies)
+            {
+                writer.WriteUInt32(currency.CurrencyID);
+                writer.WriteUInt32(currency.Quantity);
+                writer.WriteUInt8(currency.LootListID);
+                writer.WriteBits(currency.UIType, 3);
+                writer.FlushBits();
+            }
+
+            return writer.Position;
         }
 
         public WowGuid128 Owner;
@@ -124,7 +183,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 Owner;
     }
 
-    class LootReleaseResponse : ServerPacket
+    class LootReleaseResponse : ServerPacket, ISpanWritable
     {
         public LootReleaseResponse() : base(Opcode.SMSG_LOOT_RELEASE) { }
 
@@ -132,6 +191,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WritePackedGuid128(LootObj);
             _worldPacket.WritePackedGuid128(Owner);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2; // 2 GUIDs
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(LootObj.Low, LootObj.High);
+            writer.WritePackedGuid128(Owner.Low, Owner.High);
+            return writer.Position;
         }
 
         public WowGuid128 LootObj;
@@ -145,7 +214,7 @@ namespace HermesProxy.World.Server.Packets
         public override void Read() { }
     }
 
-    class LootMoneyNotify : ServerPacket
+    class LootMoneyNotify : ServerPacket, ISpanWritable
     {
         public LootMoneyNotify() : base(Opcode.SMSG_LOOT_MONEY_NOTIFY) { }
 
@@ -157,18 +226,39 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => 17; // 2 uint64 + 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt64(Money);
+            writer.WriteUInt64(MoneyMod);
+            writer.WriteBit(SoleLooter);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public ulong Money;
         public ulong MoneyMod;
         public bool SoleLooter;
     }
 
-    class CoinRemoved : ServerPacket
+    class CoinRemoved : ServerPacket, ISpanWritable
     {
         public CoinRemoved() : base(Opcode.SMSG_COIN_REMOVED) { }
 
         public override void Write()
         {
             _worldPacket.WritePackedGuid128(LootObj);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(LootObj.Low, LootObj.High);
+            return writer.Position;
         }
 
         public WowGuid128 LootObj;
@@ -202,7 +292,7 @@ namespace HermesProxy.World.Server.Packets
         public byte LootListID;
     }
 
-    class LootRemoved : ServerPacket
+    class LootRemoved : ServerPacket, ISpanWritable
     {
         public LootRemoved() : base(Opcode.SMSG_LOOT_REMOVED, ConnectionType.Instance) { }
 
@@ -211,6 +301,17 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(Owner);
             _worldPacket.WritePackedGuid128(LootObj);
             _worldPacket.WriteUInt8(LootListID);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 1; // 2 GUIDs + byte
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Owner.Low, Owner.High);
+            writer.WritePackedGuid128(LootObj.Low, LootObj.High);
+            writer.WriteUInt8(LootListID);
+            return writer.Position;
         }
 
         public WowGuid128 Owner;
@@ -248,7 +349,7 @@ namespace HermesProxy.World.Server.Packets
         public bool PassOnLoot;
     }
 
-    class StartLootRoll : ServerPacket
+    class StartLootRoll : ServerPacket, ISpanWritable
     {
         public StartLootRoll() : base(Opcode.SMSG_LOOT_START_ROLL) { }
 
@@ -260,6 +361,36 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt8((byte)ValidRolls);
             _worldPacket.WriteUInt8((byte)Method);
             Item.Write(_worldPacket);
+        }
+
+        // LootItemData: 1 (bits) + ItemInstance + 4 + 1 + 1 = 7 + ItemInstanceMaxSize
+        private const int LootItemDataSize = 7 + ItemPacketHelpers.ItemInstanceMaxSize;
+        // GUID(18) + 2 uints(8) + 2 bytes(2) + LootItemData
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 8 + 2 + LootItemDataSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(LootObj.Low, LootObj.High);
+            writer.WriteUInt32(MapID);
+            writer.WriteUInt32(RollTime);
+            writer.WriteUInt8((byte)ValidRolls);
+            writer.WriteUInt8((byte)Method);
+
+            // Write LootItemData inline
+            writer.WriteBits(Item.Type, 2);
+            writer.WriteBits((byte)Item.UIType, 3);
+            writer.WriteBit(Item.CanTradeToTapList);
+            writer.FlushBits();
+
+            if (!ItemPacketHelpers.WriteItemInstance(ref writer, Item.Loot))
+                return -1;
+
+            writer.WriteUInt32(Item.Quantity);
+            writer.WriteUInt8(Item.LootItemType);
+            writer.WriteUInt8(Item.LootListID);
+
+            return writer.Position;
         }
 
         public WowGuid128 LootObj;
@@ -286,7 +417,7 @@ namespace HermesProxy.World.Server.Packets
         public RollType RollType;
     }
 
-    class LootRollBroadcast : ServerPacket
+    class LootRollBroadcast : ServerPacket, ISpanWritable
     {
         public LootRollBroadcast() : base(Opcode.SMSG_LOOT_ROLL) { }
 
@@ -301,6 +432,38 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        // LootItemData: 1 (bits) + ItemInstance + 6 = 7 + ItemInstanceMaxSize
+        private const int LootItemDataSize = 7 + ItemPacketHelpers.ItemInstanceMaxSize;
+        // 2 GUIDs + int + byte + LootItemData + 1 bit
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 4 + 1 + LootItemDataSize + 1;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(LootObj.Low, LootObj.High);
+            writer.WritePackedGuid128(Player.Low, Player.High);
+            writer.WriteInt32(Roll);
+            writer.WriteUInt8((byte)RollType);
+
+            // Write LootItemData inline
+            writer.WriteBits(Item.Type, 2);
+            writer.WriteBits((byte)Item.UIType, 3);
+            writer.WriteBit(Item.CanTradeToTapList);
+            writer.FlushBits();
+
+            if (!ItemPacketHelpers.WriteItemInstance(ref writer, Item.Loot))
+                return -1;
+
+            writer.WriteUInt32(Item.Quantity);
+            writer.WriteUInt8(Item.LootItemType);
+            writer.WriteUInt8(Item.LootListID);
+
+            writer.WriteBit(Autopassed);
+            writer.FlushBits();
+
+            return writer.Position;
+        }
+
         public WowGuid128 LootObj;
         public WowGuid128 Player;
         public int Roll;
@@ -309,7 +472,7 @@ namespace HermesProxy.World.Server.Packets
         public bool Autopassed = false;    // Triggers message |HlootHistory:%d|h[Loot]|h: You automatically passed on: %s because you cannot loot that item.
     }
 
-    class LootRollWon : ServerPacket
+    class LootRollWon : ServerPacket, ISpanWritable
     {
         public LootRollWon() : base(Opcode.SMSG_LOOT_ROLL_WON) { }
 
@@ -323,6 +486,37 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt8(MainSpec);
         }
 
+        // LootItemData: 1 (bits) + ItemInstance + 6 = 7 + ItemInstanceMaxSize
+        private const int LootItemDataSize = 7 + ItemPacketHelpers.ItemInstanceMaxSize;
+        // 2 GUIDs + int + byte + LootItemData + byte
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 4 + 1 + LootItemDataSize + 1;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(LootObj.Low, LootObj.High);
+            writer.WritePackedGuid128(Winner.Low, Winner.High);
+            writer.WriteInt32(Roll);
+            writer.WriteUInt8((byte)RollType);
+
+            // Write LootItemData inline
+            writer.WriteBits(Item.Type, 2);
+            writer.WriteBits((byte)Item.UIType, 3);
+            writer.WriteBit(Item.CanTradeToTapList);
+            writer.FlushBits();
+
+            if (!ItemPacketHelpers.WriteItemInstance(ref writer, Item.Loot))
+                return -1;
+
+            writer.WriteUInt32(Item.Quantity);
+            writer.WriteUInt8(Item.LootItemType);
+            writer.WriteUInt8(Item.LootListID);
+
+            writer.WriteUInt8(MainSpec);
+
+            return writer.Position;
+        }
+
         public WowGuid128 LootObj;
         public WowGuid128 Winner;
         public int Roll;
@@ -331,7 +525,7 @@ namespace HermesProxy.World.Server.Packets
         public byte MainSpec;
     }
 
-    class LootAllPassed : ServerPacket
+    class LootAllPassed : ServerPacket, ISpanWritable
     {
         public LootAllPassed() : base(Opcode.SMSG_LOOT_ALL_PASSED) { }
 
@@ -341,11 +535,37 @@ namespace HermesProxy.World.Server.Packets
             Item.Write(_worldPacket);
         }
 
+        // LootItemData: 1 (bits) + ItemInstance + 6 = 7 + ItemInstanceMaxSize
+        private const int LootItemDataSize = 7 + ItemPacketHelpers.ItemInstanceMaxSize;
+        // GUID + LootItemData
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + LootItemDataSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(LootObj.Low, LootObj.High);
+
+            // Write LootItemData inline
+            writer.WriteBits(Item.Type, 2);
+            writer.WriteBits((byte)Item.UIType, 3);
+            writer.WriteBit(Item.CanTradeToTapList);
+            writer.FlushBits();
+
+            if (!ItemPacketHelpers.WriteItemInstance(ref writer, Item.Loot))
+                return -1;
+
+            writer.WriteUInt32(Item.Quantity);
+            writer.WriteUInt8(Item.LootItemType);
+            writer.WriteUInt8(Item.LootListID);
+
+            return writer.Position;
+        }
+
         public WowGuid128 LootObj;
         public LootItemData Item = new();
     }
 
-    class LootRollsComplete : ServerPacket
+    class LootRollsComplete : ServerPacket, ISpanWritable
     {
         public LootRollsComplete() : base(Opcode.SMSG_LOOT_ROLLS_COMPLETE) { }
 
@@ -353,6 +573,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WritePackedGuid128(LootObj);
             _worldPacket.WriteUInt8(LootListID);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 1; // GUID + byte
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(LootObj.Low, LootObj.High);
+            writer.WriteUInt8(LootListID);
+            return writer.Position;
         }
 
         public WowGuid128 LootObj;
@@ -381,8 +611,11 @@ namespace HermesProxy.World.Server.Packets
         public List<LootRequest> Loot = new();
     }
 
-    class MasterLootCandidateList : ServerPacket
+    class MasterLootCandidateList : ServerPacket, ISpanWritable
     {
+        // Max raid size is 40 players
+        private const int MaxPlayers = 40;
+
         public MasterLootCandidateList() : base(Opcode.SMSG_LOOT_MASTER_LIST, ConnectionType.Instance) { }
 
         public override void Write()
@@ -393,11 +626,27 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WritePackedGuid128(guid);
         }
 
+        // MaxSize: GUID (18) + count (4) + 40 GUIDs (720) = 742
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + MaxPlayers * PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Players.Count > MaxPlayers)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(LootObj.Low, LootObj.High);
+            writer.WriteInt32(Players.Count);
+            foreach (var guid in Players)
+                writer.WritePackedGuid128(guid.Low, guid.High);
+            return writer.Position;
+        }
+
         public WowGuid128 LootObj;
         public List<WowGuid128> Players = new();
     }
 
-    class LootList : ServerPacket
+    class LootList : ServerPacket, ISpanWritable
     {
         public LootList() : base(Opcode.SMSG_LOOT_LIST, ConnectionType.Instance) { }
 
@@ -415,6 +664,28 @@ namespace HermesProxy.World.Server.Packets
 
             if (RoundRobinWinner != default)
                 _worldPacket.WritePackedGuid128(RoundRobinWinner);
+        }
+
+        // MaxSize: 2 GUIDs (36) + 2 bits (1) + 2 optional GUIDs (36) = 73
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 4 + 1;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Owner.Low, Owner.High);
+            writer.WritePackedGuid128(LootObj.Low, LootObj.High);
+
+            writer.WriteBit(Master != default);
+            writer.WriteBit(RoundRobinWinner != default);
+            writer.FlushBits();
+
+            if (Master != default)
+                writer.WritePackedGuid128(Master.Low, Master.High);
+
+            if (RoundRobinWinner != default)
+                writer.WritePackedGuid128(RoundRobinWinner.Low, RoundRobinWinner.High);
+
+            return writer.Position;
         }
 
         public WowGuid128 Owner;

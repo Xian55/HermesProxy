@@ -16,8 +16,10 @@
  */
 
 
+using System;
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
@@ -48,7 +50,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 Guid;
     }
 
-    class GameObjectDespawn : ServerPacket
+    class GameObjectDespawn : ServerPacket, ISpanWritable
     {
         public GameObjectDespawn() : base(Opcode.SMSG_GAME_OBJECT_DESPAWN) { }
 
@@ -57,10 +59,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(ObjectGUID);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(ObjectGUID.Low, ObjectGUID.High);
+            return writer.Position;
+        }
+
         public WowGuid128 ObjectGUID;
     }
 
-    class GameObjectResetState : ServerPacket
+    class GameObjectResetState : ServerPacket, ISpanWritable
     {
         public GameObjectResetState() : base(Opcode.SMSG_GAME_OBJECT_RESET_STATE) { }
 
@@ -69,10 +80,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(ObjectGUID);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(ObjectGUID.Low, ObjectGUID.High);
+            return writer.Position;
+        }
+
         public WowGuid128 ObjectGUID;
     }
 
-    class GameObjectCustomAnim : ServerPacket
+    class GameObjectCustomAnim : ServerPacket, ISpanWritable
     {
         public GameObjectCustomAnim() : base(Opcode.SMSG_GAME_OBJECT_CUSTOM_ANIM, ConnectionType.Instance) { }
 
@@ -84,22 +104,42 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 5; // GUID + uint + 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(ObjectGUID.Low, ObjectGUID.High);
+            writer.WriteUInt32(CustomAnim);
+            writer.WriteBit(PlayAsDespawn);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public WowGuid128 ObjectGUID;
         public uint CustomAnim;
         public bool PlayAsDespawn;
     }
 
-    class FishNotHooked : ServerPacket
+    class FishNotHooked : ServerPacket, ISpanWritable
     {
         public FishNotHooked() : base(Opcode.SMSG_FISH_NOT_HOOKED) { }
 
         public override void Write() { }
+
+        public int MaxSize => 0;
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 
-    class FishEscaped : ServerPacket
+    class FishEscaped : ServerPacket, ISpanWritable
     {
         public FishEscaped() : base(Opcode.SMSG_FISH_ESCAPED) { }
 
         public override void Write() { }
+
+        public int MaxSize => 0;
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 }

@@ -17,7 +17,9 @@ namespace Framework.Logging
         Debug,
         Error,
         Warn,
-        Storage
+        Storage,
+        SpanMiss,
+        SpanStats
     }
 
     public enum LogNetDir // Network direction
@@ -32,12 +34,14 @@ namespace Framework.Logging
     {
         static Dictionary<LogType, (ConsoleColor Color, string Type)> LogToColorType = new()
         {
-            { LogType.Debug,    (ConsoleColor.DarkBlue, " Debug   ") },
-            { LogType.Server,   (ConsoleColor.Blue,     " Server  ") },
-            { LogType.Network,  (ConsoleColor.Green,    " Network ") },
-            { LogType.Error,    (ConsoleColor.Red,      " Error   ") },
-            { LogType.Warn,     (ConsoleColor.Yellow,   " Warning ") },
-            { LogType.Storage,  (ConsoleColor.Cyan,     " Storage ") },
+            { LogType.Debug,     (ConsoleColor.DarkBlue,  " Debug   ") },
+            { LogType.Server,    (ConsoleColor.Blue,      " Server  ") },
+            { LogType.Network,   (ConsoleColor.Green,     " Network ") },
+            { LogType.Error,     (ConsoleColor.Red,       " Error   ") },
+            { LogType.Warn,      (ConsoleColor.Yellow,    " Warning ") },
+            { LogType.Storage,   (ConsoleColor.Cyan,      " Storage ") },
+            { LogType.SpanMiss,  (ConsoleColor.Magenta,   " SpanMiss") },
+            { LogType.SpanStats, (ConsoleColor.DarkGreen, "SpanStats") },
         }; 
 
         static BlockingCollection<(LogType Type, string Message)> logQueue = new();
@@ -45,6 +49,7 @@ namespace Framework.Logging
         public static bool IsLogging => _logOutputThread != null && !logQueue.IsCompleted;
 
         public static bool DebugLogEnabled { get; set; }
+        public static bool SpanStatsEnabled { get; set; }
         
         /// <summary>
         /// Start the logging Thread and take logs out of the <see cref="BlockingCollection{T}"/>
@@ -69,6 +74,8 @@ namespace Framework.Logging
         private static void PrintInternalDirectly(LogType type, string text)
         {
             if (type == LogType.Debug && !DebugLogEnabled)
+                return;
+            if (type == LogType.SpanStats && !SpanStatsEnabled)
                 return;
 #if DEBUG
             Console.Write($"{DateTime.Now:HH:mm:ss.ff} | "); // This function is directly called in DEBUG, so our timesstamps can also be a more precise

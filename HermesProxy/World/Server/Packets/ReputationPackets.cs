@@ -16,15 +16,17 @@
  */
 
 
+using System;
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets
 {
-    public class InitializeFactions : ServerPacket
+    public class InitializeFactions : ServerPacket, ISpanWritable
     {
         const ushort FactionCount = 400;
 
@@ -44,12 +46,32 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        // Fixed size: 400 factions × (byte + int) + 400 bits = 2000 + 50 = 2050 bytes
+        public int MaxSize => FactionCount * 5 + 50;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+
+            for (ushort i = 0; i < FactionCount; ++i)
+            {
+                writer.WriteUInt8((byte)((ushort)FactionFlags[i] & 0xFF));
+                writer.WriteInt32(FactionStandings[i]);
+            }
+
+            for (ushort i = 0; i < FactionCount; ++i)
+                writer.WriteBit(FactionHasBonus[i]);
+
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public int[] FactionStandings = new int[FactionCount];
         public bool[] FactionHasBonus = new bool[FactionCount]; //@todo: implement faction bonus
         public ReputationFlags[] FactionFlags = new ReputationFlags[FactionCount];
     }
 
-    class SetFactionStanding : ServerPacket
+    class SetFactionStanding : ServerPacket, ISpanWritable
     {
         public SetFactionStanding() : base(Opcode.SMSG_SET_FACTION_STANDING, ConnectionType.Instance) { }
 
@@ -64,6 +86,30 @@ namespace HermesProxy.World.Server.Packets
 
             _worldPacket.WriteBit(ShowVisual);
             _worldPacket.FlushBits();
+        }
+
+        // Cap for faction standing changes - usually just a few at once
+        private const int MaxFactions = 16;
+        // 2 floats(8) + count(4) + factions(8 each) + 1 bit
+        public int MaxSize => 8 + 4 + MaxFactions * 8 + 1;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Factions.Count > MaxFactions)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteFloat(ReferAFriendBonus);
+            writer.WriteFloat(BonusFromAchievementSystem);
+            writer.WriteInt32(Factions.Count);
+            foreach (FactionStandingData factionStanding in Factions)
+            {
+                writer.WriteInt32(factionStanding.Index);
+                writer.WriteInt32(factionStanding.Standing);
+            }
+            writer.WriteBit(ShowVisual);
+            writer.FlushBits();
+            return writer.Position;
         }
 
         public float ReferAFriendBonus;
@@ -134,7 +180,7 @@ namespace HermesProxy.World.Server.Packets
         public uint FactionIndex;
     }
 
-    class SetForcedReactions : ServerPacket
+    class SetForcedReactions : ServerPacket, ISpanWritable
     {
         public SetForcedReactions() : base(Opcode.SMSG_SET_FORCED_REACTIONS, ConnectionType.Instance) { }
 
@@ -143,6 +189,26 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(Reactions.Count);
             foreach (ForcedReaction reaction in Reactions)
                 reaction.Write(_worldPacket);
+        }
+
+        // Cap for forced reactions - rarely more than a few
+        private const int MaxReactions = 8;
+        // count(4) + reactions(8 each)
+        public int MaxSize => 4 + MaxReactions * 8;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Reactions.Count > MaxReactions)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Reactions.Count);
+            foreach (ForcedReaction reaction in Reactions)
+            {
+                writer.WriteInt32(reaction.Faction);
+                writer.WriteInt32(reaction.Reaction);
+            }
+            return writer.Position;
         }
 
         public List<ForcedReaction> Reactions = new();
@@ -160,13 +226,22 @@ namespace HermesProxy.World.Server.Packets
         public int Reaction;
     }
 
-    class SetFactionVisible : ServerPacket
+    class SetFactionVisible : ServerPacket, ISpanWritable
     {
         public SetFactionVisible(bool visible) : base(visible ? Opcode.SMSG_SET_FACTION_VISIBLE : Opcode.SMSG_SET_FACTION_NOT_VISIBLE, ConnectionType.Instance) { }
 
         public override void Write()
         {
             _worldPacket.WriteUInt32(FactionIndex);
+        }
+
+        public int MaxSize => 4; // uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(FactionIndex);
+            return writer.Position;
         }
 
         public uint FactionIndex;

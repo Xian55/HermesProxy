@@ -18,6 +18,7 @@
 
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -25,7 +26,7 @@ using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets
 {
-    class UpdateInstanceOwnership : ServerPacket
+    class UpdateInstanceOwnership : ServerPacket, ISpanWritable
     {
         public UpdateInstanceOwnership() : base(Opcode.SMSG_UPDATE_INSTANCE_OWNERSHIP) { }
 
@@ -34,10 +35,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(IOwnInstance);
         }
 
+        public int MaxSize => 4; // uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(IOwnInstance);
+            return writer.Position;
+        }
+
         public uint IOwnInstance;
     }
 
-    class UpdateLastInstance : ServerPacket
+    class UpdateLastInstance : ServerPacket, ISpanWritable
     {
         public UpdateLastInstance() : base(Opcode.SMSG_UPDATE_LAST_INSTANCE) { }
 
@@ -46,10 +56,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(MapID);
         }
 
+        public int MaxSize => 4; // uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(MapID);
+            return writer.Position;
+        }
+
         public uint MapID;
     }
 
-    class InstanceReset : ServerPacket
+    class InstanceReset : ServerPacket, ISpanWritable
     {
         public InstanceReset() : base(Opcode.SMSG_INSTANCE_RESET) { }
 
@@ -58,10 +77,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(MapID);
         }
 
+        public int MaxSize => 4; // uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(MapID);
+            return writer.Position;
+        }
+
         public uint MapID;
     }
 
-    class InstanceResetFailed : ServerPacket
+    class InstanceResetFailed : ServerPacket, ISpanWritable
     {
         public InstanceResetFailed() : base(Opcode.SMSG_INSTANCE_RESET_FAILED) { }
 
@@ -72,18 +100,33 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => 5; // uint + 1 byte for 2 bits
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(MapID);
+            writer.WriteBits((uint)ResetFailedReason, 2);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public uint MapID;
         public ResetFailedReason ResetFailedReason;
     }
 
-    class ResetFailedNotify : ServerPacket
+    class ResetFailedNotify : ServerPacket, ISpanWritable
     {
         public ResetFailedNotify() : base(Opcode.SMSG_RESET_FAILED_NOTIFY) { }
 
         public override void Write() { }
+
+        public int MaxSize => 0;
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 
-    class RaidInstanceInfo : ServerPacket
+    class RaidInstanceInfo : ServerPacket, ISpanWritable
     {
         public RaidInstanceInfo() : base(Opcode.SMSG_RAID_INSTANCE_INFO) { }
 
@@ -93,6 +136,35 @@ namespace HermesProxy.World.Server.Packets
 
             foreach (InstanceLock lockInfos in LockList)
                 lockInfos.Write(_worldPacket);
+        }
+
+        // Cap for raid lockouts - players typically have few
+        private const int MaxLocks = 16;
+        // Each lock: 2 uints(8) + ulong(8) + int(4) + uint(4) + 2 bits(1) = 25 bytes
+        private const int LockSize = 25;
+        // count(4) + locks
+        public int MaxSize => 4 + MaxLocks * LockSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (LockList.Count > MaxLocks)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(LockList.Count);
+
+            foreach (InstanceLock lockInfos in LockList)
+            {
+                writer.WriteUInt32(lockInfos.MapID);
+                writer.WriteUInt32((uint)lockInfos.DifficultyID);
+                writer.WriteUInt64(lockInfos.InstanceID);
+                writer.WriteInt32(lockInfos.TimeRemaining);
+                writer.WriteUInt32(lockInfos.CompletedMask);
+                writer.WriteBit(lockInfos.Locked);
+                writer.WriteBit(lockInfos.Extended);
+                writer.FlushBits();
+            }
+            return writer.Position;
         }
 
         public List<InstanceLock> LockList = new();
@@ -123,7 +195,7 @@ namespace HermesProxy.World.Server.Packets
         public bool Extended;
     }
 
-    class InstanceSaveCreated : ServerPacket
+    class InstanceSaveCreated : ServerPacket, ISpanWritable
     {
         public InstanceSaveCreated() : base(Opcode.SMSG_INSTANCE_SAVE_CREATED) { }
 
@@ -133,10 +205,20 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => 1; // 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBit(Gm);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public bool Gm;
     }
 
-    class RaidGroupOnly : ServerPacket
+    class RaidGroupOnly : ServerPacket, ISpanWritable
     {
         public RaidGroupOnly() : base(Opcode.SMSG_RAID_GROUP_ONLY) { }
 
@@ -146,11 +228,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32((uint)Reason);
         }
 
+        public int MaxSize => 8; // int + uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Delay);
+            writer.WriteUInt32((uint)Reason);
+            return writer.Position;
+        }
+
         public int Delay;
         public RaidGroupReason Reason;
     }
 
-    class RaidInstanceMessage : ServerPacket
+    class RaidInstanceMessage : ServerPacket, ISpanWritable
     {
         public RaidInstanceMessage() : base(Opcode.SMSG_RAID_INSTANCE_MESSAGE) { }
 
@@ -162,6 +254,20 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteBit(Locked);
             _worldPacket.WriteBit(Extended);
             _worldPacket.FlushBits();
+        }
+
+        public int MaxSize => 10; // byte + 2 uint + 1 byte for bits
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt8((byte)Type);
+            writer.WriteUInt32(MapID);
+            writer.WriteUInt32((uint)DifficultyID);
+            writer.WriteBit(Locked);
+            writer.WriteBit(Extended);
+            writer.FlushBits();
+            return writer.Position;
         }
 
         public InstanceResetWarningType Type;

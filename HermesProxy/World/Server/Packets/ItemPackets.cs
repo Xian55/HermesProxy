@@ -16,15 +16,17 @@
  */
 
 
+using System;
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets
 {
-    public class SetProficiency : ServerPacket
+    public class SetProficiency : ServerPacket, ISpanWritable
     {
         public SetProficiency() : base(Opcode.SMSG_SET_PROFICIENCY, ConnectionType.Instance) { }
 
@@ -32,6 +34,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WriteUInt32(ProficiencyMask);
             _worldPacket.WriteUInt8(ProficiencyClass);
+        }
+
+        public int MaxSize => 5; // uint + byte
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(ProficiencyMask);
+            writer.WriteUInt8(ProficiencyClass);
+            return writer.Position;
         }
 
         public uint ProficiencyMask;
@@ -79,7 +91,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 ContainerGUID;
     }
 
-    public class BuySucceeded : ServerPacket
+    public class BuySucceeded : ServerPacket, ISpanWritable
     {
         public BuySucceeded() : base(Opcode.SMSG_BUY_SUCCEEDED) { }
 
@@ -91,13 +103,25 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(QuantityBought);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 12; // GUID + uint + int + uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(VendorGUID.Low, VendorGUID.High);
+            writer.WriteUInt32(Slot);
+            writer.WriteInt32(NewQuantity);
+            writer.WriteUInt32(QuantityBought);
+            return writer.Position;
+        }
+
         public WowGuid128 VendorGUID;
         public uint Slot;
         public int NewQuantity;
         public uint QuantityBought;
     }
 
-    public class BuyFailed : ServerPacket
+    public class BuyFailed : ServerPacket, ISpanWritable
     {
         public BuyFailed() : base(Opcode.SMSG_BUY_FAILED) { }
 
@@ -108,12 +132,23 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt8((byte)Reason);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 5; // GUID + uint + byte
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(VendorGUID.Low, VendorGUID.High);
+            writer.WriteUInt32(Slot);
+            writer.WriteUInt8((byte)Reason);
+            return writer.Position;
+        }
+
         public WowGuid128 VendorGUID;
         public uint Slot;
         public BuyResult Reason = BuyResult.CantFindItem;
     }
 
-    class ItemPushResult : ServerPacket
+    class ItemPushResult : ServerPacket, ISpanWritable
     {
         public ItemPushResult() : base(Opcode.SMSG_ITEM_PUSH_RESULT) { }
 
@@ -139,6 +174,38 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
 
             Item.Write(_worldPacket);
+        }
+
+        // 2 GUIDs (18 each) + byte + 9 ints + 1 byte bits + ItemInstance
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 1 + 9 * 4 + 1 +
+                              ItemPacketHelpers.ItemInstanceMaxSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(PlayerGUID.Low, PlayerGUID.High);
+            writer.WriteUInt8(Slot);
+            writer.WriteInt32(SlotInBag);
+            writer.WriteInt32(QuestLogItemID);
+            writer.WriteUInt32(Quantity);
+            writer.WriteUInt32(QuantityInInventory);
+            writer.WriteInt32(DungeonEncounterID);
+            writer.WriteInt32(BattlePetSpeciesID);
+            writer.WriteInt32(BattlePetBreedID);
+            writer.WriteUInt32(BattlePetBreedQuality);
+            writer.WriteInt32(BattlePetLevel);
+            writer.WritePackedGuid128(ItemGUID.Low, ItemGUID.High);
+            writer.WriteBit(Pushed);
+            writer.WriteBit(Created);
+            writer.WriteBits((uint)DisplayText, 3);
+            writer.WriteBit(IsBonusRoll);
+            writer.WriteBit(IsEncounterLoot);
+            writer.FlushBits();
+
+            if (!ItemPacketHelpers.WriteItemInstance(ref writer, Item))
+                return -1;
+
+            return writer.Position;
         }
 
         public WowGuid128 PlayerGUID;
@@ -186,7 +253,7 @@ namespace HermesProxy.World.Server.Packets
         public uint Amount;
     }
 
-    public class SellResponse : ServerPacket
+    public class SellResponse : ServerPacket, ISpanWritable
     {
         public SellResponse() : base(Opcode.SMSG_SELL_RESPONSE) { }
 
@@ -195,6 +262,17 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(VendorGUID);
             _worldPacket.WritePackedGuid128(ItemGUID);
             _worldPacket.WriteUInt8(Reason);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 1; // 2 GUIDs + byte
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(VendorGUID.Low, VendorGUID.High);
+            writer.WritePackedGuid128(ItemGUID.Low, ItemGUID.High);
+            writer.WriteUInt8(Reason);
+            return writer.Position;
         }
 
         public WowGuid128 VendorGUID;
@@ -471,7 +549,7 @@ namespace HermesProxy.World.Server.Packets
         public byte Slot;
     }
 
-    class ReadItemResultFailed : ServerPacket
+    class ReadItemResultFailed : ServerPacket, ISpanWritable
     {
         public ReadItemResultFailed() : base(Opcode.SMSG_READ_ITEM_RESULT_FAILED) { }
 
@@ -483,12 +561,24 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 5; // GUID + uint + 1 byte for bits
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(ItemGUID.Low, ItemGUID.High);
+            writer.WriteUInt32(Delay);
+            writer.WriteBits(Subcode, 2);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public WowGuid128 ItemGUID;
         public uint Delay;
         public byte Subcode;
     }
 
-    class ReadItemResultOK : ServerPacket
+    class ReadItemResultOK : ServerPacket, ISpanWritable
     {
         public ReadItemResultOK() : base(Opcode.SMSG_READ_ITEM_RESULT_OK) { }
 
@@ -497,10 +587,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(ItemGUID);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(ItemGUID.Low, ItemGUID.High);
+            return writer.Position;
+        }
+
         public WowGuid128 ItemGUID;
     }
 
-    public class InventoryChangeFailure : ServerPacket
+    public class InventoryChangeFailure : ServerPacket, ISpanWritable
     {
         public InventoryChangeFailure() : base(Opcode.SMSG_INVENTORY_CHANGE_FAILURE) { }
 
@@ -528,6 +627,40 @@ namespace HermesProxy.World.Server.Packets
                     _worldPacket.WriteInt32(LimitCategory);
                     break;
             }
+        }
+
+        // Fixed: sbyte + 2 GUIDs + byte = 2 + 36 = 38
+        // Max additional (EventAutoEquipBindConfirm): 2 GUIDs + int = 40
+        public int MaxSize => 2 + PackedGuidHelper.MaxPackedGuid128Size * 2 +
+                              PackedGuidHelper.MaxPackedGuid128Size * 2 + 4;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt8((sbyte)BagResult);
+            writer.WritePackedGuid128(Item[0].Low, Item[0].High);
+            writer.WritePackedGuid128(Item[1].Low, Item[1].High);
+            writer.WriteUInt8(ContainerBSlot);
+
+            switch (BagResult)
+            {
+                case InventoryResult.CantEquipLevel:
+                case InventoryResult.PurchaseLevelTooLow:
+                    writer.WriteInt32(Level);
+                    break;
+                case InventoryResult.EventAutoEquipBindConfirm:
+                    writer.WritePackedGuid128(SrcContainer.Low, SrcContainer.High);
+                    writer.WriteInt32(SrcSlot);
+                    writer.WritePackedGuid128(DstContainer.Low, DstContainer.High);
+                    break;
+                case InventoryResult.ItemMaxLimitCategoryCountExceeded:
+                case InventoryResult.ItemMaxLimitCategorySocketedExceeded:
+                case InventoryResult.ItemMaxLimitCategoryEquippedExceeded:
+                    writer.WriteInt32(LimitCategory);
+                    break;
+            }
+
+            return writer.Position;
         }
 
         public InventoryResult BagResult;
@@ -571,7 +704,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128[] Gems = new WowGuid128[ItemConst.MaxGemSockets];
     }
 
-    class SocketGemsSuccess : ServerPacket
+    class SocketGemsSuccess : ServerPacket, ISpanWritable
     {
         public SocketGemsSuccess() : base(Opcode.SMSG_SOCKET_GEMS_SUCCESS, ConnectionType.Instance) { }
 
@@ -580,10 +713,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(ItemGuid);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(ItemGuid.Low, ItemGuid.High);
+            return writer.Position;
+        }
+
         public WowGuid128 ItemGuid;
     }
 
-    class DurabilityDamageDeath : ServerPacket
+    class DurabilityDamageDeath : ServerPacket, ISpanWritable
     {
         public DurabilityDamageDeath() : base(Opcode.SMSG_DURABILITY_DAMAGE_DEATH) { }
 
@@ -592,10 +734,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(Percent);
         }
 
+        public int MaxSize => 4; // uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(Percent);
+            return writer.Position;
+        }
+
         public uint Percent;
     }
 
-    class ItemCooldown : ServerPacket
+    class ItemCooldown : ServerPacket, ISpanWritable
     {
         public ItemCooldown() : base(Opcode.SMSG_ITEM_COOLDOWN) { }
 
@@ -604,6 +755,17 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(ItemGuid);
             _worldPacket.WriteUInt32(SpellID);
             _worldPacket.WriteUInt32(Cooldown);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 8; // GUID + 2 uints
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(ItemGuid.Low, ItemGuid.High);
+            writer.WriteUInt32(SpellID);
+            writer.WriteUInt32(Cooldown);
+            return writer.Position;
         }
 
         public WowGuid128 ItemGuid;
@@ -637,7 +799,7 @@ namespace HermesProxy.World.Server.Packets
         public uint ItemId;
     }
 
-    class ItemEnchantTimeUpdate : ServerPacket
+    class ItemEnchantTimeUpdate : ServerPacket, ISpanWritable
     {
         public ItemEnchantTimeUpdate() : base(Opcode.SMSG_ITEM_ENCHANT_TIME_UPDATE, ConnectionType.Instance) { }
 
@@ -649,13 +811,25 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(OwnerGuid);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 8; // 2 GUIDs + 2 uints
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(ItemGuid.Low, ItemGuid.High);
+            writer.WriteUInt32(DurationLeft);
+            writer.WriteUInt32(Slot);
+            writer.WritePackedGuid128(OwnerGuid.Low, OwnerGuid.High);
+            return writer.Position;
+        }
+
         public WowGuid128 ItemGuid;
         public uint DurationLeft;
         public uint Slot;
         public WowGuid128 OwnerGuid;
     }
 
-    class EnchantmentLog : ServerPacket
+    class EnchantmentLog : ServerPacket, ISpanWritable
     {
         public EnchantmentLog() : base(Opcode.SMSG_ENCHANTMENT_LOG) { }
 
@@ -668,6 +842,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(Enchantment);
             _worldPacket.WriteInt32(EnchantSlot);
         }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 3 + 12; // 3 GUIDs + 3 ints
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Owner.Low, Owner.High);
+            writer.WritePackedGuid128(Caster.Low, Caster.High);
+            writer.WritePackedGuid128(ItemGUID.Low, ItemGUID.High);
+            writer.WriteInt32(ItemID);
+            writer.WriteInt32(Enchantment);
+            writer.WriteInt32(EnchantSlot);
+            return writer.Position;
+        }
+
         public WowGuid128 Owner;
         public WowGuid128 Caster;
         public WowGuid128 ItemGUID;
@@ -705,5 +894,52 @@ namespace HermesProxy.World.Server.Packets
         public byte GiftSlot;
         public byte ItemBag;
         public byte ItemSlot;
+    }
+
+    internal static class ItemPacketHelpers
+    {
+        public const int MaxItemMods = 8;
+        public const int MaxBonusListIDs = 8;
+
+        // ItemInstance: 4+4+4 fixed + 1 bit flush + ItemModList + optional ItemBonuses
+        // ItemModList: 1 byte (6 bits count) + mods * 5
+        // ItemBonuses: 1 + 4 + bonuses * 4
+        public const int ItemInstanceMaxSize = 12 + 1 + 1 + MaxItemMods * 5 + 1 + 4 + MaxBonusListIDs * 4;
+
+        public static bool WriteItemInstance(ref SpanPacketWriter writer, ItemInstance item)
+        {
+            writer.WriteUInt32(item.ItemID);
+            writer.WriteUInt32(item.RandomPropertiesSeed);
+            writer.WriteUInt32(item.RandomPropertiesID);
+
+            writer.WriteBit(item.ItemBonus != null);
+            writer.FlushBits();
+
+            // ItemModList
+            if (item.Modifications.Values.Count > MaxItemMods)
+                return false;
+
+            writer.WriteBits((uint)item.Modifications.Values.Count, 6);
+            writer.FlushBits();
+            foreach (ItemMod itemMod in item.Modifications.Values)
+            {
+                writer.WriteUInt32(itemMod.Value);
+                writer.WriteUInt8((byte)itemMod.Type);
+            }
+
+            // ItemBonuses (optional)
+            if (item.ItemBonus != null)
+            {
+                if (item.ItemBonus.BonusListIDs.Count > MaxBonusListIDs)
+                    return false;
+
+                writer.WriteUInt8((byte)item.ItemBonus.Context);
+                writer.WriteInt32(item.ItemBonus.BonusListIDs.Count);
+                foreach (uint bonusID in item.ItemBonus.BonusListIDs)
+                    writer.WriteUInt32(bonusID);
+            }
+
+            return true;
+        }
     }
 }

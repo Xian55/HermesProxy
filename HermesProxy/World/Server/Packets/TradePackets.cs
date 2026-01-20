@@ -18,6 +18,7 @@
 
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -61,7 +62,7 @@ namespace HermesProxy.World.Server.Packets
         public byte TradeSlot;
     }
 
-    public class TradeStatusPkt : ServerPacket
+    public class TradeStatusPkt : ServerPacket, ISpanWritable
     {
         public TradeStatusPkt() : base(Opcode.SMSG_TRADE_STATUS, ConnectionType.Instance) { }
 
@@ -96,6 +97,49 @@ namespace HermesProxy.World.Server.Packets
                     _worldPacket.FlushBits();
                     break;
             }
+        }
+
+        // Max size: bits(1) + largest case is Proposed with 2 GUIDs(36) = 37 bytes
+        // Failed: bits(1) + int(4) + uint(4) = 9
+        // Initiated: bits(1) + uint(4) = 5
+        // Proposed: bits(1) + 2 GUIDs(36) = 37
+        // WrongRealm/NotOnTaplist: bits(1) + byte(1) = 2
+        // Currency: bits(1) + 2 ints(8) = 9
+        public int MaxSize => 1 + PackedGuidHelper.MaxPackedGuid128Size * 2;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBit(PartnerIsSameBnetAccount);
+            writer.WriteBits((uint)Status, 5);
+            switch (Status)
+            {
+                case TradeStatus.Failed:
+                    writer.WriteBit(FailureForYou);
+                    writer.WriteInt32((int)BagResult);
+                    writer.WriteUInt32(ItemID);
+                    break;
+                case TradeStatus.Initiated:
+                    writer.WriteUInt32(Id);
+                    break;
+                case TradeStatus.Proposed:
+                    writer.WritePackedGuid128(Partner.Low, Partner.High);
+                    writer.WritePackedGuid128(PartnerAccount.Low, PartnerAccount.High);
+                    break;
+                case TradeStatus.WrongRealm:
+                case TradeStatus.NotOnTaplist:
+                    writer.WriteUInt8(TradeSlot);
+                    break;
+                case TradeStatus.NotEnoughCurrency:
+                case TradeStatus.CurrencyNotTradable:
+                    writer.WriteInt32(CurrencyType);
+                    writer.WriteInt32(CurrencyQuantity);
+                    break;
+                default:
+                    writer.FlushBits();
+                    break;
+            }
+            return writer.Position;
         }
 
         public bool PartnerIsSameBnetAccount;

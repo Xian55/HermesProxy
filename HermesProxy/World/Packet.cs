@@ -17,7 +17,9 @@
 
 using Framework.IO;
 using Framework.Constants;
+using Framework.Logging;
 using System;
+using System.Buffers;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Client;
 using Ionic.Zlib;
@@ -121,10 +123,41 @@ namespace HermesProxy.World
             if (buffer != null)
                 return;
 
-            Write();
+            // Fast path: Use Span-based writing for packets that support it
+            if (this is ISpanWritable spanWritable)
+            {
+                byte[] pooledBuffer = ArrayPool<byte>.Shared.Rent(spanWritable.MaxSize);
+                try
+                {
+                    int bytesWritten = spanWritable.WriteToSpan(pooledBuffer);
 
-            buffer = _worldPacket.GetData();
-            _worldPacket.Dispose();
+                    // Negative return means packet exceeded MaxSize cap, fall back to standard Write()
+                    if (bytesWritten < 0)
+                    {
+                        Log.Print(LogType.SpanMiss, $"{GetType().Name} exceeded MaxSize ({spanWritable.MaxSize}), using fallback");
+                        Write();
+                        buffer = _worldPacket.GetData();
+                    }
+                    else
+                    {
+                        Log.Print(LogType.SpanStats, $"{GetType().Name}: {bytesWritten}/{spanWritable.MaxSize} bytes");
+                        buffer = new byte[bytesWritten];
+                        pooledBuffer.AsSpan(0, bytesWritten).CopyTo(buffer);
+                    }
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(pooledBuffer);
+                }
+                _worldPacket.Dispose();
+            }
+            else
+            {
+                // Standard path: Use ByteBuffer-based writing
+                Write();
+                buffer = _worldPacket.GetData();
+                _worldPacket.Dispose();
+            }
         }
 
         public ConnectionType GetConnection() { return connectionType; }

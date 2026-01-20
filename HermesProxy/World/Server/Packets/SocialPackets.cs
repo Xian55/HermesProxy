@@ -17,8 +17,10 @@
 
 
 using System;
+using System.Text;
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
@@ -37,7 +39,7 @@ namespace HermesProxy.World.Server.Packets
         public SocialFlag Flags;
     }
 
-    public class ContactList : ServerPacket
+    public class ContactList : ServerPacket, ISpanWritable
     {
         public ContactList() : base(Opcode.SMSG_CONTACT_LIST)
         {
@@ -52,6 +54,51 @@ namespace HermesProxy.World.Server.Packets
 
             foreach (ContactInfo contact in Contacts)
                 contact.Write(_worldPacket);
+        }
+
+        // Cap for contacts (8 bits = 256 max, reduced from 200 to 16 based on typical usage)
+        private const int MaxContacts = 16;
+        // Cap for note string (10 bits = 1024, using 128)
+        private const int MaxNoteBytes = 128;
+        // Per contact: 2 GUIDs(36) + 4 uints(16) + byte(1) + bits(2) + note = 183 bytes max
+        private const int ContactSize = PackedGuidHelper.MaxPackedGuid128Size * 2 + 16 + 1 + 2 + MaxNoteBytes;
+        // uint(4) + bits(1) + contacts
+        public int MaxSize => 4 + 1 + MaxContacts * ContactSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Contacts.Count > MaxContacts)
+                return -1;
+
+            // Pre-validate note lengths
+            foreach (var contact in Contacts)
+            {
+                if (Encoding.UTF8.GetByteCount(contact.Note) > MaxNoteBytes)
+                    return -1;
+            }
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32((uint)Flags);
+            writer.WriteBits((uint)Contacts.Count, 8);
+            writer.FlushBits();
+
+            foreach (ContactInfo contact in Contacts)
+            {
+                writer.WritePackedGuid128(contact.Guid.Low, contact.Guid.High);
+                writer.WritePackedGuid128(contact.WowAccountGuid.Low, contact.WowAccountGuid.High);
+                writer.WriteUInt32(contact.VirtualRealmAddr);
+                writer.WriteUInt32(contact.NativeRealmAddr);
+                writer.WriteUInt32((uint)contact.TypeFlags);
+                writer.WriteUInt8((byte)contact.Status);
+                writer.WriteUInt32(contact.AreaID);
+                writer.WriteUInt32(contact.Level);
+                writer.WriteUInt32((uint)contact.ClassID);
+                writer.WriteBits((uint)Encoding.UTF8.GetByteCount(contact.Note), 10);
+                writer.WriteBit(contact.Mobile);
+                writer.FlushBits();
+                writer.WriteString(contact.Note);
+            }
+            return writer.Position;
         }
 
         public List<ContactInfo> Contacts;
@@ -90,7 +137,7 @@ namespace HermesProxy.World.Server.Packets
         public string Note = "";
     }
 
-    public class FriendStatusPkt : ServerPacket
+    public class FriendStatusPkt : ServerPacket, ISpanWritable
     {
         public FriendStatusPkt() : base(Opcode.SMSG_FRIEND_STATUS) { }
 
@@ -108,6 +155,34 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteBit(Mobile);
             _worldPacket.FlushBits();
             _worldPacket.WriteString(Notes);
+        }
+
+        // Cap for friend notes - 10 bits = 1024 max, using 128
+        private const int MaxNotesBytes = 128;
+        // byte(1) + 2 GUIDs(36) + 4 uints(16) + byte(1) + 11 bits(2) + notes
+        public int MaxSize => 1 + PackedGuidHelper.MaxPackedGuid128Size * 2 + 16 + 1 + 2 + MaxNotesBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int notesBytes = Notes != null ? Encoding.UTF8.GetByteCount(Notes) : 0;
+            if (notesBytes > MaxNotesBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt8((byte)FriendResult);
+            writer.WritePackedGuid128(Guid.Low, Guid.High);
+            writer.WritePackedGuid128(WowAccountGuid.Low, WowAccountGuid.High);
+            writer.WriteUInt32(VirtualRealmAddress);
+            writer.WriteUInt8((byte)Status);
+            writer.WriteUInt32(AreaID);
+            writer.WriteUInt32(Level);
+            writer.WriteUInt32((uint)ClassID);
+            writer.WriteBits((uint)notesBytes, 10);
+            writer.WriteBit(Mobile);
+            writer.FlushBits();
+            if (Notes != null)
+                writer.WriteString(Notes);
+            return writer.Position;
         }
 
         public FriendsResult FriendResult;

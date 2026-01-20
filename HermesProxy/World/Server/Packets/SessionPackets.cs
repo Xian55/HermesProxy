@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+using System;
 using Framework.Constants;
 using Framework.IO;
 using HermesProxy.World.Enums;
@@ -56,7 +57,7 @@ namespace HermesProxy.World.Server.Packets
         public ByteBuffer Data = new();
     }
 
-    class ConnectionStatus : ServerPacket
+    class ConnectionStatus : ServerPacket, ISpanWritable
     {
         public ConnectionStatus() : base(Opcode.SMSG_BATTLE_NET_CONNECTION_STATUS) { }
 
@@ -65,6 +66,17 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteBits(State, 2);
             _worldPacket.WriteBit(SuppressNotification);
             _worldPacket.FlushBits();
+        }
+
+        public int MaxSize => 1; // 3 bits = 1 byte
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits(State, 2);
+            writer.WriteBit(SuppressNotification);
+            writer.FlushBits();
+            return writer.Position;
         }
 
         public byte State;

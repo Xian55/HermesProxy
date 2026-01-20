@@ -16,11 +16,13 @@
  */
 
 
+using System;
+using System.Collections.Generic;
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
-using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets
 {
@@ -34,7 +36,7 @@ namespace HermesProxy.World.Server.Packets
         }
     }
 
-    public class BindPointUpdate : ServerPacket
+    public class BindPointUpdate : ServerPacket, ISpanWritable
     {
         public BindPointUpdate() : base(Opcode.SMSG_BIND_POINT_UPDATE, ConnectionType.Instance) { }
 
@@ -45,12 +47,23 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(BindAreaID);
         }
 
+        public int MaxSize => 12 + 4 + 4; // Vector3 (12) + 2x uint32 (8)
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteVector3(BindPosition);
+            writer.WriteUInt32(BindMapID);
+            writer.WriteUInt32(BindAreaID);
+            return writer.Position;
+        }
+
         public uint BindMapID = 0xFFFFFFFF;
         public Vector3 BindPosition;
         public uint BindAreaID;
     }
 
-    public class PlayerBound : ServerPacket
+    public class PlayerBound : ServerPacket, ISpanWritable
     {
         public PlayerBound() : base(Opcode.SMSG_PLAYER_BOUND) { }
 
@@ -60,17 +73,36 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(AreaID);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4; // Packed GUID + uint32
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(BinderGUID.Low, BinderGUID.High);
+            writer.WriteUInt32(AreaID);
+            return writer.Position;
+        }
+
         public WowGuid128 BinderGUID;
         public uint AreaID;
     }
 
-    public class ServerTimeOffset : ServerPacket
+    public class ServerTimeOffset : ServerPacket, ISpanWritable
     {
         public ServerTimeOffset() : base(Opcode.SMSG_SERVER_TIME_OFFSET) { }
 
         public override void Write()
         {
             _worldPacket.WriteInt64(Time);
+        }
+
+        public int MaxSize => 8;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt64(Time);
+            return writer.Position;
         }
 
         public long Time;
@@ -91,7 +123,7 @@ namespace HermesProxy.World.Server.Packets
         public uint TutorialBit;
     }
 
-    public class TutorialFlags : ServerPacket
+    public class TutorialFlags : ServerPacket, ISpanWritable
     {
         public TutorialFlags() : base(Opcode.SMSG_TUTORIAL_FLAGS) { }
 
@@ -101,10 +133,20 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteUInt32(TutorialData[i]);
         }
 
+        public int MaxSize => (int)Tutorials.Max * 4; // 8 uint32s = 32 bytes
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            for (byte i = 0; i < (int)Tutorials.Max; ++i)
+                writer.WriteUInt32(TutorialData[i]);
+            return writer.Position;
+        }
+
         public uint[] TutorialData = new uint[(int)Tutorials.Max];
     }
 
-    public class CorpseReclaimDelay : ServerPacket
+    public class CorpseReclaimDelay : ServerPacket, ISpanWritable
     {
         public CorpseReclaimDelay() : base(Opcode.SMSG_CORPSE_RECLAIM_DELAY, ConnectionType.Instance) { }
 
@@ -113,10 +155,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(Remaining);
         }
 
+        public int MaxSize => 4;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(Remaining);
+            return writer.Position;
+        }
+
         public uint Remaining;
     }
 
-    public class SetupCurrency : ServerPacket
+    public class SetupCurrency : ServerPacket, ISpanWritable
     {
         public SetupCurrency() : base(Opcode.SMSG_SETUP_CURRENCY, ConnectionType.Instance) { }
 
@@ -150,22 +201,64 @@ namespace HermesProxy.World.Server.Packets
             }
         }
 
+        // Cap for currencies - reduced from 128 to 16 based on typical usage (0 observed at login)
+        private const int MaxCurrencies = 16;
+        // Per currency max: 2 uints(8) + bits(2) + 5 optional uints(20) = 30 bytes
+        private const int MaxRecordSize = 30;
+        // count(4) + currencies
+        public int MaxSize => 4 + MaxCurrencies * MaxRecordSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Data.Count > MaxCurrencies)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Data.Count);
+
+            foreach (Record data in Data)
+            {
+                writer.WriteUInt32(data.Type);
+                writer.WriteUInt32(data.Quantity);
+
+                writer.WriteBit(data.WeeklyQuantity.HasValue);
+                writer.WriteBit(data.MaxWeeklyQuantity.HasValue);
+                writer.WriteBit(data.TrackedQuantity.HasValue);
+                writer.WriteBit(data.MaxQuantity.HasValue);
+                writer.WriteBit(data.Unused901.HasValue);
+                writer.WriteBits(data.Flags, 5);
+                writer.FlushBits();
+
+                if (data.WeeklyQuantity.HasValue)
+                    writer.WriteUInt32(data.WeeklyQuantity.Value);
+                if (data.MaxWeeklyQuantity.HasValue)
+                    writer.WriteUInt32(data.MaxWeeklyQuantity.Value);
+                if (data.TrackedQuantity.HasValue)
+                    writer.WriteUInt32(data.TrackedQuantity.Value);
+                if (data.MaxQuantity.HasValue)
+                    writer.WriteInt32(data.MaxQuantity.Value);
+                if (data.Unused901.HasValue)
+                    writer.WriteInt32(data.Unused901.Value);
+            }
+            return writer.Position;
+        }
+
         public List<Record> Data = new();
 
         public struct Record
         {
             public uint Type;
             public uint Quantity;
-            public uint? WeeklyQuantity;       // Currency count obtained this Week.  
+            public uint? WeeklyQuantity;       // Currency count obtained this Week.
             public uint? MaxWeeklyQuantity;    // Weekly Currency cap.
             public uint? TrackedQuantity;
             public int? MaxQuantity;
             public int? Unused901;
-            public byte Flags;                      // 0 = none, 
+            public byte Flags;                      // 0 = none,
         }
     }
 
-    class AllAccountCriteria : ServerPacket
+    class AllAccountCriteria : ServerPacket, ISpanWritable
     {
         public AllAccountCriteria() : base(Opcode.SMSG_ALL_ACCOUNT_CRITERIA, ConnectionType.Instance) { }
 
@@ -174,6 +267,38 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(Progress.Count);
             foreach (var progress in Progress)
                 progress.Write(_worldPacket);
+        }
+
+        // Cap for account criteria - reduced from 256 to 32 based on typical usage (0 observed)
+        private const int MaxCriteria = 32;
+        // Per criteria: uint(4) + ulong(8) + GUID(18) + PackedTime(4) + 2 uints(8) + bits(1) + optional ulong(8) = 51 bytes max
+        private const int MaxCriteriaSize = 51;
+        // count(4) + criteria
+        public int MaxSize => 4 + MaxCriteria * MaxCriteriaSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Progress.Count > MaxCriteria)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Progress.Count);
+            foreach (var progress in Progress)
+            {
+                writer.WriteUInt32(progress.Id);
+                writer.WriteUInt64(progress.Quantity);
+                writer.WritePackedGuid128(progress.Player.Low, progress.Player.High);
+                writer.WriteUInt32(Time.GetPackedTimeFromUnixTime(progress.Date));
+                writer.WriteUInt32(progress.TimeFromStart);
+                writer.WriteUInt32(progress.TimeFromCreate);
+                writer.WriteBits(progress.Flags, 4);
+                writer.WriteBit(progress.RafAcceptanceID.HasValue);
+                writer.FlushBits();
+
+                if (progress.RafAcceptanceID.HasValue)
+                    writer.WriteUInt64(progress.RafAcceptanceID.Value);
+            }
+            return writer.Position;
         }
 
         public List<CriteriaProgressPkt> Progress = new();
@@ -207,13 +332,22 @@ namespace HermesProxy.World.Server.Packets
         public ulong? RafAcceptanceID;
     }
 
-    public class TimeSyncRequest : ServerPacket
+    public class TimeSyncRequest : ServerPacket, ISpanWritable
     {
         public TimeSyncRequest() : base(Opcode.SMSG_TIME_SYNC_REQUEST, ConnectionType.Instance) { }
 
         public override void Write()
         {
             _worldPacket.WriteUInt32(SequenceIndex);
+        }
+
+        public int MaxSize => 4; // uint32
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(SequenceIndex);
+            return writer.Position;
         }
 
         public uint SequenceIndex;
@@ -233,7 +367,7 @@ namespace HermesProxy.World.Server.Packets
         public uint SequenceIndex; // Same index as in request
     }
 
-    public class WeatherPkt : ServerPacket
+    public class WeatherPkt : ServerPacket, ISpanWritable
     {
         public WeatherPkt() : base(Opcode.SMSG_WEATHER, ConnectionType.Instance) { }
 
@@ -246,12 +380,24 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => 4 + 4 + 1; // uint32 + float + 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32((uint)WeatherID);
+            writer.WriteFloat(Intensity);
+            writer.WriteBit(Abrupt);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public bool Abrupt;
         public float Intensity;
         public WeatherState WeatherID;
     }
 
-    class StartLightningStorm : ServerPacket
+    class StartLightningStorm : ServerPacket, ISpanWritable
     {
         public StartLightningStorm() : base(Opcode.SMSG_START_LIGHTNING_STORM, ConnectionType.Instance) { }
 
@@ -260,10 +406,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(LightningStormId);
         }
 
+        public int MaxSize => 4; // uint32
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(LightningStormId);
+            return writer.Position;
+        }
+
         public uint LightningStormId;
     }
 
-    public class LoginSetTimeSpeed : ServerPacket
+    public class LoginSetTimeSpeed : ServerPacket, ISpanWritable
     {
         public LoginSetTimeSpeed() : base(Opcode.SMSG_LOGIN_SET_TIME_SPEED, ConnectionType.Instance) { }
 
@@ -274,6 +429,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteFloat(NewSpeed);
             _worldPacket.WriteInt32(ServerTimeHolidayOffset);
             _worldPacket.WriteInt32(GameTimeHolidayOffset);
+        }
+
+        public int MaxSize => 20; // 2 uints + float + 2 ints
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(ServerTime);
+            writer.WriteUInt32(GameTime);
+            writer.WriteFloat(NewSpeed);
+            writer.WriteInt32(ServerTimeHolidayOffset);
+            writer.WriteInt32(GameTimeHolidayOffset);
+            return writer.Position;
         }
 
         public uint ServerTime;
@@ -299,13 +467,22 @@ namespace HermesProxy.World.Server.Packets
         public bool FromClient;
     }
 
-    class AreaTriggerMessage : ServerPacket
+    class AreaTriggerMessage : ServerPacket, ISpanWritable
     {
         public AreaTriggerMessage() : base(Opcode.SMSG_AREA_TRIGGER_MESSAGE) { }
 
         public override void Write()
         {
             _worldPacket.WriteUInt32(AreaTriggerID);
+        }
+
+        public int MaxSize => 4; // uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(AreaTriggerID);
+            return writer.Position;
         }
 
         public uint AreaTriggerID = 0;
@@ -323,7 +500,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 TargetGUID;
     }
 
-    public class WorldServerInfo : ServerPacket
+    public class WorldServerInfo : ServerPacket, ISpanWritable
     {
         public WorldServerInfo() : base(Opcode.SMSG_WORLD_SERVER_INFO, ConnectionType.Instance) { }
 
@@ -347,6 +524,32 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteUInt32(InstanceGroupSize.Value);
         }
 
+        // uint(4) + byte(1) + 4 bits(1) + optional uint(4) + optional ulong(8) + optional uint(4) = 22
+        public int MaxSize => 4 + 1 + 1 + 4 + 8 + 4;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(DifficultyID);
+            writer.WriteUInt8(IsTournamentRealm);
+            writer.WriteBit(XRealmPvpAlert);
+            writer.WriteBit(RestrictedAccountMaxLevel.HasValue);
+            writer.WriteBit(RestrictedAccountMaxMoney.HasValue);
+            writer.WriteBit(InstanceGroupSize.HasValue);
+            writer.FlushBits();
+
+            if (RestrictedAccountMaxLevel.HasValue)
+                writer.WriteUInt32(RestrictedAccountMaxLevel.Value);
+
+            if (RestrictedAccountMaxMoney.HasValue)
+                writer.WriteUInt64(RestrictedAccountMaxMoney.Value);
+
+            if (InstanceGroupSize.HasValue)
+                writer.WriteUInt32(InstanceGroupSize.Value);
+
+            return writer.Position;
+        }
+
         public uint DifficultyID;
         public byte IsTournamentRealm;
         public bool XRealmPvpAlert;
@@ -367,7 +570,7 @@ namespace HermesProxy.World.Server.Packets
         public uint DifficultyID;
     }
 
-    public class DungeonDifficultySet : ServerPacket
+    public class DungeonDifficultySet : ServerPacket, ISpanWritable
     {
         public DungeonDifficultySet() : base(Opcode.SMSG_SET_DUNGEON_DIFFICULTY) { }
 
@@ -376,10 +579,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(DifficultyID);
         }
 
+        public int MaxSize => 4; // int
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(DifficultyID);
+            return writer.Position;
+        }
+
         public int DifficultyID;
     }
 
-    public class SetAllTaskProgress : ServerPacket
+    public class SetAllTaskProgress : ServerPacket, ISpanWritable
     {
         public SetAllTaskProgress() : base(Opcode.SMSG_SET_ALL_TASK_PROGRESS, ConnectionType.Instance) { }
 
@@ -388,6 +600,42 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(Tasks.Count);
             foreach (var task in Tasks)
                 task.Write(_worldPacket);
+        }
+
+        // Cap for tasks - reduced from 64 to 8 based on typical usage (0 observed)
+        private const int MaxTasks = 8;
+        // Cap for progress items per task
+        private const int MaxProgressPerTask = 16;
+        // Per task: 4 uints(16) + count(4) + progress items(2 each) = 52 bytes max
+        private const int MaxTaskSize = 16 + 4 + MaxProgressPerTask * 2;
+        // count(4) + tasks
+        public int MaxSize => 4 + MaxTasks * MaxTaskSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Tasks.Count > MaxTasks)
+                return -1;
+
+            // Pre-validate progress counts
+            foreach (var task in Tasks)
+            {
+                if (task.Progress.Count > MaxProgressPerTask)
+                    return -1;
+            }
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Tasks.Count);
+            foreach (var task in Tasks)
+            {
+                writer.WriteUInt32(task.TaskID);
+                writer.WriteUInt32(task.FailureTime);
+                writer.WriteUInt32(task.Flags);
+                writer.WriteUInt32(task.Unk);
+                writer.WriteInt32(task.Progress.Count);
+                foreach (ushort progress in task.Progress)
+                    writer.WriteUInt16(progress);
+            }
+            return writer.Position;
         }
 
         public List<TaskProgress> Tasks = new List<TaskProgress>();
@@ -412,7 +660,7 @@ namespace HermesProxy.World.Server.Packets
         public List<ushort> Progress = new List<ushort>();
     }
 
-    public class InitialSetup : ServerPacket
+    public class InitialSetup : ServerPacket, ISpanWritable
     {
         public InitialSetup() : base(Opcode.SMSG_INITIAL_SETUP, ConnectionType.Instance) { }
 
@@ -420,6 +668,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WriteUInt8(ServerExpansionLevel);
             _worldPacket.WriteUInt8(ServerExpansionTier);
+        }
+
+        public int MaxSize => 2; // 2 bytes
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt8(ServerExpansionLevel);
+            writer.WriteUInt8(ServerExpansionTier);
+            return writer.Position;
         }
 
         public byte ServerExpansionLevel;
@@ -450,7 +708,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 Player;
     }
 
-    public class CorpseLocation : ServerPacket
+    public class CorpseLocation : ServerPacket, ISpanWritable
     {
         public CorpseLocation() : base(Opcode.SMSG_CORPSE_LOCATION) { }
 
@@ -466,6 +724,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(Transport);
         }
 
+        public int MaxSize => 1 + PackedGuidHelper.MaxPackedGuid128Size * 2 + 4 + 12 + 4; // bit + 2 GUIDs + int + Vector3 + int
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBit(Valid);
+            writer.FlushBits();
+            writer.WritePackedGuid128(Player.Low, Player.High);
+            writer.WriteInt32(ActualMapID);
+            writer.WriteVector3(Position);
+            writer.WriteInt32(MapID);
+            writer.WritePackedGuid128(Transport.Low, Transport.High);
+            return writer.Position;
+        }
+
         public WowGuid128 Player;
         public WowGuid128 Transport;
         public Vector3 Position;
@@ -474,7 +747,7 @@ namespace HermesProxy.World.Server.Packets
         public bool Valid;
     }
 
-    public class DeathReleaseLoc : ServerPacket
+    public class DeathReleaseLoc : ServerPacket, ISpanWritable
     {
         public DeathReleaseLoc() : base(Opcode.SMSG_DEATH_RELEASE_LOC) { }
 
@@ -482,6 +755,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WriteInt32(MapID);
             _worldPacket.WriteVector3(Location);
+        }
+
+        public int MaxSize => 16; // int + Vector3 (3 floats)
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(MapID);
+            writer.WriteVector3(Location);
+            return writer.Position;
         }
 
         public int MapID;
@@ -512,7 +795,7 @@ namespace HermesProxy.World.Server.Packets
         public uint StandState;
     }
 
-    public class StandStateUpdate : ServerPacket
+    public class StandStateUpdate : ServerPacket, ISpanWritable
     {
         public StandStateUpdate() : base(Opcode.SMSG_STAND_STATE_UPDATE) { }
 
@@ -522,11 +805,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt8(StandState);
         }
 
+        public int MaxSize => 5; // uint + byte
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(AnimKitID);
+            writer.WriteUInt8(StandState);
+            return writer.Position;
+        }
+
         public uint AnimKitID;
         public byte StandState;
     }
 
-    public class ExplorationExperience : ServerPacket
+    public class ExplorationExperience : ServerPacket, ISpanWritable
     {
         public ExplorationExperience() : base(Opcode.SMSG_EXPLORATION_EXPERIENCE) { }
 
@@ -536,11 +829,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(Experience);
         }
 
+        public int MaxSize => 8; // 2 uints
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(AreaID);
+            writer.WriteUInt32(Experience);
+            return writer.Position;
+        }
+
         public uint AreaID;
         public uint Experience;
     }
 
-    public class PlayMusic : ServerPacket
+    public class PlayMusic : ServerPacket, ISpanWritable
     {
         public PlayMusic() : base(Opcode.SMSG_PLAY_MUSIC) { }
 
@@ -549,10 +852,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(SoundEntryID);
         }
 
+        public int MaxSize => 4; // uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(SoundEntryID);
+            return writer.Position;
+        }
+
         public uint SoundEntryID;
     }
 
-    class PlaySound : ServerPacket
+    class PlaySound : ServerPacket, ISpanWritable
     {
         public PlaySound() : base(Opcode.SMSG_PLAY_SOUND) { }
 
@@ -564,12 +876,25 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteInt32(BroadcastTextId);
         }
 
+        // MaxSize: uint + GUID + optional int = 4 + 18 + 4 = 26
+        public int MaxSize => 4 + PackedGuidHelper.MaxPackedGuid128Size + 4;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(SoundEntryID);
+            writer.WritePackedGuid128(SourceObjectGuid.Low, SourceObjectGuid.High);
+            if (ModernVersion.AddedInVersion(9, 0, 1, 1, 14, 0, 2, 5, 1))
+                writer.WriteInt32(BroadcastTextId);
+            return writer.Position;
+        }
+
         public uint SoundEntryID;
         public WowGuid128 SourceObjectGuid;
         public int BroadcastTextId;
     }
 
-    class PlayObjectSound : ServerPacket
+    class PlayObjectSound : ServerPacket, ISpanWritable
     {
         public PlayObjectSound() : base(Opcode.SMSG_PLAY_OBJECT_SOUND) { }
 
@@ -583,6 +908,21 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteInt32(BroadcastTextID);
         }
 
+        // MaxSize: uint + 2 GUIDs + Vector3 + optional int = 4 + 18*2 + 12 + 4 = 56
+        public int MaxSize => 4 + PackedGuidHelper.MaxPackedGuid128Size * 2 + 12 + 4;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(SoundEntryID);
+            writer.WritePackedGuid128(SourceObjectGUID.Low, SourceObjectGUID.High);
+            writer.WritePackedGuid128(TargetObjectGUID.Low, TargetObjectGUID.High);
+            writer.WriteVector3(Position);
+            if (ModernVersion.AddedInVersion(9, 0, 1, 1, 14, 0, 2, 5, 1))
+                writer.WriteInt32(BroadcastTextID);
+            return writer.Position;
+        }
+
         public uint SoundEntryID;
         public WowGuid128 SourceObjectGUID;
         public WowGuid128 TargetObjectGUID;
@@ -590,13 +930,22 @@ namespace HermesProxy.World.Server.Packets
         public int BroadcastTextID;
     }
 
-    public class TriggerCinematic : ServerPacket
+    public class TriggerCinematic : ServerPacket, ISpanWritable
     {
         public TriggerCinematic() : base(Opcode.SMSG_TRIGGER_CINEMATIC) { }
 
         public override void Write()
         {
             _worldPacket.WriteUInt32(CinematicID);
+        }
+
+        public int MaxSize => 4; // uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(CinematicID);
+            return writer.Position;
         }
 
         public uint CinematicID;
@@ -638,7 +987,7 @@ namespace HermesProxy.World.Server.Packets
         public int SequenceVariation;
     }
 
-    class SpecialMountAnim : ServerPacket
+    class SpecialMountAnim : ServerPacket, ISpanWritable
     {
         public SpecialMountAnim() : base(Opcode.SMSG_SPECIAL_MOUNT_ANIM, ConnectionType.Instance) { }
 
@@ -655,12 +1004,35 @@ namespace HermesProxy.World.Server.Packets
             }
         }
 
+        // Cap for spell visual kit IDs - rarely more than 1-2
+        private const int MaxSpellVisualKitIDs = 4;
+        // GUID(18) + count(4) + SequenceVariation(4) + IDs(4 each)
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + 4 + MaxSpellVisualKitIDs * 4;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (SpellVisualKitIDs.Count > MaxSpellVisualKitIDs)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(UnitGUID.Low, UnitGUID.High);
+            if (ModernVersion.AddedInVersion(9, 0, 5, 1, 14, 0, 2, 5, 1))
+            {
+                writer.WriteInt32(SpellVisualKitIDs.Count);
+                if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 2, 2, 5, 3))
+                    writer.WriteInt32(SequenceVariation);
+                foreach (var id in SpellVisualKitIDs)
+                    writer.WriteInt32(id);
+            }
+            return writer.Position;
+        }
+
         public WowGuid128 UnitGUID;
         public List<int> SpellVisualKitIDs = new();
         public int SequenceVariation;
     }
 
-    public class StartMirrorTimer : ServerPacket
+    public class StartMirrorTimer : ServerPacket, ISpanWritable
     {
         public StartMirrorTimer() : base(Opcode.SMSG_START_MIRROR_TIMER) { }
 
@@ -675,6 +1047,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => 21; // 5 ints + 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32((int)Timer);
+            writer.WriteInt32(Value);
+            writer.WriteInt32(MaxValue);
+            writer.WriteInt32(Scale);
+            writer.WriteInt32(SpellID);
+            writer.WriteBit(Paused);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public MirrorTimerType Timer;
         public int Value;
         public int MaxValue;
@@ -683,7 +1070,7 @@ namespace HermesProxy.World.Server.Packets
         public bool Paused;
     }
 
-    public class PauseMirrorTimer : ServerPacket
+    public class PauseMirrorTimer : ServerPacket, ISpanWritable
     {
         public PauseMirrorTimer() : base(Opcode.SMSG_PAUSE_MIRROR_TIMER) { }
 
@@ -694,11 +1081,22 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => 5; // int + 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32((int)Timer);
+            writer.WriteBit(Paused);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public MirrorTimerType Timer;
         public bool Paused;
     }
 
-    public class StopMirrorTimer : ServerPacket
+    public class StopMirrorTimer : ServerPacket, ISpanWritable
     {
         public StopMirrorTimer() : base(Opcode.SMSG_STOP_MIRROR_TIMER) { }
 
@@ -707,10 +1105,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32((int)Timer);
         }
 
+        public int MaxSize => 4; // int
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32((int)Timer);
+            return writer.Position;
+        }
+
         public MirrorTimerType Timer;
     }
 
-    public class LFGListUpdateBlacklist : ServerPacket
+    public class LFGListUpdateBlacklist : ServerPacket, ISpanWritable
     {
         public LFGListUpdateBlacklist() : base(Opcode.SMSG_LFG_LIST_UPDATE_BLACKLIST, ConnectionType.Instance) { }
 
@@ -719,6 +1126,26 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(Blacklist.Count);
             foreach (var entry in Blacklist)
                 entry.Write(_worldPacket);
+        }
+
+        // Cap for blacklist entries - reduced from 128 to 16 based on typical usage (0 observed)
+        private const int MaxBlacklistEntries = 16;
+        // Per entry: 2 ints = 8 bytes
+        public int MaxSize => 4 + MaxBlacklistEntries * 8;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Blacklist.Count > MaxBlacklistEntries)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(Blacklist.Count);
+            foreach (var entry in Blacklist)
+            {
+                writer.WriteInt32(entry.ActivityID);
+                writer.WriteInt32(entry.Reason);
+            }
+            return writer.Position;
         }
 
         public void AddBlacklist(int activity, int reason)
@@ -744,7 +1171,7 @@ namespace HermesProxy.World.Server.Packets
         public int Reason;
     }
 
-    public class ConquestFormulaConstants : ServerPacket
+    public class ConquestFormulaConstants : ServerPacket, ISpanWritable
     {
         public ConquestFormulaConstants() : base(Opcode.SMSG_CONQUEST_FORMULA_CONSTANTS, ConnectionType.Instance) { }
 
@@ -757,6 +1184,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteFloat(PvpCPNumerator);
         }
 
+        public int MaxSize => 20; // 2 ints + 3 floats
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(PvpMinCPPerWeek);
+            writer.WriteInt32(PvpMaxCPPerWeek);
+            writer.WriteFloat(PvpCPBaseCoefficient);
+            writer.WriteFloat(PvpCPExpCoefficient);
+            writer.WriteFloat(PvpCPNumerator);
+            return writer.Position;
+        }
+
         public int PvpMinCPPerWeek;
         public int PvpMaxCPPerWeek;
         public float PvpCPBaseCoefficient;
@@ -764,7 +1204,7 @@ namespace HermesProxy.World.Server.Packets
         public float PvpCPNumerator;
     }
 
-    public class SeasonInfo : ServerPacket
+    public class SeasonInfo : ServerPacket, ISpanWritable
     {
         public SeasonInfo() : base(Opcode.SMSG_SEASON_INFO) { }
 
@@ -779,6 +1219,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => 21; // 5 ints + 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(MythicPlusSeasonID);
+            writer.WriteInt32(CurrentSeason);
+            writer.WriteInt32(PreviousSeason);
+            writer.WriteInt32(ConquestWeeklyProgressCurrencyID);
+            writer.WriteInt32(PvpSeasonID);
+            writer.WriteBit(WeeklyRewardChestsEnabled);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public int MythicPlusSeasonID;
         public int PreviousSeason;
         public int CurrentSeason;
@@ -787,7 +1242,7 @@ namespace HermesProxy.World.Server.Packets
         public bool WeeklyRewardChestsEnabled;
     }
 
-    public class InvalidatePlayer : ServerPacket
+    public class InvalidatePlayer : ServerPacket, ISpanWritable
     {
         public InvalidatePlayer() : base(Opcode.SMSG_INVALIDATE_PLAYER) { }
 
@@ -796,16 +1251,34 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(Guid);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Guid.Low, Guid.High);
+            return writer.Position;
+        }
+
         public WowGuid128 Guid;
     }
 
-    public class ZoneUnderAttack : ServerPacket
+    public class ZoneUnderAttack : ServerPacket, ISpanWritable
     {
         public ZoneUnderAttack() : base(Opcode.SMSG_ZONE_UNDER_ATTACK) { }
 
         public override void Write()
         {
             _worldPacket.WriteInt32(AreaID);
+        }
+
+        public int MaxSize => 4; // int
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(AreaID);
+            return writer.Position;
         }
 
         public int AreaID;

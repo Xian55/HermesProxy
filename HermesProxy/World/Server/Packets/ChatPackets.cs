@@ -18,11 +18,13 @@
 
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace HermesProxy.World.Server.Packets
 {
@@ -45,7 +47,7 @@ namespace HermesProxy.World.Server.Packets
         public int ChatChannelId;
     }
 
-    public class ChannelNotifyJoined : ServerPacket
+    public class ChannelNotifyJoined : ServerPacket, ISpanWritable
     {
         public ChannelNotifyJoined() : base(Opcode.SMSG_CHANNEL_NOTIFY_JOINED) { }
 
@@ -59,6 +61,32 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(ChannelGUID);
             _worldPacket.WriteString(Channel);
             _worldPacket.WriteString(ChannelWelcomeMsg);
+        }
+
+        // Cap for channel name and welcome message
+        // Reduced MaxWelcomeMsgBytes from 256 to 64 based on typical usage (~50 bytes)
+        private const int MaxChannelBytes = 64;
+        private const int MaxWelcomeMsgBytes = 64;
+        // 18 bits(3) + uint(4) + int(4) + ulong(8) + GUID(18) + channel + msg
+        public int MaxSize => 3 + 4 + 4 + 8 + PackedGuidHelper.MaxPackedGuid128Size + MaxChannelBytes + MaxWelcomeMsgBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int channelBytes = Encoding.UTF8.GetByteCount(Channel);
+            int welcomeBytes = Encoding.UTF8.GetByteCount(ChannelWelcomeMsg);
+            if (channelBytes > MaxChannelBytes || welcomeBytes > MaxWelcomeMsgBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)channelBytes, 7);
+            writer.WriteBits((uint)welcomeBytes, 11);
+            writer.WriteUInt32((uint)ChannelFlags);
+            writer.WriteInt32(ChatChannelID);
+            writer.WriteUInt64(InstanceID);
+            writer.WritePackedGuid128(ChannelGUID.Low, ChannelGUID.High);
+            writer.WriteString(Channel);
+            writer.WriteString(ChannelWelcomeMsg);
+            return writer.Position;
         }
 
         public string ChannelWelcomeMsg = "";
@@ -83,7 +111,7 @@ namespace HermesProxy.World.Server.Packets
         public string ChannelName;
     }
 
-    public class ChannelNotifyLeft : ServerPacket
+    public class ChannelNotifyLeft : ServerPacket, ISpanWritable
     {
         public ChannelNotifyLeft() : base(Opcode.SMSG_CHANNEL_NOTIFY_LEFT) { }
 
@@ -93,6 +121,25 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteBit(Suspended);
             _worldPacket.WriteInt32(ChatChannelID);
             _worldPacket.WriteString(Channel);
+        }
+
+        // Cap for channel name - 7 bits = max 128, using 64
+        private const int MaxChannelBytes = 64;
+        // 8 bits(1) + int(4) + channel name
+        public int MaxSize => 1 + 4 + MaxChannelBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int channelBytes = Encoding.UTF8.GetByteCount(Channel);
+            if (channelBytes > MaxChannelBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)channelBytes, 7);
+            writer.WriteBit(Suspended);
+            writer.WriteInt32(ChatChannelID);
+            writer.WriteString(Channel);
+            return writer.Position;
         }
 
         public string Channel;
@@ -112,7 +159,7 @@ namespace HermesProxy.World.Server.Packets
         public string ChannelName;
     }
 
-    public class ChannelListResponse : ServerPacket
+    public class ChannelListResponse : ServerPacket, ISpanWritable
     {
         public ChannelListResponse() : base(Opcode.SMSG_CHANNEL_LIST)
         {
@@ -133,6 +180,40 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteUInt32(player.VirtualRealmAddress);
                 _worldPacket.WriteUInt8(player.Flags);
             }
+        }
+
+        // Cap for channel members - typical channel size
+        private const int MaxMembers = 64;
+        // Cap for channel name
+        private const int MaxChannelBytes = 64;
+        // Per member: GUID(18) + uint(4) + byte(1) = 23 bytes
+        private const int MemberSize = PackedGuidHelper.MaxPackedGuid128Size + 4 + 1;
+        // 8 bits(1) + uint(4) + int(4) + channel name + members
+        public int MaxSize => 1 + 4 + 4 + MaxChannelBytes + MaxMembers * MemberSize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Members.Count > MaxMembers)
+                return -1;
+
+            int channelBytes = Encoding.UTF8.GetByteCount(ChannelName);
+            if (channelBytes > MaxChannelBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBit(Display);
+            writer.WriteBits((uint)channelBytes, 7);
+            writer.WriteUInt32((uint)ChannelFlags);
+            writer.WriteInt32(Members.Count);
+            writer.WriteString(ChannelName);
+
+            foreach (ChannelPlayer player in Members)
+            {
+                writer.WritePackedGuid128(player.Guid.Low, player.Guid.High);
+                writer.WriteUInt32(player.VirtualRealmAddress);
+                writer.WriteUInt8(player.Flags);
+            }
+            return writer.Position;
         }
 
         public List<ChannelPlayer> Members;
@@ -288,7 +369,7 @@ namespace HermesProxy.World.Server.Packets
         public bool IsLogged;
     }
 
-    public class ChatPkt : ServerPacket
+    public class ChatPkt : ServerPacket, ISpanWritable
     {
         public ChatPkt(GlobalSessionData globalSession, ChatMessageTypeModern chatType, string message, uint language = 0, WowGuid128 sender = default, string senderName = "", WowGuid128 receiver = default, string receiverName = "", string channelName = "", ChatFlags chatFlags = ChatFlags.None, string addonPrefix = "", uint achievementId = 0) : base(Opcode.SMSG_CHAT)
         {
@@ -379,6 +460,69 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WritePackedGuid128(ChannelGUID);
         }
 
+        // MaxSize: byte(1) + uint(4) + 6 GUIDs(108) + 2 uints(8) + uint(4) + float(4)
+        // + bits(8) + strings: sender(128) + target(128) + prefix(32) + channel(128) + chat(512)
+        // + opt uint(4) + opt GUID(18) = ~430 bytes
+        // Note: Real player names are max 24 bytes, typical chat is <200 bytes.
+        // If exceeded, WriteToSpan returns -1 to trigger fallback to Write().
+        private const int MaxSenderNameBytes = 128;
+        private const int MaxChatTextBytes = 512;
+        public int MaxSize => 1 + 4 + PackedGuidHelper.MaxPackedGuid128Size * 6 + 16 + 8 +
+            MaxSenderNameBytes * 2 + 32 + 128 + MaxChatTextBytes + 22;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int senderNameBytes = Encoding.UTF8.GetByteCount(SenderName ?? "");
+            int targetNameBytes = Encoding.UTF8.GetByteCount(TargetName ?? "");
+            int prefixBytes = Encoding.UTF8.GetByteCount(Prefix ?? "");
+            int channelBytes = Encoding.UTF8.GetByteCount(Channel ?? "");
+            int chatTextBytes = Encoding.UTF8.GetByteCount(ChatText ?? "");
+
+            // Check against our reduced MaxSize limits - fallback to Write() for oversized messages
+            // Protocol limits are larger (2047/4095) but we optimize for typical usage
+            if (senderNameBytes > MaxSenderNameBytes || targetNameBytes > MaxSenderNameBytes ||
+                prefixBytes > 31 || channelBytes > 127 || chatTextBytes > MaxChatTextBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt8((byte)SlashCmd);
+            writer.WriteUInt32(_Language);
+            writer.WritePackedGuid128(SenderGUID.Low, SenderGUID.High);
+            writer.WritePackedGuid128(SenderGuildGUID.Low, SenderGuildGUID.High);
+            writer.WritePackedGuid128(SenderAccountGUID.Low, SenderAccountGUID.High);
+            writer.WritePackedGuid128(TargetGUID.Low, TargetGUID.High);
+            writer.WriteUInt32(TargetVirtualAddress);
+            writer.WriteUInt32(SenderVirtualAddress);
+            writer.WritePackedGuid128(PartyGUID.Low, PartyGUID.High);
+            writer.WriteUInt32(AchievementID);
+            writer.WriteFloat(DisplayTime);
+            writer.WriteBits((uint)senderNameBytes, 11);
+            writer.WriteBits((uint)targetNameBytes, 11);
+            writer.WriteBits((uint)prefixBytes, 5);
+            writer.WriteBits((uint)channelBytes, 7);
+            writer.WriteBits((uint)chatTextBytes, 12);
+            writer.WriteBits((uint)_ChatFlags, 14);
+            writer.WriteBit(HideChatLog);
+            writer.WriteBit(FakeSenderName);
+            writer.WriteBit(Unused_801.HasValue);
+            writer.WriteBit(ChannelGUID != default);
+            writer.FlushBits();
+
+            writer.WriteString(SenderName ?? "");
+            writer.WriteString(TargetName ?? "");
+            writer.WriteString(Prefix ?? "");
+            writer.WriteString(Channel ?? "");
+            writer.WriteString(ChatText ?? "");
+
+            if (Unused_801.HasValue)
+                writer.WriteUInt32(Unused_801.Value);
+
+            if (ChannelGUID != default)
+                writer.WritePackedGuid128(ChannelGUID.Low, ChannelGUID.High);
+
+            return writer.Position;
+        }
+
         public ChatMessageTypeModern SlashCmd = 0;
         public uint _Language = 0;
         public WowGuid128 SenderGUID;
@@ -402,7 +546,7 @@ namespace HermesProxy.World.Server.Packets
         public bool FakeSenderName = false;
     }
 
-    public class EmoteMessage : ServerPacket
+    public class EmoteMessage : ServerPacket, ISpanWritable
     {
         public EmoteMessage() : base(Opcode.SMSG_EMOTE, ConnectionType.Instance) { }
 
@@ -418,6 +562,30 @@ namespace HermesProxy.World.Server.Packets
                 foreach (var id in SpellVisualKitIDs)
                     _worldPacket.WriteUInt32(id);
             }
+        }
+
+        // Cap for spell visual kit IDs - rarely more than 1-2
+        private const int MaxSpellVisualKitIDs = 4;
+        // GUID(18) + EmoteID(4) + count(4) + SequenceVariation(4) + IDs(4 each)
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + 4 + 4 + MaxSpellVisualKitIDs * 4;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (SpellVisualKitIDs.Count > MaxSpellVisualKitIDs)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Guid.Low, Guid.High);
+            writer.WriteUInt32(EmoteID);
+            if (ModernVersion.AddedInVersion(9, 0, 5, 1, 14, 0, 2, 5, 1))
+            {
+                writer.WriteInt32(SpellVisualKitIDs.Count);
+                if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 2, 2, 5, 3))
+                    writer.WriteInt32(SequenceVariation);
+                foreach (var id in SpellVisualKitIDs)
+                    writer.WriteUInt32(id);
+            }
+            return writer.Position;
         }
 
         public WowGuid128 Guid;
@@ -453,7 +621,7 @@ namespace HermesProxy.World.Server.Packets
         public uint[] SpellVisualKitIDs;
     }
 
-    public class STextEmote : ServerPacket
+    public class STextEmote : ServerPacket, ISpanWritable
     {
         public STextEmote() : base(Opcode.SMSG_TEXT_EMOTE, ConnectionType.Instance) { }
 
@@ -466,6 +634,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(TargetGUID);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 3 + 8; // 3 GUIDs + 2 ints
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(SourceGUID.Low, SourceGUID.High);
+            writer.WritePackedGuid128(SourceAccountGUID.Low, SourceAccountGUID.High);
+            writer.WriteInt32(EmoteID);
+            writer.WriteInt32(SoundIndex);
+            writer.WritePackedGuid128(TargetGUID.Low, TargetGUID.High);
+            return writer.Position;
+        }
+
         public WowGuid128 SourceGUID;
         public WowGuid128 SourceAccountGUID;
         public WowGuid128 TargetGUID;
@@ -473,7 +654,7 @@ namespace HermesProxy.World.Server.Packets
         public int EmoteID;
     }
 
-    public class PrintNotification : ServerPacket
+    public class PrintNotification : ServerPacket, ISpanWritable
     {
         public PrintNotification() : base(Opcode.SMSG_PRINT_NOTIFICATION) { }
 
@@ -483,10 +664,27 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(NotifyText);
         }
 
+        // Cap for notification text - most are short system messages
+        private const int MaxTextBytes = 256;
+        // 12 bits(2) + text
+        public int MaxSize => 2 + MaxTextBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int textBytes = Encoding.UTF8.GetByteCount(NotifyText);
+            if (textBytes > MaxTextBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)textBytes, 12);
+            writer.WriteString(NotifyText);
+            return writer.Position;
+        }
+
         public string NotifyText;
     }
 
-    class ChatPlayerNotfound : ServerPacket
+    class ChatPlayerNotfound : ServerPacket, ISpanWritable
     {
         public ChatPlayerNotfound() : base(Opcode.SMSG_CHAT_PLAYER_NOTFOUND) { }
 
@@ -496,10 +694,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(Name);
         }
 
+        // MaxSize: 9 bits (2 bytes) + max player name bytes
+        public int MaxSize => 2 + GameLimits.MaxPlayerNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Name), 9);
+            writer.WriteString(Name);
+            return writer.Position;
+        }
+
         public string Name;
     }
 
-    class DefenseMessage : ServerPacket
+    class DefenseMessage : ServerPacket, ISpanWritable
     {
         public DefenseMessage() : base(Opcode.SMSG_DEFENSE_MESSAGE) { }
 
@@ -511,11 +720,30 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(MessageText);
         }
 
+        // Cap for defense message - zone attack notifications
+        private const int MaxTextBytes = 256;
+        // uint(4) + 12 bits(2) + text
+        public int MaxSize => 4 + 2 + MaxTextBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int textBytes = Encoding.UTF8.GetByteCount(MessageText);
+            if (textBytes > MaxTextBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(ZoneID);
+            writer.WriteBits((uint)textBytes, 12);
+            writer.FlushBits();
+            writer.WriteString(MessageText);
+            return writer.Position;
+        }
+
         public uint ZoneID;
         public string MessageText = "";
     }
 
-    class ChatServerMessage : ServerPacket
+    class ChatServerMessage : ServerPacket, ISpanWritable
     {
         public ChatServerMessage() : base(Opcode.SMSG_CHAT_SERVER_MESSAGE) { }
 
@@ -525,6 +753,24 @@ namespace HermesProxy.World.Server.Packets
 
             _worldPacket.WriteBits(StringParam.GetByteCount(), 11);
             _worldPacket.WriteString(StringParam);
+        }
+
+        // Cap for server message param - usually short strings
+        private const int MaxParamBytes = 256;
+        // int(4) + 11 bits(2) + string
+        public int MaxSize => 4 + 2 + MaxParamBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int paramBytes = Encoding.UTF8.GetByteCount(StringParam);
+            if (paramBytes > MaxParamBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(MessageID);
+            writer.WriteBits((uint)paramBytes, 11);
+            writer.WriteString(StringParam);
+            return writer.Position;
         }
 
         public int MessageID;

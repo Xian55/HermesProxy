@@ -18,10 +18,12 @@
 
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace HermesProxy.World.Server.Packets
 {
@@ -303,7 +305,7 @@ namespace HermesProxy.World.Server.Packets
         public override void Read() { }
     }
 
-    public class QuestGiverStatusPkt : ServerPacket
+    public class QuestGiverStatusPkt : ServerPacket, ISpanWritable
     {
         public QuestGiverStatusPkt() : base(Opcode.SMSG_QUEST_GIVER_STATUS, ConnectionType.Instance)
         {
@@ -316,10 +318,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32((uint)QuestGiver.Status);
         }
 
+        // GUID(18) + uint(4) = 22 bytes
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(QuestGiver.Guid.Low, QuestGiver.Guid.High);
+            writer.WriteUInt32((uint)QuestGiver.Status);
+            return writer.Position;
+        }
+
         public QuestGiverInfo QuestGiver;
     }
 
-    public class QuestGiverStatusMultiple : ServerPacket
+    public class QuestGiverStatusMultiple : ServerPacket, ISpanWritable
     {
         public QuestGiverStatusMultiple() : base(Opcode.SMSG_QUEST_GIVER_STATUS_MULTIPLE, ConnectionType.Instance) { }
 
@@ -331,6 +344,26 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WritePackedGuid128(questGiver.Guid);
                 _worldPacket.WriteUInt32((uint)questGiver.Status);
             }
+        }
+
+        // Cap for quest givers in view - typically only a handful visible at once
+        private const int MaxQuestGivers = 32;
+        // Each entry: PackedGuid128 (18) + uint (4) = 22 bytes
+        public int MaxSize => 4 + MaxQuestGivers * (PackedGuidHelper.MaxPackedGuid128Size + 4);
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (QuestGivers.Count > MaxQuestGivers)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(QuestGivers.Count);
+            foreach (QuestGiverInfo questGiver in QuestGivers)
+            {
+                writer.WritePackedGuid128(questGiver.Guid.Low, questGiver.Guid.High);
+                writer.WriteUInt32((uint)questGiver.Status);
+            }
+            return writer.Position;
         }
 
         public List<QuestGiverInfo> QuestGivers = new();
@@ -651,7 +684,7 @@ namespace HermesProxy.World.Server.Packets
         public bool FromScript; // 0 - standart complete quest mode with npc, 1 - auto-complete mode
     }
 
-    class QuestGiverQuestFailed : ServerPacket
+    class QuestGiverQuestFailed : ServerPacket, ISpanWritable
     {
         public QuestGiverQuestFailed() : base(Opcode.SMSG_QUEST_GIVER_QUEST_FAILED) { }
 
@@ -661,11 +694,21 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32((uint)Reason);
         }
 
+        public int MaxSize => 8; // 2 uints
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(QuestID);
+            writer.WriteUInt32((uint)Reason);
+            return writer.Position;
+        }
+
         public uint QuestID;
         public InventoryResult Reason;
     }
 
-    class QuestGiverInvalidQuest : ServerPacket
+    class QuestGiverInvalidQuest : ServerPacket, ISpanWritable
     {
         public QuestGiverInvalidQuest() : base(Opcode.SMSG_QUEST_GIVER_INVALID_QUEST) { }
 
@@ -681,13 +724,34 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(ReasonText);
         }
 
+        // Cap for reason text - usually short error messages
+        private const int MaxReasonTextBytes = 256;
+        // uint(4) + int(4) + 10 bits(2) + text
+        public int MaxSize => 4 + 4 + 2 + MaxReasonTextBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int textBytes = Encoding.UTF8.GetByteCount(ReasonText);
+            if (textBytes > MaxReasonTextBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32((uint)Reason);
+            writer.WriteInt32(ContributionRewardID);
+            writer.WriteBit(SendErrorMessage);
+            writer.WriteBits((uint)textBytes, 9);
+            writer.FlushBits();
+            writer.WriteString(ReasonText);
+            return writer.Position;
+        }
+
         public QuestFailedReasons Reason;
         public int ContributionRewardID;
         public bool SendErrorMessage = true;
         public string ReasonText = "";
     }
 
-    class QuestUpdateStatus : ServerPacket
+    class QuestUpdateStatus : ServerPacket, ISpanWritable
     {
         public QuestUpdateStatus(Opcode opcode) : base(opcode) { }
 
@@ -696,9 +760,18 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(QuestID);
         }
 
+        public int MaxSize => 4; // uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(QuestID);
+            return writer.Position;
+        }
+
         public uint QuestID;
     }
-    public class QuestUpdateAddCredit : ServerPacket
+    public class QuestUpdateAddCredit : ServerPacket, ISpanWritable
     {
         public QuestUpdateAddCredit() : base(Opcode.SMSG_QUEST_UPDATE_ADD_CREDIT, ConnectionType.Instance) { }
 
@@ -712,6 +785,20 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt8((byte)ObjectiveType);
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 13; // GUID + uint + int + 2 ushorts + byte
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(VictimGUID.Low, VictimGUID.High);
+            writer.WriteUInt32(QuestID);
+            writer.WriteInt32(ObjectID);
+            writer.WriteUInt16(Count);
+            writer.WriteUInt16(Required);
+            writer.WriteUInt8((byte)ObjectiveType);
+            return writer.Position;
+        }
+
         public WowGuid128 VictimGUID;
         public int ObjectID;
         public uint QuestID;
@@ -720,7 +807,7 @@ namespace HermesProxy.World.Server.Packets
         public QuestObjectiveType ObjectiveType;
     }
 
-    class QuestUpdateAddCreditSimple : ServerPacket
+    class QuestUpdateAddCreditSimple : ServerPacket, ISpanWritable
     {
         public QuestUpdateAddCreditSimple() : base(Opcode.SMSG_QUEST_UPDATE_ADD_CREDIT_SIMPLE, ConnectionType.Instance) { }
 
@@ -731,12 +818,23 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt8((byte)ObjectiveType);
         }
 
+        public int MaxSize => 9; // uint + int + byte
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(QuestID);
+            writer.WriteInt32(ObjectID);
+            writer.WriteUInt8((byte)ObjectiveType);
+            return writer.Position;
+        }
+
         public uint QuestID;
         public int ObjectID;
         public QuestObjectiveType ObjectiveType;
     }
 
-    class QuestConfirmAccept : ServerPacket
+    class QuestConfirmAccept : ServerPacket, ISpanWritable
     {
         public QuestConfirmAccept() : base(Opcode.SMSG_QUEST_CONFIRM_ACCEPT) { }
 
@@ -747,6 +845,25 @@ namespace HermesProxy.World.Server.Packets
 
             _worldPacket.WriteBits(QuestTitle.GetByteCount(), 10);
             _worldPacket.WriteString(QuestTitle);
+        }
+
+        // Cap for quest title - most are well under 128 bytes
+        private const int MaxTitleBytes = 128;
+        // uint(4) + GUID(18) + 10 bits(2) + title
+        public int MaxSize => 4 + PackedGuidHelper.MaxPackedGuid128Size + 2 + MaxTitleBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int titleBytes = Encoding.UTF8.GetByteCount(QuestTitle);
+            if (titleBytes > MaxTitleBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(QuestID);
+            writer.WritePackedGuid128(InitiatedBy.Low, InitiatedBy.High);
+            writer.WriteBits((uint)titleBytes, 10);
+            writer.WriteString(QuestTitle);
+            return writer.Position;
         }
 
         public WowGuid128 InitiatedBy;
@@ -778,7 +895,7 @@ namespace HermesProxy.World.Server.Packets
         public uint QuestID;
     }
 
-    class QuestPushResult : ServerPacket
+    class QuestPushResult : ServerPacket, ISpanWritable
     {
         public QuestPushResult() : base(Opcode.SMSG_QUEST_PUSH_RESULT) { }
 
@@ -786,6 +903,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WritePackedGuid128(SenderGUID);
             _worldPacket.WriteUInt8((byte)Result);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 1; // GUID + byte
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(SenderGUID.Low, SenderGUID.High);
+            writer.WriteUInt8((byte)Result);
+            return writer.Position;
         }
 
         public WowGuid128 SenderGUID;
