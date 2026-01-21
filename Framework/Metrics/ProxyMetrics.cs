@@ -10,7 +10,7 @@ namespace Framework.Metrics
     /// Thread-safe metrics collector for measuring proxy-introduced latency per opcode.
     /// Tracks min, max, average, and percentiles (p50, p95, p99) for packet processing times.
     /// </summary>
-    public class ProxyMetrics
+    public sealed class ProxyMetrics
     {
         private const int MaxSamplesPerOpcode = 1000;
 
