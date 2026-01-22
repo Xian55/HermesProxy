@@ -147,19 +147,37 @@ namespace HermesProxy.World.Client
             if (packet.CanRead())
                 arg2 = packet.ReadInt32();
 
-            // Check special casts first (next melee / auto repeat)
-            if (GetSession().GameState.CurrentClientSpecialCast != null &&
-                GetSession().GameState.CurrentClientSpecialCast.SpellId == spellId)
+            // Check special casts first - try next melee, then auto repeat
+            ClientCastRequest specialCast = null;
+            bool isAutoRepeat = false;
+
+            if (GetSession().GameState.CurrentClientNextMeleeCast != null &&
+                GetSession().GameState.CurrentClientNextMeleeCast.SpellId == spellId)
+            {
+                specialCast = GetSession().GameState.CurrentClientNextMeleeCast;
+            }
+            else if (GetSession().GameState.CurrentClientAutoRepeatCast != null &&
+                     GetSession().GameState.CurrentClientAutoRepeatCast.SpellId == spellId)
+            {
+                specialCast = GetSession().GameState.CurrentClientAutoRepeatCast;
+                isAutoRepeat = true;
+            }
+
+            if (specialCast != null)
             {
                 CastFailed failed = new();
-                failed.SpellID = GetSession().GameState.CurrentClientSpecialCast.SpellId;
-                failed.SpellXSpellVisualID = GetSession().GameState.CurrentClientSpecialCast.SpellXSpellVisualId;
+                failed.SpellID = specialCast.SpellId;
+                failed.SpellXSpellVisualID = specialCast.SpellXSpellVisualId;
                 failed.Reason = LegacyVersion.ConvertSpellCastResult(reason);
-                failed.CastID = GetSession().GameState.CurrentClientSpecialCast.ServerGUID;
+                failed.CastID = specialCast.ServerGUID;
                 failed.FailedArg1 = arg1;
                 failed.FailedArg2 = arg2;
                 SendPacketToClient(failed);
-                GetSession().GameState.CurrentClientSpecialCast = null;
+
+                if (isAutoRepeat)
+                    GetSession().GameState.CurrentClientAutoRepeatCast = null;
+                else
+                    GetSession().GameState.CurrentClientNextMeleeCast = null;
             }
             // Look up pending normal cast by SpellId (queue-based, FIFO order)
             else if (GetSession().GameState.TryDequeuePendingNormalCast(spellId, out var pendingCast))
@@ -381,12 +399,20 @@ namespace HermesProxy.World.Client
                 }
             }
             else if (GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit &&
-                GetSession().GameState.CurrentClientSpecialCast != null &&
-                GetSession().GameState.CurrentClientSpecialCast.SpellId == spell.Cast.SpellID)
+                GetSession().GameState.CurrentClientNextMeleeCast != null &&
+                GetSession().GameState.CurrentClientNextMeleeCast.SpellId == spell.Cast.SpellID)
             {
-                spell.Cast.CastID = GetSession().GameState.CurrentClientSpecialCast.ServerGUID;
-                spell.Cast.SpellXSpellVisualID = GetSession().GameState.CurrentClientSpecialCast.SpellXSpellVisualId;
-                GetSession().GameState.CurrentClientSpecialCast = null;
+                spell.Cast.CastID = GetSession().GameState.CurrentClientNextMeleeCast.ServerGUID;
+                spell.Cast.SpellXSpellVisualID = GetSession().GameState.CurrentClientNextMeleeCast.SpellXSpellVisualId;
+                GetSession().GameState.CurrentClientNextMeleeCast = null;
+            }
+            else if (GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit &&
+                GetSession().GameState.CurrentClientAutoRepeatCast != null &&
+                GetSession().GameState.CurrentClientAutoRepeatCast.SpellId == spell.Cast.SpellID)
+            {
+                spell.Cast.CastID = GetSession().GameState.CurrentClientAutoRepeatCast.ServerGUID;
+                spell.Cast.SpellXSpellVisualID = GetSession().GameState.CurrentClientAutoRepeatCast.SpellXSpellVisualId;
+                // Note: Don't clear auto-repeat cast here - it stays active until cancelled
             }
             else if (GetSession().GameState.CurrentPetGuid == spell.Cast.CasterUnit &&
                      GetSession().GameState.TryDequeuePendingPetCast((uint)spell.Cast.SpellID, out var pendingPetCast))
@@ -598,13 +624,8 @@ namespace HermesProxy.World.Client
         [PacketHandler(Opcode.SMSG_CANCEL_AUTO_REPEAT)]
         void HandleCancelAutoRepeat(WorldPacket packet)
         {
-            // Queue-based spell tracking replaces the need for artificial delay.
-
-            if (GetSession().GameState.CurrentClientSpecialCast != null &&
-                GameData.AutoRepeatSpells.Contains(GetSession().GameState.CurrentClientSpecialCast.SpellId))
-            {
-                GetSession().GameState.CurrentClientSpecialCast = null;
-            }
+            // Clear the auto-repeat cast tracking
+            GetSession().GameState.CurrentClientAutoRepeatCast = null;
 
             CancelAutoRepeat cancel = new CancelAutoRepeat();
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))

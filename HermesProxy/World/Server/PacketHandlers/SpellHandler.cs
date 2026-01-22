@@ -109,18 +109,27 @@ namespace HermesProxy.World.Server
         [PacketHandler(Opcode.CMSG_CAST_SPELL)]
         void HandleCastSpell(CastSpell cast)
         {
-            if (GameData.NextMeleeSpells.Contains(cast.Cast.SpellID) ||
-                GameData.AutoRepeatSpells.Contains(cast.Cast.SpellID))
+            bool isNextMelee = GameData.NextMeleeSpells.Contains(cast.Cast.SpellID);
+            bool isAutoRepeat = GameData.AutoRepeatSpells.Contains(cast.Cast.SpellID);
+
+            if (isNextMelee || isAutoRepeat)
             {
-                // Special casts (next melee / auto repeat) are exclusive - only one at a time
+                // Next melee and auto repeat spells are tracked separately - they can coexist
+                // (e.g., hunter can have Raptor Strike queued AND Auto Shot active)
                 ClientCastRequest castRequest = new ClientCastRequest();
                 castRequest.Timestamp = Environment.TickCount;
                 castRequest.SpellId = cast.Cast.SpellID;
                 castRequest.SpellXSpellVisualId = cast.Cast.SpellXSpellVisualID;
                 castRequest.ClientGUID = cast.Cast.CastID;
 
-                if (GetSession().GameState.CurrentClientSpecialCast != null)
+                // Get the appropriate tracking variable based on spell type
+                ref ClientCastRequest currentCast = ref (isAutoRepeat
+                    ? ref GetSession().GameState.CurrentClientAutoRepeatCast
+                    : ref GetSession().GameState.CurrentClientNextMeleeCast);
+
+                if (currentCast != null)
                 {
+                    // Already have one of this type in progress - reject
                     castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId, cast.Cast.SpellID, 10000 + cast.Cast.CastID.GetCounter());
                     SendCastRequestFailed(castRequest, false);
                     return;
@@ -134,7 +143,7 @@ namespace HermesProxy.World.Server
                     prepare.ServerCastID = castRequest.ServerGUID;
                     SendPacket(prepare);
 
-                    GetSession().GameState.CurrentClientSpecialCast = castRequest;
+                    currentCast = castRequest;
                 }
             }
             else

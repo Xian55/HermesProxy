@@ -85,7 +85,8 @@ namespace HermesProxy
         public WowGuid128 CurrentPetGuid;
         public uint[] CurrentArenaTeamIds = new uint[3];
         public ConcurrentQueue<ClientCastRequest> PendingNormalCasts = new();  // regular spell casts (queue for proper FIFO handling)
-        public ClientCastRequest CurrentClientSpecialCast; // next melee or auto repeat spells (exclusive, only one at a time)
+        public ClientCastRequest CurrentClientNextMeleeCast; // next melee spells (Raptor Strike, Heroic Strike, etc.)
+        public ClientCastRequest CurrentClientAutoRepeatCast; // auto repeat spells (Auto Shot, Shoot, etc.)
         public ConcurrentQueue<ClientCastRequest> PendingPetCasts = new();  // pet spell casts (queue for proper FIFO handling)
         public WowGuid64 LastLootTargetGuid;
         public List<int> ActionButtons = new();
