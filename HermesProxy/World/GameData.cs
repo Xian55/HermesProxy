@@ -49,6 +49,7 @@ namespace HermesProxy.World
         public static HashSet<uint> NextMeleeSpells = [];
         public static HashSet<uint> AutoRepeatSpells = [];
         public static HashSet<uint> AuraSpells = [];
+        public static FrozenDictionary<uint, int> AuraDurations = FrozenDictionary<uint, int>.Empty;
         public static FrozenDictionary<uint, TaxiPath> TaxiPaths = FrozenDictionary<uint, TaxiPath>.Empty;
         public static int[,] TaxiNodesGraph = new int[250, 250];
         public static FrozenDictionary<uint /*questId*/, uint /*questBit*/> QuestBits = FrozenDictionary<uint, uint>.Empty;
@@ -260,6 +261,19 @@ namespace HermesProxy.World
             uint visual;
             if (SpellVisuals.TryGetValue(spellId, out visual))
                 return visual;
+            return 0;
+        }
+
+        /// <summary>
+        /// Gets the base duration for an aura spell in milliseconds.
+        /// Used as a fallback when the server doesn't provide duration info (e.g., enemy debuffs in Vanilla).
+        /// Durations are loaded from AuraDurations{expansion}.csv, sourced from LibClassicDurations.
+        /// </summary>
+        public static int GetAuraSpellDuration(uint spellId)
+        {
+            if (AuraDurations.TryGetValue(spellId, out int duration))
+                return duration;
+
             return 0;
         }
 
@@ -492,6 +506,7 @@ namespace HermesProxy.World
             LoadMeleeSpells();
             LoadAutoRepeatSpells();
             LoadAuraSpells();
+            LoadAuraDurations();
             LoadTaxiPaths();
             LoadTaxiPathNodesGraph();
             LoadQuestBits();
@@ -1155,6 +1170,26 @@ namespace HermesProxy.World
                 AuraSpells.Add(spellId);
             }
         }
+
+        public static void LoadAuraDurations()
+        {
+            var path = Path.Combine("CSV", $"AuraDurations{LegacyVersion.ExpansionVersion}.csv");
+            if (!File.Exists(path))
+                return;
+
+            var dict = new Dictionary<uint, int>();
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+
+            foreach (var row in reader)
+            {
+                uint spellId = uint.Parse(row[0].Span);
+                int duration = int.Parse(row[1].Span);
+                dict[spellId] = duration;
+            }
+
+            AuraDurations = dict.ToFrozenDictionary();
+        }
+
         public static void LoadTaxiPaths()
         {
             var path = Path.Combine("CSV", $"TaxiPath{ModernVersion.ExpansionVersion}.csv");

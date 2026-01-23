@@ -3,6 +3,7 @@ using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace HermesProxy.World.Client
@@ -432,8 +433,23 @@ namespace HermesProxy.World.Client
 
             if (!spell.Cast.CasterUnit.IsEmpty() && GameData.AuraSpells.Contains((uint)spell.Cast.SpellID))
             {
+                uint spellId = (uint)spell.Cast.SpellID;
                 foreach (WowGuid128 target in spell.Cast.HitTargets)
-                    GetSession().GameState.StoreLastAuraCasterOnTarget(target, (uint)spell.Cast.SpellID, spell.Cast.CasterUnit);
+                {
+                    // Check if this is an aura refresh (target already has this aura)
+                    var updateFields = GetSession().GameState.GetCachedObjectFieldsLegacy(target);
+                    if (updateFields != null)
+                    {
+                        int existingSlot = FindAuraSlotBySpellId(target, spellId, updateFields);
+                        if (existingSlot >= 0)
+                        {
+                            // Aura refresh detected - send AuraUpdate to refresh the duration timer
+                            SendAuraRefreshUpdate(target, spellId, spell.Cast.CasterUnit, (byte)existingSlot, updateFields);
+                        }
+                    }
+
+                    GetSession().GameState.StoreLastAuraCasterOnTarget(target, spellId, spell.Cast.CasterUnit);
+                }
             }
 
             SendPacketToClient(spell);
@@ -1155,6 +1171,72 @@ namespace HermesProxy.World.Client
                 GetSession().GameState.SetFlatSpellMod(modIndex, classIndex, modValue);
             else
                 GetSession().GameState.SetPctSpellMod(modIndex, classIndex, modValue);
+        }
+
+        /// <summary>
+        /// Finds the aura slot containing the specified spell on a target.
+        /// Returns -1 if the spell is not found in any aura slot.
+        /// </summary>
+        private int FindAuraSlotBySpellId(WowGuid128 target, uint spellId, Dictionary<int, UpdateField> updateFields)
+        {
+            int UNIT_FIELD_AURA = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_AURA);
+            if (UNIT_FIELD_AURA < 0)
+                return -1;
+
+            int aurasCount = LegacyVersion.GetAuraSlotsCount();
+            for (int i = 0; i < aurasCount; i++)
+            {
+                if (updateFields.TryGetValue(UNIT_FIELD_AURA + i, out var field) && field.UInt32Value == spellId)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// Sends an AuraUpdate packet to refresh the duration of an existing aura on a target.
+        /// Called when an aura spell is recast on a target that already has the aura.
+        /// </summary>
+        private void SendAuraRefreshUpdate(WowGuid128 target, uint spellId, WowGuid128 caster, byte slot, Dictionary<int, UpdateField> updateFields)
+        {
+            AuraDataInfo auraData = ReadAuraSlot(slot, target, updateFields);
+            if (auraData == null || auraData.SpellID != spellId)
+            {
+                return;
+            }
+
+            auraData.CastUnit = caster;
+
+            // Get stored duration info - use full duration as the new remaining time (refresh resets the timer)
+            GetSession().GameState.GetAuraDuration(target, slot, out int durationLeft, out int durationFull);
+
+            // If no duration info available from server, use a fallback duration
+            // This is needed for Vanilla servers which don't send duration for enemy debuffs
+            // The addon (ClassicAuraDurations) will use its own database for accurate duration,
+            // but needs SOME duration in the packet to recognize this as a refresh
+            if (durationFull <= 0)
+            {
+                durationFull = GameData.GetAuraSpellDuration(spellId);
+            }
+
+            if (durationFull > 0)
+            {
+                auraData.Flags |= AuraFlagsModern.Duration;
+                auraData.Duration = durationFull;
+                auraData.Remaining = durationFull;
+
+                // Update the stored duration to reflect the refresh
+                GetSession().GameState.StoreAuraDurationLeft(target, slot, durationFull, Environment.TickCount);
+                GetSession().GameState.StoreAuraDurationFull(target, slot, durationFull);
+            }
+
+            AuraInfo aura = new AuraInfo();
+            aura.Slot = slot;
+            aura.AuraData = auraData;
+
+            AuraUpdate update = new AuraUpdate(target, false);
+            update.Auras.Add(aura);
+            SendPacketToClient(update);
         }
     }
 }
