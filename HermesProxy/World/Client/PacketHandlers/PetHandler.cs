@@ -158,5 +158,13 @@ namespace HermesProxy.World.Client
             stable.Result = packet.ReadUInt8();
             SendPacketToClient(stable);
         }
+
+        [PacketHandler(Opcode.SMSG_PET_TAME_FAILURE)]
+        void HandlePetTameFailure(WorldPacket packet)
+        {
+            PetTameFailure tameFailure = new PetTameFailure();
+            tameFailure.Reason = packet.ReadUInt8();
+            SendPacketToClient(tameFailure);
+        }
     }
 }

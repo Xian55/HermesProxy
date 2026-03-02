@@ -389,6 +389,27 @@ namespace HermesProxy.World.Server.Packets
         public byte Result;
     }
 
+    sealed class PetTameFailure : ServerPacket, ISpanWritable
+    {
+        public PetTameFailure() : base(Opcode.SMSG_PET_TAME_FAILURE, ConnectionType.Instance) { }
+
+        public override void Write()
+        {
+            _worldPacket.WriteUInt8(Reason);
+        }
+
+        public int MaxSize => 1;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt8(Reason);
+            return writer.Position;
+        }
+
+        public byte Reason;
+    }
+
     class StablePet : ClientPacket
     {
         public StablePet(WorldPacket packet) : base(packet) { }
