@@ -32,6 +32,9 @@ namespace HermesProxy.World.Client
         FrozenDictionary<Opcode, Action<WorldPacket>> _packetHandlers;
         GlobalSessionData _globalSession;
         System.Threading.Mutex _sendMutex = new System.Threading.Mutex();
+        Timer? _keepAliveTimer;
+        uint _keepAlivePingSerial;
+        const int KeepAliveIntervalMs = 30_000;
 
         // packet order is not always the same as new client, sometimes we need to delay packet until another one
         Dictionary<Opcode, List<WorldPacket>> _delayedPacketsToServer;
@@ -108,6 +111,8 @@ namespace HermesProxy.World.Client
 
         public void Disconnect()
         {
+            StopKeepAliveTimer();
+
             if (!IsConnected())
                 return;
 
@@ -172,7 +177,6 @@ namespace HermesProxy.World.Client
         private void HandleDisconnect(string reason)
         {
             Log.PrintNet(LogType.Error, LogNetDir.S2P, $"Socket Closed By GameWorldServer ({reason})");
-
             if (_isSuccessful == null)
             {
                 _isSuccessful = false;
@@ -180,8 +184,7 @@ namespace HermesProxy.World.Client
             else
             {
                 Disconnect();
-                if (GetSession().WorldClient == this)
-                    GetSession().OnDisconnect();
+                GetSession().OnDisconnect();
             }
         }
 
@@ -517,6 +520,7 @@ namespace HermesProxy.World.Client
                     GetSession().RealmSocket.SendAuthWaitQue(_queuePosition);
                 }
                 _isSuccessful = true;
+                StartKeepAliveTimer();
             }
             else if (result == AuthResult.AUTH_WAIT_QUEUE)
             {
@@ -542,6 +546,23 @@ namespace HermesProxy.World.Client
             packet.WriteUInt32(ping);
             packet.WriteUInt32(latency);
             SendPacket(packet);
+        }
+
+        private void StartKeepAliveTimer()
+        {
+            _keepAliveTimer = new Timer(SendKeepAlivePing, null, KeepAliveIntervalMs, KeepAliveIntervalMs);
+        }
+
+        private void StopKeepAliveTimer()
+        {
+            _keepAliveTimer?.Dispose();
+            _keepAliveTimer = null;
+        }
+
+        private void SendKeepAlivePing(object? state)
+        {
+            uint serial = Interlocked.Increment(ref _keepAlivePingSerial);
+            SendPing(serial | 0x80000000, 0);
         }
 
         public void InitializePacketHandlers()

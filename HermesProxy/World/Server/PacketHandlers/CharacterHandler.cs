@@ -115,6 +115,13 @@ namespace HermesProxy.World.Server
         [PacketHandler(Opcode.CMSG_PLAYER_LOGIN)]
         void HandlePlayerLogin(PlayerLogin playerLogin)
         {
+            if (GetSession().WorldClient == null || !GetSession().WorldClient.IsConnected())
+            {
+                Log.Print(LogType.Error, "WorldClient is disconnected, cannot enter world.");
+                AbortLogin(LoginFailureReason.NoWorld);
+                return;
+            }
+
             if (!GetSession().GameState.CachedPlayers.TryGetValue(playerLogin.Guid, out var selectedChar))
             {
                 Log.Print(LogType.Error, $"Player tried to log in with unknown char id: {playerLogin.Guid}");
