@@ -15,10 +15,10 @@ namespace HermesProxy.World.Objects
     }
     public class ItemData
     {
-        public WowGuid128 Owner;
-        public WowGuid128 ContainedIn;
-        public WowGuid128 Creator;
-        public WowGuid128 GiftCreator;
+        public WowGuid128? Owner;
+        public WowGuid128? ContainedIn;
+        public WowGuid128? Creator;
+        public WowGuid128? GiftCreator;
         public uint? StackCount;
         public uint? Duration;
         public int?[] SpellCharges = new int?[5];

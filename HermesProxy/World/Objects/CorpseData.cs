@@ -9,9 +9,9 @@ namespace HermesProxy.World.Objects
 {
     public class CorpseData
     {
-        public WowGuid128 Owner;
-        public WowGuid128 PartyGUID;
-        public WowGuid128 GuildGUID;
+        public WowGuid128? Owner;
+        public WowGuid128? PartyGUID;
+        public WowGuid128? GuildGUID;
         public uint? DisplayID;
         public uint?[] Items { get; } = new uint?[19]; // itemDisplayId | (itemInventoryType << 24)
         public byte? RaceId;

@@ -44,9 +44,9 @@ namespace HermesProxy.World.Objects
         public WowGuid128?[] BankBagSlots = new WowGuid128?[7]; // only 6 in vanilla
         public WowGuid128?[] BuyBackSlots = new WowGuid128?[12];
         public WowGuid128?[] KeyringSlots = new WowGuid128?[32];
-        public WowGuid128 FarsightObject;
-        public WowGuid128 ComboTarget;
-        public WowGuid128 SummonedBattlePetGUID;
+        public WowGuid128? FarsightObject;
+        public WowGuid128? ComboTarget;
+        public WowGuid128? SummonedBattlePetGUID;
         public uint?[] KnownTitles = new uint?[12];
         public ulong? Coinage;
         public int? XP;

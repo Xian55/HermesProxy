@@ -160,14 +160,14 @@ namespace HermesProxy.World.Server.Packets
             {
                 if (CorpseData.ClassId == null)
                 {
-                    if (CorpseData.Owner != default)
-                        CorpseData.ClassId = (byte)GlobalSession.GameState.GetUnitClass(CorpseData.Owner);
+                    if (CorpseData.Owner != null)
+                        CorpseData.ClassId = (byte)GlobalSession.GameState.GetUnitClass(CorpseData.Owner.Value);
                     else
                         CorpseData.ClassId = 1;
                 }
-                if (CorpseData.FactionTemplate == null && CorpseData.Owner != default)
+                if (CorpseData.FactionTemplate == null && CorpseData.Owner != null)
                 {
-                    int ownerFaction = GlobalSession.GameState.GetLegacyFieldValueInt32(CorpseData.Owner, UnitField.UNIT_FIELD_FACTIONTEMPLATE);
+                    int ownerFaction = GlobalSession.GameState.GetLegacyFieldValueInt32(CorpseData.Owner.Value, UnitField.UNIT_FIELD_FACTIONTEMPLATE);
                     if (ownerFaction != 0)
                         CorpseData.FactionTemplate = ownerFaction;
                     else if (CorpseData.RaceId != null)
@@ -203,13 +203,13 @@ namespace HermesProxy.World.Server.Packets
                     UnitData.ScaleDuration = 100;
                 if (UnitData.LookAtControllerID == null)
                     UnitData.LookAtControllerID = -1;
-                if (UnitData.ChannelObject == default &&
+                if (UnitData.ChannelObject == null &&
                     Guid == GlobalSession.GameState.CurrentPlayerGuid)
                     UnitData.ChannelObject = WowGuid128.Empty;
             }
             if (PlayerData != null)
             {
-                if (PlayerData.WowAccount == default)
+                if (PlayerData.WowAccount == null)
                 {
                     if (CreateData.ThisIsYou == true)
                         PlayerData.WowAccount = WowGuid128.Create(HighGuidType703.WowAccount, GlobalSession.GameAccountInfo.Id);

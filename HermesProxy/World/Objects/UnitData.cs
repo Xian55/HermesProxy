@@ -28,16 +28,16 @@
 
     public class UnitData
     {
-        public WowGuid128 Charm;
-        public WowGuid128 Summon;
-        public WowGuid128 Critter;
-        public WowGuid128 CharmedBy;
-        public WowGuid128 SummonedBy;
-        public WowGuid128 CreatedBy;
-        public WowGuid128 DemonCreator;
-        public WowGuid128 LookAtControllerTarget;
-        public WowGuid128 Target;
-        public WowGuid128 BattlePetCompanionGUID;
+        public WowGuid128? Charm;
+        public WowGuid128? Summon;
+        public WowGuid128? Critter;
+        public WowGuid128? CharmedBy;
+        public WowGuid128? SummonedBy;
+        public WowGuid128? CreatedBy;
+        public WowGuid128? DemonCreator;
+        public WowGuid128? LookAtControllerTarget;
+        public WowGuid128? Target;
+        public WowGuid128? BattlePetCompanionGUID;
         public ulong? BattlePetDBID;
         public UnitChannel? ChannelData;
         public uint? SummonedByHomeRealm;
@@ -141,9 +141,9 @@
         public int? LooksLikeMountID;
         public int? LooksLikeCreatureID;
         public int? LookAtControllerID;
-        public WowGuid128 GuildGUID;
+        public WowGuid128? GuildGUID;
 
         // Dynamic Fields
-        public WowGuid128 ChannelObject;
+        public WowGuid128? ChannelObject;
     }
 }

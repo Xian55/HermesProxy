@@ -17,9 +17,9 @@ namespace HermesProxy.World.Objects
     }
     public class PlayerData
     {
-        public WowGuid128 DuelArbiter;
-        public WowGuid128 WowAccount;
-        public WowGuid128 LootTargetGUID;
+        public WowGuid128? DuelArbiter;
+        public WowGuid128? WowAccount;
+        public WowGuid128? LootTargetGUID;
         public uint? PlayerFlags;
         public uint? PlayerFlagsEx;
         public uint? GuildRankID;

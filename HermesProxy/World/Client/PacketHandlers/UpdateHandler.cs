@@ -1813,7 +1813,7 @@ namespace HermesProxy.World.Client
                     updateData.UnitData.CreatedBySpell = updates[UNIT_CREATED_BY_SPELL].Int32Value;
 
                     if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180) &&
-                        isCreate && updateData.UnitData.CreatedBy == GetSession().GameState.CurrentPlayerGuid)
+                        isCreate && updateData.UnitData.CreatedBy != null && updateData.UnitData.CreatedBy.Value == GetSession().GameState.CurrentPlayerGuid)
                     {
                         int totemSlot = GameData.GetTotemSlotForSpell((uint)updateData.UnitData.CreatedBySpell);
                         if (totemSlot >= 0)

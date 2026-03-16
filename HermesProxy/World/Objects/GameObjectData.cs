@@ -9,8 +9,8 @@ namespace HermesProxy.World.Objects
 {
     public class GameObjectData
     {
-        public WowGuid128 CreatedBy;
-        public WowGuid128 GuildGUID;
+        public WowGuid128? CreatedBy;
+        public WowGuid128? GuildGUID;
         public int? DisplayID;
         public uint? Flags;
         public float?[] ParentRotation = new float?[4];
