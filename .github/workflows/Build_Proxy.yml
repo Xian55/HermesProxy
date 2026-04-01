@@ -31,13 +31,13 @@ jobs:
 
       - name: Publish
         if: matrix.os != 'macos'
-        run: dotnet publish --configuration Release --use-current-runtime -p:UsePublishBuildSettings=true
+        run: dotnet publish HermesProxy --configuration Release --use-current-runtime -p:UsePublishBuildSettings=true
 
       - name: Publish (MacOS x86_64 and arm64)
         if: matrix.os == 'macos'
         run: |
-          dotnet publish --configuration Release --runtime osx-arm64 -p:UsePublishBuildSettings=true
-          dotnet publish --configuration Release --runtime osx-x64 -p:UsePublishBuildSettings=true
+          dotnet publish HermesProxy --configuration Release --runtime osx-arm64 -p:UsePublishBuildSettings=true
+          dotnet publish HermesProxy --configuration Release --runtime osx-x64 -p:UsePublishBuildSettings=true
           lipo ./HermesProxy/bin/Release/net10.0/osx-arm64/publish/HermesProxy ./HermesProxy/bin/Release/net10.0/osx-x64/publish/HermesProxy -create -output ./HermesProxy/bin/Release/net10.0/osx-x64/publish/HermesProxy_universal
           mv ./HermesProxy/bin/Release/net10.0/osx-x64/publish/HermesProxy_universal ./HermesProxy/bin/Release/net10.0/osx-x64/publish/HermesProxy
           rm -rf ./HermesProxy/bin/Release/net10.0/osx-arm64
