@@ -1,6 +1,6 @@
 name: Build Proxy
 
-on: ['push']
+on: ['push', 'workflow_dispatch']
 
 env:
   DOTNET_VERSION: '10.0.x'
