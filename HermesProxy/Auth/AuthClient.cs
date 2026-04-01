@@ -53,8 +53,8 @@ namespace HermesProxy.Auth
             _username = username;
             _locale = locale;
 
-            _response = new ();
-            _hasRealmlist = new();
+            _response = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            _hasRealmlist = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _realmlistRequestIsPending = false;
 
             string authstring = $"{_username}:{password}";
@@ -82,8 +82,8 @@ namespace HermesProxy.Auth
 
         public AuthResult Reconnect()
         {
-            _response = new ();
-            _hasRealmlist = new();
+            _response = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            _hasRealmlist = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _realmlistRequestIsPending = false;
 
             try

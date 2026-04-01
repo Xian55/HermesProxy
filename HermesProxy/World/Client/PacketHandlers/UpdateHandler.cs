@@ -21,10 +21,11 @@ namespace HermesProxy.World.Client
         void HandleDestroyObject(WorldPacket packet)
         {
             WowGuid128 guid = packet.ReadGuid().To128(GetSession().GameState);
-            GetSession().GameState.ObjectCacheMutex.WaitOne();
-            GetSession().GameState.ObjectCacheLegacy.Remove(guid);
-            GetSession().GameState.ObjectCacheModern.Remove(guid);
-            GetSession().GameState.ObjectCacheMutex.ReleaseMutex();
+            lock (GetSession().GameState.ObjectCacheLock)
+            {
+                GetSession().GameState.ObjectCacheLegacy.Remove(guid);
+                GetSession().GameState.ObjectCacheModern.Remove(guid);
+            }
             GetSession().GameState.LastAuraCasterOnTarget.Remove(guid);
 
             UpdateObject updateObject = new UpdateObject(GetSession().GameState);
@@ -308,10 +309,11 @@ namespace HermesProxy.World.Client
                 if (guid == GetSession().GameState.CurrentPlayerGuid)
                     continue;
                 PrintString($"Guid = {objCount}", index, j);
-                GetSession().GameState.ObjectCacheMutex.WaitOne();
-                GetSession().GameState.ObjectCacheLegacy.Remove(guid);
-                GetSession().GameState.ObjectCacheModern.Remove(guid);
-                GetSession().GameState.ObjectCacheMutex.ReleaseMutex();
+                lock (GetSession().GameState.ObjectCacheLock)
+                {
+                    GetSession().GameState.ObjectCacheLegacy.Remove(guid);
+                    GetSession().GameState.ObjectCacheModern.Remove(guid);
+                }
                 GetSession().GameState.LastAuraCasterOnTarget.Remove(guid);
 
                 // If the pet is too far away, sends a SMSG_UPDATE_OBJECT protocol
@@ -340,12 +342,10 @@ namespace HermesProxy.World.Client
             BitArray? updateMaskArray = null;
             var updates = ReadValuesUpdateBlock(packet, ref type, index, true, null, out updateMaskArray, out var actuallyChangedValuesMaskArray);
             StoreObjectUpdate(guid, type, updateMaskArray, updates, auraUpdate, null, true, updateData, actuallyChangedValuesMaskArray);
-            GetSession().GameState.ObjectCacheMutex.WaitOne();
-            if (!GetSession().GameState.ObjectCacheLegacy.ContainsKey(guid))
-                GetSession().GameState.ObjectCacheLegacy.Add(guid, updates);
-            else
+            lock (GetSession().GameState.ObjectCacheLock)
+            {
                 GetSession().GameState.ObjectCacheLegacy[guid] = updates;
-            GetSession().GameState.ObjectCacheMutex.ReleaseMutex();
+            }
         }
 
         public void ReadValuesUpdateBlock(WorldPacket packet, WowGuid128 guid, ObjectUpdate updateData, AuraUpdate auraUpdate, PowerUpdate powerUpdate, int index)

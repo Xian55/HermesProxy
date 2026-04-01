@@ -1,7 +1,7 @@
 ---
 name: dotnet-performance
 description: .NET 10 performance best practices and patterns for C# code
-user-invocable: false
+user-invocable: true
 ---
 
 # .NET Performance Guidelines

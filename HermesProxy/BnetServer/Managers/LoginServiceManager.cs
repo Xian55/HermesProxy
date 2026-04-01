@@ -12,7 +12,7 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace BNetServer
 {
-    public class LoginServiceManager : Singleton<LoginServiceManager>
+    public sealed class LoginServiceManager : Singleton<LoginServiceManager>
     {
         FormInputs formInputs;
         IPEndPoint externalAddress = null!;

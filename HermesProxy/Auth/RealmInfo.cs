@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace HermesProxy.Auth
 {
-    public class RealmInfo
+    public sealed class RealmInfo
     {
         public uint ID;
         public RealmType Type;

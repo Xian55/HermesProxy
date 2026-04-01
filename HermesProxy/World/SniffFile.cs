@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HermesProxy.World
 {
-    public class SniffFile
+    public sealed class SniffFile
     {
         public SniffFile(string fileName, ushort build)
         {
@@ -23,7 +24,7 @@ namespace HermesProxy.World
         }
         BinaryWriter _fileWriter;
         ushort _gameVersion;
-        System.Threading.Mutex _mutex = new System.Threading.Mutex();
+        readonly Lock _lock = new();
 
         public void WriteHeader()
         {
@@ -43,32 +44,33 @@ namespace HermesProxy.World
 
         public void WritePacket(uint opcode, bool isFromClient, byte[] data)
         {
-            _mutex.WaitOne();
-            byte direction = !isFromClient ? (byte)0xff : (byte)0x0;
-            _fileWriter.Write(direction);
-
-            uint unixtime = (uint)Time.UnixTime;
-            _fileWriter.Write(unixtime);
-            _fileWriter.Write(Environment.TickCount);
-
-            if (isFromClient)
+            lock (_lock)
             {
-                uint packetSize = (uint)(data.Length - 2 + sizeof(uint));
-                _fileWriter.Write(packetSize);
-                _fileWriter.Write(opcode);
+                byte direction = !isFromClient ? (byte)0xff : (byte)0x0;
+                _fileWriter.Write(direction);
 
-                for (int i = 2; i < data.Length; i++)
-                    _fileWriter.Write(data[i]);
+                uint unixtime = (uint)Time.UnixTime;
+                _fileWriter.Write(unixtime);
+                _fileWriter.Write(Environment.TickCount);
+
+                if (isFromClient)
+                {
+                    uint packetSize = (uint)(data.Length - 2 + sizeof(uint));
+                    _fileWriter.Write(packetSize);
+                    _fileWriter.Write(opcode);
+
+                    for (int i = 2; i < data.Length; i++)
+                        _fileWriter.Write(data[i]);
+                }
+                else
+                {
+                    uint packetSize = (uint)data.Length + sizeof(ushort);
+                    _fileWriter.Write(packetSize);
+                    ushort opcode2 = (ushort)opcode;
+                    _fileWriter.Write(opcode2);
+                    _fileWriter.Write(data);
+                }
             }
-            else
-            {
-                uint packetSize = (uint)data.Length + sizeof(ushort);
-                _fileWriter.Write(packetSize);
-                ushort opcode2 = (ushort)opcode;
-                _fileWriter.Write(opcode2);
-                _fileWriter.Write(data);
-            }
-            _mutex.ReleaseMutex();
         }
 
         public void CloseFile()

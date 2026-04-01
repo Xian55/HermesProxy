@@ -20,6 +20,7 @@ using Framework.Constants;
 using Framework.Logging;
 using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Client;
 using System.Collections.Generic;
@@ -343,7 +344,7 @@ namespace HermesProxy.World
 
         public void Read(byte[] buffer)
         {
-            Size = BitConverter.ToInt32(buffer, 0);
+            Size = BinaryPrimitives.ReadInt32LittleEndian(buffer);
             Buffer.BlockCopy(buffer, 4, Tag, 0, 12);
         }
 
@@ -363,8 +364,8 @@ namespace HermesProxy.World
         public ushort Opcode;
         public void Read(byte[] buffer)
         {
-            Size = Framework.Util.NetworkUtility.EndianConvert(BitConverter.ToUInt16(buffer, 0));
-            Opcode = BitConverter.ToUInt16(buffer, sizeof(ushort));
+            Size = BinaryPrimitives.ReadUInt16BigEndian(buffer);
+            Opcode = BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(sizeof(ushort)));
         }
         public void Write(ByteBuffer byteBuffer)
         {
@@ -380,8 +381,8 @@ namespace HermesProxy.World
         public uint Opcode;
         public void Read(byte[] buffer)
         {
-            Size = BitConverter.ToUInt16(buffer, 0);
-            Opcode = BitConverter.ToUInt32(buffer, sizeof(ushort));
+            Size = BinaryPrimitives.ReadUInt16LittleEndian(buffer);
+            Opcode = BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(sizeof(ushort)));
         }
         public void Write(ByteBuffer byteBuffer)
         {

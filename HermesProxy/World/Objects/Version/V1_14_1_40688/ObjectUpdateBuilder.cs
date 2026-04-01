@@ -84,20 +84,21 @@ namespace HermesProxy.World.Objects.Version.V1_14_1_40688
 
             m_dynamicFields = new(dynamicFieldsSize, m_updateData.Type);
 
-            m_gameState.ObjectCacheMutex.WaitOne();
-            if (m_updateData.CreateData == null &&
-                m_gameState.ObjectCacheModern.TryGetValue(updateData.Guid, out m_fields!) &&
-                m_fields != null)
+            lock (m_gameState.ObjectCacheLock)
             {
-                m_fields.m_updateMask.Clear();
+                if (m_updateData.CreateData == null &&
+                    m_gameState.ObjectCacheModern.TryGetValue(updateData.Guid, out m_fields!) &&
+                    m_fields != null)
+                {
+                    m_fields.m_updateMask.Clear();
+                }
+                else
+                {
+                    m_fields = new UpdateFieldsArray(fieldsSize);
+                    m_gameState.ObjectCacheModern.Remove(updateData.Guid);
+                    m_gameState.ObjectCacheModern.Add(updateData.Guid, m_fields);
+                }
             }
-            else
-            {
-                m_fields = new UpdateFieldsArray(fieldsSize);
-                m_gameState.ObjectCacheModern.Remove(updateData.Guid);
-                m_gameState.ObjectCacheModern.Add(updateData.Guid, m_fields);
-            }
-            m_gameState.ObjectCacheMutex.ReleaseMutex();
         }
 
         protected bool m_alreadyWritten;

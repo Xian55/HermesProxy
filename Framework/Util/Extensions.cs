@@ -115,16 +115,16 @@ namespace System
 
         public static IEnumerable<TSource> TakeRandom<TSource>(this IEnumerable<TSource> source, int count)
         {
-            Random random = new Random();
-            List<int> indexes = new List<int>(source.Count());
+            var list = source as IList<TSource> ?? source.ToList();
+            List<int> indexes = new List<int>(list.Count);
             for (int index = 0; index < indexes.Capacity; index++)
                 indexes.Add(index);
 
             List<TSource> result = new List<TSource>(count);
-            for (int index = 0; index < count && indexes.Count() > 0; index++)
+            for (int index = 0; index < count && indexes.Count > 0; index++)
             {
-                int randomIndex = random.Next(indexes.Count());
-                result.Add(source.ElementAt(randomIndex));
+                int randomIndex = Random.Shared.Next(indexes.Count);
+                result.Add(list[randomIndex]);
                 indexes.Remove(randomIndex);
             }
 
@@ -160,7 +160,6 @@ namespace System
 
         public static byte[] GenerateRandomKey(this byte[] s, int length)
         {
-            var random = new Random((int)((uint)(Guid.NewGuid().GetHashCode() ^ 1 >> 89 << 2 ^ 42)).LeftRotate(13));
             var key = new byte[length];
 
             for (int i = 0; i < length; i++)
@@ -169,7 +168,7 @@ namespace System
 
                 do
                 {
-                    randValue = (int)((uint)random.Next(0xFF)).LeftRotate(1) ^ i;
+                    randValue = (int)((uint)Random.Shared.Next(0xFF)).LeftRotate(1) ^ i;
                 } while (randValue > 0xFF && randValue <= 0);
 
                 key[i] = (byte)randValue;

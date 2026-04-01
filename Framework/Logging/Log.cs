@@ -45,6 +45,7 @@ namespace Framework.Logging
         }; 
 
         static BlockingCollection<(LogType Type, string Message)> logQueue = new();
+        static readonly Lock _debugOutputLock = new();
         private static Thread? _logOutputThread = null;
         public static bool IsLogging => _logOutputThread != null && !logQueue.IsCompleted;
 
@@ -96,7 +97,7 @@ namespace Framework.Logging
             // Fastpath when using breakpoints we want to see the log results immediately
             if (Debugger.IsAttached)
             {
-                lock (logQueue)
+                lock (_debugOutputLock)
                 {
                     PrintInternalDirectly(type, formattedText);
                 }

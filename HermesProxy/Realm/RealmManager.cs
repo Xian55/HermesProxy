@@ -32,7 +32,7 @@ using HermesProxy;
 using HermesProxy.Auth;
 using HermesProxy.World;
 
-public class RealmManager
+public sealed class RealmManager
 {
     const int placeholderRegion = 1;
     const int placeholderBattlegroup = 1;
@@ -284,7 +284,9 @@ public class RealmManager
             byte[] compressed = Json.Deflate("JSONRealmListServerIPAddresses", serverAddresses);
 
             byte[] serverSecret = new byte[0].GenerateRandomKey(32);
-            byte[] keyData = clientSecret.ToArray().Combine(serverSecret);
+            byte[] keyData = new byte[clientSecret.Length + serverSecret.Length];
+            clientSecret.CopyTo(keyData);
+            serverSecret.CopyTo(keyData.AsSpan(clientSecret.Length));
 
             globalSession.SessionKey = keyData;
 

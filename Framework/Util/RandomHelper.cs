@@ -1,6 +1,6 @@
-﻿/*
+/*
  * Copyright (C) 2012-2020 CypherCore <http://github.com/CypherCore>
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -18,20 +18,13 @@ using System;
 
 public class RandomHelper
 {
-    private static readonly Random rand;
-
-    static RandomHelper()
-    {
-        rand = new Random();
-    }
-
     /// <summary>
     /// Returns a random number between 0.0 and 1.0.
     /// </summary>
     /// <returns></returns>
     public static double NextDouble()
     {
-        return rand.NextDouble();
+        return Random.Shared.NextDouble();
     }
 
     /// <summary>
@@ -40,7 +33,7 @@ public class RandomHelper
     /// <returns></returns>
     public static uint Rand32()
     {
-        return (uint)rand.Next();
+        return (uint)Random.Shared.Next();
     }
 
     /// <summary>
@@ -50,7 +43,7 @@ public class RandomHelper
     /// <returns></returns>
     public static uint Rand32(dynamic maxValue)
     {
-        return (uint)rand.Next(maxValue);
+        return (uint)Random.Shared.Next(maxValue);
     }
 
     /// <summary>
@@ -61,16 +54,16 @@ public class RandomHelper
     /// <returns></returns>
     public static int IRand(int minValue, int maxValue)
     {
-        return rand.Next(minValue, maxValue);
+        return Random.Shared.Next(minValue, maxValue);
     }
     public static uint URand(dynamic minValue, dynamic maxValue)
     {
-        return (uint)rand.Next(Convert.ToInt32(minValue), Convert.ToInt32(maxValue));
+        return (uint)Random.Shared.Next(Convert.ToInt32(minValue), Convert.ToInt32(maxValue));
     }
     public static float FRand(float min, float max)
     {
         Cypher.Assert(max >= min);
-        return (float)(rand.NextDouble() * (max - min) + min);
+        return (float)(Random.Shared.NextDouble() * (max - min) + min);
     }
 
     /// <summary>
@@ -85,7 +78,7 @@ public class RandomHelper
 
     public static double randChance()
     {
-        return rand.NextDouble() * 100.0;
+        return Random.Shared.NextDouble() * 100.0;
     }
 
     /// <summary>
@@ -94,7 +87,7 @@ public class RandomHelper
     /// <param name="buffer"></param>
     public static void NextBytes(byte[] buffer)
     {
-        rand.NextBytes(buffer);
+        Random.Shared.NextBytes(buffer);
     }
 
     public static T RAND<T>(params T[] args)
@@ -104,4 +97,3 @@ public class RandomHelper
         return args[randIndex];
     }
 }
-

@@ -16,7 +16,7 @@ using HermesProxy.World.Server;
 
 namespace BNetServer.Networking
 {
-    public class BnetRestApiSession : SSLSocket
+    public sealed class BnetRestApiSession : SSLSocket
     {
         private const string BNET_SERVER_BASE_PATH = "/bnetserver/";
         private const string TICKET_PREFIX = "HP-"; // Hermes Proxy

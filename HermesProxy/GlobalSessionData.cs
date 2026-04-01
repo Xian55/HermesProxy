@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Framework.Realm;
 using HermesProxy.World.Server.Packets;
 using ArenaTeamInspectData = HermesProxy.World.Server.Packets.ArenaTeamInspectData;
@@ -24,7 +25,7 @@ namespace HermesProxy
         public byte Level = 0;
     }
 
-    public class OwnCharacterInfo : PlayerCache
+    public sealed class OwnCharacterInfo : PlayerCache
     {
         public WowGuid128 AccountId;
         public WowGuid128 CharacterGuid;
@@ -32,7 +33,7 @@ namespace HermesProxy
         public ulong LastLoginUnixSec;
     }
 
-    public class TradeSession
+    public sealed class TradeSession
     {
         public static uint GlobalTradeIdCounter; // Fallback for pre 2.0.0 servers
         public uint TradeId;
@@ -44,7 +45,7 @@ namespace HermesProxy
         public uint ServerStateIndex = 1; // incremented by any trade action
     }
 
-    public class GameSessionData
+    public sealed class GameSessionData
     {
         public bool HasWsgHordeFlagCarrier;
         public bool HasWsgAllyFlagCarrier;
@@ -58,6 +59,7 @@ namespace HermesProxy
         public bool IsFirstEnterWorld;
         public bool IsConnectedToInstance;
         public Queue<ServerPacket> PendingUninstancedPackets = new(); // Here packets are queued while IsConnectedToInstance = false;
+        public readonly Lock PendingUninstancedPacketsLock = new();
         public bool IsInWorld;
         public uint? CurrentMapId;
         public uint CurrentZoneId;
@@ -97,7 +99,7 @@ namespace HermesProxy
         public Dictionary<WowGuid128, PlayerCache> CachedPlayers = new();
         public HashSet<WowGuid128> IgnoredPlayers = new();
         public Dictionary<WowGuid128, uint> PlayerGuildIds = new();
-        public System.Threading.Mutex ObjectCacheMutex = new System.Threading.Mutex();
+        public readonly Lock ObjectCacheLock = new();
         public Dictionary<WowGuid128, Dictionary<int, UpdateField>> ObjectCacheLegacy = new();
         public Dictionary<WowGuid128, UpdateFieldsArray> ObjectCacheModern = new();
         public Dictionary<WowGuid128, ObjectType> OriginalObjectTypes = new();
@@ -773,18 +775,18 @@ namespace HermesProxy
         }
         public WowGuid128 GetPetGuidByNumber(uint petNumber)
         {
-            ObjectCacheMutex.WaitOne();
-            foreach (var itr in ObjectCacheModern)
+            lock (ObjectCacheLock)
             {
-                if (itr.Key.GetHighType() == HighGuidType.Pet &&
-                    itr.Key.GetEntry() == petNumber)
+                foreach (var itr in ObjectCacheModern)
                 {
-                    ObjectCacheMutex.ReleaseMutex();
-                    return itr.Key;
+                    if (itr.Key.GetHighType() == HighGuidType.Pet &&
+                        itr.Key.GetEntry() == petNumber)
+                    {
+                        return itr.Key;
+                    }
                 }
+                return default;
             }
-            ObjectCacheMutex.ReleaseMutex();
-            return default;
         }
         public void StoreOriginalObjectType(WowGuid128 guid, ObjectType type)
         {
@@ -955,28 +957,20 @@ namespace HermesProxy
 
         public Dictionary<int, UpdateField>? GetCachedObjectFieldsLegacy(WowGuid128 guid)
         {
-            Dictionary<int, UpdateField>? dict;
-            ObjectCacheMutex.WaitOne();
-            if (ObjectCacheLegacy.TryGetValue(guid, out dict))
+            lock (ObjectCacheLock)
             {
-                ObjectCacheMutex.ReleaseMutex();
+                ObjectCacheLegacy.TryGetValue(guid, out var dict);
                 return dict;
             }
-            ObjectCacheMutex.ReleaseMutex();
-            return null;
         }
 
         public UpdateFieldsArray? GetCachedObjectFieldsModern(WowGuid128 guid)
         {
-            UpdateFieldsArray? array;
-            ObjectCacheMutex.WaitOne();
-            if (ObjectCacheModern.TryGetValue(guid, out array))
+            lock (ObjectCacheLock)
             {
-                ObjectCacheMutex.ReleaseMutex();
+                ObjectCacheModern.TryGetValue(guid, out var array);
                 return array;
             }
-            ObjectCacheMutex.ReleaseMutex();
-            return null;
         }
     }
 

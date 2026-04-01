@@ -61,14 +61,15 @@ namespace HermesProxy.World.Server
                     return;
 
                 List<WowGuid128> npcGuids = new List<WowGuid128>();
-                GetSession().GameState.ObjectCacheMutex.WaitOne();
-                foreach (var obj in GetSession().GameState.ObjectCacheModern)
+                lock (GetSession().GameState.ObjectCacheLock)
                 {
-                    if (obj.Key.GetObjectType() == ObjectType.Unit && 
-                        obj.Value.GetUpdateField<uint>(UNIT_NPC_FLAGS).HasAnyFlag(NPCFlags.QuestGiver))
-                        npcGuids.Add(obj.Key);
+                    foreach (var obj in GetSession().GameState.ObjectCacheModern)
+                    {
+                        if (obj.Key.GetObjectType() == ObjectType.Unit &&
+                            obj.Value.GetUpdateField<uint>(UNIT_NPC_FLAGS).HasAnyFlag(NPCFlags.QuestGiver))
+                            npcGuids.Add(obj.Key);
+                    }
                 }
-                GetSession().GameState.ObjectCacheMutex.ReleaseMutex();
 
                 foreach (var guid in npcGuids)
                 {

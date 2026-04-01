@@ -16,9 +16,9 @@
  */
 
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
 
 namespace Framework.IO
 {
@@ -30,15 +30,20 @@ namespace Framework.IO
             buffer.WriteUInt8(0x78);
             buffer.WriteUInt8(0x9c);
 
-            uint adler32 = ZLib.adler32(1, data, (uint)data.Length);// Adler32(1, data, (uint)data.Length);
+            uint adler32 = ZLib.adler32(1, data, (uint)data.Length);
             var ms = new MemoryStream();
             using (var deflateStream = new DeflateStream(ms, CompressionMode.Compress))
             {
                 deflateStream.Write(data, 0, data.Length);
                 deflateStream.Flush();
             }
-            buffer.WriteBytes(ms.ToArray());
-            buffer.WriteBytes(BitConverter.GetBytes(adler32).Reverse().ToArray());
+            if (ms.TryGetBuffer(out var msBuffer))
+                buffer.WriteBytes(new Span<byte>(msBuffer.Array!, msBuffer.Offset, msBuffer.Count));
+            else
+                buffer.WriteBytes(ms.ToArray());
+            Span<byte> adlerBytes = stackalloc byte[4];
+            BinaryPrimitives.WriteUInt32BigEndian(adlerBytes, adler32);
+            buffer.WriteBytes(adlerBytes);
 
             return buffer.GetData();
         }

@@ -31,7 +31,7 @@ namespace HermesProxy.World.Client
         LegacyWorldCrypt _worldCrypt = null!;
         FrozenDictionary<Opcode, Action<WorldPacket>> _packetHandlers = null!;
         GlobalSessionData _globalSession = null!;
-        System.Threading.Mutex _sendMutex = new System.Threading.Mutex();
+        readonly Lock _sendLock = new();
         Timer? _keepAliveTimer;
         uint _keepAlivePingSerial;
         const int KeepAliveIntervalMs = 30_000;
@@ -251,35 +251,36 @@ namespace HermesProxy.World.Client
         // C P>S: Sends data to world server
         private void SendPacket(WorldPacket packet)
         {
-            _sendMutex.WaitOne();
-            try
+            lock (_sendLock)
             {
-                ByteBuffer buffer = new ByteBuffer();
-                LegacyClientPacketHeader header = new LegacyClientPacketHeader();
+                try
+                {
+                    ByteBuffer buffer = new ByteBuffer();
+                    LegacyClientPacketHeader header = new LegacyClientPacketHeader();
 
-                header.Size = (ushort)(packet.GetSize() + sizeof(uint)); // size includes the opcode
-                header.Opcode = packet.GetOpcode();
-                header.Write(buffer);
+                    header.Size = (ushort)(packet.GetSize() + sizeof(uint)); // size includes the opcode
+                    header.Opcode = packet.GetOpcode();
+                    header.Write(buffer);
 
-                Log.PrintNet(LogType.Debug, LogNetDir.P2S, $"Sending opcode {LegacyVersion.GetUniversalOpcode(header.Opcode)} ({header.Opcode}) with size {header.Size}.");
+                    Log.PrintNet(LogType.Debug, LogNetDir.P2S, $"Sending opcode {LegacyVersion.GetUniversalOpcode(header.Opcode)} ({header.Opcode}) with size {header.Size}.");
 
-                byte[] headerArray = buffer.GetData();
-                if (_worldCrypt != null)
-                    _worldCrypt.Encrypt(headerArray, LegacyClientPacketHeader.StructSize);
-                buffer.Clear();
-                buffer.WriteBytes(headerArray);
+                    byte[] headerArray = buffer.GetData();
+                    if (_worldCrypt != null)
+                        _worldCrypt.Encrypt(headerArray, LegacyClientPacketHeader.StructSize);
+                    buffer.Clear();
+                    buffer.WriteBytes(headerArray);
 
-                buffer.WriteBytes(packet.GetData(), packet.GetSize());
+                    buffer.WriteBytes(packet.GetData(), packet.GetSize());
 
-                _clientSocket.Send(buffer.GetData(), SocketFlags.None);
+                    _clientSocket.Send(buffer.GetData(), SocketFlags.None);
+                }
+                catch (Exception ex)
+                {
+                    Log.PrintNet(LogType.Error, LogNetDir.P2S, $"Packet Write Error: {ex.Message}");
+                    if (_isSuccessful == null)
+                        _isSuccessful = false;
+                }
             }
-            catch (Exception ex)
-            {
-                Log.PrintNet(LogType.Error, LogNetDir.P2S, $"Packet Write Error: {ex.Message}");
-                if (_isSuccessful == null)
-                    _isSuccessful = false;
-            }
-            _sendMutex.ReleaseMutex();
         }
 
         public void SendPacketToClient(ServerPacket packet, Opcode delayUntilOpcode = Opcode.MSG_NULL_ACTION)
@@ -304,7 +305,9 @@ namespace HermesProxy.World.Client
 
         private void SendPacketToClientDirect(ServerPacket packet)
         {
-            var pendingPackets = GetSession().GameState.PendingUninstancedPackets;
+            var gameState = GetSession().GameState;
+            var pendingPackets = gameState.PendingUninstancedPackets;
+            var pendingLock = gameState.PendingUninstancedPacketsLock;
             if (packet.GetConnection() == ConnectionType.Realm)
             {
                 GetSession().RealmSocket.SendPacket(packet);
@@ -312,12 +315,12 @@ namespace HermesProxy.World.Client
             else
             {
                 if (GetSession().InstanceSocket == null &&
-                   !GetSession().GameState.IsConnectedToInstance)
+                   !gameState.IsConnectedToInstance)
                 {
-                    lock (pendingPackets)
+                    lock (pendingLock)
                     {
                         if (GetSession().InstanceSocket == null &&
-                            !GetSession().GameState.IsConnectedToInstance)
+                            !gameState.IsConnectedToInstance)
                         {
                             pendingPackets.Enqueue(packet);
                             Log.PrintNet(LogType.Warn, LogNetDir.P2C, $"Can't send opcode {packet.GetUniversalOpcode()} ({packet.GetOpcode()}) before entering world! Queue");
@@ -336,7 +339,7 @@ namespace HermesProxy.World.Client
                 var socket = GetSession().InstanceSocket;
                 if (pendingPackets.Count > 0)
                 {
-                    lock (pendingPackets)
+                    lock (pendingLock)
                     {
                         while (pendingPackets.TryDequeue(out var oldPacket))
                         {

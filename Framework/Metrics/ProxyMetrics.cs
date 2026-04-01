@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 
 namespace Framework.Metrics
 {
@@ -172,10 +173,10 @@ namespace Framework.Metrics
     /// <summary>
     /// Thread-safe circular buffer for latency samples.
     /// </summary>
-    public class LatencySamples
+    public sealed class LatencySamples
     {
         private readonly double[] _samples;
-        private readonly object _lock = new();
+        private readonly Lock _lock = new();
         private int _count;
         private int _index;
         private double _sum;

@@ -21,6 +21,7 @@ using System.Net.Sockets;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Collections.Concurrent;
+using System.Threading;
 
 using Framework.Constants;
 using Framework.Cryptography;
@@ -67,7 +68,7 @@ namespace HermesProxy.World.Server
         ZLib.z_stream _compressionStream = null!;
         ConcurrentDictionary<Opcode, PacketHandler> _clientPacketTable = new();
         GlobalSessionData _globalSession = null!;
-        System.Threading.Mutex _sendMutex = new System.Threading.Mutex();
+        readonly Lock _sendLock = new();
 
         private BnetServices.ServiceManager _bnetRpc = null!;
 
@@ -377,55 +378,58 @@ namespace HermesProxy.World.Server
             if (GetSession() != null)
                 packet.LogPacket(ref GetSession().ModernSniff);
 
-            _sendMutex.WaitOne();
-            var data = packet.GetData()!;
-            Opcode universalOpcode = packet.GetUniversalOpcode();
-            ushort opcode = (ushort)packet.GetOpcode();
-
-            Log.PrintNet(LogType.Debug, LogNetDir.P2C, $"Sending opcode {universalOpcode} ({(uint)opcode}).");
-
-            ByteBuffer buffer = new();
-
-            int packetSize = data.Length;
-            if (packetSize > 0x400 && _worldCrypt.IsInitialized)
+            lock (_sendLock)
             {
-                buffer.WriteInt32(packetSize + 2);
-                buffer.WriteUInt32(ZLib.adler32(ZLib.adler32(0x9827D8F1, BitConverter.GetBytes(opcode), 2), data, (uint)packetSize));
+                var data = packet.GetData()!;
+                Opcode universalOpcode = packet.GetUniversalOpcode();
+                ushort opcode = (ushort)packet.GetOpcode();
 
-                byte[] compressedData;
-                uint compressedSize = CompressPacket(data, opcode, out compressedData);
-                buffer.WriteUInt32(ZLib.adler32(0x9827D8F1, compressedData, compressedSize));
-                buffer.WriteBytes(compressedData, compressedSize);
+                Log.PrintNet(LogType.Debug, LogNetDir.P2C, $"Sending opcode {universalOpcode} ({(uint)opcode}).");
 
-                packetSize = (int)(compressedSize + 12);
-                opcode = (ushort)ModernVersion.GetCurrentOpcode(Opcode.SMSG_COMPRESSED_PACKET);
-                System.Diagnostics.Trace.Assert(opcode != 0);
+                ByteBuffer buffer = new();
+
+                int packetSize = data.Length;
+                if (packetSize > 0x400 && _worldCrypt.IsInitialized)
+                {
+                    buffer.WriteInt32(packetSize + 2);
+                    buffer.WriteUInt32(ZLib.adler32(ZLib.adler32(0x9827D8F1, BitConverter.GetBytes(opcode), 2), data, (uint)packetSize));
+
+                    byte[] compressedData;
+                    uint compressedSize = CompressPacket(data, opcode, out compressedData);
+                    buffer.WriteUInt32(ZLib.adler32(0x9827D8F1, compressedData, compressedSize));
+                    buffer.WriteBytes(compressedData, compressedSize);
+
+                    packetSize = (int)(compressedSize + 12);
+                    opcode = (ushort)ModernVersion.GetCurrentOpcode(Opcode.SMSG_COMPRESSED_PACKET);
+                    System.Diagnostics.Trace.Assert(opcode != 0);
+
+                    data = buffer.GetData();
+                }
+
+                buffer = new ByteBuffer();
+                buffer.WriteUInt16(opcode);
+                buffer.WriteBytes(data);
+                packetSize += 2 /*opcode*/;
 
                 data = buffer.GetData();
+
+                PacketHeader header = new();
+                header.Size = packetSize;
+                _worldCrypt.Encrypt(ref data, ref header.Tag);
+
+                ByteBuffer byteBuffer = new();
+                header.Write(byteBuffer);
+                byteBuffer.WriteBytes(data);
+
+                AsyncWrite(byteBuffer.GetData());
             }
-
-            buffer = new ByteBuffer();
-            buffer.WriteUInt16(opcode);
-            buffer.WriteBytes(data);
-            packetSize += 2 /*opcode*/;
-
-            data = buffer.GetData();
-
-            PacketHeader header = new();
-            header.Size = packetSize;
-            _worldCrypt.Encrypt(ref data, ref header.Tag);
-
-            ByteBuffer byteBuffer = new();
-            header.Write(byteBuffer);
-            byteBuffer.WriteBytes(data);
-
-            AsyncWrite(byteBuffer.GetData());
-            _sendMutex.ReleaseMutex();
         }
 
         public uint CompressPacket(byte[] data, ushort opcode, out byte[] outData)
         {
-            byte[] uncompressedData = BitConverter.GetBytes(opcode).Combine(data);
+            byte[] uncompressedData = new byte[2 + data.Length];
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(uncompressedData, opcode);
+            data.CopyTo(uncompressedData.AsSpan(2));
 
             uint bufferSize = ZLib.deflateBound(_compressionStream, (uint)data.Length);
             outData = new byte[bufferSize];

@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 
@@ -17,7 +16,7 @@ public static class NetworkUtils
             return result;
         }
 
-        return Dns.GetHostAddresses(hostOrIpaddress, AddressFamily.InterNetwork).First();
+        return Dns.GetHostAddresses(hostOrIpaddress, AddressFamily.InterNetwork)[0];
     }
 
     /// Forces IPv4 or IPv6 result or exception
@@ -31,6 +30,6 @@ public static class NetworkUtils
             return result;
         }
 
-        return Dns.GetHostAddresses(hostOrIpaddress).First();
+        return Dns.GetHostAddresses(hostOrIpaddress)[0];
     }
 }

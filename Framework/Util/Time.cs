@@ -231,7 +231,7 @@ public static class Time
     }
 }
 
-public class TimeTrackerSmall
+public sealed class TimeTrackerSmall
 {
     public TimeTrackerSmall(int expiry = 0)
     {
@@ -260,7 +260,7 @@ public class TimeTrackerSmall
     int i_expiryTime;
 }
 
-public class TimeTracker
+public sealed class TimeTracker
 {
     public TimeTracker(long expiry = 0)
     {
@@ -290,7 +290,7 @@ public class TimeTracker
     long i_expiryTime;
 }
 
-public class IntervalTimer
+public sealed class IntervalTimer
 {
     public void Update(long diff)
     {
@@ -334,7 +334,7 @@ public class IntervalTimer
     long _current;
 }
 
-public class PeriodicTimer
+public sealed class PeriodicTimer
 {
     public PeriodicTimer(int period, int start_time)
     {
