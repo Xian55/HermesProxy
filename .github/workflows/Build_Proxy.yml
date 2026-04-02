@@ -4,9 +4,38 @@ on: ['push', 'workflow_dispatch']
 
 env:
   DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository content
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET Core SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ hashFiles('Directory.Packages.props') }}
+          restore-keys: nuget-
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Test
+        run: dotnet test --no-restore --filter "FullyQualifiedName!~MovementInfoSpanTests"
+
   build:
+    needs: test
     strategy:
       matrix:
         os: ['windows', 'ubuntu', 'macos']
@@ -23,11 +52,12 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Install dependencies
-        run: dotnet restore
-
-      - name: Test
-        run: dotnet test --no-restore --filter "FullyQualifiedName!~MovementInfoSpanTests"
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
 
       - name: Publish
         if: matrix.os != 'macos'
@@ -68,6 +98,7 @@ jobs:
           name: HermesProxy-${{ matrix.os }}-${{ runner.arch }}-${{ github.sha }}
           path: publish
           if-no-files-found: error
+          compression-level: 1
 
       - name: Upload build artifact (Linux)
         if: matrix.os == 'ubuntu'
@@ -76,6 +107,7 @@ jobs:
           name: HermesProxy-${{ matrix.os }}-${{ runner.arch }}-${{ github.sha }}
           path: HermesProxy-${{ matrix.os }}-${{ runner.arch }}-${{ github.sha }}.*
           if-no-files-found: error
+          compression-level: 1
 
       - name: Upload build artifact (MacOS)
         if: matrix.os == 'macos'
@@ -84,3 +116,4 @@ jobs:
           name: HermesProxy-${{ matrix.os }}-universal-${{ github.sha }}
           path: HermesProxy-${{ matrix.os }}-universal-${{ github.sha }}.*
           if-no-files-found: error
+          compression-level: 1
