@@ -2,6 +2,10 @@ name: Build Proxy
 
 on: ['push', 'workflow_dispatch']
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   DOTNET_VERSION: '10.0.x'
   DOTNET_NOLOGO: true
@@ -35,7 +39,6 @@ jobs:
         run: dotnet test --no-restore --filter "FullyQualifiedName!~MovementInfoSpanTests"
 
   build:
-    needs: test
     strategy:
       matrix:
         os: ['windows', 'ubuntu', 'macos']
@@ -117,3 +120,16 @@ jobs:
           path: HermesProxy-${{ matrix.os }}-universal-${{ github.sha }}.*
           if-no-files-found: error
           compression-level: 1
+
+  # Gate: fails the workflow if tests failed, even though builds may have succeeded
+  verify:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check test result
+        run: |
+          if [ "${{ needs.test.result }}" != "success" ]; then
+            echo "Tests failed — artifacts from this run should not be trusted"
+            exit 1
+          fi
