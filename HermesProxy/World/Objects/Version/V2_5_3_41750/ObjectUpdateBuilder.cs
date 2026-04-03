@@ -129,16 +129,22 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
 
         public void SetCreateObjectBits()
         {
-            m_createBits.Clear();
-            m_createBits.PlayHoverAnim = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && m_updateData.CreateData.MoveInfo.Hover;
-            m_createBits.MovementUpdate = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && m_objectTypeMask.HasAnyFlag(Enums.ObjectTypeMask.Unit);
-            m_createBits.MovementTransport = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && m_updateData.CreateData.MoveInfo.TransportGuid != default && m_objectType == Enums.ObjectTypeBCC.GameObject;
-            m_createBits.Stationary = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && !m_objectTypeMask.HasAnyFlag(Enums.ObjectTypeMask.Unit);
-            m_createBits.ServerTime = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && m_updateData.Guid.GetHighType() == Enums.HighGuidType.Transport;
-            m_createBits.CombatVictim = m_updateData.CreateData != null && m_updateData.CreateData.AutoAttackVictim != default;
-            m_createBits.Vehicle = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && m_updateData.CreateData.MoveInfo.VehicleId != 0;
-            m_createBits.Rotation = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && m_objectType == Enums.ObjectTypeBCC.GameObject;
-            m_createBits.ThisIsYou = m_createBits.ActivePlayer = m_objectType == Enums.ObjectTypeBCC.ActivePlayer;
+            var createData = m_updateData.CreateData;
+            var moveInfo = createData?.MoveInfo;
+            bool isGameObject = m_objectType == Enums.ObjectTypeBCC.GameObject;
+            bool isUnit = m_objectTypeMask.HasAnyFlag(Enums.ObjectTypeMask.Unit);
+            bool isActivePlayer = m_objectType == Enums.ObjectTypeBCC.ActivePlayer;
+
+            m_createBits =
+                (moveInfo is { Hover: true }                                        ? CreateObjectBits.PlayHoverAnim     : 0) |
+                (moveInfo != null && isUnit                                          ? CreateObjectBits.MovementUpdate    : 0) |
+                (moveInfo != null && moveInfo.TransportGuid != default && isGameObject ? CreateObjectBits.MovementTransport : 0) |
+                (moveInfo != null && !isUnit                                         ? CreateObjectBits.Stationary        : 0) |
+                (moveInfo != null && m_updateData.Guid.GetHighType() == Enums.HighGuidType.Transport ? CreateObjectBits.ServerTime : 0) |
+                (createData?.AutoAttackVictim != null                                ? CreateObjectBits.CombatVictim      : 0) |
+                (moveInfo is { VehicleId: not 0 }                                    ? CreateObjectBits.Vehicle           : 0) |
+                (moveInfo != null && isGameObject                                    ? CreateObjectBits.Rotation          : 0) |
+                (isActivePlayer                                                      ? CreateObjectBits.ThisIsYou | CreateObjectBits.ActivePlayer : 0);
         }
 
         public void BuildValuesUpdate(WorldPacket packet)
@@ -156,27 +162,9 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
         {
             int PauseTimesCount = 0;
 
-            data.WriteBit(m_createBits.NoBirthAnim);
-            data.WriteBit(m_createBits.EnablePortals);
-            data.WriteBit(m_createBits.PlayHoverAnim);
-            data.WriteBit(m_createBits.MovementUpdate);
-            data.WriteBit(m_createBits.MovementTransport);
-            data.WriteBit(m_createBits.Stationary);
-            data.WriteBit(m_createBits.CombatVictim);
-            data.WriteBit(m_createBits.ServerTime);
-            data.WriteBit(m_createBits.Vehicle);
-            data.WriteBit(m_createBits.AnimKit);
-            data.WriteBit(m_createBits.Rotation);
-            data.WriteBit(m_createBits.AreaTrigger);
-            data.WriteBit(m_createBits.GameObject);
-            data.WriteBit(m_createBits.SmoothPhasing);
-            data.WriteBit(m_createBits.ThisIsYou);
-            data.WriteBit(m_createBits.SceneObject);
-            data.WriteBit(m_createBits.ActivePlayer);
-            data.WriteBit(m_createBits.Conversation);
-            data.FlushBits();
+            m_createBits.WriteCreateBits(data);
 
-            if (m_createBits.MovementUpdate)
+            if (m_createBits.HasFlag(CreateObjectBits.MovementUpdate))
             {
                 MovementInfo moveInfo = m_updateData.CreateData.MoveInfo;
                 bool hasSpline = m_updateData.CreateData.MoveSpline != null;
@@ -218,7 +206,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
 
             data.WriteInt32(PauseTimesCount);
 
-            if (m_createBits.Stationary)
+            if (m_createBits.HasFlag(CreateObjectBits.Stationary))
             {
                 data.WriteFloat(m_updateData.CreateData.MoveInfo.Position.X);
                 data.WriteFloat(m_updateData.CreateData.MoveInfo.Position.Y);
@@ -226,10 +214,10 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 data.WriteFloat(m_updateData.CreateData.MoveInfo.Orientation);
             }
 
-            if (m_createBits.CombatVictim)
-                data.WritePackedGuid128(m_updateData.CreateData.AutoAttackVictim); // CombatVictim
+            if (m_createBits.HasFlag(CreateObjectBits.CombatVictim))
+                data.WritePackedGuid128(m_updateData.CreateData.AutoAttackVictim!.Value); // CombatVictim
 
-            if (m_createBits.ServerTime)
+            if (m_createBits.HasFlag(CreateObjectBits.ServerTime))
             {
                 /** @TODO Use IsTransport() to also handle type 11 (TRANSPORT)
                     Currently grid objects are not updated if there are no nearby players,
@@ -242,30 +230,30 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                     data.WriteUInt32((uint)Time.UnixTime);
             }
 
-            if (m_createBits.Vehicle)
+            if (m_createBits.HasFlag(CreateObjectBits.Vehicle))
             {
                 data.WriteUInt32(m_updateData.CreateData.MoveInfo.VehicleId); // RecID
                 data.WriteFloat(m_updateData.CreateData.MoveInfo.VehicleOrientation); // InitialRawFacing
             }
 
-            if (m_createBits.AnimKit)
+            if (m_createBits.HasFlag(CreateObjectBits.AnimKit))
             {
                 data.WriteUInt16(0); // AiID
                 data.WriteUInt16(0); // MovementID
                 data.WriteUInt16(0); // MeleeID
             }
 
-            if (m_createBits.Rotation)
+            if (m_createBits.HasFlag(CreateObjectBits.Rotation))
                 data.WriteInt64(m_updateData.CreateData.MoveInfo.Rotation.GetPackedRotation()); // Rotation
 
             for (int i = 0; i < PauseTimesCount; ++i)
                 data.WriteUInt32(0);
 
-            if (m_createBits.MovementTransport)
+            if (m_createBits.HasFlag(CreateObjectBits.MovementTransport))
                 m_updateData.CreateData.MoveInfo.WriteTransportInfoModern(data);
 
             /*
-            if (m_createBits.AreaTrigger)
+            if (m_createBits.HasFlag(CreateObjectBits.AreaTrigger))
             {
                 AreaTrigger areaTrigger = ToAreaTrigger();
                 AreaTriggerMiscTemplate areaTriggerMiscTemplate = areaTrigger.GetMiscTemplate();
@@ -410,7 +398,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
             }
             */
 
-            if (m_createBits.GameObject)
+            if (m_createBits.HasFlag(CreateObjectBits.GameObject))
             {
                 bool bit8 = false;
                 uint Int1 = 0;
@@ -423,7 +411,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                     data.WriteUInt32(Int1);
             }
 
-            //if (m_createBits.SmoothPhasing)
+            //if (m_createBits.HasFlag(CreateObjectBits.SmoothPhasing))
             //{
             //    data.WriteBit(ReplaceActive);
             //    data.WriteBit(StopAnimKits);
@@ -433,7 +421,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
             //        *data << ObjectGuid(ReplaceObject);
             //}
 
-            //if (m_createBits.SceneObject)
+            //if (m_createBits.HasFlag(CreateObjectBits.SceneObject))
             //{
             //    data.WriteBit(HasLocalScriptData);
             //    data.WriteBit(HasPetBattleFullUpdate);
@@ -543,7 +531,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
             //    }
             //}
 
-            if (m_createBits.ActivePlayer)
+            if (m_createBits.HasFlag(CreateObjectBits.ActivePlayer))
             {
                 bool hasSceneInstanceIDs = false;
                 bool hasRuneState = false;
@@ -583,7 +571,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
             }
 
             /*
-            if (m_createBits.Conversation)
+            if (m_createBits.HasFlag(CreateObjectBits.Conversation))
             {
                 Conversation self = ToConversation();
                 if (data.WriteBit(self.GetTextureKitId() != 0))
