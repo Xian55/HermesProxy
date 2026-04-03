@@ -36,7 +36,7 @@ namespace HermesProxy.World.Server.Packets
         public bool EnablePortals;
         public bool PlayHoverAnim;
         public bool ThisIsYou;
-        public WowGuid128 AutoAttackVictim;
+        public WowGuid128? AutoAttackVictim;
     }
     public class ObjectUpdate
     {

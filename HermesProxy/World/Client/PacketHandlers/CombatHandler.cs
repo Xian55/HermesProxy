@@ -1,4 +1,4 @@
-﻿using Framework;
+using Framework;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -16,6 +16,10 @@ namespace HermesProxy.World.Client
             SAttackStart attack = new();
             attack.Attacker = packet.ReadGuid().To128(GetSession().GameState);
             attack.Victim = packet.ReadGuid().To128(GetSession().GameState);
+
+            if (attack.Attacker == GetSession().GameState.CurrentPlayerGuid)
+                GetSession().GameState.WaitingForAttackStart = false;
+
             SendPacketToClient(attack);
         }
         [PacketHandler(Opcode.SMSG_ATTACK_STOP)]
@@ -25,6 +29,22 @@ namespace HermesProxy.World.Client
             attack.Attacker = packet.ReadPackedGuid().To128(GetSession().GameState);
             attack.Victim = packet.ReadPackedGuid().To128(GetSession().GameState);
             attack.NowDead = packet.ReadUInt32() != 0;
+
+            var state = GetSession().GameState;
+            if (attack.Attacker == state.CurrentPlayerGuid)
+            {
+                // If the client wanted to stop and we deferred it, now flush it
+                if (state.DeferredAttackStop)
+                {
+                    state.DeferredAttackStop = false;
+                    state.CurrentAttackTarget = default;
+                    WorldPacket stopPacket = new WorldPacket(Opcode.CMSG_ATTACK_STOP);
+                    SendPacketToServer(stopPacket, Opcode.MSG_NULL_ACTION);
+                }
+                // If CurrentAttackTarget is set but no deferred stop, we're switching targets —
+                // don't clear the attack target, the new SWING already set it
+            }
+
             SendPacketToClient(attack);
         }
         [PacketHandler(Opcode.SMSG_ATTACKER_STATE_UPDATE)]
@@ -134,6 +154,9 @@ namespace HermesProxy.World.Client
         [PacketHandler(Opcode.SMSG_CANCEL_COMBAT)]
         void HandleCancelCombat(WorldPacket packet)
         {
+            GetSession().GameState.CurrentAttackTarget = default;
+            GetSession().GameState.WaitingForAttackStart = false;
+            GetSession().GameState.DeferredAttackStop = false;
             CancelCombat combat = new();
             SendPacketToClient(combat);
         }

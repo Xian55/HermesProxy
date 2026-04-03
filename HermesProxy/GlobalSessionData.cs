@@ -85,6 +85,9 @@ namespace HermesProxy
         public WowGuid128 CurrentInteractedWithGO;
         public uint LastWhoRequestId;
         public WowGuid128 CurrentPetGuid;
+        public WowGuid64 CurrentAttackTarget;        // active CMSG_ATTACK_SWING victim, cleared on ATTACK_STOP/CANCEL_COMBAT
+        public bool WaitingForAttackStart;           // true between CMSG_ATTACK_SWING and SMSG_ATTACK_START
+        public bool DeferredAttackStop;              // CMSG_ATTACK_STOP received while waiting for SMSG_ATTACK_START
         public uint[] CurrentArenaTeamIds = new uint[3];
         public ConcurrentQueue<ClientCastRequest> PendingNormalCasts = new();  // regular spell casts (queue for proper FIFO handling)
         public ClientCastRequest? CurrentClientNextMeleeCast; // next melee spells (Raptor Strike, Heroic Strike, etc.)
