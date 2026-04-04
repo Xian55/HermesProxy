@@ -109,13 +109,13 @@ jobs:
 
       - name: Publish
         if: matrix.os != 'macos'
-        run: dotnet publish HermesProxy --configuration Release --use-current-runtime -p:UsePublishBuildSettings=true -p:Version=${{ steps.ver.outputs.semver }}
+        run: dotnet publish HermesProxy --configuration Release --use-current-runtime -p:UsePublishBuildSettings=true -p:UpdateVersionProperties=false -p:Version=${{ steps.ver.outputs.semver }} -p:AssemblyVersion=${{ steps.ver.outputs.semver }} -p:FileVersion=${{ steps.ver.outputs.semver }} -p:InformationalVersion=${{ steps.ver.outputs.semver }}
 
       - name: Publish (MacOS x86_64 and arm64)
         if: matrix.os == 'macos'
         run: |
-          dotnet publish HermesProxy --configuration Release --runtime osx-arm64 -p:UsePublishBuildSettings=true -p:Version=${{ steps.ver.outputs.semver }}
-          dotnet publish HermesProxy --configuration Release --runtime osx-x64 -p:UsePublishBuildSettings=true -p:Version=${{ steps.ver.outputs.semver }}
+          dotnet publish HermesProxy --configuration Release --runtime osx-arm64 -p:UsePublishBuildSettings=true -p:UpdateVersionProperties=false -p:Version=${{ steps.ver.outputs.semver }} -p:AssemblyVersion=${{ steps.ver.outputs.semver }} -p:FileVersion=${{ steps.ver.outputs.semver }} -p:InformationalVersion=${{ steps.ver.outputs.semver }}
+          dotnet publish HermesProxy --configuration Release --runtime osx-x64 -p:UsePublishBuildSettings=true -p:UpdateVersionProperties=false -p:Version=${{ steps.ver.outputs.semver }} -p:AssemblyVersion=${{ steps.ver.outputs.semver }} -p:FileVersion=${{ steps.ver.outputs.semver }} -p:InformationalVersion=${{ steps.ver.outputs.semver }}
           lipo ./HermesProxy/bin/Release/osx-arm64/publish/HermesProxy ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy -create -output ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy_universal
           mv ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy_universal ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy
           rm -rf ./HermesProxy/bin/Release/osx-arm64
