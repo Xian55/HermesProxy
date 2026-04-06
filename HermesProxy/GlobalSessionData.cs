@@ -279,6 +279,121 @@ namespace HermesProxy
             }
             return WowGuid64.Empty;
         }
+        public WowGuid64 GetInventorySlotItem(byte containerSlot, byte slot)
+        {
+            // Main backpack (Bag0 = 255): read directly from player inventory fields
+            if (containerSlot == 255)
+                return GetInventorySlotItem(slot);
+
+            // Extra bag: read from the bag container's slot fields
+            var bagGuid64 = GetInventorySlotItem(containerSlot);
+            if (bagGuid64 == WowGuid64.Empty)
+                return WowGuid64.Empty;
+
+            int containerSlotField = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_FIELD_SLOT_1);
+            if (containerSlotField < 0)
+                return WowGuid64.Empty;
+
+            var bagGuid128 = bagGuid64.To128(this);
+            var bagFields = GetCachedObjectFieldsLegacy(bagGuid128);
+            if (bagFields == null)
+                return WowGuid64.Empty;
+
+            return bagFields.GetGuidValue(containerSlotField + slot * 2);
+        }
+        public uint GetItemStackCount(WowGuid128 itemGuid)
+        {
+            uint count = GetLegacyFieldValueUInt32(itemGuid, ItemField.ITEM_FIELD_STACK_COUNT);
+            return count > 0 ? count : 1;
+        }
+        public (byte containerSlot, byte slot)? FindItemInInventory(WowGuid64 itemGuid64)
+        {
+            // Search main backpack (slots ItemStart=23 to ItemEnd=39)
+            const int itemStart = 23;
+            const int itemEnd = 39;
+            for (int i = itemStart; i < itemEnd; i++)
+            {
+                if (GetInventorySlotItem(i) == itemGuid64)
+                    return (255, (byte)i);
+            }
+
+            // Search extra bags (bag container slots 19-22)
+            const int bagStart = 19;
+            const int bagEnd = 23;
+            int containerSlotField = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_FIELD_SLOT_1);
+            int numSlotsField = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_FIELD_NUM_SLOTS);
+            if (containerSlotField < 0 || numSlotsField < 0)
+                return null;
+
+            for (int bagIdx = bagStart; bagIdx < bagEnd; bagIdx++)
+            {
+                var bagGuid64 = GetInventorySlotItem(bagIdx);
+                if (bagGuid64 == WowGuid64.Empty)
+                    continue;
+
+                var bagGuid128 = bagGuid64.To128(this);
+                var bagFields = GetCachedObjectFieldsLegacy(bagGuid128);
+                if (bagFields == null)
+                    continue;
+
+                if (!bagFields.ContainsKey(numSlotsField))
+                    continue;
+                int numSlots = (int)bagFields[numSlotsField].UInt32Value;
+
+                for (int slot = 0; slot < numSlots; slot++)
+                {
+                    var slotGuid = bagFields.GetGuidValue(containerSlotField + slot * 2);
+                    if (slotGuid == itemGuid64)
+                        return ((byte)bagIdx, (byte)slot);
+                }
+            }
+
+            return null;
+        }
+        public (byte containerSlot, byte slot)? FindEmptyInventorySlot()
+        {
+            // Search main backpack first
+            const int itemStart = 23;
+            const int itemEnd = 39;
+            for (int i = itemStart; i < itemEnd; i++)
+            {
+                if (GetInventorySlotItem(i) == WowGuid64.Empty)
+                    return (255, (byte)i);
+            }
+
+            // Search extra bags
+            const int bagStart = 19;
+            const int bagEnd = 23;
+            int containerSlotField = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_FIELD_SLOT_1);
+            int numSlotsField = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_FIELD_NUM_SLOTS);
+            if (containerSlotField < 0 || numSlotsField < 0)
+                return null;
+
+            for (int bagIdx = bagStart; bagIdx < bagEnd; bagIdx++)
+            {
+                var bagGuid64 = GetInventorySlotItem(bagIdx);
+                if (bagGuid64 == WowGuid64.Empty)
+                    continue;
+
+                var bagGuid128 = bagGuid64.To128(this);
+                var bagFields = GetCachedObjectFieldsLegacy(bagGuid128);
+                if (bagFields == null)
+                    continue;
+
+                if (!bagFields.ContainsKey(numSlotsField))
+                    continue;
+                int numSlots = (int)bagFields[numSlotsField].UInt32Value;
+
+                for (int slot = 0; slot < numSlots; slot++)
+                {
+                    var slotGuid = bagFields.GetGuidValue(containerSlotField + slot * 2);
+                    if (slotGuid == WowGuid64.Empty)
+                        return ((byte)bagIdx, (byte)slot);
+                }
+            }
+
+            return null;
+        }
         public ushort GetObjectSpawnCounter(WowGuid64 guid)
         {
             if (ObjectSpawnCount.TryGetValue(guid, out ushort count))
