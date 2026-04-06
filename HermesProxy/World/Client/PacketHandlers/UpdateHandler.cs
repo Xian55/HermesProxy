@@ -2093,11 +2093,17 @@ namespace HermesProxy.World.Client
                     for (int i = 0; i < 19; i++)
                     {
                         int itemIdIndex = PLAYER_VISIBLE_ITEM_1_0 + i * offset;
-                        int enchantIdIndex = PLAYER_VISIBLE_ITEM_1_0 + 1 + i * offset;
-                        if (updateMaskArray[itemIdIndex] || updateMaskArray[enchantIdIndex])
+                        int permEnchantIndex = PLAYER_VISIBLE_ITEM_1_0 + 1 + i * offset;
+                        int tempEnchantIndex = PLAYER_VISIBLE_ITEM_1_0 + 2 + i * offset;
+                        if (updateMaskArray[itemIdIndex] || updateMaskArray[permEnchantIndex] || updateMaskArray[tempEnchantIndex])
                         {
                             int itemId = updates.ContainsKey(itemIdIndex) ? updates[itemIdIndex].Int32Value : 0;
-                            ushort itemVisual = updates.ContainsKey(enchantIdIndex) ? (ushort)GameData.GetItemEnchantVisual(updates[enchantIdIndex].UInt32Value) : (ushort)0;
+                            // Temporary enchants (shaman imbues, poisons) take visual priority over permanent
+                            ushort itemVisual = 0;
+                            if (updates.ContainsKey(tempEnchantIndex))
+                                itemVisual = (ushort)GameData.GetItemEnchantVisual(updates[tempEnchantIndex].UInt32Value);
+                            if (itemVisual == 0 && updates.ContainsKey(permEnchantIndex))
+                                itemVisual = (ushort)GameData.GetItemEnchantVisual(updates[permEnchantIndex].UInt32Value);
                             updateData.PlayerData.VisibleItems[i] = new VisibleItem(itemId, 0, itemVisual);
                         }
                     }
