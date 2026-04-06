@@ -191,7 +191,7 @@ namespace HermesProxy
                 string rawJson = await response.Content.ReadAsStringAsync();
                 var parsedJson = JsonSerializer.Deserialize<Dictionary<string, object>>(rawJson);
 
-                string commitDateStr = parsedJson!["created_at"].ToString();
+                string? commitDateStr = parsedJson!["created_at"].ToString();
                 DateTime commitDate = DateTime.Parse(commitDateStr!, CultureInfo.InvariantCulture).ToUniversalTime();;
 
                 string myCommitDateStr = GitVersionInformation.CommitDate;
