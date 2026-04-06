@@ -43,6 +43,7 @@ namespace Framework.Networking
             try
             {
                 _listener = new TcpListener(bindIP, port);
+                _listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 _listener.Start();
             }
             catch (SocketException ex)
