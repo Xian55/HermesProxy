@@ -68,6 +68,8 @@ namespace HermesProxy.World.Client
         [PacketHandler(Opcode.SMSG_GROUP_LIST, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
         void HandleGroupListVanilla(WorldPacket packet)
         {
+            GetSession().GameState.MasterLootCandidates = null;
+            GetSession().GameState.LastMasterLootSentTarget = default;
             PartyUpdate party = new PartyUpdate();
             party.SequenceNum = GetSession().GameState.GroupUpdateCounter++;
             bool isRaid = packet.ReadBool();
@@ -164,6 +166,8 @@ namespace HermesProxy.World.Client
         [PacketHandler(Opcode.SMSG_GROUP_LIST, ClientVersionBuild.V2_0_1_6180)]
         void HandleGroupListTBC(WorldPacket packet)
         {
+            GetSession().GameState.MasterLootCandidates = null;
+            GetSession().GameState.LastMasterLootSentTarget = default;
             PartyUpdate party = new PartyUpdate();
             party.SequenceNum = GetSession().GameState.GroupUpdateCounter++;
             bool isRaid = packet.ReadBool();

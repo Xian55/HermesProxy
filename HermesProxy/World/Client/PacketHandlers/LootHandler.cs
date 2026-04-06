@@ -4,6 +4,8 @@ using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace HermesProxy.World.Client
 {
@@ -41,6 +43,7 @@ namespace HermesProxy.World.Client
                 lootItem.UIType = uiType.CastEnum<LootSlotTypeModern>();
                 loot.Items.Add(lootItem);
             }
+            SendMasterLootListIfApplicable();
             SendPacketToClient(loot);
         }
 
@@ -53,6 +56,7 @@ namespace HermesProxy.World.Client
             loot.LootObj = owner.ToLootGuid();
             packet.ReadBool(); // unk
             SendPacketToClient(loot);
+            GetSession().GameState.LastMasterLootSentTarget = default;
         }
 
         [PacketHandler(Opcode.SMSG_LOOT_REMOVED)]
@@ -193,24 +197,51 @@ namespace HermesProxy.World.Client
         [PacketHandler(Opcode.SMSG_LOOT_MASTER_LIST)]
         void HandleLootMasterList(WorldPacket packet)
         {
-            if (GetSession().GameState.LastLootTargetGuid == default)
+            // Cache the candidate list -- do NOT send packets here.
+            // The legacy server sends this only once per corpse (to whoever loots first),
+            // so we defer sending until HandleLootResponse where we can check
+            // whether the current player is actually the master looter.
+            byte count = packet.ReadUInt8();
+            var candidates = new List<WowGuid128>(count);
+            for (byte i = 0; i < count; i++)
+                candidates.Add(packet.ReadGuid().To128(GetSession().GameState));
+            GetSession().GameState.MasterLootCandidates = candidates;
+        }
+
+        void SendMasterLootListIfApplicable()
+        {
+            var gameState = GetSession().GameState;
+
+            // Only send once per corpse open. The server re-sends SMSG_LOOT_RESPONSE
+            // after each master loot distribution; re-sending LootList would cause the
+            // client to auto-open the master loot popup for the wrong (stale) item.
+            if (gameState.LastMasterLootSentTarget == gameState.LastLootTargetGuid)
                 return;
 
+            var group = gameState.GetCurrentGroup();
+            if (group?.LootSettings is not { Method: LootMethod.MasterLoot })
+                return;
+
+            if (group.LootSettings.LootMaster != gameState.CurrentPlayerGuid)
+                return;
+
+            var candidates = gameState.MasterLootCandidates;
+
             LootList list = new LootList();
-            list.Owner = GetSession().GameState.LastLootTargetGuid.To128(GetSession().GameState);
-            list.LootObj = GetSession().GameState.LastLootTargetGuid.ToLootGuid();
-            list.Master = GetSession().GameState.CurrentPlayerGuid;
+            list.Owner = gameState.LastLootTargetGuid.To128(gameState);
+            list.LootObj = gameState.LastLootTargetGuid.ToLootGuid();
+            list.Master = gameState.CurrentPlayerGuid;
             SendPacketToClient(list);
 
-            MasterLootCandidateList loot = new MasterLootCandidateList();
-            loot.LootObj = GetSession().GameState.LastLootTargetGuid.ToLootGuid();
-            byte count = packet.ReadUInt8();
-            for (byte i = 0; i < count; i++)
-            {
-                WowGuid128 guid = packet.ReadGuid().To128(GetSession().GameState);
-                loot.Players.Add(guid);
-            }
-            SendPacketToClient(loot);
+            MasterLootCandidateList candidateList = new MasterLootCandidateList();
+            candidateList.LootObj = gameState.LastLootTargetGuid.ToLootGuid();
+            if (candidates != null)
+                candidateList.Players.AddRange(candidates);
+            else
+                candidateList.Players.AddRange(group.PlayerList.Select(p => p.GUID));
+            SendPacketToClient(candidateList);
+
+            gameState.LastMasterLootSentTarget = gameState.LastLootTargetGuid;
         }
     }
 }

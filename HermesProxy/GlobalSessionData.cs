@@ -94,6 +94,8 @@ namespace HermesProxy
         public ClientCastRequest? CurrentClientAutoRepeatCast; // auto repeat spells (Auto Shot, Shoot, etc.)
         public ConcurrentQueue<ClientCastRequest> PendingPetCasts = new();  // pet spell casts (queue for proper FIFO handling)
         public WowGuid64 LastLootTargetGuid;
+        public List<WowGuid128>? MasterLootCandidates;
+        public WowGuid64 LastMasterLootSentTarget;
         public List<int> ActionButtons = new();
         public Dictionary<WowGuid128, Dictionary<byte, int>> UnitAuraDurationUpdateTime = new();
         public Dictionary<WowGuid128, Dictionary<byte, int>> UnitAuraDurationLeft = new();
