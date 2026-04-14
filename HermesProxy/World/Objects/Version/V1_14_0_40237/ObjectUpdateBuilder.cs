@@ -674,7 +674,7 @@ public class ObjectUpdateBuilder
 
         ObjectData objectData = m_updateData.ObjectData;
         if (objectData.Guid != default)
-            m_fields.SetUpdateField<WowGuid128>(ObjectField.OBJECT_FIELD_GUID, objectData.Guid);
+            m_fields.SetUpdateField(ObjectField.OBJECT_FIELD_GUID, objectData.Guid);
         if (objectData.EntryID != null)
             m_fields.SetUpdateField<int>(ObjectField.OBJECT_FIELD_ENTRY, (int)objectData.EntryID);
         if (objectData.DynamicFlags != null)
@@ -686,13 +686,13 @@ public class ObjectUpdateBuilder
         if (itemData != null)
         {
             if (itemData.Owner != null)
-                m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_OWNER, itemData.Owner.Value);
+                m_fields.SetUpdateField(ItemField.ITEM_FIELD_OWNER, itemData.Owner.Value);
             if (itemData.ContainedIn != null)
-                m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_CONTAINED, itemData.ContainedIn.Value);
+                m_fields.SetUpdateField(ItemField.ITEM_FIELD_CONTAINED, itemData.ContainedIn.Value);
             if (itemData.Creator != null)
-                m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_CREATOR, itemData.Creator.Value);
+                m_fields.SetUpdateField(ItemField.ITEM_FIELD_CREATOR, itemData.Creator.Value);
             if (itemData.GiftCreator != null)
-                m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_GIFTCREATOR, itemData.GiftCreator.Value);
+                m_fields.SetUpdateField(ItemField.ITEM_FIELD_GIFTCREATOR, itemData.GiftCreator.Value);
             if (itemData.StackCount != null)
                 m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_STACK_COUNT, (uint)itemData.StackCount);
             if (itemData.Duration != null)
@@ -761,7 +761,7 @@ public class ObjectUpdateBuilder
                 int sizePerEntry = 4;
                 if (containerData.Slots[i] != null)
                 {
-                    m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, containerData.Slots[i]!.Value);
+                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, containerData.Slots[i]!.Value);
                 }
             }
             if (containerData.NumSlots != null)
@@ -772,25 +772,25 @@ public class ObjectUpdateBuilder
         if (unitData != null)
         {
             if (unitData.Charm != null)
-                m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CHARM, unitData.Charm.Value);
+                m_fields.SetUpdateField(UnitField.UNIT_FIELD_CHARM, unitData.Charm.Value);
             if (unitData.Summon != null)
-                m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_SUMMON, unitData.Summon.Value);
+                m_fields.SetUpdateField(UnitField.UNIT_FIELD_SUMMON, unitData.Summon.Value);
             if (unitData.Critter != null)
-                m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CRITTER, unitData.Critter.Value);
+                m_fields.SetUpdateField(UnitField.UNIT_FIELD_CRITTER, unitData.Critter.Value);
             if (unitData.CharmedBy != null)
-                m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CHARMEDBY, unitData.CharmedBy.Value);
+                m_fields.SetUpdateField(UnitField.UNIT_FIELD_CHARMEDBY, unitData.CharmedBy.Value);
             if (unitData.SummonedBy != null)
-                m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_SUMMONEDBY, unitData.SummonedBy.Value);
+                m_fields.SetUpdateField(UnitField.UNIT_FIELD_SUMMONEDBY, unitData.SummonedBy.Value);
             if (unitData.CreatedBy != null)
-                m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CREATEDBY, unitData.CreatedBy.Value);
+                m_fields.SetUpdateField(UnitField.UNIT_FIELD_CREATEDBY, unitData.CreatedBy.Value);
             if (unitData.DemonCreator != null)
-                m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_DEMON_CREATOR, unitData.DemonCreator.Value);
+                m_fields.SetUpdateField(UnitField.UNIT_FIELD_DEMON_CREATOR, unitData.DemonCreator.Value);
             if (unitData.LookAtControllerTarget != null)
-                m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_LOOK_AT_CONTROLLER_TARGET, unitData.LookAtControllerTarget.Value);
+                m_fields.SetUpdateField(UnitField.UNIT_FIELD_LOOK_AT_CONTROLLER_TARGET, unitData.LookAtControllerTarget.Value);
             if (unitData.Target != null)
-                m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_TARGET, unitData.Target.Value);
+                m_fields.SetUpdateField(UnitField.UNIT_FIELD_TARGET, unitData.Target.Value);
             if (unitData.BattlePetCompanionGUID != null)
-                m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_BATTLE_PET_COMPANION_GUID, unitData.BattlePetCompanionGUID.Value);
+                m_fields.SetUpdateField(UnitField.UNIT_FIELD_BATTLE_PET_COMPANION_GUID, unitData.BattlePetCompanionGUID.Value);
             if (unitData.BattlePetDBID != null)
                 m_fields.SetUpdateField<ulong>(UnitField.UNIT_FIELD_BATTLE_PET_DB_ID, (ulong)unitData.BattlePetDBID);
             if (unitData.ChannelData != null)
@@ -1073,7 +1073,7 @@ public class ObjectUpdateBuilder
             if (unitData.LookAtControllerID != null)
                 m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_LOOK_AT_CONTROLLER_ID, (int)unitData.LookAtControllerID);
             if (unitData.GuildGUID != null)
-                m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_GUILD_GUID, unitData.GuildGUID.Value);
+                m_fields.SetUpdateField(UnitField.UNIT_FIELD_GUILD_GUID, unitData.GuildGUID.Value);
 
             // Dynamic Fields
             if (unitData.ChannelObject != null)
@@ -1084,11 +1084,11 @@ public class ObjectUpdateBuilder
         if (playerData != null)
         {
             if (playerData.DuelArbiter != null)
-                m_fields.SetUpdateField<WowGuid128>(PlayerField.PLAYER_DUEL_ARBITER, playerData.DuelArbiter.Value);
+                m_fields.SetUpdateField(PlayerField.PLAYER_DUEL_ARBITER, playerData.DuelArbiter.Value);
             if (playerData.WowAccount != null)
-                m_fields.SetUpdateField<WowGuid128>(PlayerField.PLAYER_WOW_ACCOUNT, playerData.WowAccount.Value);
+                m_fields.SetUpdateField(PlayerField.PLAYER_WOW_ACCOUNT, playerData.WowAccount.Value);
             if (playerData.LootTargetGUID != null)
-                m_fields.SetUpdateField<WowGuid128>(PlayerField.PLAYER_LOOT_TARGET_GUID, playerData.LootTargetGUID.Value);
+                m_fields.SetUpdateField(PlayerField.PLAYER_LOOT_TARGET_GUID, playerData.LootTargetGUID.Value);
             if (playerData.PlayerFlags != null)
                 m_fields.SetUpdateField<uint>(PlayerField.PLAYER_FLAGS, (uint)playerData.PlayerFlags);
             if (playerData.PlayerFlagsEx != null)
@@ -1195,49 +1195,49 @@ public class ObjectUpdateBuilder
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD;
                 int sizePerEntry = 4;
                 if (activeData.InvSlots[i] != null)
-                    m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.InvSlots[i]!.Value);
+                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, activeData.InvSlots[i]!.Value);
             }
             for (int i = 0; i < 24; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.ItemStart * 4;
                 int sizePerEntry = 4;
                 if (activeData.PackSlots[i] != null)
-                    m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.PackSlots[i]!.Value);
+                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, activeData.PackSlots[i]!.Value);
             }
             for (int i = 0; i < 28; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.BankItemStart * 4;
                 int sizePerEntry = 4;
                 if (activeData.BankSlots[i] != null)
-                    m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BankSlots[i]!.Value);
+                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, activeData.BankSlots[i]!.Value);
             }
             for (int i = 0; i < 7; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.BankBagStart * 4;
                 int sizePerEntry = 4;
                 if (activeData.BankBagSlots[i] != null)
-                    m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BankBagSlots[i]!.Value);
+                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, activeData.BankBagSlots[i]!.Value);
             }
             for (int i = 0; i < 12; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.BuyBackStart * 4;
                 int sizePerEntry = 4;
                 if (activeData.BuyBackSlots[i] != null)
-                    m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BuyBackSlots[i]!.Value);
+                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, activeData.BuyBackSlots[i]!.Value);
             }
             for (int i = 0; i < 32; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.KeyringStart * 4;
                 int sizePerEntry = 4;
                 if (activeData.KeyringSlots[i] != null)
-                    m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.KeyringSlots[i]!.Value);
+                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, activeData.KeyringSlots[i]!.Value);
             }
             if (activeData.FarsightObject != null)
-                m_fields.SetUpdateField<WowGuid128>(ActivePlayerField.ACTIVE_PLAYER_FIELD_FARSIGHT, activeData.FarsightObject.Value);
+                m_fields.SetUpdateField(ActivePlayerField.ACTIVE_PLAYER_FIELD_FARSIGHT, activeData.FarsightObject.Value);
             if (activeData.ComboTarget != null)
-                m_fields.SetUpdateField<WowGuid128>(ActivePlayerField.ACTIVE_PLAYER_FIELD_COMBO_TARGET, activeData.ComboTarget.Value);
+                m_fields.SetUpdateField(ActivePlayerField.ACTIVE_PLAYER_FIELD_COMBO_TARGET, activeData.ComboTarget.Value);
             if (activeData.SummonedBattlePetGUID != null)
-                m_fields.SetUpdateField<WowGuid128>(ActivePlayerField.ACTIVE_PLAYER_FIELD_SUMMONED_BATTLE_PET_ID, activeData.SummonedBattlePetGUID.Value);
+                m_fields.SetUpdateField(ActivePlayerField.ACTIVE_PLAYER_FIELD_SUMMONED_BATTLE_PET_ID, activeData.SummonedBattlePetGUID.Value);
             for (int i = 0; i < 12; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_KNOWN_TITLES;
@@ -1608,7 +1608,7 @@ public class ObjectUpdateBuilder
         if (goData != null)
         {
             if (goData.CreatedBy != null)
-                m_fields.SetUpdateField<WowGuid128>(GameObjectField.GAMEOBJECT_FIELD_CREATED_BY, goData.CreatedBy.Value);
+                m_fields.SetUpdateField(GameObjectField.GAMEOBJECT_FIELD_CREATED_BY, goData.CreatedBy.Value);
             if (goData.DisplayID != null)
                 m_fields.SetUpdateField<int>(GameObjectField.GAMEOBJECT_DISPLAYID, (int)goData.DisplayID);
             if (goData.Flags != null)
@@ -1656,7 +1656,7 @@ public class ObjectUpdateBuilder
         if (dynData != null)
         {
             if (dynData.Caster != null)
-                m_fields.SetUpdateField<WowGuid128>(DynamicObjectField.DYNAMICOBJECT_CASTER, dynData.Caster.Value);
+                m_fields.SetUpdateField(DynamicObjectField.DYNAMICOBJECT_CASTER, dynData.Caster.Value);
             if (dynData.Type != null)
                 m_fields.SetUpdateField<uint>(DynamicObjectField.DYNAMICOBJECT_TYPE, (uint)dynData.Type);
             if (dynData.SpellXSpellVisualID != null)
@@ -1673,11 +1673,11 @@ public class ObjectUpdateBuilder
         if (corpseData != null)
         {
             if (corpseData.Owner != null)
-                m_fields.SetUpdateField<WowGuid128>(CorpseField.CORPSE_FIELD_OWNER, corpseData.Owner.Value);
+                m_fields.SetUpdateField(CorpseField.CORPSE_FIELD_OWNER, corpseData.Owner.Value);
             if (corpseData.PartyGUID != null)
-                m_fields.SetUpdateField<WowGuid128>(CorpseField.CORPSE_FIELD_PARTY_GUID, corpseData.PartyGUID.Value);
+                m_fields.SetUpdateField(CorpseField.CORPSE_FIELD_PARTY_GUID, corpseData.PartyGUID.Value);
             if (corpseData.GuildGUID != null)
-                m_fields.SetUpdateField<WowGuid128>(CorpseField.CORPSE_FIELD_GUILD_GUID, corpseData.GuildGUID.Value);
+                m_fields.SetUpdateField(CorpseField.CORPSE_FIELD_GUILD_GUID, corpseData.GuildGUID.Value);
             if (corpseData.DisplayID != null)
                 m_fields.SetUpdateField<uint>(CorpseField.CORPSE_FIELD_DISPLAY_ID, (uint)corpseData.DisplayID);
             for (int i = 0; i < 19; i++)

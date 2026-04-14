@@ -117,11 +117,7 @@ public class UpdateFieldsArray
         }
         else if (value is WowGuid128 guid)
         {
-            //if (GetUpdateField<WowGuid128>(index) != guid)
-            //{
-            SetUpdateField<ulong>(index, guid.GetLowValue());
-            SetUpdateField<ulong>((int)index + 2, guid.GetHighValue());
-            //}
+            SetUpdateField(index, guid);
         }
         else
             throw new Exception($"Unhandled type {typeof(T).Name} in SetUpdateField!");
@@ -138,9 +134,48 @@ public class UpdateFieldsArray
             uint => (T)(object)m_updateValues[idx].UnsignedValue,
             float => (T)(object)m_updateValues[idx].FloatValue,
             ulong => (T)(object)((ulong)m_updateValues[idx + 1].UnsignedValue << 32 | m_updateValues[idx].UnsignedValue),
-            WowGuid128 => (T)(object)new WowGuid128(GetUpdateField<ulong>(index), GetUpdateField<ulong>(idx + 2)),
+            WowGuid128 => (T)(object)GetUpdateFieldGuid(idx),
             _ => throw new Exception($"{typeof(T).Name} is not implemented in GetUpdateField<T>"),
         };
+    }
+
+    public WowGuid128 GetUpdateFieldGuid(object index)
+    {
+        int idx = (int)index;
+        ulong low = (ulong)m_updateValues[idx + 1].UnsignedValue << 32 | m_updateValues[idx].UnsignedValue;
+        ulong high = (ulong)m_updateValues[idx + 3].UnsignedValue << 32 | m_updateValues[idx + 2].UnsignedValue;
+        return new WowGuid128(low, high);
+    }
+
+    public void SetUpdateField(object index, WowGuid128 guid)
+    {
+        int idx = (int)index;
+
+        // Low 8 bytes → indices [idx, idx+1]
+        ulong low = guid.GetLowValue();
+        uint loLo = MathFunctions.Pair64_LoPart(low);
+        uint loHi = MathFunctions.Pair64_HiPart(low);
+        if (m_updateValues[idx].UnsignedValue != loLo ||
+            m_updateValues[idx + 1].UnsignedValue != loHi)
+        {
+            m_updateValues[idx].UnsignedValue = loLo;
+            m_updateValues[idx + 1].UnsignedValue = loHi;
+            m_updateMask.SetBit(idx);
+            m_updateMask.SetBit(idx + 1);
+        }
+
+        // High 8 bytes → indices [idx+2, idx+3]
+        ulong high = guid.GetHighValue();
+        uint hiLo = MathFunctions.Pair64_LoPart(high);
+        uint hiHi = MathFunctions.Pair64_HiPart(high);
+        if (m_updateValues[idx + 2].UnsignedValue != hiLo ||
+            m_updateValues[idx + 3].UnsignedValue != hiHi)
+        {
+            m_updateValues[idx + 2].UnsignedValue = hiLo;
+            m_updateValues[idx + 3].UnsignedValue = hiHi;
+            m_updateMask.SetBit(idx + 2);
+            m_updateMask.SetBit(idx + 3);
+        }
     }
 
     public void _LoadIntoDataField(string data, uint startOffset, uint count)
