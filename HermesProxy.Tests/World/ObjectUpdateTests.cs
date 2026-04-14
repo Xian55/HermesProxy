@@ -13,7 +13,7 @@ public class ObjectUpdateConstructorTests
     static ObjectUpdateConstructorTests()
     {
         if (global::Framework.Settings.ClientBuild == ClientVersionBuild.Zero)
-            global::Framework.Settings.ClientBuild = ClientVersionBuild.V9_0_1_36216;
+            global::Framework.Settings.ClientBuild = ClientVersionBuild.V1_14_2_42597;
     }
 
     private static GlobalSessionData CreateGlobalSession()
@@ -130,7 +130,7 @@ public class ObjectUpdateFieldExclusivityTests
     static ObjectUpdateFieldExclusivityTests()
     {
         if (global::Framework.Settings.ClientBuild == ClientVersionBuild.Zero)
-            global::Framework.Settings.ClientBuild = ClientVersionBuild.V9_0_1_36216;
+            global::Framework.Settings.ClientBuild = ClientVersionBuild.V1_14_2_42597;
     }
 
     private static GlobalSessionData CreateGlobalSession()
