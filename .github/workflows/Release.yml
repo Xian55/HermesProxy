@@ -41,8 +41,9 @@ jobs:
             major="${version%%.*}"
             rest="${version#*.}"
             minor="${rest%%.*}"
-            next_minor=$((minor + 1))
-            tag="v${major}.${next_minor}.0"
+            patch="${rest#*.}"
+            next_patch=$((patch + 1))
+            tag="v${major}.${minor}.${next_patch}"
             echo "Latest tag: $latest → Next: $tag"
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
