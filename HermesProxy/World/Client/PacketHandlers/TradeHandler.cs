@@ -42,24 +42,34 @@ public partial class WorldClient
         switch (trade.Status)
         {
             case TradeStatus.Proposed:
-                trade.Partner = tradeSession.Partner = packet.ReadGuid().To128(GetSession().GameState);
-                trade.PartnerAccount = tradeSession.PartnerAccount = GetSession().GetGameAccountGuidForPlayer(trade.Partner);
+            {
+                var partner = packet.ReadGuid().To128(GetSession().GameState);
+                var partnerAccount = GetSession().GetGameAccountGuidForPlayer(partner);
+                tradeSession.Partner = partner;
+                tradeSession.PartnerAccount = partnerAccount;
+                trade.Variant = new TradeProposedData(partner, partnerAccount);
                 break;
+            }
             case TradeStatus.Initiated:
-                if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-                    trade.Id = packet.ReadUInt32();
-                else
-                    trade.Id = TradeSession.GlobalTradeIdCounter++;
-                tradeSession.TradeId = trade.Id;
+            {
+                uint id = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180)
+                    ? packet.ReadUInt32()
+                    : TradeSession.GlobalTradeIdCounter++;
+                tradeSession.TradeId = id;
+                trade.Variant = new TradeInitiatedData(id);
                 break;
+            }
             case TradeStatus.Failed:
-                trade.BagResult = LegacyVersion.ConvertInventoryResult(packet.ReadUInt32());
-                trade.FailureForYou = packet.ReadBool();
-                trade.ItemID = packet.ReadUInt32();
+            {
+                var bagResult = LegacyVersion.ConvertInventoryResult(packet.ReadUInt32());
+                var failureForYou = packet.ReadBool();
+                var itemID = packet.ReadUInt32();
+                trade.Variant = new TradeFailedData(failureForYou, bagResult, itemID);
                 break;
+            }
             case TradeStatus.WrongRealm:
             case TradeStatus.NotOnTaplist:
-                trade.TradeSlot = packet.ReadUInt8();
+                trade.Variant = new TradeSlotData(packet.ReadUInt8());
                 break;
         }
 
