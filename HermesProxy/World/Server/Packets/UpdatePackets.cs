@@ -38,6 +38,23 @@ public class CreateObjectData
     public bool ThisIsYou;
     public WowGuid128? AutoAttackVictim;
 }
+// Variant payloads for ObjectSpecificData union — each shape carries
+// only the data classes that are valid for its object type.
+public sealed record ItemVariantData(ItemData Item, ContainerData Container);
+public sealed record UnitVariantData(UnitData Unit);
+public sealed record PlayerVariantData(UnitData Unit, PlayerData Player, ActivePlayerData ActivePlayer);
+public sealed record GameObjectVariantData(GameObjectData GameObject);
+public sealed record DynamicObjectVariantData(DynamicObjectData DynamicObject);
+public sealed record CorpseVariantData(CorpseData Corpse);
+
+public union ObjectSpecificData(
+    ItemVariantData,
+    UnitVariantData,
+    PlayerVariantData,
+    GameObjectVariantData,
+    DynamicObjectVariantData,
+    CorpseVariantData);
+
 public class ObjectUpdate
 {
     public ObjectUpdate(WowGuid128 guid, UpdateTypeModern type, GlobalSessionData globalSession)
@@ -55,32 +72,22 @@ public class ObjectUpdate
                 break;
         }
 
-        switch (guid.GetObjectType())
+        Specific = guid.GetObjectType() switch
         {
-            case ObjectType.Item:
-            case ObjectType.Container:
-                ItemData = new ItemData();
-                ContainerData = new ContainerData();
-                break;
-            case ObjectType.Unit:
-                UnitData = new UnitData();
-                break;
-            case ObjectType.Player:
-            case ObjectType.ActivePlayer:
-                UnitData = new UnitData();
-                PlayerData = new PlayerData();
-                ActivePlayerData = new ActivePlayerData();
-                break;
-            case ObjectType.GameObject:
-                GameObjectData = new GameObjectData();
-                break;
-            case ObjectType.DynamicObject:
-                DynamicObjectData = new DynamicObjectData();
-                break;
-            case ObjectType.Corpse:
-                CorpseData = new CorpseData();
-                break;
-        }
+            ObjectType.Item or ObjectType.Container
+                => new ItemVariantData(new ItemData(), new ContainerData()),
+            ObjectType.Unit
+                => new UnitVariantData(new UnitData()),
+            ObjectType.Player or ObjectType.ActivePlayer
+                => new PlayerVariantData(new UnitData(), new PlayerData(), new ActivePlayerData()),
+            ObjectType.GameObject
+                => new GameObjectVariantData(new GameObjectData()),
+            ObjectType.DynamicObject
+                => new DynamicObjectVariantData(new DynamicObjectData()),
+            ObjectType.Corpse
+                => new CorpseVariantData(new CorpseData()),
+            _ => default,
+        };
     }
 
     public UpdateTypeModern Type;
@@ -88,14 +95,30 @@ public class ObjectUpdate
     public GlobalSessionData GlobalSession;
     public CreateObjectData CreateData = null!;
     public ObjectData ObjectData;
-    public ItemData ItemData = null!;
-    public ContainerData ContainerData = null!;
-    public UnitData UnitData = null!;
-    public PlayerData PlayerData = null!;
-    public ActivePlayerData ActivePlayerData = null!;
-    public GameObjectData GameObjectData = null!;
-    public DynamicObjectData DynamicObjectData = null!;
-    public CorpseData CorpseData = null!;
+
+    /// <summary>
+    /// Discriminated union holding object-type-specific data. Only one variant
+    /// is populated per object, eliminating the invalid states that the
+    /// previous nullable-field design allowed.
+    /// </summary>
+    public ObjectSpecificData Specific;
+
+    // Accessor properties pattern-match the union to preserve the original
+    // field-style API. Returning null! for the wrong type matches the prior
+    // `null!`-suppressed behavior (callers that access the wrong field still NRE).
+    public ItemData ItemData => (Specific.Value is ItemVariantData i ? i.Item : null)!;
+    public ContainerData ContainerData => (Specific.Value is ItemVariantData i ? i.Container : null)!;
+    public UnitData UnitData => (Specific.Value switch
+    {
+        UnitVariantData u => u.Unit,
+        PlayerVariantData p => p.Unit,
+        _ => null,
+    })!;
+    public PlayerData PlayerData => (Specific.Value is PlayerVariantData p ? p.Player : null)!;
+    public ActivePlayerData ActivePlayerData => (Specific.Value is PlayerVariantData p ? p.ActivePlayer : null)!;
+    public GameObjectData GameObjectData => (Specific.Value is GameObjectVariantData g ? g.GameObject : null)!;
+    public DynamicObjectData DynamicObjectData => (Specific.Value is DynamicObjectVariantData d ? d.DynamicObject : null)!;
+    public CorpseData CorpseData => (Specific.Value is CorpseVariantData c ? c.Corpse : null)!;
 
     public void InitializePlaceholders()
     {
