@@ -62,6 +62,21 @@ public class ClearTradeItem : ClientPacket
     public byte TradeSlot;
 }
 
+// Variant payloads for TradeStatusVariant union — each shape carries
+// only the fields valid for its TradeStatus dispatch case.
+public sealed record TradeFailedData(bool FailureForYou, InventoryResult BagResult, uint ItemID);
+public sealed record TradeInitiatedData(uint Id);
+public sealed record TradeProposedData(WowGuid128 Partner, WowGuid128 PartnerAccount);
+public sealed record TradeSlotData(byte TradeSlot);
+public sealed record TradeCurrencyData(int CurrencyType, int CurrencyQuantity);
+
+public union TradeStatusVariant(
+    TradeFailedData,
+    TradeInitiatedData,
+    TradeProposedData,
+    TradeSlotData,
+    TradeCurrencyData);
+
 public class TradeStatusPkt : ServerPacket, ISpanWritable
 {
     public TradeStatusPkt() : base(Opcode.SMSG_TRADE_STATUS, ConnectionType.Instance) { }
@@ -70,28 +85,26 @@ public class TradeStatusPkt : ServerPacket, ISpanWritable
     {
         _worldPacket.WriteBit(PartnerIsSameBnetAccount);
         _worldPacket.WriteBits(Status, 5);
-        switch (Status)
+        switch (Variant.Value)
         {
-            case TradeStatus.Failed:
-                _worldPacket.WriteBit(FailureForYou);
-                _worldPacket.WriteInt32((int)BagResult);
-                _worldPacket.WriteUInt32(ItemID);
+            case TradeFailedData failed:
+                _worldPacket.WriteBit(failed.FailureForYou);
+                _worldPacket.WriteInt32((int)failed.BagResult);
+                _worldPacket.WriteUInt32(failed.ItemID);
                 break;
-            case TradeStatus.Initiated:
-                _worldPacket.WriteUInt32(Id);
+            case TradeInitiatedData init:
+                _worldPacket.WriteUInt32(init.Id);
                 break;
-            case TradeStatus.Proposed:
-                _worldPacket.WritePackedGuid128(Partner);
-                _worldPacket.WritePackedGuid128(PartnerAccount);
+            case TradeProposedData proposed:
+                _worldPacket.WritePackedGuid128(proposed.Partner);
+                _worldPacket.WritePackedGuid128(proposed.PartnerAccount);
                 break;
-            case TradeStatus.WrongRealm:
-            case TradeStatus.NotOnTaplist:
-                _worldPacket.WriteUInt8(TradeSlot);
+            case TradeSlotData slot:
+                _worldPacket.WriteUInt8(slot.TradeSlot);
                 break;
-            case TradeStatus.NotEnoughCurrency:
-            case TradeStatus.CurrencyNotTradable:
-                _worldPacket.WriteInt32(CurrencyType);
-                _worldPacket.WriteInt32(CurrencyQuantity);
+            case TradeCurrencyData currency:
+                _worldPacket.WriteInt32(currency.CurrencyType);
+                _worldPacket.WriteInt32(currency.CurrencyQuantity);
                 break;
             default:
                 _worldPacket.FlushBits();
@@ -112,28 +125,26 @@ public class TradeStatusPkt : ServerPacket, ISpanWritable
         var writer = new SpanPacketWriter(buffer);
         writer.WriteBit(PartnerIsSameBnetAccount);
         writer.WriteBits((uint)Status, 5);
-        switch (Status)
+        switch (Variant.Value)
         {
-            case TradeStatus.Failed:
-                writer.WriteBit(FailureForYou);
-                writer.WriteInt32((int)BagResult);
-                writer.WriteUInt32(ItemID);
+            case TradeFailedData failed:
+                writer.WriteBit(failed.FailureForYou);
+                writer.WriteInt32((int)failed.BagResult);
+                writer.WriteUInt32(failed.ItemID);
                 break;
-            case TradeStatus.Initiated:
-                writer.WriteUInt32(Id);
+            case TradeInitiatedData init:
+                writer.WriteUInt32(init.Id);
                 break;
-            case TradeStatus.Proposed:
-                writer.WritePackedGuid128(Partner.Low, Partner.High);
-                writer.WritePackedGuid128(PartnerAccount.Low, PartnerAccount.High);
+            case TradeProposedData proposed:
+                writer.WritePackedGuid128(proposed.Partner.Low, proposed.Partner.High);
+                writer.WritePackedGuid128(proposed.PartnerAccount.Low, proposed.PartnerAccount.High);
                 break;
-            case TradeStatus.WrongRealm:
-            case TradeStatus.NotOnTaplist:
-                writer.WriteUInt8(TradeSlot);
+            case TradeSlotData slot:
+                writer.WriteUInt8(slot.TradeSlot);
                 break;
-            case TradeStatus.NotEnoughCurrency:
-            case TradeStatus.CurrencyNotTradable:
-                writer.WriteInt32(CurrencyType);
-                writer.WriteInt32(CurrencyQuantity);
+            case TradeCurrencyData currency:
+                writer.WriteInt32(currency.CurrencyType);
+                writer.WriteInt32(currency.CurrencyQuantity);
                 break;
             default:
                 writer.FlushBits();
@@ -144,15 +155,14 @@ public class TradeStatusPkt : ServerPacket, ISpanWritable
 
     public bool PartnerIsSameBnetAccount;
     public TradeStatus Status = TradeStatus.Initiated;
-    public bool FailureForYou;
-    public InventoryResult BagResult;
-    public uint ItemID;
-    public uint Id;
-    public WowGuid128 Partner;
-    public WowGuid128 PartnerAccount;
-    public byte TradeSlot;
-    public int CurrencyType;
-    public int CurrencyQuantity;
+
+    /// <summary>
+    /// Discriminated union holding fields specific to Status. Only populated for
+    /// statuses that carry payload (Failed, Initiated, Proposed, slot/currency cases);
+    /// other statuses leave Variant.Value as null and the writer falls through to
+    /// the default branch.
+    /// </summary>
+    public TradeStatusVariant Variant;
 }
 
 public class SetTradeGold : ClientPacket
