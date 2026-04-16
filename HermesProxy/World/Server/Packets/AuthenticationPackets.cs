@@ -347,26 +347,17 @@ class ConnectTo : ServerPacket
     public override void Write()
     {
         ByteBuffer whereBuffer = new();
-        whereBuffer.WriteUInt8((byte)Payload.Where.Type);
-
-        switch (Payload.Where.Type)
+        AddressType wireType = Payload.Where.Value switch
         {
-            case AddressType.IPv4:
-                whereBuffer.WriteBytes(Payload.Where.IPv4);
-                break;
-            case AddressType.IPv6:
-                whereBuffer.WriteBytes(Payload.Where.IPv6);
-                break;
-            case AddressType.NamedSocket:
-                whereBuffer.WriteString(Payload.Where.NameSocket);
-                break;
-            default:
-                break;
-        }
+            IPv4Address ipv4 => WriteAndGetType(whereBuffer, AddressType.IPv4, ipv4.Bytes),
+            IPv6Address ipv6 => WriteAndGetType(whereBuffer, AddressType.IPv6, ipv6.Bytes),
+            NamedSocketAddress named => WriteAndGetType(whereBuffer, AddressType.NamedSocket, named.Name),
+            _ => throw new InvalidOperationException("Unknown SocketAddress variant"),
+        };
 
         Sha256 hash = new();
         hash.Process(whereBuffer.GetData(), (int)whereBuffer.GetSize());
-        hash.Process((uint)Payload.Where.Type);
+        hash.Process((uint)wireType);
         hash.Finish(BitConverter.GetBytes(Payload.Port));
 
         Payload.Signature = RsaCrypt.RSA.SignHash(hash.Digest!, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1).Reverse().ToArray();
@@ -377,6 +368,20 @@ class ConnectTo : ServerPacket
         _worldPacket.WriteUInt32((uint)Serial);
         _worldPacket.WriteUInt8(Con);
         _worldPacket.WriteUInt64(Key);
+    }
+
+    private static AddressType WriteAndGetType(ByteBuffer buffer, AddressType type, byte[] bytes)
+    {
+        buffer.WriteUInt8((byte)type);
+        buffer.WriteBytes(bytes);
+        return type;
+    }
+
+    private static AddressType WriteAndGetType(ByteBuffer buffer, AddressType type, string name)
+    {
+        buffer.WriteUInt8((byte)type);
+        buffer.WriteString(name);
+        return type;
     }
 
     public ulong Key;
@@ -391,14 +396,11 @@ class ConnectTo : ServerPacket
         public byte[] Signature = new byte[256];
     }
 
-    public struct SocketAddress
-    {
-        public AddressType Type;
+    public sealed record IPv4Address(byte[] Bytes);
+    public sealed record IPv6Address(byte[] Bytes);
+    public sealed record NamedSocketAddress(string Name);
 
-        public byte[] IPv4;
-        public byte[] IPv6;
-        public string NameSocket;
-    }
+    public union SocketAddress(IPv4Address, IPv6Address, NamedSocketAddress);
 
     public enum AddressType
     {
