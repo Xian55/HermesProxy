@@ -1945,10 +1945,21 @@ public partial class WorldClient
                 updateData.UnitData.AttackPowerModNeg = (updates[UNIT_FIELD_ATTACK_POWER_MODS].Int32Value & 0xFFFF);
                 updateData.UnitData.AttackPowerModPos = ((updates[UNIT_FIELD_ATTACK_POWER_MODS].Int32Value >> 16) & 0xFFFF);
             }
+            int UNIT_FIELD_RANGED_ATTACK_POWER = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RANGED_ATTACK_POWER);
+            if (UNIT_FIELD_RANGED_ATTACK_POWER >= 0 && updateMaskArray[UNIT_FIELD_RANGED_ATTACK_POWER])
+            {
+                updateData.UnitData.RangedAttackPower = updates[UNIT_FIELD_RANGED_ATTACK_POWER].Int32Value;
+            }
+            int UNIT_FIELD_RANGED_ATTACK_POWER_MODS = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RANGED_ATTACK_POWER_MODS);
+            if (UNIT_FIELD_RANGED_ATTACK_POWER_MODS >= 0 && updateMaskArray[UNIT_FIELD_RANGED_ATTACK_POWER_MODS])
+            {
+                updateData.UnitData.RangedAttackPowerModNeg = (updates[UNIT_FIELD_RANGED_ATTACK_POWER_MODS].Int32Value & 0xFFFF);
+                updateData.UnitData.RangedAttackPowerModPos = ((updates[UNIT_FIELD_RANGED_ATTACK_POWER_MODS].Int32Value >> 16) & 0xFFFF);
+            }
             int UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER);
             if (UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER >= 0 && updateMaskArray[UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER])
             {
-                updateData.UnitData.AttackPowerMultiplier = updates[UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER].FloatValue;
+                updateData.UnitData.RangedAttackPowerMultiplier = updates[UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER].FloatValue;
             }
             int UNIT_FIELD_MINRANGEDDAMAGE = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_MINRANGEDDAMAGE);
             if (UNIT_FIELD_MINRANGEDDAMAGE >= 0 && updateMaskArray[UNIT_FIELD_MINRANGEDDAMAGE])
