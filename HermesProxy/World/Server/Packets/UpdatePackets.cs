@@ -42,6 +42,47 @@ public class CreateObjectData
     public bool ThisIsYou;
     public WowGuid128? AutoAttackVictim;
 }
+// Variant payloads for ObjectSpecificData union — each shape carries
+// only the data classes that are valid for its object type.
+public sealed record ItemVariantData(ItemData Item, ContainerData Container)
+{
+    public ItemData Item { get; set; } = Item;
+    public ContainerData Container { get; set; } = Container;
+}
+public sealed record UnitVariantData(UnitData Unit)
+{
+    public UnitData Unit { get; set; } = Unit;
+}
+public sealed record PlayerVariantData(UnitData Unit, PlayerData Player)
+{
+    public UnitData Unit { get; set; } = Unit;
+    public PlayerData Player { get; set; } = Player;
+
+    // Owner-only block, left null until the first owner field is written. See
+    // ObjectUpdate.EnsureActivePlayerData for why it is not allocated up front.
+    public ActivePlayerData? ActivePlayer { get; set; }
+}
+public sealed record GameObjectVariantData(GameObjectData GameObject)
+{
+    public GameObjectData GameObject { get; set; } = GameObject;
+}
+public sealed record DynamicObjectVariantData(DynamicObjectData DynamicObject)
+{
+    public DynamicObjectData DynamicObject { get; set; } = DynamicObject;
+}
+public sealed record CorpseVariantData(CorpseData Corpse)
+{
+    public CorpseData Corpse { get; set; } = Corpse;
+}
+
+public union ObjectSpecificData(
+    ItemVariantData,
+    UnitVariantData,
+    PlayerVariantData,
+    GameObjectVariantData,
+    DynamicObjectVariantData,
+    CorpseVariantData);
+
 public class ObjectUpdate
 {
     public ObjectUpdate(WowGuid128 guid, UpdateTypeModern type, GlobalSessionData globalSession)
@@ -59,37 +100,28 @@ public class ObjectUpdate
                 break;
         }
 
-        switch (guid.GetObjectType())
+        Specific = guid.GetObjectType() switch
         {
-            case ObjectType.Item:
-            case ObjectType.Container:
-                ItemData = new ItemData();
-                ContainerData = new ContainerData();
-                break;
-            case ObjectType.Unit:
-                UnitData = new UnitData();
-                break;
-            case ObjectType.Player:
-            case ObjectType.ActivePlayer:
-                UnitData = new UnitData();
-                PlayerData = new PlayerData();
-                // ActivePlayerData is deliberately not allocated here. It is owner-only data
-                // (~32 KB of nullable arrays, QuestCompleted[875] alone being 14 KB), and a
-                // 3.3.5a core never sends owner-only fields for a foreign player, so every
-                // other Player in view -- every bot in a battleground -- allocated and then
-                // discarded the whole block. EnsureActivePlayerData() materialises it on the
-                // first owner field written; every reader already treats null as "no fields".
-                break;
-            case ObjectType.GameObject:
-                GameObjectData = new GameObjectData();
-                break;
-            case ObjectType.DynamicObject:
-                DynamicObjectData = new DynamicObjectData();
-                break;
-            case ObjectType.Corpse:
-                CorpseData = new CorpseData();
-                break;
-        }
+            ObjectType.Item or ObjectType.Container
+                => new ItemVariantData(new ItemData(), new ContainerData()),
+            ObjectType.Unit
+                => new UnitVariantData(new UnitData()),
+            // ActivePlayerData is deliberately not allocated here. It is owner-only data
+            // (~32 KB of nullable arrays, QuestCompleted[875] alone being 14 KB), and a
+            // 3.3.5a core never sends owner-only fields for a foreign player, so every
+            // other Player in view -- every bot in a battleground -- allocated and then
+            // discarded the whole block. EnsureActivePlayerData() materialises it on the
+            // first owner field written; every reader already treats null as "no fields".
+            ObjectType.Player or ObjectType.ActivePlayer
+                => new PlayerVariantData(new UnitData(), new PlayerData()),
+            ObjectType.GameObject
+                => new GameObjectVariantData(new GameObjectData()),
+            ObjectType.DynamicObject
+                => new DynamicObjectVariantData(new DynamicObjectData()),
+            ObjectType.Corpse
+                => new CorpseVariantData(new CorpseData()),
+            _ => default,
+        };
     }
 
     /// <summary>
@@ -97,19 +129,24 @@ public class ObjectUpdate
     /// site; read sites keep using the field so a foreign player stays at null.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ActivePlayerData EnsureActivePlayerData() => ActivePlayerData ??= new ActivePlayerData();
+    public ActivePlayerData EnsureActivePlayerData()
+        => Specific.Value is PlayerVariantData player
+            ? player.ActivePlayer ??= new ActivePlayerData()
+            : throw new InvalidOperationException($"ActivePlayerData written for a non-player object update");
 
     public UpdateTypeModern Type;
     public WowGuid128 Guid;
     public GlobalSessionData GlobalSession;
     public CreateObjectData CreateData = null!;
     public ObjectData ObjectData;
-    public ItemData ItemData = null!;
-    public ContainerData ContainerData = null!;
-    public UnitData UnitData = null!;
-    public PlayerData PlayerData = null!;
-    public ActivePlayerData? ActivePlayerData;
-    public GameObjectData GameObjectData = null!;
+
+    /// <summary>
+    /// Discriminated union holding object-type-specific data. Only one variant
+    /// is populated per object, eliminating the invalid states that the
+    /// previous nullable-field design allowed.
+    /// </summary>
+    public ObjectSpecificData Specific;
+
     /// <summary>
     /// Stop frame for a type 11 transport, emitted as the single PauseTimes entry. Taken
     /// from the legacy GAMEOBJECT_LEVEL, which on a 3.3.5a core carries
@@ -126,8 +163,72 @@ public class ObjectUpdate
     /// boat itself.
     /// </summary>
     public uint? TransportServerTime;
-    public DynamicObjectData DynamicObjectData = null!;
-    public CorpseData CorpseData = null!;
+
+    // Accessor properties pattern-match the union so the original field-style API keeps
+    // working. A get against the wrong variant still yields null! -- that matches the prior
+    // `null!`-suppressed fields, and the builders already null-check what they read. A set
+    // against the wrong variant throws: nothing in the proxy ever assigned one of these
+    // (the constructor picks the variant from the guid), so a mismatch is a bug, and
+    // silently dropping the write would hide it behind a later NRE.
+    public ItemData ItemData
+    {
+        get => (Specific.Value is ItemVariantData i ? i.Item : null)!;
+        set => VariantOr<ItemVariantData>().Item = value;
+    }
+    public ContainerData ContainerData
+    {
+        get => (Specific.Value is ItemVariantData i ? i.Container : null)!;
+        set => VariantOr<ItemVariantData>().Container = value;
+    }
+    public UnitData UnitData
+    {
+        get => (Specific.Value switch
+        {
+            UnitVariantData u => u.Unit,
+            PlayerVariantData p => p.Unit,
+            _ => null,
+        })!;
+        set
+        {
+            switch (Specific.Value)
+            {
+                case UnitVariantData u: u.Unit = value; break;
+                case PlayerVariantData p: p.Unit = value; break;
+                default: throw VariantMismatch(nameof(UnitData));
+            }
+        }
+    }
+    public PlayerData PlayerData
+    {
+        get => (Specific.Value is PlayerVariantData p ? p.Player : null)!;
+        set => VariantOr<PlayerVariantData>().Player = value;
+    }
+    public ActivePlayerData? ActivePlayerData
+    {
+        get => Specific.Value is PlayerVariantData p ? p.ActivePlayer : null;
+        set => VariantOr<PlayerVariantData>().ActivePlayer = value;
+    }
+    public GameObjectData GameObjectData
+    {
+        get => (Specific.Value is GameObjectVariantData g ? g.GameObject : null)!;
+        set => VariantOr<GameObjectVariantData>().GameObject = value;
+    }
+    public DynamicObjectData DynamicObjectData
+    {
+        get => (Specific.Value is DynamicObjectVariantData d ? d.DynamicObject : null)!;
+        set => VariantOr<DynamicObjectVariantData>().DynamicObject = value;
+    }
+    public CorpseData CorpseData
+    {
+        get => (Specific.Value is CorpseVariantData c ? c.Corpse : null)!;
+        set => VariantOr<CorpseVariantData>().Corpse = value;
+    }
+
+    private T VariantOr<T>() where T : class
+        => Specific.Value as T ?? throw VariantMismatch(typeof(T).Name);
+
+    private InvalidOperationException VariantMismatch(string requested)
+        => new($"{requested} written on an update whose variant is {Specific.Value?.GetType().Name ?? "none"}");
 
     // GO_FLAG_MAP_OBJECT: the object is a WMO map object, i.e. a MO_TRANSPORT. No
     // equivalent exists in the 3.3.5a flag set. Combined with the legacy GAMEOBJECT_FLAGS

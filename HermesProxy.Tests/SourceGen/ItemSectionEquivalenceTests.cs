@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using HermesProxy;
 using HermesProxy.Enums;
 using HermesProxy.World;
@@ -95,15 +95,19 @@ public class ItemSectionEquivalenceTests
             ? WowGuid128.Create(HighGuidType703.Item, 1)
             : WowGuid128.Create(HighGuidType703.Creature, 0, 1234, 1);
         var builder = MakeBuilder(guid, session, out var update);
-        // Ensure ItemData exists for Creature guids — constructor only allocates it for Item highTypes.
-        if (update.ItemData == null) update.ItemData = new ItemData();
-        populate(update.ItemData);
+        // The non-owner shape is synthetic: it pairs a Creature guid with item data so the
+        // generator's OwnerOnly wrapping can be exercised with IsOwner false. The constructor
+        // only picks ItemVariantData for Item highTypes, so seed the variant directly.
+        if (update.Specific.Value is not ItemVariantData)
+            update.Specific = new ItemVariantData(new ItemData(), new ContainerData());
+        var item = update.ItemData;
+        populate(item);
 
         var actual = new WorldPacket();
         builder.WriteCreateItemData(actual);
 
         var expected = new WorldPacket();
-        WriteCreateItemData_HandPort(expected, update.ItemData, ownerGuid);
+        WriteCreateItemData_HandPort(expected, item, ownerGuid);
 
         Assert.Equal(expected.GetData(), actual.GetData());
     }
