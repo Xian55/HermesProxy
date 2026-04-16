@@ -599,6 +599,17 @@ class ReadItemResultOK : ServerPacket, ISpanWritable
     public WowGuid128 ItemGUID;
 }
 
+// Variant payloads for InventoryFailureVariant union — each shape carries
+// only the fields valid for its BagResult dispatch case.
+public sealed record InventoryFailureLevelData(int Level);
+public sealed record InventoryFailureAutoEquipData(WowGuid128 SrcContainer, int SrcSlot, WowGuid128 DstContainer);
+public sealed record InventoryFailureLimitData(int LimitCategory);
+
+public union InventoryFailureVariant(
+    InventoryFailureLevelData,
+    InventoryFailureAutoEquipData,
+    InventoryFailureLimitData);
+
 public class InventoryChangeFailure : ServerPacket, ISpanWritable
 {
     public InventoryChangeFailure() : base(Opcode.SMSG_INVENTORY_CHANGE_FAILURE) { }
@@ -610,21 +621,18 @@ public class InventoryChangeFailure : ServerPacket, ISpanWritable
         _worldPacket.WritePackedGuid128(Item[1]);
         _worldPacket.WriteUInt8(ContainerBSlot); // bag type subclass, used with EQUIP_ERR_EVENT_AUTOEQUIP_BIND_CONFIRM and EQUIP_ERR_WRONG_BAG_TYPE_2
 
-        switch (BagResult)
+        switch (Variant.Value)
         {
-            case InventoryResult.CantEquipLevel:
-            case InventoryResult.PurchaseLevelTooLow:
-                _worldPacket.WriteInt32(Level);
+            case InventoryFailureLevelData level:
+                _worldPacket.WriteInt32(level.Level);
                 break;
-            case InventoryResult.EventAutoEquipBindConfirm:
-                _worldPacket.WritePackedGuid128(SrcContainer);
-                _worldPacket.WriteInt32(SrcSlot);
-                _worldPacket.WritePackedGuid128(DstContainer);
+            case InventoryFailureAutoEquipData autoEquip:
+                _worldPacket.WritePackedGuid128(autoEquip.SrcContainer);
+                _worldPacket.WriteInt32(autoEquip.SrcSlot);
+                _worldPacket.WritePackedGuid128(autoEquip.DstContainer);
                 break;
-            case InventoryResult.ItemMaxLimitCategoryCountExceeded:
-            case InventoryResult.ItemMaxLimitCategorySocketedExceeded:
-            case InventoryResult.ItemMaxLimitCategoryEquippedExceeded:
-                _worldPacket.WriteInt32(LimitCategory);
+            case InventoryFailureLimitData limit:
+                _worldPacket.WriteInt32(limit.LimitCategory);
                 break;
         }
     }
@@ -642,21 +650,18 @@ public class InventoryChangeFailure : ServerPacket, ISpanWritable
         writer.WritePackedGuid128(Item[1].Low, Item[1].High);
         writer.WriteUInt8(ContainerBSlot);
 
-        switch (BagResult)
+        switch (Variant.Value)
         {
-            case InventoryResult.CantEquipLevel:
-            case InventoryResult.PurchaseLevelTooLow:
-                writer.WriteInt32(Level);
+            case InventoryFailureLevelData level:
+                writer.WriteInt32(level.Level);
                 break;
-            case InventoryResult.EventAutoEquipBindConfirm:
-                writer.WritePackedGuid128(SrcContainer.Low, SrcContainer.High);
-                writer.WriteInt32(SrcSlot);
-                writer.WritePackedGuid128(DstContainer.Low, DstContainer.High);
+            case InventoryFailureAutoEquipData autoEquip:
+                writer.WritePackedGuid128(autoEquip.SrcContainer.Low, autoEquip.SrcContainer.High);
+                writer.WriteInt32(autoEquip.SrcSlot);
+                writer.WritePackedGuid128(autoEquip.DstContainer.Low, autoEquip.DstContainer.High);
                 break;
-            case InventoryResult.ItemMaxLimitCategoryCountExceeded:
-            case InventoryResult.ItemMaxLimitCategorySocketedExceeded:
-            case InventoryResult.ItemMaxLimitCategoryEquippedExceeded:
-                writer.WriteInt32(LimitCategory);
+            case InventoryFailureLimitData limit:
+                writer.WriteInt32(limit.LimitCategory);
                 break;
         }
 
@@ -665,12 +670,14 @@ public class InventoryChangeFailure : ServerPacket, ISpanWritable
 
     public InventoryResult BagResult;
     public byte ContainerBSlot;
-    public WowGuid128 SrcContainer;
-    public WowGuid128 DstContainer;
-    public int SrcSlot;
-    public int LimitCategory;
-    public int Level;
     public WowGuid128[] Item = new WowGuid128[2];
+
+    /// <summary>
+    /// Discriminated union holding fields specific to BagResult. Most BagResult
+    /// values carry no payload and leave Variant.Value as null; only the level,
+    /// auto-equip and limit-category cases populate it.
+    /// </summary>
+    public InventoryFailureVariant Variant;
 }
 
 public class RepairItem : ClientPacket
