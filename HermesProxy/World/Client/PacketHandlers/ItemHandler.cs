@@ -124,7 +124,7 @@ public partial class WorldClient
         switch (failure.BagResult)
         {
             case InventoryResult.CantEquipLevel:
-                failure.Level = packet.ReadInt32();
+                failure.Variant = new InventoryFailureLevelData(packet.ReadInt32());
                 break;
         }
 
@@ -156,17 +156,20 @@ public partial class WorldClient
         {
             case InventoryResult.CantEquipLevel:
             case InventoryResult.PurchaseLevelTooLow:
-                failure.Level = packet.ReadInt32();
+                failure.Variant = new InventoryFailureLevelData(packet.ReadInt32());
                 break;
             case InventoryResult.EventAutoEquipBindConfirm:
-                failure.SrcContainer = packet.ReadGuid().To128(GetSession().GameState);
-                failure.SrcSlot = packet.ReadInt32();
-                failure.DstContainer = packet.ReadGuid().To128(GetSession().GameState);
+            {
+                var srcContainer = packet.ReadGuid().To128(GetSession().GameState);
+                var srcSlot = packet.ReadInt32();
+                var dstContainer = packet.ReadGuid().To128(GetSession().GameState);
+                failure.Variant = new InventoryFailureAutoEquipData(srcContainer, srcSlot, dstContainer);
                 break;
+            }
             case InventoryResult.ItemMaxLimitCategoryCountExceeded:
             case InventoryResult.ItemMaxLimitCategorySocketedExceeded:
             case InventoryResult.ItemMaxLimitCategoryEquippedExceeded:
-                failure.LimitCategory = packet.ReadInt32();
+                failure.Variant = new InventoryFailureLimitData(packet.ReadInt32());
                 break;
         }
         SendPacketToClient(failure);
