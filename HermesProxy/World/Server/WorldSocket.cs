@@ -665,16 +665,9 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         connectTo.Payload.Port = (ushort)Framework.Settings.InstancePort;
         connectTo.Con = (byte)ConnectionType.Instance;
 
-        if (instanceAddress.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-        {
-            connectTo.Payload.Where.IPv4 = instanceAddress.Address.GetAddressBytes();
-            connectTo.Payload.Where.Type = ConnectTo.AddressType.IPv4;
-        }
-        else
-        {
-            connectTo.Payload.Where.IPv6 = instanceAddress.Address.GetAddressBytes();
-            connectTo.Payload.Where.Type = ConnectTo.AddressType.IPv6;
-        }
+        connectTo.Payload.Where = instanceAddress.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+            ? new ConnectTo.IPv4Address(instanceAddress.Address.GetAddressBytes())
+            : new ConnectTo.IPv6Address(instanceAddress.Address.GetAddressBytes());
 
         SendPacket(connectTo);
     }
