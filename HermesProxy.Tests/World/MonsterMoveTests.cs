@@ -12,12 +12,6 @@ namespace HermesProxy.Tests.World;
 
 public class MonsterMoveConstructorTests
 {
-    static MonsterMoveConstructorTests()
-    {
-        if (global::Framework.Settings.ClientBuild == ClientVersionBuild.Zero)
-            global::Framework.Settings.ClientBuild = ClientVersionBuild.V1_14_2_42597;
-    }
-
     private static WowGuid128 TestGuid => WowGuid128.Create(HighGuidType703.Creature, 0, 1234, 1);
 
     private static ServerSideMovement CreateBaseSpline(
@@ -93,12 +87,6 @@ public class MonsterMoveConstructorTests
 
 public class MonsterMoveWriteTests
 {
-    static MonsterMoveWriteTests()
-    {
-        if (global::Framework.Settings.ClientBuild == ClientVersionBuild.Zero)
-            global::Framework.Settings.ClientBuild = ClientVersionBuild.V1_14_2_42597;
-    }
-
     private static WowGuid128 TestGuid => WowGuid128.Create(HighGuidType703.Creature, 0, 1234, 1);
 
     private static ServerSideMovement CreateSpline(SplineTypeModern splineType)
