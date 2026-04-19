@@ -10,16 +10,33 @@ namespace HermesProxy.World;
 
 public sealed class SniffFile
 {
+    // Monotonic counter suffixed to filenames so simultaneous sessions can't collide on the
+    // one-second-granular Unix timestamp (two logins in the same second previously raced for
+    // the same path).
+    private static int _sessionCounter = 0;
+
+    // 64 KB FileStream buffer — packet logging is bursty sequential writes; the default 4 KB
+    // buffer means more frequent syscalls. Larger buffer reduces kernel transitions.
+    private const int FileBufferSize = 64 * 1024;
+
     public SniffFile(string fileName, ushort build)
     {
         string dir = "PacketsLog";
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);
 
-        string file = fileName + "_" + build + "_" + Time.UnixTime + ".pkt";
+        int seq = Interlocked.Increment(ref _sessionCounter);
+        string file = fileName + "_" + build + "_" + Time.UnixTime + "_" + seq + ".pkt";
         string path = Path.Combine(dir, file);
 
-        _fileWriter = new BinaryWriter(File.Open(path, FileMode.Create));
+        var stream = new FileStream(
+            path,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.Read,
+            FileBufferSize,
+            FileOptions.SequentialScan);
+        _fileWriter = new BinaryWriter(stream);
         _gameVersion = build;
     }
     BinaryWriter _fileWriter;
@@ -42,7 +59,7 @@ public sealed class SniffFile
         }
     }
 
-    public void WritePacket(uint opcode, bool isFromClient, byte[] data)
+    public void WritePacket(uint opcode, bool isFromClient, ReadOnlySpan<byte> data)
     {
         lock (_lock)
         {
@@ -59,8 +76,8 @@ public sealed class SniffFile
                 _fileWriter.Write(packetSize);
                 _fileWriter.Write(opcode);
 
-                for (int i = 2; i < data.Length; i++)
-                    _fileWriter.Write(data[i]);
+                // Skip the 2-byte opcode prefix; single bulk write of the payload.
+                _fileWriter.Write(data[2..]);
             }
             else
             {
@@ -75,6 +92,15 @@ public sealed class SniffFile
 
     public void CloseFile()
     {
-        _fileWriter.Close();
+        // Guard against races with an in-flight WritePacket on another thread — session teardown
+        // can run concurrently with the last packets being flushed.
+        // Flush() is redundant here (BinaryWriter.Close -> FileStream.Dispose flushes the 64 KB
+        // buffer before closing the handle) but makes the intent explicit, and keeps the invariant
+        // that "CloseFile returned cleanly => all previously-written bytes are in the OS page cache".
+        lock (_lock)
+        {
+            _fileWriter.Flush();
+            _fileWriter.Close();
+        }
     }
 }
