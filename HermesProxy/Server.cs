@@ -28,6 +28,15 @@ namespace HermesProxy;
 
 partial class Server
 {
+    // These MEL loggers are captured during Server's static init, which runs BEFORE
+    // Log.Configure rebuilds the Serilog pipeline. Log.CreateMelLogger returns a SwappableMelLogger
+    // that re-resolves through the current MEL factory on every call — so captures made here
+    // remain valid after Log.Configure without any runtime reinitialisation.
+    private static readonly Microsoft.Extensions.Logging.ILogger _melServer = Log.CreateMelLogger(Log.CategoryServer);
+    private static readonly Microsoft.Extensions.Logging.ILogger _melNetwork = Log.CreateMelLogger(Log.CategoryNetwork);
+    private static readonly string _sourceFile = nameof(Server).PadRight(15);
+    private const string _netDirNone = "";
+
     /// <summary>
     /// Global metrics collector for packet statistics.
     /// Only active when --metrics command line argument is passed.
@@ -53,7 +62,7 @@ partial class Server
         MetricsEnabled = args.EnableMetrics;
 
         Log.Print(LogType.Server, "Starting Hermes Proxy...");
-        Log.Print(LogType.Server, $"Version {GetVersionInformation()}");
+        ServerLogMessages.Version(_melServer, _sourceFile, _netDirNone, GetVersionInformation());
         if (MetricsEnabled)
             Log.Print(LogType.Server, "Latency metrics collection enabled");
         Log.Start();
@@ -98,8 +107,8 @@ partial class Server
             return;
         }
 
-        Log.Print(LogType.Server, $"Modern (Client) Build: {Settings.ClientBuild}");
-        Log.Print(LogType.Server, $"Legacy (Server) Build: {Settings.ServerBuild}");
+        ServerLogMessages.ModernClientBuild(_melServer, _sourceFile, _netDirNone, Settings.ClientBuild);
+        ServerLogMessages.LegacyServerBuild(_melServer, _sourceFile, _netDirNone, Settings.ServerBuild);
 
         GameData.LoadEverything();
 
@@ -107,7 +116,7 @@ partial class Server
         if (!IPAddress.IsLoopback(bindIp))
             bindIp = IPAddress.Any; // If we are not listening on localhost we have to expose our services
 
-        Log.Print(LogType.Network, $"External IP: {Settings.ExternalAddress}");
+        ServerLogMessages.ExternalIp(_melNetwork, _sourceFile, _netDirNone, Settings.ExternalAddress);
         // LoginServiceManager holds our external IPs so that other player can connect to our Hermes instance
         LoginServiceManager.Instance.Initialize();
 
@@ -179,7 +188,7 @@ partial class Server
     {
         var socketManager = new SocketManager<TSocketType>();
 
-        Log.Print(LogType.Server, $"Starting {typeof(TSocketType).Name} service on {bindIp}...");
+        ServerLogMessages.StartingService(_melServer, _sourceFile, _netDirNone, typeof(TSocketType).Name, bindIp.ToString());
         if (!socketManager.StartNetwork(bindIp.Address.ToString(), bindIp.Port))
         {
             throw new Exception($"Failed to start {typeof(TSocketType).Name} service");

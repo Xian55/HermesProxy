@@ -20,6 +20,10 @@ namespace HermesProxy.World;
 
 public static partial class GameData
 {
+    private static readonly Microsoft.Extensions.Logging.ILogger _melStorage = Log.CreateMelLogger(Log.CategoryStorage);
+    private static readonly string _sourceFile = nameof(GameData).PadRight(15);
+    private const string _netDirNone = "";
+
     // From CSV
     public static Dictionary<uint/*Build*/, Dictionary<string /*Platform*/, byte[] /*seed*/>> BuildAuthSeeds = [];
     public static SortedDictionary<uint, BroadcastText> BroadcastTextStore = [];
@@ -544,7 +548,7 @@ public static partial class GameData
     public static void LoadEverything()
     {
         long startTime = Stopwatch.GetTimestamp();
-        Log.Print(LogType.Storage, "Loading data files...");
+        GameDataLogMessages.LoadingDataFiles(_melStorage, _sourceFile, _netDirNone);
 
         Parallel.Invoke(
             LoadBuildAuthSeeds,
@@ -583,7 +587,7 @@ public static partial class GameData
             LoadHotfixes
         );
 
-        Log.Print(LogType.Storage, $"Finished loading data. Time taken: {Stopwatch.GetElapsedTime(startTime).TotalMilliseconds} ms");
+        GameDataLogMessages.FinishedLoadingData(_melStorage, _sourceFile, _netDirNone, Stopwatch.GetElapsedTime(startTime).TotalMilliseconds);
     }
 
     public static void LoadBuildAuthSeeds()

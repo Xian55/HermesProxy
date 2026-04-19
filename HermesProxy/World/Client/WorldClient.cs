@@ -18,11 +18,19 @@ using Framework.Networking;
 using HermesProxy.World.Server;
 using System.Collections.Frozen;
 using System.Diagnostics;
+using HermesProxy.World.Logging;
 
 namespace HermesProxy.World.Client;
 
 public partial class WorldClient
 {
+    private static readonly Microsoft.Extensions.Logging.ILogger _melLog = Log.CreateMelLogger(Log.CategoryPacket);
+    private static readonly Microsoft.Extensions.Logging.ILogger _melNet = Log.CreateMelLogger(Log.CategoryNetwork);
+    private static readonly string _sourceFile = nameof(WorldClient).PadRight(15);
+    private static readonly string _netDirRecv = Log.FormatDir(LogNetDir.S2P);
+    private static readonly string _netDirSend = Log.FormatDir(LogNetDir.P2S);
+    private const string _netDirNone = "";
+
     Socket _clientSocket = null!;
     bool? _isSuccessful;
     uint _queuePosition;
@@ -62,11 +70,11 @@ public partial class WorldClient
         _delayedPacketsToServer = new Dictionary<Opcode, List<WorldPacket>>();
         _delayedPacketsToClient = new Dictionary<Opcode, List<ServerPacket>>();
 
-        Log.Print(LogType.Network, "Connecting to world server...");
+        WorldClientLogMessages.ConnectingToWorldServer(_melNet, _sourceFile, _netDirNone);
         try
         {
             var ip = NetworkUtils.ResolveOrDirectIPv4(realm.ExternalAddress);
-            Log.Print(LogType.Network, $"World Server address {realm.ExternalAddress}:{realm.Port} resolved as {ip}:{realm.Port}");
+            WorldClientLogMessages.WorldServerResolved(_melNet, _sourceFile, _netDirNone, realm.ExternalAddress, realm.Port, ip.ToString());
             _clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             // Connect to the specified host.
             var endPoint = new IPEndPoint(ip, realm.Port);
@@ -142,7 +150,7 @@ public partial class WorldClient
     {
         try
         {
-            Log.Print(LogType.Network, "Connection established!");
+            WorldClientLogMessages.ConnectionEstablished(_melNet, _sourceFile, _netDirNone);
 
             _clientSocket.EndConnect(AR);
             _clientSocket.ReceiveBufferSize = 65535;
@@ -237,7 +245,7 @@ public partial class WorldClient
         }
         catch(Exception e)
         {
-            Log.PrintNet(LogType.Error, LogNetDir.S2P, $"Packet Read Error: {e.Message}{Environment.NewLine}{e.StackTrace}");
+            WorldClientLogMessages.PacketReadError(_melLog, e, _sourceFile, _netDirRecv, e.Message);
             if (_isSuccessful == null)
                 _isSuccessful = false;
             else
@@ -262,7 +270,7 @@ public partial class WorldClient
                 header.Opcode = packet.GetOpcode();
                 header.Write(buffer);
 
-                Log.PrintNet(LogType.Debug, LogNetDir.P2S, $"Sending opcode {LegacyVersion.GetUniversalOpcode(header.Opcode)} ({header.Opcode}) with size {header.Size}.");
+                WorldClientLogMessages.PacketSent(_melLog, _sourceFile, _netDirSend, LegacyVersion.GetUniversalOpcode(header.Opcode), header.Opcode, header.Size);
 
                 byte[] headerArray = buffer.GetData();
                 if (_worldCrypt != null)
@@ -401,7 +409,7 @@ public partial class WorldClient
     private void HandlePacket(WorldPacket packet)
     {
         Opcode universalOpcode = packet.GetUniversalOpcode(false);
-        Log.PrintNet(LogType.Debug, LogNetDir.S2P, $"Received opcode {universalOpcode} ({packet.GetOpcode()}).");
+        WorldClientLogMessages.PacketReceived(_melLog, _sourceFile, _netDirRecv, universalOpcode, packet.GetOpcode());
 
         long startTimestamp = HermesProxy.Server.MetricsEnabled ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
 
@@ -422,7 +430,7 @@ public partial class WorldClient
                 }
                 else
                 {
-                    Log.PrintNet(LogType.Warn, LogNetDir.S2P, $"No handler for opcode {universalOpcode} ({packet.GetOpcode()}) (Got unknown packet from WorldServer)");
+                    WorldClientLogMessages.NoHandlerForOpcode(_melLog, _sourceFile, _netDirRecv, universalOpcode, packet.GetOpcode());
                     if (_isSuccessful == null)
                         _isSuccessful = false;
                 }
@@ -522,7 +530,7 @@ public partial class WorldClient
 
         if (result == AuthResult.AUTH_OK)
         {
-            Log.Print(LogType.Network, "Authentication succeeded!");
+            WorldClientLogMessages.AuthenticationSucceeded(_melNet, _sourceFile, _netDirNone);
             if (_queuePosition != 0 && GetSession().RealmSocket != null)
             {
                 _queuePosition = 0;

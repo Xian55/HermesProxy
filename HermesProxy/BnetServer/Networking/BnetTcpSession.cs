@@ -346,6 +346,10 @@ internal readonly struct BnetPacketParseResultPooled
 
 public class BnetTcpSession : SSLSocket, BnetServices.INetwork
 {
+    private static readonly Microsoft.Extensions.Logging.ILogger _melServer = Log.CreateMelLogger(Log.CategoryServer);
+    private static readonly string _sourceFile = nameof(BnetTcpSession).PadRight(15);
+    private const string _netDirNone = "";
+
     private readonly BnetServices.ServiceManager _handlerManager;
 
     public BnetTcpSession(Socket socket) : base(socket)
@@ -356,7 +360,7 @@ public class BnetTcpSession : SSLSocket, BnetServices.INetwork
     public override void Accept()
     {
         string ipAddress = GetRemoteIpEndPoint()!.ToString();
-        Log.Print(LogType.Server, $"Accepting connection from {ipAddress}.");
+        BnetTcpSessionLogMessages.AcceptingConnection(_melServer, _sourceFile, _netDirNone, ipAddress);
         AsyncHandshake(BnetServerCertificate.Certificate);
     }
 

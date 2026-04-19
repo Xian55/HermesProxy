@@ -34,6 +34,10 @@ using HermesProxy.World;
 
 public sealed class RealmManager
 {
+    private static readonly Microsoft.Extensions.Logging.ILogger _melServer = Log.CreateMelLogger(Log.CategoryServer);
+    private static readonly string _sourceFile = nameof(RealmManager).PadRight(15);
+    private const string _netDirNone = "";
+
     const int placeholderRegion = 1;
     const int placeholderBattlegroup = 1;
 
@@ -102,9 +106,9 @@ public sealed class RealmManager
         UpdateRealm(realm);
 
         if (!existingRealms.ContainsKey(realm.Id))
-            Log.Print(LogType.Server, $"Added realm \"{realm.Name}\" at {realm.ExternalAddress}:{realm.Port}");
+            RealmManagerLogMessages.AddedRealm(_melServer, _sourceFile, _netDirNone, realm.Name, realm.ExternalAddress, realm.Port);
         else
-            Log.Print(LogType.Server, $"Updating realm \"{realm.Name}\" at { realm.ExternalAddress}:{realm.Port}");
+            RealmManagerLogMessages.UpdatingRealm(_melServer, _sourceFile, _netDirNone, realm.Name, realm.ExternalAddress, realm.Port);
 
         existingRealms.Remove(realm.Id);
     }
@@ -131,13 +135,14 @@ public sealed class RealmManager
         if (_realms.Count == 0)
             return;
 
-        Log.Print(LogType.Debug, "");
-        Log.Print(LogType.Debug, $"{"Type",-5} {"Type",-5} {"Locked",-8} {"Flags",-10} {"Name",-15} {"Address",-15} {"Port",-10} {"Build",-10}");
+        RealmManagerLogMessages.RealmListLine(_melServer, _sourceFile, _netDirNone, string.Empty);
+        RealmManagerLogMessages.RealmListLine(_melServer, _sourceFile, _netDirNone,
+            $"{"Type",-5} {"Type",-5} {"Locked",-8} {"Flags",-10} {"Name",-15} {"Address",-15} {"Port",-10} {"Build",-10}");
 
         foreach (var realm in _realms)
-            Log.Print(LogType.Debug, realm.ToString());
+            RealmManagerLogMessages.RealmListLine(_melServer, _sourceFile, _netDirNone, realm.ToString());
 
-        Log.Print(LogType.Debug,"");
+        RealmManagerLogMessages.RealmListLine(_melServer, _sourceFile, _netDirNone, string.Empty);
     }
 
     public Realm? GetRealm(RealmId id)
