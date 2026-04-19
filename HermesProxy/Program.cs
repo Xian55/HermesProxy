@@ -8,6 +8,8 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
+using Framework.Logging;
 
 namespace HermesProxy;
 
@@ -17,6 +19,16 @@ public class Program
     {
         CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
         Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+
+        // Route crashes to the log file before the process dies. The Serilog
+        // async sink buffers entries; without explicit flush, a worker-thread
+        // exception (packet handler, network thread, etc.) takes the process
+        // down faster than pending entries can reach disk. Bug reporters see
+        // an empty log and a terminal window that closed before they could
+        // read the stack trace.
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+        AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
         var commandTree = new RootCommand("Hermes Proxy: Allows you to play on legacy WoW server with modern client")
         {
@@ -64,6 +76,53 @@ public class Program
         }
 
         return exitCode;
+    }
+
+    private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        TryLogAndFlushException(e.ExceptionObject as Exception, isTerminating: e.IsTerminating,
+            source: "AppDomain.UnhandledException");
+    }
+
+    private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        TryLogAndFlushException(e.Exception, isTerminating: false,
+            source: "TaskScheduler.UnobservedTaskException");
+        e.SetObserved();
+    }
+
+    private static void OnProcessExit(object? sender, EventArgs e)
+    {
+        // Final drain on normal shutdown — covers clean exits that still left
+        // async-sink entries in flight.
+        try { Log.Shutdown(); } catch { /* best effort */ }
+    }
+
+    private static void TryLogAndFlushException(Exception? ex, bool isTerminating, string source)
+    {
+        try
+        {
+            if (Log.IsLogging && ex != null)
+                Log.outException(ex);
+        }
+        catch { /* don't let the crash-logger itself crash */ }
+
+        // Always echo to stderr so something is visible even if Log isn't
+        // configured yet (config parse failure, very early startup crash).
+        try
+        {
+            Console.Error.WriteLine($"[{source}] terminating={isTerminating}");
+            Console.Error.WriteLine(ex?.ToString() ?? "<null exception>");
+        }
+        catch { /* best effort */ }
+
+        // Flush Serilog synchronously before the CLR tears everything down.
+        // Only on terminating events — a non-terminating UnobservedTaskException
+        // shouldn't kill the logging pipeline the rest of the process relies on.
+        if (isTerminating)
+        {
+            try { Log.Shutdown(); } catch { /* best effort */ }
+        }
     }
 
     private static Dictionary<string, string> ParseMultiArgument(string[]? multiArgs)
