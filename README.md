@@ -67,11 +67,12 @@ HermesProxy provides some internal chat commands:
 
 ## Command Line Arguments
 
-| Argument                   | Description                                                  |
-|----------------------------|--------------------------------------------------------------|
-| `--config <filename>`      | Specify a config file (default: `HermesProxy.config`)        |
-| `--set <key>=<value>`      | Override a specific config value at runtime                  |
-| `--no-version-check`       | Disable the check for newer versions on startup              |
+| Argument                   | Description                                                                                     |
+|----------------------------|-------------------------------------------------------------------------------------------------|
+| `--config <filename>`      | Specify a config file (default: `HermesProxy.config`)                                           |
+| `--set <key>=<value>`      | Override a specific config value at runtime (repeatable)                                        |
+| `--no-version-check`       | Disable the check for newer versions on startup                                                 |
+| `--metrics`                | Enable per-opcode latency metrics collection. A top-20 summary is logged every 60 s (see below) |
 
 **Examples:**
 ```bash
@@ -86,7 +87,24 @@ HermesProxy --set ServerAddress=logon.example.com --set ServerPort=3725
 
 # Combine config file with overrides
 HermesProxy --config Production.config --set DebugOutput=true
+
+# Run with latency metrics enabled (a summary is written to the log every 60 seconds)
+HermesProxy --metrics
+
+# Metrics + verbose packet capture, handy when profiling a suspicious opcode
+HermesProxy --metrics --set Log.Packet.MinimumLevel=Debug
 ```
+
+### `--metrics` Details
+
+When enabled, HermesProxy tracks per-opcode round-trip latency for both directions (Client → Server and Server → Client) and emits a summary line every minute through the `Server` logging category. Nothing is printed when no traffic has been observed, so idle proxies stay quiet.
+
+```
+17:42:14 | I | S | Server          | Latency Metrics: 842 C->S opcodes, 1203 S->C opcodes tracked
+17:42:14 | I | S | Server          | <top 20 opcodes with min / max / avg / p99 latency>
+```
+
+Useful for: identifying slow-dispatching opcodes, spotting regressions after a packet-handler change, and validating that hot-path migrations didn't shift the latency profile. Leave it off in normal play — it has a small per-packet timestamp overhead.
 
 ## Configuration Reference
 
@@ -126,13 +144,144 @@ All ports must be in the range `1-65535`.
 | `ReportedOS`       | `OSX`   | `OSX`, `Win`, etc.              | OS identifier sent to the legacy server  |
 | `ReportedPlatform` | `x86`   | `x86`, `x64`                    | Platform identifier sent to legacy server|
 
-### Logging Settings
+### Logging
 
-| Setting        | Default | Description                                                          |
-|----------------|---------|----------------------------------------------------------------------|
-| `DebugOutput`  | `false` | Print additional debug information to console                        |
-| `PacketsLog`   | `true`  | Save each session's packets to files in `PacketsLog` directory       |
-| `SpanStatsLog` | `false` | Log statistics about Span-based packet serialization (for profiling) |
+HermesProxy ships with a Serilog-backed logger that splits **severity** (single letter: `V`, `D`, `I`, `W`, `E`, `F`) from **category** (single letter: `S` = Server, `N` = Network, `T` = Storage, `P` = Packet) and colors property values in the console output (strings in cyan, numbers in yellow) so the interesting bits stand out at a glance.
+
+```
+17:00:33 | I | S | Server          | Starting WorldSocket service on 127.0.0.1:8086...
+17:00:34 | I | S | BnetTcpSession  | Accepting connection from 127.0.0.1:49695.
+17:09:19 | W | P | WorldSocket     | C>P S | No handler for opcode CMSG_BATTLE_PAY_GET_PURCHASE_LIST (14019) (Got unknown packet from ModernClient)
+```
+
+Each category has its own minimum level so you can dial verbosity in independently — the console has an additional floor applied on top, which lets you keep the console tidy while the file captures enough detail for a bug report.
+
+#### Reading a Log Line
+
+Every line has the same pipe-delimited shape so it's easy to scan vertically:
+
+```
+HH:mm:ss | L | C | SourceFile      | [NetDir | ] message
+```
+
+Worked example:
+
+```
+17:09:19 | W | P | WorldSocket     | C>P S | No handler for opcode CMSG_BATTLE_PAY_GET_PURCHASE_LIST (14019)
+   ▲       ▲   ▲        ▲              ▲                       ▲                                      ▲
+   │       │   │        │              │                       │                                      └── number, yellow
+   │       │   │        │              │                       └── string, bright cyan
+   │       │   │        │              └── optional network-direction tag (only on packet-flow events)
+   │       │   │        └── caller file (class name, padded to 15 chars) — always default color
+   │       │   └── category letter — blue(S) / green(N) / cyan(T) / magenta(P)
+   │       └── severity letter — yellow(W) / red(E,F) / gray(V,D) / default(I)
+   └── local clock (24h)
+```
+
+**Severity letter — `L`**
+
+The first letter encodes the severity so you can grep / filter without remembering words:
+
+| Letter | Level         | Console color | When you see it                                                     |
+|--------|---------------|---------------|---------------------------------------------------------------------|
+| `V`    | `Verbose`     | gray          | Per-packet `SpanStats` — only when `Log.Packet.MinimumLevel=Verbose` |
+| `D`    | `Debug`       | gray          | Opcode send/receive traces when debug is enabled                    |
+| `I`    | `Information` | default       | Normal lifecycle events — the default minimum                       |
+| `W`    | `Warning`     | yellow        | Recoverable issues: unknown opcode, unimplemented service, SpanMiss |
+| `E`    | `Error`       | red           | Socket errors, auth failures, decrypt failures                      |
+| `F`    | `Fatal`       | bold red      | Reserved for unrecoverable conditions                               |
+
+**Category letter — `C`**
+
+The second letter tells you *which subsystem* is talking, independent of severity:
+
+| Letter | Category  | Console color | Covers                                                                |
+|--------|-----------|---------------|-----------------------------------------------------------------------|
+| `S`    | `Server`  | blue          | Lifecycle, config, startup, version checks, service managers         |
+| `N`    | `Network` | green         | Auth/world-socket connect/disconnect, handshake, network thread      |
+| `T`    | `Storage` | cyan          | GameData load, CSV/DB2 readers, hotfix files                          |
+| `P`    | `Packet`  | magenta       | Opcode dispatch, per-packet traces, Span-based serialization fallback |
+
+This is also the selector for per-category verbosity: `Log.Packet.MinimumLevel=Debug` affects only lines where the category letter is `P`.
+
+**Network direction tag — `NetDir`** *(optional)*
+
+When a line represents packet flow between client, proxy, and server, the message is prefixed with a 5-character flow diagram. `C` = game client, `P` = HermesProxy, `S` = legacy server; the `>` or `<` marks the direction:
+
+| Tag     | Meaning                                       |
+|---------|-----------------------------------------------|
+| `C>P S` | Client → Proxy — packet received from client  |
+| `C<P S` | Proxy → Client — packet sent to client        |
+| `C P>S` | Proxy → Server — packet forwarded to server   |
+| `C P<S` | Server → Proxy — packet received from server  |
+
+Lines without this tag are not packet-flow events (startup, config, etc.).
+
+**Message and property values**
+
+Everything after the final `|` is the human-readable message. The literal text stays at the terminal default color; property values substituted into the message are colored by type — strings go bright cyan (`CMSG_BATTLE_PAY_GET_PURCHASE_LIST`, `PROTONOX`, `192.168.88.55`), numbers go bright yellow (`14019`, `8085`, `42597`). When you're scanning for a specific opcode or account, you can spot it on color alone.
+
+In the rolling file (`Logs/hermes-YYYYMMDD.log`) the same layout is used but without ANSI codes, so it stays grep-friendly and safe to paste into a bug report.
+
+#### Logging Settings
+
+| Setting                       | Default       | Description                                                                                                          |
+|-------------------------------|---------------|----------------------------------------------------------------------------------------------------------------------|
+| `Log.MinimumLevel`            | `Information` | Absolute floor across all sinks. Events below this level are dropped before categories/sinks are checked.            |
+| `Log.Server.MinimumLevel`     | `Information` | Category override for `Server` (lifecycle, config, startup). Rendered as `S`.                                        |
+| `Log.Network.MinimumLevel`    | `Information` | Category override for `Network` (auth/world socket connect, handshake). Rendered as `N`.                             |
+| `Log.Storage.MinimumLevel`    | `Information` | Category override for `Storage` (GameData, CSV/DB2, hotfixes). Rendered as `T`.                                      |
+| `Log.Packet.MinimumLevel`     | `Warning`     | Category override for `Packet` (opcode dispatch, span fallback/stats). Rendered as `P`. `Verbose` enables SpanStats. |
+| `Log.Console.MinimumLevel`    | `Information` | Additional floor applied ONLY to the console. File sink captures everything the categories allow.                    |
+| `Log.ToFile`                  | `true`        | Write a daily rolling log file to `Log.Directory/hermes-YYYY-MM-DD.log`. Last 30 days are retained automatically.    |
+| `Log.Directory`               | `Logs`        | Directory (relative to the working directory) where rolling log files are placed.                                    |
+| `PacketsLog`                  | `true`        | Dump each session's raw packets to a `.pkt` file in `PacketsLog/` for replay / inspection (unrelated to text logs).  |
+| `DebugOutput` *(legacy)*      | `false`       | Back-compat shortcut — lowers `Log.MinimumLevel` and `Log.Console.MinimumLevel` to `Debug`.                          |
+| `SpanStatsLog` *(legacy)*     | `false`       | Back-compat shortcut — lowers `Log.Packet.MinimumLevel` to `Verbose`.                                                |
+
+Valid level values (case-insensitive): `Verbose`, `Debug`, `Information`, `Warning`, `Error`, `Fatal`.
+
+#### CLI Examples
+
+All logging settings can be overridden at runtime with `--set key=value` (repeat the flag for multiple overrides).
+
+```bash
+# Capture packet-level debug detail in the log file while keeping the console quiet.
+# Ideal default for "always-on" logging — when a user reports an issue, ask for
+# Logs/hermes-YYYYMMDD.log and you already have the Debug-level context.
+HermesProxy --set Log.Packet.MinimumLevel=Debug --set Log.Console.MinimumLevel=Information
+
+# Crank everything to maximum verbosity (console included) for interactive debugging.
+HermesProxy --set Log.MinimumLevel=Verbose --set Log.Console.MinimumLevel=Verbose --set Log.Packet.MinimumLevel=Verbose
+
+# Enable per-packet SpanStats output to the file only (useful for profiling packet serialization).
+HermesProxy --set Log.Packet.MinimumLevel=Verbose --set Log.Console.MinimumLevel=Information
+
+# Reduce noise on a long-running proxy — warnings and above only, even in the file.
+HermesProxy --set Log.MinimumLevel=Warning --set Log.Console.MinimumLevel=Warning
+
+# Silence the Packet category entirely (e.g. when you're debugging auth and don't care about
+# "No handler for opcode" warnings), while leaving Server/Network/Storage at defaults.
+HermesProxy --set Log.Packet.MinimumLevel=Error
+
+# Opt out of the rolling file sink if disk writes are undesirable (headless containers, etc.).
+HermesProxy --set Log.ToFile=false
+
+# Point the file sink at a different location.
+HermesProxy --set Log.Directory=D:/HermesLogs
+
+# Legacy flags still work via the back-compat shortcuts.
+HermesProxy --set DebugOutput=true          # == Log.MinimumLevel=Debug + Log.Console.MinimumLevel=Debug
+HermesProxy --set SpanStatsLog=true         # == Log.Packet.MinimumLevel=Verbose
+```
+
+#### Bug-Report Workflow
+
+With the defaults (`Log.ToFile=true`, file captures per-category levels, console filtered by `Log.Console.MinimumLevel`), a typical error triage goes:
+
+1. User reports the issue and shares `Logs/hermes-<date>.log` for the day it happened.
+2. The file contains all startup context (version, client/server build, bound ports, resolved realms) and the per-session flow (auth, realm-list, world-socket handshake, opcode handler warnings, etc.).
+3. If you need even more detail for a particular subsystem, ask the user to rerun with for example `--set Log.Packet.MinimumLevel=Debug` and resend the log.
 
 ### Example Configuration
 
@@ -145,8 +294,11 @@ All ports must be in the range `1-65535`.
     <add key="ServerAddress" value="logon.example.com" />
     <add key="ServerPort" value="3724" />
     <add key="BNetPort" value="1119" />
-    <add key="DebugOutput" value="false" />
     <add key="PacketsLog" value="true" />
+    <add key="Log.MinimumLevel" value="Information" />
+    <add key="Log.Packet.MinimumLevel" value="Debug" />
+    <add key="Log.Console.MinimumLevel" value="Information" />
+    <add key="Log.ToFile" value="true" />
   </appSettings>
 </configuration>
 ```
