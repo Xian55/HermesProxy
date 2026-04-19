@@ -17,11 +17,19 @@
 
 using Framework.Logging;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Sockets;
 
 namespace Framework.Networking;
 
-public class SocketManager<TSocketType> where TSocketType : ISocket
+// TSocketType is reflectively constructed in OnSocketOpen via
+// Activator.CreateInstance(typeof(TSocketType), socket). The trimmer
+// can't see that call path, so the constructor gets stripped from
+// published (PublishTrimmed=true) binaries — MissingMethodException
+// at first inbound connection. The annotation tells the trimmer to
+// preserve public ctors on any T that SocketManager<T> is closed over.
+// Same fix family as the Singleton<T> annotation in PR #36.
+public class SocketManager<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TSocketType> where TSocketType : ISocket
 {
     public AsyncAcceptor Acceptor = null!;
     NetworkThread<TSocketType>[] _threads = null!;

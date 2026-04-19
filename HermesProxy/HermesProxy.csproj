@@ -12,6 +12,18 @@
     <Copyright>Copyright © WowLegacyCore 2023</Copyright>
     <Authors>WowLegacyCore</Authors>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+
+    <!-- Keep System.Text.Json reflection-based serialization on under
+         PublishTrimmed=true. Without this, JsonSerializer.Deserialize<T>(string)
+         throws InvalidOperationException "Reflection-based serialization has
+         been disabled for this application" the first time AccountDataManager
+         reads a character settings file (hit after PlayerLogin). The SDK
+         auto-disables reflection serialization with trimming as a safety,
+         but our HermesProxy assembly is rooted via TrimmerRootAssembly so
+         the deserialized types remain intact — reflection is safe. A proper
+         fix would use JsonSerializerContext source generation on every
+         serialized type; that's a bigger refactor. -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(UsePublishBuildSettings)' == 'true'">
@@ -24,12 +36,31 @@
     <PublishTrimmed>true</PublishTrimmed>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(UsePublishBuildSettings)' == 'true'">
-    <!-- ConfigurationManager reflectively constructs ClientConfigurationHost,
-         which the trimmer can't see and otherwise strips. Without this the
-         published binary throws MissingMethodException on first config read.
-         See issue #34 follow-up. -->
+  <!-- Trimmer roots. Intentionally NOT gated on UsePublishBuildSettings: those
+       <ItemGroup Condition> evaluations happen before publish profiles import,
+       so a `dotnet publish -p:PublishProfile=...` that sets the flag in its
+       pubxml would see an empty list and strip reflectively-looked-up types.
+       TrimmerRootAssembly items are no-ops when PublishTrimmed is off, so
+       leaving them unconditional is safe.
+
+       Without these, PublishTrimmed=true binaries fail at runtime:
+         System.Configuration.ConfigurationManager — issue #34 follow-up:
+           reflectively constructs ClientConfigurationHost.
+         HermesProxy — VersionChecker.cs Assembly.GetType("HermesProxy.World.Enums.V*.*")
+           per-build enums; AccountDataManager.cs JsonSerializer on account data;
+           Server.cs JsonSerializer for update check; WorldSocket.cs packet
+           handler reflection; BnetServices.ServiceManager.cs Assembly.GetTypes()
+           + Activator.CreateInstance on request/response types; GameData.cs
+           Type.GetFields/GetProperties for EstimateAvgBytesPerRow<T>.
+         Framework — Framework.Serialization.Json and Framework.Util.RandomHelper
+           use reflection over app types passed in by the caller.
+         Serilog — internal reflection paths flagged as IL2104 at assembly
+           level; root so Serilog's configuration/enrichment surface stays intact. -->
+  <ItemGroup>
     <TrimmerRootAssembly Include="System.Configuration.ConfigurationManager" />
+    <TrimmerRootAssembly Include="HermesProxy" />
+    <TrimmerRootAssembly Include="Framework" />
+    <TrimmerRootAssembly Include="Serilog" />
   </ItemGroup>
 
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
