@@ -11,6 +11,16 @@ on:
         required: false
         type: string
 
+# Serialize release runs so a second PR merging while the first is still
+# building can't race the "Compute next version" step and ship an artifact
+# from an older commit. cancel-in-progress is deliberately false — we do
+# NOT want to interrupt a running release mid-upload and leave a partial
+# GitHub release. Each queued run recomputes the next version tag, so the
+# second run will produce the *next* patch (not overwrite the first).
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   DOTNET_VERSION: '10.0.x'
   DOTNET_NOLOGO: true
