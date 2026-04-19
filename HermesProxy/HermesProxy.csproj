@@ -25,11 +25,26 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(UsePublishBuildSettings)' == 'true'">
-    <!-- ConfigurationManager reflectively constructs ClientConfigurationHost,
-         which the trimmer can't see and otherwise strips. Without this the
-         published binary throws MissingMethodException on first config read.
-         See issue #34 follow-up. -->
+    <!-- Trimmer roots for assemblies that use reflection paths the IL linker
+         can't see statically. Without these, published (PublishTrimmed=true)
+         binaries throw at runtime when the looked-up types were stripped.
+
+         System.Configuration.ConfigurationManager — issue #34 follow-up:
+           reflectively constructs ClientConfigurationHost.
+         HermesProxy — VersionChecker.cs Assembly.GetType("HermesProxy.World.Enums.V*.*")
+           per-build enums; AccountDataManager.cs JsonSerializer on account data;
+           Server.cs JsonSerializer for update check; WorldSocket.cs packet
+           handler reflection; BnetServices.ServiceManager.cs Assembly.GetTypes()
+           + Activator.CreateInstance on request/response types; GameData.cs
+           Type.GetFields/GetProperties for EstimateAvgBytesPerRow<T>.
+         Framework — Framework.Serialization.Json and Framework.Util.RandomHelper
+           use reflection over app types passed in by the caller.
+         Serilog — internal reflection paths flagged as IL2104 at assembly
+           level; root so Serilog's configuration/enrichment surface stays intact. -->
     <TrimmerRootAssembly Include="System.Configuration.ConfigurationManager" />
+    <TrimmerRootAssembly Include="HermesProxy" />
+    <TrimmerRootAssembly Include="Framework" />
+    <TrimmerRootAssembly Include="Serilog" />
   </ItemGroup>
 
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
