@@ -16,10 +16,11 @@
  */
 
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Threading;
 
-public class Singleton<T> where T : class
+public class Singleton<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)] T> where T : class
 {
     private static volatile T? instance;
     private static readonly Lock _syncRoot = new();

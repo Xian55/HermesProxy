@@ -24,6 +24,14 @@
     <PublishTrimmed>true</PublishTrimmed>
   </PropertyGroup>
 
+  <ItemGroup Condition="'$(UsePublishBuildSettings)' == 'true'">
+    <!-- ConfigurationManager reflectively constructs ClientConfigurationHost,
+         which the trimmer can't see and otherwise strips. Without this the
+         published binary throws MissingMethodException on first config read.
+         See issue #34 follow-up. -->
+    <TrimmerRootAssembly Include="System.Configuration.ConfigurationManager" />
+  </ItemGroup>
+
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <DefineConstants>_WINDOWS</DefineConstants>
   </PropertyGroup>
