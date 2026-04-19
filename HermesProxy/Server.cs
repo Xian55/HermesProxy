@@ -13,6 +13,7 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -184,7 +185,7 @@ partial class Server
         Log.RegisterCallerMapping(nameof(GameData), Log.Storage);
     }
 
-    private static SocketManager<TSocketType> StartServer<TSocketType>(IPEndPoint bindIp) where TSocketType : ISocket
+    private static SocketManager<TSocketType> StartServer<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TSocketType>(IPEndPoint bindIp) where TSocketType : ISocket
     {
         var socketManager = new SocketManager<TSocketType>();
 
