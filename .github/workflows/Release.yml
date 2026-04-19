@@ -89,7 +89,7 @@ jobs:
         run: dotnet restore
 
       - name: Test
-        run: dotnet test --no-restore --filter "FullyQualifiedName!~MovementInfoSpanTests"
+        run: dotnet test --no-restore
 
   build:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true

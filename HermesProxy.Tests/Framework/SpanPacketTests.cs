@@ -563,26 +563,12 @@ public class SpanPacketRoundTripTests
 }
 
 /// <summary>
-/// Note: Full MovementInfo comparison tests cannot run in unit tests because
-/// WriteMovementInfoModern depends on ModernVersion which requires application-level
-/// configuration. The Span-based implementation should be verified through integration
-/// testing with the actual proxy.
-///
-/// These tests verify that the Span-based writer produces reasonable output and
-/// doesn't crash for various MovementInfo configurations.
+/// Verifies that the Span-based MovementInfo writer produces reasonable output and
+/// doesn't crash for various MovementInfo configurations. ModernVersion is satisfied
+/// by the assembly-level ModuleInitializer that pins ClientBuild before any test loads.
 /// </summary>
 public class MovementInfoSpanTests
 {
-    static MovementInfoSpanTests()
-    {
-        // Initialize required settings for ModernVersion static constructor
-        // This must run before any test that uses ModernVersion.AddedInVersion()
-        if (global::Framework.Settings.ClientBuild == ClientVersionBuild.Zero)
-        {
-            global::Framework.Settings.ClientBuild = ClientVersionBuild.V9_0_1_36216;
-        }
-    }
-
     [Fact]
     public void WriteMovementInfoModernToSpan_Simple_ProducesOutput()
     {

@@ -10,12 +10,6 @@ namespace HermesProxy.Tests.World;
 
 public class ObjectUpdateConstructorTests
 {
-    static ObjectUpdateConstructorTests()
-    {
-        if (global::Framework.Settings.ClientBuild == ClientVersionBuild.Zero)
-            global::Framework.Settings.ClientBuild = ClientVersionBuild.V1_14_2_42597;
-    }
-
     private static GlobalSessionData CreateGlobalSession()
     {
         return (GlobalSessionData)RuntimeHelpers.GetUninitializedObject(typeof(GlobalSessionData));
@@ -127,12 +121,6 @@ public class ObjectUpdateConstructorTests
 
 public class ObjectUpdateFieldExclusivityTests
 {
-    static ObjectUpdateFieldExclusivityTests()
-    {
-        if (global::Framework.Settings.ClientBuild == ClientVersionBuild.Zero)
-            global::Framework.Settings.ClientBuild = ClientVersionBuild.V1_14_2_42597;
-    }
-
     private static GlobalSessionData CreateGlobalSession()
     {
         return (GlobalSessionData)RuntimeHelpers.GetUninitializedObject(typeof(GlobalSessionData));

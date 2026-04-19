@@ -42,7 +42,7 @@ jobs:
         run: dotnet restore
 
       - name: Test
-        run: dotnet test --no-restore --filter "FullyQualifiedName!~MovementInfoSpanTests"
+        run: dotnet test --no-restore
 
   build:
     strategy:
