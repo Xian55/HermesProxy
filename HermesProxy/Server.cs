@@ -1,8 +1,11 @@
 ﻿using BNetServer.Networking;
+using BNetServer.Services;
 using Framework.Logging;
 using Framework.Metrics;
 using Framework.Networking;
+using HermesProxy.Auth;
 using HermesProxy.World;
+using HermesProxy.World.Client;
 using HermesProxy.World.Server;
 using System;
 using System.Collections.Generic;
@@ -79,9 +82,9 @@ partial class Server
             Log.Print(LogType.Error, "The verification of the config failed");
             return;
         }
-        Log.DebugLogEnabled = Settings.DebugOutput;
+        Log.Configure(Settings.ToLogBootstrapOptions());
+        RegisterLogCallerMappings();
         Log.Print(LogType.Debug, "Debug logging enabled");
-        Log.SpanStatsEnabled = Settings.SpanStatsLog;
 
         if (!AesGcm.IsSupported)
         {
@@ -154,6 +157,22 @@ partial class Server
         Console.WriteLine($"(bnetSocketServer.IsListening: {bnetSocketServer.IsListening}");
         Console.WriteLine($"(realmSocketServer.IsListening: {realmSocketServer.IsListening}");
         Console.WriteLine($"(worldSocketServer.IsListening: {worldSocketServer.IsListening}");
+    }
+
+    private static void RegisterLogCallerMappings()
+    {
+        // Route legacy Log.Print(LogType.Warn|Error, ...) calls to the appropriate Serilog category
+        // based on the caller file that the [CallerFilePath] attribute resolves to.
+        Log.RegisterCallerMapping(nameof(AuthClient), Log.Network);
+        Log.RegisterCallerMapping(nameof(BnetTcpSession), Log.Network);
+        Log.RegisterCallerMapping(nameof(BnetServices), Log.Network);
+        Log.RegisterCallerMapping(nameof(LoginServiceManager), Log.Network);
+        Log.RegisterCallerMapping(nameof(RealmSocket), Log.Network);
+        Log.RegisterCallerMapping("NetworkThread", Log.Network); // generic type, no clean nameof form
+        Log.RegisterCallerMapping(nameof(WorldClient), Log.Packet);
+        Log.RegisterCallerMapping(nameof(WorldSocket), Log.Packet);
+        Log.RegisterCallerMapping(nameof(WorldSocketManager), Log.Packet);
+        Log.RegisterCallerMapping(nameof(GameData), Log.Storage);
     }
 
     private static SocketManager<TSocketType> StartServer<TSocketType>(IPEndPoint bindIp) where TSocketType : ISocket

@@ -8,6 +8,7 @@ using Framework.Logging;
 using Framework.Networking;
 using HermesProxy;
 using HermesProxy.Configuration;
+using Serilog.Events;
 
 namespace Framework;
 
@@ -28,6 +29,15 @@ public static class Settings
     public static bool DebugOutput;
     public static bool PacketsLog;
     public static bool SpanStatsLog;
+
+    public static LogEventLevel LogMinimumLevel;
+    public static LogEventLevel LogServerLevel;
+    public static LogEventLevel LogNetworkLevel;
+    public static LogEventLevel LogStorageLevel;
+    public static LogEventLevel LogPacketLevel;
+    public static LogEventLevel LogConsoleLevel;
+    public static bool LogToFile;
+    public static string LogDirectory = "Logs";
 
     public static bool LoadAndVerifyFrom(ConfigurationParser config)
     {
@@ -51,8 +61,35 @@ public static class Settings
         PacketsLog = config.GetBoolean("PacketsLog", true);
         SpanStatsLog = config.GetBoolean("SpanStatsLog", false);
 
+        LogMinimumLevel = ParseLogLevel(config.GetString("Log.MinimumLevel", "Information"), LogEventLevel.Information);
+        LogServerLevel = ParseLogLevel(config.GetString("Log.Server.MinimumLevel", "Information"), LogEventLevel.Information);
+        LogNetworkLevel = ParseLogLevel(config.GetString("Log.Network.MinimumLevel", "Information"), LogEventLevel.Information);
+        LogStorageLevel = ParseLogLevel(config.GetString("Log.Storage.MinimumLevel", "Information"), LogEventLevel.Information);
+        LogPacketLevel = ParseLogLevel(config.GetString("Log.Packet.MinimumLevel", "Warning"), LogEventLevel.Warning);
+        LogConsoleLevel = ParseLogLevel(config.GetString("Log.Console.MinimumLevel", "Information"), LogEventLevel.Information);
+        LogToFile = config.GetBoolean("Log.ToFile", true);
+        LogDirectory = config.GetString("Log.Directory", "Logs");
+
+        // Back-compat: translate legacy DebugOutput / SpanStatsLog into the new per-category min-levels.
+        if (DebugOutput && LogMinimumLevel > LogEventLevel.Debug)
+            LogMinimumLevel = LogEventLevel.Debug;
+        if (DebugOutput && LogConsoleLevel > LogEventLevel.Debug)
+            LogConsoleLevel = LogEventLevel.Debug;
+        if (SpanStatsLog && LogPacketLevel > LogEventLevel.Verbose)
+            LogPacketLevel = LogEventLevel.Verbose;
+
         return VerifyConfig();
     }
+
+    private static LogEventLevel ParseLogLevel(string raw, LogEventLevel defaultValue)
+    {
+        if (Enum.TryParse<LogEventLevel>(raw, ignoreCase: true, out var parsed))
+            return parsed;
+        return defaultValue;
+    }
+
+    public static LogBootstrapOptions ToLogBootstrapOptions()
+        => new(LogMinimumLevel, LogServerLevel, LogNetworkLevel, LogStorageLevel, LogPacketLevel, LogConsoleLevel, LogToFile, LogDirectory);
     
     private static bool VerifyConfig()
     {
