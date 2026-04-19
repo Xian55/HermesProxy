@@ -479,6 +479,9 @@ public partial class WorldClient
                 reply2.Timestamp = (uint)Time.UnixTime;
                 SendPacketToClient(reply2);
             }
+            // issue #34: even an "invalid" answer is an answer — drop this id
+            // from any pending waiting-set so the deferred batch can release.
+            FlushDeferredUpdatesFor((uint)entry.Key);
             return;
         }
 
@@ -487,6 +490,50 @@ public partial class WorldClient
 
         SendItemUpdatesIfNeeded(item);
         GameData.StoreItemTemplate((uint)entry.Key, item);
+
+        // issue #34: any UpdateObject batch that was held back waiting on this
+        // item template's hotfix can be released now that the DB2 row is in
+        // place on the modern client.
+        FlushDeferredUpdatesFor((uint)entry.Key);
+    }
+
+    private void FlushDeferredUpdatesFor(uint resolvedItemId)
+    {
+        var session = GetSession();
+        List<PendingObjectUpdate>? toFlush = null;
+        lock (session.GameState.DeferredObjectUpdatesLock)
+        {
+            var pending = session.GameState.DeferredObjectUpdates;
+            for (int i = 0; i < pending.Count; i++)
+            {
+                var entry = pending[i];
+                entry.WaitingForItemIds.Remove(resolvedItemId);
+                if (entry.WaitingForItemIds.Count == 0)
+                {
+                    toFlush ??= [];
+                    toFlush.Add(entry);
+                }
+            }
+            if (toFlush != null)
+            {
+                foreach (var entry in toFlush)
+                    pending.Remove(entry);
+            }
+        }
+
+        if (toFlush == null)
+            return;
+
+        foreach (var entry in toFlush)
+        {
+            if (entry.UpdateObject.ObjectUpdates.Count != 0 ||
+                entry.UpdateObject.DestroyedGuids.Count != 0 ||
+                entry.UpdateObject.OutOfRangeGuids.Count != 0)
+                SendPacketToClient(entry.UpdateObject);
+
+            foreach (var auraUpdate in entry.AuraUpdates)
+                SendPacketToClient(auraUpdate);
+        }
     }
 
     void SendItemUpdatesIfNeeded(ItemTemplate item)

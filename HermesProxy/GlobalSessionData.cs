@@ -47,6 +47,13 @@ public sealed class TradeSession
     public uint ServerStateIndex = 1; // incremented by any trade action
 }
 
+public sealed class PendingObjectUpdate
+{
+    public required UpdateObject UpdateObject;
+    public required List<AuraUpdate> AuraUpdates;
+    public required HashSet<uint> WaitingForItemIds;
+}
+
 public sealed class GameSessionData
 {
     public bool HasWsgHordeFlagCarrier;
@@ -135,6 +142,13 @@ public sealed class GameSessionData
     public TradeSession? CurrentTrade = null;
     public HashSet<uint> RequestedItemHotfixes = [];
     public HashSet<uint> RequestedItemSparseHotfixes = [];
+
+    // SMSG_UPDATE_OBJECT batches that contain a player CreateObject whose
+    // VisibleItems reference item templates not yet cached. Held back until
+    // the matching ItemModifiedAppearance hotfixes are emitted, so the modern
+    // client renders the player dressed instead of naked. See issue #34.
+    public List<PendingObjectUpdate> DeferredObjectUpdates = [];
+    public Lock DeferredObjectUpdatesLock = new();
 
     private GameSessionData()
     {
