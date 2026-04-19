@@ -276,6 +276,78 @@ public partial class WorldClient
             }
         }
 
+        // Issue #34: when the player CreateObject in this batch references item
+        // templates the modern client doesn't know (custom items, typically
+        // entry > 60000), the ItemModifiedAppearance hotfix has to land before
+        // the UpdateObject — otherwise the player renders naked because the
+        // client falls through the missing DB2 lookup. Hold the batch until
+        // the legacy server has answered every dependent CMSG_ITEM_QUERY_SINGLE
+        // and SendItemUpdatesIfNeeded has emitted the hotfixes.
+        //
+        // Vanilla 1.12 player CreateObjects don't reliably populate
+        // PlayerData.VisibleItems via the translator (the field block layout
+        // differs from later expansions), so the load-bearing signal is
+        // missingItemTemplates — items that came in the same batch as
+        // inventory CreateObject2 blocks. Scan PlayerData.VisibleItems
+        // additionally to cover partial-update reconnects where bag Creates
+        // aren't part of this batch.
+        HashSet<uint>? deferredFor = null;
+        if (activePlayerUpdateIndex >= 0)
+        {
+            if (missingItemTemplates.Count > 0)
+            {
+                deferredFor = new HashSet<uint>(missingItemTemplates);
+            }
+
+            var playerUpdate = updateObject.ObjectUpdates[activePlayerUpdateIndex];
+            if (playerUpdate.PlayerData != null)
+            {
+                foreach (var visible in playerUpdate.PlayerData.VisibleItems)
+                {
+                    if (visible.HasValue && visible.Value.ItemID > 0 &&
+                        !GameData.ItemTemplates.ContainsKey((uint)visible.Value.ItemID))
+                    {
+                        deferredFor ??= new HashSet<uint>();
+                        deferredFor.Add((uint)visible.Value.ItemID);
+                    }
+                }
+            }
+        }
+
+        if (deferredFor != null && deferredFor.Count > 0)
+        {
+            // Items only seen via PlayerData.VisibleItems still need their own
+            // CMSG_ITEM_QUERY_SINGLE — items already in missingItemTemplates
+            // were dispatched by the loop above.
+            foreach (uint itemId in deferredFor)
+            {
+                if (missingItemTemplates.Contains(itemId))
+                    continue;
+                WorldPacket reqPacket = new WorldPacket(Opcode.CMSG_ITEM_QUERY_SINGLE);
+                reqPacket.WriteUInt32(itemId);
+                if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
+                    reqPacket.WriteGuid(WowGuid64.Empty);
+                SendPacketToServer(reqPacket);
+            }
+
+            var pending = new PendingObjectUpdate
+            {
+                UpdateObject = updateObject,
+                AuraUpdates = auraUpdates,
+                WaitingForItemIds = deferredFor,
+            };
+            var session = GetSession();
+            lock (session.GameState.DeferredObjectUpdatesLock)
+                session.GameState.DeferredObjectUpdates.Add(pending);
+
+            // Release path: every SMSG_ITEM_QUERY_SINGLE_RESPONSE (valid or
+            // invalid) calls FlushDeferredUpdatesFor on its entry id. If the
+            // legacy server stops answering entirely, the connection-level
+            // TCP timeout tears the session down — the queue is per-session
+            // so it's GC'd along with the rest of the state.
+            return;
+        }
+
         if (updateObject.ObjectUpdates.Count != 0 ||
             updateObject.DestroyedGuids.Count != 0 ||
             updateObject.OutOfRangeGuids.Count != 0)
