@@ -23,6 +23,7 @@ using System.Buffers;
 using System.Buffers.Binary;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Client;
+using HermesProxy.World.Logging;
 using System.Collections.Generic;
 
 namespace HermesProxy.World;
@@ -65,6 +66,12 @@ public abstract class ClientPacket : IDisposable
 
 public abstract class ServerPacket
 {
+    // Source-generated [LoggerMessage] methods use the MEL logger below.
+    // MinimumLevel.Override("Packet", _packetSwitch) still applies because we create the MEL logger
+    // with the "Packet" category name, which becomes SourceContext on the Serilog side.
+    private static readonly Microsoft.Extensions.Logging.ILogger _melLog = Log.CreateMelLogger(Log.CategoryPacket);
+    private static readonly string _sourceFile = nameof(ServerPacket).PadRight(15);
+
     protected ServerPacket(Opcode universalOpcode)
     {
         connectionType = ConnectionType.Realm;
@@ -134,13 +141,13 @@ public abstract class ServerPacket
                 // Negative return means packet exceeded MaxSize cap, fall back to standard Write()
                 if (bytesWritten < 0)
                 {
-                    Log.Print(LogType.SpanMiss, $"{GetType().Name} exceeded MaxSize ({spanWritable.MaxSize}), using fallback");
+                    PacketLogMessages.SpanMissExceededMaxSize(_melLog, _sourceFile, GetType().Name, spanWritable.MaxSize);
                     Write();
                     buffer = _worldPacket.GetData();
                 }
                 else
                 {
-                    Log.Print(LogType.SpanStats, $"{GetType().Name}: {bytesWritten}/{spanWritable.MaxSize} bytes");
+                    PacketLogMessages.SpanStats(_melLog, _sourceFile, GetType().Name, bytesWritten, spanWritable.MaxSize);
                     buffer = new byte[bytesWritten];
                     pooledBuffer.AsSpan(0, bytesWritten).CopyTo(buffer);
                 }

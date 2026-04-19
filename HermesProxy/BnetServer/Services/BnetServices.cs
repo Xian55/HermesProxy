@@ -15,6 +15,10 @@ namespace BNetServer.Services;
 
 public partial class BnetServices
 {
+    internal static readonly Microsoft.Extensions.Logging.ILogger _melNet = Log.CreateMelLogger(Log.CategoryNetwork);
+    internal static readonly string _sourceFile = nameof(BnetServices).PadRight(15);
+    internal const string _netDirNone = "";
+
     private static uint _serverInvokedRequestToken = 0;
     private Dictionary<uint /*requestId*/, Action<CodedInputStream> /*callbackHandler*/> _callbackHandlers = new();
 
@@ -60,10 +64,19 @@ public partial class BnetServices
 
     private void ServiceLog(LogType type, string message)
     {
+        Log.Print(type, $"{BuildSessionPrefix()} {message}");
+    }
+
+    /// <summary>
+    /// Compose the per-session prefix like <c>[WorldSocket][127.0.0.1:1234, Account: X, Game account: Y]</c>
+    /// used as a structured property by source-generated BnetServices log messages.
+    /// </summary>
+    internal string BuildSessionPrefix()
+    {
         StringBuilder prefix = new StringBuilder();
         prefix.Append($"[{_connectionPath}]");
         prefix.Append($"[{GetRemoteIpEndPoint()}");
-        
+
         if (GetSession() != null)
         {
             if (GetSession().AccountInfo != null && !GetSession().AccountInfo.Login.IsEmpty())
@@ -72,10 +85,9 @@ public partial class BnetServices
             if (GetSession().GameAccountInfo != null)
                 prefix.Append(", Game account: " + GetSession().GameAccountInfo.Name);
         }
-        
-        prefix.Append(']');
 
-        Log.Print(type, $"{prefix} {message}");
+        prefix.Append(']');
+        return prefix.ToString();
     }
 
     public ServiceRequirement CurrentMatchingRequirement()

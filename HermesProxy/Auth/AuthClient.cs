@@ -14,11 +14,21 @@ using Framework;
 using Framework.IO;
 using Framework.Logging;
 using Framework.Networking;
+using HermesProxy.Auth.Logging;
 
 namespace HermesProxy.Auth;
 
 public partial class AuthClient
 {
+    // Source-generated logging: one MEL logger per target category so per-category
+    // MinimumLevel.Override still applies. SourceFile + NetDir strings are cached constants.
+    private static readonly Microsoft.Extensions.Logging.ILogger _melNet = Log.CreateMelLogger(Log.CategoryNetwork);
+    private static readonly Microsoft.Extensions.Logging.ILogger _melServer = Log.CreateMelLogger(Log.CategoryServer);
+    private static readonly string _sourceFile = nameof(AuthClient).PadRight(15);
+    private static readonly string _netDirP2S = Log.FormatDir(LogNetDir.P2S);
+    private static readonly string _netDirS2P = Log.FormatDir(LogNetDir.S2P);
+    private const string _netDirNone = "";
+
     // For ez debugging: Call this function wherever you want
     private static readonly Action<ByteBuffer> _debugTraceBreakpointHandler = (b) =>
     {
@@ -62,8 +72,8 @@ public partial class AuthClient
 
         try
         {
-            var serverIpAddress = NetworkUtils.ResolveOrDirectIPv4(Settings.ServerAddress); 
-            Log.PrintNet(LogType.Network, LogNetDir.P2S, $"Connecting to auth server... (realmlist addr: {Settings.ServerAddress}:{Settings.ServerPort}) (resolved as: {serverIpAddress}:{Settings.ServerPort})");
+            var serverIpAddress = NetworkUtils.ResolveOrDirectIPv4(Settings.ServerAddress);
+            AuthClientLogMessages.ConnectingToAuthServer(_melNet, _sourceFile, _netDirP2S, Settings.ServerAddress, Settings.ServerPort, serverIpAddress.ToString());
             _clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             // Connect to the specified host.
             var endPoint = new IPEndPoint(serverIpAddress, Settings.ServerPort);
@@ -71,7 +81,7 @@ public partial class AuthClient
         }
         catch (Exception ex)
         {
-            Log.PrintNet(LogType.Error, LogNetDir.P2S, $"Socket Error: {ex.Message}");
+            AuthClientLogMessages.SocketError(_melNet, ex, _sourceFile, _netDirP2S, ex.Message);
             _response.SetResult(AuthResult.FAIL_INTERNAL_ERROR);
         }
 
@@ -88,8 +98,8 @@ public partial class AuthClient
 
         try
         {
-            var serverIpAddress = NetworkUtils.ResolveOrDirectIPv4(Settings.ServerAddress); 
-            Log.PrintNet(LogType.Network, LogNetDir.P2S, $"Reconnecting to auth server... (realmlist addr: {Settings.ServerAddress}:{Settings.ServerPort}) (resolved as: {serverIpAddress}:{Settings.ServerPort})");
+            var serverIpAddress = NetworkUtils.ResolveOrDirectIPv4(Settings.ServerAddress);
+            AuthClientLogMessages.ReconnectingToAuthServer(_melNet, _sourceFile, _netDirP2S, Settings.ServerAddress, Settings.ServerPort, serverIpAddress.ToString());
             _clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             // Connect to the specified host.
             var endPoint = new IPEndPoint(serverIpAddress, Settings.ServerPort);
@@ -97,7 +107,7 @@ public partial class AuthClient
         }
         catch (Exception ex)
         {
-            Log.PrintNet(LogType.Error, LogNetDir.P2S, $"Socket Error: {ex.Message}");
+            AuthClientLogMessages.SocketError(_melNet, ex, _sourceFile, _netDirP2S, ex.Message);
             _response.SetResult(AuthResult.FAIL_INTERNAL_ERROR);
         }
 
@@ -142,7 +152,7 @@ public partial class AuthClient
         }
         catch (Exception ex)
         {
-            Log.Print(LogType.Error, $"Connect Error: {ex.Message}");
+            AuthClientLogMessages.ConnectError(_melNet, ex, _sourceFile, _netDirNone, ex.Message);
             SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
         }
     }
@@ -159,7 +169,7 @@ public partial class AuthClient
         }
         catch (Exception ex)
         {
-            Log.PrintNet(LogType.Error, LogNetDir.P2S, $"Connect Error: {ex.Message}");
+            AuthClientLogMessages.ConnectError(_melNet, ex, _sourceFile, _netDirP2S, ex.Message);
             SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
         }
     }
@@ -174,7 +184,7 @@ public partial class AuthClient
             {
                 SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
 
-                Log.PrintNet(LogType.Error, LogNetDir.S2P, "Socket Closed By Server");
+                AuthClientLogMessages.SocketClosedByServer(_melNet, _sourceFile, _netDirS2P);
                 return;
             }
 
@@ -191,7 +201,7 @@ public partial class AuthClient
         }
         catch (Exception ex)
         {
-            Log.Print(LogType.Error, $"Packet Read Error: {ex.Message}");
+            AuthClientLogMessages.PacketReadError(_melNet, ex, _sourceFile, _netDirNone, ex.Message);
             SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
         }
     }
@@ -204,7 +214,7 @@ public partial class AuthClient
         }
         catch (Exception ex)
         {
-            Log.PrintNet(LogType.Error, LogNetDir.P2S, $"Packet Send Error: {ex.Message}");
+            AuthClientLogMessages.PacketSendError(_melNet, ex, _sourceFile, _netDirP2S, ex.Message);
             SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
         }
     }
@@ -218,7 +228,7 @@ public partial class AuthClient
         }
         catch (Exception ex)
         {
-            Log.PrintNet(LogType.Error, LogNetDir.P2S, $"Packet Write Error: {ex.Message}");
+            AuthClientLogMessages.PacketWriteError(_melNet, ex, _sourceFile, _netDirP2S, ex.Message);
             SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
         }
     }
@@ -227,7 +237,7 @@ public partial class AuthClient
     {
         ByteBuffer packet = new ByteBuffer(buffer);
         AuthCommand opcode = (AuthCommand)packet.ReadUInt8();
-        Log.PrintNet(LogType.Debug, LogNetDir.S2P, $"Received opcode {opcode} size {size}.");
+        AuthClientLogMessages.PacketReceived(_melNet, _sourceFile, _netDirS2P, opcode, size);
 
         switch (opcode)
         {
@@ -247,7 +257,7 @@ public partial class AuthClient
                 HandleRealmList(packet);
                 break;
             default:
-                Log.PrintNet(LogType.Error, LogNetDir.S2P, $"No handler for opcode {opcode}!");
+                AuthClientLogMessages.NoHandlerForOpcode(_melNet, _sourceFile, _netDirS2P, opcode);
                 SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
                 break;
         }
@@ -283,7 +293,7 @@ public partial class AuthClient
         AuthResult error = (AuthResult)packet.ReadUInt8();
         if (error != AuthResult.SUCCESS)
         {
-            Log.Print(LogType.Error, $"Login failed. Reason: {error}");
+            AuthClientLogMessages.LoginFailed(_melNet, _sourceFile, _netDirNone, error);
             SetAuthResponse(error);
             return;
         }
@@ -454,7 +464,7 @@ public partial class AuthClient
         AuthResult error = (AuthResult)packet.ReadUInt8();
         if (error != AuthResult.SUCCESS)
         {
-            Log.Print(LogType.Error, $"Login failed. Reason: {error}");
+            AuthClientLogMessages.LoginFailed(_melNet, _sourceFile, _netDirNone, error);
             SetAuthResponse(error);
             return;
         }
@@ -487,12 +497,12 @@ public partial class AuthClient
 
         if (!equal)
         {
-            Log.Print(LogType.Error, "Authentication failed!");
+            AuthClientLogMessages.AuthenticationFailed(_melNet, _sourceFile, _netDirNone);
             SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
         }
         else
         {
-            Log.Print(LogType.Network, "Authentication succeeded!");
+            AuthClientLogMessages.AuthenticationSucceeded(_melNet, _sourceFile, _netDirNone);
             SetAuthResponse(AuthResult.SUCCESS);
         }
     }
@@ -528,7 +538,7 @@ public partial class AuthClient
         AuthResult error = (AuthResult)packet.ReadUInt8();
         if (error != AuthResult.SUCCESS)
         {
-            Log.Print(LogType.Error, $"Reconnect failed. Reason: {error}");
+            AuthClientLogMessages.ReconnectFailed(_melNet, _sourceFile, _netDirNone, error);
             SetAuthResponse(error);
             return;
         }
@@ -538,7 +548,7 @@ public partial class AuthClient
 
     public void SendRealmListUpdateRequest()
     {
-        Log.Print(LogType.Server, $"Requesting RealmList update for {_username}");
+        AuthClientLogMessages.RequestingRealmListUpdate(_melServer, _sourceFile, _netDirNone, _username);
         ByteBuffer buffer = new ByteBuffer();
         buffer.WriteUInt8((byte)AuthCommand.REALM_LIST);
         for (int i = 0; i < 4; i++)
@@ -562,7 +572,7 @@ public partial class AuthClient
             realmsCount = packet.ReadUInt16();
         }
 
-        Log.Print(LogType.Network, $"Received {realmsCount} realms.");
+        AuthClientLogMessages.ReceivedRealms(_melNet, _sourceFile, _netDirNone, realmsCount);
         List<RealmInfo> realmList = new List<RealmInfo>();
 
         for (ushort i = 0; i < realmsCount; i++)

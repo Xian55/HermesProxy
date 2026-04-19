@@ -24,6 +24,10 @@ namespace Framework.Networking;
 
 public class NetworkThread<TSocketType> where TSocketType : ISocket
 {
+    private static readonly Microsoft.Extensions.Logging.ILogger _melNet = Log.CreateMelLogger(Log.CategoryNetwork);
+    private static readonly string _sourceFile = "NetworkThread".PadRight(15);
+    private const string _netDirNone = "";
+
     int _connections;
     volatile bool _stopped;
 
@@ -88,7 +92,7 @@ public class NetworkThread<TSocketType> where TSocketType : ISocket
 
     void Run()
     {
-        Log.Print(LogType.Network, "Network Thread Starting");
+        NetworkThreadLogMessages.NetworkThreadStarting(_melNet, _sourceFile, _netDirNone);
 
         int sleepTime = 10;
         while (!_stopped)

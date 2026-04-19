@@ -28,14 +28,19 @@ public partial class BnetServices
                         var key = (serviceAttr.ServiceHash, serviceAttr.MethodId);
                         if (_serviceHandlers.ContainsKey(key))
                         {
-                            Log.Print(LogType.Error, $"Tried to override ServiceHandler: {_serviceHandlers[key]} with {methodInfo.Name} (ServiceHash: {serviceAttr.ServiceHash} MethodId: {serviceAttr.MethodId})");
+                            BnetServicesLogMessages.ServiceHandlerOverrideAttempt(
+                                BnetServices._melNet, BnetServices._sourceFile, BnetServices._netDirNone,
+                                _serviceHandlers[key].ToString() ?? "", methodInfo.Name,
+                                serviceAttr.ServiceHash, serviceAttr.MethodId);
                             continue;
                         }
 
                         var parameters = methodInfo.GetParameters();
                         if (parameters.Length == 0)
                         {
-                            Log.Print(LogType.Error, $"Method: {methodInfo.Name} needs atleast one parameter");
+                            BnetServicesLogMessages.ServiceHandlerMissingParameters(
+                                BnetServices._melNet, BnetServices._sourceFile, BnetServices._netDirNone,
+                                methodInfo.Name);
                             continue;
                         }
 
@@ -83,19 +88,26 @@ public partial class BnetServices
 
             if (!_serviceHandlers.TryGetValue((serviceHash, methodId), out var handler))
             {
-                _serviceHolder.ServiceLog(LogType.Warn, $"Client requested service {serviceHash}/m:{methodId} but this service is not implemented?");
+                BnetServicesLogMessages.ServiceNotImplemented(
+                    BnetServices._melNet, BnetServices._sourceFile, BnetServices._netDirNone,
+                    _serviceHolder.BuildSessionPrefix(), serviceHash, methodId);
                 SendErrorResponse(BattlenetRpcErrorCode.RpcNotImplemented);
                 return;
             }
 
             if (handler.Requirement != ServiceRequirement.Always && handler.Requirement != _serviceHolder.CurrentMatchingRequirement())
             {
-                _serviceHolder.ServiceLog(LogType.Warn, $"Client requested service {serviceHash}/m:{methodId} but with invalid state, required: {handler.Requirement} but only has {_serviceHolder.CurrentMatchingRequirement()}!");
+                BnetServicesLogMessages.ServiceInvalidState(
+                    BnetServices._melNet, BnetServices._sourceFile, BnetServices._netDirNone,
+                    _serviceHolder.BuildSessionPrefix(), serviceHash, methodId,
+                    handler.Requirement, _serviceHolder.CurrentMatchingRequirement());
                 SendErrorResponse(BattlenetRpcErrorCode.Denied);
                 return;
             }
 
-            _serviceHolder.ServiceLog(LogType.Debug, $"Client requested service {serviceHash}/m:{methodId}");
+            BnetServicesLogMessages.ServiceRequested(
+                BnetServices._melNet, BnetServices._sourceFile, BnetServices._netDirNone,
+                _serviceHolder.BuildSessionPrefix(), serviceHash, methodId);
 
             var request = (IMessage)Activator.CreateInstance(handler.RequestType)!;
             request.MergeFrom(stream);

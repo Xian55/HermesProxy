@@ -37,11 +37,19 @@ using System.Net;
 using BNetServer;
 using BNetServer.Services;
 using Google.Protobuf;
+using HermesProxy.World.Logging;
 
 namespace HermesProxy.World.Server;
 
 public partial class WorldSocket : SocketBase, BnetServices.INetwork
 {
+    // Source-generated [LoggerMessage] methods use this MEL logger. SourceFile and NetDir are
+    // passed per-call but resolve to the same cached strings, so they compile to const loads.
+    private static readonly Microsoft.Extensions.Logging.ILogger _melLog = Log.CreateMelLogger(Log.CategoryPacket);
+    private static readonly string _sourceFile = nameof(WorldSocket).PadRight(15);
+    private static readonly string _netDirRecv = Log.FormatDir(LogNetDir.C2P);
+    private static readonly string _netDirSend = Log.FormatDir(LogNetDir.P2C);
+
     static readonly string ClientConnectionInitialize = "WORLD OF WARCRAFT CONNECTION - CLIENT TO SERVER - V2";
     static readonly string ServerConnectionInitialize = "WORLD OF WARCRAFT CONNECTION - SERVER TO CLIENT - V2";
 
@@ -253,7 +261,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
         Opcode opcode = packet.GetUniversalOpcode(true);
 
-        Log.PrintNet(LogType.Debug, LogNetDir.C2P, $"Received opcode {opcode.ToString()} ({packet.GetOpcode()}).");
+        WorldSocketLogMessages.PacketReceived(_melLog, _sourceFile, _netDirRecv, opcode, packet.GetOpcode());
 
         if (opcode != Opcode.CMSG_HOTFIX_REQUEST && !header.IsValidSize())
         {
@@ -341,7 +349,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             }
         }
         else
-            Log.PrintNet(LogType.Warn, LogNetDir.C2P, $"No handler for opcode {universalOpcode} ({packet.GetOpcode()}) (Got unknown packet from ModernClient)");
+            WorldSocketLogMessages.NoHandlerForOpcode(_melLog, _sourceFile, _netDirRecv, universalOpcode, packet.GetOpcode());
     }
 
     private void SendPacketToServer(WorldPacket packet, Opcode delayUntilOpcode = Opcode.MSG_NULL_ACTION)
@@ -384,7 +392,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             Opcode universalOpcode = packet.GetUniversalOpcode();
             ushort opcode = (ushort)packet.GetOpcode();
 
-            Log.PrintNet(LogType.Debug, LogNetDir.P2C, $"Sending opcode {universalOpcode} ({(uint)opcode}).");
+            WorldSocketLogMessages.PacketSent(_melLog, _sourceFile, _netDirSend, universalOpcode, (uint)opcode);
 
             ByteBuffer buffer = new();
 

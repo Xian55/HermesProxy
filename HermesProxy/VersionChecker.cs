@@ -19,6 +19,11 @@ namespace HermesProxy;
 // This is class is a plain copy of ModernVersion/LegacyVersion/Opcodes but without static constructor
 public static class VersionChecker
 {
+    // Shared with sibling classes LegacyVersion / ModernVersion in this file.
+    internal static readonly Microsoft.Extensions.Logging.ILogger _melServer = Log.CreateMelLogger(Log.CategoryServer);
+    internal static readonly string _sourceFile = nameof(VersionChecker).PadRight(15);
+    internal const string _netDirNone = "";
+
     public static bool IsSupportedLegacyVersion(ClientVersionBuild legacyVersion)
     {
         switch (legacyVersion)
@@ -166,7 +171,7 @@ public static class LegacyVersion
         CurrentToUniversalOpcodeDictionary = dict1.ToFrozenDictionary();
         UniversalToCurrentOpcodeDictionary = dict1.ToFrozenDictionary(kvp => kvp.Value, kvp => kvp.Key);
 
-        Log.Print(LogType.Server, $"Loaded {CurrentToUniversalOpcodeDictionary.Count} legacy opcodes.");
+        ServerLogMessages.LoadedLegacyOpcodes(VersionChecker._melServer, VersionChecker._sourceFile, VersionChecker._netDirNone, CurrentToUniversalOpcodeDictionary.Count);
     }
 
     private static readonly FrozenDictionary<uint, Opcode> CurrentToUniversalOpcodeDictionary = FrozenDictionary<uint, Opcode>.Empty;
@@ -501,7 +506,7 @@ public static class ModernVersion
         if (dict.Count < 1)
             return (FrozenDictionary<uint, Opcode>.Empty, FrozenDictionary<Opcode, uint>.Empty);
 
-        Log.Print(LogType.Server, $"Loaded {dict.Count} modern opcodes.");
+        ServerLogMessages.LoadedModernOpcodes(VersionChecker._melServer, VersionChecker._sourceFile, VersionChecker._netDirNone, dict.Count);
         return (dict.ToFrozenDictionary(), dict.ToFrozenDictionary(kvp => kvp.Value, kvp => kvp.Key));
     }
 
