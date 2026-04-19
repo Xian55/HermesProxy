@@ -93,13 +93,20 @@ jobs:
         include:
           - os: windows
             artifact: Windows
-            runtime: ''
+            runtimeArg: '--use-current-runtime'
           - os: ubuntu
             artifact: Ubuntu
-            runtime: ''
+            runtimeArg: '--use-current-runtime'
+          # linux-arm64: cross-compile from the x64 ubuntu runner. .NET SDK
+          # supports cross-RID self-contained publish, so no ARM runner is
+          # needed. The verify step below only executes the x64 artifact;
+          # arm64 is built but not smoke-tested in CI (would need qemu).
+          - os: ubuntu
+            artifact: Ubuntu-arm64
+            runtimeArg: '--runtime linux-arm64'
           - os: macos
             artifact: MacOS
-            runtime: ''
+            runtimeArg: ''
     runs-on: ${{ matrix.os }}-latest
 
     steps:
@@ -130,7 +137,7 @@ jobs:
 
       - name: Publish
         if: matrix.os != 'macos'
-        run: dotnet publish HermesProxy --configuration Release --use-current-runtime -p:UsePublishBuildSettings=true -p:UpdateVersionProperties=false -p:Version=${{ steps.ver.outputs.semver }} -p:AssemblyVersion=${{ steps.ver.outputs.semver }} -p:FileVersion=${{ steps.ver.outputs.semver }} -p:InformationalVersion=${{ steps.ver.outputs.semver }}
+        run: dotnet publish HermesProxy --configuration Release ${{ matrix.runtimeArg }} -p:UsePublishBuildSettings=true -p:UpdateVersionProperties=false -p:Version=${{ steps.ver.outputs.semver }} -p:AssemblyVersion=${{ steps.ver.outputs.semver }} -p:FileVersion=${{ steps.ver.outputs.semver }} -p:InformationalVersion=${{ steps.ver.outputs.semver }}
 
       - name: Publish (MacOS x86_64 and arm64)
         if: matrix.os == 'macos'
@@ -204,8 +211,12 @@ jobs:
           find artifacts -type f -name "HermesProxy-*" | sort
           echo ""
 
-          for platform in Windows Ubuntu MacOS; do
-            files=$(find artifacts -name "HermesProxy-${platform}-*" -type f | head -1)
+          # Ubuntu matches both -Ubuntu-v* (x64) and -Ubuntu-arm64-v* — list
+          # each flavor explicitly so a missing arm64 artifact fails here
+          # instead of silently shipping. Suffix regex anchors on '-v' so
+          # 'Ubuntu' doesn't accidentally swallow 'Ubuntu-arm64'.
+          for platform in "Windows-v" "Ubuntu-v" "Ubuntu-arm64-v" "MacOS-v"; do
+            files=$(find artifacts -name "HermesProxy-${platform}*" -type f | head -1)
             if [ -z "$files" ]; then
               echo "FAIL: Missing artifact for $platform"
               exit 1
@@ -220,12 +231,16 @@ jobs:
 
       - name: Verify Linux binary executes
         run: |
-          tarball=$(find artifacts -name "HermesProxy-Ubuntu-*.tar.gz" -type f | head -1)
+          # Only the x64 artifact runs on ubuntu-latest (x64). The arm64
+          # artifact is cross-compiled and can't be smoke-tested here
+          # without qemu-user. Pattern 'Ubuntu-v*' anchors to exclude
+          # 'Ubuntu-arm64-v*'.
+          tarball=$(find artifacts -name "HermesProxy-Ubuntu-v*.tar.gz" -type f | head -1)
           tar -xzf "$tarball"
-          dir=$(find . -maxdepth 1 -name "HermesProxy-Ubuntu-*" -type d | head -1)
+          dir=$(find . -maxdepth 1 -name "HermesProxy-Ubuntu-v*" -type d | head -1)
           chmod +x "$dir/HermesProxy"
           "$dir/HermesProxy" --help || true
-          echo "OK: Linux binary executes"
+          echo "OK: Linux x64 binary executes"
 
   release:
     needs: [version, test, build, verify]
