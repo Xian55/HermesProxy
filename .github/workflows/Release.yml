@@ -59,8 +59,22 @@ jobs:
             minor="${rest%%.*}"
             patch="${rest#*.}"
             next_patch=$((patch + 1))
-            tag="v${major}.${minor}.${next_patch}"
-            echo "Latest tag: $latest → Next: $tag"
+            auto_bump="${major}.${minor}.${next_patch}"
+
+            # GitVersion.yml's next-version acts as a floor — lets us cut a
+            # major/minor bump by editing one line rather than by pushing a
+            # throwaway tag first. When auto_bump is already higher (i.e. we've
+            # already released past the floor), auto_bump wins and patches
+            # continue as normal.
+            floor=$(grep -E "^\s*next-version:" GitVersion.yml 2>/dev/null \
+                    | sed -E "s/.*next-version:\s*['\"]?([0-9]+\.[0-9]+\.[0-9]+)['\"]?.*/\1/" \
+                    | head -1)
+            floor="${floor:-0.0.0}"
+
+            # sort -V gives correct semver ordering for plain x.y.z triples.
+            winner=$(printf "%s\n%s\n" "$auto_bump" "$floor" | sort -V | tail -1)
+            tag="v${winner}"
+            echo "Latest tag: $latest → auto=$auto_bump, floor(GitVersion.yml)=$floor → $tag"
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
