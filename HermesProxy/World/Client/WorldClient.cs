@@ -101,7 +101,7 @@ public partial class WorldClient
 
     private void InitializeEncryption(byte[] sessionKey)
     {
-        switch (Settings.ServerBuild)
+        switch (LegacyVersion.Build)
         {
             case ClientVersionBuild.V1_12_1_5875:
             case ClientVersionBuild.V1_12_2_6005:
@@ -447,14 +447,14 @@ public partial class WorldClient
 
     private void HandleAuthChallenge(WorldPacket packet)
     {
-        if (Settings.ServerBuild >= ClientVersionBuild.V3_3_5a_12340)
+        if (LegacyVersion.Build >= ClientVersionBuild.V3_3_5a_12340)
         {
             uint one = packet.ReadUInt32();
         }
 
         uint seed = packet.ReadUInt32();
 
-        if (Settings.ServerBuild >= ClientVersionBuild.V3_3_5a_12340)
+        if (LegacyVersion.Build >= ClientVersionBuild.V3_3_5a_12340)
         {
             BigInteger seed1 = packet.ReadBytes(16).ToBigInteger();
             BigInteger seed2 = packet.ReadBytes(16).ToBigInteger();
@@ -482,23 +482,23 @@ public partial class WorldClient
         );
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_AUTH_SESSION);
-        packet.WriteUInt32((uint)Settings.ServerBuild);
+        packet.WriteUInt32((uint)LegacyVersion.Build);
         packet.WriteUInt32(_realm.Id.Index);
         packet.WriteBytes(_username.ToUpper().ToCString());
 
-        if (Settings.ServerBuild >= ClientVersionBuild.V3_0_2_9056)
+        if (LegacyVersion.Build >= ClientVersionBuild.V3_0_2_9056)
             packet.WriteUInt32(zero); // LoginServerType
 
         packet.WriteUInt32(clientSeed);
 
-        if (Settings.ServerBuild >= ClientVersionBuild.V3_3_5a_12340)
+        if (LegacyVersion.Build >= ClientVersionBuild.V3_3_5a_12340)
         {
             packet.WriteUInt32(_realm.Id.Region);
             packet.WriteUInt32(_realm.Id.Site);
             packet.WriteUInt32(_realm.Id.Index);
         }
 
-        if (Settings.ServerBuild >= ClientVersionBuild.V3_2_0_10192)
+        if (LegacyVersion.Build >= ClientVersionBuild.V3_2_0_10192)
             packet.WriteUInt64(zero); // DosResponse
 
         packet.WriteBytes(authResponse);
@@ -522,7 +522,7 @@ public partial class WorldClient
             byte billingFlags = packet.ReadUInt8();
             uint billingTimeRested = packet.ReadUInt32();
 
-            if (Settings.ServerBuild >= ClientVersionBuild.V2_0_1_6180)
+            if (LegacyVersion.Build >= ClientVersionBuild.V2_0_1_6180)
             {
                 byte expansion = packet.ReadUInt8();
             }

@@ -1,6 +1,6 @@
-﻿/*
+/*
  * Copyright (C) 2012-2020 CypherCore <http://github.com/CypherCore>
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -16,26 +16,32 @@
  */
 
 using Framework.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Sockets;
 
 namespace Framework.Networking;
 
-// TSocketType is reflectively constructed in OnSocketOpen via
-// Activator.CreateInstance(typeof(TSocketType), socket). The trimmer
-// can't see that call path, so the constructor gets stripped from
-// published (PublishTrimmed=true) binaries — MissingMethodException
-// at first inbound connection. The annotation tells the trimmer to
-// preserve public ctors on any T that SocketManager<T> is closed over.
-// Same fix family as the Singleton<T> annotation in PR #36.
+// TSocketType is constructed via ActivatorUtilities.CreateInstance(services, socket) in
+// OnSocketOpen. The trimmer can't see that call path, so the constructor gets stripped from
+// published (PublishTrimmed=true) binaries — MissingMethodException at first inbound
+// connection. The annotation tells the trimmer to preserve public ctors on any T that
+// SocketManager<T> is closed over. Same fix family as the Singleton<T> annotation in PR #36.
 public class SocketManager<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TSocketType> where TSocketType : ISocket
 {
+    private readonly IServiceProvider _services;
+
     public AsyncAcceptor Acceptor = null!;
     NetworkThread<TSocketType>[] _threads = null!;
     int _threadCount;
 
     public bool IsListening => Acceptor.IsListening;
+
+    public SocketManager(IServiceProvider services)
+    {
+        _services = services;
+    }
 
     public virtual bool StartNetwork(string bindIp, int port, int threadCount = 1)
     {
@@ -88,7 +94,7 @@ public class SocketManager<[DynamicallyAccessedMembers(DynamicallyAccessedMember
     {
         try
         {
-            TSocketType newSocket = (TSocketType)Activator.CreateInstance(typeof(TSocketType), sock)!;
+            TSocketType newSocket = ActivatorUtilities.CreateInstance<TSocketType>(_services, sock);
             newSocket.Accept();
 
             _threads[SelectThreadWithMinConnections()].AddSocket(newSocket);

@@ -10,9 +10,12 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using HermesProxy;
 using HermesProxy.Auth;
+using HermesProxy.Configuration.Options;
 using HermesProxy.Enums;
 using HermesProxy.World.Server;
+using Microsoft.Extensions.Options;
 
 namespace BNetServer.Networking;
 
@@ -21,7 +24,23 @@ public sealed class BnetRestApiSession : SSLSocket
     private const string BNET_SERVER_BASE_PATH = "/bnetserver/";
     private const string TICKET_PREFIX = "HP-"; // Hermes Proxy
 
-    public BnetRestApiSession(Socket socket) : base(socket) { }
+    private readonly IOptions<ClientOptions> _clientOptions;
+    private readonly IOptions<LegacyServerOptions> _legacyServerOptions;
+    private readonly IOptions<ProxyNetworkOptions> _networkOptions;
+    private readonly IOptions<DiagnosticsOptions> _diagnosticsOptions;
+
+    public BnetRestApiSession(
+        Socket socket,
+        IOptions<ClientOptions> clientOptions,
+        IOptions<LegacyServerOptions> legacyServerOptions,
+        IOptions<ProxyNetworkOptions> networkOptions,
+        IOptions<DiagnosticsOptions> diagnosticsOptions) : base(socket)
+    {
+        _clientOptions = clientOptions;
+        _legacyServerOptions = legacyServerOptions;
+        _networkOptions = networkOptions;
+        _diagnosticsOptions = diagnosticsOptions;
+    }
 
     public override void Accept()
     {
@@ -72,7 +91,7 @@ public sealed class BnetRestApiSession : SSLSocket
         if (loginForm == null)
             return SendEmptyResponse(HttpCode.InternalServerError);
 
-        HermesProxy.GlobalSessionData globalSession = new();
+        HermesProxy.GlobalSessionData globalSession = new(_clientOptions.Value, _legacyServerOptions.Value, _networkOptions.Value, _diagnosticsOptions.Value);
 
         // Format: "login/$platform/$build/$locale/"
         globalSession.OS = pathElements[1];
@@ -80,7 +99,7 @@ public sealed class BnetRestApiSession : SSLSocket
         globalSession.Locale = pathElements[3];
 
         // Should never happen. Session.HandleLogon checks version already
-        if (Framework.Settings.ClientBuild != (ClientVersionBuild) globalSession.Build)
+        if (ModernVersion.Build != (ClientVersionBuild) globalSession.Build)
             return SendAuthError(AuthResult.FAIL_WRONG_MODERN_VER);
 
         string login = "";

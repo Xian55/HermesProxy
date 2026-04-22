@@ -21,12 +21,23 @@ using Framework.Logging;
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Client;
 using HermesProxy.World.Logging;
 using System.Collections.Generic;
 
 namespace HermesProxy.World;
+
+/// <summary>
+/// Per-connection packet-log configuration snapshot. Captured once in the owning session so
+/// LogPacket can read PacketsLog / ClientBuild from instance fields instead of static
+/// Framework.Settings lookups on every packet.
+/// </summary>
+public readonly record struct PacketLogContext(bool PacketsLog, HermesProxy.Enums.ClientVersionBuild ClientBuild)
+{
+    public static readonly PacketLogContext Disabled = new(false, HermesProxy.Enums.ClientVersionBuild.Zero);
+}
 
 public abstract class ClientPacket : IDisposable
 {
@@ -48,14 +59,14 @@ public abstract class ClientPacket : IDisposable
         return ModernVersion.GetUniversalOpcode(GetOpcode());
     }
 
-    public void LogPacket(ref SniffFile sniffFile)
+    public void LogPacket(ref SniffFile sniffFile, in PacketLogContext context)
     {
-        if (!Framework.Settings.PacketsLog)
+        if (!context.PacketsLog)
             return;
 
         if (sniffFile == null)
         {
-            sniffFile = new SniffFile("modern", (ushort)Framework.Settings.ClientBuild);
+            sniffFile = new SniffFile("modern", (ushort)context.ClientBuild);
             sniffFile.WriteHeader();
         }
         sniffFile.WritePacket(GetOpcode(), true, _worldPacket.GetData());
@@ -110,14 +121,14 @@ public abstract class ServerPacket
         return buffer;
     }
 
-    public void LogPacket(ref SniffFile sniffFile)
+    public void LogPacket(ref SniffFile sniffFile, in PacketLogContext context)
     {
-        if (!Framework.Settings.PacketsLog)
+        if (!context.PacketsLog)
             return;
 
         if (sniffFile == null)
         {
-            sniffFile = new SniffFile("modern", (ushort)Framework.Settings.ClientBuild);
+            sniffFile = new SniffFile("modern", (ushort)context.ClientBuild);
             sniffFile.WriteHeader();
         }
         sniffFile.WritePacket(GetOpcode(), false, GetData()!);

@@ -47,9 +47,9 @@ public partial class WorldSocket
     {
         string opcodeName = movement.GetUniversalOpcode().ToString();
         opcodeName = opcodeName.Replace("CMSG", "MSG");
-        uint opcode = Opcodes.GetOpcodeValueForVersion(opcodeName, Framework.Settings.ServerBuild);
+        uint opcode = Opcodes.GetOpcodeValueForVersion(opcodeName, LegacyVersion.Build);
         if (opcode == 0)
-            opcode = Opcodes.GetOpcodeValueForVersion("MSG_MOVE_SET_FACING", Framework.Settings.ServerBuild);
+            opcode = Opcodes.GetOpcodeValueForVersion("MSG_MOVE_SET_FACING", LegacyVersion.Build);
 
         WorldPacket packet = new WorldPacket(opcode);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))

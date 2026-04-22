@@ -72,11 +72,11 @@ public partial class AuthClient
 
         try
         {
-            var serverIpAddress = NetworkUtils.ResolveOrDirectIPv4(Settings.ServerAddress);
-            AuthClientLogMessages.ConnectingToAuthServer(_melNet, _sourceFile, _netDirP2S, Settings.ServerAddress, Settings.ServerPort, serverIpAddress.ToString());
+            var serverIpAddress = NetworkUtils.ResolveOrDirectIPv4(_globalSession.LegacyServerOptions.Address);
+            AuthClientLogMessages.ConnectingToAuthServer(_melNet, _sourceFile, _netDirP2S, _globalSession.LegacyServerOptions.Address, _globalSession.LegacyServerOptions.Port, serverIpAddress.ToString());
             _clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             // Connect to the specified host.
-            var endPoint = new IPEndPoint(serverIpAddress, Settings.ServerPort);
+            var endPoint = new IPEndPoint(serverIpAddress, _globalSession.LegacyServerOptions.Port);
             _clientSocket.BeginConnect(endPoint, ConnectCallback, null);
         }
         catch (Exception ex)
@@ -98,11 +98,11 @@ public partial class AuthClient
 
         try
         {
-            var serverIpAddress = NetworkUtils.ResolveOrDirectIPv4(Settings.ServerAddress);
-            AuthClientLogMessages.ReconnectingToAuthServer(_melNet, _sourceFile, _netDirP2S, Settings.ServerAddress, Settings.ServerPort, serverIpAddress.ToString());
+            var serverIpAddress = NetworkUtils.ResolveOrDirectIPv4(_globalSession.LegacyServerOptions.Address);
+            AuthClientLogMessages.ReconnectingToAuthServer(_melNet, _sourceFile, _netDirP2S, _globalSession.LegacyServerOptions.Address, _globalSession.LegacyServerOptions.Port, serverIpAddress.ToString());
             _clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             // Connect to the specified host.
-            var endPoint = new IPEndPoint(serverIpAddress, Settings.ServerPort);
+            var endPoint = new IPEndPoint(serverIpAddress, _globalSession.LegacyServerOptions.Port);
             _clientSocket.BeginConnect(endPoint, ConnectCallback, null);
         }
         catch (Exception ex)
@@ -274,10 +274,10 @@ public partial class AuthClient
         buffer.WriteUInt8(LegacyVersion.ExpansionVersion);
         buffer.WriteUInt8(LegacyVersion.MajorVersion);
         buffer.WriteUInt8(LegacyVersion.MinorVersion);
-        buffer.WriteUInt16((ushort)Settings.ServerBuild);
-        buffer.WriteBytes(Encoding.ASCII.GetBytes(Settings.ReportedPlatform.Reverse()));
+        buffer.WriteUInt16((ushort)LegacyVersion.Build);
+        buffer.WriteBytes(Encoding.ASCII.GetBytes(_globalSession.ClientOptions.ReportedPlatform.Reverse()));
         buffer.WriteUInt8(0);
-        buffer.WriteBytes(Encoding.ASCII.GetBytes(Settings.ReportedOS.Reverse()));
+        buffer.WriteBytes(Encoding.ASCII.GetBytes(_globalSession.ClientOptions.ReportedOS.Reverse()));
         buffer.WriteUInt8(0);
         buffer.WriteBytes(Encoding.ASCII.GetBytes(_locale.Reverse()));
         buffer.WriteUInt32(0x3C); // timezone_bias
@@ -474,11 +474,11 @@ public partial class AuthClient
         uint surveyId = 0;
         ushort loginFlags = 0;
 
-        if (Settings.ServerBuild < ClientVersionBuild.V2_0_3_6299)
+        if (LegacyVersion.Build < ClientVersionBuild.V2_0_3_6299)
         {
             surveyId = packet.ReadUInt32();
         }
-        else if (Settings.ServerBuild < ClientVersionBuild.V2_4_0_8089)
+        else if (LegacyVersion.Build < ClientVersionBuild.V2_4_0_8089)
         {
             surveyId = packet.ReadUInt32();
             loginFlags = packet.ReadUInt16();
@@ -563,7 +563,7 @@ public partial class AuthClient
         packet.ReadUInt32(); // unused
         ushort realmsCount = 0;
 
-        if (Settings.ServerBuild < ClientVersionBuild.V2_0_3_6299)
+        if (LegacyVersion.Build < ClientVersionBuild.V2_0_3_6299)
         {
             realmsCount = packet.ReadUInt8();
         }
@@ -580,7 +580,7 @@ public partial class AuthClient
             RealmInfo realmInfo = new RealmInfo();
             realmInfo.ID = i;
 
-            if (Settings.ServerBuild < ClientVersionBuild.V2_0_3_6299)
+            if (LegacyVersion.Build < ClientVersionBuild.V2_0_3_6299)
             {
                 realmInfo.Type = (RealmType)packet.ReadUInt32();
             }

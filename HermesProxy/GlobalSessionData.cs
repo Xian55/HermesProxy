@@ -1,4 +1,5 @@
 ﻿using HermesProxy.Auth;
+using HermesProxy.Configuration.Options;
 using HermesProxy.World;
 using HermesProxy.World.Client;
 using HermesProxy.World.Enums;
@@ -1044,7 +1045,7 @@ public class GlobalSessionData
     public GameSessionData GameState;
     
     public RealmId RealmId;
-    public RealmManager RealmManager = new();
+    public RealmManager RealmManager;
     public Realm? Realm => RealmManager.GetRealm(RealmId);
 
     public AccountMetaDataManager AccountMetaDataMgr = null!;
@@ -1059,8 +1060,31 @@ public class GlobalSessionData
     public Dictionary<string, WowGuid128> GuildsByName = [];
     public Dictionary<uint, List<string>> GuildRanks = [];
 
-    public GlobalSessionData()
+    // Snapshots of the proxy-wide options captured at session creation.
+    // Used by per-session components (AuthClient, WorldClient, packet log) to read
+    // configuration without static Framework.Settings reads.
+    public ClientOptions ClientOptions { get; }
+    public LegacyServerOptions LegacyServerOptions { get; }
+    public ProxyNetworkOptions NetworkOptions { get; }
+    public DiagnosticsOptions DiagnosticsOptions { get; }
+
+    // Pre-computed read-only struct used on the per-packet LogPacket hot path to avoid
+    // an IOptions<T> getter chain on every send/recv.
+    public PacketLogContext PacketLogContext { get; }
+
+    public GlobalSessionData(
+        ClientOptions clientOptions,
+        LegacyServerOptions legacyServerOptions,
+        ProxyNetworkOptions networkOptions,
+        DiagnosticsOptions diagnosticsOptions)
     {
+        ClientOptions = clientOptions;
+        LegacyServerOptions = legacyServerOptions;
+        NetworkOptions = networkOptions;
+        DiagnosticsOptions = diagnosticsOptions;
+        PacketLogContext = new PacketLogContext(diagnosticsOptions.PacketsLog, clientOptions.ClientBuild);
+
+        RealmManager = new RealmManager(clientOptions, networkOptions);
         GameState = GameSessionData.CreateNewGameSessionData(this);
     }
     

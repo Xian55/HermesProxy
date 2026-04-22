@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Source generators load into the compiler, which is still running on older Roslyn
+         in many SDKs. netstandard2.0 is the lowest-common-denominator target required by the
+         Roslyn analyzer contract. -->
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- The generator is NOT published alongside the runtime binary. -->
+    <IsPackable>false</IsPackable>
+    <!-- RS2008 wants us to maintain an "analyzer release tracking" file (AnalyzerReleases.*.md)
+         used by the Roslyn analyzer release pipeline. That's for shipped NuGet-distributed
+         analyzers, not an internal project-local generator. Suppress. -->
+    <NoWarn>$(NoWarn);RS2008</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

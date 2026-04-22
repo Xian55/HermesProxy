@@ -29,16 +29,16 @@ public class Realm : IEquatable<Realm>
         NormalizedName = NormalizedName.Replace(" ", "");
     }
 
-    public IPEndPoint GetAddressForClient(IPAddress clientAddr)
+    public IPEndPoint GetAddressForClient(IPAddress clientAddr, string externalAddress, int realmPort)
     {
         IPAddress realmIp;
 
         if (IPAddress.IsLoopback(clientAddr))
             realmIp = IPAddress.Parse("127.0.0.1");
         else
-            realmIp = IPAddress.Parse(Framework.Settings.ExternalAddress);
+            realmIp = IPAddress.Parse(externalAddress);
 
-        IPEndPoint endpoint = new IPEndPoint(realmIp, Framework.Settings.RealmPort);
+        IPEndPoint endpoint = new IPEndPoint(realmIp, realmPort);
 
         // Return external IP
         return endpoint;

@@ -24,8 +24,8 @@ public class MonsterMoveWriteBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        if (global::Framework.Settings.ClientBuild == ClientVersionBuild.Zero)
-            global::Framework.Settings.ClientBuild = ClientVersionBuild.V9_0_1_36216;
+        if (global::HermesProxy.VersionBootstrap.ModernBuild == ClientVersionBuild.Zero)
+            global::HermesProxy.VersionBootstrap.ModernBuild = ClientVersionBuild.V9_0_1_36216;
 
         _guid = WowGuid128.Create(HighGuidType703.Creature, 0, 1234, 1);
 

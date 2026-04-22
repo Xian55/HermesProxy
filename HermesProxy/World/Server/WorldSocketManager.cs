@@ -1,6 +1,6 @@
-﻿/*
+/*
  * Copyright (C) 2012-2020 CypherCore <http://github.com/CypherCore>
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -15,14 +15,25 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-using Framework.Networking;
-using System.Net.Sockets;
 using Framework.Logging;
+using Framework.Networking;
+using HermesProxy.Configuration.Options;
+using Microsoft.Extensions.Options;
+using System;
+using System.Net.Sockets;
 
 namespace HermesProxy.World.Server;
 
 public sealed class WorldSocketManager : SocketManager<WorldSocket>
 {
+    private readonly int _instancePort;
+
+    public WorldSocketManager(IServiceProvider services, IOptions<ProxyNetworkOptions> networkOptions)
+        : base(services)
+    {
+        _instancePort = networkOptions.Value.InstancePort;
+    }
+
     public override bool StartNetwork(string bindIp, int realmPort, int threadCount = 1)
     {
         _tcpNoDelay = true;
@@ -34,7 +45,7 @@ public sealed class WorldSocketManager : SocketManager<WorldSocket>
             return false;
 
         _instanceAcceptor = new AsyncAcceptor();
-        if (!_instanceAcceptor.Start(bindIp, Framework.Settings.InstancePort))
+        if (!_instanceAcceptor.Start(bindIp, _instancePort))
         {
             Log.Print(LogType.Error, "StartNetwork failed to start instance AsyncAcceptor");
             return false;

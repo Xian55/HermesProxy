@@ -30,6 +30,7 @@ using Framework.Util;
 using Google.Protobuf;
 using HermesProxy;
 using HermesProxy.Auth;
+using HermesProxy.Configuration.Options;
 using HermesProxy.World;
 
 public sealed class RealmManager
@@ -41,16 +42,22 @@ public sealed class RealmManager
     const int placeholderRegion = 1;
     const int placeholderBattlegroup = 1;
 
-    public RealmManager()
+    private readonly string _externalAddress;
+    private readonly int _realmPort;
+
+    public RealmManager(ClientOptions clientOptions, ProxyNetworkOptions networkOptions)
     {
-        LoadBuildInfo();
+        _externalAddress = networkOptions.ExternalAddress;
+        _realmPort = networkOptions.RealmPort;
+
+        LoadBuildInfo(clientOptions);
 
         var subRegion = new RealmId(placeholderRegion, placeholderBattlegroup, 0).GetAddressString();
         if (!_subRegions.Contains(subRegion))
             _subRegions.Add(subRegion);
     }
 
-    void LoadBuildInfo()
+    void LoadBuildInfo(ClientOptions clientOptions)
     {
         RealmBuildInfo build = new RealmBuildInfo();
         build.MajorVersion = ModernVersion.ExpansionVersion;
@@ -61,9 +68,9 @@ public sealed class RealmManager
         if (!hotfixVersion.IsEmpty() && hotfixVersion.Length < build.HotfixVersion.Length)
             build.HotfixVersion = hotfixVersion.ToCharArray();
 
-        build.Build = (uint)Framework.Settings.ClientBuild;
+        build.Build = (uint)ModernVersion.Build;
 
-        build.FallbackStaticSeed = Framework.Settings.ClientSeed;
+        build.FallbackStaticSeed = clientOptions.ClientSeed;
         build.BuildSeeds = GameData.BuildAuthSeeds.GetValueOrDefault(build.Build, new Dictionary<string, byte[]>());
 
         _builds.Add(build);
@@ -100,7 +107,7 @@ public sealed class RealmManager
         realm.CharacterCount = characterCount;
         realm.Timezone = timezone;
         realm.PopulationLevel = populationLevel;
-        realm.Build = (uint)Framework.Settings.ClientBuild;
+        realm.Build = (uint)ModernVersion.Build;
 
         realm.Id = new RealmId(placeholderRegion, placeholderBattlegroup, id);
         UpdateRealm(realm);
@@ -281,8 +288,8 @@ public sealed class RealmManager
             addressFamily.Id = 1;
 
             var address = new Address();
-            address.Ip = realm.GetAddressForClient(clientAddress).Address.ToString();
-            address.Port = Framework.Settings.RealmPort;
+            address.Ip = realm.GetAddressForClient(clientAddress, _externalAddress, _realmPort).Address.ToString();
+            address.Port = _realmPort;
             addressFamily.Addresses.Add(address);
             serverAddresses.Families.Add(addressFamily);
 
