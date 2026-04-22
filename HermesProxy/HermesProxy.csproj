@@ -24,6 +24,17 @@
          fix would use JsonSerializerContext source generation on every
          serialized type; that's a bigger refactor. -->
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+
+    <!-- Enable the .NET 8+ source generator for Microsoft.Extensions.Configuration.Binder so
+         services.AddOptions<T>().Bind(section) emits AOT/trim-safe binding code at compile time
+         instead of falling back on reflection. Keeps the trimmed publish clean without needing
+         fresh TrimmerRootDescriptor entries for the Options DTOs. -->
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
+
+    <!-- Write generator output to disk under obj/Generated/ for inspection during prototyping.
+         Safe to leave on — the compiler doesn't read these files back, it uses the in-memory copy. -->
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>obj/Generated</CompilerGeneratedFilesOutputPath>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(UsePublishBuildSettings)' == 'true'">
@@ -44,8 +55,6 @@
        leaving them unconditional is safe.
 
        Without these, PublishTrimmed=true binaries fail at runtime:
-         System.Configuration.ConfigurationManager — issue #34 follow-up:
-           reflectively constructs ClientConfigurationHost.
          HermesProxy — VersionChecker.cs Assembly.GetType("HermesProxy.World.Enums.V*.*")
            per-build enums; AccountDataManager.cs JsonSerializer on account data;
            Server.cs JsonSerializer for update check; WorldSocket.cs packet
@@ -57,7 +66,6 @@
          Serilog — internal reflection paths flagged as IL2104 at assembly
            level; root so Serilog's configuration/enrichment surface stays intact. -->
   <ItemGroup>
-    <TrimmerRootAssembly Include="System.Configuration.ConfigurationManager" />
     <TrimmerRootAssembly Include="HermesProxy" />
     <TrimmerRootAssembly Include="Framework" />
     <TrimmerRootAssembly Include="Serilog" />
@@ -72,15 +80,25 @@
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Sep" />
-    <PackageReference Include="System.CommandLine" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Framework\Framework.csproj" />
+    <!-- Source generator — emits the per-version opcode translation tables as literal arrays.
+         Analyzer-only reference: the generator assembly is not shipped with HermesProxy. -->
+    <ProjectReference Include="..\HermesProxy.SourceGen\HermesProxy.SourceGen.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="HermesProxy.config">
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="appsettings.Development.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Content>

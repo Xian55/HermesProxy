@@ -1,9 +1,11 @@
-﻿// Copyright (c) CypherCore <http://github.com/CypherCore> All rights reserved.
+// Copyright (c) CypherCore <http://github.com/CypherCore> All rights reserved.
 // Licensed under the GNU GENERAL PUBLIC LICENSE. See LICENSE file in the project root for full license information.
 
 using Framework.Constants;
 using Framework.Logging;
 using Framework.Web;
+using HermesProxy.Configuration.Options;
+using Microsoft.Extensions.Options;
 using System;
 using System.IO;
 using System.Net;
@@ -12,27 +14,35 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace BNetServer;
 
-public sealed class LoginServiceManager : Singleton<LoginServiceManager>
+public sealed class LoginServiceManager
 {
-    FormInputs formInputs;
-    IPEndPoint externalAddress = null!;
-    IPEndPoint localAddress = null!;
+    // Transitional service-locator for the handful of per-session callers that still use
+    // LoginServiceManager.Instance. Populated by ProxyHostedService once DI resolves the
+    // singleton. Removed in Phase 4 when BnetRestApiSession / BnetServices move to ctor injection.
+    public static LoginServiceManager Instance { get; internal set; } = null!;
 
-    LoginServiceManager() 
+    private readonly IOptions<ProxyNetworkOptions> _networkOptions;
+
+    private FormInputs formInputs;
+    private IPEndPoint externalAddress = null!;
+    private IPEndPoint localAddress = null!;
+
+    public LoginServiceManager(IOptions<ProxyNetworkOptions> networkOptions)
     {
+        _networkOptions = networkOptions;
         formInputs = new FormInputs();
     }
 
     public void Initialize()
     {
-        int port = Framework.Settings.RestPort;
+        int port = _networkOptions.Value.RestPort;
         if (port < 0 || port > 0xFFFF)
         {
             Log.Print(LogType.Error, $"Specified login service port ({port}) out of allowed range (1-65535), defaulting to 8081");
             port = 8081;
         }
 
-        string configuredAddress = Framework.Settings.ExternalAddress;
+        string configuredAddress = _networkOptions.Value.ExternalAddress;
         IPAddress? address;
         if (!IPAddress.TryParse(configuredAddress, out address))
         {
@@ -49,7 +59,7 @@ public sealed class LoginServiceManager : Singleton<LoginServiceManager>
         }
         localAddress = new IPEndPoint(address, port);
 
-        // set up form inputs 
+        // set up form inputs
         formInputs.Type = "LOGIN_FORM";
 
         var input = new FormInput();

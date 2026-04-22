@@ -1,8 +1,7 @@
-﻿using BNetServer.Networking;
+using BNetServer.Networking;
 using BNetServer.Services;
 using Framework.Logging;
 using Framework.Metrics;
-using Framework.Networking;
 using HermesProxy.Auth;
 using HermesProxy.World;
 using HermesProxy.World.Client;
@@ -10,20 +9,12 @@ using HermesProxy.World.Server;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Net;
 using System.Net.Http;
-using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using BNetServer;
-using Framework;
-using HermesProxy.Configuration;
 using HermesProxy.World.Enums;
+using HermesProxy.Enums;
 
 namespace HermesProxy;
 
@@ -40,143 +31,38 @@ partial class Server
 
     /// <summary>
     /// Global metrics collector for packet statistics.
-    /// Only active when --metrics command line argument is passed.
+    /// Only active when Diagnostics.EnableMetrics is on.
     /// </summary>
     public static readonly ProxyMetrics Metrics = new();
 
     /// <summary>
-    /// Whether metrics collection is enabled via --metrics argument.
+    /// Whether metrics collection is enabled. Set once by ProxyHostedService from DiagnosticsOptions.
     /// </summary>
-    public static bool MetricsEnabled { get; private set; }
+    public static bool MetricsEnabled { get; internal set; }
 
-    public static void ServerMain(CommandLineArguments args)
+    internal static void LogVersion()
+        => ServerLogMessages.Version(_melServer, _sourceFile, _netDirNone, GetVersionInformation());
+
+    internal static void LogClientAndServerBuild(ClientVersionBuild clientBuild, ClientVersionBuild serverBuild)
     {
-#if !DEBUG
-        try
-        {
-            if (!args.DisableVersionCheck)
-                CheckForUpdate().WaitAsync(TimeSpan.FromSeconds(15)).Wait(); // Max wait 15 sec, maybe there is some wierd network error
-        }
-        catch { /* ignore */ }
-#endif
-
-        MetricsEnabled = args.EnableMetrics;
-
-        Log.Print(LogType.Server, "Starting Hermes Proxy...");
-        ServerLogMessages.Version(_melServer, _sourceFile, _netDirNone, GetVersionInformation());
-        if (MetricsEnabled)
-            Log.Print(LogType.Server, "Latency metrics collection enabled");
-        Log.Start();
-
-        if (Environment.CurrentDirectory != Path.GetDirectoryName(AppContext.BaseDirectory))
-        {
-            Log.Print(LogType.Storage, "Switching working directory");
-            Log.Print(LogType.Storage, $"Old: {Environment.CurrentDirectory}");
-            Environment.CurrentDirectory = Path.GetDirectoryName(AppContext.BaseDirectory)!;
-            Log.Print(LogType.Storage, $"New: {Environment.CurrentDirectory}");
-            Thread.Sleep(TimeSpan.FromSeconds(1));
-        }
-
-        ConfigurationParser config;
-        try
-        {
-            config = ConfigurationParser.ParseFromFile(args.ConfigFileLocation!, args.OverwrittenConfigValues);
-        }
-        catch (FileNotFoundException)
-        {
-            Log.Print(LogType.Error, "Config loading failed");
-            return;
-        }
-        if (!Settings.LoadAndVerifyFrom(config))
-        {
-            Log.Print(LogType.Error, "The verification of the config failed");
-            return;
-        }
-        Log.Configure(Settings.ToLogBootstrapOptions());
-        RegisterLogCallerMappings();
-        Log.Print(LogType.Debug, "Debug logging enabled");
-
-        if (!AesGcm.IsSupported)
-        {
-            Log.Print(LogType.Error, "AesGcm is not supported on your platform");
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                Log.Print(LogType.Error, "Since you are on MacOS, you can install openssl@3 via homebrew");
-                Log.Print(LogType.Error, "Run this:      brew install openssl@3");
-                Log.Print(LogType.Error, "Start Hermes:  DYLD_LIBRARY_PATH=/opt/homebrew/opt/openssl@3/lib ./HermesProxy");
-            }
-            return;
-        }
-
-        ServerLogMessages.ModernClientBuild(_melServer, _sourceFile, _netDirNone, Settings.ClientBuild);
-        ServerLogMessages.LegacyServerBuild(_melServer, _sourceFile, _netDirNone, Settings.ServerBuild);
-
-        GameData.LoadEverything();
-
-        var bindIp = NetworkUtils.ResolveOrDirectIPv64(Settings.ExternalAddress);
-        if (!IPAddress.IsLoopback(bindIp))
-            bindIp = IPAddress.Any; // If we are not listening on localhost we have to expose our services
-
-        ServerLogMessages.ExternalIp(_melNetwork, _sourceFile, _netDirNone, Settings.ExternalAddress);
-        // LoginServiceManager holds our external IPs so that other player can connect to our Hermes instance
-        LoginServiceManager.Instance.Initialize();
-
-        // 1. Start the listener for binary bnet RPC service connections
-        var bnetSocketServer = StartServer<BnetTcpSession>(new IPEndPoint(bindIp, Settings.BNetPort));
-
-        // 2. Start the listener for http(s) bnet RPC service like auth/"realm" connections
-        var restSocketServer = StartServer<BnetRestApiSession>(new IPEndPoint(bindIp, Settings.RestPort));
-
-        // 3. Start the listener for realm connections
-        var realmSocketServer = StartServer<RealmSocket>(new IPEndPoint(bindIp, Settings.RealmPort));
-
-        // 4. Start the listener for world connections
-        var worldSocketServer = StartServer<WorldSocket>(new IPEndPoint(bindIp, Settings.InstancePort));
-
-        int metricsLogCounter = 0;
-        const int metricsLogIntervalSeconds = 60;
-        const int loopIntervalSeconds = 10;
-        const int displayMetricCount = 20;
-
-        while (restSocketServer.IsListening || bnetSocketServer.IsListening || realmSocketServer.IsListening || worldSocketServer.IsListening)
-        {
-            Thread.Sleep(TimeSpan.FromSeconds(loopIntervalSeconds));
-
-            // Log metrics periodically (every 60 seconds) when enabled
-            if (MetricsEnabled)
-            {
-                metricsLogCounter += loopIntervalSeconds;
-                if (metricsLogCounter >= metricsLogIntervalSeconds)
-                {
-                    metricsLogCounter = 0;
-                    if (Metrics.ClientToServerOpcodeCount > 0 || Metrics.ServerToClientOpcodeCount > 0)
-                    {
-                        Log.Print(LogType.Server, $"Latency Metrics: {Metrics.ClientToServerOpcodeCount} C->S opcodes, {Metrics.ServerToClientOpcodeCount} S->C opcodes tracked");
-
-                        foreach (var line in Metrics.GetSummary(displayMetricCount, ResolveOpcodeName).Split('\n'))
-                        {
-                            if (!string.IsNullOrWhiteSpace(line))
-                                Log.Print(LogType.Server, line);
-                        }
-                    }
-                }
-            }
-        }
-
-        Console.WriteLine($"(restSocketServer.IsListening: {restSocketServer.IsListening}");
-        Console.WriteLine($"(bnetSocketServer.IsListening: {bnetSocketServer.IsListening}");
-        Console.WriteLine($"(realmSocketServer.IsListening: {realmSocketServer.IsListening}");
-        Console.WriteLine($"(worldSocketServer.IsListening: {worldSocketServer.IsListening}");
+        ServerLogMessages.ModernClientBuild(_melServer, _sourceFile, _netDirNone, clientBuild);
+        ServerLogMessages.LegacyServerBuild(_melServer, _sourceFile, _netDirNone, serverBuild);
     }
 
-    private static void RegisterLogCallerMappings()
+    internal static void LogExternalIp(string address)
+        => ServerLogMessages.ExternalIp(_melNetwork, _sourceFile, _netDirNone, address);
+
+    internal static void LogStartingService(string serviceName, string endpoint)
+        => ServerLogMessages.StartingService(_melServer, _sourceFile, _netDirNone, serviceName, endpoint);
+
+    internal static void RegisterLogCallerMappings()
     {
         // Route legacy Log.Print(LogType.Warn|Error, ...) calls to the appropriate Serilog category
         // based on the caller file that the [CallerFilePath] attribute resolves to.
         Log.RegisterCallerMapping(nameof(AuthClient), Log.Network);
         Log.RegisterCallerMapping(nameof(BnetTcpSession), Log.Network);
         Log.RegisterCallerMapping(nameof(BnetServices), Log.Network);
-        Log.RegisterCallerMapping(nameof(LoginServiceManager), Log.Network);
+        Log.RegisterCallerMapping(nameof(BNetServer.LoginServiceManager), Log.Network);
         Log.RegisterCallerMapping(nameof(RealmSocket), Log.Network);
         Log.RegisterCallerMapping("NetworkThread", Log.Network); // generic type, no clean nameof form
         Log.RegisterCallerMapping(nameof(WorldClient), Log.Packet);
@@ -185,22 +71,7 @@ partial class Server
         Log.RegisterCallerMapping(nameof(GameData), Log.Storage);
     }
 
-    private static SocketManager<TSocketType> StartServer<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TSocketType>(IPEndPoint bindIp) where TSocketType : ISocket
-    {
-        var socketManager = new SocketManager<TSocketType>();
-
-        ServerLogMessages.StartingService(_melServer, _sourceFile, _netDirNone, typeof(TSocketType).Name, bindIp.ToString());
-        if (!socketManager.StartNetwork(bindIp.Address.ToString(), bindIp.Port))
-        {
-            throw new Exception($"Failed to start {typeof(TSocketType).Name} service");
-        }
-
-        Thread.Sleep(50); // Lets wait until the thread has been logged
-
-        return socketManager;
-    }
-
-    private static async Task CheckForUpdate()
+    internal static async Task CheckForUpdate()
     {
         const string hermesGitHubRepo = "WowLegacyCore/HermesProxy";
 
@@ -221,10 +92,10 @@ partial class Server
             var parsedJson = JsonSerializer.Deserialize<Dictionary<string, object>>(rawJson);
 
             string? commitDateStr = parsedJson!["created_at"].ToString();
-            DateTime commitDate = DateTime.Parse(commitDateStr!, CultureInfo.InvariantCulture).ToUniversalTime();;
+            DateTime commitDate = DateTime.Parse(commitDateStr!, CultureInfo.InvariantCulture).ToUniversalTime();
 
             string myCommitDateStr = GitVersionInformation.CommitDate;
-            DateTime myCommitDate = DateTime.Parse(myCommitDateStr, CultureInfo.InvariantCulture).ToUniversalTime();;
+            DateTime myCommitDate = DateTime.Parse(myCommitDateStr, CultureInfo.InvariantCulture).ToUniversalTime();
 
             if (commitDate > myCommitDate)
             {
@@ -244,7 +115,7 @@ partial class Server
         }
     }
 
-    private static string ResolveOpcodeName(int opcode)
+    internal static string ResolveOpcodeName(int opcode)
     {
         if (Enum.IsDefined(typeof(Opcode), (uint)opcode))
             return ((Opcode)opcode).ToString();
@@ -253,7 +124,7 @@ partial class Server
 
     private static readonly string? _buildTag = null;
     #pragma warning disable CS0162 // GitVersion constants vary per build environment
-    private static string GetVersionInformation()
+    internal static string GetVersionInformation()
     {
         var commitDate = DateTime.Parse(GitVersionInformation.CommitDate, CultureInfo.InvariantCulture).ToUniversalTime();
 

@@ -28,6 +28,8 @@ using Framework.Cryptography;
 using Framework.IO;
 using Framework.Logging;
 using Framework.Networking;
+using HermesProxy.Configuration.Options;
+using Microsoft.Extensions.Options;
 using Framework.Realm;
 
 using HermesProxy.World.Enums;
@@ -80,8 +82,14 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
     private BnetServices.ServiceManager _bnetRpc = null!;
 
-    public WorldSocket(Socket socket) : base(socket)
+    private readonly string _externalAddress;
+    private readonly int _instancePort;
+
+    public WorldSocket(Socket socket, IOptions<ProxyNetworkOptions> networkOptions) : base(socket)
     {
+        _externalAddress = networkOptions.Value.ExternalAddress;
+        _instancePort = networkOptions.Value.InstancePort;
+
         _connectType = ConnectionType.Realm;
         _serverChallenge = Array.Empty<byte>().GenerateRandomKey(16);
         _worldCrypt = new WorldCrypt();
@@ -384,7 +392,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
         packet.WritePacketData();
         if (GetSession() != null)
-            packet.LogPacket(ref GetSession().ModernSniff);
+            packet.LogPacket(ref GetSession().ModernSniff, GetSession().PacketLogContext);
 
         lock (_sendLock)
         {
@@ -650,8 +658,8 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
     public void SendConnectToInstance(ConnectToSerial serial)
     {
-        IPAddress externalIp = IPAddress.Parse(Framework.Settings.ExternalAddress);
-        IPEndPoint instanceAddress = new IPEndPoint(externalIp, Framework.Settings.InstancePort);
+        IPAddress externalIp = IPAddress.Parse(_externalAddress);
+        IPEndPoint instanceAddress = new IPEndPoint(externalIp, _instancePort);
         
         _instanceConnectKey.AccountId = GetSession().AccountInfo.Id;
         _instanceConnectKey.connectionType = ConnectionType.Instance;
@@ -662,7 +670,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         ConnectTo connectTo = new();
         connectTo.Key = _instanceConnectKey.Raw;
         connectTo.Serial = serial;
-        connectTo.Payload.Port = (ushort)Framework.Settings.InstancePort;
+        connectTo.Payload.Port = (ushort)_instancePort;
         connectTo.Con = (byte)ConnectionType.Instance;
 
         if (instanceAddress.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
@@ -1143,7 +1151,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
                 return;
 
             using var clientPacket = (ClientPacket)Activator.CreateInstance(packetType, packet)!;
-            clientPacket.LogPacket(ref session.GetSession().ModernSniff);
+            clientPacket.LogPacket(ref session.GetSession().ModernSniff, session.GetSession().PacketLogContext);
             clientPacket.Read();
             methodCaller(session, clientPacket);
         }
