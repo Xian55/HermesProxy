@@ -11,10 +11,24 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace HermesProxy;
+
+// VersionBootstrap — the one-line mutable handoff point for ModernVersion / LegacyVersion.
+// Assigned exactly once at Host startup (ProxyHostedService.ExecuteAsync), and by the
+// test-assembly [ModuleInitializer] / benchmark GlobalSetup before any code touches the
+// two static classes. The static-readonly fields of ModernVersion / LegacyVersion are
+// initialized from these values via field initializers, keeping both types
+// beforefieldinit-clean so the JIT can fold Build / ExpansionVersion / table references
+// as constants on the per-packet hot path.
+internal static class VersionBootstrap
+{
+    internal static ClientVersionBuild ModernBuild;
+    internal static ClientVersionBuild LegacyBuild;
+}
 
 // This is class is a plain copy of ModernVersion/LegacyVersion/Opcodes but without static constructor
 public static class VersionChecker
@@ -129,72 +143,84 @@ public class UpdateFieldInfo
 }
 public static class LegacyVersion
 {
-    static LegacyVersion()
+    // Declaration order IS initialization order for static field initializers. Build must be
+    // declared first so the loaders below can reference it through the derived fields.
+    public static readonly ClientVersionBuild Build = RequireBuild();
+    public static readonly byte ExpansionVersion = GetExpansionVersion();
+    public static readonly byte MajorVersion = GetMajorPatchVersion();
+    public static readonly byte MinorVersion = GetMinorPatchVersion();
+
+    public static int BuildInt => (int)Build;
+    public static string VersionString => Build.ToString();
+
+    // Opcode translation uses direct-indexed arrays instead of FrozenDictionary. The per-version
+    // legacy Opcode enums are uint-backed and densely-enough populated (max value ~1060 for TBC,
+    // ~15k for modern) that flat arrays sized to (maxValue + 1) are both smaller than the
+    // dictionary-plus-hash overhead AND reduce lookup to a bounds check + single load that the
+    // JIT can inline and fold against the static-readonly array reference. Default slot value
+    // (Opcode 0 = MSG_NULL_ACTION, uint 0 = invalid) matches the "not found" return of the old
+    // dictionary path, so uninhabited array slots behave correctly without an explicit fill.
+    private static readonly Opcode[] _currentToUniversal;
+    private static readonly uint[]   _universalToCurrent;
+
+    // Field initializers run in textual order inside a beforefieldinit cctor; to keep both
+    // opcode-direction arrays populated by a single load pass (and to preserve beforefieldinit)
+    // we produce them from one helper via a throwaway marker field whose initializer has the
+    // side effect of assigning both arrays.
+    private static readonly bool _opcodeTablesLoaded = LoadOpcodeTables(out _currentToUniversal, out _universalToCurrent);
+
+    private static ClientVersionBuild RequireBuild()
     {
-        Build = Settings.ServerBuild;
-
-        ExpansionVersion = GetExpansionVersion();
-        MajorVersion = GetMajorPatchVersion();
-        MinorVersion = GetMinorPatchVersion();
-
-        UpdateFieldDictionary = new Dictionary<Type, SortedList<int, UpdateFieldInfo>>();
-        UpdateFieldNameDictionary = new Dictionary<Type, Dictionary<string, int>>();
-        if (!LoadUFDictionariesInto(UpdateFieldDictionary, UpdateFieldNameDictionary))
-            Log.Print(LogType.Error, "Could not load update fields for current legacy version.");
-
-        Type? enumType = Opcodes.GetOpcodesEnumForVersion(Build);
-        if (enumType == null)
-            Log.Print(LogType.Error, "1 Could not load opcodes for current legacy version.");
-
-        var dict1 = new Dictionary<uint, Opcode>();
-
-        foreach (var item in Enum.GetValues(enumType!))
-        {
-            string oldOpcodeName = Enum.GetName(enumType!, item)!;
-            Opcode universalOpcode = Opcodes.GetUniversalOpcode(oldOpcodeName);
-            if (universalOpcode == Opcode.MSG_NULL_ACTION &&
-                oldOpcodeName != "MSG_NULL_ACTION")
-            {
-                Log.Print(LogType.Error, $"Opcode {oldOpcodeName} is missing from the universal opcode enum!");
-                continue;
-            }
-
-            dict1.Add((uint)item, universalOpcode);
-        }
-
-        if (dict1.Count < 1)
-        {
-            Log.Print(LogType.Error, "1 Could not load opcodes for current legacy version.");
-            return;
-        }
-
-        CurrentToUniversalOpcodeDictionary = dict1.ToFrozenDictionary();
-        UniversalToCurrentOpcodeDictionary = dict1.ToFrozenDictionary(kvp => kvp.Value, kvp => kvp.Key);
-
-        ServerLogMessages.LoadedLegacyOpcodes(VersionChecker._melServer, VersionChecker._sourceFile, VersionChecker._netDirNone, CurrentToUniversalOpcodeDictionary.Count);
+        if (VersionBootstrap.LegacyBuild == ClientVersionBuild.Zero)
+            throw new InvalidOperationException(
+                "LegacyVersion accessed before VersionBootstrap.LegacyBuild was set. " +
+                "Host startup (ProxyHostedService.ExecuteAsync) or test/benchmark setup must assign it first.");
+        return VersionBootstrap.LegacyBuild;
     }
 
-    private static readonly FrozenDictionary<uint, Opcode> CurrentToUniversalOpcodeDictionary = FrozenDictionary<uint, Opcode>.Empty;
-    private static readonly FrozenDictionary<Opcode, uint> UniversalToCurrentOpcodeDictionary = FrozenDictionary<Opcode, uint>.Empty;
+    private static bool LoadOpcodeTables(out Opcode[] currentToUniversal, out uint[] universalToCurrent)
+    {
+        // The generator emits tables keyed by ClientVersionBuild members that correspond to the
+        // "defining" builds (V1_12_1_5875, V2_4_3_8606, V2_5_2_39570, …). At runtime any supported
+        // build is resolved to its defining build via Opcodes.GetOpcodesDefiningBuild so aliased
+        // builds (V1_12_2_6005, V2_5_2_40892, etc.) pick up the right table.
+        var definingBuild = Opcodes.GetOpcodesDefiningBuild(Build);
+        if (!GeneratedOpcodeTables.TryGet(definingBuild, out currentToUniversal, out universalToCurrent))
+        {
+            Log.Print(LogType.Error, "Could not load opcodes for current legacy version.");
+            return false;
+        }
 
+        ServerLogMessages.LoadedLegacyOpcodes(
+            VersionChecker._melServer, VersionChecker._sourceFile, VersionChecker._netDirNone,
+            CountMappings(universalToCurrent));
+        return true;
+    }
+
+    // Counts non-zero entries in the reverse table — matches the "pairs.Count" diagnostic the
+    // reflective loader used to print. Called once at startup, so the O(N) sweep is negligible.
+    private static int CountMappings(uint[] universalToCurrent)
+    {
+        int count = 0;
+        for (int i = 0; i < universalToCurrent.Length; i++)
+            if (universalToCurrent[i] != 0) count++;
+        return count;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Opcode GetUniversalOpcode(uint opcode)
     {
-        Opcode universalOpcode;
-        if (CurrentToUniversalOpcodeDictionary.TryGetValue(opcode, out universalOpcode))
-            return universalOpcode;
-        return Opcode.MSG_NULL_ACTION;
+        var table = _currentToUniversal;
+        return opcode < (uint)table.Length ? table[opcode] : Opcode.MSG_NULL_ACTION;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static uint GetCurrentOpcode(Opcode universalOpcode)
     {
-        uint opcode;
-        if (UniversalToCurrentOpcodeDictionary.TryGetValue(universalOpcode, out opcode))
-            return opcode;
-        return 0;
+        var table = _universalToCurrent;
+        uint idx = (uint)universalOpcode;
+        return idx < (uint)table.Length ? table[idx] : 0u;
     }
-
-    private static readonly Dictionary<Type, SortedList<int, UpdateFieldInfo>> UpdateFieldDictionary;
-    private static readonly Dictionary<Type, Dictionary<string, int>> UpdateFieldNameDictionary;
 
     public static ClientVersionBuild GetUpdateFieldsDefiningBuild()
     {
@@ -217,114 +243,78 @@ public static class LegacyVersion
         return ClientVersionBuild.Zero;
     }
 
-    private static bool LoadUFDictionariesInto(Dictionary<Type, SortedList<int, UpdateFieldInfo>> dicts,
-        Dictionary<Type, Dictionary<string, int>> nameToValueDict)
+    // Per-T generic static cache. The CLR allocates one set of static fields per closed
+    // generic instantiation (UpdateFields<PlayerField>, UpdateFields<UnitField>, …), so
+    // lookups become direct static-field reads with no Dictionary<Type,_> hop. Nested inside
+    // LegacyVersion so the same T used by ModernVersion.UpdateFields<T> resolves to a
+    // different (per-version) cache. Tables are emitted at compile time by
+    // HermesProxy.SourceGen.UpdateFieldTableGenerator.
+    private static class UpdateFields<T> where T : System.Enum
     {
-        Type[] enumTypes =
+        public static readonly int[] Keys;
+        public static readonly UpdateFieldInfo[] Infos;
+        public static readonly Dictionary<string, int>? NamesToValues;
+
+        static UpdateFields()
         {
-            typeof(ObjectField), typeof(ItemField), typeof(ContainerField), typeof(AzeriteEmpoweredItemField), typeof(AzeriteItemField), typeof(UnitField),
-            typeof(PlayerField), typeof(ActivePlayerField), typeof(GameObjectField), typeof(DynamicObjectField),
-            typeof(CorpseField), typeof(AreaTriggerField), typeof(SceneObjectField), typeof(ConversationField),
-            typeof(ObjectDynamicField), typeof(ItemDynamicField), typeof(ContainerDynamicField), typeof(AzeriteEmpoweredItemDynamicField), typeof(AzeriteItemDynamicField), typeof(UnitDynamicField),
-            typeof(PlayerDynamicField), typeof(ActivePlayerDynamicField), typeof(GameObjectDynamicField), typeof(DynamicObjectDynamicField),
-            typeof(CorpseDynamicField), typeof(AreaTriggerDynamicField), typeof(SceneObjectDynamicField), typeof(ConversationDynamicField)
-        };
-
-        ClientVersionBuild ufDefiningBuild = GetUpdateFieldsDefiningBuild(Build);
-        System.Diagnostics.Trace.Assert(ufDefiningBuild != ClientVersionBuild.Zero);
-
-        bool loaded = false;
-        foreach (Type enumType in enumTypes)
-        {
-            string vTypeString =
-                $"HermesProxy.World.Enums.{ufDefiningBuild.ToString()}.{enumType.Name}";
-            Type? vEnumType = Assembly.GetExecutingAssembly().GetType(vTypeString);
-            if (vEnumType == null)
+            var definingBuild = GetUpdateFieldsDefiningBuild(Build);
+            if (GeneratedUpdateFieldTables.TryGet(definingBuild, typeof(T),
+                out var keys, out var infos, out var names))
             {
-                vTypeString =
-                    $"HermesProxy.World.Enums.{ufDefiningBuild.ToString()}.{enumType.Name}";
-                vEnumType = Assembly.GetExecutingAssembly().GetType(vTypeString);
-                if (vEnumType == null)
-                    continue;   // versions prior to 4.3.0 do not have AreaTriggerField
+                Keys = keys;
+                Infos = infos;
+                NamesToValues = names;
             }
-
-            Array vValues = Enum.GetValues(vEnumType);
-            var vNames = Enum.GetNames(vEnumType);
-
-            var result = new SortedList<int, UpdateFieldInfo>(vValues.Length);
-            var namesResult = new Dictionary<string, int>(vNames.Length);
-
-            for (int i = 0; i < vValues.Length; ++i)
+            else
             {
-                var format = enumType.GetMember(vNames[i])
-                    .SelectMany(member => member.GetCustomAttributes(typeof(UpdateFieldAttribute), false))
-                    .Where(attribute => ((UpdateFieldAttribute)attribute).Version <= Build)
-                    .OrderByDescending(attribute => ((UpdateFieldAttribute)attribute).Version)
-                    .Select(attribute => ((UpdateFieldAttribute)attribute).UFAttribute)
-                    .DefaultIfEmpty(UpdateFieldType.Default).First();
-
-                result.Add((int)vValues.GetValue(i)!, new UpdateFieldInfo() { Value = (int)vValues.GetValue(i)!, Name = vNames[i], Size = 0, Format = format });
-                namesResult.Add(vNames[i], (int)vValues.GetValue(i)!);
+                Keys = Array.Empty<int>();
+                Infos = Array.Empty<UpdateFieldInfo>();
+                NamesToValues = null;
             }
-
-            for (var i = 0; i < result.Count - 1; ++i)
-                result.Values[i].Size = result.Keys[i + 1] - result.Keys[i];
-
-            dicts.Add(enumType, result);
-            nameToValueDict.Add(enumType, namesResult);
-            loaded = true;
         }
-
-        return loaded;
     }
 
     public static int GetUpdateField<T>(T field) where T: System.Enum // C# 7.3
     {
-        if (UpdateFieldNameDictionary.TryGetValue(typeof(T), out Dictionary<string, int>? byNamesDict))
-        {
-            if (byNamesDict.TryGetValue(field.ToString(), out int fieldValue))
-                return fieldValue;
-        }
-
+        var names = UpdateFields<T>.NamesToValues;
+        if (names != null && names.TryGetValue(field.ToString(), out int fieldValue))
+            return fieldValue;
         return -1;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static string GetUpdateFieldName<T>(int field) where T: System.Enum // C# 7.3
     {
-        SortedList<int, UpdateFieldInfo>? infoDict;
-        if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
-        {
-            if (infoDict.Count != 0)
-            {
-                var index = infoDict.BinarySearch(field);
-                if (index >= 0)
-                    return infoDict.Values[index].Name;
+        var keys = UpdateFields<T>.Keys;
+        var infos = UpdateFields<T>.Infos;
+        if (keys.Length == 0)
+            return field.ToString(CultureInfo.InvariantCulture);
 
-                index = ~index - 1;
-                var start = infoDict.Keys[index];
-                return infoDict.Values[index].Name + " + " + (field - start);
-            }
-        }
+        int idx = Array.BinarySearch(keys, field);
+        if (idx >= 0)
+            return infos[idx].Name;
 
-        return field.ToString(CultureInfo.InvariantCulture);
+        idx = ~idx - 1;
+        if (idx < 0) // field lower than every key
+            return field.ToString(CultureInfo.InvariantCulture);
+        return infos[idx].Name + " + " + (field - keys[idx]);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static UpdateFieldInfo? GetUpdateFieldInfo<T>(int field) where T: System.Enum // C# 7.3
     {
-        SortedList<int, UpdateFieldInfo>? infoDict;
-        if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
-        {
-            if (infoDict.Count != 0)
-            {
-                var index = infoDict.BinarySearch(field);
-                if (index >= 0)
-                    return infoDict.Values[index];
+        var keys = UpdateFields<T>.Keys;
+        if (keys.Length == 0)
+            return null;
 
-                return infoDict.Values[~index - 1];
-            }
-        }
+        int idx = Array.BinarySearch(keys, field);
+        if (idx >= 0)
+            return UpdateFields<T>.Infos[idx];
 
-        return null;
+        idx = ~idx - 1;
+        if (idx < 0) // field lower than every key
+            return null;
+        return UpdateFields<T>.Infos[idx];
     }
 
     public static Type? GetResponseCodesEnum()
@@ -339,16 +329,6 @@ public static class LegacyVersion
         }
         return null;
     }
-
-    public static readonly byte ExpansionVersion;
-    public static readonly byte MajorVersion;
-    public static readonly byte MinorVersion;
-
-    public static readonly ClientVersionBuild Build;
-
-    public static int BuildInt => (int)Build;
-
-    public static string VersionString => Build.ToString();
 
     private static byte GetExpansionVersion()
     {
@@ -459,75 +439,70 @@ public static class LegacyVersion
 
 public static class ModernVersion
 {
-    static ModernVersion()
+    // Declaration order IS initialization order for static field initializers. Build must be
+    // declared first so the loaders below can reference it through the derived fields.
+    public static readonly ClientVersionBuild Build = RequireBuild();
+    public static readonly byte ExpansionVersion = GetExpansionVersion();
+    public static readonly byte MajorVersion = GetMajorPatchVersion();
+    public static readonly byte MinorVersion = GetMinorPatchVersion();
+
+    public static int BuildInt => (int)Build;
+    public static string VersionString => Build.ToString();
+
+    // Same direct-indexed array scheme as LegacyVersion — see LegacyVersion for the rationale.
+    private static readonly Opcode[] _currentToUniversal;
+    private static readonly uint[]   _universalToCurrent;
+
+    private static readonly bool _opcodeTablesLoaded = LoadOpcodeTables(out _currentToUniversal, out _universalToCurrent);
+
+    private static ClientVersionBuild RequireBuild()
     {
-        Build = Settings.ClientBuild;
-
-        ExpansionVersion = GetExpansionVersion();
-        MajorVersion = GetMajorPatchVersion();
-        MinorVersion = GetMinorPatchVersion();
-
-        UpdateFieldDictionary = new Dictionary<Type, SortedList<int, UpdateFieldInfo>>();
-        UpdateFieldNameDictionary = new Dictionary<Type, Dictionary<string, int>>();
-
-        if (!LoadUFDictionariesInto(UpdateFieldDictionary, UpdateFieldNameDictionary))
-            Log.Print(LogType.Error, "Could not load update fields for current modern version.");
-
-        (CurrentToUniversalOpcodeDictionary, UniversalToCurrentOpcodeDictionary) = LoadOpcodeDictionaries();
-        if (CurrentToUniversalOpcodeDictionary.Count < 1)
-            Log.Print(LogType.Error, "Could not load opcodes for current modern version.");
+        if (VersionBootstrap.ModernBuild == ClientVersionBuild.Zero)
+            throw new InvalidOperationException(
+                "ModernVersion accessed before VersionBootstrap.ModernBuild was set. " +
+                "Host startup (ProxyHostedService.ExecuteAsync) or test/benchmark setup must assign it first.");
+        return VersionBootstrap.ModernBuild;
     }
 
-    private static readonly FrozenDictionary<uint, Opcode> CurrentToUniversalOpcodeDictionary;
-    private static readonly FrozenDictionary<Opcode, uint> UniversalToCurrentOpcodeDictionary;
-
-    private static (FrozenDictionary<uint, Opcode>, FrozenDictionary<Opcode, uint>) LoadOpcodeDictionaries()
+    private static bool LoadOpcodeTables(out Opcode[] currentToUniversal, out uint[] universalToCurrent)
     {
-        Type? enumType = Opcodes.GetOpcodesEnumForVersion(Build);
-        if (enumType == null)
-            return (FrozenDictionary<uint, Opcode>.Empty, FrozenDictionary<Opcode, uint>.Empty);
-
-        var dict = new Dictionary<uint, Opcode>();
-
-        foreach (var item in Enum.GetValues(enumType))
+        // Same generator-backed path as LegacyVersion. See LegacyVersion.LoadOpcodeTables for the rationale.
+        var definingBuild = Opcodes.GetOpcodesDefiningBuild(Build);
+        if (!GeneratedOpcodeTables.TryGet(definingBuild, out currentToUniversal, out universalToCurrent))
         {
-            string oldOpcodeName = Enum.GetName(enumType, item)!;
-            Opcode universalOpcode = Opcodes.GetUniversalOpcode(oldOpcodeName);
-            if (universalOpcode == Opcode.MSG_NULL_ACTION &&
-                oldOpcodeName != "MSG_NULL_ACTION")
-            {
-                Log.Print(LogType.Error, $"Opcode {oldOpcodeName} is missing from the universal opcode enum!");
-                continue;
-            }
-
-            dict.Add((uint)item, universalOpcode);
+            Log.Print(LogType.Error, "Could not load opcodes for current modern version.");
+            return false;
         }
 
-        if (dict.Count < 1)
-            return (FrozenDictionary<uint, Opcode>.Empty, FrozenDictionary<Opcode, uint>.Empty);
-
-        ServerLogMessages.LoadedModernOpcodes(VersionChecker._melServer, VersionChecker._sourceFile, VersionChecker._netDirNone, dict.Count);
-        return (dict.ToFrozenDictionary(), dict.ToFrozenDictionary(kvp => kvp.Value, kvp => kvp.Key));
+        ServerLogMessages.LoadedModernOpcodes(
+            VersionChecker._melServer, VersionChecker._sourceFile, VersionChecker._netDirNone,
+            CountMappings(universalToCurrent));
+        return true;
     }
 
+    // Same helper as LegacyVersion — call once at startup.
+    private static int CountMappings(uint[] universalToCurrent)
+    {
+        int count = 0;
+        for (int i = 0; i < universalToCurrent.Length; i++)
+            if (universalToCurrent[i] != 0) count++;
+        return count;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Opcode GetUniversalOpcode(uint opcode)
     {
-        Opcode universalOpcode;
-        if (CurrentToUniversalOpcodeDictionary.TryGetValue(opcode, out universalOpcode))
-            return universalOpcode;
-        return Opcode.MSG_NULL_ACTION;
+        var table = _currentToUniversal;
+        return opcode < (uint)table.Length ? table[opcode] : Opcode.MSG_NULL_ACTION;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static uint GetCurrentOpcode(Opcode universalOpcode)
     {
-        uint opcode;
-        if (UniversalToCurrentOpcodeDictionary.TryGetValue(universalOpcode, out opcode))
-            return opcode;
-        return 0;
+        var table = _universalToCurrent;
+        uint idx = (uint)universalOpcode;
+        return idx < (uint)table.Length ? table[idx] : 0u;
     }
-
-    private static readonly Dictionary<Type, SortedList<int, UpdateFieldInfo>> UpdateFieldDictionary;
-    private static readonly Dictionary<Type, Dictionary<string, int>> UpdateFieldNameDictionary;
 
     public static ClientVersionBuild GetUpdateFieldsDefiningBuild()
     {
@@ -596,116 +571,74 @@ public static class ModernVersion
         return ClientVersionBuild.Zero;
     }
 
-    private static bool LoadUFDictionariesInto(Dictionary<Type, SortedList<int, UpdateFieldInfo>> dicts,
-        Dictionary<Type, Dictionary<string, int>> nameToValueDict)
+    // Same per-T generic static cache pattern as LegacyVersion. See the LegacyVersion copy.
+    // Tables are emitted at compile time by HermesProxy.SourceGen.UpdateFieldTableGenerator.
+    private static class UpdateFields<T> where T : System.Enum
     {
-        Type[] enumTypes =
+        public static readonly int[] Keys;
+        public static readonly UpdateFieldInfo[] Infos;
+        public static readonly Dictionary<string, int>? NamesToValues;
+
+        static UpdateFields()
         {
-            typeof(ObjectField), typeof(ItemField), typeof(ContainerField), typeof(AzeriteEmpoweredItemField), typeof(AzeriteItemField), typeof(UnitField),
-            typeof(PlayerField), typeof(ActivePlayerField), typeof(GameObjectField), typeof(DynamicObjectField),
-            typeof(CorpseField), typeof(AreaTriggerField), typeof(SceneObjectField), typeof(ConversationField),
-            typeof(ObjectDynamicField), typeof(ItemDynamicField), typeof(ContainerDynamicField), typeof(AzeriteEmpoweredItemDynamicField), typeof(AzeriteItemDynamicField), typeof(UnitDynamicField),
-            typeof(PlayerDynamicField), typeof(ActivePlayerDynamicField), typeof(GameObjectDynamicField), typeof(DynamicObjectDynamicField),
-            typeof(CorpseDynamicField), typeof(AreaTriggerDynamicField), typeof(SceneObjectDynamicField), typeof(ConversationDynamicField)
-        };
-
-        ClientVersionBuild ufDefiningBuild = GetUpdateFieldsDefiningBuild(Build);
-        System.Diagnostics.Trace.Assert(ufDefiningBuild != ClientVersionBuild.Zero);
-
-        bool loaded = false;
-        foreach (Type enumType in enumTypes)
-        {
-            string vTypeString =
-                $"HermesProxy.World.Enums.{ufDefiningBuild.ToString()}.{enumType.Name}";
-            Type? vEnumType = Assembly.GetExecutingAssembly().GetType(vTypeString);
-            if (vEnumType == null)
+            var definingBuild = GetUpdateFieldsDefiningBuild(Build);
+            if (GeneratedUpdateFieldTables.TryGet(definingBuild, typeof(T),
+                out var keys, out var infos, out var names))
             {
-                vTypeString =
-                    $"HermesProxy.World.Enums.{ufDefiningBuild.ToString()}.{enumType.Name}";
-                vEnumType = Assembly.GetExecutingAssembly().GetType(vTypeString);
-                if (vEnumType == null)
-                    continue;   // versions prior to 4.3.0 do not have AreaTriggerField
+                Keys = keys;
+                Infos = infos;
+                NamesToValues = names;
             }
-
-            Array vValues = Enum.GetValues(vEnumType);
-            var vNames = Enum.GetNames(vEnumType);
-
-            var result = new SortedList<int, UpdateFieldInfo>(vValues.Length);
-            var namesResult = new Dictionary<string, int>(vNames.Length);
-
-            for (int i = 0; i < vValues.Length; ++i)
+            else
             {
-                var format = enumType.GetMember(vNames[i])
-                    .SelectMany(member => member.GetCustomAttributes(typeof(UpdateFieldAttribute), false))
-                    .Where(attribute => ((UpdateFieldAttribute)attribute).Version <= Build)
-                    .OrderByDescending(attribute => ((UpdateFieldAttribute)attribute).Version)
-                    .Select(attribute => ((UpdateFieldAttribute)attribute).UFAttribute)
-                    .DefaultIfEmpty(UpdateFieldType.Default).First();
-
-                result.Add((int)vValues.GetValue(i)!, new UpdateFieldInfo() { Value = (int)vValues.GetValue(i)!, Name = vNames[i], Size = 0, Format = format });
-                namesResult.Add(vNames[i], (int)vValues.GetValue(i)!);
+                Keys = Array.Empty<int>();
+                Infos = Array.Empty<UpdateFieldInfo>();
+                NamesToValues = null;
             }
-
-            for (var i = 0; i < result.Count - 1; ++i)
-                result.Values[i].Size = result.Keys[i + 1] - result.Keys[i];
-
-            dicts.Add(enumType, result);
-            nameToValueDict.Add(enumType, namesResult);
-            loaded = true;
         }
-
-        return loaded;
     }
 
     public static int GetUpdateField<T>(T field) where T: System.Enum // C# 7.3
     {
-        Dictionary<string, int>? byNamesDict;
-        if (UpdateFieldNameDictionary.TryGetValue(typeof(T), out byNamesDict))
-        {
-            int fieldValue;
-            if (byNamesDict.TryGetValue(field.ToString(), out fieldValue))
-                return fieldValue;
-        }
-
+        var names = UpdateFields<T>.NamesToValues;
+        if (names != null && names.TryGetValue(field.ToString(), out int fieldValue))
+            return fieldValue;
         return -1;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static string GetUpdateFieldName<T>(int field) where T: System.Enum // C# 7.3
     {
-        SortedList<int, UpdateFieldInfo>? infoDict;
-        if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
-        {
-            if (infoDict.Count != 0)
-            {
-                var index = infoDict.BinarySearch(field);
-                if (index >= 0)
-                    return infoDict.Values[index].Name;
+        var keys = UpdateFields<T>.Keys;
+        var infos = UpdateFields<T>.Infos;
+        if (keys.Length == 0)
+            return field.ToString(CultureInfo.InvariantCulture);
 
-                index = ~index - 1;
-                var start = infoDict.Keys[index];
-                return infoDict.Values[index].Name + " + " + (field - start);
-            }
-        }
+        int idx = Array.BinarySearch(keys, field);
+        if (idx >= 0)
+            return infos[idx].Name;
 
-        return field.ToString(CultureInfo.InvariantCulture);
+        idx = ~idx - 1;
+        if (idx < 0) // field lower than every key
+            return field.ToString(CultureInfo.InvariantCulture);
+        return infos[idx].Name + " + " + (field - keys[idx]);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static UpdateFieldInfo? GetUpdateFieldInfo<T>(int field) where T: System.Enum // C# 7.3
     {
-        SortedList<int, UpdateFieldInfo>? infoDict;
-        if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
-        {
-            if (infoDict.Count != 0)
-            {
-                var index = infoDict.BinarySearch(field);
-                if (index >= 0)
-                    return infoDict.Values[index];
+        var keys = UpdateFields<T>.Keys;
+        if (keys.Length == 0)
+            return null;
 
-                return infoDict.Values[~index - 1];
-            }
-        }
+        int idx = Array.BinarySearch(keys, field);
+        if (idx >= 0)
+            return UpdateFields<T>.Infos[idx];
 
-        return null;
+        idx = ~idx - 1;
+        if (idx < 0) // field lower than every key
+            return null;
+        return UpdateFields<T>.Infos[idx];
     }
 
     public static Type? GetResponseCodesEnum()
@@ -720,15 +653,6 @@ public static class ModernVersion
         }
         return null;
     }
-
-    public static readonly byte ExpansionVersion;
-    public static readonly byte MajorVersion;
-    public static readonly byte MinorVersion;
-    public static readonly ClientVersionBuild Build;
-
-    public static int BuildInt => (int)Build;
-
-    public static string VersionString => Build.ToString();
 
     private static byte GetExpansionVersion()
     {
