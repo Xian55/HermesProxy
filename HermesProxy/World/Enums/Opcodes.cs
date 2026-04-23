@@ -9,94 +9,78 @@ namespace HermesProxy.World.Enums;
 
 public static class Opcodes
 {
-    public static ClientVersionBuild GetOpcodesDefiningBuild(ClientVersionBuild version)
-    {
-        switch (version)
+    public static ClientVersionBuild GetOpcodesDefiningBuild(ClientVersionBuild version) =>
+        version switch
         {
-            case ClientVersionBuild.V1_12_1_5875:
-            case ClientVersionBuild.V1_12_2_6005:
-            case ClientVersionBuild.V1_12_3_6141:
-                return ClientVersionBuild.V1_12_1_5875;
-            case ClientVersionBuild.V2_4_3_8606:
-                return ClientVersionBuild.V2_4_3_8606;
-            case ClientVersionBuild.V3_3_5a_12340:
-                return ClientVersionBuild.V3_3_5a_12340;
-            case ClientVersionBuild.V2_5_2_39570:
-            case ClientVersionBuild.V2_5_2_39618:
-            case ClientVersionBuild.V2_5_2_39926:
-            case ClientVersionBuild.V2_5_2_40011:
-            case ClientVersionBuild.V2_5_2_40045:
-            case ClientVersionBuild.V2_5_2_40203:
-            case ClientVersionBuild.V2_5_2_40260:
-            case ClientVersionBuild.V2_5_2_40422:
-            case ClientVersionBuild.V2_5_2_40488:
-            case ClientVersionBuild.V2_5_2_40617:
-            case ClientVersionBuild.V2_5_2_40892:
-            case ClientVersionBuild.V2_5_2_41446:
-            case ClientVersionBuild.V2_5_2_41510:
-            case ClientVersionBuild.V1_14_0_39802:
-            case ClientVersionBuild.V1_14_0_39958:
-            case ClientVersionBuild.V1_14_0_40140:
-            case ClientVersionBuild.V1_14_0_40179:
-            case ClientVersionBuild.V1_14_0_40237:
-            case ClientVersionBuild.V1_14_0_40347:
-            case ClientVersionBuild.V1_14_0_40441:
-            case ClientVersionBuild.V1_14_0_40618:
-                return ClientVersionBuild.V2_5_2_39570;
-            case ClientVersionBuild.V1_14_1_40487:
-            case ClientVersionBuild.V1_14_1_40594:
-            case ClientVersionBuild.V1_14_1_40666:
-            case ClientVersionBuild.V1_14_1_40688:
-            case ClientVersionBuild.V1_14_1_40800:
-            case ClientVersionBuild.V1_14_1_40818:
-            case ClientVersionBuild.V1_14_1_40926:
-            case ClientVersionBuild.V1_14_1_40962:
-            case ClientVersionBuild.V1_14_1_41009:
-            case ClientVersionBuild.V1_14_1_41030:
-            case ClientVersionBuild.V1_14_1_41077:
-            case ClientVersionBuild.V1_14_1_41137:
-            case ClientVersionBuild.V1_14_1_41243:
-            case ClientVersionBuild.V1_14_1_41511:
-            case ClientVersionBuild.V1_14_1_41794:
-            case ClientVersionBuild.V1_14_1_42032:
-                return ClientVersionBuild.V1_14_1_40688;
-            case ClientVersionBuild.V2_5_3_41402:
-            case ClientVersionBuild.V2_5_3_41531:
-            case ClientVersionBuild.V2_5_3_41750:
-            case ClientVersionBuild.V2_5_3_41812:
-            case ClientVersionBuild.V2_5_3_42083:
-            case ClientVersionBuild.V2_5_3_42328:
-            case ClientVersionBuild.V2_5_3_42598:
-            case ClientVersionBuild.V1_14_2_41858:
-            case ClientVersionBuild.V1_14_2_41959:
-            case ClientVersionBuild.V1_14_2_42065:
-            case ClientVersionBuild.V1_14_2_42082:
-            case ClientVersionBuild.V1_14_2_42214:
-            case ClientVersionBuild.V1_14_2_42597:
-                return ClientVersionBuild.V2_5_3_41750;
-        }
-        return ClientVersionBuild.Zero;
-    }
+            ClientVersionBuild.V1_12_1_5875
+                or ClientVersionBuild.V1_12_2_6005
+                or ClientVersionBuild.V1_12_3_6141 => ClientVersionBuild.V1_12_1_5875,
+            ClientVersionBuild.V2_4_3_8606 => ClientVersionBuild.V2_4_3_8606,
+            ClientVersionBuild.V3_3_5a_12340 => ClientVersionBuild.V3_3_5a_12340,
+            ClientVersionBuild.V2_5_2_39570
+                or ClientVersionBuild.V2_5_2_39618
+                or ClientVersionBuild.V2_5_2_39926
+                or ClientVersionBuild.V2_5_2_40011
+                or ClientVersionBuild.V2_5_2_40045
+                or ClientVersionBuild.V2_5_2_40203
+                or ClientVersionBuild.V2_5_2_40260
+                or ClientVersionBuild.V2_5_2_40422
+                or ClientVersionBuild.V2_5_2_40488
+                or ClientVersionBuild.V2_5_2_40617
+                or ClientVersionBuild.V2_5_2_40892
+                or ClientVersionBuild.V2_5_2_41446
+                or ClientVersionBuild.V2_5_2_41510
+                or ClientVersionBuild.V1_14_0_39802
+                or ClientVersionBuild.V1_14_0_39958
+                or ClientVersionBuild.V1_14_0_40140
+                or ClientVersionBuild.V1_14_0_40179
+                or ClientVersionBuild.V1_14_0_40237
+                or ClientVersionBuild.V1_14_0_40347
+                or ClientVersionBuild.V1_14_0_40441
+                or ClientVersionBuild.V1_14_0_40618 => ClientVersionBuild.V2_5_2_39570,
+            ClientVersionBuild.V1_14_1_40487
+                or ClientVersionBuild.V1_14_1_40594
+                or ClientVersionBuild.V1_14_1_40666
+                or ClientVersionBuild.V1_14_1_40688
+                or ClientVersionBuild.V1_14_1_40800
+                or ClientVersionBuild.V1_14_1_40818
+                or ClientVersionBuild.V1_14_1_40926
+                or ClientVersionBuild.V1_14_1_40962
+                or ClientVersionBuild.V1_14_1_41009
+                or ClientVersionBuild.V1_14_1_41030
+                or ClientVersionBuild.V1_14_1_41077
+                or ClientVersionBuild.V1_14_1_41137
+                or ClientVersionBuild.V1_14_1_41243
+                or ClientVersionBuild.V1_14_1_41511
+                or ClientVersionBuild.V1_14_1_41794
+                or ClientVersionBuild.V1_14_1_42032 => ClientVersionBuild.V1_14_1_40688,
+            ClientVersionBuild.V2_5_3_41402
+                or ClientVersionBuild.V2_5_3_41531
+                or ClientVersionBuild.V2_5_3_41750
+                or ClientVersionBuild.V2_5_3_41812
+                or ClientVersionBuild.V2_5_3_42083
+                or ClientVersionBuild.V2_5_3_42328
+                or ClientVersionBuild.V2_5_3_42598
+                or ClientVersionBuild.V1_14_2_41858
+                or ClientVersionBuild.V1_14_2_41959
+                or ClientVersionBuild.V1_14_2_42065
+                or ClientVersionBuild.V1_14_2_42082
+                or ClientVersionBuild.V1_14_2_42214
+                or ClientVersionBuild.V1_14_2_42597 => ClientVersionBuild.V2_5_3_41750,
+            _ => ClientVersionBuild.Zero,
+        };
 
-    public static Type? GetOpcodesEnumForVersion(ClientVersionBuild version)
-    {
-        switch (GetOpcodesDefiningBuild(version))
+    public static Type? GetOpcodesEnumForVersion(ClientVersionBuild version) =>
+        GetOpcodesDefiningBuild(version) switch
         {
-            case ClientVersionBuild.V1_12_1_5875:
-                return typeof(V1_12_1_5875.Opcode);
-            case ClientVersionBuild.V2_4_3_8606:
-                return typeof(V2_4_3_8606.Opcode);
-            case ClientVersionBuild.V3_3_5a_12340:
-                return typeof(V3_3_5a_12340.Opcode);
-            case ClientVersionBuild.V2_5_2_39570:
-                return typeof(V2_5_2_39570.Opcode);
-            case ClientVersionBuild.V2_5_3_41750:
-                return typeof(V2_5_3_41750.Opcode);
-            case ClientVersionBuild.V1_14_1_40688:
-                return typeof(V1_14_1_40688.Opcode);
-        }
-        return null;
-    }
+            ClientVersionBuild.V1_12_1_5875 => typeof(V1_12_1_5875.Opcode),
+            ClientVersionBuild.V2_4_3_8606 => typeof(V2_4_3_8606.Opcode),
+            ClientVersionBuild.V3_3_5a_12340 => typeof(V3_3_5a_12340.Opcode),
+            ClientVersionBuild.V2_5_2_39570 => typeof(V2_5_2_39570.Opcode),
+            ClientVersionBuild.V2_5_3_41750 => typeof(V2_5_3_41750.Opcode),
+            ClientVersionBuild.V1_14_1_40688 => typeof(V1_14_1_40688.Opcode),
+            _ => null,
+        };
 
     public static uint GetOpcodeValueForVersion(Opcode opcode, ClientVersionBuild version)
     {

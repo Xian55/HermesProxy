@@ -1,0 +1,11 @@
+root = true
+
+[*.cs]
+
+# IDE0066: Convert switch statement to switch expression
+# https://learn.microsoft.com/dotnet/fundamentals/code-analysis/style-rules/ide0066
+# Surfaces as an IDE suggestion with a one-click quick-fix. Only fires on pure
+# value-returning switches (no side effects), so packet-handler dispatch switches
+# that call handler methods are correctly left alone.
+dotnet_style_prefer_switch_expression = true:suggestion
+dotnet_diagnostic.IDE0066.severity = suggestion

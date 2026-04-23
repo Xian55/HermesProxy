@@ -38,84 +38,72 @@ public static class VersionChecker
     internal static readonly string _sourceFile = nameof(VersionChecker).PadRight(15);
     internal const string _netDirNone = "";
 
-    public static bool IsSupportedLegacyVersion(ClientVersionBuild legacyVersion)
-    {
-        switch (legacyVersion)
+    public static bool IsSupportedLegacyVersion(ClientVersionBuild legacyVersion) =>
+        legacyVersion switch
         {
-            case ClientVersionBuild.V1_12_1_5875:
-            case ClientVersionBuild.V1_12_2_6005:
-            case ClientVersionBuild.V1_12_3_6141:
-                return true;
-            case ClientVersionBuild.V2_4_3_8606:
-                return true;
-            case ClientVersionBuild.V3_3_5a_12340:
-                return true;
-        }
+            ClientVersionBuild.V1_12_1_5875
+                or ClientVersionBuild.V1_12_2_6005
+                or ClientVersionBuild.V1_12_3_6141
+                or ClientVersionBuild.V2_4_3_8606
+                or ClientVersionBuild.V3_3_5a_12340 => true,
+            _ => false,
+        };
 
-        return false;
-    }
-
-    public static bool IsSupportedModernVersion(ClientVersionBuild modernVersion)
-    {
-        switch (modernVersion)
+    public static bool IsSupportedModernVersion(ClientVersionBuild modernVersion) =>
+        modernVersion switch
         {
-            case ClientVersionBuild.V2_5_2_39570:
-            case ClientVersionBuild.V2_5_2_39618:
-            case ClientVersionBuild.V2_5_2_39926:
-            case ClientVersionBuild.V2_5_2_40011:
-            case ClientVersionBuild.V2_5_2_40045:
-            case ClientVersionBuild.V2_5_2_40203:
-            case ClientVersionBuild.V2_5_2_40260:
-            case ClientVersionBuild.V2_5_2_40422:
-            case ClientVersionBuild.V2_5_2_40488:
-            case ClientVersionBuild.V2_5_2_40617:
-            case ClientVersionBuild.V2_5_2_40892:
-            case ClientVersionBuild.V2_5_2_41446:
-            case ClientVersionBuild.V2_5_2_41510:
-            case ClientVersionBuild.V1_14_0_39802:
-            case ClientVersionBuild.V1_14_0_39958:
-            case ClientVersionBuild.V1_14_0_40140:
-            case ClientVersionBuild.V1_14_0_40179:
-            case ClientVersionBuild.V1_14_0_40237:
-            case ClientVersionBuild.V1_14_0_40347:
-            case ClientVersionBuild.V1_14_0_40441:
-            case ClientVersionBuild.V1_14_0_40618:
-                return true;
-            case ClientVersionBuild.V1_14_1_40487:
-            case ClientVersionBuild.V1_14_1_40594:
-            case ClientVersionBuild.V1_14_1_40666:
-            case ClientVersionBuild.V1_14_1_40688:
-            case ClientVersionBuild.V1_14_1_40800:
-            case ClientVersionBuild.V1_14_1_40818:
-            case ClientVersionBuild.V1_14_1_40926:
-            case ClientVersionBuild.V1_14_1_40962:
-            case ClientVersionBuild.V1_14_1_41009:
-            case ClientVersionBuild.V1_14_1_41030:
-            case ClientVersionBuild.V1_14_1_41077:
-            case ClientVersionBuild.V1_14_1_41137:
-            case ClientVersionBuild.V1_14_1_41243:
-            case ClientVersionBuild.V1_14_1_41511:
-            case ClientVersionBuild.V1_14_1_41794:
-            case ClientVersionBuild.V1_14_1_42032:
-                return true;
-            case ClientVersionBuild.V2_5_3_41402:
-            case ClientVersionBuild.V2_5_3_41531:
-            case ClientVersionBuild.V2_5_3_41750:
-            case ClientVersionBuild.V2_5_3_41812:
-            case ClientVersionBuild.V2_5_3_42083:
-            case ClientVersionBuild.V2_5_3_42328:
-            case ClientVersionBuild.V2_5_3_42598:
-            case ClientVersionBuild.V1_14_2_41858:
-            case ClientVersionBuild.V1_14_2_41959:
-            case ClientVersionBuild.V1_14_2_42065:
-            case ClientVersionBuild.V1_14_2_42082:
-            case ClientVersionBuild.V1_14_2_42214:
-            case ClientVersionBuild.V1_14_2_42597:
-                return true;
-        }
-
-        return false;
-    }
+            ClientVersionBuild.V2_5_2_39570
+                or ClientVersionBuild.V2_5_2_39618
+                or ClientVersionBuild.V2_5_2_39926
+                or ClientVersionBuild.V2_5_2_40011
+                or ClientVersionBuild.V2_5_2_40045
+                or ClientVersionBuild.V2_5_2_40203
+                or ClientVersionBuild.V2_5_2_40260
+                or ClientVersionBuild.V2_5_2_40422
+                or ClientVersionBuild.V2_5_2_40488
+                or ClientVersionBuild.V2_5_2_40617
+                or ClientVersionBuild.V2_5_2_40892
+                or ClientVersionBuild.V2_5_2_41446
+                or ClientVersionBuild.V2_5_2_41510
+                or ClientVersionBuild.V1_14_0_39802
+                or ClientVersionBuild.V1_14_0_39958
+                or ClientVersionBuild.V1_14_0_40140
+                or ClientVersionBuild.V1_14_0_40179
+                or ClientVersionBuild.V1_14_0_40237
+                or ClientVersionBuild.V1_14_0_40347
+                or ClientVersionBuild.V1_14_0_40441
+                or ClientVersionBuild.V1_14_0_40618
+                or ClientVersionBuild.V1_14_1_40487
+                or ClientVersionBuild.V1_14_1_40594
+                or ClientVersionBuild.V1_14_1_40666
+                or ClientVersionBuild.V1_14_1_40688
+                or ClientVersionBuild.V1_14_1_40800
+                or ClientVersionBuild.V1_14_1_40818
+                or ClientVersionBuild.V1_14_1_40926
+                or ClientVersionBuild.V1_14_1_40962
+                or ClientVersionBuild.V1_14_1_41009
+                or ClientVersionBuild.V1_14_1_41030
+                or ClientVersionBuild.V1_14_1_41077
+                or ClientVersionBuild.V1_14_1_41137
+                or ClientVersionBuild.V1_14_1_41243
+                or ClientVersionBuild.V1_14_1_41511
+                or ClientVersionBuild.V1_14_1_41794
+                or ClientVersionBuild.V1_14_1_42032
+                or ClientVersionBuild.V2_5_3_41402
+                or ClientVersionBuild.V2_5_3_41531
+                or ClientVersionBuild.V2_5_3_41750
+                or ClientVersionBuild.V2_5_3_41812
+                or ClientVersionBuild.V2_5_3_42083
+                or ClientVersionBuild.V2_5_3_42328
+                or ClientVersionBuild.V2_5_3_42598
+                or ClientVersionBuild.V1_14_2_41858
+                or ClientVersionBuild.V1_14_2_41959
+                or ClientVersionBuild.V1_14_2_42065
+                or ClientVersionBuild.V1_14_2_42082
+                or ClientVersionBuild.V1_14_2_42214
+                or ClientVersionBuild.V1_14_2_42597 => true,
+            _ => false,
+        };
 
     public static ClientVersionBuild GetBestLegacyVersion(ClientVersionBuild modernVersion)
     {
@@ -228,21 +216,16 @@ public static class LegacyVersion
         return GetUpdateFieldsDefiningBuild(Build);
     }
 
-    public static ClientVersionBuild GetUpdateFieldsDefiningBuild(ClientVersionBuild version)
-    {
-        switch (version)
+    public static ClientVersionBuild GetUpdateFieldsDefiningBuild(ClientVersionBuild version) =>
+        version switch
         {
-            case ClientVersionBuild.V1_12_1_5875:
-            case ClientVersionBuild.V1_12_2_6005:
-            case ClientVersionBuild.V1_12_3_6141:
-                return ClientVersionBuild.V1_12_1_5875;
-            case ClientVersionBuild.V2_4_3_8606:
-                return ClientVersionBuild.V2_4_3_8606;
-            case ClientVersionBuild.V3_3_5a_12340:
-                return ClientVersionBuild.V3_3_5a_12340;
-        }
-        return ClientVersionBuild.Zero;
-    }
+            ClientVersionBuild.V1_12_1_5875
+                or ClientVersionBuild.V1_12_2_6005
+                or ClientVersionBuild.V1_12_3_6141 => ClientVersionBuild.V1_12_1_5875,
+            ClientVersionBuild.V2_4_3_8606 => ClientVersionBuild.V2_4_3_8606,
+            ClientVersionBuild.V3_3_5a_12340 => ClientVersionBuild.V3_3_5a_12340,
+            _ => ClientVersionBuild.Zero,
+        };
 
     // Per-T generic static cache. The CLR allocates one set of static fields per closed
     // generic instantiation (UpdateFields<PlayerField>, UpdateFields<UnitField>, …), so
@@ -318,18 +301,14 @@ public static class LegacyVersion
         return UpdateFields<T>.Infos[idx];
     }
 
-    public static Type? GetResponseCodesEnum()
-    {
-        switch (Opcodes.GetOpcodesDefiningBuild(Build))
+    public static Type? GetResponseCodesEnum() =>
+        Opcodes.GetOpcodesDefiningBuild(Build) switch
         {
-            case ClientVersionBuild.V1_12_1_5875:
-                return typeof(World.Enums.V1_12_1_5875.ResponseCodes);
-            case ClientVersionBuild.V2_4_3_8606:
-            case ClientVersionBuild.V3_3_5a_12340:
-                return typeof(World.Enums.V2_4_3_8606.ResponseCodes);
-        }
-        return null;
-    }
+            ClientVersionBuild.V1_12_1_5875 => typeof(World.Enums.V1_12_1_5875.ResponseCodes),
+            ClientVersionBuild.V2_4_3_8606
+                or ClientVersionBuild.V3_3_5a_12340 => typeof(World.Enums.V2_4_3_8606.ResponseCodes),
+            _ => null,
+        };
 
     private static byte GetExpansionVersion()
     {
@@ -514,67 +493,61 @@ public static class ModernVersion
         return GetUpdateFieldsDefiningBuild(Build);
     }
 
-    public static ClientVersionBuild GetUpdateFieldsDefiningBuild(ClientVersionBuild version)
-    {
-        switch (version)
+    public static ClientVersionBuild GetUpdateFieldsDefiningBuild(ClientVersionBuild version) =>
+        version switch
         {
-            case ClientVersionBuild.V1_14_0_39802:
-            case ClientVersionBuild.V1_14_0_39958:
-            case ClientVersionBuild.V1_14_0_40140:
-            case ClientVersionBuild.V1_14_0_40179:
-            case ClientVersionBuild.V1_14_0_40237:
-            case ClientVersionBuild.V1_14_0_40347:
-            case ClientVersionBuild.V1_14_0_40441:
-            case ClientVersionBuild.V1_14_0_40618:
-                return ClientVersionBuild.V1_14_0_40237;
-            case ClientVersionBuild.V1_14_1_40487:
-            case ClientVersionBuild.V1_14_1_40594:
-            case ClientVersionBuild.V1_14_1_40666:
-            case ClientVersionBuild.V1_14_1_40688:
-            case ClientVersionBuild.V1_14_1_40800:
-            case ClientVersionBuild.V1_14_1_40818:
-            case ClientVersionBuild.V1_14_1_40926:
-            case ClientVersionBuild.V1_14_1_40962:
-            case ClientVersionBuild.V1_14_1_41009:
-            case ClientVersionBuild.V1_14_1_41030:
-            case ClientVersionBuild.V1_14_1_41077:
-            case ClientVersionBuild.V1_14_1_41137:
-            case ClientVersionBuild.V1_14_1_41243:
-            case ClientVersionBuild.V1_14_1_41511:
-            case ClientVersionBuild.V1_14_1_41794:
-            case ClientVersionBuild.V1_14_1_42032:
-            case ClientVersionBuild.V1_14_2_41858:
-            case ClientVersionBuild.V1_14_2_41959:
-            case ClientVersionBuild.V1_14_2_42065:
-            case ClientVersionBuild.V1_14_2_42082:
-            case ClientVersionBuild.V1_14_2_42214:
-            case ClientVersionBuild.V1_14_2_42597:
-                return ClientVersionBuild.V1_14_1_40688;
-            case ClientVersionBuild.V2_5_2_39570:
-            case ClientVersionBuild.V2_5_2_39618:
-            case ClientVersionBuild.V2_5_2_39926:
-            case ClientVersionBuild.V2_5_2_40011:
-            case ClientVersionBuild.V2_5_2_40045:
-            case ClientVersionBuild.V2_5_2_40203:
-            case ClientVersionBuild.V2_5_2_40260:
-            case ClientVersionBuild.V2_5_2_40422:
-            case ClientVersionBuild.V2_5_2_40488:
-            case ClientVersionBuild.V2_5_2_40617:
-            case ClientVersionBuild.V2_5_2_40892:
-            case ClientVersionBuild.V2_5_2_41446:
-            case ClientVersionBuild.V2_5_2_41510:
-                return ClientVersionBuild.V2_5_2_39570;
-            case ClientVersionBuild.V2_5_3_41402:
-            case ClientVersionBuild.V2_5_3_41531:
-            case ClientVersionBuild.V2_5_3_41750:
-            case ClientVersionBuild.V2_5_3_41812:
-            case ClientVersionBuild.V2_5_3_42083:
-            case ClientVersionBuild.V2_5_3_42328:
-            case ClientVersionBuild.V2_5_3_42598:
-                return ClientVersionBuild.V2_5_3_41750;
-        }
-        return ClientVersionBuild.Zero;
-    }
+            ClientVersionBuild.V1_14_0_39802
+                or ClientVersionBuild.V1_14_0_39958
+                or ClientVersionBuild.V1_14_0_40140
+                or ClientVersionBuild.V1_14_0_40179
+                or ClientVersionBuild.V1_14_0_40237
+                or ClientVersionBuild.V1_14_0_40347
+                or ClientVersionBuild.V1_14_0_40441
+                or ClientVersionBuild.V1_14_0_40618 => ClientVersionBuild.V1_14_0_40237,
+            ClientVersionBuild.V1_14_1_40487
+                or ClientVersionBuild.V1_14_1_40594
+                or ClientVersionBuild.V1_14_1_40666
+                or ClientVersionBuild.V1_14_1_40688
+                or ClientVersionBuild.V1_14_1_40800
+                or ClientVersionBuild.V1_14_1_40818
+                or ClientVersionBuild.V1_14_1_40926
+                or ClientVersionBuild.V1_14_1_40962
+                or ClientVersionBuild.V1_14_1_41009
+                or ClientVersionBuild.V1_14_1_41030
+                or ClientVersionBuild.V1_14_1_41077
+                or ClientVersionBuild.V1_14_1_41137
+                or ClientVersionBuild.V1_14_1_41243
+                or ClientVersionBuild.V1_14_1_41511
+                or ClientVersionBuild.V1_14_1_41794
+                or ClientVersionBuild.V1_14_1_42032
+                or ClientVersionBuild.V1_14_2_41858
+                or ClientVersionBuild.V1_14_2_41959
+                or ClientVersionBuild.V1_14_2_42065
+                or ClientVersionBuild.V1_14_2_42082
+                or ClientVersionBuild.V1_14_2_42214
+                or ClientVersionBuild.V1_14_2_42597 => ClientVersionBuild.V1_14_1_40688,
+            ClientVersionBuild.V2_5_2_39570
+                or ClientVersionBuild.V2_5_2_39618
+                or ClientVersionBuild.V2_5_2_39926
+                or ClientVersionBuild.V2_5_2_40011
+                or ClientVersionBuild.V2_5_2_40045
+                or ClientVersionBuild.V2_5_2_40203
+                or ClientVersionBuild.V2_5_2_40260
+                or ClientVersionBuild.V2_5_2_40422
+                or ClientVersionBuild.V2_5_2_40488
+                or ClientVersionBuild.V2_5_2_40617
+                or ClientVersionBuild.V2_5_2_40892
+                or ClientVersionBuild.V2_5_2_41446
+                or ClientVersionBuild.V2_5_2_41510 => ClientVersionBuild.V2_5_2_39570,
+            ClientVersionBuild.V2_5_3_41402
+                or ClientVersionBuild.V2_5_3_41531
+                or ClientVersionBuild.V2_5_3_41750
+                or ClientVersionBuild.V2_5_3_41812
+                or ClientVersionBuild.V2_5_3_42083
+                or ClientVersionBuild.V2_5_3_42328
+                or ClientVersionBuild.V2_5_3_42598 => ClientVersionBuild.V2_5_3_41750,
+            _ => ClientVersionBuild.Zero,
+        };
 
     // Same per-T generic static cache pattern as LegacyVersion. See the LegacyVersion copy.
     // Tables are emitted at compile time by HermesProxy.SourceGen.UpdateFieldTableGenerator.
@@ -646,18 +619,14 @@ public static class ModernVersion
         return UpdateFields<T>.Infos[idx];
     }
 
-    public static Type? GetResponseCodesEnum()
-    {
-        switch (Opcodes.GetOpcodesDefiningBuild(Build))
+    public static Type? GetResponseCodesEnum() =>
+        Opcodes.GetOpcodesDefiningBuild(Build) switch
         {
-            case ClientVersionBuild.V2_5_2_39570:
-                return typeof(World.Enums.V2_5_2_39570.ResponseCodes);
-            case ClientVersionBuild.V2_5_3_41750:
-            case ClientVersionBuild.V1_14_1_40688:
-                return typeof(World.Enums.V1_14_1_40688.ResponseCodes);
-        }
-        return null;
-    }
+            ClientVersionBuild.V2_5_2_39570 => typeof(World.Enums.V2_5_2_39570.ResponseCodes),
+            ClientVersionBuild.V2_5_3_41750
+                or ClientVersionBuild.V1_14_1_40688 => typeof(World.Enums.V1_14_1_40688.ResponseCodes),
+            _ => null,
+        };
 
     private static byte GetExpansionVersion()
     {
@@ -929,33 +898,23 @@ public static class ModernVersion
         }
     }
 
-    public static uint GetArenaTeamSizeFromIndex(uint index)
-    {
-        switch (index)
+    public static uint GetArenaTeamSizeFromIndex(uint index) =>
+        index switch
         {
-            case 0:
-                return 2;
-            case 1:
-                return 3;
-            case 2:
-                return 5;
-        }
-        return 0;
-    }
+            0 => 2,
+            1 => 3,
+            2 => 5,
+            _ => 0,
+        };
 
-    public static uint GetArenaTeamIndexFromSize(uint size)
-    {
-        switch (size)
+    public static uint GetArenaTeamIndexFromSize(uint size) =>
+        size switch
         {
-            case 2:
-                return 0;
-            case 3:
-                return 1;
-            case 5:
-                return 2;
-        }
-        return 0;
-    }
+            2 => 0,
+            3 => 1,
+            5 => 2,
+            _ => 0,
+        };
 
     public static byte ConvertResponseCodesValue(byte legacyValue)
     {
