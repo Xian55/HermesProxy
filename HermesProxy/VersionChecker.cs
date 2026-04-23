@@ -101,7 +101,8 @@ public static class VersionChecker
                 or ClientVersionBuild.V1_14_2_42065
                 or ClientVersionBuild.V1_14_2_42082
                 or ClientVersionBuild.V1_14_2_42214
-                or ClientVersionBuild.V1_14_2_42597 => true,
+                or ClientVersionBuild.V1_14_2_42597
+                or ClientVersionBuild.V3_4_3_54261 => true,
             _ => false,
         };
 
@@ -546,6 +547,7 @@ public static class ModernVersion
                 or ClientVersionBuild.V2_5_3_42083
                 or ClientVersionBuild.V2_5_3_42328
                 or ClientVersionBuild.V2_5_3_42598 => ClientVersionBuild.V2_5_3_41750,
+            ClientVersionBuild.V3_4_3_54261 => ClientVersionBuild.V3_4_3_54261,
             _ => ClientVersionBuild.Zero,
         };
 
@@ -625,6 +627,7 @@ public static class ModernVersion
             ClientVersionBuild.V2_5_2_39570 => typeof(World.Enums.V2_5_2_39570.ResponseCodes),
             ClientVersionBuild.V2_5_3_41750
                 or ClientVersionBuild.V1_14_1_40688 => typeof(World.Enums.V1_14_1_40688.ResponseCodes),
+            ClientVersionBuild.V3_4_3_54261 => typeof(World.Enums.V3_4_3_54261.ResponseCodes),
             _ => null,
         };
 
@@ -789,6 +792,8 @@ public static class ModernVersion
             return 1618;
         if (IsVersion(1, 14, 2) || IsVersion(2, 5, 3))
             return 1672;
+        if (IsVersion(3, 4, 3))
+            return 1772;
         return 0;
     }
 
