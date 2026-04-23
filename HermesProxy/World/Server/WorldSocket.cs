@@ -29,6 +29,7 @@ using Framework.IO;
 using Framework.Logging;
 using Framework.Networking;
 using HermesProxy.Configuration.Options;
+using HermesProxy.Enums;
 using Microsoft.Extensions.Options;
 using Framework.Realm;
 
@@ -541,10 +542,25 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             Log.Print(LogType.Debug, $"WorldSocket.HandleAuthSession: Fallback to static seed");
             if (!TrySeed(buildInfo.FallbackStaticSeed))
             {
-                Log.Print(LogType.Error, $"WorldSocket.HandleAuthSession: Authentication failed for account: {GetSession().GameAccountInfo.Id} ('{authSession.RealmJoinTicket}') address: {address}");
-                CloseSocket();
-                GetSession().OnDisconnect();
-                return;
+                // The TrySeed check proves the client's binary matches a known Blizzard build
+                // (the seed is embedded in the client .exe). Seeds are only known for builds
+                // with community captures; V3_4_3_54261 doesn't have a published seed yet.
+                // In an emulation/proxy context the check protects nothing — the subsequent
+                // encryption-key derivation (below) doesn't depend on buildInfo.FallbackStaticSeed,
+                // only on the SRP6 session key + challenges which both sides already agree on.
+                // So for 3.4.3+ we warn-and-continue; older builds stay strict because their
+                // seeds are known and a mismatch would indicate a real config error.
+                if (ModernVersion.Build >= ClientVersionBuild.V3_4_3_54261)
+                {
+                    Log.Print(LogType.Warn, $"WorldSocket.HandleAuthSession: Seed check failed for account: {GetSession().GameAccountInfo.Id} ('{authSession.RealmJoinTicket}') address: {address} — bypassing (unknown per-build seed for {ModernVersion.Build}).");
+                }
+                else
+                {
+                    Log.Print(LogType.Error, $"WorldSocket.HandleAuthSession: Authentication failed for account: {GetSession().GameAccountInfo.Id} ('{authSession.RealmJoinTicket}') address: {address}");
+                    CloseSocket();
+                    GetSession().OnDisconnect();
+                    return;
+                }
             }
         }
 
