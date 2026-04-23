@@ -31,6 +31,24 @@ public partial class WorldClient
     private static readonly string _netDirSend = Log.FormatDir(LogNetDir.P2S);
     private const string _netDirNone = "";
 
+    // Minimal WotLK 3.3.5a CMSG_AUTH_SESSION addon payload: [uncompressedSize=4][zlib(addonsCount=0)].
+    // Built once; mangos-wotlk accepts a zero-addon-list as valid.
+    private static readonly byte[] EmptyAddonInfoBlob = BuildEmptyAddonInfoBlob();
+
+    private static byte[] BuildEmptyAddonInfoBlob()
+    {
+        ReadOnlySpan<byte> uncompressed = [0, 0, 0, 0]; // uint32 addonsCount = 0
+        using var compressed = new System.IO.MemoryStream();
+        using (var deflate = new System.IO.Compression.ZLibStream(compressed, System.IO.Compression.CompressionLevel.Fastest, leaveOpen: true))
+            deflate.Write(uncompressed);
+
+        byte[] body = compressed.ToArray();
+        byte[] blob = new byte[sizeof(uint) + body.Length];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(blob, (uint)uncompressed.Length);
+        body.CopyTo(blob, sizeof(uint));
+        return blob;
+    }
+
     Socket _clientSocket = null!;
     bool? _isSuccessful;
     uint _queuePosition;
@@ -110,6 +128,9 @@ public partial class WorldClient
                 break;
             case ClientVersionBuild.V2_4_3_8606:
                 _worldCrypt = new TbcWorldCrypt();
+                break;
+            case ClientVersionBuild.V3_3_5a_12340:
+                _worldCrypt = new WotlkWorldCrypt();
                 break;
         }
 
@@ -215,7 +236,7 @@ public partial class WorldClient
                 }
 
                 if (_worldCrypt != null)
-                    _worldCrypt.Decrypt(_headerBuffer, LegacyServerPacketHeader.StructSize);
+                    _worldCrypt.Decrypt(_headerBuffer.AsSpan(0, LegacyServerPacketHeader.StructSize));
 
                 LegacyServerPacketHeader header = new();
                 header.Read(_headerBuffer);
@@ -274,7 +295,7 @@ public partial class WorldClient
 
                 byte[] headerArray = buffer.GetData();
                 if (_worldCrypt != null)
-                    _worldCrypt.Encrypt(headerArray, LegacyClientPacketHeader.StructSize);
+                    _worldCrypt.Encrypt(headerArray.AsSpan(0, LegacyClientPacketHeader.StructSize));
                 buffer.Clear();
                 buffer.WriteBytes(headerArray);
 
@@ -503,9 +524,19 @@ public partial class WorldClient
 
         packet.WriteBytes(authResponse);
 
-        // packet.WriteUInt32(zero); // length of addon data
-        Span<byte> addonBytes = [208, 1, 0, 0, 120, 156, 117, 207, 61, 14, 194, 48, 12, 5, 224, 114, 14, 184, 12, 97, 64, 149, 154, 133, 150, 25, 153, 196, 173, 172, 38, 78, 21, 82, 126, 58, 113, 66, 206, 68, 81, 133, 24, 98, 188, 126, 126, 79, 182, 114, 52, 77, 16, 237, 105, 59, 154, 68, 129, 143, 101, 177, 242, 183, 77, 85, 204, 163, 190, 166, 32, 37, 135, 45, 161, 179, 154, 152, 60, 12, 210, 18, 177, 37, 238, 230, 130, 87, 102, 187, 224, 207, 144, 170, 208, 9, 185, 197, 26, 188, 39, 9, 35, 180, 73, 188, 105, 175, 235, 49, 94, 241, 33, 227, 72, 206, 42, 224, 94, 212, 146, 47, 3, 154, 79, 237, 58, 183, 132, 190, 14, 166, 199, 180, 252, 146, 167, 53, 152, 24, 102, 121, 102, 114, 0, 178, 51, 196, 12, 26, 112, 200, 242, 27, 77, 4, 139, 117, 79, 206, 253, 99, 98, 140, 178, 145, 71, 13, 12, 29, 198, 159, 190, 1, 43, 0, 141, 195];
-        packet.WriteBytes(addonBytes);
+        // Addon list. Pre-WotLK emulators are lenient; the hardcoded 2.4.3-era blob works.
+        // mangos-wotlk's addon parser strictly validates addon records and rejects that blob
+        // (the decompressed data has an inconsistent addonsCount → ByteBuffer overrun → kick).
+        // For 3.3.5a+ we send a minimal "zero addons" blob generated once at static init.
+        if (LegacyVersion.Build >= ClientVersionBuild.V3_3_5a_12340)
+        {
+            packet.WriteBytes(EmptyAddonInfoBlob);
+        }
+        else
+        {
+            Span<byte> addonBytes = [208, 1, 0, 0, 120, 156, 117, 207, 61, 14, 194, 48, 12, 5, 224, 114, 14, 184, 12, 97, 64, 149, 154, 133, 150, 25, 153, 196, 173, 172, 38, 78, 21, 82, 126, 58, 113, 66, 206, 68, 81, 133, 24, 98, 188, 126, 126, 79, 182, 114, 52, 77, 16, 237, 105, 59, 154, 68, 129, 143, 101, 177, 242, 183, 77, 85, 204, 163, 190, 166, 32, 37, 135, 45, 161, 179, 154, 152, 60, 12, 210, 18, 177, 37, 238, 230, 130, 87, 102, 187, 224, 207, 144, 170, 208, 9, 185, 197, 26, 188, 39, 9, 35, 180, 73, 188, 105, 175, 235, 49, 94, 241, 33, 227, 72, 206, 42, 224, 94, 212, 146, 47, 3, 154, 79, 237, 58, 183, 132, 190, 14, 166, 199, 180, 252, 146, 167, 53, 152, 24, 102, 121, 102, 114, 0, 178, 51, 196, 12, 26, 112, 200, 242, 27, 77, 4, 139, 117, 79, 206, 253, 99, 98, 140, 178, 145, 71, 13, 12, 29, 198, 159, 190, 1, 43, 0, 141, 195];
+            packet.WriteBytes(addonBytes);
+        }
 
         SendPacket(packet);
 
