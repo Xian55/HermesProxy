@@ -170,7 +170,26 @@ See "CSV/DBC data strategy" section below for the full story and why not every f
 
 **Risk**: off-by-one in any `WriteBits(mask, N)` corrupts the stream. Mitigation: generate ground-truth captures from CMaNGOS via WowPacketParser and diff HermesProxy output byte-for-byte in tests. Approach B (source-gen) materially reduces this risk class by making width mismatches compile-time errors.
 
-**Recommendation**: spend the first 3-4 days of Phase 5 on the source-generator bootstrap against the trivial `Object` type. If the attribute vocabulary and generator are healthy, commit to Approach B and expand. If the generator design hits walls (e.g., some fork patterns resist declarative description), fall back to Approach A (hand-port). This is a fork-in-the-road **evaluable on day 4** — don't pre-commit either way at planning time.
+**Recommended path — Hybrid (A → then incrementally B)**:
+
+After v0.1 shipped (character-select through Phases 0–4), straight Approach B was scoped as "~2–3 days bootstrap, then 1–2 weeks expansion before world-enter works." That's a long block of the protocol being unreachable while scaffolding the generator. A hybrid path gets users into the world faster AND ends up at the same clean declarative codebase:
+
+1. **Phase 5a — Hand-port verbatim.** Copy the fork's ~3,400-line `ObjectUpdateBuilder` wholesale into `HermesProxy/World/Objects/Version/V3_4_3_54261/ObjectUpdateBuilder.cs`, adapting call sites to current upstream APIs (`WorldPacket.WriteBits` signature, `BitBuffer` / `RoBitBuffer` usage). One big PR, high-confidence working baseline. **World-enter works after this commit.** Everything after 5a is refactoring-to-cleaner-infra, not protocol progress.
+
+2. **Phases 5b–5e — Incrementally replace sections with generator output.** Each sub-phase expands the source generator's capability along one complexity dimension, using the 5a hand-port as the **test oracle**: snapshot-capture the hand-port's byte output for a known `{ObjectData,UnitData,PlayerData,…}` input, replace the hand-written section with generated code, assert byte-equivalence. This is exactly the "generate-and-diff against the fork's hand-written version" strategy from Approach B above, except now the "fork's hand-written version" lives in our own repo and is unit-testable.
+
+    | Sub-phase | Scope | Generator capability gained | What 5a code gets deleted |
+    |---|---|---|---|
+    | **5b** | Create-path scalars for all object types (Object already seeded by the bootstrap PR; add Item, Unit, Player, ActivePlayer, GameObject, DynamicObject, Corpse, Container, AreaTrigger, SceneObject, Conversation). | Existing `[DescriptorCreateField]` vocabulary. No new generator features — just more annotations and more `WriteCreate*Data` emissions. | All 12 hand-written `WriteCreate*Data` methods |
+    | **5c** | Update-path bit-mask cascade (`uint mask = 0; if (field.HasValue) mask \|= N; data.WriteBits(mask, N)`). | New `[DescriptorUpdateField(bitIndex)]` attribute + mask-width validation in the generator. | All 4 hand-written `WriteValuesUpdate*Data` methods — the big ones (`WriteUpdateUnitData` 618 LoC, `WriteUpdateActivePlayerData` 816 LoC) |
+    | **5d** | Variable-size arrays (QuestLog, VisibleItem, Power/MaxPower, skills) + nested structs (RestInfo, SkillInfo, PvPInfo). | New `[DescriptorArray(elementCount)]` + `[DescriptorStruct]` attributes. | `WriteUpdateSkillInfo` helper, per-element array loops, nested-struct blocks |
+    | **5e** | Viewer-filter bucketing (0x03 owner / 0x00 non-owner byte + `IsOwner`-guarded per-field writes). | New `[DescriptorOwnerOnly]` / `[DescriptorPartyOnly]` attributes. | All `if (IsOwner)` per-field conditionals |
+
+    **At the end of 5e, the hand-port is entirely replaced by attribute-annotated enums + generator emission.** Each 5b–5e PR is self-contained and reviewable; gameplay continues working throughout because 5a stays canonical until each section is proven byte-equivalent.
+
+3. **Bootstrap PR context**: the Phase 5 generator scaffolding (project plumbing, `[DescriptorCreateField]` attribute, `ObjectUpdateBuilderGenerator`, Verify-based snapshot test, `WriteCreateObjectData` for V3_4_3_54261) was seeded on a separate branch to prove the generator pipeline before 5a ships. That seed feeds directly into 5b when the time comes.
+
+**Fallback**: if any 5b–5e PR surfaces a fork pattern that genuinely resists declarative description (e.g. some hand-crafted bit-field that can't be expressed as a clean attribute), that section stays in 5a's hand-port form indefinitely. The vocabulary expands to cover ~90% of the fork, the remaining ~10% stays hand-written — both coexist on the same partial class. This is exactly what wotlk.md's Approach B original notes anticipated with the "hand-written partials handle the irregular ~10%" clause.
 
 ---
 

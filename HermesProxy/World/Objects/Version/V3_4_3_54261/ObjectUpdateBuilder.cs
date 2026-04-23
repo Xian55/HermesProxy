@@ -3,10 +3,13 @@ using System;
 
 namespace HermesProxy.World.Objects.Version.V3_4_3_54261;
 
-// Phase 1 stub — real implementation (descriptor-tree serializers) ships in Phase 5.
-// See wotlk.md for the ~3,400-line reference in the fork's cc12fd6 commit and
-// the Approach A (hand-port) vs Approach B (source-generated) fork in the road.
-public class ObjectUpdateBuilder
+// Phase 5 source-generated descriptor-tree serializer for WotLK Classic 3.4.3.
+// The Write{Create,Update}*Data leaf methods are emitted by
+// HermesProxy.SourceGen.ObjectUpdateBuilderGenerator from [DescriptorCreateField]
+// attributes on the per-version field enums (e.g. V3_4_3_54261.ObjectField).
+// Bootstrap scope: WriteCreateObjectData only. The WriteToPacket dispatcher and
+// the remaining per-type methods (Item/Unit/Player/…) land in follow-up PRs.
+public partial class ObjectUpdateBuilder
 {
     private readonly ObjectUpdate _updateData;
     private readonly GameSessionData _gameState;
