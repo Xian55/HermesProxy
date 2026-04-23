@@ -456,7 +456,24 @@ class EnterEncryptedMode : ServerPacket
     byte[] EncryptionKey;
     bool Enabled;
 
-    static byte[] EnableEncryptionSeed = { 0x90, 0x9C, 0xD0, 0x50, 0x5A, 0x2C, 0x14, 0xDD, 0x5C, 0x2C, 0xC0, 0x64, 0x14, 0xF3, 0xFE, 0xC9 };
+    // The HMAC input seed has always been these 16 bytes. Retail/TBC-Classic/Era (<= 2.5.x)
+    // signs the HMAC output with the server's RSA private key; the client verifies with
+    // the baked-in RSA public key and the client-embedded `EnableEncryptionSeed`.
+    static readonly byte[] EnableEncryptionSeed = { 0x90, 0x9C, 0xD0, 0x50, 0x5A, 0x2C, 0x14, 0xDD, 0x5C, 0x2C, 0xC0, 0x64, 0x14, 0xF3, 0xFE, 0xC9 };
+
+    // WotLK Classic 3.4.3+ replaced the RSA signature with Ed25519ctx (RFC 8032) using a
+    // fixed context string. Private key and context are Blizzard constants; the client has
+    // the matching public key + context baked in. Values match the advocaite/HermesProxy-WOTLK
+    // fork, cross-checked against the published 3.4.3 client binary's signature verification.
+    static readonly byte[] Ed25519Context =
+    {
+        0xA7, 0x1F, 0xB6, 0x9B, 0xC9, 0x7C, 0xDD, 0x96, 0xE9, 0xBB, 0xB8, 0x21, 0x39, 0x8D, 0x5A, 0xD4
+    };
+    static readonly byte[] Ed25519PrivateKey =
+    {
+        0x08, 0xBD, 0xC7, 0xA3, 0xCC, 0xC3, 0x4F, 0x3F, 0x6A, 0x0B, 0xFF, 0xCF, 0x31, 0xC1, 0xB6, 0x97,
+        0x69, 0x1E, 0x72, 0x9A, 0x0A, 0xAB, 0x2C, 0x77, 0xC3, 0x6F, 0x8A, 0xE7, 0x5A, 0x9A, 0xA7, 0xC9
+    };
 
     public EnterEncryptedMode(byte[] encryptionKey, bool enabled) : base(Opcode.SMSG_ENTER_ENCRYPTED_MODE)
     {
@@ -466,13 +483,33 @@ class EnterEncryptedMode : ServerPacket
 
     public override void Write()
     {
+        // Both paths start with HMAC-SHA256(EncryptionKey) over [Enabled] || EnableEncryptionSeed.
         HmacSha256 hash = new(EncryptionKey);
         hash.Process(BitConverter.GetBytes(Enabled), 1);
         hash.Finish(EnableEncryptionSeed, 16);
+        byte[] toSign = hash.Digest!;
 
-        _worldPacket.WriteBytes(RsaCrypt.RSA.SignHash(hash.Digest!, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1).Reverse().ToArray());
+        if (ModernVersion.ExpansionVersion >= 3)
+            WriteEd25519(toSign);
+        else
+            WriteRsa(toSign);
+
         _worldPacket.WriteBit(Enabled);
         _worldPacket.FlushBits();
+    }
+
+    void WriteRsa(byte[] toSign)
+    {
+        _worldPacket.WriteBytes(RsaCrypt.RSA.SignHash(toSign, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1).Reverse().ToArray());
+    }
+
+    void WriteEd25519(byte[] toSign)
+    {
+        var privateKey = new Org.BouncyCastle.Crypto.Parameters.Ed25519PrivateKeyParameters(Ed25519PrivateKey, 0);
+        var signer = new Org.BouncyCastle.Crypto.Signers.Ed25519ctxSigner(Ed25519Context);
+        signer.Init(forSigning: true, privateKey);
+        signer.BlockUpdate(toSign, 0, toSign.Length);
+        _worldPacket.WriteBytes(signer.GenerateSignature());
     }
 }
 
