@@ -49,7 +49,7 @@ public static class VersionChecker
             case ClientVersionBuild.V2_4_3_8606:
                 return true;
             case ClientVersionBuild.V3_3_5a_12340:
-                return false;
+                return true;
         }
 
         return false;
@@ -123,6 +123,7 @@ public static class VersionChecker
         {
             1 => ClientVersionBuild.V1_12_1_5875,
             2 => ClientVersionBuild.V2_4_3_8606,
+            3 => ClientVersionBuild.V3_3_5a_12340,
             _ => ClientVersionBuild.Zero,
         };
     }
@@ -352,7 +353,11 @@ public static class LegacyVersion
         int secondUnderscore = span.IndexOf('_');
         span = span[(secondUnderscore + 1)..];
         int thirdUnderscore = span.IndexOf('_');
-        return byte.Parse(span[..thirdUnderscore]);
+        var segment = span[..thirdUnderscore];
+        // Strip trailing non-digit patch-letter (e.g. 'a' in "5a" for WotLK 3.3.5a)
+        while (segment.Length > 0 && !char.IsDigit(segment[^1]))
+            segment = segment[..^1];
+        return byte.Parse(segment);
     }
 
     public static bool InVersion(ClientVersionBuild build1, ClientVersionBuild build2)
@@ -676,7 +681,11 @@ public static class ModernVersion
         int secondUnderscore = span.IndexOf('_');
         span = span[(secondUnderscore + 1)..];
         int thirdUnderscore = span.IndexOf('_');
-        return byte.Parse(span[..thirdUnderscore]);
+        var segment = span[..thirdUnderscore];
+        // Strip trailing non-digit patch-letter (e.g. 'a' in "5a" for WotLK 3.3.5a)
+        while (segment.Length > 0 && !char.IsDigit(segment[^1]))
+            segment = segment[..^1];
+        return byte.Parse(segment);
     }
 
     public static bool AddedInVersion(byte expansion, byte major, byte minor)
