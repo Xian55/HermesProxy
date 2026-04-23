@@ -339,6 +339,25 @@ public partial class WorldClient
         var pendingLock = gameState.PendingUninstancedPacketsLock;
         if (packet.GetConnection() == ConnectionType.Realm)
         {
+            // Legacy backends (CMaNGOS / TrinityCore 3.3.5a) emit early-session Realm packets
+            // (SMSG_TUTORIAL_FLAGS, SMSG_CACHE_VERSION, etc.) as soon as the legacy world auth
+            // handshake completes. But on the modern-client side, the BNet→Realm socket
+            // handoff is still in flight — RealmSocket is null for a brief window.
+            // Mirror the InstanceSocket pattern below: queue and flush in
+            // WorldSocket.HandleEnterEncryptedModeAck when RealmSocket is assigned.
+            if (GetSession().RealmSocket == null)
+            {
+                lock (gameState.PendingRealmPacketsLock)
+                {
+                    if (GetSession().RealmSocket == null)
+                    {
+                        gameState.PendingRealmPackets.Enqueue(packet);
+                        Log.PrintNet(LogType.Warn, LogNetDir.P2C, $"Can't send opcode {packet.GetUniversalOpcode()} ({packet.GetOpcode()}) before RealmSocket ready! Queue");
+                        return;
+                    }
+                }
+            }
+
             GetSession().RealmSocket.SendPacket(packet);
         }
         else

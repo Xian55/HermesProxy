@@ -761,6 +761,18 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             SendBnetConnectionState(1);
             GetSession().AccountDataMgr = new AccountDataManager(GetSession().Username, GetSession().RealmManager.GetRealm(_realmId)!.Name);
             GetSession().RealmSocket = this;
+
+            // Flush any Realm-destined packets the legacy WorldClient queued before this
+            // socket was ready. See WorldClient.SendPacketToClientDirect for the producer.
+            var gameState = GetSession().GameState;
+            if (gameState.PendingRealmPackets.Count > 0)
+            {
+                lock (gameState.PendingRealmPacketsLock)
+                {
+                    while (gameState.PendingRealmPackets.TryDequeue(out var queuedPacket))
+                        SendPacket(queuedPacket);
+                }
+            }
         }
         else
         {

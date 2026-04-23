@@ -70,6 +70,12 @@ public sealed class GameSessionData
     public bool IsConnectedToInstance;
     public Queue<ServerPacket> PendingUninstancedPackets = new(); // Here packets are queued while IsConnectedToInstance = false;
     public readonly Lock PendingUninstancedPacketsLock = new();
+    // Realm-destined packets queued while RealmSocket is null (modern client's BNet→Realm
+    // handoff hasn't completed yet but the legacy server is already sending early-session
+    // packets like SMSG_TUTORIAL_FLAGS). Flushed in WorldSocket.HandleEnterEncryptedModeAck
+    // when RealmSocket is assigned.
+    public Queue<ServerPacket> PendingRealmPackets = new();
+    public readonly Lock PendingRealmPacketsLock = new();
     public bool IsInWorld;
     public uint? CurrentMapId;
     public uint CurrentZoneId;
