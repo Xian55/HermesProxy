@@ -243,13 +243,32 @@ public static class Log
             get
             {
                 var factory = _melFactory;
-                if (!ReferenceEquals(factory, _cachedFactory))
-                {
-                    _cachedFactory = factory;
-                    _cachedLogger = factory.CreateLogger(_name);
-                }
-                return _cachedLogger!;
+                var cachedLogger = _cachedLogger;
+                // Fast path: both cache slots agree AND the logger is actually populated.
+                // Checking _cachedLogger != null closes a torn-cache race: without it, a
+                // concurrent reader could observe the two assignments in the slow path out
+                // of order (_cachedFactory = factory visible, _cachedLogger not yet) and
+                // return null — a NullReferenceException on the caller's IsEnabled/Log.
+                if (cachedLogger != null && ReferenceEquals(factory, _cachedFactory))
+                    return cachedLogger;
+
+                return ResolveSlow(factory);
             }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private Microsoft.Extensions.Logging.ILogger ResolveSlow(Microsoft.Extensions.Logging.ILoggerFactory? factory)
+        {
+            if (factory is null)
+                throw new InvalidOperationException($"Logger '{_name}' accessed before Log.Configure ran.");
+
+            // Two concurrent resolvers each creating a logger is harmless — the loggers are
+            // semantically equivalent and the final writes below publish whichever won. The
+            // fast path stays correct because it re-reads both slots atomically per call.
+            var logger = factory.CreateLogger(_name);
+            _cachedLogger = logger;
+            _cachedFactory = factory;
+            return logger;
         }
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull
