@@ -328,6 +328,12 @@ public class UpdateObject : ServerPacket
                     builder.WriteToPacket(data);
                     break;
                 }
+                case ClientVersionBuild.V3_4_3_54261:
+                {
+                    Objects.Version.V3_4_3_54261.ObjectUpdateBuilder builder = new Objects.Version.V3_4_3_54261.ObjectUpdateBuilder(update, _gameState);
+                    builder.WriteToPacket(data);
+                    break;
+                }
                 default:
                     throw new System.ArgumentOutOfRangeException("No object update builder defined for current build.");
             }
