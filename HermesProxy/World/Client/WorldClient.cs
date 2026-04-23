@@ -215,7 +215,7 @@ public partial class WorldClient
                 }
 
                 if (_worldCrypt != null)
-                    _worldCrypt.Decrypt(_headerBuffer, LegacyServerPacketHeader.StructSize);
+                    _worldCrypt.Decrypt(_headerBuffer.AsSpan(0, LegacyServerPacketHeader.StructSize));
 
                 LegacyServerPacketHeader header = new();
                 header.Read(_headerBuffer);
@@ -274,7 +274,7 @@ public partial class WorldClient
 
                 byte[] headerArray = buffer.GetData();
                 if (_worldCrypt != null)
-                    _worldCrypt.Encrypt(headerArray, LegacyClientPacketHeader.StructSize);
+                    _worldCrypt.Encrypt(headerArray.AsSpan(0, LegacyClientPacketHeader.StructSize));
                 buffer.Clear();
                 buffer.WriteBytes(headerArray);
 
