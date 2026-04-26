@@ -113,6 +113,8 @@ public sealed class GameSessionData
     public List<WowGuid128>? MasterLootCandidates;
     public WowGuid64 LastMasterLootSentTarget;
     public List<int> ActionButtons = [];
+    public ushort[] ActiveGlyphs = new ushort[6];
+    public byte GlyphsEnabled;
     public Dictionary<WowGuid128, Dictionary<byte, int>> UnitAuraDurationUpdateTime = [];
     public Dictionary<WowGuid128, Dictionary<byte, int>> UnitAuraDurationLeft = [];
     public Dictionary<WowGuid128, Dictionary<byte, int>> UnitAuraDurationFull = [];
