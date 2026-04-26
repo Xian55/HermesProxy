@@ -156,6 +156,13 @@ class AuthResponse : ServerPacket
                     _worldPacket.WriteUInt8(classAvailability.ClassID);
                     _worldPacket.WriteUInt8(classAvailability.ActiveExpansionLevel);
                     _worldPacket.WriteUInt8(classAvailability.AccountExpansionLevel);
+                    // 3.4.3+ added MinActiveExpansionLevel byte. WITHOUT this, the modern
+                    // 3.4.3 client reads garbage data into every class entry, catastrophically
+                    // misaligning the rest of AUTH_RESPONSE — including VirtualRealms — and
+                    // thus failing to match any character's GUID realmId. (Per WPP V3_4_0_45166
+                    // AuthenticationHandler.cs:39-40, gated on V3_4_3_51505+.)
+                    if (ModernVersion.ExpansionVersion >= 3)
+                        _worldPacket.WriteUInt8(classAvailability.MinActiveExpansionLevel);
                 }
             }
 
@@ -231,12 +238,14 @@ class AuthResponse : ServerPacket
         public byte ClassID;
         public byte ActiveExpansionLevel;
         public byte AccountExpansionLevel;
+        public byte MinActiveExpansionLevel;   // 3.4.3+ — added in V3_4_3_51505 per WPP
 
         public ClassAvailability(byte classId, byte activeExpLevel, byte accountExpLevel)
         {
             ClassID = classId;
             ActiveExpansionLevel = activeExpLevel;
             AccountExpansionLevel = accountExpLevel;
+            MinActiveExpansionLevel = 0;
         }
     }
 
