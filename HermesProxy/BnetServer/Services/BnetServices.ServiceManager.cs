@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Reflection;
 using Framework.Constants;
-using Framework.Logging;
 using Google.Protobuf;
 using HermesProxy;
 
@@ -91,7 +90,13 @@ public partial class BnetServices
                 BnetServicesLogMessages.ServiceNotImplemented(
                     BnetServices._melNet, BnetServices._sourceFile, BnetServices._netDirNone,
                     _serviceHolder.BuildSessionPrefix(), serviceHash, methodId);
-                SendErrorResponse(BattlenetRpcErrorCode.RpcNotImplemented);
+                // Send OK with empty payload, NOT an RpcNotImplemented error. The 3.4.3 WotLK
+                // Classic client requests `ResourcesService/m:1` early in character-select and
+                // treats an error response as fatal (character list never renders). The fork
+                // does the same — see HermesProxy-WOTLK BnetServices.cs:121 "sending OK stub".
+                Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                    $"[Trace] BNet ServiceManager: unimplemented service {serviceHash}/m:{methodId} — sending OK stub (was: RpcNotImplemented)");
+                SendRpcMessage(BattlenetRpcErrorCode.Ok, null);
                 return;
             }
 
