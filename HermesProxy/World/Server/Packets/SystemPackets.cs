@@ -297,6 +297,82 @@ public class FeatureSystemStatusGlueScreen : ServerPacket
 
     public override void Write()
     {
+        if (ModernVersion.ExpansionVersion >= 3)
+        {
+            // 3.4.3 (WotLK Classic) layout per WPP V3_4_0_45166 MiscellaneousHandler.cs:124-203
+            // (gated on V3_4_3_51505+, before V3_4_4_59817). Reads 30 bits + EuropaTicket-conditional
+            // payload + 11 trailing uint/int fields. Critical: this packet is sent BEFORE
+            // SMSG_ENUM_CHARACTERS_RESULT — getting it wrong misaligns every byte after, including
+            // the character list, breaking client deserialization silently.
+            _worldPacket.WriteBit(BpayStoreEnabled);
+            _worldPacket.WriteBit(BpayStoreAvailable);
+            _worldPacket.WriteBit(BpayStoreDisabledByParentalControls);
+            _worldPacket.WriteBit(CharUndeleteEnabled);
+            _worldPacket.WriteBit(CommerceSystemEnabled);
+            _worldPacket.WriteBit(Unk14);
+            _worldPacket.WriteBit(WillKickFromWorld);
+            _worldPacket.WriteBit(IsExpansionPreorderInStore);
+
+            _worldPacket.WriteBit(KioskModeEnabled);
+            _worldPacket.WriteBit(CompetitiveModeEnabled);
+            _worldPacket.WriteBit(false); // IsBoostEnabled
+            _worldPacket.WriteBit(TrialBoostEnabled);
+            _worldPacket.WriteBit(TokenBalanceEnabled);
+            _worldPacket.WriteBit(LiveRegionCharacterListEnabled);
+            _worldPacket.WriteBit(LiveRegionCharacterCopyEnabled);
+            _worldPacket.WriteBit(LiveRegionAccountCopyEnabled);
+
+            _worldPacket.WriteBit(LiveRegionKeyBindingsCopyEnabled);
+            _worldPacket.WriteBit(Unknown901CheckoutRelated);
+            _worldPacket.WriteBit(false); // SoftTargetEnabled
+            _worldPacket.WriteBit(EuropaTicketSystemStatus != null); // IsEuropaTicketSystemStatusEnabled
+            _worldPacket.WriteBit(false); // IsNameReservationEnabled
+            _worldPacket.WriteBit(false); // IsLaunchETA
+            _worldPacket.WriteBit(false); // AddonsDisabled
+            _worldPacket.WriteBit(false); // Unk
+
+            _worldPacket.WriteBit(false); // Unk
+            _worldPacket.WriteBit(false); // SoMNotificationEnabled
+            _worldPacket.WriteBit(false); // AccountSaveDataExportEnabled
+            _worldPacket.WriteBit(false); // AccountLockedByExport
+            _worldPacket.WriteBit(false); // Unk
+            _worldPacket.WriteBit(false); // IsRealmHiddenAlert (no following 11-bit payload since false)
+
+            _worldPacket.FlushBits();
+
+            if (EuropaTicketSystemStatus != null)
+                EuropaTicketSystemStatus.Write(_worldPacket);
+
+            _worldPacket.WriteUInt32(TokenPollTimeSeconds);
+            _worldPacket.WriteUInt32(KioskSessionMinutes);
+            _worldPacket.WriteInt64(TokenBalanceAmount);
+            _worldPacket.WriteInt32(MaxCharactersPerRealm);
+            _worldPacket.WriteInt32(LiveRegionCharacterCopySourceRegions.Count);
+            _worldPacket.WriteUInt32(BpayStoreProductDeliveryDelay);
+            _worldPacket.WriteInt32(ActiveCharacterUpgradeBoostType);
+            _worldPacket.WriteInt32(ActiveClassTrialBoostType);
+            _worldPacket.WriteInt32(MinimumExpansionLevel);
+            _worldPacket.WriteInt32(MaximumExpansionLevel);
+            _worldPacket.WriteInt32(ActiveSeason);
+            _worldPacket.WriteInt32(GameRuleValues.Count);
+            _worldPacket.WriteInt16(MaxPlayerNameQueriesPerPacket);
+            _worldPacket.WriteInt16(PlayerNameQueryTelemetryInterval);
+            _worldPacket.WriteInt32(0);  // PlayerNameQueryInterval
+            _worldPacket.WriteInt32(0);  // DebugTimeEventsSize
+            _worldPacket.WriteInt32(0);  // Unused1007
+
+            // No IsLaunchETA payload (bit was false), no DebugTimeEvents loop (count = 0).
+
+            foreach (var sourceRegion in LiveRegionCharacterCopySourceRegions)
+                _worldPacket.WriteInt32(sourceRegion);
+
+            foreach (var rulePair in GameRuleValues)
+                rulePair.Write(_worldPacket);
+
+            return;
+        }
+
+        // Legacy modern (V1_14, V2_5) layout — preserve current behavior.
         _worldPacket.WriteBit(BpayStoreEnabled);
         _worldPacket.WriteBit(BpayStoreAvailable);
         _worldPacket.WriteBit(BpayStoreDisabledByParentalControls);
