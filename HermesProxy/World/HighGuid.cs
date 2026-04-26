@@ -27,6 +27,7 @@ public class HighGuidLegacy : HighGuid
         { HighGuidTypeLegacy.Group2, HighGuidType.RaidGroup },
         { HighGuidTypeLegacy.MOTransport, HighGuidType.MOTransport }, // ?? unused in wpp
         { HighGuidTypeLegacy.Item, HighGuidType.Item },
+        { HighGuidTypeLegacy.ItemContainer, HighGuidType.Item }, // cmangos 0x4700 → treat as Item
         { HighGuidTypeLegacy.DynamicObject, HighGuidType.DynamicObject },
         { HighGuidTypeLegacy.GameObject, HighGuidType.GameObject },
         { HighGuidTypeLegacy.Transport, HighGuidType.Transport },
@@ -39,10 +40,20 @@ public class HighGuidLegacy : HighGuid
     public HighGuidLegacy(HighGuidTypeLegacy high)
     {
         this.high = high;
-        if (!HighLegacyToHighType.ContainsKey(high))
-            throw new ArgumentOutOfRangeException("0x" + high.ToString("X"));
-
-        highGuidType = HighLegacyToHighType[high];
+        if (!HighLegacyToHighType.TryGetValue(high, out highGuidType))
+        {
+            // FIXME(phase5a-7c): unknown legacy high-guid (any value not in the
+            // HighLegacyToHighType table above) is silently mapped to Null and the
+            // object is dropped on the modern side. Originally added for cmangos's
+            // non-standard 0x4700 ItemContainer; that case now has its own enum entry
+            // and proper mapping. Any remaining unknown high here likely indicates a
+            // missing mapping (or a corrupt packet) — investigate the warning log
+            // before adding new entries to the table or removing this fallback.
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Warn,
+                $"[HighGuidLegacy] Unknown legacy high-guid 0x{(uint)high:X4} — treating as Null. " +
+                "Object will be skipped on the modern side.");
+            highGuidType = HighGuidType.Null;
+        }
     }
 }
 

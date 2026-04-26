@@ -17,12 +17,12 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
 using HermesProxy.World.Enums;
-using HermesProxy.World.Objects;
 
 namespace HermesProxy.World.Server.Packets;
 
@@ -39,6 +39,59 @@ public sealed class EnumCharactersResult : ServerPacket
 
     public override void Write()
     {
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+            $"[Trace] EnumCharactersResult.Write: ENTER expansion={ModernVersion.ExpansionVersion} chars={Characters.Count}");
+        int envStart = _worldPacket.GetData().Length;
+
+        if (ModernVersion.ExpansionVersion >= 3)
+        {
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                "[Trace] EnumCharactersResult.Write: branch=V3_4_3 (WPP layout, 7 bits + 5 UInt32s)");
+            // 3.4.3.54261 (WotLK Classic) envelope per WowPacketParser
+            // WowPacketParserModule.V3_4_0_45166/Parsers/CharacterHandler.cs:402-460
+            // (gated on ClientVersionBuild.V3_4_3_51505, before V3_4_4_59817 additions).
+            // 7 bits + 5 UInt32 size fields. Realmless/DontCreateCharacterDisplays/
+            // RegionwideCharacters/WarbandGroups were all added in 3.4.4 — they MUST NOT
+            // appear in the 3.4.3 wire format or every byte after them is misaligned.
+            _worldPacket.WriteBit(Success);
+            _worldPacket.WriteBit(IsDeletedCharacters);
+            _worldPacket.WriteBit(IsNewPlayerRestrictionSkipped);
+            _worldPacket.WriteBit(IsNewPlayerRestricted);
+            _worldPacket.WriteBit(IsNewPlayer);
+            _worldPacket.WriteBit(IsTrialAccountRestricted);
+            _worldPacket.WriteBit(DisabledClassesMask.HasValue);
+            _worldPacket.WriteUInt32((uint)Characters.Count);
+            _worldPacket.WriteInt32(MaxCharacterLevel);
+            _worldPacket.WriteUInt32((uint)RaceUnlockData.Count);
+            _worldPacket.WriteUInt32((uint)UnlockedConditionalAppearances.Count);
+            _worldPacket.WriteUInt32((uint)RaceLimitDisablesCount);
+
+            if (DisabledClassesMask.HasValue)
+                _worldPacket.WriteUInt32(DisabledClassesMask.Value);
+
+            foreach (var unlockedConditionalAppearance in UnlockedConditionalAppearances)
+                unlockedConditionalAppearance.Write(_worldPacket);
+
+            // RaceLimitDisables loop intentionally absent — count is always 0.
+
+            // Envelope hex dump BEFORE Characters loop — captures the wrapper bits/UInt32s the
+            // client reads first. If the wrapper is wrong, every Character entry is misaligned.
+            DumpEnvelope(envStart);
+
+            foreach (var charInfo in Characters)
+                charInfo.Write(_worldPacket);
+
+            foreach (var raceUnlock in RaceUnlockData)
+                raceUnlock.Write(_worldPacket);
+
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[Trace] EnumCharactersResult.Write: EXIT total={_worldPacket.GetData().Length}b (V3_4_3 path)");
+            return;
+        }
+
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+            "[Trace] EnumCharactersResult.Write: branch=Legacy (V1_14/V2_5 layout)");
+        // Legacy modern (V1_14, V2_5) envelope.
         _worldPacket.WriteBit(Success);
         _worldPacket.WriteBit(IsDeletedCharacters);
         _worldPacket.WriteBit(IsNewPlayerRestrictionSkipped);
@@ -54,25 +107,49 @@ public sealed class EnumCharactersResult : ServerPacket
         if (DisabledClassesMask.HasValue)
             _worldPacket.WriteUInt32(DisabledClassesMask.Value);
 
-        foreach (UnlockedConditionalAppearance unlockedConditionalAppearance in UnlockedConditionalAppearances)
+        foreach (var unlockedConditionalAppearance in UnlockedConditionalAppearances)
             unlockedConditionalAppearance.Write(_worldPacket);
 
-        foreach (CharacterInfo charInfo in Characters)
+        foreach (var charInfo in Characters)
             charInfo.Write(_worldPacket);
 
-        foreach (RaceUnlock raceUnlock in RaceUnlockData)
+        foreach (var raceUnlock in RaceUnlockData)
             raceUnlock.Write(_worldPacket);
     }
 
+    private void DumpEnvelope(int start)
+    {
+        byte[] all = _worldPacket.GetData();
+        int len = all.Length - start;
+        int dumpLen = Math.Min(40, len);
+        string hex = BitConverter.ToString(all, start, dumpLen);
+        string customSummary = Characters.Count > 0 && Characters[0].Customizations.Count > 0
+            ? string.Join(",", Characters[0].Customizations.Select(c => $"{c.ChrCustomizationOptionID}/{c.ChrCustomizationChoiceID}"))
+            : "(none)";
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Network,
+            $"[CharEnumEnv] charsCount={Characters.Count} maxLevel={MaxCharacterLevel} raceCount={RaceUnlockData.Count} envBytes={len} envFirst40={hex}");
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Network,
+            $"[CharEnumEnv] customizations[0]={customSummary}");
+    }
+
     public bool Success;
+    public bool Realmless;                      // 3.4.3+ — set when the result spans realms (we never do)
     public bool IsDeletedCharacters; // used for character undelete list
     public bool IsNewPlayerRestrictionSkipped; // allows client to skip new player restrictions
     public bool IsNewPlayerRestricted; // forbids using level boost and class trials
     public bool IsNewPlayer; // forbids hero classes and allied races
+    public bool IsTrialAccountRestricted;       // 3.4.3+
     public bool IsAlliedRacesCreationAllowed;
+    public bool DontCreateCharacterDisplays;    // 3.4.3+
 
     public int MaxCharacterLevel = 1;
     public uint? DisabledClassesMask = new();
+
+    // 3.4.3+ envelope size fields. We never populate these; they exist purely to satisfy
+    // the modern client's expected packet length. All counts will be zero on the wire.
+    public int RegionwideCharactersCount;
+    public int RaceLimitDisablesCount;
+    public int WarbandGroupsCount;
 
     public List<CharacterInfo> Characters = new(); // all characters on the list
     public List<RaceUnlock> RaceUnlockData = new(); //
@@ -81,6 +158,117 @@ public sealed class EnumCharactersResult : ServerPacket
     public class CharacterInfo
     {
         public void Write(WorldPacket data)
+        {
+            int startSize = data.GetData().Length;
+
+            if (ModernVersion.ExpansionVersion >= 3)
+            {
+                Write_V3_4_3(data);
+            }
+            else
+            {
+                WriteLegacyModern(data);
+            }
+
+            // Phase 5a diagnostic: hex-dump the per-character block so we can compare against
+            // a known-good 3.4.3 capture. Drop after character-select renders correctly.
+            byte[] all = data.GetData();
+            int totalSize = all.Length - startSize;
+            int firstLen = Math.Min(40, totalSize);
+            int lastLen = Math.Min(30, totalSize);
+            string firstHex = BitConverter.ToString(all, startSize, firstLen);
+            string lastHex = BitConverter.ToString(all, startSize + totalSize - lastLen, lastLen);
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Network,
+                $"[CharInfo] name={Name} race={RaceId} class={ClassId} level={ExperienceLevel} " +
+                $"visItems={VisualItems.Length} bytes={totalSize}");
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Network,
+                $"[CharInfo] first40={firstHex}");
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Network,
+                $"[CharInfo] last30={lastHex}");
+        }
+
+        // 3.4.3.54261 (WotLK Classic) per-character body per WowPacketParser
+        // WowPacketParserModule.V3_4_0_45166/Parsers/CharacterHandler.cs:45-117
+        // (the 3.4.3 layout, before V3_4_4_59817 added VirtualRealmAddress, PersonalTabard,
+        // TimerunningSeasonID, separate RestrictionsAndMails struct, etc.).
+        private void Write_V3_4_3(WorldPacket data)
+        {
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[Trace] CharacterInfo.Write_V3_4_3: ENTER name='{Name}' guid={Guid} race={RaceId} class={ClassId} sex={SexId} " +
+                $"flags=0x{(uint)Flags:X8} flags2=0x{Flags2:X8} flags3=0x{Flags3:X8} flags4=0x{Flags4:X8}");
+            data.WritePackedGuid128(Guid);
+            data.WriteUInt64(GuildClubMemberID);
+            data.WriteUInt8(ListPosition);
+            data.WriteUInt8((byte)RaceId);
+            data.WriteUInt8((byte)ClassId);
+            data.WriteUInt8((byte)SexId);
+            data.WriteUInt32((uint)Customizations.Count);
+            data.WriteUInt8(ExperienceLevel);
+            data.WriteInt32((int)ZoneId);
+            data.WriteInt32((int)MapId);
+            data.WriteVector3(PreloadPos);
+            data.WritePackedGuid128(GuildGuid);
+            data.WriteUInt32((uint)Flags);
+            data.WriteUInt32(Flags2);
+            data.WriteUInt32(Flags3);
+            data.WriteUInt32(PetCreatureDisplayId);
+            data.WriteUInt32(PetExperienceLevel);
+            data.WriteUInt32(PetCreatureFamilyId);
+
+            data.WriteInt32((int)ProfessionIds[0]);
+            data.WriteInt32((int)ProfessionIds[1]);
+
+            // 34 visual items × 14 bytes each = 476 bytes. Pad missing slots with default.
+            const int VisualItemCount_V3_4_3 = 34;
+            for (int vi = 0; vi < VisualItemCount_V3_4_3; vi++)
+            {
+                if (vi < VisualItems.Length)
+                    VisualItems[vi].Write(data);
+                else
+                    default(VisualItemInfo).Write(data);
+            }
+
+            data.WriteUInt64(LastPlayedTime);
+            data.WriteInt16((short)SpecID);
+            data.WriteInt32((int)Unknown703);          // SaveVersion in WPP
+            data.WriteInt32((int)LastLoginVersion);
+            data.WriteUInt32(Flags4);                  // RestrictionFlags in WPP
+            data.WriteUInt32((uint)MailSenders.Count);
+            data.WriteUInt32((uint)MailSenderTypes.Count);
+            data.WriteUInt32(OverrideSelectScreenFileDataID);
+
+            foreach (ChrCustomizationChoice customization in Customizations)
+            {
+                data.WriteUInt32(customization.ChrCustomizationOptionID);
+                data.WriteUInt32(customization.ChrCustomizationChoiceID);
+            }
+
+            foreach (var mailSenderType in MailSenderTypes)
+                data.WriteUInt32(mailSenderType);
+
+            data.WriteBits(Name.GetByteCount(), 6);
+            data.WriteBit(FirstLogin);
+            data.WriteBit(BoostInProgress);
+            data.WriteBits(unkWod61x, 5);              // CantLoginReason in WPP
+            data.WriteBits(0, 2);                       // Unk
+            data.WriteBit(false);                       // RpeResetAvailable
+            data.WriteBit(false);                       // RpeResetQuestClearAvailable
+
+            foreach (string str in MailSenders)
+                data.WriteBits(str.GetByteCount() + 1, 6);
+
+            data.FlushBits();
+
+            foreach (string str in MailSenders)
+                if (!str.IsEmpty())
+                    data.WriteCString(str);
+
+            data.WriteString(Name);
+        }
+
+        // Legacy modern (V1_14, V2_5) per-character body — preserves the prior layout
+        // exactly, so older modern clients keep working.
+        private void WriteLegacyModern(WorldPacket data)
         {
             data.WritePackedGuid128(Guid);
             data.WriteUInt64(GuildClubMemberID);
@@ -135,7 +323,7 @@ public sealed class EnumCharactersResult : ServerPacket
 
             foreach (string str in MailSenders)
                 data.WriteBits(str.GetByteCount() + 1, 6);
-            
+
             data.FlushBits();
 
             foreach (string str in MailSenders)
@@ -146,6 +334,7 @@ public sealed class EnumCharactersResult : ServerPacket
         }
 
         public WowGuid128 Guid;
+        public uint VirtualRealmAddress;
         public ulong GuildClubMemberID; // same as bgs.protocol.club.v1.MemberId.unique_id, guessed basing on SMSG_QUERY_PLAYER_NAME_RESPONSE (that one is known)
         public string Name = string.Empty;
         public byte ListPosition; // Order of the characters in list
@@ -170,17 +359,22 @@ public sealed class EnumCharactersResult : ServerPacket
         public uint Unknown703;
         public uint LastLoginVersion;
         public uint OverrideSelectScreenFileDataID;
+        public int TimerunningSeasonID;
         public uint PetCreatureDisplayId;
         public uint PetExperienceLevel;
         public uint PetCreatureFamilyId;
         public bool BoostInProgress; // @todo
         public uint[] ProfessionIds = new uint[2];      // @todo
         public VisualItemInfo[] VisualItems = new VisualItemInfo[Enums.Classic.InventorySlots.BagEnd];
+        public CustomTabardInfo PersonalTabard = CustomTabardInfo.Default;
         public List<string> MailSenders = new();
         public List<uint> MailSenderTypes = new();
 
         public struct VisualItemInfo
         {
+            // 14-byte layout used by V1_14, V2_5, and 3.4.3.54261. Per WPP V3_4_0_45166's
+            // ReadVisualItemInfo, 3.4.3 still uses the older format. Only V3_4_4_59817+ moved
+            // to the 24-byte layout (ItemID + TransmogrifiedItemID added).
             public void Write(WorldPacket data)
             {
                 data.WriteUInt32(DisplayId);
@@ -195,6 +389,36 @@ public sealed class EnumCharactersResult : ServerPacket
             public uint SecondaryItemModifiedAppearanceID; // also -1 is some special value
             public byte InvType;
             public byte Subclass;
+        }
+
+        // 3.4.3+ adds a per-character "personal tabard" customization. Defaults to all -1
+        // (= "no tabard set"); the default factory supplies that without forcing every call
+        // site to remember the magic value.
+        public struct CustomTabardInfo
+        {
+            public static CustomTabardInfo Default => new()
+            {
+                EmblemStyle = -1,
+                EmblemColor = -1,
+                BorderStyle = -1,
+                BorderColor = -1,
+                BackgroundColor = -1,
+            };
+
+            public int EmblemStyle;
+            public int EmblemColor;
+            public int BorderStyle;
+            public int BorderColor;
+            public int BackgroundColor;
+
+            public void Write(WorldPacket data)
+            {
+                data.WriteInt32(EmblemStyle);
+                data.WriteInt32(EmblemColor);
+                data.WriteInt32(BorderStyle);
+                data.WriteInt32(BorderColor);
+                data.WriteInt32(BackgroundColor);
+            }
         }
 
         public struct PetInfo
@@ -220,6 +444,10 @@ public sealed class EnumCharactersResult : ServerPacket
             data.WriteBit(HasExpansion);
             data.WriteBit(HasAchievement);
             data.WriteBit(HasHeritageArmor);
+            // 3.4.3+ added IsLocked and Unused1027. Write them unconditionally — older modern
+            // clients ignore the upper bits inside the byte that FlushBits aligns to.
+            data.WriteBit(IsLocked);
+            data.WriteBit(Unused1027);
             data.FlushBits();
         }
 
@@ -227,6 +455,8 @@ public sealed class EnumCharactersResult : ServerPacket
         public bool HasExpansion;
         public bool HasAchievement;
         public bool HasHeritageArmor;
+        public bool IsLocked;
+        public bool Unused1027;
     }
 
     public struct UnlockedConditionalAppearance
@@ -515,7 +745,10 @@ public class PlayerLogin : ClientPacket
     {
         Guid = _worldPacket.ReadPackedGuid128();
         FarClip = _worldPacket.ReadFloat();
-        UnkBit = _worldPacket.HasBit();
+        // 3.4.3 client doesn't send the trailing bit — packet is exactly Guid+FarClip.
+        // Per WPP V3_4_0_45166 SessionHandler.cs:143, gated on V3_4_3_51505+.
+        if (ModernVersion.ExpansionVersion < 3)
+            UnkBit = _worldPacket.HasBit();
     }
 
     public WowGuid128 Guid;      // Guid of the player that is logging in

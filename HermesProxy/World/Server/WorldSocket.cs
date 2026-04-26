@@ -793,14 +793,17 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
     public void SendAuthResponse(BattlenetRpcErrorCode code, uint queuePos = 0)
     {
+        Log.Print(LogType.Trace,
+            $"[Trace] SendAuthResponse: code={code} queuePos={queuePos} legacyExpansion={LegacyVersion.ExpansionVersion} " +
+            $"realmAddress=0x{_realmId.GetAddress():X8}");
         AuthResponse response = new();
         response.Result = code;
 
         if (code == BattlenetRpcErrorCode.Ok)
         {
             response.SuccessInfo = new AuthResponse.AuthSuccessInfo();
-            response.SuccessInfo.ActiveExpansionLevel = (byte)(LegacyVersion.ExpansionVersion - 1);
-            response.SuccessInfo.AccountExpansionLevel = (byte)0;
+            response.SuccessInfo.ActiveExpansionLevel = (byte)LegacyVersion.ExpansionVersion;
+            response.SuccessInfo.AccountExpansionLevel = (byte)LegacyVersion.ExpansionVersion;
             response.SuccessInfo.VirtualRealmAddress = _realmId.GetAddress();
             response.SuccessInfo.Time = (uint)Time.UnixTime;
 

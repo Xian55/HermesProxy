@@ -137,6 +137,7 @@ public enum HighGuidTypeLegacy
 {
     None                    = -1,
     Item                    = 0x4000,                       // blizz 4000
+    ItemContainer           = 0x4700,                       // cmangos uses 0x4700 for equipped/container items in CreateObject burst
     Player                  = 0x0000,                       // blizz 0000
     GameObject              = 0xF110,                       // blizz F110
     Transport               = 0xF120,                       // blizz F120 (for GAMEOBJECT_TYPE_TRANSPORT)

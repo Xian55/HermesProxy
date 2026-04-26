@@ -578,7 +578,11 @@ public partial class AuthClient
         for (ushort i = 0; i < realmsCount; i++)
         {
             RealmInfo realmInfo = new RealmInfo();
-            realmInfo.ID = i;
+            // Realm IDs are 1-based: WowGuid128.RealmSpecificCreate hardcodes realmId=1 in
+            // the high portion of player GUIDs, and the modern 3.4.3 client extracts that to
+            // look up the matching VirtualRealmInfo. With realm.Index=0 the lookup fails and
+            // the client silently hides characters.
+            realmInfo.ID = (uint)(i + 1);
 
             if (LegacyVersion.Build < ClientVersionBuild.V2_0_3_6299)
             {

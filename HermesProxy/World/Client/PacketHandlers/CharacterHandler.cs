@@ -1,8 +1,8 @@
-﻿using HermesProxy.Enums;
+﻿using Framework.Logging;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
-using System;
 using System.Collections.Generic;
 
 namespace HermesProxy.World.Client;
@@ -13,20 +13,29 @@ public partial class WorldClient
     [PacketHandler(Opcode.SMSG_ENUM_CHARACTERS_RESULT)]
     void HandleEnumCharactersResult(WorldPacket packet)
     {
+        Log.Print(LogType.Trace, "[Trace] HandleEnumCharactersResult: ENTER — translating legacy SMSG_ENUM_CHARACTERS_RESULT to modern");
         EnumCharactersResult charEnum = new();
         charEnum.Success = true;
         charEnum.IsDeletedCharacters = false;
         charEnum.IsNewPlayerRestrictionSkipped = false;
         charEnum.IsNewPlayerRestricted = false;
-        charEnum.IsNewPlayer = true;
+        // Must be false for the 3.4.3 client to render existing characters — true marks the
+        // result as "new account, no characters yet" and the client suppresses the list.
+        charEnum.IsNewPlayer = false;
         charEnum.IsAlliedRacesCreationAllowed = false;
+        charEnum.DisabledClassesMask = null;
 
         GetSession().GameState.OwnCharacters.Clear();
 
         byte count = packet.ReadUInt8();
+        Log.Print(LogType.Network, $"[CharEnum] legacy count={count}");
+        uint virtualRealmAddress = GetSession().Realm?.Id.GetAddress() ?? 0u;
+        Log.Print(LogType.Trace, $"[Trace] HandleEnumCharactersResult: realm.GetAddress()=0x{virtualRealmAddress:X8} ({virtualRealmAddress})");
         for (byte i = 0; i < count; i++)
         {
             EnumCharactersResult.CharacterInfo char1 = new EnumCharactersResult.CharacterInfo();
+            char1.ListPosition = i;
+            char1.VirtualRealmAddress = virtualRealmAddress;
             PlayerCache cache = new PlayerCache();
             char1.Guid = packet.ReadGuid().To128(GetSession().GameState);
             char1.Name = cache.Name = packet.ReadCString();
@@ -40,6 +49,13 @@ public partial class WorldClient
             byte hairColor = packet.ReadUInt8();
             byte facialHair = packet.ReadUInt8();
             char1.Customizations = CharacterCustomizations.ConvertLegacyCustomizationsToModern((Race)char1.RaceId, (Gender)char1.SexId, skin, face, hairStyle, hairColor, facialHair);
+            // Phase 5a diagnostic: clear customizations to test whether the choice IDs from
+            // GetModernCustomizationChoice (17160-17209 range — looks like Shadowlands retail
+            // DB2 IDs) are rejected by the 3.4.3.54261 client's ChrCustomizationChoice.db2.
+            // If the character renders with default appearance after this, the IDs are wrong
+            // and we need DB2-correct values from wago.tools.
+            if (ClientVersionBuild.V3_4_3_54261 == ModernVersion.Build)
+                char1.Customizations.Clear();
 
             char1.ExperienceLevel = cache.Level = packet.ReadUInt8();
             if (char1.ExperienceLevel > charEnum.MaxCharacterLevel)
@@ -52,8 +68,17 @@ public partial class WorldClient
             char1.PreloadPos = packet.ReadVector3();
             uint guildId = packet.ReadUInt32();
             GetSession().GameState.StorePlayerGuildId(char1.Guid, guildId);
-            char1.GuildGuid = WowGuid128.Create(HighGuidType703.Guild, guildId);
+            char1.GuildGuid = guildId != 0 ? WowGuid128.Create(HighGuidType703.Guild, guildId) : WowGuid128.Empty;
             char1.Flags = (CharacterFlags)packet.ReadUInt32();
+            // Phase 5a diagnostic: log what flags cmangos set, then zero them out for 3.4.3.
+            // If the character now renders, one of cmangos's CharacterFlags (RenameRequired,
+            // DeclineRequired, LockedForTransfer, etc.) is being treated as "hide me" by the
+            // 3.4.3 client. We'll then look up the specific flag and translate it correctly.
+            if (ClientVersionBuild.V3_4_3_54261 == ModernVersion.Build)
+            {
+                Log.Print(LogType.Network, $"[CharFlags] legacy flags=0x{(uint)char1.Flags:X8} — overriding to 0 for diagnostic");
+                char1.Flags = 0;
+            }
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 char1.Flags2 = packet.ReadUInt32(); // Customization Flags
@@ -82,20 +107,26 @@ public partial class WorldClient
                     char1.VisualItems[EquipmentSlot.Bag1 + j].DisplayEnchantId = packet.ReadUInt32();
             }
 
-            // placeholders
-            char1.Flags2 = 402685956;
-            char1.Flags3 = 855688192;
+            // Reset Flags2 — the legacy CustomizationFlags read above are not the same field as
+            // the modern Flags2, and stale bits there cause the 3.4.3 client to silently drop
+            // the character entry.
+            char1.Flags2 = 0;
+            char1.Flags3 = 0;
             char1.Flags4 = 0;
             char1.ProfessionIds[0] = 0;
             char1.ProfessionIds[1] = 0;
             char1.LastPlayedTime = (ulong) Time.UnixTime;
             char1.SpecID = 0;
-            char1.Unknown703 = 55;
-            char1.LastLoginVersion = 11400;
+            char1.Unknown703 = 0;
+            char1.LastLoginVersion = (uint)ModernVersion.BuildInt;
             char1.OverrideSelectScreenFileDataID = 0;
             char1.BoostInProgress = false;
             char1.unkWod61x = 0;
             char1.ExpansionChosen = true;
+            Log.Print(LogType.Network,
+                $"[Trace] HandleEnumCharactersResult: built char[{i}] guid={char1.Guid} name='{char1.Name}' " +
+                $"race={char1.RaceId} class={char1.ClassId} sex={char1.SexId} level={char1.ExperienceLevel} " +
+                $"zone={char1.ZoneId} map={char1.MapId} guildGuid={char1.GuildGuid} customizations={char1.Customizations.Count}");
             charEnum.Characters.Add(char1);
 
             GetSession().GameState.OwnCharacters.Add(new OwnCharacterInfo
@@ -126,7 +157,12 @@ public partial class WorldClient
             charEnum.RaceUnlockData.Add(new EnumCharactersResult.RaceUnlock(10, true, false, false));
             charEnum.RaceUnlockData.Add(new EnumCharactersResult.RaceUnlock(11, true, false, false));
         }
+        Log.Print(LogType.Network,
+            $"[Trace] HandleEnumCharactersResult: SEND — chars={charEnum.Characters.Count} maxLvl={charEnum.MaxCharacterLevel} " +
+            $"races={charEnum.RaceUnlockData.Count} success={charEnum.Success} isNewPlayer={charEnum.IsNewPlayer} " +
+            $"disabledClassesMask={(charEnum.DisabledClassesMask.HasValue ? "set" : "null")}");
         SendPacketToClient(charEnum);
+        Log.Print(LogType.Trace, "[Trace] HandleEnumCharactersResult: EXIT — translation complete, packet queued for modern client");
     }
 
     [PacketHandler(Opcode.SMSG_CREATE_CHAR)]

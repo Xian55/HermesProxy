@@ -64,7 +64,8 @@ public partial class WorldClient
             {
                 case UpdateTypeLegacy.Values:
                 {
-                    var guid = packet.ReadPackedGuid().To128(GetSession().GameState);
+                    var oldGuid = packet.ReadPackedGuid();
+                    var guid = oldGuid.To128(GetSession().GameState);
                     PrintString($"Guid = {guid.ToString()}", i);
 
                     ObjectUpdate updateData = new ObjectUpdate(guid, UpdateTypeModern.Values, GetSession());
@@ -74,6 +75,33 @@ public partial class WorldClient
 
                     if (powerUpdate.Powers.Count != 0)
                         SendPacketToClient(powerUpdate);
+
+                    // FIXME(phase5a-7c): Same Phase 5a skip filters as CreateObject1. V3_4_3 only —
+                    // V1_14/V2_5 paths must keep all object types so zeppelins, mailboxes, chests
+                    // etc. still render under Vanilla/TBC clients. Removing the filter requires
+                    // WriteCreateGameObjectData / Item / Transport to produce bytes the V3_4_3
+                    // client accepts (currently triggers CMSG_OBJECT_UPDATE_FAILED retry loops).
+                    if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+                    {
+                        var legacyHigh = oldGuid.GetHighGuidTypeLegacy();
+                        if (legacyHigh == HighGuidTypeLegacy.ItemContainer)
+                        {
+                            Log.Print(LogType.Network, $"[Phase5aTrace] Skipping Values for 0x4700 ItemContainer guid={guid}.");
+                            break;
+                        }
+                        if (legacyHigh == HighGuidTypeLegacy.GameObject)
+                        {
+                            Log.Print(LogType.Network, $"[Phase5aTrace] Skipping Values for GameObject guid={guid}.");
+                            break;
+                        }
+                        if (legacyHigh == HighGuidTypeLegacy.Transport ||
+                            legacyHigh == HighGuidTypeLegacy.MOTransport)
+                        {
+                            Log.Print(LogType.Network, $"[Phase5aTrace] Skipping Values for Transport guid={guid}.");
+                            break;
+                        }
+                    }
+
                     updateObject.ObjectUpdates.Add(updateData);
                     if (auraUpdate.Auras.Count != 0)
                         auraUpdates.Add(auraUpdate);
@@ -131,13 +159,48 @@ public partial class WorldClient
 
                     if (updateData.CreateData.MoveInfo != null || !guid.IsWorldObject() )
                     {
-                        updateObject.ObjectUpdates.Add(updateData);
-                        if (auraUpdate.Auras.Count != 0)
-                            auraUpdates.Add(auraUpdate);
+                        // FIXME(phase5a-7c): filter out object types whose Phase 5a WriteCreate*Data
+                        // path hasn't been verified against the V3_4_3 client. Each one currently
+                        // produces bytes the client rejects with CMSG_OBJECT_UPDATE_FAILED, causing
+                        // retry loops that block world entry.
+                        // - 0x4700 ItemContainer: cmangos phantom items, no real ItemData to send.
+                        // - GameObject: WriteCreateGameObjectData has format issue under V3_4_3 client.
+                        // - Transport/MOTransport: same path as GameObject (zeppelins, boats, elevators).
+                        // Filters relax as each WriteCreate*Data is verified working. V3_4_3 only —
+                        // V1_14/V2_5 ObjectUpdateBuilders are pre-existing/known-good and need full
+                        // GameObject/Transport coverage to render mailboxes, chests, zeppelins, etc.
+                        bool filtered = false;
+                        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+                        {
+                            var legacyHigh = oldGuid.GetHighGuidTypeLegacy();
+                            if (legacyHigh == HighGuidTypeLegacy.ItemContainer)
+                            {
+                                Log.Print(LogType.Network, $"[Phase5aTrace] Skipping 0x4700 ItemContainer guid={guid}.");
+                                filtered = true;
+                            }
+                            else if (legacyHigh == HighGuidTypeLegacy.GameObject)
+                            {
+                                Log.Print(LogType.Network, $"[Phase5aTrace] Skipping GameObject create1 guid={guid} (Phase 5a smoke-test, client can't parse).");
+                                filtered = true;
+                            }
+                            else if (legacyHigh == HighGuidTypeLegacy.Transport ||
+                                     legacyHigh == HighGuidTypeLegacy.MOTransport)
+                            {
+                                Log.Print(LogType.Network, $"[Phase5aTrace] Skipping Transport create1 guid={guid} (Phase 5a smoke-test, client can't parse).");
+                                filtered = true;
+                            }
+                        }
+
+                        if (!filtered)
+                        {
+                            updateObject.ObjectUpdates.Add(updateData);
+                            if (auraUpdate.Auras.Count != 0)
+                                auraUpdates.Add(auraUpdate);
+                        }
                     }
                     else
                         Log.Print(LogType.Error, $"Broken create1 without position for {guid}");
-                    
+
                     break;
                 }
                 case UpdateTypeLegacy.CreateObject2:
@@ -163,9 +226,35 @@ public partial class WorldClient
 
                     if (updateData.CreateData.MoveInfo != null || !guid.IsWorldObject())
                     {
-                        updateObject.ObjectUpdates.Add(updateData);
-                        if (auraUpdate.Auras.Count != 0)
-                            auraUpdates.Add(auraUpdate);
+                        // FIXME(phase5a-7c): same Phase 5a skip filters as CreateObject1. V3_4_3 only.
+                        bool filtered = false;
+                        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+                        {
+                            var legacyHigh = oldGuid.GetHighGuidTypeLegacy();
+                            if (legacyHigh == HighGuidTypeLegacy.ItemContainer)
+                            {
+                                Log.Print(LogType.Network, $"[Phase5aTrace] Skipping CreateObject2 for 0x4700 ItemContainer guid={guid}.");
+                                filtered = true;
+                            }
+                            else if (legacyHigh == HighGuidTypeLegacy.GameObject)
+                            {
+                                Log.Print(LogType.Network, $"[Phase5aTrace] Skipping GameObject create2 guid={guid}.");
+                                filtered = true;
+                            }
+                            else if (legacyHigh == HighGuidTypeLegacy.Transport ||
+                                     legacyHigh == HighGuidTypeLegacy.MOTransport)
+                            {
+                                Log.Print(LogType.Network, $"[Phase5aTrace] Skipping Transport create2 guid={guid}.");
+                                filtered = true;
+                            }
+                        }
+
+                        if (!filtered)
+                        {
+                            updateObject.ObjectUpdates.Add(updateData);
+                            if (auraUpdate.Auras.Count != 0)
+                                auraUpdates.Add(auraUpdate);
+                        }
                     }
                     else
                         Log.Print(LogType.Error, $"Broken create2 without position for {guid}");
@@ -1117,6 +1206,31 @@ public partial class WorldClient
             return GetGuidValue64(UpdateFields, field).To128(GetSession().GameState);
         else
             return GetGuidValue128(UpdateFields, field);
+    }
+
+    // FIXME(phase5a-7c): cmangos packs equipped/container items with non-standard 0x4700
+    // (HighGuidTypeLegacy.ItemContainer). We skip CreateObject blocks for those items
+    // in the legacy→modern translation above. If we still write their guids into the
+    // player's InvSlots/PackSlots/etc, the V3_4_3 client looks them up, finds nothing,
+    // and dereferences a null object pointer → ERROR #132 ACCESS_VIOLATION on
+    // world-enter. Returning Empty here makes the slot appear unequipped, which is
+    // wrong but non-crashing — the proper fix is to actually serialize ItemContainer
+    // items via WriteCreateItemData. V3_4_3 only — V1_14/V2_5 paths must keep the
+    // original item guids so equipped items still render under Vanilla/TBC clients.
+    private WowGuid128 GetSlotGuidValue(Dictionary<int, UpdateField> updates, int field)
+    {
+        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V6_0_2_19033))
+            return GetGuidValue128(updates, field);
+
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            var legacyGuid = GetGuidValue64(updates, field);
+            if (legacyGuid.GetHighGuidTypeLegacy() == HighGuidTypeLegacy.ItemContainer)
+                return WowGuid128.Empty;
+            return legacyGuid.To128(GetSession().GameState);
+        }
+
+        return GetGuidValue64(updates, field).To128(GetSession().GameState);
     }
 
     public QuestLog? ReadQuestLogEntry(int i, BitArray? updateMaskArray, Dictionary<int, UpdateField> updates)
@@ -2214,7 +2328,7 @@ public partial class WorldClient
                 for (int i = 0; i < 23; i++)
                 {
                     if (updateMaskArray[PLAYER_FIELD_INV_SLOT_HEAD + i * 2])
-                        updateData.ActivePlayerData.InvSlots[i] = GetGuidValue(updates, PLAYER_FIELD_INV_SLOT_HEAD + i * 2).To128(GetSession().GameState);
+                        updateData.ActivePlayerData.InvSlots[i] = GetSlotGuidValue(updates, PLAYER_FIELD_INV_SLOT_HEAD + i * 2);
                 }
             }
             int PLAYER_FIELD_PACK_SLOT_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_PACK_SLOT_1);
@@ -2223,27 +2337,27 @@ public partial class WorldClient
                 for (int i = 0; i < 16; i++)
                 {
                     if (updateMaskArray[PLAYER_FIELD_PACK_SLOT_1 + i * 2])
-                        updateData.ActivePlayerData.PackSlots[i] = GetGuidValue(updates, PLAYER_FIELD_PACK_SLOT_1 + i * 2).To128(GetSession().GameState);
+                        updateData.ActivePlayerData.PackSlots[i] = GetSlotGuidValue(updates, PLAYER_FIELD_PACK_SLOT_1 + i * 2);
                 }
             }
             int PLAYER_FIELD_BANK_SLOT_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_BANK_SLOT_1);
             if (PLAYER_FIELD_BANK_SLOT_1 >= 0)
             {
-                int bankSlots = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180) ? 28 : 24; // 2.0.0.5965 Alpha 
+                int bankSlots = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180) ? 28 : 24; // 2.0.0.5965 Alpha
                 for (int i = 0; i < bankSlots; i++)
                 {
                     if (updateMaskArray[PLAYER_FIELD_BANK_SLOT_1 + i * 2])
-                        updateData.ActivePlayerData.BankSlots[i] = GetGuidValue(updates, PLAYER_FIELD_BANK_SLOT_1 + i * 2).To128(GetSession().GameState);
+                        updateData.ActivePlayerData.BankSlots[i] = GetSlotGuidValue(updates, PLAYER_FIELD_BANK_SLOT_1 + i * 2);
                 }
             }
             int PLAYER_FIELD_BANKBAG_SLOT_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_BANKBAG_SLOT_1);
             if (PLAYER_FIELD_BANKBAG_SLOT_1 >= 0)
             {
-                int bankBagSlots = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180) ? 7 : 6; // 2.0.0.5965 Alpha 
+                int bankBagSlots = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180) ? 7 : 6; // 2.0.0.5965 Alpha
                 for (int i = 0; i < bankBagSlots; i++)
                 {
                     if (updateMaskArray[PLAYER_FIELD_BANKBAG_SLOT_1 + i * 2])
-                        updateData.ActivePlayerData.BankBagSlots[i] = GetGuidValue(updates, PLAYER_FIELD_BANKBAG_SLOT_1 + i * 2).To128(GetSession().GameState);
+                        updateData.ActivePlayerData.BankBagSlots[i] = GetSlotGuidValue(updates, PLAYER_FIELD_BANKBAG_SLOT_1 + i * 2);
                 }
             }
             int PLAYER_FIELD_VENDORBUYBACK_SLOT_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_VENDORBUYBACK_SLOT_1);
@@ -2252,7 +2366,7 @@ public partial class WorldClient
                 for (int i = 0; i < 12; i++)
                 {
                     if (updateMaskArray[PLAYER_FIELD_VENDORBUYBACK_SLOT_1 + i * 2])
-                        updateData.ActivePlayerData.BuyBackSlots[i] = GetGuidValue(updates, PLAYER_FIELD_VENDORBUYBACK_SLOT_1 + i * 2).To128(GetSession().GameState);
+                        updateData.ActivePlayerData.BuyBackSlots[i] = GetSlotGuidValue(updates, PLAYER_FIELD_VENDORBUYBACK_SLOT_1 + i * 2);
                 }
             }
             int PLAYER_FIELD_KEYRING_SLOT_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_KEYRING_SLOT_1);
@@ -2261,7 +2375,7 @@ public partial class WorldClient
                 for (int i = 0; i < 32; i++)
                 {
                     if (updateMaskArray[PLAYER_FIELD_KEYRING_SLOT_1 + i * 2])
-                        updateData.ActivePlayerData.KeyringSlots[i] = GetGuidValue(updates, PLAYER_FIELD_KEYRING_SLOT_1 + i * 2).To128(GetSession().GameState);
+                        updateData.ActivePlayerData.KeyringSlots[i] = GetSlotGuidValue(updates, PLAYER_FIELD_KEYRING_SLOT_1 + i * 2);
                 }
             }
 
