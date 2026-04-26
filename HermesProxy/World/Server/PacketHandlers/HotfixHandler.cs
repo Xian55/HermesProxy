@@ -114,20 +114,6 @@ public partial class WorldSocket
 
         HotfixConnect connect = new HotfixConnect();
 
-        // FIXME(phase5a-7b): empty hotfix response for V3_4_3. Our HotfixContent rows are
-        // for an older build; the V3_4_3 client receives them but can't deserialize against
-        // its DB2 schemas, then sits waiting — character-select never renders. Empty response
-        // tells the client "no hotfixes for these IDs", which it accepts and proceeds. Real
-        // fix: import wago.tools' 3.4.3.54261 hotfix dataset (tracked as Phase 5a-7b).
-        if (ClientVersionBuild.V3_4_3_54261 == ModernVersion.Build)
-        {
-            Log.Print(LogType.Network,
-                $"[Hotfix] V3_4_3 diagnostic: sending EMPTY SMSG_HOTFIX_CONNECT (count=0) to " +
-                $"unblock character-select. If this works, hotfixes were the blocker.");
-            SendPacket(connect);
-            return;
-        }
-
         int matched = 0;
         foreach (uint id in request.Hotfixes)
         {

@@ -1067,6 +1067,13 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     {
         AvailableHotfixes hotfixes = new AvailableHotfixes();
         hotfixes.VirtualRealmAddress = GetSession().RealmId.GetAddress();
+        // V3_4_3 ships ~700k real WotLK hotfix records; enumerating them all in
+        // SMSG_AVAILABLE_HOTFIXES yields a multi-MB packet that stalls the client
+        // at the glue-screen loading bar (character preview never renders). Suppress
+        // the record list and let the client lazy-fetch via CMSG_DB_QUERY_BULK /
+        // CMSG_HOTFIX_REQUEST — both paths return real data via HotfixHandler.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            hotfixes.IncludeRecords = false;
         SendPacket(hotfixes);
     }
 

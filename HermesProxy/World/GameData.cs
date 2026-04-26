@@ -1418,26 +1418,29 @@ public static partial class GameData
     #endregion
     #region HotFixes
     // Stores
-    public const uint HotfixAreaTriggerBegin = 100000;
-    public const uint HotfixSkillLineBegin = 110000;
-    public const uint HotfixSkillRaceClassInfoBegin = 120000;
-    public const uint HotfixSkillLineAbilityBegin = 130000;
-    public const uint HotfixSpellBegin = 140000;
-    public const uint HotfixSpellNameBegin = 150000;
-    public const uint HotfixSpellLevelsBegin = 160000;
-    public const uint HotfixSpellAuraOptionsBegin = 170000;
-    public const uint HotfixSpellMiscBegin = 180000;
-    public const uint HotfixSpellEffectBegin = 190000;
-    public const uint HotfixSpellXSpellVisualBegin = 200000;
-    public const uint HotfixItemBegin = 210000;
-    public const uint HotfixItemSparseBegin = 220000;
-    public const uint HotfixItemAppearanceBegin = 230000;
-    public const uint HotfixItemModifiedAppearanceBegin = 240000;
-    public const uint HotfixItemEffectBegin = 250000;
-    public const uint HotfixItemDisplayInfoBegin = 260000;
-    public const uint HotfixCreatureDisplayInfoBegin = 270000;
-    public const uint HotfixCreatureDisplayInfoExtraBegin = 280000;
-    public const uint HotfixCreatureDisplayInfoOptionBegin = 290000;
+    // Base values are spaced 100k apart to fit WotLK 3.4.3.54261 row counts
+    // (max table CreatureDisplayInfoOption ~75k rows). The previous 10k spacing
+    // was sized for TBC stub data and collides under real WotLK row counts.
+    public const uint HotfixAreaTriggerBegin = 1_000_000;
+    public const uint HotfixSkillLineBegin = 1_100_000;
+    public const uint HotfixSkillRaceClassInfoBegin = 1_200_000;
+    public const uint HotfixSkillLineAbilityBegin = 1_300_000;
+    public const uint HotfixSpellBegin = 1_400_000;
+    public const uint HotfixSpellNameBegin = 1_500_000;
+    public const uint HotfixSpellLevelsBegin = 1_600_000;
+    public const uint HotfixSpellAuraOptionsBegin = 1_700_000;
+    public const uint HotfixSpellMiscBegin = 1_800_000;
+    public const uint HotfixSpellEffectBegin = 1_900_000;
+    public const uint HotfixSpellXSpellVisualBegin = 2_000_000;
+    public const uint HotfixItemBegin = 2_100_000;
+    public const uint HotfixItemSparseBegin = 2_200_000;
+    public const uint HotfixItemAppearanceBegin = 2_300_000;
+    public const uint HotfixItemModifiedAppearanceBegin = 2_400_000;
+    public const uint HotfixItemEffectBegin = 2_500_000;
+    public const uint HotfixItemDisplayInfoBegin = 2_600_000;
+    public const uint HotfixCreatureDisplayInfoBegin = 2_700_000;
+    public const uint HotfixCreatureDisplayInfoExtraBegin = 2_800_000;
+    public const uint HotfixCreatureDisplayInfoOptionBegin = 2_900_000;
     public static Dictionary<uint, HotfixRecord> Hotfixes = [];
     public static void LoadHotfixes()
     {

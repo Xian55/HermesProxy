@@ -193,6 +193,73 @@ After v0.1 shipped (character-select through Phases 0–4), straight Approach B 
 
 ---
 
+### Phase 5a — DONE (PR #50, merge `5b9fcc0`, 2026-04-26)
+
+Shipped: V3_4_3.54261 client connects through HermesProxy to CMaNGOS 3.3.5a, authenticates, sees the character list, enters the world, plays, and quits cleanly. V1_14 (Vanilla) and V2_5 (TBC) paths smoke-tested unaffected; `dotnet test` 296/296 passing.
+
+Phase 5a deliberately left **scaffolding workarounds** so subsequent sub-phases have obvious entry points. Each one is tagged in source with a `FIXME(phase5*)` marker — `grep -rn "FIXME(phase5" --include="*.cs"` produces the full list:
+
+| Sub-phase | FIXME count | Where | What it gates |
+|---|---|---|---|
+| **5a-7b** | DONE | — | V3_4_3 hotfix data — landed in 5a-7b PR; real item names + spell names now reach the client |
+| **5a-7c** | 5 | 4× `UpdateHandler.cs`, 1× `HighGuid.cs` | Item / GameObject / Transport object-create blocks — players appear naked, no mailboxes/chests/zeppelins |
+| **5a-7d** | 1 | `ObjectUpdateBuilder.cs:1173` | Values / partial-update path — no live HP bars, aura ticks, combat propagation |
+| **5b** | 2 | `ObjectField.cs`, `ObjectUpdateBuilderGeneratorTests.cs` | Source-generator restoration → byte-equivalence audit lane against the 5a hand-port |
+
+All V3_4_3-specific code (filters, hotfix stub, etc.) is gated on `ModernVersion.Build == ClientVersionBuild.V3_4_3_54261` so V1_14/V2_5 paths fall through unchanged.
+
+---
+
+### Phase 5a-7 — sub-phase follow-ups (next on deck)
+
+Recommended execution order: **~~7b~~ → 7c → 7d → 5b**. 7b shipped 2026-04-26. 7c is next on deck — biggest user-visible jump (naked-AFK → can equip + interact); 7d makes combat feel live; 5b sets up the source-gen lane for the eventual hand-port deletion.
+
+#### Phase 5a-7b — DONE (real hotfix data via wago.tools, 2026-04-26)
+
+Shipped: all 18 `HermesProxy/CSV/Hotfix/*3.csv` files regenerated from wago.tools at `?build=3.4.3.54261` (the previous files were byte-identical TBC carryovers labeled WotLK). Data set: `AreaTrigger`, `SkillLine`, `SkillLineAbility`, `SkillRaceClassInfo`, `Spell`, `SpellName`, `SpellLevels`, `SpellAuraOptions`, `SpellMisc`, `SpellEffect`, `SpellXSpellVisual`, `Item`, `ItemSparse`, `ItemEffect`, `ItemDisplayInfo`, `CreatureDisplayInfo`, `CreatureDisplayInfoExtra`, `CreatureDisplayInfoOption`. Total ~700K hotfix records.
+
+Code changes:
+- `HotfixHandler.HandleHotfixRequest` — V3_4_3-gated empty-response stub deleted; V3_4_3 path now falls through to the existing `GameData.Hotfixes.TryGetValue` per-record reply loop (same path TBC/Era already use).
+- `GameData.cs` `Hotfix*Begin` constants — bumped from 10K to 100K spacing. The 10K spacing fit TBC stub data but collided under WotLK row counts (e.g. SkillLineAbility @ 10244 rows overflows into Spell's 140000 base). Bases now start at 1M with 100K gaps so every WotLK table fits comfortably.
+- Column projection per loader's positional `row[N]` order: 13 of 18 tables match wago's column order verbatim; 5 (`SpellMisc`, `ItemSparse`, `Item`, `ItemDisplayInfo`, `CreatureDisplayInfo`) need explicit reorder + drop of wago-only columns. Negative bitmask values (`RaceMask=-1` "all races", `Attributes_*` flag bitmasks with high bit set) coerced via 2's-complement to the loader's unsigned types so `uint.Parse("4294967295")` accepts them — same wire bits as `(uint)-1`.
+- `AvailableHotfixes` packet — V3_4_3 send path suppresses the per-record enumeration (sends `count=0`). At ~700K records the full list produced a ~5.6 MB `SMSG_AVAILABLE_HOTFIXES` that stalled the V3_4_3 client at the glue-screen loading bar (character preview never rendered). The client lazy-fetches what it needs via `CMSG_DB_QUERY_BULK` and `CMSG_HOTFIX_REQUEST` — both already return real data. V1_14 / V2_5 paths keep the legacy enumeration since their record counts are tiny.
+
+Known limitations:
+- **2306 ItemSparse rows skipped** (5% of WotLK item set, mostly Naxx/Ulduar/ICC raid gear with stats > 127). Cause: loader parses `StatValue1..10` as `sbyte` (TBC-era field width). Future work: widen loader to `short` (parse) + `WriteInt16` (wire) — fork's loader uses `WriteInt16` for these but the upstream `WriteInt8` is a latent TBC bug. Affects raid-tier tooltips only; quest gear / dungeon gear unaffected.
+- The skipped raid items still get tooltips via the legacy `SMSG_ITEM_QUERY_SINGLE_RESPONSE` path; only the modern `SMSG_HOTFIX_CONNECT` slot is empty for them.
+
+Verification:
+- `dotnet build` clean (43 pre-existing HPSG001 warnings, 0 errors)
+- `dotnet test` 296 passed / 1 skipped (pre-existing 5b-gated generator test) / 0 failed
+- HermesProxy boots with `--set ClientBuild=V3_4_3_54261` and `LoadEverything()` completes in ~1.8 s; `[Hotfix] CMSG_HOTFIX_REQUEST` log line shows `GameData.Hotfixes total available = ~700000`
+- `grep -rn "FIXME(phase5a-7b)" --include="*.cs"` returns no hits
+
+#### Phase 5a-7c — Item / GameObject / Transport WriteCreate*Data for V3_4_3
+
+**Why second**: biggest user-visible jump (naked-AFK character → equipped player + interactable world). Largest scope of the four follow-ups — re-validates each `WriteCreate*Data` byte-for-byte against the V3_4_3 client and removes the 5 skip filters.
+
+**Scope**: walk each of the three `WriteCreate*Data` paths in `HermesProxy/World/Objects/Version/V3_4_3_54261/ObjectUpdateBuilder.cs` (Item ~line 307, GameObject ~line 938, Transport shares the GameObject path), capture-validate against WPP V3_4_0_45166 reference parser, fix divergence. Per filter removed:
+
+- `UpdateHandler.cs:79, 162, 229` — three `if (legacyHigh == ...)` filter sites removed once each type's `WriteCreate*Data` is verified
+- `UpdateHandler.cs:1211` — `GetSlotGuidValue` returns the real Item guid (not `Empty`) once `WriteCreateItemData` is correct
+- `HighGuid.cs:45` — fallback `HighGuidType.Null` for unknown legacy highs can be tightened or removed once we've audited all real legacy highs cmangos emits
+
+**Estimated scope**: 1 PR per object type (Item / GameObject / Transport) is sensible if any single type proves involved. Probably 3 PRs total stacked on 7b.
+
+#### Phase 5a-7d — Implement Values / partial-update path
+
+**Why third**: gates live combat / HP bars / aura ticks / movement deltas. Currently empty (`WriteUInt32(0)`) so cmangos has to re-send full CreateObject blocks instead of partial deltas; the client gets correct state but with extra latency / bandwidth.
+
+**Scope**: ~1700 LOC of the fork's bit-mask serialization for partial updates, ported using the same pattern as 5a's WriteCreate path. Source: `X:\Programming\HermesProxy-WOTLK\HermesProxy\World\Objects\Version\V3_4_3_54261\ObjectUpdateBuilder.cs` (the `WriteValuesUpdate*Data` family of methods).
+
+**Estimated scope**: 1 large PR or 2 medium PRs (UnitData/PlayerData together, ActivePlayerData solo). High off-by-one risk — needs WPP capture-diff oracle.
+
+#### Phase 5b — Source-generator restoration
+
+**Why last**: pure infrastructure change with no user-visible impact. Unblocked once 5a is stable and 7b/7c/7d aren't iterating heavily on the hand-port (which would invalidate the byte-equivalence snapshots). Restores `[DescriptorCreateField]` attributes in `HermesProxy/World/Enums/V3_4_3_54261/ObjectField.cs`, re-enables the `WriteCreateObjectData_V3_4_3_54261` Verify snapshot test, then per the 5b–5e roadmap above, incrementally replaces hand-written sections with generator output using the 5a hand-port as the byte-equivalence test oracle.
+
+---
+
 ### Phase 6 — Surrounding objects
 
 **Scope**: Units/creatures, GameObjects, Items from other players. No new files; bugfixing the Phase 5 builder in a populated area.
@@ -378,7 +445,10 @@ Day 5 — Phase 1 verification
   - Phase 2: 3.4.3 client completes BNet auth, sees realm list.
   - Phase 3: 3.4.3 client reaches (empty) character-select.
   - Phase 4: character list populated.
-  - Phase 5: enter world, see own character.
+  - Phase 5a (DONE, PR #50): enter world, see own character (naked, no GameObjects/Transports — those are gated by FIXME(phase5a-7c)).
+  - Phase 5a-7b (DONE, 2026-04-26): real item names + tooltips on character-select equipment slots; ~700K hotfix records loaded from wago.tools build 3.4.3.54261.
+  - Phase 5a-7c (NEXT): equipped items render, mailboxes/chests/zeppelins visible.
+  - Phase 5a-7d: live HP bars, aura ticks, combat propagation.
   - Phase 6: NPCs and other players render.
   - Phase 7: bags/bank usable.
   - Phase 8: spellbook + auras correct.
