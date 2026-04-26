@@ -73,13 +73,20 @@ class AvailableHotfixes : ServerPacket
     public override void Write()
     {
         _worldPacket.WriteUInt32(VirtualRealmAddress);
-        _worldPacket.WriteInt32(GameData.Hotfixes.Count);
-
-        foreach (var hotfix in GameData.Hotfixes)
-            hotfix.Value.WriteAvailable(_worldPacket);
+        if (IncludeRecords)
+        {
+            _worldPacket.WriteInt32(GameData.Hotfixes.Count);
+            foreach (var hotfix in GameData.Hotfixes)
+                hotfix.Value.WriteAvailable(_worldPacket);
+        }
+        else
+        {
+            _worldPacket.WriteInt32(0);
+        }
     }
 
     public uint VirtualRealmAddress;
+    public bool IncludeRecords = true;
 }
 
 class HotfixRequest : ClientPacket
