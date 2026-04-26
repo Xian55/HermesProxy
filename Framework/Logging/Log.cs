@@ -18,7 +18,10 @@ public enum LogType
     Warn,
     Storage,
     SpanMiss,
-    SpanStats
+    SpanStats,
+    Trace,      // Routes to (Server, Verbose) — for high-volume code-path tracing.
+                // Enable with --set Log.Server.MinimumLevel=Verbose (or globally with
+                // Log.MinimumLevel=Verbose). Off by default; cheap when filtered.
 }
 
 public enum LogNetDir // Network direction
@@ -360,6 +363,7 @@ public static class Log
             LogType.Error => (ResolveCategoryFromPath(path), LogEventLevel.Error),
             LogType.SpanMiss => (Packet, LogEventLevel.Warning),
             LogType.SpanStats => (Packet, LogEventLevel.Verbose),
+            LogType.Trace => (Server, LogEventLevel.Verbose),
             _ => (Server, LogEventLevel.Information)
         };
     }
