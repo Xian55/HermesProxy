@@ -1,6 +1,8 @@
 ﻿using Framework;
+using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 using System;
 using System.Collections.Generic;
@@ -1136,6 +1138,152 @@ public partial class WorldClient
         // The modern client doesn't use this mechanism - it uses update fields instead.
         // Simply acknowledge the packet without forwarding to the client.
         packet.ReadPackedGuid(); // target guid
+    }
+
+    // FIXME(phase5a-auras): stub. Forwards an empty modern AuraUpdate ONLY for the
+    // player's own GUID — that single packet is what V3_4_3's loading screen waits
+    // for after the player CreateObject. Legacy 3.3.5a sends one of these for every
+    // nearby unit on world-entry; forwarding all of them floods the client and
+    // triggers an auto-disconnect, so we drop the rest until full translation lands.
+    // Existing buffs/debuffs on the player are also invisible until the full parse.
+    // Replace with a slot-by-slot parse:
+    //   while (packet.CanRead()) {
+    //       slot = packet.ReadUInt8();
+    //       flags = packet.ReadUInt8();
+    //       if (flags == 0) emit empty aura at slot;
+    //       else { spellId, level, charges, optional caster guid, optional duration } -> AuraInfo
+    //   }
+    // SMSG_AURA_UPDATE_ALL (one shot for all auras on a unit) — loop ReadSingleAura
+    // until the packet is exhausted. SMSG_AURA_UPDATE (single update) — one read.
+    // Ported from HermesProxy-WOTLK fork's WorldClient.HandleAuraUpdate*. The prior
+    // stub-handler discarded all aura entries; the V3_4_3 client tolerates an empty
+    // single-update but a multi-update with combat auras stripped causes a state
+    // divergence (SMSG_ATTACK_START + empty AURA_UPDATE_ALL on the player) that
+    // produces an immediate `CMSG_LOG_DISCONNECT reason=7` — observed in
+    // hermes-20260501_004716.log line 1395.
+    [PacketHandler(Opcode.SMSG_AURA_UPDATE)]
+    [PacketHandler(Opcode.SMSG_AURA_UPDATE_ALL)]
+    void HandleAuraUpdate(WorldPacket packet)
+    {
+        bool isAll = packet.GetUniversalOpcode(false) == Opcode.SMSG_AURA_UPDATE_ALL;
+        uint incomingBytes = packet.GetSize();
+        WowGuid128 guid = packet.ReadPackedGuid().To128(GetSession().GameState);
+        bool isPlayer = guid == GetSession().GameState.CurrentPlayerGuid;
+
+        AuraUpdate update = new AuraUpdate(guid, isAll);
+
+        if (isAll)
+        {
+            while (packet.CanRead())
+                ReadSingleAura(packet, guid, update);
+        }
+        else
+        {
+            ReadSingleAura(packet, guid, update);
+        }
+
+        Log.Print(LogType.Trace,
+            $"[AuraUpdateTrace] guid={guid} isAll={isAll} isPlayer={isPlayer} " +
+            $"incomingBytes={incomingBytes} aurasShipped={update.Auras.Count}");
+
+        if (update.Auras.Count > 0)
+            SendPacketToClient(update);
+    }
+
+    void ReadSingleAura(WorldPacket packet, WowGuid128 guid, AuraUpdate update)
+    {
+        byte slot = packet.ReadUInt8();
+        uint spellId = packet.ReadUInt32();
+
+        AuraInfo aura = new AuraInfo { Slot = slot };
+
+        if (spellId == 0)
+        {
+            // Aura removed — modern packet ships AuraData=null in this slot.
+            aura.AuraData = null!;
+            update.Auras.Add(aura);
+            return;
+        }
+
+        AuraDataInfo data = new AuraDataInfo
+        {
+            SpellID = spellId,
+            CastID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Aura,
+                                       (uint)(GetSession().GameState.CurrentMapId ?? 0u),
+                                       spellId, guid.GetCounter()),
+            SpellXSpellVisualID = GameData.GetSpellVisual(spellId),
+        };
+
+        byte legacyFlags = packet.ReadUInt8();
+        data.CastLevel = packet.ReadUInt8();
+        data.Applications = packet.ReadUInt8();
+
+        data.Flags = AuraFlagsModern.None;
+        data.ActiveFlags = 0u;
+
+        // Legacy 3.3.5a aura flag bits → modern AuraFlagsModern + ActiveFlags mapping.
+        // Bits 0x10 / 0x20 are Positive / has-Duration. Bits 0x01/0x02/0x04 are the three
+        // aura point slots. Bit 0x08 indicates the caster is the affected unit (no GUID).
+        // Bit 0x40 indicates the packet carries explicit point floats.
+        if ((legacyFlags & 0x10) != 0) data.Flags |= AuraFlagsModern.Positive;
+        if ((legacyFlags & 0x20) != 0) data.Flags |= AuraFlagsModern.Duration;
+        if ((legacyFlags & 0x01) != 0) data.ActiveFlags |= 1u;
+        if ((legacyFlags & 0x02) != 0) data.ActiveFlags |= 2u;
+        if ((legacyFlags & 0x04) != 0) data.ActiveFlags |= 4u;
+
+        data.CastUnit = (legacyFlags & 0x08) == 0
+            ? packet.ReadPackedGuid().To128(GetSession().GameState)
+            : guid;
+
+        if ((legacyFlags & 0x20) != 0)
+        {
+            data.Duration = packet.ReadInt32();
+            data.Remaining = packet.ReadInt32();
+        }
+
+        if ((legacyFlags & 0x40) != 0)
+        {
+            if ((legacyFlags & 0x01) != 0) data.Points.Add(packet.ReadFloat());
+            if ((legacyFlags & 0x02) != 0) data.Points.Add(packet.ReadFloat());
+            if ((legacyFlags & 0x04) != 0) data.Points.Add(packet.ReadFloat());
+        }
+
+        aura.AuraData = data;
+        update.Auras.Add(aura);
+    }
+
+    // Legacy 3.3.5a SMSG_HEALTH_UPDATE wire format: PackedGuid + uint32 health.
+    // Modern V3_4_3 expects: PackedGuid128 + int64 health.
+    [PacketHandler(Opcode.SMSG_HEALTH_UPDATE)]
+    void HandleHealthUpdate(WorldPacket packet)
+    {
+        WowGuid128 guid = packet.ReadPackedGuid().To128(GetSession().GameState);
+        uint health = packet.ReadUInt32();
+
+        HealthUpdate update = new HealthUpdate(guid)
+        {
+            Health = health,
+        };
+        SendPacketToClient(update);
+        Log.Print(LogType.Trace, $"[HealthUpdateTrace] guid={guid} health={health}");
+    }
+
+    // Legacy 3.3.5a SMSG_POWER_UPDATE wire format: PackedGuid + uint8 powerType + uint32 power.
+    // Modern V3_4_3 expects: PackedGuid128 + int32 count + (int32 power, uint8 type)*.
+    // The `type` byte is forwarded as-is — the V3_4_3 client interprets it as the
+    // global PowerType enum, same as legacy (verified in HermesProxy-WOTLK fork
+    // WorldClient.cs:5500-5510 which works for warrior rage).
+    [PacketHandler(Opcode.SMSG_POWER_UPDATE)]
+    void HandlePowerUpdate(WorldPacket packet)
+    {
+        WowGuid128 guid = packet.ReadPackedGuid().To128(GetSession().GameState);
+        byte powerType = packet.ReadUInt8();
+        int power = (int)packet.ReadUInt32();
+
+        PowerUpdate update = new PowerUpdate(guid);
+        update.Powers.Add(new PowerUpdatePower(power, powerType));
+        SendPacketToClient(update);
+        Log.Print(LogType.Trace, $"[PowerUpdateTrace] guid={guid} type={(PowerType)powerType} power={power}");
     }
 
     [PacketHandler(Opcode.SMSG_RESURRECT_REQUEST)]
