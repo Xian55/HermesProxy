@@ -570,7 +570,35 @@ public partial class WorldClient
         }
 
         MonsterMove monsterMove = new MonsterMove(guid, moveSpline);
-        SendPacketToClient(monsterMove);
+
+        // V3_4_3 throttle: drop monster-moves arriving within 250ms of the last
+        // forward for the same GUID. Cumulative load from steady mob patrols
+        // exhausts the V3_4_3 client's per-move allocation budget and triggers
+        // the client-side OOM dialog (reason 7 disconnect) within ~1-2 minutes
+        // of in-world play. The throttle does NOT apply to taxi flights — those
+        // are the player's own movement and must arrive in full.
+        bool dropForThrottle = false;
+        long deltaMs = -1;
+        if (!isTaxiFlight && ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            var state = GetSession().GameState;
+            long nowMs = Environment.TickCount64;
+            if (state.LastMonsterMoveTickMs.TryGetValue(guid, out long lastMs))
+            {
+                deltaMs = nowMs - lastMs;
+                if (deltaMs < GameSessionData.MonsterMoveMinIntervalMs)
+                    dropForThrottle = true;
+                else
+                    state.LastMonsterMoveTickMs[guid] = nowMs;
+            }
+            else
+            {
+                state.LastMonsterMoveTickMs[guid] = nowMs;
+            }
+        }
+
+        if (!dropForThrottle)
+            SendPacketToClient(monsterMove);
 
         if (isTaxiFlight)
         {

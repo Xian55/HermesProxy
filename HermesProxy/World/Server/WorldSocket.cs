@@ -270,7 +270,10 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
         Opcode opcode = packet.GetUniversalOpcode(true);
 
-        WorldSocketLogMessages.PacketReceived(_melLog, _sourceFile, _netDirRecv, opcode, packet.GetOpcode());
+        if (NoisyOpcodes.IsNoisy(opcode))
+            WorldSocketLogMessages.PacketReceivedNoisy(_melLog, _sourceFile, _netDirRecv, opcode, packet.GetOpcode());
+        else
+            WorldSocketLogMessages.PacketReceived(_melLog, _sourceFile, _netDirRecv, opcode, packet.GetOpcode());
 
         if (opcode != Opcode.CMSG_HOTFIX_REQUEST && !header.IsValidSize())
         {
@@ -401,12 +404,35 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             Opcode universalOpcode = packet.GetUniversalOpcode();
             ushort opcode = (ushort)packet.GetOpcode();
 
-            WorldSocketLogMessages.PacketSent(_melLog, _sourceFile, _netDirSend, universalOpcode, (uint)opcode);
+            if (NoisyOpcodes.IsNoisy(universalOpcode))
+                WorldSocketLogMessages.PacketSentNoisy(_melLog, _sourceFile, _netDirSend, universalOpcode, (uint)opcode);
+            else
+                WorldSocketLogMessages.PacketSent(_melLog, _sourceFile, _netDirSend, universalOpcode, (uint)opcode);
+
+            // Trace-level enrichment for the modern V3_4_3 SMSG_UPDATE_OBJECT envelope.
+            // Layout: u32 NumObjUpdates, u16 MapID, then per-update body. Read the first
+            // 6 bytes directly from the encoded buffer to surface count/map without re-
+            // parsing — useful for diagnosing loading-screen / world-entry desync.
+            if (universalOpcode == Opcode.SMSG_UPDATE_OBJECT && data.Length >= 6)
+            {
+                uint numObjUpdates = (uint)(data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24));
+                ushort mapId = (ushort)(data[4] | (data[5] << 8));
+                Log.Print(LogType.Trace,
+                    $"[UpdateObjectTrace][C<P] SMSG_UPDATE_OBJECT bytes={data.Length} NumObjUpdates={numObjUpdates} MapID={mapId}");
+            }
 
             ByteBuffer buffer = new();
 
             int packetSize = data.Length;
-            if (packetSize > 0x400 && _worldCrypt.IsInitialized)
+            // V3_4_3 has no SMSG_COMPRESSED_PACKET opcode mapping (only
+            // SMSG_COMPRESSED_UPDATE_OBJECT exists), so wrapping a >1KB packet via
+            // SMSG_COMPRESSED_PACKET produces an opcode-zero packet the client silently
+            // drops. Skip per-packet compression for V3_4_3; let the raw packet go out.
+            // Confirmed via WoW's own Hotfix.log: 14KB SMSG_AVAILABLE_HOTFIXES never
+            // resulted in a "ClientAvailableHotfixes" log entry while a smaller (<1KB)
+            // count=0 version of the same opcode always logged it.
+            ushort compressedOpcode = (ushort)ModernVersion.GetCurrentOpcode(Opcode.SMSG_COMPRESSED_PACKET);
+            if (packetSize > 0x400 && _worldCrypt.IsInitialized && compressedOpcode != 0)
             {
                 buffer.WriteInt32(packetSize + 2);
                 buffer.WriteUInt32(ZLib.adler32(ZLib.adler32(0x9827D8F1, BitConverter.GetBytes(opcode), 2), data, (uint)packetSize));
@@ -417,8 +443,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
                 buffer.WriteBytes(compressedData, compressedSize);
 
                 packetSize = (int)(compressedSize + 12);
-                opcode = (ushort)ModernVersion.GetCurrentOpcode(Opcode.SMSG_COMPRESSED_PACKET);
-                System.Diagnostics.Trace.Assert(opcode != 0);
+                opcode = compressedOpcode;
 
                 data = buffer.GetData();
             }
@@ -1067,13 +1092,18 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     {
         AvailableHotfixes hotfixes = new AvailableHotfixes();
         hotfixes.VirtualRealmAddress = GetSession().RealmId.GetAddress();
-        // V3_4_3 ships ~700k real WotLK hotfix records; enumerating them all in
-        // SMSG_AVAILABLE_HOTFIXES yields a multi-MB packet that stalls the client
-        // at the glue-screen loading bar (character preview never renders). Suppress
-        // the record list and let the client lazy-fetch via CMSG_DB_QUERY_BULK /
-        // CMSG_HOTFIX_REQUEST — both paths return real data via HotfixHandler.
+        // V3_4_3: ship the char-customization tables. Filtered scope keeps the index
+        // around 14 KB (vs 5 MB for full 600k records) — and now that compression is
+        // disabled for V3_4_3 (no SMSG_COMPRESSED_PACKET mapping), the raw packet
+        // actually reaches the client.
         if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-            hotfixes.IncludeRecords = false;
+        {
+            hotfixes.TableFilter = new HashSet<DB2Hash>
+            {
+                DB2Hash.ChrCustomizationChoice,
+                DB2Hash.ChrCustomizationOption,
+            };
+        }
         SendPacket(hotfixes);
     }
 

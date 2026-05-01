@@ -24,11 +24,38 @@ internal static partial class WorldSocketLogMessages
         Opcode Opcode,
         uint OpcodeId);
 
+    /// <summary>
+    /// Verbose variant of <see cref="PacketReceived"/> for noisy opcodes.
+    /// Gated by Log.Server.MinimumLevel=Verbose. See <see cref="NoisyOpcodes"/>.
+    /// </summary>
+    [LoggerMessage(
+        EventId = 103,
+        Level = LogLevel.Trace,
+        Message = "Received opcode {Opcode} ({OpcodeId}).")]
+    public static partial void PacketReceivedNoisy(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        Opcode Opcode,
+        uint OpcodeId);
+
     [LoggerMessage(
         EventId = 101,
         Level = LogLevel.Debug,
         Message = "Sending opcode {Opcode} ({OpcodeId}).")]
     public static partial void PacketSent(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        Opcode Opcode,
+        uint OpcodeId);
+
+    /// <summary>Verbose variant of <see cref="PacketSent"/> for noisy opcodes.</summary>
+    [LoggerMessage(
+        EventId = 104,
+        Level = LogLevel.Trace,
+        Message = "Sending opcode {Opcode} ({OpcodeId}).")]
+    public static partial void PacketSentNoisy(
         ILogger logger,
         string SourceFile,
         string NetDir,
