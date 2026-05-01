@@ -75,9 +75,22 @@ class AvailableHotfixes : ServerPacket
         _worldPacket.WriteUInt32(VirtualRealmAddress);
         if (IncludeRecords)
         {
-            _worldPacket.WriteInt32(GameData.Hotfixes.Count);
+            // Filter records if a TableFilter is set. V3_4_3 multi-char rendering only
+            // needs ChrCustomizationChoice + ChrCustomizationOption — shipping the full
+            // ~600k Item/Spell index produces a ~5 MB packet the client never even logs
+            // ("ClientAvailableHotfixes" line missing) suggesting parse-abort. CypherCore's
+            // working session shipped 245 distinct PushIDs total. Filtered scope keeps the
+            // index in the same order of magnitude.
+            int count = TableFilter == null
+                ? GameData.Hotfixes.Count
+                : System.Linq.Enumerable.Count(GameData.Hotfixes.Values, h => TableFilter.Contains(h.TableHash));
+            _worldPacket.WriteInt32(count);
             foreach (var hotfix in GameData.Hotfixes)
+            {
+                if (TableFilter != null && !TableFilter.Contains(hotfix.Value.TableHash))
+                    continue;
                 hotfix.Value.WriteAvailable(_worldPacket);
+            }
         }
         else
         {
@@ -87,6 +100,7 @@ class AvailableHotfixes : ServerPacket
 
     public uint VirtualRealmAddress;
     public bool IncludeRecords = true;
+    public HashSet<DB2Hash>? TableFilter;
 }
 
 class HotfixRequest : ClientPacket
