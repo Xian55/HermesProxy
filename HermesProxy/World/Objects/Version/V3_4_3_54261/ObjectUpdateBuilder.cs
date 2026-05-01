@@ -259,20 +259,15 @@ public class ObjectUpdateBuilder
             data.WriteBit(hasRuneState);
             data.WriteBit(hasActionButtons);
             data.FlushBits();
-            // TC reference parse (`World_login_parsed.txt` packet #140 player CreateObject)
-            // writes ALL ZEROS for the embedded action buttons; the real button
-            // assignments arrive in the separate SMSG_UPDATE_ACTION_BUTTONS at packet #151
-            // (the LAST server packet before the canary). cmangos populates the buttons
-            // pre-CreateObject and our previous behaviour wrote them embedded — that
-            // duplication (real values in CreateObject + real values in standalone) is
-            // a structural mismatch with TC's pattern. Re-emit the standalone one
-            // post-CreateObject (see QueryHandler.FlushDeferredUpdatesFor) for the live data.
-            //
-            // NB: this embedded section uses int32 entries (legacy 32-bit packed
-            // action+type), unlike the standalone SMSG which uses int64. Both use
-            // PlayerConst.MaxActionButtonsModern (180) as the count.
+            // Embedded ActivePlayer.ActionButtons — 180 × int32 (legacy packed action+type).
+            // V3_4_3 client uses this as the authoritative bar state; the standalone
+            // SMSG_UPDATE_ACTION_BUTTONS only carries updates relative to it. Writing zeros
+            // here leaves every slot blank regardless of the standalone packet that follows.
             for (int j = 0; j < PlayerConst.MaxActionButtonsModern; j++)
-                data.WriteInt32(0);
+            {
+                int legacy = j < _gameState.ActionButtons.Count ? _gameState.ActionButtons[j] : 0;
+                data.WriteInt32(legacy);
+            }
         }
     }
 
