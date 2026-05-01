@@ -133,6 +133,7 @@ public partial class WorldClient
             vendorItem.StackCount = packet.ReadUInt32();
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
                 vendorItem.ExtendedCostID = packet.ReadInt32();
+            vendorItem.MuID = (uint)(i + 1);
             GetSession().GameState.SetItemBuyCount(vendorItem.Item.ItemID, vendorItem.StackCount);
             vendor.Items.Add(vendorItem);
         }
