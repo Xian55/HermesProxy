@@ -245,15 +245,31 @@ public partial class WorldSocket
         GetSession().GameState.PendingNormalCasts.Enqueue(castRequest);
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_USE_ITEM);
-        byte containerSlot = use.PackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(use.PackSlot) : use.PackSlot;
-        byte slot = use.PackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(use.Slot) : use.Slot;
+        byte containerSlot = use.PackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(use.PackSlot) : use.PackSlot;
+        byte slot = use.PackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(use.Slot) : use.Slot;
+        uint resolvedSpellId = legacySpellId != 0 ? legacySpellId : use.Cast.SpellID;
         packet.WriteUInt8(containerSlot);
         packet.WriteUInt8(slot);
-        packet.WriteUInt8(GetSession().GameState.GetItemSpellSlot(use.CastItem, legacySpellId != 0 ? legacySpellId : use.Cast.SpellID));
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
+        if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
-            packet.WriteUInt8(0); // cast count;
+            // Vanilla 1.12: bagIndex, slot, spellSlot, targets
+            packet.WriteUInt8(GetSession().GameState.GetItemSpellSlot(use.CastItem, resolvedSpellId));
+        }
+        else if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V3_0_2_9056))
+        {
+            // TBC 2.4.3: bagIndex, slot, spell_count, cast_count, itemGuid, targets
+            packet.WriteUInt8(GetSession().GameState.GetItemSpellSlot(use.CastItem, resolvedSpellId));
+            packet.WriteUInt8(0); // cast_count
             packet.WriteGuid(use.CastItem.To64());
+        }
+        else
+        {
+            // WotLK 3.3.5a: bagIndex, slot, cast_count, spellId, itemGuid, glyphIndex, cast_flags, targets
+            packet.WriteUInt8(0); // cast_count
+            packet.WriteUInt32(resolvedSpellId);
+            packet.WriteGuid(use.CastItem.To64());
+            packet.WriteUInt32(0); // glyphIndex
+            packet.WriteUInt8((byte)use.Cast.SendCastFlags);
         }
         SpellCastTargetFlags targetFlags = ConvertSpellTargetFlags(use.Cast.Target);
         WriteSpellTargets(use.Cast.Target, targetFlags, packet);
