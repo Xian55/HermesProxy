@@ -6,6 +6,7 @@ using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using static HermesProxy.World.Server.Packets.QueryPageTextResponse;
 
 namespace HermesProxy.World.Client;
@@ -526,6 +527,11 @@ public partial class WorldClient
 
         foreach (var entry in toFlush)
         {
+            // Pre-filter Values updates BEFORE the emptiness check (mirrors the
+            // UpdateHandler.HandleUpdateObject path) so we don't ship empty
+            // SMSG_UPDATE_OBJECT packets to the V3_4_3 client.
+            UpdateObject.FilterV3_4_3Values(entry.UpdateObject, session.GameState);
+
             if (entry.UpdateObject.ObjectUpdates.Count != 0 ||
                 entry.UpdateObject.DestroyedGuids.Count != 0 ||
                 entry.UpdateObject.OutOfRangeGuids.Count != 0)
@@ -533,6 +539,102 @@ public partial class WorldClient
 
             foreach (var auraUpdate in entry.AuraUpdates)
                 SendPacketToClient(auraUpdate);
+
+            // V3_4_3-only: when this deferred batch contained any CreateObject for
+            // the player, immediately follow it with an empty SMSG_AURA_UPDATE_ALL.
+            // Mirrors the in-line trigger in UpdateHandler.HandleUpdateObject — the
+            // deferred path bypasses that code, but the V3_4_3 client requires the
+            // post-Create AURA_UPDATE handshake regardless of which path delivered
+            // the player object. Without this, the player CreateObject2 ships to the
+            // client but the client never sends CMSG_MOVE_INIT_ACTIVE_MOVER_COMPLETE
+            // and the loading screen never dismisses.
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                var currentPlayerGuid = session.GameState.CurrentPlayerGuid;
+                bool playerCreateInBatch = false;
+                foreach (var u in entry.UpdateObject.ObjectUpdates)
+                {
+                    if (u.CreateData != null && u.Guid == currentPlayerGuid &&
+                        (u.Type == UpdateTypeModern.CreateObject1 || u.Type == UpdateTypeModern.CreateObject2))
+                    {
+                        playerCreateInBatch = true;
+                        break;
+                    }
+                }
+
+                Log.Print(LogType.Trace,
+                    $"[PlayerEnterTrace] deferred-flush: objects={entry.UpdateObject.ObjectUpdates.Count} " +
+                    $"playerCreateMatched={playerCreateInBatch} playerGuid={currentPlayerGuid} " +
+                    $"types=[{string.Join(",", entry.UpdateObject.ObjectUpdates.Select(o => $"{o.Guid.Low}:{o.Type}"))}]");
+
+                if (playerCreateInBatch)
+                {
+                    // TC reference packet #141 is an EMPTY SMSG_UPDATE_OBJECT (NumObjUpdates=0,
+                    // Data size=0, 11 bytes total) sent immediately after the player+items
+                    // batch and BEFORE the post-Create handshake (PhaseShiftChange, etc.).
+                    // The V3_4_3 client may use this empty marker as a "create burst
+                    // complete" signal that transitions its state from "loading-screen"
+                    // to "in-world" — at TC #143 the client emits CMSG_REQUEST_PLAYED_TIME
+                    // unprompted, which never happens in our flow without this empty
+                    // packet. Without this marker, the post-Create handshake arrives but
+                    // the client never enters the in-world state machine, and so never
+                    // fires CMSG_MOVE_INIT_ACTIVE_MOVER_COMPLETE.
+                    var emptyUpdateMarker = new UpdateObject(session.GameState);
+                    SendPacketToClient(emptyUpdateMarker);
+                    Log.Print(LogType.Trace,
+                        $"[PlayerEnterTrace] deferred-flush empty SMSG_UPDATE_OBJECT marker sent (mirrors TC #141)");
+
+                    // Post-CreateObject world-ready handshake. Order matches TC reference
+                    // (`World_login_parsed.txt` packets #142–#151): AURA_UPDATE_ALL →
+                    // PHASE_SHIFT_CHANGE → INIT_WORLD_STATES → UPDATE_ACTION_BUTTONS.
+                    // UPDATE_ACTION_BUTTONS must be LAST: TC's parse shows it as the final
+                    // server packet, with CMSG_MOVE_INIT_ACTIVE_MOVER_COMPLETE arriving
+                    // 1ms later — the client uses that last packet of the world-entry
+                    // burst as its "world ready" trigger.
+                    //
+                    // SMSG_MOVE_SET_ACTIVE_MOVER is intentionally NOT in this block.
+                    // TC sends it BEFORE the player CreateObject (#138), so we send it
+                    // early in CharacterHandler.HandleLoginVerifyWorld instead.
+                    var playerAuraSync = new AuraUpdate(currentPlayerGuid, true);
+                    SendPacketToClient(playerAuraSync);
+                    Log.Print(LogType.Trace,
+                        $"[PlayerEnterTrace] deferred-flush post-CreateObject AURA_UPDATE_ALL sent for player guid={currentPlayerGuid}");
+
+                    var phaseShiftAfter = new PhaseShiftChange
+                    {
+                        Client = currentPlayerGuid,
+                    };
+                    SendPacketToClient(phaseShiftAfter);
+                    Log.Print(LogType.Trace,
+                        $"[PlayerEnterTrace] deferred-flush post-CreateObject SMSG_PHASE_SHIFT_CHANGE resent for player guid={currentPlayerGuid}");
+
+                    var cachedWorldStates = session.GameState.LastInitWorldStates;
+                    if (cachedWorldStates != null)
+                    {
+                        SendPacketToClient(cachedWorldStates);
+                        Log.Print(LogType.Trace,
+                            $"[PlayerEnterTrace] deferred-flush post-CreateObject SMSG_INIT_WORLD_STATES resent (mapId={cachedWorldStates.MapID} zoneId={cachedWorldStates.ZoneID})");
+                    }
+
+                    // LAST packet — TC's canary trigger. cmangos sends action buttons
+                    // BEFORE the player CreateObject; the early forward in
+                    // CharacterHandler.HandleUpdateActionButtons reaches the client too
+                    // soon to bind to a not-yet-existing player. Re-emit here so the
+                    // client gets a second copy AFTER the player object — this is the
+                    // emission TC's last server packet maps to.
+                    var cachedButtons = session.GameState.ActionButtons;
+                    if (cachedButtons != null && cachedButtons.Count > 0)
+                    {
+                        // UpdateActionButtons.Write pads to PlayerConst.MaxActionButtonsModern (180)
+                        // internally — no need to pad the list ourselves.
+                        var modern = new UpdateActionButtons { Reason = 0 };
+                        modern.ActionButtons.AddRange(cachedButtons);
+                        SendPacketToClient(modern);
+                        Log.Print(LogType.Trace,
+                            $"[PlayerEnterTrace] deferred-flush post-CreateObject SMSG_UPDATE_ACTION_BUTTONS resent LAST ({modern.ActionButtons.Count} legacy entries, Reason=0)");
+                    }
+                }
+            }
         }
     }
 
@@ -547,10 +649,12 @@ public partial class WorldClient
         reply = GameData.GenerateItemSparseUpdateIfNeeded(item);
         if (reply != null)
         {
-            // TODO!!! Something might be wrong here.
-            // TODO: When I send the ItemSpare entry with HotFixMessage it does not work
-
-            SendPacketToClient(reply); // TODO: <-- Optional??
+            // The V3_4_3 ItemSparse layout has been brought into alignment with
+            // WPP's ItemSparseHandler341 expectations (StartQuestID/ItemRange split,
+            // MinReputation Int32, three new Int32 fields between FactionRelated and
+            // MaxDurability, no trailing MinReputation byte, removed duplicate
+            // StartQuestId UInt16). The HotFixMessage path is safe to send again.
+            SendPacketToClient(reply);
 
             Server.Packets.DBReply replyA = new();
             replyA.Status = HotfixStatus.Valid;

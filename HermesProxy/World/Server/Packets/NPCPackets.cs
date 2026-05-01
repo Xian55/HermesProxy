@@ -19,6 +19,7 @@
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -46,6 +47,20 @@ public class GossipMessagePkt : ServerPacket
 
     public override void Write()
     {
+        // V3_4_3 (WotLK Classic) uses a distinct on-the-wire shape: TextID is at
+        // the END of the packet (not after FriendshipFactionID), per-option fields
+        // include a duplicated OptionIndex + an extra reserved Int32 + an extra
+        // trailing bit, and there are two leading bits before the options array.
+        // Without this, the V3_4_3 client mis-parses the bit cascade and the quest
+        // list reads `ConditionalQuestText` as garbage → 5 TB allocation OOM
+        // (observed crash: ?AUConditionalQuestText@@, line -6). Layout mirrors
+        // HermesProxy-WOTLK's GossipMessagePkt.WriteWotLK exactly.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            WriteWotLK();
+            return;
+        }
+
         _worldPacket.WritePackedGuid128(GossipGUID);
         _worldPacket.WriteInt32(GossipID);
         _worldPacket.WriteInt32(FriendshipFactionID);
@@ -80,6 +95,48 @@ public class GossipMessagePkt : ServerPacket
 
         foreach (ClientGossipQuest text in GossipQuests)
             text.Write(_worldPacket);
+    }
+
+    private void WriteWotLK()
+    {
+        _worldPacket.WritePackedGuid128(GossipGUID);
+        _worldPacket.WriteInt32(GossipID);
+        _worldPacket.WriteInt32(FriendshipFactionID);
+        _worldPacket.WriteUInt32((uint)GossipOptions.Count);
+        _worldPacket.WriteUInt32((uint)GossipQuests.Count);
+        _worldPacket.WriteBit(true);
+        _worldPacket.WriteBit(false);
+        _worldPacket.FlushBits();
+
+        foreach (ClientGossipOption options in GossipOptions)
+        {
+            _worldPacket.WriteInt32(options.OptionIndex);
+            _worldPacket.WriteUInt8(options.OptionIcon);
+            _worldPacket.WriteInt8((sbyte)options.OptionFlags);
+            _worldPacket.WriteInt32(options.OptionCost);
+            _worldPacket.WriteUInt32(options.Language);
+            _worldPacket.WriteInt32(0);
+            _worldPacket.WriteInt32(options.OptionIndex);
+            _worldPacket.WriteBits(options.Text.GetByteCount(), 12);
+            _worldPacket.WriteBits(options.Confirm.GetByteCount(), 12);
+            _worldPacket.WriteBits((byte)options.Status, 2);
+            _worldPacket.WriteBit(options.SpellID.HasValue);
+            _worldPacket.WriteBit(false);
+            _worldPacket.FlushBits();
+
+            options.Treasure.Write(_worldPacket);
+
+            _worldPacket.WriteString(options.Text);
+            _worldPacket.WriteString(options.Confirm);
+
+            if (options.SpellID.HasValue)
+                _worldPacket.WriteInt32(options.SpellID.Value);
+        }
+
+        _worldPacket.WriteInt32(TextID);
+
+        foreach (ClientGossipQuest quest in GossipQuests)
+            quest.WriteWotLK(_worldPacket);
     }
 
     public List<ClientGossipOption> GossipOptions = new();
@@ -156,6 +213,26 @@ public class ClientGossipQuest
         data.WriteBits(QuestTitle.GetByteCount(), 9);
         data.FlushBits();
 
+        data.WriteString(QuestTitle);
+    }
+
+    // V3_4_3 layout adds an extra reserved bit between Repeatable and the title
+    // length. Without it, the V3_4_3 client reads the title length 1 bit shifted
+    // and then mis-parses the next field as a ConditionalQuestText length prefix,
+    // producing absurd allocation requests (~5 TB) → client OOM crash.
+    public void WriteWotLK(WorldPacket data)
+    {
+        data.WriteInt32((int)QuestID);
+        data.WriteInt32((int)ContentTuningID);
+        data.WriteInt32(QuestType);
+        data.WriteInt32(QuestLevel);
+        data.WriteInt32(QuestMaxLevel);
+        data.WriteInt32((int)QuestFlags);
+        data.WriteInt32((int)QuestFlagsEx);
+        data.WriteBit(Repeatable);
+        data.WriteBit(false);
+        data.WriteBits(QuestTitle.GetByteCount(), 9);
+        data.FlushBits();
         data.WriteString(QuestTitle);
     }
 }

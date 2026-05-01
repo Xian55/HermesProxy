@@ -43,6 +43,12 @@ public sealed class EnumCharactersResult : ServerPacket
             $"[Trace] EnumCharactersResult.Write: ENTER expansion={ModernVersion.ExpansionVersion} chars={Characters.Count}");
         int envStart = _worldPacket.GetData().Length;
 
+        _worldPacket.WriteBit(Success);
+        _worldPacket.WriteBit(IsDeletedCharacters);
+        _worldPacket.WriteBit(IsNewPlayerRestrictionSkipped);
+        _worldPacket.WriteBit(IsNewPlayerRestricted);
+        _worldPacket.WriteBit(IsNewPlayer);
+
         if (ModernVersion.ExpansionVersion >= 3)
         {
             Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
@@ -53,11 +59,12 @@ public sealed class EnumCharactersResult : ServerPacket
             // 7 bits + 5 UInt32 size fields. Realmless/DontCreateCharacterDisplays/
             // RegionwideCharacters/WarbandGroups were all added in 3.4.4 — they MUST NOT
             // appear in the 3.4.3 wire format or every byte after them is misaligned.
-            _worldPacket.WriteBit(Success);
-            _worldPacket.WriteBit(IsDeletedCharacters);
-            _worldPacket.WriteBit(IsNewPlayerRestrictionSkipped);
-            _worldPacket.WriteBit(IsNewPlayerRestricted);
-            _worldPacket.WriteBit(IsNewPlayer);
+            //_worldPacket.WriteBit(Success);
+            //_worldPacket.WriteBit(IsDeletedCharacters);
+            //_worldPacket.WriteBit(IsNewPlayerRestrictionSkipped);
+            //_worldPacket.WriteBit(IsNewPlayerRestricted);
+            //_worldPacket.WriteBit(IsNewPlayer);
+
             _worldPacket.WriteBit(IsTrialAccountRestricted);
             _worldPacket.WriteBit(DisabledClassesMask.HasValue);
             _worldPacket.WriteUInt32((uint)Characters.Count);
@@ -65,6 +72,8 @@ public sealed class EnumCharactersResult : ServerPacket
             _worldPacket.WriteUInt32((uint)RaceUnlockData.Count);
             _worldPacket.WriteUInt32((uint)UnlockedConditionalAppearances.Count);
             _worldPacket.WriteUInt32((uint)RaceLimitDisablesCount);
+
+            //_worldPacket.WriteUInt32(0u);
 
             if (DisabledClassesMask.HasValue)
                 _worldPacket.WriteUInt32(DisabledClassesMask.Value);
@@ -86,17 +95,19 @@ public sealed class EnumCharactersResult : ServerPacket
 
             Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
                 $"[Trace] EnumCharactersResult.Write: EXIT total={_worldPacket.GetData().Length}b (V3_4_3 path)");
+
             return;
         }
 
         Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
             "[Trace] EnumCharactersResult.Write: branch=Legacy (V1_14/V2_5 layout)");
         // Legacy modern (V1_14, V2_5) envelope.
-        _worldPacket.WriteBit(Success);
-        _worldPacket.WriteBit(IsDeletedCharacters);
-        _worldPacket.WriteBit(IsNewPlayerRestrictionSkipped);
-        _worldPacket.WriteBit(IsNewPlayerRestricted);
-        _worldPacket.WriteBit(IsNewPlayer);
+        //_worldPacket.WriteBit(Success);
+        //_worldPacket.WriteBit(IsDeletedCharacters);
+        //_worldPacket.WriteBit(IsNewPlayerRestrictionSkipped);
+        //_worldPacket.WriteBit(IsNewPlayerRestricted);
+        //_worldPacket.WriteBit(IsNewPlayer);
+
         _worldPacket.WriteBit(DisabledClassesMask.HasValue);
         _worldPacket.WriteBit(IsAlliedRacesCreationAllowed);
         _worldPacket.WriteInt32(Characters.Count);
@@ -1001,6 +1012,45 @@ public class SetActionButton : ClientPacket
     public byte Index;
 }
 
+public class UpdateActionButtons : ServerPacket
+{
+    // V3_4_3 layout: PlayerConst.MaxActionButtonsModern (180) × int64
+    // (packed action+type) + 1 byte Reason. Total 1441 bytes.
+    // Reference: TC reference packet #151 (1441b = 180*8 + 1), HermesProxy-WOTLK
+    // fork Server/Packets/UpdateActionButtons.cs.
+    //
+    // The packed 64-bit format (per WPP V3_4_0_45166 ActionBarHandler.cs:25-36):
+    //   low 56 bits = action ID
+    //   high  8 bits = ActionButtonType
+    //
+    // Legacy 3.3.5a sends a packed int32 where:
+    //   low 24 bits = action ID
+    //   high  8 bits = ActionButtonType
+    //
+    // Forwarding the int32 as int64 directly puts the legacy type byte at bits
+    // 24-31 (garbage middle of the action value) and leaves the V3_4_3 type byte
+    // (bits 56-63) at zero — every slot is read as "type=0" with a mangled
+    // action ID, so the client renders the entire bar as empty on every login.
+    // The fix unpacks the legacy 32-bit value and repacks for V3_4_3.
+    public List<int> ActionButtons = new();
+    public byte Reason;
+
+    public UpdateActionButtons() : base(Opcode.SMSG_UPDATE_ACTION_BUTTONS, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        for (int i = 0; i < PlayerConst.MaxActionButtonsModern; i++)
+        {
+            int legacy = i < ActionButtons.Count ? ActionButtons[i] : 0;
+            ulong action = (uint)legacy & 0x00FFFFFFu;
+            byte type = (byte)(((uint)legacy >> 24) & 0xFFu);
+            ulong packed = action | ((ulong)type << 56);
+            _worldPacket.WriteInt64((long)packed);
+        }
+        _worldPacket.WriteUInt8(Reason);
+    }
+}
+
 public class SetActionBarToggles : ClientPacket
 {
     public SetActionBarToggles(WorldPacket packet) : base(packet) { }
@@ -1017,13 +1067,24 @@ public class LevelUpInfo : ServerPacket, ISpanWritable
 {
     public LevelUpInfo() : base(Opcode.SMSG_LEVEL_UP_INFO) { }
 
+    // V3_4_3 (WotLK Classic) and later expansions reserve 10 power-delta slots
+    // (the legacy 7 plus SoulShards/HolyPower/AlternatePower). Writing only 7
+    // shifts every stat that follows by 12 bytes, so the modern client reads
+    // garbage past the buffer for Spirit and NumNewTalents (observed: "Spirit
+    // increases by 121619977", "1354810122 talent points"). The legacy 3.3.5a
+    // server only sends 7; we pad the trailing slots with zero, matching the
+    // HermesProxy-WOTLK fork's LevelUpInfo writer.
+    private static int GetWirePowerCount() =>
+        ModernVersion.ExpansionVersion >= 3 ? 10 : ModernVersion.GetPowerCountForClientVersion();
+
     public override void Write()
     {
         _worldPacket.WriteInt32(Level);
         _worldPacket.WriteInt32(HealthDelta);
 
-        for (int i = 0; i < ModernVersion.GetPowerCountForClientVersion(); i++)
-            _worldPacket.WriteInt32(PowerDelta[i]);
+        int powerCount = GetWirePowerCount();
+        for (int i = 0; i < powerCount; i++)
+            _worldPacket.WriteInt32(i < PowerDelta.Length ? PowerDelta[i] : 0);
 
         foreach (int stat in StatDelta)
             _worldPacket.WriteInt32(stat);
@@ -1032,8 +1093,8 @@ public class LevelUpInfo : ServerPacket, ISpanWritable
         _worldPacket.WriteInt32(NumNewPvpTalentSlots);
     }
 
-    // Level(4) + Health(4) + 7 powers(28) + 5 stats(20) + 2 ints(8) = 64 bytes
-    public int MaxSize => 4 + 4 + 7 * 4 + 5 * 4 + 4 + 4;
+    // Level(4) + Health(4) + 10 powers(40) + 5 stats(20) + 2 ints(8) = 76 bytes
+    public int MaxSize => 4 + 4 + 10 * 4 + 5 * 4 + 4 + 4;
 
     public int WriteToSpan(Span<byte> buffer)
     {
@@ -1041,9 +1102,9 @@ public class LevelUpInfo : ServerPacket, ISpanWritable
         writer.WriteInt32(Level);
         writer.WriteInt32(HealthDelta);
 
-        int powerCount = ModernVersion.GetPowerCountForClientVersion();
+        int powerCount = GetWirePowerCount();
         for (int i = 0; i < powerCount; i++)
-            writer.WriteInt32(PowerDelta[i]);
+            writer.WriteInt32(i < PowerDelta.Length ? PowerDelta[i] : 0);
 
         foreach (int stat in StatDelta)
             writer.WriteInt32(stat);
@@ -1055,7 +1116,7 @@ public class LevelUpInfo : ServerPacket, ISpanWritable
 
     public int Level = 0;
     public int HealthDelta = 0;
-    public int[] PowerDelta = new int[7];
+    public int[] PowerDelta = new int[10];
     public int[] StatDelta = new int[5];
     public int NumNewTalents;
     public int NumNewPvpTalentSlots;

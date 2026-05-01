@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using System;
 using System.Text;
@@ -349,11 +350,30 @@ public class QueryQuestInfoResponse : ServerPacket
             _worldPacket.WriteUInt32(Info.RewardSkillLineID);
             _worldPacket.WriteUInt32(Info.RewardNumSkillUps);
 
-            _worldPacket.WriteUInt32(Info.PortraitGiver);
-            _worldPacket.WriteUInt32(Info.PortraitGiverMount);
-            _worldPacket.WriteUInt32(Info.PortraitTurnIn);
+            // V3_4_3 layout (fork QueryQuestInfoResponse:82-112): adds
+            // PortraitGiverModelSceneID between Mount and TurnIn, uses INT32 for
+            // portrait fields (instead of UINT32), promotes TimeAllowed from
+            // UINT32 to INT64, treats AllowableRaces as UINT64, and appends
+            // ManagedWorldStateID/QuestSessionBonus/QuestGiverCreatureID. Without
+            // these, the V3_4_3 client mis-parses the title-length bits at line
+            // ~113 of the writer, then reads garbage as a ConditionalQuestText
+            // length prefix → ~5 TB allocation crash (?AUConditionalQuestText@@).
+            bool isV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+            if (isV343)
+            {
+                _worldPacket.WriteInt32((int)Info.PortraitGiver);
+                _worldPacket.WriteInt32((int)Info.PortraitGiverMount);
+                _worldPacket.WriteInt32((int)Info.PortraitGiverModelSceneID);
+                _worldPacket.WriteInt32((int)Info.PortraitTurnIn);
+            }
+            else
+            {
+                _worldPacket.WriteUInt32(Info.PortraitGiver);
+                _worldPacket.WriteUInt32(Info.PortraitGiverMount);
+                _worldPacket.WriteUInt32(Info.PortraitTurnIn);
 
-            _worldPacket.WriteInt32(0); // Unk 2.5.2
+                _worldPacket.WriteInt32(0); // Unk 2.5.2
+            }
 
             for (uint i = 0; i < QuestConst.QuestRewardReputationsCount; ++i)
             {
@@ -374,13 +394,31 @@ public class QueryQuestInfoResponse : ServerPacket
             _worldPacket.WriteUInt32(Info.AcceptedSoundKitID);
             _worldPacket.WriteUInt32(Info.CompleteSoundKitID);
 
-            _worldPacket.WriteUInt32(Info.AreaGroupID);
-            _worldPacket.WriteUInt32(Info.TimeAllowed);
+            if (isV343)
+            {
+                _worldPacket.WriteInt32((int)Info.AreaGroupID);
+                _worldPacket.WriteInt64(Info.TimeAllowed);
+            }
+            else
+            {
+                _worldPacket.WriteUInt32(Info.AreaGroupID);
+                _worldPacket.WriteUInt32(Info.TimeAllowed);
+            }
 
             _worldPacket.WriteInt32(Info.Objectives.Count);
-            _worldPacket.WriteInt64(Info.AllowableRaces);
+            if (isV343)
+                _worldPacket.WriteUInt64((ulong)Info.AllowableRaces);
+            else
+                _worldPacket.WriteInt64(Info.AllowableRaces);
             _worldPacket.WriteInt32(Info.TreasurePickerID);
             _worldPacket.WriteInt32(Info.Expansion);
+
+            if (isV343)
+            {
+                _worldPacket.WriteInt32(Info.ManagedWorldStateID);
+                _worldPacket.WriteInt32(Info.QuestSessionBonus);
+                _worldPacket.WriteInt32((int)Info.QuestGiverCreatureID);
+            }
 
             _worldPacket.WriteBits(Info.LogTitle.GetByteCount(), 9);
             _worldPacket.WriteBits(Info.LogDescription.GetByteCount(), 12);

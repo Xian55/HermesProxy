@@ -52,6 +52,28 @@ public partial class WorldClient
             gossip.GossipQuests.Add(quest);
         }
 
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            int totalOptionTextLen = 0;
+            int maxOptionTextLen = 0;
+            foreach (var opt in gossip.GossipOptions)
+            {
+                int len = opt.Text?.Length ?? 0;
+                totalOptionTextLen += len;
+                if (len > maxOptionTextLen) maxOptionTextLen = len;
+            }
+            int totalQuestTextLen = 0;
+            int maxQuestTextLen = 0;
+            foreach (var q in gossip.GossipQuests)
+            {
+                int len = q.QuestTitle?.Length ?? 0;
+                totalQuestTextLen += len;
+                if (len > maxQuestTextLen) maxQuestTextLen = len;
+            }
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Debug,
+                $"[V343Trace][Gossip] guid={gossip.GossipGUID} gossipId={gossip.GossipID} textId={gossip.TextID} options={gossip.GossipOptions.Count} quests={gossip.GossipQuests.Count} optTextLen(total/max)={totalOptionTextLen}/{maxOptionTextLen} questTextLen(total/max)={totalQuestTextLen}/{maxQuestTextLen}");
+        }
+
         SendPacketToClient(gossip);
     }
 
