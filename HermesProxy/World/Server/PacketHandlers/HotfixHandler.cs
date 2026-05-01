@@ -26,6 +26,22 @@ public partial class WorldSocket
 
             Log.PrintNet(LogType.Debug, LogNetDir.C2P, $"DB_QUERY_BULK requested ({query.TableHash}) #{id}");
 
+            // TactKey is the per-record encryption key for protected DB2 content
+            // (race/class/customization tables can be encrypted; client uses TactKey
+            // to decrypt). cMangos doesn't have these keys; sending Status=Invalid
+            // (the default) made the V3_4_3 client log every TactKey reply as
+            // VALIDATION_RESULT_INVALID and silently refuse to render any characters
+            // that depend on encrypted records — observed in the WoW client's own
+            // Hotfix.log. NotPublic tells the client "this key exists server-side
+            // but isn't exposed to your account" so the client falls back to its
+            // baseline / unencrypted DB2 records.
+            if (query.TableHash == DB2Hash.TactKey)
+            {
+                reply.Status = HotfixStatus.NotPublic;
+                SendPacket(reply);
+                continue;
+            }
+
             if (query.TableHash == DB2Hash.BroadcastText)
             {
                 BroadcastText? bct = GameData.GetBroadcastText(id);
