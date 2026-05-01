@@ -17,7 +17,34 @@ public struct PlayerConst
     public const int ReqPrimaryTreeTalents = 31;
     public const int ExploredZonesSize = 192;
     public const ulong MaxMoneyAmount = 99999999999UL;
-    public const int MaxActionButtons = 132;
+    /// <summary>
+    /// Action-button array sizes as sent on the wire. The size grew with each
+    /// expansion; the proxy needs to know all four to read legacy SMSG packets
+    /// and pad the modern outgoing packet correctly.
+    /// </summary>
+    /// <remarks>
+    /// Sources of truth:
+    ///   <list type="bullet">
+    ///     <item>120 — pre-TBC (Vanilla, &lt; 2.0.1).</item>
+    ///     <item>132 — TBC (2.0.1+). Matches mangos-classic / mangos-tbc Player.h.</item>
+    ///     <item>144 — Wrath legacy (3.2.0+). Matches mangos-wotlk
+    ///       <c>Player.h:201 #define MAX_ACTION_BUTTONS 144 // checked in 3.2.0</c>.</item>
+    ///     <item>180 — Modern V3_4_3.54261 (WotLK Classic) and later retail. Matches
+    ///       TrinityCore wotlk_classic
+    ///       <c>Player.h:351 #define MAX_ACTION_BUTTONS 180 // checked in 4.4.0</c>.</item>
+    ///   </list>
+    /// </remarks>
+    public const int MaxActionButtonsVanilla = 120;
+    public const int MaxActionButtonsTbc = 132;
+    public const int MaxActionButtonsWotLK = 144;
+    public const int MaxActionButtonsModern = 180;
+
+    /// <summary>
+    /// Legacy alias preserved for back-compat with V1_14 / V2_5 ObjectUpdateBuilder
+    /// (which was written assuming the TBC array size of 132). New code should
+    /// reference one of the version-specific constants above.
+    /// </summary>
+    public const int MaxActionButtons = MaxActionButtonsTbc;
     public const int MaxActionButtonActionValue = 0x00FFFFFF + 1;
 
     public const int MaxDailyQuests = 25;
