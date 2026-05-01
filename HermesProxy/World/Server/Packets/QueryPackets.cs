@@ -152,13 +152,42 @@ public class QueryPlayerNames : ClientPacket
 
 public class QueryPlayerNameResponse : ServerPacket, ISpanWritable
 {
-    public QueryPlayerNameResponse() : base(Opcode.SMSG_QUERY_PLAYER_NAME_RESPONSE)
+    // V3_4_3 dropped the singular SMSG_QUERY_PLAYER_NAME_RESPONSE opcode and
+    // expects everything via SMSG_QUERY_PLAYER_NAMES_RESPONSE (plural, with a
+    // Count + array). Per WPP V3_4_0_45166 QueryHandler.cs:517 the per-entry
+    // shape is { byte Result, PackedGuid128 Player, bit HasPlayerGuidLookupData,
+    // bit HasNameCacheUnused920, FlushBits, optional PlayerGuidLookupData }.
+    // Without this branch the packet was sent with no V3_4_3 wire opcode at
+    // all, the modern client never resolved the player's name, and the
+    // character panel + chat sender both rendered "Unknown".
+    public QueryPlayerNameResponse() : base(GetResponseOpcode())
     {
         Data = new PlayerGuidLookupData();
     }
 
+    private static Opcode GetResponseOpcode()
+    {
+        return ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            ? Opcode.SMSG_QUERY_PLAYER_NAMES_RESPONSE
+            : Opcode.SMSG_QUERY_PLAYER_NAME_RESPONSE;
+    }
+
     public override void Write()
     {
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            _worldPacket.WriteUInt32(1);   // Count: we always carry exactly one
+                                           // legacy SMSG_NAME_QUERY_RESPONSE.
+            _worldPacket.WriteUInt8(Result);
+            _worldPacket.WritePackedGuid128(Player);
+            _worldPacket.WriteBit(Result == 0);   // HasPlayerGuidLookupData
+            _worldPacket.WriteBit(false);          // HasNameCacheUnused920
+            _worldPacket.FlushBits();
+            if (Result == 0)
+                Data.Write(_worldPacket);
+            return;
+        }
+
         _worldPacket.WriteInt8((sbyte)Result);
         _worldPacket.WritePackedGuid128(Player);
 
@@ -167,42 +196,62 @@ public class QueryPlayerNameResponse : ServerPacket, ISpanWritable
     }
 
     // Result byte(1) + GUID(18) + Data: bits(6) + 5 declined names(120) + 3 GUIDs(54) + ulong(8) + uint(4) + 5 bytes(5) + name(24) = 240 bytes max
-    public int MaxSize => 1 + PackedGuidHelper.MaxPackedGuid128Size + 6 +
+    // V3_4_3 adds Count(4) + 1 byte for the two extra bits, all within margin.
+    public int MaxSize => 4 + 1 + PackedGuidHelper.MaxPackedGuid128Size + 6 +
         (PlayerConst.MaxDeclinedNameCases * GameLimits.MaxPlayerNameBytes) +
         PackedGuidHelper.MaxPackedGuid128Size * 3 + 8 + 4 + 5 + GameLimits.MaxPlayerNameBytes;
 
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
+
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            writer.WriteUInt32(1);
+            writer.WriteUInt8(Result);
+            writer.WritePackedGuid128(Player.Low, Player.High);
+            writer.WriteBit(Result == 0);
+            writer.WriteBit(false);
+            writer.FlushBits();
+
+            if (Result == 0)
+                WritePlayerGuidLookupDataInline(ref writer);
+
+            return writer.Position;
+        }
+
         writer.WriteInt8((sbyte)Result);
         writer.WritePackedGuid128(Player.Low, Player.High);
 
         if (Result == 0)
-        {
-            // Inline PlayerGuidLookupData.Write
-            writer.WriteBit(Data.IsDeleted);
-            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Data.Name), 6);
+            WritePlayerGuidLookupDataInline(ref writer);
 
-            for (byte i = 0; i < PlayerConst.MaxDeclinedNameCases; ++i)
-                writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Data.DeclinedNames.name[i]), 7);
-
-            writer.FlushBits();
-            for (byte i = 0; i < PlayerConst.MaxDeclinedNameCases; ++i)
-                writer.WriteString(Data.DeclinedNames.name[i]);
-
-            writer.WritePackedGuid128(Data.AccountID.Low, Data.AccountID.High);
-            writer.WritePackedGuid128(Data.BnetAccountID.Low, Data.BnetAccountID.High);
-            writer.WritePackedGuid128(Data.GuidActual.Low, Data.GuidActual.High);
-            writer.WriteUInt64(Data.GuildClubMemberID);
-            writer.WriteUInt32(Data.VirtualRealmAddress);
-            writer.WriteUInt8((byte)Data.RaceID);
-            writer.WriteUInt8((byte)Data.Sex);
-            writer.WriteUInt8((byte)Data.ClassID);
-            writer.WriteUInt8(Data.Level);
-            writer.WriteUInt8(Data.Unused915);
-            writer.WriteString(Data.Name);
-        }
         return writer.Position;
+    }
+
+    private void WritePlayerGuidLookupDataInline(ref SpanPacketWriter writer)
+    {
+        writer.WriteBit(Data.IsDeleted);
+        writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Data.Name), 6);
+
+        for (byte i = 0; i < PlayerConst.MaxDeclinedNameCases; ++i)
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Data.DeclinedNames.name[i]), 7);
+
+        writer.FlushBits();
+        for (byte i = 0; i < PlayerConst.MaxDeclinedNameCases; ++i)
+            writer.WriteString(Data.DeclinedNames.name[i]);
+
+        writer.WritePackedGuid128(Data.AccountID.Low, Data.AccountID.High);
+        writer.WritePackedGuid128(Data.BnetAccountID.Low, Data.BnetAccountID.High);
+        writer.WritePackedGuid128(Data.GuidActual.Low, Data.GuidActual.High);
+        writer.WriteUInt64(Data.GuildClubMemberID);
+        writer.WriteUInt32(Data.VirtualRealmAddress);
+        writer.WriteUInt8((byte)Data.RaceID);
+        writer.WriteUInt8((byte)Data.Sex);
+        writer.WriteUInt8((byte)Data.ClassID);
+        writer.WriteUInt8(Data.Level);
+        writer.WriteUInt8(Data.Unused915);
+        writer.WriteString(Data.Name);
     }
 
     public WowGuid128 Player;
