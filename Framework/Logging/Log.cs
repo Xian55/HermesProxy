@@ -185,11 +185,16 @@ public static class Log
                     {
                         // If the directory can't be created we still want console logging to work.
                     }
+                    // Each application start gets its own log file (hermes-<yyyyMMdd_HHmmss>.log)
+                    // so successive runs don't append into a shared daily file. RollingInterval is
+                    // Infinite because the timestamp in the filename already gives us per-run
+                    // separation; retainedFileCountLimit caps disk usage at the latest 30 runs.
                     // File sink has no additional filter — it captures whatever passes the
                     // per-category switches, which is typically the more verbose view.
+                    var startupStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                     a.File(
-                        path: Path.Combine(directory, "hermes-.log"),
-                        rollingInterval: RollingInterval.Day,
+                        path: Path.Combine(directory, $"hermes-{startupStamp}.log"),
+                        rollingInterval: RollingInterval.Infinite,
                         retainedFileCountLimit: 30,
                         outputTemplate: FileOutputTemplate,
                         shared: false);
