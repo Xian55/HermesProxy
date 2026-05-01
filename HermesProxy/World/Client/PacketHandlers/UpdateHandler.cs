@@ -97,7 +97,31 @@ public partial class WorldClient
                         p.GuildRankID.HasValue || p.HonorLevel.HasValue ||
                         p.DuelArbiter != null || p.WowAccount != null);
                     bool activeHasAnyField = a != null && (
-                        a.Coinage.HasValue || a.XP.HasValue || a.NextLevelXP.HasValue);
+                        a.Coinage.HasValue || a.XP.HasValue || a.NextLevelXP.HasValue ||
+                        ActivePlayerHasAnySlot(a));
+
+                    static bool ActivePlayerHasAnySlot(ActivePlayerData a)
+                    {
+                        if (a.InvSlots != null)
+                            for (int i = 0; i < a.InvSlots.Length; i++)
+                                if (a.InvSlots[i] != null) return true;
+                        if (a.PackSlots != null)
+                            for (int i = 0; i < a.PackSlots.Length; i++)
+                                if (a.PackSlots[i] != null) return true;
+                        if (a.BankSlots != null)
+                            for (int i = 0; i < a.BankSlots.Length; i++)
+                                if (a.BankSlots[i] != null) return true;
+                        if (a.BankBagSlots != null)
+                            for (int i = 0; i < a.BankBagSlots.Length; i++)
+                                if (a.BankBagSlots[i] != null) return true;
+                        if (a.BuyBackSlots != null)
+                            for (int i = 0; i < a.BuyBackSlots.Length; i++)
+                                if (a.BuyBackSlots[i] != null) return true;
+                        if (a.KeyringSlots != null)
+                            for (int i = 0; i < a.KeyringSlots.Length; i++)
+                                if (a.KeyringSlots[i] != null) return true;
+                        return false;
+                    }
 
                     Log.Print(LogType.Trace,
                         $"[UpdateValuesTrace][in] i={i} guid={guid} legacyHigh={valuesLegacyHigh} legacyEntry={legacyEntry} legacyCounter={legacyCounter} " +

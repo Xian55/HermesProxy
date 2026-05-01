@@ -400,6 +400,27 @@ public class UpdateObject : ServerPacket
             if (ap.InvSlots != null)
                 for (int i = 0; i < ap.InvSlots.Length; i++)
                     if (ap.InvSlots[i] != null) return false;
+            // PackSlots / BankSlots / BankBagSlots / BuyBackSlots / KeyringSlots
+            // are where cMaNGOS stores main-backpack and bank items. A Values
+            // update that only adds a looted item to the backpack populates
+            // PackSlots[N] but no other ActivePlayerData field — without these
+            // checks the filter classified the delta as empty and dropped it,
+            // leaving the V3_4_3 client unaware of the new item until relog.
+            if (ap.PackSlots != null)
+                for (int i = 0; i < ap.PackSlots.Length; i++)
+                    if (ap.PackSlots[i] != null) return false;
+            if (ap.BankSlots != null)
+                for (int i = 0; i < ap.BankSlots.Length; i++)
+                    if (ap.BankSlots[i] != null) return false;
+            if (ap.BankBagSlots != null)
+                for (int i = 0; i < ap.BankBagSlots.Length; i++)
+                    if (ap.BankBagSlots[i] != null) return false;
+            if (ap.BuyBackSlots != null)
+                for (int i = 0; i < ap.BuyBackSlots.Length; i++)
+                    if (ap.BuyBackSlots[i] != null) return false;
+            if (ap.KeyringSlots != null)
+                for (int i = 0; i < ap.KeyringSlots.Length; i++)
+                    if (ap.KeyringSlots[i] != null) return false;
             if (ap.Skill != null)
             {
                 for (int i = 0; i < 256; i++)
