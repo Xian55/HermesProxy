@@ -68,6 +68,8 @@ public abstract class ClientPacket : IDisposable
         {
             sniffFile = new SniffFile("modern", (ushort)context.ClientBuild);
             sniffFile.WriteHeader();
+
+            Log.Print(LogType.Trace, $"Opened modern sniff file: {sniffFile.FilePath}");
         }
         sniffFile.WritePacket(GetOpcode(), true, _worldPacket.GetData());
     }
@@ -130,6 +132,8 @@ public abstract class ServerPacket
         {
             sniffFile = new SniffFile("modern", (ushort)context.ClientBuild);
             sniffFile.WriteHeader();
+
+            Log.Print(LogType.Trace, $"Opened modern sniff file: {sniffFile.FilePath}");
         }
         sniffFile.WritePacket(GetOpcode(), false, GetData()!);
     }

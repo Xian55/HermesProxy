@@ -46,6 +46,25 @@ public class AsyncAcceptor
             _listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             _listener.Start();
         }
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AccessDenied)
+        {
+            Log.Print(LogType.Error,
+                $"Cannot bind {ip}:{port} - port is held with exclusive access (WSAEACCES). " +
+                "Common Windows causes: (1) the WoW client still has an open TCP connection to a " +
+                "previous proxy instance - close and reopen the client to release it; " +
+                "(2) the port falls inside a Hyper-V / WinNAT excluded range - verify with " +
+                "'netsh int ipv4 show excludedportrange protocol=tcp'; " +
+                "(3) another process is bound here with SO_EXCLUSIVEADDRUSE. " +
+                "Or change the listen port via ProxyNetworkOptions.");
+            return false;
+        }
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
+        {
+            Log.Print(LogType.Error,
+                $"Cannot bind {ip}:{port} - another process is already listening here (WSAEADDRINUSE). " +
+                "Stop the conflicting process or change the listen port via ProxyNetworkOptions.");
+            return false;
+        }
         catch (SocketException ex)
         {
             Log.outException(ex);
@@ -98,5 +117,17 @@ public class AsyncAcceptor
             return;
 
         _closed = true;
+
+        // Without this the TcpListener stays bound and any in-flight AcceptSocketAsync keeps
+        // running until the next inbound connection. Stopping it triggers ObjectDisposedException
+        // in AsyncAcceptSocket (already handled) and releases the listening port immediately.
+        try
+        {
+            _listener?.Stop();
+        }
+        catch (Exception ex)
+        {
+            Log.outException(ex);
+        }
     }
 }

@@ -28,47 +28,62 @@ namespace HermesProxy.World.Server.Packets;
 
 public class InitializeFactions : ServerPacket, ISpanWritable
 {
-    const ushort FactionCount = 400;
+    // Per-build entry count. WotLK Classic 3.4.3 expects 1000; legacy modern builds (V1_14, V2_5) keep 400.
+    // Reference: HermesProxy-WOTLK fork InitializeFactions.cs:16-19, WPP V3_4_0 ReputationHandler.cs:9.
+    private const ushort MaxFactionCount = 1000;
 
     public InitializeFactions() : base(Opcode.SMSG_INITIALIZE_FACTIONS, ConnectionType.Instance) { }
 
+    private static ushort GetFactionCount() =>
+        (ushort)(ModernVersion.ExpansionVersion >= 3 ? 1000 : 400);
+
     public override void Write()
     {
-        for (ushort i = 0; i < FactionCount; ++i)
+        ushort count = GetFactionCount();
+        bool wide = ModernVersion.ExpansionVersion >= 3;
+        for (ushort i = 0; i < count; ++i)
         {
-            _worldPacket.WriteUInt8((byte)((ushort)FactionFlags[i] & 0xFF));
+            if (wide)
+                _worldPacket.WriteUInt16((ushort)FactionFlags[i]);
+            else
+                _worldPacket.WriteUInt8((byte)((ushort)FactionFlags[i] & 0xFF));
             _worldPacket.WriteInt32(FactionStandings[i]);
         }
 
-        for (ushort i = 0; i < FactionCount; ++i)
+        for (ushort i = 0; i < count; ++i)
             _worldPacket.WriteBit(FactionHasBonus[i]);
 
         _worldPacket.FlushBits();
     }
 
-    // Fixed size: 400 factions × (byte + int) + 400 bits = 2000 + 50 = 2050 bytes
-    public int MaxSize => FactionCount * 5 + 50;
+    // V3_4_3: 1000 × (UInt16 + Int32) + 1000 bits = 6000 + 125 = 6125 bytes max.
+    public int MaxSize => MaxFactionCount * 6 + (MaxFactionCount + 7) / 8;
 
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
 
-        for (ushort i = 0; i < FactionCount; ++i)
+        ushort count = GetFactionCount();
+        bool wide = ModernVersion.ExpansionVersion >= 3;
+        for (ushort i = 0; i < count; ++i)
         {
-            writer.WriteUInt8((byte)((ushort)FactionFlags[i] & 0xFF));
+            if (wide)
+                writer.WriteUInt16((ushort)FactionFlags[i]);
+            else
+                writer.WriteUInt8((byte)((ushort)FactionFlags[i] & 0xFF));
             writer.WriteInt32(FactionStandings[i]);
         }
 
-        for (ushort i = 0; i < FactionCount; ++i)
+        for (ushort i = 0; i < count; ++i)
             writer.WriteBit(FactionHasBonus[i]);
 
         writer.FlushBits();
         return writer.Position;
     }
 
-    public int[] FactionStandings = new int[FactionCount];
-    public bool[] FactionHasBonus = new bool[FactionCount]; //@todo: implement faction bonus
-    public ReputationFlags[] FactionFlags = new ReputationFlags[FactionCount];
+    public int[] FactionStandings = new int[MaxFactionCount];
+    public bool[] FactionHasBonus = new bool[MaxFactionCount]; //@todo: implement faction bonus
+    public ReputationFlags[] FactionFlags = new ReputationFlags[MaxFactionCount];
 }
 
 class SetFactionStanding : ServerPacket, ISpanWritable

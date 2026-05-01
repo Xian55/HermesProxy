@@ -38,6 +38,12 @@ public partial class WorldClient
         states.AddClassicStates();
         SendPacketToClient(states);
 
+        // Cache so deferred-flush can re-emit AFTER the player CreateObject.
+        // TC reference order is INIT_WORLD_STATES at #146 (post player); cmangos sends
+        // it earlier in the flow. The V3_4_3 client may want to see world states again
+        // post-player as part of the world-ready handshake.
+        GetSession().GameState.LastInitWorldStates = states;
+
         // These packets don't exist in old versions.
         if (LegacyVersion.ExpansionVersion <= 1 || ModernVersion.ExpansionVersion <= 1)
             SendPacketToClient(new SetupCurrency());
