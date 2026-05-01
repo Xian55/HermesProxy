@@ -1,5 +1,6 @@
 ﻿using Framework.IO;
 using Framework.Logging;
+using HermesProxy.Enums;
 
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -1441,6 +1442,8 @@ public static partial class GameData
     public const uint HotfixCreatureDisplayInfoBegin = 2_700_000;
     public const uint HotfixCreatureDisplayInfoExtraBegin = 2_800_000;
     public const uint HotfixCreatureDisplayInfoOptionBegin = 2_900_000;
+    public const uint HotfixChrCustomizationChoiceBegin = 3_000_000;
+    public const uint HotfixChrCustomizationOptionBegin = 3_100_000;
     public static Dictionary<uint, HotfixRecord> Hotfixes = [];
     public static void LoadHotfixes()
     {
@@ -1462,6 +1465,16 @@ public static partial class GameData
         LoadCreatureDisplayInfoHotfixes();
         LoadCreatureDisplayInfoExtraHotfixes();
         LoadCreatureDisplayInfoOptionHotfixes();
+        // ChrCustomizationChoice / ChrCustomizationOption hotfix CSVs only exist for V3_4_3
+        // (WotLK Classic, expansion=3). The DB2 tables don't exist in TBC / Vanilla
+        // hotfix data, and the V3_4_3 client is the only modern build that consults them
+        // for character-enum rendering (see Phase 5a-7a notes). Skip the load for older
+        // expansions to avoid FileNotFoundException at startup.
+        if (ModernVersion.ExpansionVersion >= 3)
+        {
+            LoadChrCustomizationChoiceHotfixes();
+            LoadChrCustomizationOptionHotfixes();
+        }
     }
 
     public static void LoadAreaTriggerHotfixes()
@@ -2160,7 +2173,16 @@ public static partial class GameData
             record.HotfixContent.WriteUInt32(durationInInventory);
             record.HotfixContent.WriteFloat(qualityModifier);
             record.HotfixContent.WriteUInt32(bagFamily);
-            record.HotfixContent.WriteFloat(rangeMod);
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                // V3_4_3 (ItemSparseHandler341): StartQuestID (Int32) + ItemRange (Single).
+                record.HotfixContent.WriteInt32(0);         // StartQuestID
+                record.HotfixContent.WriteFloat(rangeMod);  // ItemRange
+            }
+            else
+            {
+                record.HotfixContent.WriteFloat(rangeMod);
+            }
             record.HotfixContent.WriteFloat(statPercentageOfSocket1);
             record.HotfixContent.WriteFloat(statPercentageOfSocket2);
             record.HotfixContent.WriteFloat(statPercentageOfSocket3);
@@ -2183,6 +2205,12 @@ public static partial class GameData
             record.HotfixContent.WriteInt32(statPercentEditor10);
             record.HotfixContent.WriteInt32(stackable);
             record.HotfixContent.WriteInt32(maxCount);
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                // V3_4_3 (ItemSparseHandler341): MinReputation as Int32 between MaxCount
+                // and RequiredAbility. The trailing MinReputation byte is dropped.
+                record.HotfixContent.WriteInt32(0);
+            }
             record.HotfixContent.WriteUInt32(requiredAbility);
             record.HotfixContent.WriteUInt32(sellPrice);
             record.HotfixContent.WriteUInt32(buyPrice);
@@ -2194,6 +2222,14 @@ public static partial class GameData
             record.HotfixContent.WriteInt32(flags3);
             record.HotfixContent.WriteInt32(flags4);
             record.HotfixContent.WriteInt32(oppositeFactionItemId);
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                // V3_4_3 (ItemSparseHandler341): three Int32 fields between FactionRelated
+                // (oppositeFactionItemId) and MaxDurability.
+                record.HotfixContent.WriteInt32(0);         // ModifiedCraftingReagentItemID
+                record.HotfixContent.WriteInt32(0);         // ContentTuningID
+                record.HotfixContent.WriteInt32(0);         // PlayerLevelToItemLevelCurveID
+            }
             record.HotfixContent.WriteUInt32(maxDurability);
             record.HotfixContent.WriteUInt16(itemNameDescriptionId);
             record.HotfixContent.WriteUInt16(requiredTransmogHoliday);
@@ -2235,47 +2271,99 @@ public static partial class GameData
             record.HotfixContent.WriteInt16(shadowResistance);
             record.HotfixContent.WriteInt16(arcaneResistance);
             record.HotfixContent.WriteUInt16(scalingStatDistributionId);
-            record.HotfixContent.WriteUInt8(expansionId);
-            record.HotfixContent.WriteUInt8(artifactId);
-            record.HotfixContent.WriteUInt8(spellWeight);
-            record.HotfixContent.WriteUInt8(spellWeightCategory);
-            record.HotfixContent.WriteUInt8(socketType1);
-            record.HotfixContent.WriteUInt8(socketType2);
-            record.HotfixContent.WriteUInt8(socketType3);
-            record.HotfixContent.WriteUInt8(sheatheType);
-            record.HotfixContent.WriteUInt8(material);
-            record.HotfixContent.WriteUInt8(pageMaterial);
-            record.HotfixContent.WriteUInt8(pageLanguage);
-            record.HotfixContent.WriteUInt8(bonding);
-            record.HotfixContent.WriteUInt8(damageType);
-            record.HotfixContent.WriteInt8(statType1);
-            record.HotfixContent.WriteInt8(statType2);
-            record.HotfixContent.WriteInt8(statType3);
-            record.HotfixContent.WriteInt8(statType4);
-            record.HotfixContent.WriteInt8(statType5);
-            record.HotfixContent.WriteInt8(statType6);
-            record.HotfixContent.WriteInt8(statType7);
-            record.HotfixContent.WriteInt8(statType8);
-            record.HotfixContent.WriteInt8(statType9);
-            record.HotfixContent.WriteInt8(statType10);
-            record.HotfixContent.WriteUInt8(containerSlots);
-            record.HotfixContent.WriteUInt8(requiredReputationRank);
-            record.HotfixContent.WriteUInt8(requiredCityRank);
-            record.HotfixContent.WriteUInt8(requiredHonorRank);
-            record.HotfixContent.WriteUInt8(inventoryType);
-            record.HotfixContent.WriteUInt8(overallQualityId);
-            record.HotfixContent.WriteUInt8(ammoType);
-            record.HotfixContent.WriteInt8(statValue1);
-            record.HotfixContent.WriteInt8(statValue2);
-            record.HotfixContent.WriteInt8(statValue3);
-            record.HotfixContent.WriteInt8(statValue4);
-            record.HotfixContent.WriteInt8(statValue5);
-            record.HotfixContent.WriteInt8(statValue6);
-            record.HotfixContent.WriteInt8(statValue7);
-            record.HotfixContent.WriteInt8(statValue8);
-            record.HotfixContent.WriteInt8(statValue9);
-            record.HotfixContent.WriteInt8(statValue10);
-            record.HotfixContent.WriteInt8(requiredLevel);
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                // V3_4_3 ItemSparse layout. Reference: WPP V3_4_0_45166 HotfixHandler.cs:4087-4113.
+                // Note: statValue1..10 move from the trailing block to here as
+                // StatModifierBonusAmount[10] (Int16). The trailing sbyte block is removed.
+                record.HotfixContent.WriteInt16((short)statValue1);  // StatModifierBonusAmount[0]
+                record.HotfixContent.WriteInt16((short)statValue2);
+                record.HotfixContent.WriteInt16((short)statValue3);
+                record.HotfixContent.WriteInt16((short)statValue4);
+                record.HotfixContent.WriteInt16((short)statValue5);
+                record.HotfixContent.WriteInt16((short)statValue6);
+                record.HotfixContent.WriteInt16((short)statValue7);
+                record.HotfixContent.WriteInt16((short)statValue8);
+                record.HotfixContent.WriteInt16((short)statValue9);
+                record.HotfixContent.WriteInt16((short)statValue10);
+                record.HotfixContent.WriteUInt8(expansionId);
+                record.HotfixContent.WriteUInt8(artifactId);
+                record.HotfixContent.WriteUInt8(spellWeight);
+                record.HotfixContent.WriteUInt8(spellWeightCategory);
+                record.HotfixContent.WriteUInt8(socketType1);
+                record.HotfixContent.WriteUInt8(socketType2);
+                record.HotfixContent.WriteUInt8(socketType3);
+                record.HotfixContent.WriteUInt8(sheatheType);
+                record.HotfixContent.WriteUInt8(material);
+                record.HotfixContent.WriteUInt8(pageMaterial);
+                record.HotfixContent.WriteUInt8(pageLanguage);
+                record.HotfixContent.WriteUInt8(bonding);
+                record.HotfixContent.WriteUInt8(damageType);
+                record.HotfixContent.WriteInt8(statType1);
+                record.HotfixContent.WriteInt8(statType2);
+                record.HotfixContent.WriteInt8(statType3);
+                record.HotfixContent.WriteInt8(statType4);
+                record.HotfixContent.WriteInt8(statType5);
+                record.HotfixContent.WriteInt8(statType6);
+                record.HotfixContent.WriteInt8(statType7);
+                record.HotfixContent.WriteInt8(statType8);
+                record.HotfixContent.WriteInt8(statType9);
+                record.HotfixContent.WriteInt8(statType10);
+                record.HotfixContent.WriteUInt8(containerSlots);
+                record.HotfixContent.WriteUInt8(requiredReputationRank);
+                record.HotfixContent.WriteUInt8(requiredCityRank);
+                // No requiredHonorRank for V3_4_3 — see RequiredHonorRank removal in
+                // WriteItemSparseHotfix above (341 layout drops the trailing MinReputation byte).
+                record.HotfixContent.WriteInt8((sbyte)inventoryType);   // sbyte in V3_4_3
+                record.HotfixContent.WriteInt8((sbyte)overallQualityId);
+                record.HotfixContent.WriteUInt8(ammoType);
+                record.HotfixContent.WriteInt8(requiredLevel);
+            }
+            else
+            {
+                // V1_14 / V2_5 layout — preserve original upstream byte sequence verbatim.
+                record.HotfixContent.WriteUInt8(expansionId);
+                record.HotfixContent.WriteUInt8(artifactId);
+                record.HotfixContent.WriteUInt8(spellWeight);
+                record.HotfixContent.WriteUInt8(spellWeightCategory);
+                record.HotfixContent.WriteUInt8(socketType1);
+                record.HotfixContent.WriteUInt8(socketType2);
+                record.HotfixContent.WriteUInt8(socketType3);
+                record.HotfixContent.WriteUInt8(sheatheType);
+                record.HotfixContent.WriteUInt8(material);
+                record.HotfixContent.WriteUInt8(pageMaterial);
+                record.HotfixContent.WriteUInt8(pageLanguage);
+                record.HotfixContent.WriteUInt8(bonding);
+                record.HotfixContent.WriteUInt8(damageType);
+                record.HotfixContent.WriteInt8(statType1);
+                record.HotfixContent.WriteInt8(statType2);
+                record.HotfixContent.WriteInt8(statType3);
+                record.HotfixContent.WriteInt8(statType4);
+                record.HotfixContent.WriteInt8(statType5);
+                record.HotfixContent.WriteInt8(statType6);
+                record.HotfixContent.WriteInt8(statType7);
+                record.HotfixContent.WriteInt8(statType8);
+                record.HotfixContent.WriteInt8(statType9);
+                record.HotfixContent.WriteInt8(statType10);
+                record.HotfixContent.WriteUInt8(containerSlots);
+                record.HotfixContent.WriteUInt8(requiredReputationRank);
+                record.HotfixContent.WriteUInt8(requiredCityRank);
+                record.HotfixContent.WriteUInt8(requiredHonorRank);
+                record.HotfixContent.WriteUInt8(inventoryType);
+                record.HotfixContent.WriteUInt8(overallQualityId);
+                record.HotfixContent.WriteUInt8(ammoType);
+                record.HotfixContent.WriteInt8(statValue1);
+                record.HotfixContent.WriteInt8(statValue2);
+                record.HotfixContent.WriteInt8(statValue3);
+                record.HotfixContent.WriteInt8(statValue4);
+                record.HotfixContent.WriteInt8(statValue5);
+                record.HotfixContent.WriteInt8(statValue6);
+                record.HotfixContent.WriteInt8(statValue7);
+                record.HotfixContent.WriteInt8(statValue8);
+                record.HotfixContent.WriteInt8(statValue9);
+                record.HotfixContent.WriteInt8(statValue10);
+                record.HotfixContent.WriteInt8(requiredLevel);
+            }
             Hotfixes.Add(record.HotfixId, record);
         }
     }
@@ -2302,7 +2390,16 @@ public static partial class GameData
         buffer.WriteUInt32(item.Duration);
         buffer.WriteFloat(0);
         buffer.WriteUInt32(item.BagFamily);
-        buffer.WriteFloat(item.RangedMod);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 (ItemSparseHandler341): StartQuestID (Int32) + ItemRange (Single).
+            buffer.WriteInt32(0);                           // StartQuestID
+            buffer.WriteFloat(item.RangedMod);              // ItemRange
+        }
+        else
+        {
+            buffer.WriteFloat(item.RangedMod);
+        }
         buffer.WriteFloat(0);
         buffer.WriteFloat(0);
         buffer.WriteFloat(0);
@@ -2325,6 +2422,12 @@ public static partial class GameData
         buffer.WriteInt32(0);
         buffer.WriteInt32(item.MaxStackSize);
         buffer.WriteInt32(item.MaxCount);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 (ItemSparseHandler341 layout): MinReputation moved here from a
+            // trailing byte to a 4-byte field between MaxCount and RequiredAbility.
+            buffer.WriteInt32(0);                           // MinReputation
+        }
         buffer.WriteUInt32(item.RequiredSpell);
         buffer.WriteUInt32(item.SellPrice);
         buffer.WriteUInt32(item.BuyPrice);
@@ -2336,6 +2439,15 @@ public static partial class GameData
         buffer.WriteInt32(0);
         buffer.WriteInt32(0);
         buffer.WriteInt32(0);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 (ItemSparseHandler341): three Int32 fields between FactionRelated
+            // and MaxDurability — ModifiedCraftingReagentItemID, ContentTuningID,
+            // PlayerLevelToItemLevelCurveID.
+            buffer.WriteInt32(0);                           // ModifiedCraftingReagentItemID
+            buffer.WriteInt32(0);                           // ContentTuningID
+            buffer.WriteInt32(0);                           // PlayerLevelToItemLevelCurveID
+        }
         buffer.WriteUInt32(item.MaxDurability);
         buffer.WriteUInt16(0);
         buffer.WriteUInt16(0);
@@ -2377,51 +2489,88 @@ public static partial class GameData
         buffer.WriteInt16((short)item.ShadowResistance);
         buffer.WriteInt16((short)item.ArcaneResistance);
         buffer.WriteUInt16((ushort)item.ScalingStatDistribution);
-        buffer.WriteUInt8(254);
-        buffer.WriteUInt8(0);
-        buffer.WriteUInt8(0);
-        buffer.WriteUInt8(0);
-        buffer.WriteUInt8((byte)item.ItemSocketColors[0]);
-        buffer.WriteUInt8((byte)item.ItemSocketColors[1]);
-        buffer.WriteUInt8((byte)item.ItemSocketColors[2]);
-        buffer.WriteUInt8((byte)item.SheathType);
-        buffer.WriteUInt8((byte)item.Material);
-        buffer.WriteUInt8((byte)item.PageMaterial);
-        buffer.WriteUInt8((byte)item.Language);
-        buffer.WriteUInt8((byte)item.Bonding);
-        buffer.WriteUInt8((byte)item.DamageTypes[0]);
-        buffer.WriteInt8((sbyte)item.StatTypes[0]);
-        buffer.WriteInt8((sbyte)item.StatTypes[1]);
-        buffer.WriteInt8((sbyte)item.StatTypes[2]);
-        buffer.WriteInt8((sbyte)item.StatTypes[3]);
-        buffer.WriteInt8((sbyte)item.StatTypes[4]);
-        buffer.WriteInt8((sbyte)item.StatTypes[5]);
-        buffer.WriteInt8((sbyte)item.StatTypes[6]);
-        buffer.WriteInt8((sbyte)item.StatTypes[7]);
-        buffer.WriteInt8((sbyte)item.StatTypes[8]);
-        buffer.WriteInt8((sbyte)item.StatTypes[9]);
-        buffer.WriteUInt8((byte)item.ContainerSlots);
-        buffer.WriteUInt8((byte)item.RequiredRepValue);
-        buffer.WriteUInt8((byte)item.RequiredCityRank);
-        buffer.WriteUInt8((byte)item.RequiredHonorRank);
-        buffer.WriteUInt8((byte)item.InventoryType);
-        buffer.WriteUInt8((byte)item.Quality);
-        buffer.WriteUInt8((byte)item.AmmoType);
-        buffer.WriteInt8((sbyte)StatValues[0]);
-        buffer.WriteInt8((sbyte)StatValues[1]);
-        buffer.WriteInt8((sbyte)StatValues[2]);
-        buffer.WriteInt8((sbyte)StatValues[3]);
-        buffer.WriteInt8((sbyte)StatValues[4]);
-        buffer.WriteInt8((sbyte)StatValues[5]);
-        buffer.WriteInt8((sbyte)StatValues[6]);
-        buffer.WriteInt8((sbyte)StatValues[7]);
-        buffer.WriteInt8((sbyte)StatValues[8]);
-        buffer.WriteInt8((sbyte)StatValues[9]);
-        buffer.WriteInt8((sbyte)item.RequiredLevel);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 ItemSparse format. Reference: WPP V3_4_0_45166 HotfixHandler.cs:4087-4113,
+            // HermesProxy-WOTLK GameData.cs:2549-2581.
+            for (int i = 0; i < 10; i++)
+                buffer.WriteInt16((short)StatValues[i]);     // StatModifierBonusAmount[10]
+            buffer.WriteUInt8(254);                          // ExpansionID
+            buffer.WriteUInt8(0);                            // ArtifactID
+            buffer.WriteUInt8(0);                            // SpellWeight
+            buffer.WriteUInt8(0);                            // SpellWeightCategory
+            buffer.WriteUInt8((byte)item.ItemSocketColors[0]); // SocketType[0]
+            buffer.WriteUInt8((byte)item.ItemSocketColors[1]);
+            buffer.WriteUInt8((byte)item.ItemSocketColors[2]);
+            buffer.WriteUInt8((byte)item.SheathType);
+            buffer.WriteUInt8((byte)item.Material);
+            buffer.WriteUInt8((byte)item.PageMaterial);
+            buffer.WriteUInt8((byte)item.Language);
+            buffer.WriteUInt8((byte)item.Bonding);
+            buffer.WriteUInt8((byte)item.DamageTypes[0]);
+            for (int i = 0; i < 10; i++)
+                buffer.WriteInt8((sbyte)item.StatTypes[i]);  // StatModifierBonusStat[10]
+            buffer.WriteUInt8((byte)item.ContainerSlots);
+            buffer.WriteUInt8((byte)item.RequiredRepValue);  // RequiredPVPMedal
+            buffer.WriteUInt8((byte)item.RequiredCityRank);  // RequiredPVPRank
+            // No RequiredHonorRank in V3_4_3 — the 341 layout removed the trailing
+            // MinReputation byte (which V3_4_3 relocated to a 4-byte field above).
+            buffer.WriteInt8((sbyte)item.InventoryType);     // sbyte in V3_4_3
+            buffer.WriteInt8((sbyte)item.Quality);           // OverallQualityID (sbyte)
+            buffer.WriteUInt8((byte)item.AmmoType);
+            buffer.WriteInt8((sbyte)item.RequiredLevel);
+        }
+        else
+        {
+            // V1_14 / V2_5 layout — original upstream format. Do not alter without
+            // a per-build WPP cross-check for the affected client.
+            buffer.WriteUInt8(254);
+            buffer.WriteUInt8(0);
+            buffer.WriteUInt8(0);
+            buffer.WriteUInt8(0);
+            buffer.WriteUInt8((byte)item.ItemSocketColors[0]);
+            buffer.WriteUInt8((byte)item.ItemSocketColors[1]);
+            buffer.WriteUInt8((byte)item.ItemSocketColors[2]);
+            buffer.WriteUInt8((byte)item.SheathType);
+            buffer.WriteUInt8((byte)item.Material);
+            buffer.WriteUInt8((byte)item.PageMaterial);
+            buffer.WriteUInt8((byte)item.Language);
+            buffer.WriteUInt8((byte)item.Bonding);
+            buffer.WriteUInt8((byte)item.DamageTypes[0]);
+            buffer.WriteInt8((sbyte)item.StatTypes[0]);
+            buffer.WriteInt8((sbyte)item.StatTypes[1]);
+            buffer.WriteInt8((sbyte)item.StatTypes[2]);
+            buffer.WriteInt8((sbyte)item.StatTypes[3]);
+            buffer.WriteInt8((sbyte)item.StatTypes[4]);
+            buffer.WriteInt8((sbyte)item.StatTypes[5]);
+            buffer.WriteInt8((sbyte)item.StatTypes[6]);
+            buffer.WriteInt8((sbyte)item.StatTypes[7]);
+            buffer.WriteInt8((sbyte)item.StatTypes[8]);
+            buffer.WriteInt8((sbyte)item.StatTypes[9]);
+            buffer.WriteUInt8((byte)item.ContainerSlots);
+            buffer.WriteUInt8((byte)item.RequiredRepValue);
+            buffer.WriteUInt8((byte)item.RequiredCityRank);
+            buffer.WriteUInt8((byte)item.RequiredHonorRank);
+            buffer.WriteUInt8((byte)item.InventoryType);
+            buffer.WriteUInt8((byte)item.Quality);
+            buffer.WriteUInt8((byte)item.AmmoType);
+            buffer.WriteInt8((sbyte)StatValues[0]);
+            buffer.WriteInt8((sbyte)StatValues[1]);
+            buffer.WriteInt8((sbyte)StatValues[2]);
+            buffer.WriteInt8((sbyte)StatValues[3]);
+            buffer.WriteInt8((sbyte)StatValues[4]);
+            buffer.WriteInt8((sbyte)StatValues[5]);
+            buffer.WriteInt8((sbyte)StatValues[6]);
+            buffer.WriteInt8((sbyte)StatValues[7]);
+            buffer.WriteInt8((sbyte)StatValues[8]);
+            buffer.WriteInt8((sbyte)StatValues[9]);
+            buffer.WriteInt8((sbyte)item.RequiredLevel);
+        }
     }
 
     public static void WriteItemSparseHotfix(ItemSparseRecord row, Framework.IO.ByteBuffer buffer)
     {
+        var startSize = buffer.GetSize();
         Span<int> StatValues = stackalloc int[10];
         for (int i = 0; i < 10; i++)
         {
@@ -2442,7 +2591,19 @@ public static partial class GameData
         buffer.WriteUInt32(row.DurationInInventory);
         buffer.WriteFloat(row.QualityModifier);
         buffer.WriteUInt32(row.BagFamily);
-        buffer.WriteFloat(row.RangeMod);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 (ItemSparseHandler341): split into StartQuestID (Int32) + ItemRange (Single).
+            // Older V1_14/V2_5 layout has a single combined RangeMod here AND a UInt16
+            // StartQuestId near ItemSet. V3_4_3 promotes StartQuestId to a 4-byte field
+            // and drops the UInt16 from the later block (handled below).
+            buffer.WriteInt32((int)row.StartQuestId);       // StartQuestID
+            buffer.WriteFloat(row.RangeMod);                // ItemRange
+        }
+        else
+        {
+            buffer.WriteFloat(row.RangeMod);
+        }
         buffer.WriteFloat(row.StatPercentageOfSocket[0]);
         buffer.WriteFloat(row.StatPercentageOfSocket[1]);
         buffer.WriteFloat(row.StatPercentageOfSocket[2]);
@@ -2465,6 +2626,12 @@ public static partial class GameData
         buffer.WriteInt32(row.StatPercentEditor[9]);
         buffer.WriteInt32(row.Stackable);
         buffer.WriteInt32(row.MaxCount);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 (ItemSparseHandler341): MinReputation Int32 between MaxCount
+            // and RequiredAbility. The trailing MinReputation byte is dropped.
+            buffer.WriteInt32(0);                           // MinReputation
+        }
         buffer.WriteUInt32(row.RequiredAbility);
         buffer.WriteUInt32(row.SellPrice);
         buffer.WriteUInt32(row.BuyPrice);
@@ -2476,6 +2643,14 @@ public static partial class GameData
         buffer.WriteUInt32(row.Flags[2]);
         buffer.WriteUInt32(row.Flags[3]);
         buffer.WriteInt32(row.OppositeFactionItemId);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 (ItemSparseHandler341): three Int32 fields between FactionRelated
+            // and MaxDurability.
+            buffer.WriteInt32(0);                           // ModifiedCraftingReagentItemID
+            buffer.WriteInt32(0);                           // ContentTuningID
+            buffer.WriteInt32(0);                           // PlayerLevelToItemLevelCurveID
+        }
         buffer.WriteUInt32(row.MaxDurability);
         buffer.WriteUInt16(row.ItemNameDescriptionId);
         buffer.WriteUInt16(row.RequiredTransmogHoliday);
@@ -2489,7 +2664,13 @@ public static partial class GameData
         buffer.WriteUInt16(row.ZoneBound[1]);
         buffer.WriteUInt16(row.ItemSet);
         buffer.WriteUInt16(row.LockId);
-        buffer.WriteUInt16(row.StartQuestId);
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        {
+            // V1_14/V2_5: StartQuestId UInt16 sits here. V3_4_3 promoted this to a
+            // 4-byte StartQuestID Int32 written earlier (after BagFamily), so the
+            // UInt16 slot here disappears.
+            buffer.WriteUInt16(row.StartQuestId);
+        }
         buffer.WriteUInt16(row.PageText);
         buffer.WriteUInt16(row.Delay);
         buffer.WriteUInt16(row.RequiredReputationId);
@@ -2517,47 +2698,84 @@ public static partial class GameData
         buffer.WriteInt16(row.Resistances[5]);
         buffer.WriteInt16(row.Resistances[6]);
         buffer.WriteUInt16(row.ScalingStatDistributionId);
-        buffer.WriteUInt8(row.ExpansionId);
-        buffer.WriteUInt8(row.ArtifactId);
-        buffer.WriteUInt8(row.SpellWeight);
-        buffer.WriteUInt8(row.SpellWeightCategory);
-        buffer.WriteUInt8(row.SocketType[0]);
-        buffer.WriteUInt8(row.SocketType[1]);
-        buffer.WriteUInt8(row.SocketType[2]);
-        buffer.WriteUInt8(row.SheatheType);
-        buffer.WriteUInt8(row.Material);
-        buffer.WriteUInt8(row.PageMaterial);
-        buffer.WriteUInt8(row.PageLanguage);
-        buffer.WriteUInt8(row.Bonding);
-        buffer.WriteUInt8(row.DamageType);
-        buffer.WriteInt8(row.StatType[0]);
-        buffer.WriteInt8(row.StatType[1]);
-        buffer.WriteInt8(row.StatType[2]);
-        buffer.WriteInt8(row.StatType[3]);
-        buffer.WriteInt8(row.StatType[4]);
-        buffer.WriteInt8(row.StatType[5]);
-        buffer.WriteInt8(row.StatType[6]);
-        buffer.WriteInt8(row.StatType[7]);
-        buffer.WriteInt8(row.StatType[8]);
-        buffer.WriteInt8(row.StatType[9]);
-        buffer.WriteUInt8(row.ContainerSlots);
-        buffer.WriteUInt8(row.RequiredReputationRank);
-        buffer.WriteUInt8(row.RequiredCityRank);
-        buffer.WriteUInt8(row.RequiredHonorRank);
-        buffer.WriteUInt8(row.InventoryType);
-        buffer.WriteUInt8(row.OverallQualityId);
-        buffer.WriteUInt8(row.AmmoType);
-        buffer.WriteInt8((sbyte)StatValues[0]);
-        buffer.WriteInt8((sbyte)StatValues[1]);
-        buffer.WriteInt8((sbyte)StatValues[2]);
-        buffer.WriteInt8((sbyte)StatValues[3]);
-        buffer.WriteInt8((sbyte)StatValues[4]);
-        buffer.WriteInt8((sbyte)StatValues[5]);
-        buffer.WriteInt8((sbyte)StatValues[6]);
-        buffer.WriteInt8((sbyte)StatValues[7]);
-        buffer.WriteInt8((sbyte)StatValues[8]);
-        buffer.WriteInt8((sbyte)StatValues[9]);
-        buffer.WriteInt8(row.RequiredLevel);
+        Log.Print(LogType.Trace, $"[ItemSparseHotfix] item={row.Id} preScalingSize={buffer.GetSize() - startSize} build={ModernVersion.Build}");
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            Log.Print(LogType.Trace, $"[ItemSparseHotfix] item={row.Id} taking V3_4_3 path");
+            // V3_4_3 ItemSparse format. Reference: WPP V3_4_0_45166 HotfixHandler.cs:4087-4113.
+            for (int i = 0; i < 10; i++)
+                buffer.WriteInt16((short)row.StatValue[i]);  // StatModifierBonusAmount[10]
+            buffer.WriteUInt8(row.ExpansionId);
+            buffer.WriteUInt8(row.ArtifactId);
+            buffer.WriteUInt8(row.SpellWeight);
+            buffer.WriteUInt8(row.SpellWeightCategory);
+            buffer.WriteUInt8(row.SocketType[0]);
+            buffer.WriteUInt8(row.SocketType[1]);
+            buffer.WriteUInt8(row.SocketType[2]);
+            buffer.WriteUInt8(row.SheatheType);
+            buffer.WriteUInt8(row.Material);
+            buffer.WriteUInt8(row.PageMaterial);
+            buffer.WriteUInt8(row.PageLanguage);
+            buffer.WriteUInt8(row.Bonding);
+            buffer.WriteUInt8(row.DamageType);
+            for (int i = 0; i < 10; i++)
+                buffer.WriteInt8(row.StatType[i]);           // StatModifierBonusStat[10]
+            buffer.WriteUInt8(row.ContainerSlots);
+            buffer.WriteUInt8(row.RequiredReputationRank);   // RequiredPVPMedal
+            buffer.WriteUInt8(row.RequiredCityRank);         // RequiredPVPRank
+            // No RequiredHonorRank for V3_4_3 — 341 layout drops the trailing
+            // MinReputation byte; MinReputation moved up to a 4-byte field above.
+            buffer.WriteInt8((sbyte)row.InventoryType);      // InventoryType (sbyte in V3_4_3)
+            buffer.WriteInt8((sbyte)row.OverallQualityId);   // OverallQualityID (sbyte)
+            buffer.WriteUInt8(row.AmmoType);                 // AmmunitionType
+            buffer.WriteInt8(row.RequiredLevel);
+        }
+        else
+        {
+            // V1_14 / V2_5 layout — preserve original upstream byte sequence.
+            buffer.WriteUInt8(row.ExpansionId);
+            buffer.WriteUInt8(row.ArtifactId);
+            buffer.WriteUInt8(row.SpellWeight);
+            buffer.WriteUInt8(row.SpellWeightCategory);
+            buffer.WriteUInt8(row.SocketType[0]);
+            buffer.WriteUInt8(row.SocketType[1]);
+            buffer.WriteUInt8(row.SocketType[2]);
+            buffer.WriteUInt8(row.SheatheType);
+            buffer.WriteUInt8(row.Material);
+            buffer.WriteUInt8(row.PageMaterial);
+            buffer.WriteUInt8(row.PageLanguage);
+            buffer.WriteUInt8(row.Bonding);
+            buffer.WriteUInt8(row.DamageType);
+            buffer.WriteInt8(row.StatType[0]);
+            buffer.WriteInt8(row.StatType[1]);
+            buffer.WriteInt8(row.StatType[2]);
+            buffer.WriteInt8(row.StatType[3]);
+            buffer.WriteInt8(row.StatType[4]);
+            buffer.WriteInt8(row.StatType[5]);
+            buffer.WriteInt8(row.StatType[6]);
+            buffer.WriteInt8(row.StatType[7]);
+            buffer.WriteInt8(row.StatType[8]);
+            buffer.WriteInt8(row.StatType[9]);
+            buffer.WriteUInt8(row.ContainerSlots);
+            buffer.WriteUInt8(row.RequiredReputationRank);
+            buffer.WriteUInt8(row.RequiredCityRank);
+            buffer.WriteUInt8(row.RequiredHonorRank);
+            buffer.WriteUInt8(row.InventoryType);
+            buffer.WriteUInt8(row.OverallQualityId);
+            buffer.WriteUInt8(row.AmmoType);
+            buffer.WriteInt8((sbyte)StatValues[0]);
+            buffer.WriteInt8((sbyte)StatValues[1]);
+            buffer.WriteInt8((sbyte)StatValues[2]);
+            buffer.WriteInt8((sbyte)StatValues[3]);
+            buffer.WriteInt8((sbyte)StatValues[4]);
+            buffer.WriteInt8((sbyte)StatValues[5]);
+            buffer.WriteInt8((sbyte)StatValues[6]);
+            buffer.WriteInt8((sbyte)StatValues[7]);
+            buffer.WriteInt8((sbyte)StatValues[8]);
+            buffer.WriteInt8((sbyte)StatValues[9]);
+            buffer.WriteInt8(row.RequiredLevel);
+        }
+        Log.Print(LogType.Trace, $"[ItemSparseHotfixSize] item={row.Id} buildTotal={buffer.GetSize() - startSize}");
     }
     public static void LoadItemHotfixes()
     {
@@ -2753,7 +2971,18 @@ public static partial class GameData
         buffer.WriteInt32(modAppearance.ItemAppearanceModifierID);
         buffer.WriteInt32(modAppearance.ItemAppearanceID);
         buffer.WriteInt32(modAppearance.OrderIndex);
-        buffer.WriteInt32(modAppearance.TransmogSourceTypeEnum);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3: TransmogSourceTypeEnum is sbyte (1 byte), per WPP
+            // V3_4_0_45166/HotfixHandler.cs:3725. Sending Int32 (4 bytes) like the
+            // V1_14/V2_5 path adds 3 trailing bytes which the V3_4_3 client rejects
+            // as "incorrect structure" — and silently fails to register the appearance.
+            buffer.WriteInt8((sbyte)modAppearance.TransmogSourceTypeEnum);
+        }
+        else
+        {
+            buffer.WriteInt32(modAppearance.TransmogSourceTypeEnum);
+        }
     }
 
     public static void WriteItemEffectHotfix(ItemEffect effect, Framework.IO.ByteBuffer buffer)
@@ -3944,6 +4173,102 @@ public static partial class GameData
             record.HotfixContent.WriteInt32(attachmentGeosetGroup6);
             record.HotfixContent.WriteInt32(helmetGeosetVis1);
             record.HotfixContent.WriteInt32(helmetGeosetVis2);
+            Hotfixes.Add(record.HotfixId, record);
+        }
+    }
+
+    // ChrCustomizationChoice: per-row choices the V3_4_3 client looks up when rendering a
+    // character (e.g. choice IDs 17161/17177/17193 for Human Male, 18079/18093 for Draenei
+    // Female). Without these the client silently drops multi-char enums for races whose
+    // choice IDs aren't in its baseline DB2 cache. Field/byte order matches CypherCore's
+    // ChrCustomizationChoiceRecord (Source/Game/DataStorage/Structs/C_Records.cs:200-213).
+    public static void LoadChrCustomizationChoiceHotfixes()
+    {
+        var path = Path.Combine("CSV", "Hotfix", $"ChrCustomizationChoice{ModernVersion.ExpansionVersion}.csv");
+        using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
+        uint counter = 0;
+        foreach (var row in reader)
+        {
+            counter++;
+
+            string name = row[0].ToString();
+            uint id = row[1].Parse<uint>();
+            int chrCustomizationOptionId = row[2].Parse<int>();
+            int chrCustomizationReqId = row[3].Parse<int>();
+            int chrCustomizationVisReqId = row[4].Parse<int>();
+            ushort sortOrder = row[5].Parse<ushort>();
+            ushort uiOrderIndex = row[6].Parse<ushort>();
+            int flags = row[7].Parse<int>();
+            int addedInPatch = row[8].Parse<int>();
+            int soundKitId = row[9].Parse<int>();
+            int swatchColor0 = row[10].Parse<int>();
+            int swatchColor1 = row[11].Parse<int>();
+
+            HotfixRecord record = new HotfixRecord();
+            record.Status = HotfixStatus.Valid;
+            record.TableHash = DB2Hash.ChrCustomizationChoice;
+            record.HotfixId = HotfixChrCustomizationChoiceBegin + counter;
+            record.UniqueId = record.HotfixId;
+            record.RecordId = id;
+            record.HotfixContent.WriteCString(name);
+            record.HotfixContent.WriteInt32((int)id);
+            record.HotfixContent.WriteInt32(chrCustomizationOptionId);
+            record.HotfixContent.WriteInt32(chrCustomizationReqId);
+            record.HotfixContent.WriteInt32(chrCustomizationVisReqId);
+            record.HotfixContent.WriteUInt16(sortOrder);
+            record.HotfixContent.WriteUInt16(uiOrderIndex);
+            record.HotfixContent.WriteInt32(flags);
+            record.HotfixContent.WriteInt32(addedInPatch);
+            record.HotfixContent.WriteInt32(soundKitId);
+            record.HotfixContent.WriteInt32(swatchColor0);
+            record.HotfixContent.WriteInt32(swatchColor1);
+            Hotfixes.Add(record.HotfixId, record);
+        }
+    }
+
+    // ChrCustomizationOption: the customization slots themselves (Skin Color, Face, ...).
+    // Pairs with ChrCustomizationChoice. Field order matches CypherCore's
+    // ChrCustomizationOptionRecord (C_Records.cs:245-259).
+    public static void LoadChrCustomizationOptionHotfixes()
+    {
+        var path = Path.Combine("CSV", "Hotfix", $"ChrCustomizationOption{ModernVersion.ExpansionVersion}.csv");
+        using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
+        uint counter = 0;
+        foreach (var row in reader)
+        {
+            counter++;
+
+            string name = row[0].ToString();
+            uint id = row[1].Parse<uint>();
+            ushort secondaryId = row[2].Parse<ushort>();
+            int flags = row[3].Parse<int>();
+            int chrModelId = row[4].Parse<int>();
+            int sortIndex = row[5].Parse<int>();
+            int chrCustomizationCategoryId = row[6].Parse<int>();
+            int optionType = row[7].Parse<int>();
+            float barberShopCostModifier = row[8].Parse<float>();
+            int chrCustomizationId = row[9].Parse<int>();
+            int chrCustomizationReqId = row[10].Parse<int>();
+            int uiOrderIndex = row[11].Parse<int>();
+
+            HotfixRecord record = new HotfixRecord();
+            record.Status = HotfixStatus.Valid;
+            record.TableHash = DB2Hash.ChrCustomizationOption;
+            record.HotfixId = HotfixChrCustomizationOptionBegin + counter;
+            record.UniqueId = record.HotfixId;
+            record.RecordId = id;
+            record.HotfixContent.WriteCString(name);
+            record.HotfixContent.WriteInt32((int)id);
+            record.HotfixContent.WriteUInt16(secondaryId);
+            record.HotfixContent.WriteInt32(flags);
+            record.HotfixContent.WriteInt32(chrModelId);
+            record.HotfixContent.WriteInt32(sortIndex);
+            record.HotfixContent.WriteInt32(chrCustomizationCategoryId);
+            record.HotfixContent.WriteInt32(optionType);
+            record.HotfixContent.WriteFloat(barberShopCostModifier);
+            record.HotfixContent.WriteInt32(chrCustomizationId);
+            record.HotfixContent.WriteInt32(chrCustomizationReqId);
+            record.HotfixContent.WriteInt32(uiOrderIndex);
             Hotfixes.Add(record.HotfixId, record);
         }
     }
