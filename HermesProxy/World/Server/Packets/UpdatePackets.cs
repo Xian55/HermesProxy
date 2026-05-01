@@ -277,8 +277,146 @@ public class UpdateObject : ServerPacket
         _gameState = gameState;
     }
 
+    /// <summary>
+    /// V3_4_3 Values-update filter. Drops Values entries that target an unknown guid
+    /// (no prior CreateObject) or carry no concrete field changes — cMangos emits
+    /// the latter as bookkeeping no-ops that materialize as a 13-byte garbage body
+    /// the V3_4_3 client rejects with CMSG_OBJECT_UPDATE_FAILED.
+    ///
+    /// Player Values now pass through unchanged. They used to be sanitized via a
+    /// StripPlayerCrashingBlocks helper (per fork research/player_values_update_crash.md),
+    /// but that strip is unnecessary now that UpdateHandler splits player Values
+    /// into a dedicated SMSG_UPDATE_OBJECT (port of fork commit 18caaf7) — once
+    /// the player's deltas are no longer intermixed with creature deltas, the
+    /// changedMask cascade is well-formed and the client accepts blocks 0/1/4 plus
+    /// PlayerData and ActivePlayerData. Removing the strip restores Coinage,
+    /// InvSlots, DisplayPower and the rage bar.
+    /// </summary>
+    public static int FilterV3_4_3Values(UpdateObject obj, GameSessionData gameState)
+    {
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+            return 0;
+
+        int beforeCount = obj.ObjectUpdates.Count;
+        var known = gameState.ClientKnownGuids;
+
+        // First pass: register every CreateObject in this batch as a guid the client
+        // will know after this packet is sent. We add BEFORE the strip pass so that a
+        // Values entry later in the same batch (uncommon but legal) wouldn't be
+        // dropped just because we register guids only after.
+        int createKept = 0;
+        foreach (var u in obj.ObjectUpdates)
+        {
+            if (u.Type == UpdateTypeModern.CreateObject1 || u.Type == UpdateTypeModern.CreateObject2)
+            {
+                known.Add(u.Guid);
+                createKept++;
+            }
+        }
+
+        int valuesKept = 0;
+        int valuesUnknownStripped = 0;
+        int valuesEmptyStripped = 0;
+        obj.ObjectUpdates.RemoveAll(u =>
+        {
+            if (u.Type != UpdateTypeModern.Values)
+                return false;
+            if (!known.Contains(u.Guid))
+            {
+                valuesUnknownStripped++;
+                return true;
+            }
+            if (IsEmptyValuesDelta(u))
+            {
+                valuesEmptyStripped++;
+                return true;
+            }
+            valuesKept++;
+            return false;
+        });
+
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+            $"[UpdateObjectTrace] V3_4_3 filter: in={beforeCount} valuesKept={valuesKept} valuesEmpty={valuesEmptyStripped} valuesUnknown={valuesUnknownStripped} createKept={createKept} mapId={gameState.CurrentMapId}");
+
+        return valuesUnknownStripped + valuesEmptyStripped;
+    }
+
+    private static bool IsEmptyValuesDelta(ObjectUpdate u)
+    {
+        // A Values delta is "empty" if no concrete field has a value. The data objects
+        // (UnitData/PlayerData/ActivePlayerData) themselves may be non-null but contain
+        // only nullable fields all set to null — the V3_4_3 client treats the resulting
+        // bit-mask body as malformed.
+        var unit = u.UnitData;
+        if (unit != null)
+        {
+            if (unit.Health.HasValue || unit.MaxHealth.HasValue || unit.DisplayID.HasValue) return false;
+            if (unit.Charm != null || unit.Summon != null || unit.CharmedBy != null) return false;
+            if (unit.SummonedBy != null || unit.CreatedBy != null || unit.Target != null) return false;
+            if (unit.ChannelData != null) return false;
+            if (unit.RaceId.HasValue || unit.ClassId.HasValue || unit.SexId.HasValue) return false;
+            if (unit.Level.HasValue || unit.EffectiveLevel.HasValue || unit.DisplayPower.HasValue) return false;
+            if (unit.FactionTemplate.HasValue || unit.Flags.HasValue || unit.Flags2.HasValue || unit.Flags3.HasValue) return false;
+            if (unit.AuraState.HasValue) return false;
+            if (unit.BoundingRadius.HasValue || unit.CombatReach.HasValue) return false;
+            if (unit.NativeDisplayID.HasValue || unit.MountDisplayID.HasValue) return false;
+            if (unit.HoverHeight.HasValue || unit.GuildGUID != null) return false;
+            if (unit.MinDamage.HasValue || unit.MaxDamage.HasValue) return false;
+            if (unit.StandState.HasValue || unit.AnimTier.HasValue) return false;
+            if (unit.AttackPower.HasValue || unit.RangedAttackPower.HasValue) return false;
+            if (unit.BaseMana.HasValue || unit.BaseHealth.HasValue) return false;
+            if (unit.NpcFlags != null)
+                for (int i = 0; i < unit.NpcFlags.Length; i++)
+                    if (unit.NpcFlags[i].HasValue && unit.NpcFlags[i] != 0) return false;
+            if (unit.Power != null)
+                for (int i = 0; i < unit.Power.Length; i++)
+                    if (unit.Power[i].HasValue) return false;
+            if (unit.MaxPower != null)
+                for (int i = 0; i < unit.MaxPower.Length; i++)
+                    if (unit.MaxPower[i].HasValue) return false;
+            if (unit.Stats != null)
+                for (int i = 0; i < unit.Stats.Length; i++)
+                    if (unit.Stats[i].HasValue) return false;
+            if (unit.Resistances != null)
+                for (int i = 0; i < 7; i++)
+                    if (unit.Resistances[i].HasValue) return false;
+        }
+        var player = u.PlayerData;
+        if (player != null)
+        {
+            if (player.PlayerFlags.HasValue || player.PlayerFlagsEx.HasValue) return false;
+            if (player.NativeSex.HasValue || player.HonorLevel.HasValue) return false;
+            if (player.GuildRankID.HasValue || player.GuildLevel.HasValue) return false;
+            if (player.DuelArbiter != null || player.WowAccount != null || player.LootTargetGUID != null) return false;
+        }
+        // ActivePlayerData has hundreds of fields; check the most common ones cMangos
+        // populates as part of real updates. If none are set, treat as empty.
+        var ap = u.ActivePlayerData;
+        if (ap != null)
+        {
+            if (ap.Coinage.HasValue || ap.XP.HasValue || ap.NextLevelXP.HasValue) return false;
+            if (ap.CharacterPoints.HasValue) return false;
+            if (ap.FarsightObject != null) return false;
+            if (ap.InvSlots != null)
+                for (int i = 0; i < ap.InvSlots.Length; i++)
+                    if (ap.InvSlots[i] != null) return false;
+            if (ap.Skill != null)
+            {
+                for (int i = 0; i < 256; i++)
+                    if (ap.Skill.SkillLineID[i].HasValue) return false;
+            }
+        }
+        return true;
+    }
+
     public override void Write()
     {
+        // Filter is now invoked from UpdateHandler / QueryHandler BEFORE Write() so the
+        // outer code can decide to skip the send when nothing useful remains. Leaving
+        // a no-op call here as a safety net so that any caller that bypasses the
+        // pre-filter still sees Values stripped.
+        FilterV3_4_3Values(this, _gameState);
+
         NumObjUpdates = (uint)ObjectUpdates.Count;
         MapID = (ushort)_gameState.CurrentMapId!;
 
@@ -355,6 +493,25 @@ public class UpdateObject : ServerPacket
     public List<WowGuid128> OutOfRangeGuids = new List<WowGuid128>();
     public List<WowGuid128> DestroyedGuids = new List<WowGuid128>();
     public List<ObjectUpdate> ObjectUpdates = new List<ObjectUpdate>();
+}
+
+public class HealthUpdate : ServerPacket
+{
+    // Modern V3_4_3 SMSG_HEALTH_UPDATE: PackedGuid128 Guid + int64 Health.
+    // Reference: WPP V3_4_0 / TC343 — health is i64 in modern (post-Legion).
+    public HealthUpdate(WowGuid128 guid) : base(Opcode.SMSG_HEALTH_UPDATE, ConnectionType.Instance)
+    {
+        Guid = guid;
+    }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(Guid);
+        _worldPacket.WriteInt64(Health);
+    }
+
+    public WowGuid128 Guid;
+    public long Health;
 }
 
 public class PowerUpdate : ServerPacket, ISpanWritable

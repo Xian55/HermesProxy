@@ -241,7 +241,11 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_OBJECT_UPDATE_FAILED)]
     void HandleObjectUpdateFailed(ObjectUpdateFailed fail)
     {
-        Log.Print(LogType.Error, $"Object update failed for {fail.ObjectGuid}.");
+        // Phase 5a-7c diagnostic: surface the modern high-guid type so we can correlate
+        // failures to specific object kinds (Transport / GameObject / Item / Unit / etc.)
+        // when the client rejects what the proxy serialized.
+        Log.Print(LogType.Error,
+            $"CMSG_OBJECT_UPDATE_FAILED guid={fail.ObjectGuid} highType={fail.ObjectGuid.GetHighType()} entry={fail.ObjectGuid.GetEntry()}.");
     }
 
     [PacketHandler(Opcode.CMSG_SET_DUNGEON_DIFFICULTY)]
