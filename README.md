@@ -23,6 +23,7 @@ These are the Blizzard WoW Classic client versions you can use:
 | 1.14.2  | Classic Era    | 41858 - 42597     |                          |
 | 2.5.2   | TBC Classic    | 39570 - 41510     |                          |
 | 2.5.3   | TBC Classic    | 41402 - 42598     |                          |
+| 3.4.3   | Wotlk Classic  | 54261             | **Experimental**         |
 
 ### Legacy Server Versions (What Emulators Run)
 
@@ -34,6 +35,7 @@ These are the private server versions HermesProxy can connect to:
 | 1.12.2  | Vanilla   | 6005  | CMaNGOS, VMaNGOS, etc.   |
 | 1.12.3  | Vanilla   | 6141  | CMaNGOS, VMaNGOS, etc.   |
 | 2.4.3   | TBC       | 8606  | CMaNGOS, etc.            |
+| 3.3.5a  | Wotlk     | 12340 | TrinityCore [link](https://www.ownedcore.com/forums/world-of-warcraft/world-of-warcraft-emulator-servers/wow-emu-general-releases/966706-repack-trinitycore-npcbots-eluna-extras-335a-solo-lan-2022-a.html)     |
 
 ### Version Mapping
 
@@ -43,6 +45,7 @@ The proxy automatically selects the best legacy version based on your client:
 |---------------|----------------|
 | 1.14.x        | 1.12.x (Vanilla) |
 | 2.5.x         | 2.4.3 (TBC)    |
+| 3.4.3         | 3.3.5a (Wotlk)  |
 
 ## Ingame Settings
 Note: Keep `Optimize Network for Speed` **enabled** (it's under `System` -> `Network`), otherwise you will get kicked every now and then.
@@ -53,8 +56,41 @@ Note: Keep `Optimize Network for Speed` **enabled** (it's under `System` -> `Net
 - Go into your game folder, in the Classic or Classic Era subdirectory, and edit WTF/Config.wtf to set the portal to 127.0.0.1.
 - Download [Arctium Launcher](https://github.com/Arctium/WoW-Launcher/releases/tag/latest) into the main game folder, and then run it
 with `--staticseed --version=ClassicEra` for vanilla
-or `--staticseed --version=Classic` for TBC.
+or `--staticseed --version=Classic` for TBC
+or `--staticseed --version=Classic` for WotLK Classic (yes, the same flag TBC uses — Arctium reuses `Classic` for both).
 - Start the proxy app and login through the game with your usual credentials.
+
+### WotLK Classic Quick Start (Experimental)
+
+WotLK Classic support is experimental and targets the **3.4.3.54261** modern client against a **3.3.5a (build 12340)** legacy server (TrinityCore / AzerothCore / CMaNGOS). Many fixes landed under the V3_4_3 umbrella but a few rough edges remain — see the "Known Limitations" subsection below.
+
+**1. Configure HermesProxy** — either edit `HermesProxy.config` or pass overrides on the command line:
+
+```bash
+HermesProxy \
+  --set ClientBuild=V3_4_3_54261 \
+  --set ServerBuild=V3_3_5a_12340 \
+  --set ServerAddress=<your-3.3.5a-server-ip> \
+  --set ServerPort=3724
+```
+
+The `ServerBuild` can be left at `auto` — for a 3.4.3 client the proxy auto-selects 3.3.5a anyway. Set it explicitly when you want the choice locked.
+
+**2. Point the WotLK Classic client at HermesProxy** — in `WTF/Config.wtf` inside the WoW install's `_classic_/` directory, set:
+
+```
+SET portal "127.0.0.1"
+```
+
+**3. Run the Arctium launcher** so it bypasses the Battle.net launcher and uses the static seed HermesProxy expects. WotLK Classic uses the same `Classic` profile flag as TBC:
+
+```
+WoW-Launcher --staticseed --version=Classic
+```
+
+**4. Start HermesProxy and login** with the same credentials your legacy server (TC/AC/CMaNGOS) accepts.
+
+WotLK Classic support is still rough — if something doesn't behave the way you'd expect on a real WotLK server, capture a packet log and open an issue with the rolling `Logs/hermes-YYYYMMDD.log` plus the matching `PacketsLog/modern_*.pkt`.
 
 ## Chat Commands
 
@@ -122,8 +158,8 @@ Configuration is stored in `HermesProxy.config` (XML format). All settings can a
 
 | Setting       | Default                            | Valid Values                                    |
 |---------------|------------------------------------|-------------------------------------------------|
-| `ClientBuild` | `40618` (1.14.0)                   | `40618` (1.14.0)<br>`41794` (1.14.1)<br>`42597` (1.14.2)<br>`40892` (2.5.2)<br>`42328` (2.5.3) |
-| `ServerBuild` | `auto`                             | `auto`<br>`5875` (1.12.1)<br>`8606` (2.4.3)         |
+| `ClientBuild` | `40618` (1.14.0)                   | `40618` (1.14.0)<br>`41794` (1.14.1)<br>`42597` (1.14.2)<br>`40892` (2.5.2)<br>`42328` (2.5.3)<br>`54261` (3.4.3 — experimental) |
+| `ServerBuild` | `auto`                             | `auto`<br>`5875` (1.12.1)<br>`8606` (2.4.3)<br>`12340` (3.3.5a) |
 | `ClientSeed`  | `179D3DC3235629D07113A9B3867F97A7` | 32-character hex string (16 bytes)              |
 
 ### Port Settings

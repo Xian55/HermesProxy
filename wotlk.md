@@ -202,8 +202,11 @@ Phase 5a deliberately left **scaffolding workarounds** so subsequent sub-phases 
 | Sub-phase | FIXME count | Where | What it gates |
 |---|---|---|---|
 | **5a-7b** | DONE | — | V3_4_3 hotfix data — landed in 5a-7b PR; real item names + spell names now reach the client |
-| **5a-7c** | 5 | 4× `UpdateHandler.cs`, 1× `HighGuid.cs` | Item / GameObject / Transport object-create blocks — players appear naked, no mailboxes/chests/zeppelins |
-| **5a-7d** | 1 | `ObjectUpdateBuilder.cs:1173` | Values / partial-update path — no live HP bars, aura ticks, combat propagation |
+| **5a-7c-i** | PARTIAL | — | Static GameObjects (mailboxes/doodads/chests) accepted by V3_4_3 client via `GAMEOBJECT_BYTES_1` unpacker. Transport/MOTransport re-filtered for V3_4_3 because cmangos's create-block position is empirically (0,0,0) — V3_4_3 client rejects. Empty Values updates suppressed for V3_4_3 to stop Player-reject loop until 5a-7d. Login unblocked; zeppelins/elevators absent (MOTransport position fix). |
+| **5a-7c-ii** | NEXT | 1× `UpdateHandler.cs:162/229` (ItemContainer branches), 1× `UpdateHandler.cs:1211` (`GetSlotGuidValue`) | cmangos's 0x4700 ItemContainer high-guid for equipped items — needs `WriteCreateItemData` treatment. Players still appear naked. |
+| **MOTransport position fix** | NEW | `UpdateHandler.cs:162/229` (Transport/MOTransport branches), `UpdateHandler.cs:~1098` (StationaryObject reader) | Read MOTransport position from cmangos's later GAMEOBJECT_POS_X/Y/Z update-field deltas, OR convert Stationary→Movement create block. Unblocks zeppelins/elevators rendering. |
+| **5a-7c-iv** | 1 | `HighGuid.cs:45` | Unknown legacy-high fallback warn — only relevant after we audit what cmangos actually emits at world-enter. |
+| **5a-7d** | 1 | `ObjectUpdateBuilder.cs:1188` (`WriteValuesUpdate`), `UpdatePackets.cs:Write` (drops empty Values for V3_4_3) | Values / partial-update path — no live HP bars, aura ticks, combat propagation. The empty-block suppress in `UpdateObject.Write` is paired with the stub and gets lifted alongside the real implementation. |
 | **5b** | 2 | `ObjectField.cs`, `ObjectUpdateBuilderGeneratorTests.cs` | Source-generator restoration → byte-equivalence audit lane against the 5a hand-port |
 
 All V3_4_3-specific code (filters, hotfix stub, etc.) is gated on `ModernVersion.Build == ClientVersionBuild.V3_4_3_54261` so V1_14/V2_5 paths fall through unchanged.
@@ -212,7 +215,7 @@ All V3_4_3-specific code (filters, hotfix stub, etc.) is gated on `ModernVersion
 
 ### Phase 5a-7 — sub-phase follow-ups (next on deck)
 
-Recommended execution order: **~~7b~~ → 7c → 7d → 5b**. 7b shipped 2026-04-26. 7c is next on deck — biggest user-visible jump (naked-AFK → can equip + interact); 7d makes combat feel live; 5b sets up the source-gen lane for the eventual hand-port deletion.
+Recommended execution order: **~~7b~~ → 7c-i (PARTIAL) → 7c-ii → 7c-iii → 7d → 5b**. 7b shipped 2026-04-26. 7c-i landed the static-GameObject create path + the empty-Values suppression on 2026-04-28; remaining MOTransport position work pulled out into 7c-iii. 7c-ii (Item / 0x4700 ItemContainer) is next on deck — naked-AFK → equipped player; 7c-iii unblocks zeppelins/elevators rendering; 7d makes combat feel live; 5b sets up the source-gen lane for the eventual hand-port deletion.
 
 #### Phase 5a-7b — DONE (real hotfix data via wago.tools, 2026-04-26)
 
@@ -234,17 +237,45 @@ Verification:
 - HermesProxy boots with `--set ClientBuild=V3_4_3_54261` and `LoadEverything()` completes in ~1.8 s; `[Hotfix] CMSG_HOTFIX_REQUEST` log line shows `GameData.Hotfixes total available = ~700000`
 - `grep -rn "FIXME(phase5a-7b)" --include="*.cs"` returns no hits
 
-#### Phase 5a-7c — Item / GameObject / Transport WriteCreate*Data for V3_4_3
+#### Phase 5a-7c-i — PARTIAL (static GameObjects + Values suppression, 2026-04-28)
 
-**Why second**: biggest user-visible jump (naked-AFK character → equipped player + interactable world). Largest scope of the four follow-ups — re-validates each `WriteCreate*Data` byte-for-byte against the V3_4_3 client and removes the 5 skip filters.
+Shipped: V3_4_3 client accepts `CreateObject1`/`CreateObject2` for **static `GameObject`** types (mailboxes, doodads, chests). The `Player` reject-on-empty-Values loop is also gone. **Login is unblocked.** Zeppelins/elevators (Transport/MOTransport) are temporarily filtered out — see MOTransport position fix.
 
-**Scope**: walk each of the three `WriteCreate*Data` paths in `HermesProxy/World/Objects/Version/V3_4_3_54261/ObjectUpdateBuilder.cs` (Item ~line 307, GameObject ~line 938, Transport shares the GameObject path), capture-validate against WPP V3_4_0_45166 reference parser, fix divergence. Per filter removed:
+Root cause (verified empirically against canonical CypherCore capture and proxy-side WPP capture):
+- 3.3.5a cmangos / TC335 / AzerothCore servers pack `State` (byte 0), `TypeID` (byte 1), `ArtKit` (byte 2), `AnimProgress` (byte 3) into a single `GAMEOBJECT_BYTES_1` uint32 field rather than per-byte individual `UpdateFields` slots. Without an unpacker, `WriteCreateGameObjectData` shipped `TypeID=0` (`GAMEOBJECT_TYPE_DOOR`) and the V3_4_3 client rejected static GO creates with `CMSG_OBJECT_UPDATE_FAILED`.
+- For MOTransports specifically, the unpacker fixes the `TypeID`/`State` fields, but cmangos's create-block position is empirically `(0,0,0)` for these (legacy server defers position to subsequent update-field deltas). The V3_4_3 client rejects a Stationary GameObject create with `Position=(0,0,0)` and `Orientation!=0`, looping forever as the legacy server retries. **Properly fixing this is MOTransport position fix scope.**
+- The empty `WriteValuesUpdate` stub at `ObjectUpdateBuilder.cs:1188` was emitting a `mask=0` Values block that the V3_4_3 client also rejected with `CMSG_OBJECT_UPDATE_FAILED highType=Player`, triggering a server resend → infinite loop. Suppressing empty Values entirely for V3_4_3 stops this loop until 5a-7d implements the real body.
 
-- `UpdateHandler.cs:79, 162, 229` — three `if (legacyHigh == ...)` filter sites removed once each type's `WriteCreate*Data` is verified
-- `UpdateHandler.cs:1211` — `GetSlotGuidValue` returns the real Item guid (not `Empty`) once `WriteCreateItemData` is correct
-- `HighGuid.cs:45` — fallback `HighGuidType.Null` for unknown legacy highs can be tightened or removed once we've audited all real legacy highs cmangos emits
+Code changes:
+- `UpdateHandler.cs` GameObject branch (~line 3061) — added `GAMEOBJECT_BYTES_1` unpacker that extracts `State`/`TypeID`/`ArtKit`/`PercentHealth` from the packed uint32 before falling through to the existing individual-field reads. TC343 `GameObjectData` renamed byte 3 from `AnimProgress` to `PercentHealth` — the unpacker writes into `PercentHealth` to match.
+- `UpdateHandler.cs:162/229` — for V3_4_3, Static `GameObject` branch forwards (the unpacker populates the fields). `Transport`/`MOTransport` branches re-filter with a `[Phase5a7cTrace] Skipping ... pending MOTransport position fix` log line. `ItemContainer` (0x4700) skip stays — that's 5a-7c-ii's scope.
+- `UpdatePackets.cs UpdateObject.Write` — for V3_4_3, drops Values updates from `ObjectUpdates` before counting/serializing. Paired with the empty-stub at `ObjectUpdateBuilder.cs:1188`; both go away when 5a-7d implements the real Values body.
+- `ObjectUpdateBuilder.cs:131` — removed the unconditional `CreateObjectBits.GameObject` set; canonical CypherCore capture shows the bit must stay false for typical GameObjects.
+- `MovementInfo.cs:47` — `Rotation` defaults to `Quaternion.Identity` (was implicit (0,0,0,0)) so static GOs without a server-supplied rotation pass V3_4_3 sanity checks.
+- `MiscHandler.HandleObjectUpdateFailed` enhanced to log `highType` + `entry` of the failing modern guid — diagnostic gold mine for any remaining client-side rejections.
 
-**Estimated scope**: 1 PR per object type (Item / GameObject / Transport) is sensible if any single type proves involved. Probably 3 PRs total stacked on 7b.
+Verification:
+- `dotnet build -c Release` clean (43 pre-existing HPSG001 warnings, 0 errors)
+- `dotnet test` 296/0/1 (no new tests)
+- Smoke test: V3_4_3 client → CMaNGOS WotLK backend, world-enter completes. Proxy log shows `[Phase5a7cTrace] Skipping {Transport|MOTransport} for V3_4_3 (Position=0 placeholder; pending MOTransport position fix)` once per zeppelin/elevator at world-enter, then **silence** — no recurring `CMSG_OBJECT_UPDATE_FAILED` lines.
+- Diagnostic capture workflow: a proxy-side WPP-parsed capture is at `HermesProxy\bin\Release\PacketsLog\modern_54261_*_parsed.txt` after enabling `DiagnosticsOptions.PacketsLog`; the canonical CypherCore reference is at `World_parsed.txt:18181-18225` (static GO CreateObject1).
+
+#### Phase 5a-7c-ii — Item / 0x4700 ItemContainer (next)
+
+**Why next**: cmangos packs equipped/container items into a non-standard `0x4700` `ItemContainer` high-guid that the V3_4_3 client doesn't understand. `WriteCreateItemData` exists at `ObjectUpdateBuilder.cs:307` but isn't exercised because the type is filtered. Also gates `GetSlotGuidValue` returning `Empty` for those items at `UpdateHandler.cs:1211` (so the player's inventory slots show the right guids). Fixing this unblocks the "naked character" issue at character-select.
+
+**Scope**: walk `WriteCreateItemData`, capture-validate against WPP V3_4_0_45166 reference parser, fix divergence. Drop the `ItemContainer` filter at `UpdateHandler.cs:84/162/229`. Restore the real legacy guid in `GetSlotGuidValue` for `ItemContainer` (delete the `Empty` fallback).
+
+#### Phase MOTransport position fix — Transport / MOTransport position (deferred from 5a-7c-i)
+
+**Why**: zeppelins, elevators, boats. These are filtered for V3_4_3 in 5a-7c-i because cmangos's create-block position is `(0,0,0)` — see the FIXME at `UpdateHandler.cs:162/229` (Transport/MOTransport branches). Without position, the V3_4_3 client rejects every Stationary GameObject create with `CMSG_OBJECT_UPDATE_FAILED`.
+
+**Scope** (one of these — investigate which is correct empirically):
+- **Option A — Aggregate position from update-field deltas before forwarding**: cmangos likely sends the actual position via `GAMEOBJECT_POS_X/Y/Z` Values updates after the CreateObject. Buffer the CreateObject until those arrive, populate `MoveInfo.Position`, then forward. Requires `UpdateHandler.cs` state per pending-MOTransport-guid.
+- **Option B — Convert MOTransport CreateObject to use a Movement block** instead of Stationary. Set `CreateObjectBits.MovementUpdate` instead of `Stationary`, populate `MoveInfo` with full living-block defaults. May require examining how V3_4_3 actually serializes a moving Transport — check fork's `ObjectUpdateBuilder.cs:2165` `MovementTransport` / `ServerTime` flag conditions.
+- **Option C — Capture cmangos's actual create-block bytes** and confirm whether Position really is sent as zero or whether `UpdateHandler.cs:1098-1103` (`UpdateFlag.StationaryObject` branch) misses a flag. Use cmangos's own packet logger or `tcpdump` between proxy and legacy server.
+
+**Drop the filter** at `UpdateHandler.cs:162/229` once position is correctly populated. Smoke test: zeppelins / Stormwind harbor boats / Undercity elevator render and animate correctly for the V3_4_3 client.
 
 #### Phase 5a-7d — Implement Values / partial-update path
 
@@ -388,6 +419,27 @@ An OwnedCore release thread ([link](https://www.ownedcore.com/forums/world-of-wa
 1. **User-base expectation management** — when our v0.1 WotLK support ships, users coming from the fork will compare feature parity. Ship the v0.1 PR with an explicit "works / doesn't work" matrix so expectations are clear (character-select: yes; world-enter: no; etc.).
 2. **No plan change** — we're still cherry-picking from the same fork. The commit-by-commit map (`cc12fd6` + ~16 follow-ups) remains the Phase 5 guide.
 3. **Look at the fork's CI** before opening Phase 1 PR. If they're producing nightly release binaries successfully, their `.github/workflows/` may contain patterns worth borrowing against our own `Release.yml` (e.g. self-contained publish flags for Windows/Linux/macOS). **Do not** adopt anything that would regress our `PublishTrimmed=true` / `BnetTcpSession.cs` / `Directory.Packages.props` posture.
+
+---
+
+## Reference packet captures (TC 3.4.3 server-side)
+
+For ground-truth V3_4_3 wire-format references (canonical for diffs against HermesProxy output), capture on a working TrinityCore 3.4.3.54261 server — no proxy in the path.
+
+1. In TC's `worldserver.conf`, set `PacketLogFile = "World.pkt"` (extension must be `.pkt`; output lands at `LogsDir/World.pkt`, default `Logs/`). Restart `worldserver.exe`.
+2. Play with the V3_4_3 client. Stop with `server shutdown 1` to flush.
+3. Parse with the WPP fork at `X:\Programming\RioMcBoo\WowPacketParser` (already pinned to `LangVersion=12`):
+
+   ```powershell
+   $wpp = "X:\Programming\RioMcBoo\WowPacketParser\WowPacketParser\bin\Release\WowPacketParser.exe"
+   & $wpp "<TC build dir>\Logs\World.pkt"
+   ```
+
+   Output is `World.txt` next to the input — full field-level decode. `V3_4_3_54261` is auto-detected from the PKT 3.1 header; force-set `<add key="ClientBuild" value="V3_4_3_54261"/>` in WPP's `App.config` if needed. Filter via `<add key="Filters" value="SMSG_UPDATE_OBJECT,..."/>` to narrow opcodes.
+
+Captures contain SRP6 session keys + account hashes — **do not commit or share**. Rotate `World.pkt` between sessions to keep diffs clean.
+
+Fallback: HermesProxy's own `SniffFile.cs` writes PKT 2.1 to `PacketsLog/` (gated by `DiagnosticsOptions.PacketsLog`, default on) — useful for debugging proxy output, not for ground-truth TC behavior.
 
 ---
 
