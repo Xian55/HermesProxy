@@ -36,7 +36,13 @@ public partial class WorldClient
         bool fromNPC = packet.ReadUInt32() == 1;
         item.Created = packet.ReadUInt32() == 1;
         bool showInChat = packet.ReadUInt32() == 1;
-        
+
+        // V3_4_3 client renders the loot/receive chat line based on a
+        // combination of DisplayText and Pushed/Created bits. Empirical
+        // CypherCore behavior (see World_chat_messages_looted_item_chat_message
+        // sniff): both vendor-buy and loot drops use DisplayText=1 — Pushed
+        // distinguishes the chat line ("you receive item" vs "you loot").
+        // Sending DisplayText=Loot (=3) silently hides the chat line on V3_4_3.
         if (fromNPC && !item.Created)
         {
             item.DisplayText = ItemPushResult.DisplayType.Received;
@@ -45,10 +51,18 @@ public partial class WorldClient
         else if (!showInChat)
             item.DisplayText = ItemPushResult.DisplayType.Hidden;
         else
-            item.DisplayText = ItemPushResult.DisplayType.Loot;
+            item.DisplayText = ItemPushResult.DisplayType.Received;
 
         item.Slot = packet.ReadUInt8();
-        item.SlotInBag = packet.ReadInt32();
+        // Legacy SMSG_ITEM_PUSHED reports SlotInBag in legacy slot space; the
+        // V3_4_3 client expects the InvSlots descriptor index (e.g. legacy 23 →
+        // descriptor 35 for first backpack position). Without this translation
+        // the V3_4_3 GetInventorySlotItem lookup below would return a stale GUID
+        // and the chat line / item-tooltip wouldn't link to the new item.
+        int rawSlotInBag = packet.ReadInt32();
+        item.SlotInBag = item.Slot == Enums.Classic.InventorySlots.Bag0 && rawSlotInBag >= 0
+            ? ModernVersion.AdjustLegacyInventorySlotToModern((byte)rawSlotInBag)
+            : rawSlotInBag;
         item.Item.ItemID = packet.ReadUInt32();
         item.Item.RandomPropertiesSeed = packet.ReadUInt32();
         item.Item.RandomPropertiesID = packet.ReadUInt32();
@@ -81,9 +95,9 @@ public partial class WorldClient
             item.QuantityInInventory = item.Quantity + currentCount;
         }
 
-        if (item.Slot == Enums.Classic.InventorySlots.Bag0 && item.SlotInBag >= 0 &&
+        if (item.Slot == Enums.Classic.InventorySlots.Bag0 && rawSlotInBag >= 0 &&
             item.PlayerGUID == GetSession().GameState.CurrentPlayerGuid)
-            item.ItemGUID = GetSession().GameState.GetInventorySlotItem(item.SlotInBag).To128(GetSession().GameState);
+            item.ItemGUID = GetSession().GameState.GetInventorySlotItem(rawSlotInBag).To128(GetSession().GameState);
         else
             item.ItemGUID = WowGuid128.Empty;
         
