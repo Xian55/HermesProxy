@@ -20,6 +20,8 @@ using System;
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using Framework.Logging;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
@@ -76,14 +78,32 @@ public class BuyItem : ClientPacket
         VendorGUID = _worldPacket.ReadPackedGuid128();
         ContainerGUID = _worldPacket.ReadPackedGuid128();
         Quantity = _worldPacket.ReadUInt32();
-        Slot = _worldPacket.ReadUInt32();
-        BagSlot = _worldPacket.ReadUInt32();
-        Item.Read(_worldPacket);
-        ItemType = (ItemVendorType)_worldPacket.ReadBits<int>(3);
+
+        // V3_4_3 (WotLK Classic) reordered the trailing fields and inserted MuID
+        // (the 1-based vendor slot index returned in SMSG_VENDOR_INVENTORY).
+        // Reading the older (pre-WotLK) layout against this packet shifts every
+        // following field, so the proxy forwarded a garbage Slot to the legacy
+        // server and the buy was silently rejected. Layout mirrors fork
+        // HermesProxy-WOTLK Server/Packets/BuyItem.cs:Read for ExpansionVersion>=3.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            MuID = _worldPacket.ReadUInt32();
+            Slot = _worldPacket.ReadUInt32();
+            ItemType = (ItemVendorType)_worldPacket.ReadInt32();
+            Item.Read(_worldPacket);
+        }
+        else
+        {
+            Slot = _worldPacket.ReadUInt32();
+            BagSlot = _worldPacket.ReadUInt32();
+            Item.Read(_worldPacket);
+            ItemType = (ItemVendorType)_worldPacket.ReadBits<int>(3);
+        }
     }
 
     public WowGuid128 VendorGUID;
     public ItemInstance Item;
+    public uint MuID;
     public uint Slot;
     public uint BagSlot;
     public ItemVendorType ItemType;
@@ -605,7 +625,17 @@ public class InventoryChangeFailure : ServerPacket, ISpanWritable
 
     public override void Write()
     {
-        _worldPacket.WriteInt8((sbyte)BagResult);
+        Log.Print(LogType.Trace,
+            $"[InventoryTrace] SMSG_INVENTORY_CHANGE_FAILURE write: BagResult={BagResult} ({(int)BagResult}) " +
+            $"Item[0]={Item[0]} Item[1]={Item[1]} ContainerBSlot={ContainerBSlot} " +
+            $"SrcContainer={SrcContainer} SrcSlot={SrcSlot} DstContainer={DstContainer} " +
+            $"Level={Level} LimitCategory={LimitCategory}");
+
+        // V3_4_3 (and WotLK 3.3.5a) expect BagResult as Int32. Writing as Int8
+        // shifts every subsequent field 3 bytes earlier, so Item[0]/[1] and
+        // ContainerBSlot read as garbage — the inventory UI then leaves the
+        // dragged slot greyed out (equip/swap appears to silently fail).
+        _worldPacket.WriteInt32((int)BagResult);
         _worldPacket.WritePackedGuid128(Item[0]);
         _worldPacket.WritePackedGuid128(Item[1]);
         _worldPacket.WriteUInt8(ContainerBSlot); // bag type subclass, used with EQUIP_ERR_EVENT_AUTOEQUIP_BIND_CONFIRM and EQUIP_ERR_WRONG_BAG_TYPE_2
@@ -629,15 +659,19 @@ public class InventoryChangeFailure : ServerPacket, ISpanWritable
         }
     }
 
-    // Fixed: sbyte + 2 GUIDs + byte = 2 + 36 = 38
+    // Fixed: int32 + 2 GUIDs + byte = 5 + 36 = 41
     // Max additional (EventAutoEquipBindConfirm): 2 GUIDs + int = 40
-    public int MaxSize => 2 + PackedGuidHelper.MaxPackedGuid128Size * 2 +
+    public int MaxSize => 5 + PackedGuidHelper.MaxPackedGuid128Size * 2 +
                           PackedGuidHelper.MaxPackedGuid128Size * 2 + 4;
 
     public int WriteToSpan(Span<byte> buffer)
     {
+        Log.Print(LogType.Trace,
+            $"[InventoryTrace] SMSG_INVENTORY_CHANGE_FAILURE span-write: BagResult={BagResult} ({(int)BagResult}) " +
+            $"Item[0]={Item[0]} Item[1]={Item[1]} ContainerBSlot={ContainerBSlot}");
+
         var writer = new SpanPacketWriter(buffer);
-        writer.WriteInt8((sbyte)BagResult);
+        writer.WriteInt32((int)BagResult);
         writer.WritePackedGuid128(Item[0].Low, Item[0].High);
         writer.WritePackedGuid128(Item[1].Low, Item[1].High);
         writer.WriteUInt8(ContainerBSlot);
