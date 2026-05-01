@@ -202,11 +202,24 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_SET_ACTION_BUTTON)]
     void HandleSetActionButton(SetActionButton button)
     {
+        // Legacy 3.3.5a CMSG_SET_ACTION_BUTTON wire format (per mangos-wotlk
+        // Player.cpp + WPP V3_4_0_45166 ActionBarHandler.cs:12-19):
+        //   byte 0   = button index (uint8)
+        //   bytes 1-4 = packed uint32 (low 24 bits = action ID, high 8 bits = type)
+        // Total: 5 bytes.
+        //
+        // Previously we wrote `WriteUInt16(Action) + WriteUInt16(Type)` which
+        // happened to match the legacy byte sequence for spell IDs < 65536 and
+        // type=Spell(0), but corrupts both fields for larger action IDs. Switch
+        // to explicit packed uint32 to match TC/mangos exactly.
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_ACTION_BUTTON);
         packet.WriteUInt8(button.Index);
-        packet.WriteUInt16(button.Action);
-        packet.WriteUInt16(button.Type);
+        uint packed = ((uint)button.Action & 0x00FFFFFFu) | (((uint)button.Type & 0xFFu) << 24);
+        packet.WriteUInt32(packed);
         SendPacketToServer(packet);
+
+        Log.Print(LogType.Debug,
+            $"[V343Trace][SaveButton] modern→legacy idx={button.Index} action={button.Action} type={button.Type} → packedLE=0x{packed:X8}");
     }
 
     [PacketHandler(Opcode.CMSG_SET_ACTION_BAR_TOGGLES)]
