@@ -746,6 +746,13 @@ public static class ModernVersion
         else if (ExpansionVersion == 2 && MajorVersion >= 5 ||
                  ExpansionVersion == 3 && MajorVersion >= 4)
         {
+            // V3_4_3.51505+ (WotLK Classic build 51505 onward) bumped the
+            // SMSG_ACCOUNT_DATA_TIMES cache count from 13 to 15. WPP's
+            // V3_4_0_45166/AccountDataHandler.cs:72 confirms this. V3_4_4_59817+
+            // bumped it again to 17. Sending only 13 makes the V3_4_3 client
+            // hit EOF when reading and may silently fail world entry.
+            if (ExpansionVersion == 3 && MajorVersion >= 4)
+                return 15;
             if (AddedInVersion(2, 5, 3))
                 return 13;
         }

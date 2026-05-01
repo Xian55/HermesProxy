@@ -44,7 +44,12 @@ public sealed class MovementInfo
     public uint TransportTime;
     public uint TransportTime2;
     public sbyte TransportSeat = -1;
-    public Quaternion Rotation;
+    // System.Numerics.Quaternion's default (0,0,0,0) is a non-unit quaternion that
+    // the V3_4_3 client rejects on Transport/GameObject CreateObject. Initializing
+    // to Identity (0,0,0,1) gives a valid baseline for objects whose legacy server
+    // doesn't send a rotation field; the PARENTROTATION read below in the GameObject
+    // branch overwrites it when the server does send one.
+    public Quaternion Rotation = Quaternion.Identity;
     public float WalkSpeed;
     public float RunSpeed;
     public float RunBackSpeed;
@@ -377,7 +382,17 @@ public sealed class MovementInfo
         if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
         {
             data.WriteUInt32(Flags);
-            data.WriteUInt32(FlagsExtra);
+            // Legacy WotLK MovementFlagExtra (cMangos `info.FlagsExtra`, read as a UInt16)
+            // shares its numeric space with a different modern enum: legacy bit 0x200
+            // (AlwaysAllowPitching) collides with modern V3_4_3 bit 0x200
+            // (VehiclePassengerIsTransitionAllowed). Forwarding cMangos's bits verbatim
+            // tells the client this player is in vehicle-transition state, which stalls
+            // world entry. Zero for V3_4_3 — none of the WotLK extra bits have known
+            // meaningful equivalents in the modern stream for a fresh-login player.
+            uint flagsExtraToWrite = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+                ? 0u
+                : FlagsExtra;
+            data.WriteUInt32(flagsExtraToWrite);
             data.WriteUInt32(FlagsExtra2);
         }
 
@@ -399,16 +414,34 @@ public sealed class MovementInfo
         if (!ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
         {
             data.WriteBits(moveInfo.Flags, 30);
-            data.WriteBits(moveInfo.FlagsExtra, 18);
+            // Legacy WotLK MovementFlagExtra (cMangos `info.FlagsExtra`, read as a UInt16)
+            // shares its numeric space with a different modern enum: legacy bit 0x200
+            // (AlwaysAllowPitching) collides with modern V3_4_3 bit 0x200
+            // (VehiclePassengerIsTransitionAllowed). Forwarding cMangos's bits verbatim
+            // tells the client this player is in vehicle-transition state, which stalls
+            // world entry. Zero for V3_4_3 — none of the WotLK extra bits have known
+            // meaningful equivalents in the modern stream for a fresh-login player.
+            uint flagsExtraToWrite = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+                ? 0u
+                : moveInfo.FlagsExtra;
+            data.WriteBits(flagsExtraToWrite, 18);
         }
-            
-        data.WriteBit(moveInfo.TransportGuid != default);                 // HasTransport
+
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            data.WriteBit(false);                                      // HasStandingOnGameObjectGUID (V3_4_2_50063+)
+        data.WriteBit(moveInfo.TransportGuid != default);              // HasTransport
         data.WriteBit(hasFall);                                        // HasFall
         data.WriteBit(HasSplineData);                                  // HasSpline - marks that the unit uses spline movement
         data.WriteBit(false);                                          // HeightChangeFailed
         data.WriteBit(false);                                          // RemoteTimeValid
         if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
             data.WriteBit(false);                                      // HasInertia
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            data.WriteBit(false);                                      // HasAdvFlying (V3_4_1_47014+)
+        // HasDriveStatus is V3_4_4_59817+ ONLY (per WPP V3_4_0_45166 module's
+        // version guard) — V3_4_3_54261 must not write it, otherwise the
+        // 9th bit + padding desyncs the byte stream after FlushBits and the
+        // client silently fails to parse the player CreateObject2.
         data.FlushBits();
 
         if (moveInfo.TransportGuid != default)
@@ -489,7 +522,12 @@ public sealed class MovementInfo
         if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
         {
             writer.WriteUInt32(Flags);
-            writer.WriteUInt32(FlagsExtra);
+            // See WriteMovementInfoModern: legacy MovementFlagExtra 0x200 collides with
+            // modern V3_4_3 VehiclePassengerIsTransitionAllowed. Zero for V3_4_3.
+            uint flagsExtraToWrite = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+                ? 0u
+                : FlagsExtra;
+            writer.WriteUInt32(flagsExtraToWrite);
             writer.WriteUInt32(FlagsExtra2);
         }
 
@@ -508,9 +546,16 @@ public sealed class MovementInfo
         if (!ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
         {
             writer.WriteBits(moveInfo.Flags, 30);
-            writer.WriteBits(moveInfo.FlagsExtra, 18);
+            // See WriteMovementInfoModern: legacy MovementFlagExtra 0x200 collides with
+            // modern V3_4_3 VehiclePassengerIsTransitionAllowed. Zero for V3_4_3.
+            uint flagsExtraToWrite = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+                ? 0u
+                : moveInfo.FlagsExtra;
+            writer.WriteBits(flagsExtraToWrite, 18);
         }
 
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            writer.WriteBit(false);                                      // HasStandingOnGameObjectGUID (V3_4_2_50063+)
         writer.WriteBit(moveInfo.TransportGuid != default);              // HasTransport
         writer.WriteBit(hasFall);                                        // HasFall
         writer.WriteBit(HasSplineData);                                  // HasSpline
@@ -518,6 +563,9 @@ public sealed class MovementInfo
         writer.WriteBit(false);                                          // RemoteTimeValid
         if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
             writer.WriteBit(false);                                      // HasInertia
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            writer.WriteBit(false);                                      // HasAdvFlying (V3_4_1_47014+)
+        // No HasDriveStatus for V3_4_3_54261 — see WriteMovementInfoModern.
         writer.FlushBits();
 
         if (moveInfo.TransportGuid != default)

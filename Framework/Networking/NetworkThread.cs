@@ -132,8 +132,25 @@ public class NetworkThread<TSocketType> where TSocketType : ISocket
 
         Log.Print(LogType.Network, "Network Thread exits");
 
-        // Drain remaining new sockets
-        while (_newSockets.TryDequeue(out _)) { }
+        // Close every accepted socket on shutdown. Without this the peer (e.g. the WoW client)
+        // sees no FIN and stays ESTABLISHED, which causes the OS to hold the listening port -
+        // the next proxy run then fails to bind with WSAEACCES until the peer is restarted.
+        // Note: deliberately not firing SocketRemoved or decrementing _connections here -
+        // those represent the normal-disconnect lifecycle, not a forced shutdown.
+        while (_newSockets.TryDequeue(out var pending))
+        {
+            if (pending.IsOpen())
+            {
+                try { pending.CloseSocket(); } catch { /* best effort */ }
+            }
+        }
+        foreach (var socket in _Sockets)
+        {
+            if (socket.IsOpen())
+            {
+                try { socket.CloseSocket(); } catch { /* best effort */ }
+            }
+        }
         _Sockets.Clear();
     }
 }
