@@ -65,7 +65,11 @@ public class QuestTemplate
     public uint RewardNumSkillUps; // reward skill points
     public uint PortraitGiver; // quest giver entry ?
     public uint PortraitGiverMount;
+    public uint PortraitGiverModelSceneID; // V3_4_3+ only
     public uint PortraitTurnIn; // quest turn in entry ?
+    public int ManagedWorldStateID; // V3_4_3+ only
+    public int QuestSessionBonus; // V3_4_3+ only
+    public uint QuestGiverCreatureID; // V3_4_3+ only
     public string PortraitGiverText;
     public string PortraitGiverName;
     public string PortraitTurnInText;

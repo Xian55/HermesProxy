@@ -19,6 +19,7 @@
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -193,6 +194,34 @@ public class LearnedSpells : ServerPacket, ISpanWritable
 
     public override void Write()
     {
+        // V3_4_3 (WotLK Classic) layout differs from modern retail. Per WotLK
+        // client (and HermesProxy-WOTLK fork LearnedSpells.cs:27-44):
+        //   int32 Count + uint32 SpecializationID + 1-bit SuppressMessaging +
+        //   per-spell { int32 SpellID + 4 bits (IsFavorite, _, HasSuperceded,
+        //   _) + optional int32 SupercededID }.
+        // Our retail layout (flat list + separate favorites + trailing bit)
+        // doesn't match the V3_4_3 cascade — without the per-spell bit gates,
+        // the client mis-parses every entry and the spellbook silently ignores
+        // newly-learned trainer spells (until logout/login resets via
+        // SMSG_SEND_KNOWN_SPELLS, which has its own correct format).
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            _worldPacket.WriteInt32(Spells.Count);
+            _worldPacket.WriteUInt32(SpecializationID);
+            _worldPacket.WriteBit(SuppressMessaging);
+            _worldPacket.FlushBits();
+            foreach (uint spell in Spells)
+            {
+                _worldPacket.WriteInt32((int)spell);
+                _worldPacket.WriteBit(FavoriteSpellID.Contains((int)spell));
+                _worldPacket.WriteBit(false);   // field_8 — reserved
+                _worldPacket.WriteBit(false);   // HasSuperceded — none for this path
+                _worldPacket.WriteBit(false);   // HasTraitDefinitionID — N/A in WotLK
+                _worldPacket.FlushBits();
+            }
+            return;
+        }
+
         _worldPacket.WriteInt32(Spells.Count);
         _worldPacket.WriteInt32(FavoriteSpellID.Count);
         _worldPacket.WriteUInt32(SpecializationID);
@@ -212,6 +241,12 @@ public class LearnedSpells : ServerPacket, ISpanWritable
 
     public int WriteToSpan(Span<byte> buffer)
     {
+        // V3_4_3 uses a different bit-packed cascade (see Write()). Fall back to
+        // the boxed Write path for V3_4_3 by returning -1 — the framework will
+        // detect the overflow sentinel and re-emit via Write().
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            return -1;
+
         if (Spells.Count > MaxSpells || FavoriteSpellID.Count > MaxSpells)
             return -1;
 
@@ -494,6 +529,9 @@ public class AuraUpdate : ServerPacket
             aura.Write(_worldPacket);
 
         _worldPacket.WritePackedGuid128(UnitGUID);
+
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+            $"[AuraUpdateTrace][write] guid={UnitGUID} updateAll={UpdateAll} aurasCount={Auras.Count} packetBytes={_worldPacket.GetSize()}");
     }
 
     public bool UpdateAll;
