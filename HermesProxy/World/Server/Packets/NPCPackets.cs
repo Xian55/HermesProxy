@@ -19,6 +19,7 @@
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -314,12 +315,26 @@ public class VendorInventory : ServerPacket
 
     public override void Write()
     {
+        Log.Print(LogType.Trace,
+            $"[VendorTrace] SMSG_VENDOR_INVENTORY write: VendorGUID={VendorGUID} " +
+            $"Reason={Reason} Items.Count={Items.Count} layoutPath={(ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? "WotLK" : "Vanilla")}");
+
         _worldPacket.WritePackedGuid128(VendorGUID);
         _worldPacket.WriteUInt8(Reason);
         _worldPacket.WriteInt32(Items.Count);
 
-        foreach (VendorItem item in Items)
+        for (int i = 0; i < Items.Count; i++)
+        {
+            VendorItem item = Items[i];
+            if (i < 3 || i == Items.Count - 1)
+            {
+                Log.Print(LogType.Trace,
+                    $"[VendorTrace] item[{i}]: Slot={item.Slot} ItemID={item.Item.ItemID} MuID={item.MuID} " +
+                    $"Type={item.Type} Quantity={item.Quantity} Price={item.Price} StackCount={item.StackCount} " +
+                    $"ExtCost={item.ExtendedCostID} Durability={item.Durability}");
+            }
             item.Write(_worldPacket);
+        }
     }
 
     public byte Reason = 0;
@@ -331,6 +346,16 @@ public class VendorItem
 {
     public void Write(WorldPacket data)
     {
+        // V3_4_3 reorders the vendor item record and inserts a MuID slot index.
+        // Without this layout the client mis-parses the field stream and the
+        // vendor window renders empty / corrupted. Layout mirrors
+        // HermesProxy-WOTLK Server/Packets/VendorItem.cs:WriteWotLK exactly.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            WriteWotLK(data);
+            return;
+        }
+
         data.WriteInt32(Slot);
         data.WriteInt32(Type);
         data.WriteInt32(Quantity);
@@ -345,6 +370,23 @@ public class VendorItem
         data.FlushBits();
     }
 
+    private void WriteWotLK(WorldPacket data)
+    {
+        data.WriteUInt64(Price);
+        data.WriteUInt32(MuID);
+        data.WriteInt32(Type);
+        data.WriteInt32(Durability);
+        data.WriteInt32((int)StackCount);
+        data.WriteInt32(Quantity);
+        data.WriteInt32(ExtendedCostID);
+        data.WriteInt32(PlayerConditionFailed);
+        data.WriteBit(false);
+        data.WriteBit(DoNotFilterOnVendor);
+        data.WriteBit(Refundable);
+        data.FlushBits();
+        Item.Write(data);
+    }
+
     public int Slot;
     public int Type = 1;
     public ItemInstance Item = new();
@@ -356,6 +398,7 @@ public class VendorItem
     public int PlayerConditionFailed;
     public bool DoNotFilterOnVendor;
     public bool Refundable;
+    public uint MuID;
 }
 
 public class ShowBank : ServerPacket, ISpanWritable
