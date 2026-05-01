@@ -845,6 +845,88 @@ public static class ModernVersion
         }
         return (byte)(slot - offset);
     }
+
+    // Inverse of GetModernInvSlot's index translation for V3_4_3:
+    //
+    //   V3_4_3 InvSlots descriptor layout has gaps that do NOT match the flat
+    //   Classic/WotLK slot enums. The V3_4_3 client tracks items by descriptor
+    //   index, so when it sends a CMSG with a "slot" value it's the descriptor
+    //   index, not a legacy absolute slot. Mapping (matches CypherCore):
+    //
+    //     descriptor 0-18  → legacy 0-18    (equipment, identity)
+    //     descriptor 30-33 → legacy 19-22   (4 bag containers, -11)
+    //     descriptor 35-58 → legacy 23-46   (main backpack, -12, 24 entries)
+    //     descriptor 59-86 → legacy 39-66   (bank, -20)
+    //     descriptor 87-93 → legacy 67-73   (bank bags, -20)
+    //     descriptor 94-105 → legacy 74-85  (buyback, -20)
+    //     descriptor 106-137 → legacy 86-117 (keyring, -20)
+    //
+    //   Without this, e.g. CMSG_AUTO_EQUIP_ITEM with PackSlot=35 (= the user's
+    //   first backpack item in V3_4_3) reaches cMaNGOS as srcSlot=35, which
+    //   cMaNGOS reads as backpack position 12 — empty for a fresh inventory,
+    //   so the equip is silently rejected.
+    //
+    //   Non-V3_4_3 builds pass through unchanged.
+    public static byte AdjustModernInventorySlotToLegacy(byte slot)
+    {
+        // Bag0 sentinel passes through every version.
+        if (slot == World.Enums.Classic.InventorySlots.Bag0)
+            return slot;
+
+        if (Build != ClientVersionBuild.V3_4_3_54261)
+            return AdjustInventorySlot(slot);
+
+        if (slot >= 30 && slot <= 33)
+            return (byte)(slot - 11);
+        if (slot >= 35 && slot <= 58)
+            return (byte)(slot - 12);
+        if (slot >= 59 && slot <= 86)
+            return (byte)(slot - 20);
+        if (slot >= 87 && slot <= 93)
+            return (byte)(slot - 20);
+        if (slot >= 94 && slot <= 105)
+            return (byte)(slot - 20);
+        if (slot >= 106 && slot <= 137)
+            return (byte)(slot - 20);
+        return slot;
+    }
+
+    // Inverse of AdjustModernInventorySlotToLegacy: legacy → V3_4_3 descriptor
+    // index. Use when forwarding SMSG packets (e.g. SMSG_ITEM_PUSH_RESULT) that
+    // carry a slot value the V3_4_3 client interprets as the InvSlots descriptor
+    // index. Without this translation, a looted item that legacy reports at
+    // slot=23 (first backpack) is forwarded as descriptor[23] (an empty gap
+    // slot in V3_4_3) and the client can't find/highlight the item — the
+    // chat-render side of SMSG_ITEM_PUSH_RESULT is silent because the lookup
+    // for the item GUID by slot fails.
+    //
+    // Non-V3_4_3 builds pass through unchanged.
+    public static byte AdjustLegacyInventorySlotToModern(byte slot)
+    {
+        if (slot == World.Enums.Classic.InventorySlots.Bag0)
+            return slot;
+
+        if (Build != ClientVersionBuild.V3_4_3_54261)
+            return slot;
+
+        // Legacy WotLK 3.3.5a slot layout:
+        //   19-22 bags, 23-38 backpack, 39-66 bank, 67-73 bank bags,
+        //   74-85 buyback, 86-117 keyring.
+        if (slot >= 19 && slot <= 22)
+            return (byte)(slot + 11);
+        if (slot >= 23 && slot <= 38)
+            return (byte)(slot + 12);
+        if (slot >= 39 && slot <= 66)
+            return (byte)(slot + 20);
+        if (slot >= 67 && slot <= 73)
+            return (byte)(slot + 20);
+        if (slot >= 74 && slot <= 85)
+            return (byte)(slot + 20);
+        if (slot >= 86 && slot <= 117)
+            return (byte)(slot + 20);
+        return slot;
+    }
+
     public static void ConvertAuraFlags(ushort oldFlags, byte slot, out AuraFlagsModern newFlags, out uint activeFlags)
     {
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))

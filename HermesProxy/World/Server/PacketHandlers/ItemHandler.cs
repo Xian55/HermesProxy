@@ -1,4 +1,5 @@
 ﻿using Framework.Constants;
+using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
@@ -17,9 +18,19 @@ public partial class WorldSocket
         packet.WriteGuid(item.VendorGUID.To64());
         packet.WriteUInt32(item.Item.ItemID);
         uint quantity = item.Quantity / GetSession().GameState.GetItemBuyCount(item.Item.ItemID);
+
+        Log.Print(LogType.Trace,
+            $"[VendorTrace] CMSG_BUY_ITEM forward: vendor={item.VendorGUID} itemID={item.Item.ItemID} " +
+            $"quantity={quantity} (rawQty={item.Quantity}) MuID={item.MuID} Slot={item.Slot} BagSlot={item.BagSlot} ItemType={item.ItemType}");
+
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
         {
-            packet.WriteUInt32(item.Slot);
+            // The legacy "Slot" field for CMSG_BUY_ITEM is the 1-based vendor
+            // index. V3_4_3 sends that as MuID (which we populate in
+            // NPCHandler.HandleVendorInventory as i+1); older modern clients
+            // sent it as Slot. Forward whichever the client gave us.
+            uint legacySlot = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? item.MuID : item.Slot;
+            packet.WriteUInt32(legacySlot);
             packet.WriteUInt32(quantity);
         }
         else
@@ -45,10 +56,10 @@ public partial class WorldSocket
     void HandleSplitItem(SplitItem item)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SPLIT_ITEM);
-        byte containerSlot1 = item.FromPackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.FromPackSlot) : item.FromPackSlot;
-        byte slot1 = item.FromPackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.FromSlot) : item.FromSlot;
-        byte containerSlot2 = item.ToPackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.ToPackSlot) : item.ToPackSlot;
-        byte slot2 = item.ToPackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.ToSlot) : item.ToSlot;
+        byte containerSlot1 = item.FromPackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.FromPackSlot) : item.FromPackSlot;
+        byte slot1 = item.FromPackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.FromSlot) : item.FromSlot;
+        byte containerSlot2 = item.ToPackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.ToPackSlot) : item.ToPackSlot;
+        byte slot2 = item.ToPackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.ToSlot) : item.ToSlot;
         packet.WriteUInt8(containerSlot1);
         packet.WriteUInt8(slot1);
         packet.WriteUInt8(containerSlot2);
@@ -64,10 +75,29 @@ public partial class WorldSocket
     void HandleSwapInvItem(SwapInvItem item)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SWAP_INV_ITEM);
-        byte slot1 = ModernVersion.AdjustInventorySlot(item.Slot1);
-        byte slot2 = ModernVersion.AdjustInventorySlot(item.Slot2);
-        packet.WriteUInt8(slot1);
-        packet.WriteUInt8(slot2);
+        byte slot1 = ModernVersion.AdjustModernInventorySlotToLegacy(item.Slot1);
+        byte slot2 = ModernVersion.AdjustModernInventorySlotToLegacy(item.Slot2);
+
+        // The V3_4_3 client packs source into Slot2 (read first) and destination
+        // into Slot1 (read second) — opposite of the field naming. The legacy
+        // 3.3.5a CMSG_SWAP_INV_ITEM expects srcSlot then dstSlot, so for V3_4_3
+        // we must flip our forward order. Without this, dragging an inventory
+        // item to an equip slot reaches the server as "move from empty equip
+        // slot to backpack slot" and silently fails. Mirrors fork
+        // HermesProxy-WOTLK Server/WorldSocket.cs:HandleSwapInvItem.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            Log.Print(LogType.Trace,
+                $"[InventoryTrace] CMSG_SWAP_INV_ITEM forward (V3_4_3): " +
+                $"raw(Slot2={item.Slot2},Slot1={item.Slot1}) → legacy src={slot2} dst={slot1}");
+            packet.WriteUInt8(slot2);
+            packet.WriteUInt8(slot1);
+        }
+        else
+        {
+            packet.WriteUInt8(slot1);
+            packet.WriteUInt8(slot2);
+        }
         SendPacketToServer(packet);
     }
 
@@ -75,10 +105,10 @@ public partial class WorldSocket
     void HandleSwapItem(SwapItem item)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SWAP_ITEM);
-        byte containerSlotB = item.ContainerSlotB != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.ContainerSlotB) : item.ContainerSlotB;
-        byte slotB = item.ContainerSlotB == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.SlotB) : item.SlotB;
-        byte containerSlotA = item.ContainerSlotA != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.ContainerSlotA) : item.ContainerSlotA;
-        byte slotA = item.ContainerSlotA == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.SlotA) : item.SlotA;
+        byte containerSlotB = item.ContainerSlotB != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.ContainerSlotB) : item.ContainerSlotB;
+        byte slotB = item.ContainerSlotB == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.SlotB) : item.SlotB;
+        byte containerSlotA = item.ContainerSlotA != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.ContainerSlotA) : item.ContainerSlotA;
+        byte slotA = item.ContainerSlotA == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.SlotA) : item.SlotA;
         packet.WriteUInt8(containerSlotB);
         packet.WriteUInt8(slotB);
         packet.WriteUInt8(containerSlotA);
@@ -90,8 +120,8 @@ public partial class WorldSocket
     void HandleDestroyItem(DestroyItem item)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_DESTROY_ITEM);
-        byte containerSlot = item.ContainerId != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.ContainerId) : item.ContainerId;
-        byte slot = item.ContainerId == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.SlotNum) : item.SlotNum;
+        byte containerSlot = item.ContainerId != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.ContainerId) : item.ContainerId;
+        byte slot = item.ContainerId == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.SlotNum) : item.SlotNum;
         packet.WriteUInt8(containerSlot);
         packet.WriteUInt8(slot);
         packet.WriteUInt32(item.Count);
@@ -104,10 +134,15 @@ public partial class WorldSocket
     void HandleAutoEquipItem(AutoEquipItem item)
     {
         WorldPacket packet = new WorldPacket(item.GetUniversalOpcode());
-        byte containerSlot = item.PackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.PackSlot) : item.PackSlot;
-        byte slot = item.PackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.Slot) : item.Slot;
+        byte containerSlot = item.PackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.PackSlot) : item.PackSlot;
+        byte slot = item.PackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.Slot) : item.Slot;
         packet.WriteUInt8(containerSlot);
         packet.WriteUInt8(slot);
+
+        Log.Print(LogType.Trace,
+            $"[InventoryTrace] {item.GetUniversalOpcode()} forward: " +
+            $"raw(PackSlot={item.PackSlot},Slot={item.Slot}) → legacy bag={containerSlot} slot={slot}");
+
         SendPacketToServer(packet);
     }
 
@@ -116,7 +151,7 @@ public partial class WorldSocket
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_AUTO_EQUIP_ITEM_SLOT);
         packet.WriteGuid(item.Item.To64());
-        byte slot = ModernVersion.AdjustInventorySlot(item.ItemDstSlot);
+        byte slot = ModernVersion.AdjustModernInventorySlotToLegacy(item.ItemDstSlot);
         packet.WriteUInt8(slot);
         SendPacketToServer(packet);
     }
@@ -125,8 +160,8 @@ public partial class WorldSocket
     void HandleReadItem(ReadItem item)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_READ_ITEM);
-        byte containerSlot = item.PackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.PackSlot) : item.PackSlot;
-        byte slot = item.PackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.Slot) : item.Slot;
+        byte containerSlot = item.PackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.PackSlot) : item.PackSlot;
+        byte slot = item.PackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.Slot) : item.Slot;
         packet.WriteUInt8(containerSlot);
         packet.WriteUInt8(slot);
         SendPacketToServer(packet);
@@ -137,7 +172,7 @@ public partial class WorldSocket
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_BUY_BACK_ITEM);
         packet.WriteGuid(item.VendorGUID.To64());
-        byte slot = ModernVersion.AdjustInventorySlot((byte)item.Slot);
+        byte slot = ModernVersion.AdjustModernInventorySlotToLegacy((byte)item.Slot);
         packet.WriteUInt32(slot);
         SendPacketToServer(packet);
     }
@@ -172,8 +207,8 @@ public partial class WorldSocket
     void HandleOpenItem(OpenItem item)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_OPEN_ITEM);
-        byte containerSlot = item.PackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.PackSlot) : item.PackSlot;
-        byte slot = item.PackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.Slot) : item.Slot;
+        byte containerSlot = item.PackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.PackSlot) : item.PackSlot;
+        byte slot = item.PackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.Slot) : item.Slot;
         packet.WriteUInt8(containerSlot);
         packet.WriteUInt8(slot);
         SendPacketToServer(packet);
@@ -201,10 +236,10 @@ public partial class WorldSocket
     void HandleWrapItem(WrapItem item)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_WRAP_ITEM);
-        byte giftBag = item.GiftBag != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.GiftBag) : item.GiftBag;
-        byte giftSlot = item.GiftBag == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.GiftSlot) : item.GiftSlot;
-        byte itemBag = item.ItemBag != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.ItemBag) : item.ItemBag;
-        byte itemSlot = item.ItemBag == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(item.ItemSlot) : item.ItemSlot;
+        byte giftBag = item.GiftBag != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.GiftBag) : item.GiftBag;
+        byte giftSlot = item.GiftBag == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.GiftSlot) : item.GiftSlot;
+        byte itemBag = item.ItemBag != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.ItemBag) : item.ItemBag;
+        byte itemSlot = item.ItemBag == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(item.ItemSlot) : item.ItemSlot;
         packet.WriteUInt8(giftBag);
         packet.WriteUInt8(giftSlot);
         packet.WriteUInt8(itemBag);
