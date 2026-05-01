@@ -19,6 +19,7 @@
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -235,7 +236,11 @@ public class ChatMessageAFK : ClientPacket
 
     public override void Read()
     {
-        uint len = _worldPacket.ReadBits<uint>(9);
+        // V3_4_3 widened the length to 11 bits (per WPP V3_4_0_45166
+        // ChatHandler.cs:86-93). Pre-V3_4_3 modern clients used 9 bits.
+        uint len = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            ? _worldPacket.ReadBits<uint>(11)
+            : _worldPacket.ReadBits<uint>(9);
         Text = _worldPacket.ReadString(len);
     }
 
@@ -248,7 +253,9 @@ public class ChatMessageDND : ClientPacket
 
     public override void Read()
     {
-        uint len = _worldPacket.ReadBits<uint>(9);
+        uint len = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            ? _worldPacket.ReadBits<uint>(11)
+            : _worldPacket.ReadBits<uint>(9);
         Text = _worldPacket.ReadString(len);
     }
 
@@ -282,10 +289,29 @@ public class ChatMessageWhisper : ClientPacket
     public override void Read()
     {
         Language = _worldPacket.ReadUInt32();
-        uint targetLen = _worldPacket.ReadBits<uint>(9);
-        uint textLen = _worldPacket.ReadBits<uint>(9);
-        Target = _worldPacket.ReadString(targetLen);
-        Text = _worldPacket.ReadString(textLen);
+
+        // V3_4_3.54261 uses the V8.1+ whisper layout (per WPP
+        // V8_0_1_27101/Parsers/ChannelHandler.cs:78-90). The V3_4_4 build
+        // (59817) added TargetGUID + TargetVirtualRealmAddress and
+        // narrowed/widened the lengths — those changes do NOT apply to
+        // V3_4_3.54261 because WPP gates them at V3_4_4_59817. An earlier
+        // attempt at the V3_4_4 layout caused the proxy to read TargetGUID
+        // bytes that didn't exist on the wire, garbling target/text — log
+        // showed `to="y" textLen=0` for a `/w Xii gooday`.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            uint targetLen = _worldPacket.ReadBits<uint>(9);
+            uint textLen = _worldPacket.ReadBits<uint>(10);
+            Target = _worldPacket.ReadString(targetLen);
+            Text = _worldPacket.ReadString(textLen);
+        }
+        else
+        {
+            uint targetLen = _worldPacket.ReadBits<uint>(9);
+            uint textLen = _worldPacket.ReadBits<uint>(9);
+            Target = _worldPacket.ReadString(targetLen);
+            Text = _worldPacket.ReadString(textLen);
+        }
     }
 
     public uint Language = 0;
@@ -299,7 +325,13 @@ public class ChatMessageEmote : ClientPacket
 
     public override void Read()
     {
-        uint len = _worldPacket.ReadBits<uint>(9);
+        // V3_4_3 widened the length to 11 bits — same DND/EMOTE/AFK group
+        // (WPP V3_4_0_45166 ChatHandler.cs:86-93). Reading 9 bits truncates
+        // the text and leaves the bit cursor mid-byte, so the legacy server
+        // sees a malformed CMSG_MESSAGECHAT and replies "unknown language".
+        uint len = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            ? _worldPacket.ReadBits<uint>(11)
+            : _worldPacket.ReadBits<uint>(9);
         Text = _worldPacket.ReadString(len);
     }
 
@@ -313,12 +345,29 @@ public class ChatMessage : ClientPacket
     public override void Read()
     {
         Language = _worldPacket.ReadUInt32();
-        uint len = _worldPacket.ReadBits<uint>(9);
-        Text = _worldPacket.ReadString(len);
+
+        // V3_4_3 widened the length to 11 bits and added a trailing IsSecure
+        // bit AFTER the length (per WPP V3_4_0_45166 ChatHandler.cs:233-238).
+        // The pre-V3_4_3 modern clients used a 9-bit length with no IsSecure.
+        // Reading the wrong layout leaves the packet bytes short and the text
+        // shifted, so HandleChatMessage sees garbage and chat / GM commands
+        // silently fail.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            uint len = _worldPacket.ReadBits<uint>(11);
+            IsSecure = _worldPacket.HasBit();
+            Text = _worldPacket.ReadString(len);
+        }
+        else
+        {
+            uint len = _worldPacket.ReadBits<uint>(9);
+            Text = _worldPacket.ReadString(len);
+        }
     }
 
     public string Text = string.Empty;
     public uint Language;
+    public bool IsSecure;
 }
 
 public class ChatAddonMessage : ClientPacket
@@ -424,6 +473,56 @@ public class ChatPkt : ServerPacket, ISpanWritable
     }
     public override void Write()
     {
+        // V3_4_3.54261 layout per WPP V9_0_1 ChatHandler.cs:12-83 (gated by
+        // WotLK branch >= V3_4_2_50129 and < V10_2_7_54577):
+        //   - PartyGUID is dropped (V3_4_2+)
+        //   - SpellID int32 added after DisplayTime (V3_4_2+)
+        //   - ChatFlags is NOT byte-aligned uint16 (that's V10_2_7+); instead
+        //     it lives as a 15-bit field inside the bit section, between
+        //     textLen and HideChatLog.
+        // Total bits: 11+11+5+7+12 + 15 + 4 = 65 bits = 9 bytes.
+        // Earlier "fix" wrote uint16 ChatFlags byte-aligned + 50 bits — those
+        // 2 extra bytes shifted every following field, so WPP saw Prefix="Xii"
+        // and Text="" and the V3_4_3 client silently dropped the message.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            _worldPacket.WriteUInt8((byte)SlashCmd);
+            _worldPacket.WriteUInt32(_Language);
+            _worldPacket.WritePackedGuid128(SenderGUID);
+            _worldPacket.WritePackedGuid128(SenderGuildGUID);
+            _worldPacket.WritePackedGuid128(SenderAccountGUID);
+            _worldPacket.WritePackedGuid128(TargetGUID);
+            _worldPacket.WriteUInt32(TargetVirtualAddress);
+            _worldPacket.WriteUInt32(SenderVirtualAddress);
+            _worldPacket.WriteInt32((int)AchievementID);
+            _worldPacket.WriteFloat(DisplayTime);
+            _worldPacket.WriteInt32(SpellID);
+
+            _worldPacket.WriteBits(SenderName.GetByteCount(), 11);
+            _worldPacket.WriteBits(TargetName.GetByteCount(), 11);
+            _worldPacket.WriteBits(Prefix.GetByteCount(), 5);
+            _worldPacket.WriteBits(Channel.GetByteCount(), 7);
+            _worldPacket.WriteBits(ChatText.GetByteCount(), 12);
+            _worldPacket.WriteBits((uint)_ChatFlags, 15);
+            _worldPacket.WriteBit(HideChatLog);
+            _worldPacket.WriteBit(FakeSenderName);
+            _worldPacket.WriteBit(Unused_801.HasValue);
+            _worldPacket.WriteBit(ChannelGUID != default);
+            _worldPacket.FlushBits();
+
+            _worldPacket.WriteString(SenderName);
+            _worldPacket.WriteString(TargetName);
+            _worldPacket.WriteString(Prefix);
+            _worldPacket.WriteString(Channel);
+            _worldPacket.WriteString(ChatText);
+
+            if (Unused_801.HasValue)
+                _worldPacket.WriteUInt32(Unused_801.Value);
+            if (ChannelGUID != default)
+                _worldPacket.WritePackedGuid128(ChannelGUID);
+            return;
+        }
+
         _worldPacket.WriteUInt8((byte)SlashCmd);
         _worldPacket.WriteUInt32((uint)_Language);
         _worldPacket.WritePackedGuid128(SenderGUID);
@@ -493,6 +592,39 @@ public class ChatPkt : ServerPacket, ISpanWritable
         writer.WritePackedGuid128(TargetGUID.Low, TargetGUID.High);
         writer.WriteUInt32(TargetVirtualAddress);
         writer.WriteUInt32(SenderVirtualAddress);
+
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            writer.WriteInt32((int)AchievementID);
+            writer.WriteFloat(DisplayTime);
+            writer.WriteInt32(SpellID);
+
+            writer.WriteBits((uint)senderNameBytes, 11);
+            writer.WriteBits((uint)targetNameBytes, 11);
+            writer.WriteBits((uint)prefixBytes, 5);
+            writer.WriteBits((uint)channelBytes, 7);
+            writer.WriteBits((uint)chatTextBytes, 12);
+            writer.WriteBits((uint)_ChatFlags, 15);
+            writer.WriteBit(HideChatLog);
+            writer.WriteBit(FakeSenderName);
+            writer.WriteBit(Unused_801.HasValue);
+            writer.WriteBit(ChannelGUID != default);
+            writer.FlushBits();
+
+            writer.WriteString(SenderName ?? "");
+            writer.WriteString(TargetName ?? "");
+            writer.WriteString(Prefix ?? "");
+            writer.WriteString(Channel ?? "");
+            writer.WriteString(ChatText ?? "");
+
+            if (Unused_801.HasValue)
+                writer.WriteUInt32(Unused_801.Value);
+            if (ChannelGUID != default)
+                writer.WritePackedGuid128(ChannelGUID.Low, ChannelGUID.High);
+
+            return writer.Position;
+        }
+
         writer.WritePackedGuid128(PartyGUID.Low, PartyGUID.High);
         writer.WriteUInt32(AchievementID);
         writer.WriteFloat(DisplayTime);
@@ -541,6 +673,7 @@ public class ChatPkt : ServerPacket, ISpanWritable
     public uint AchievementID;
     public ChatFlags _ChatFlags = 0;
     public float DisplayTime = 0.0f;
+    public int SpellID = 0;
     public uint? Unused_801;
     public bool HideChatLog = false;
     public bool FakeSenderName = false;

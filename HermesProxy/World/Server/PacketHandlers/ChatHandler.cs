@@ -133,14 +133,26 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_CHAT_MESSAGE_EMOTE)]
     void HandleChatMessageEmote(ChatMessageEmote emote)
     {
+        var rawPreview = emote.Text.Length > 30 ? emote.Text.Substring(0, 30) + "…" : emote.Text;
+        Log.Print(LogType.Trace,
+            $"[ChatTrace] CMSG_CHAT_MESSAGE_EMOTE received: textLen={emote.Text.Length} preview=\"{rawPreview}\"");
+
         var toBeSentTextParts = ConvertTextMessageIntoMaxLengthParts(emote.Text);
         if (toBeSentTextParts.Count < 1)
             return;
 
+        // Modern client doesn't carry a Language field for emote — but legacy
+        // CMSG_MESSAGECHAT requires one. Forwarding lang=0 (Universal) makes
+        // cMaNGOS reject the packet with a "unknown language" notification,
+        // because Universal isn't allowed for player chat types (incl. EMOTE).
+        // TC repack accepts it, which is why the fork "works" on TC but not
+        // cMaNGOS. Common (7) is the language /say uses by default and is
+        // accepted everywhere.
+        const uint defaultLang = (uint)Language.Common;
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-            GetSession().WorldClient!.SendMessageChatWotLK(ChatMessageTypeWotLK.Emote, 0, toBeSentTextParts[0], "", "");
+            GetSession().WorldClient!.SendMessageChatWotLK(ChatMessageTypeWotLK.Emote, defaultLang, toBeSentTextParts[0], "", "");
         else
-            GetSession().WorldClient!.SendMessageChatVanilla(ChatMessageTypeVanilla.Emote, 0, toBeSentTextParts[0], "", "");
+            GetSession().WorldClient!.SendMessageChatVanilla(ChatMessageTypeVanilla.Emote, defaultLang, toBeSentTextParts[0], "", "");
     }
 
     [PacketHandler(Opcode.CMSG_CHAT_MESSAGE_GUILD)]
@@ -153,6 +165,11 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_CHAT_MESSAGE_INSTANCE_CHAT)]
     void HandleChatMessage(ChatMessage packet)
     {
+        var preview = packet.Text.Length > 30 ? packet.Text.Substring(0, 30) + "…" : packet.Text;
+        Log.Print(LogType.Trace,
+            $"[ChatTrace] CMSG_CHAT_MESSAGE_* received: opcode={packet.GetUniversalOpcode()} " +
+            $"lang={packet.Language} textLen={packet.Text.Length} preview=\"{preview}\"");
+
         ChatMessageTypeModern type;
 
         switch (packet.GetUniversalOpcode())
