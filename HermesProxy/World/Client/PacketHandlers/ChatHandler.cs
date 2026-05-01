@@ -209,6 +209,11 @@ public partial class WorldClient
 
         uint textLength = packet.ReadUInt32();
         string text = packet.ReadString(textLength);
+        // See HandleServerChatMessageWotLK — legacy servers include the trailing
+        // NUL byte inside textLength; modern V3_4_3 SMSG_CHAT carries
+        // non-NUL-terminated strings, so the trailing \0 must be trimmed before
+        // we forward.
+        text = text.TrimEnd('\0');
         var chatTag = (ChatTag)packet.ReadUInt8();
         var chatFlags = chatTag.CastEnum<ChatFlags>();
 
@@ -331,6 +336,13 @@ public partial class WorldClient
 
         uint textLength = packet.ReadUInt32();
         string text = packet.ReadString(textLength);
+        // Legacy 3.3.5a SMSG_CHAT / SMSG_GM_MESSAGECHAT include the trailing
+        // NUL byte inside textLength. Modern V3_4_3 SMSG_CHAT carries a
+        // non-NUL-terminated string — when we forwarded "gooday\0" (textLen=7),
+        // the V3_4_3 client either rejected the packet or rendered nothing,
+        // producing the "chat scrolls but message invisible" symptom for
+        // SAY/GM/System messages and the empty-emote fallback for /e.
+        text = text.TrimEnd('\0');
         var chatFlags = (ChatFlags)packet.ReadUInt8();
 
         if (LegacyVersion.InVersion(ClientVersionBuild.V2_0_1_6180, ClientVersionBuild.V3_0_2_9056) &&
@@ -362,6 +374,13 @@ public partial class WorldClient
 
         ChatMessageTypeModern chatTypeModern = chatType.CastEnum<ChatMessageTypeModern>();
         ChatPkt chat = new ChatPkt(GetSession(), chatTypeModern, text, language, sender, senderName, receiver, receiverName, channelName, chatFlags, addonPrefix, achievementId);
+
+        var preview = text.Length > 30 ? text.Substring(0, 30) + "…" : text;
+        Log.Print(LogType.Trace,
+            $"[ChatTrace] <- legacy SMSG_CHAT (WotLK): chatType={chatType} -> modern={chatTypeModern} " +
+            $"lang={language} sender={sender} senderName=\"{senderName}\" receiver={receiver} " +
+            $"channel=\"{channelName}\" textLen={text.Length} preview=\"{preview}\"");
+
         SendPacketToClient(chat);
     }
 
@@ -443,8 +462,14 @@ public partial class WorldClient
 
     public void SendMessageChatWotLK(ChatMessageTypeWotLK type, uint lang, string msg, string channel, string to)
     {
+        var preview = msg.Length > 30 ? msg.Substring(0, 30) + "…" : msg;
+        Log.Print(LogType.Trace,
+            $"[ChatTrace] -> legacy CMSG_MESSAGECHAT (WotLK): type={type} lang={lang} " +
+            $"textLen={msg.Length} channel=\"{channel}\" to=\"{to}\" preview=\"{preview}\"");
+
         if (HandleHermesInternalChatCommand(msg))
         {
+            Log.Print(LogType.Trace, $"[ChatTrace] handled internally as Hermes command, no legacy send");
             return; // was handled by us
         }
 
