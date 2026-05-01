@@ -5,8 +5,13 @@ namespace HermesProxy.World.Objects;
 
 /// <summary>
 /// Bit flags for SMSG_UPDATE_OBJECT create block movement data.
-/// Bit order must match wire format.
-/// Reference: https://github.com/TrinityCore/WowPacketParser
+/// Bit order must match wire format — 18 bits starting at NoBirthAnim.
+/// Reference: CypherCore Classic WotLK
+/// (X:\Programming\CypherCoreClassicWOTLK\Source\Game\Entities\Object\WorldObject.cs:253-271)
+/// — that's the canonical server-side serialization that V3_4_3 clients connect to.
+/// (Note: WowPacketParserModule.V3_4_0_45166's UpdateHandler reads 19 bits with a
+/// leading HasPositionFragment, but that's stale for build 54261; CypherCore is
+/// authoritative.)
 /// </summary>
 [Flags]
 public enum CreateObjectBits : uint

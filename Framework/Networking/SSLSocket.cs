@@ -89,7 +89,16 @@ public abstract class SSLSocket : ISocket, IDisposable
         {
             await _stream.AuthenticateAsServerAsync(certificate, false, SslProtocols.Tls12, false);
         }
-        catch(Exception ex)
+        catch (Exception ex) when (ex is AuthenticationException || ex is System.IO.IOException)
+        {
+            // WoW retail opens BNet probe connections that arrive without a valid TLS
+            // ClientHello (AuthenticationException) or close mid-handshake (IOException
+            // "unexpected EOF"). Either way it's a probe — log a single line, no stack.
+            Log.Print(LogType.Warn, $"TLS handshake failed for {GetRemoteIpEndPoint()}: {ex.Message}");
+            CloseSocket();
+            return;
+        }
+        catch (Exception ex)
         {
             Log.outException(ex);
             CloseSocket();

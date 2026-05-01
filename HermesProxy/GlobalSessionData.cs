@@ -5,6 +5,7 @@ using HermesProxy.World.Client;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server;
+using HermesProxy.World.Server.Packets;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -57,6 +58,10 @@ public sealed class PendingObjectUpdate
 
 public sealed class GameSessionData
 {
+    // Back-reference to the owning session. Set by CreateNewGameSessionData. Used by writers
+    // (e.g. ObjectUpdateBuilder) that need helpers on GlobalSessionData like
+    // GetBnetAccountGuidForPlayer without threading the session through every call.
+    public GlobalSessionData GlobalSession = null!;
     public bool HasWsgHordeFlagCarrier;
     public bool HasWsgAllyFlagCarrier;
     public bool ChannelDisplayList;
@@ -128,6 +133,14 @@ public sealed class GameSessionData
     public Dictionary<WowGuid128, ObjectType> OriginalObjectTypes = [];
     public Dictionary<WowGuid128, uint[]> ItemGems = [];
     public Dictionary<uint, Class> CreatureClasses = [];
+
+    // Per-GUID monster-move throttle. The V3_4_3 client OOMs when it receives
+    // hundreds of monster-moves per minute (observed: legacy server emits ~20/sec
+    // for nearby patrols, client allocates per-move and never frees fast enough).
+    // We drop moves for the same GUID arriving within MonsterMoveMinIntervalMs
+    // of the previous one for that GUID.
+    public Dictionary<WowGuid128, long> LastMonsterMoveTickMs = [];
+    public const int MonsterMoveMinIntervalMs = 250;
     public Dictionary<string, int> ChannelIds = [];
     public Dictionary<int, string> ChannelNamesById = [];
     public Dictionary<uint, uint> ItemBuyCount = [];
@@ -143,6 +156,11 @@ public sealed class GameSessionData
     public Dictionary<WowGuid64, ushort> ObjectSpawnCount = [];
     public HashSet<WowGuid64> DespawnedGameObjects = [];
     public HashSet<WowGuid128> HunterPetGuids = [];
+    // GUIDs for which we've successfully forwarded a modern CreateObject to the V3_4_3
+    // client. Used by the Values-update filter so we don't ship deltas for objects the
+    // client doesn't have in its world model — those would round-trip as
+    // CMSG_OBJECT_UPDATE_FAILED rejections (e.g. Transports we filter at create time).
+    public HashSet<WowGuid128> ClientKnownGuids = [];
     public Dictionary<WowGuid128, ArenaTeamInspectData[]> PlayerArenaTeams = [];
     public HashSet<string> AddonPrefixes = [];
     public Dictionary<byte, Dictionary<byte, int>> FlatSpellMods = [];
@@ -159,6 +177,12 @@ public sealed class GameSessionData
     public List<PendingObjectUpdate> DeferredObjectUpdates = [];
     public Lock DeferredObjectUpdatesLock = new();
 
+    // Cache of the last SMSG_INIT_WORLD_STATES we sent to the modern client. TC reference
+    // re-emits INIT_WORLD_STATES AFTER the player CreateObject (#146 in World_login_parsed.txt),
+    // but cmangos sends it earlier and we forward immediately. The deferred-flush re-emits this
+    // cached copy AFTER the player Create so the V3_4_3 client sees TC's ordering.
+    public InitWorldStates? LastInitWorldStates;
+
     private GameSessionData()
     {
         
@@ -167,6 +191,7 @@ public sealed class GameSessionData
     public static GameSessionData CreateNewGameSessionData(GlobalSessionData globalSession)
     {
         var self = new GameSessionData();
+        self.GlobalSession = globalSession;
         self.CurrentPlayerStorage = new CurrentPlayerStorage(globalSession);
         return self;
     }
@@ -1064,6 +1089,11 @@ public class GlobalSessionData
     public AuthClient AuthClient = null!;
     public WorldClient? WorldClient;
     public SniffFile ModernSniff = null!;
+    // Sniff of the cMangos↔HermesProxy legacy stream. Created lazily by WorldClient
+    // on the first incoming SMSG once decryption is established. Used to capture an
+    // (almost-)unaltered view of what the legacy server sends, so we can diff cMangos's
+    // CreateObject content against TC's reference parse for the V3_4_3 canary investigation.
+    public SniffFile LegacySniff = null!;
 
     public Dictionary<string, WowGuid128> GuildsByName = [];
     public Dictionary<uint, List<string>> GuildRanks = [];
@@ -1155,6 +1185,11 @@ public class GlobalSessionData
         {
             ModernSniff.CloseFile();
             ModernSniff = null!;
+        }
+        if (LegacySniff != null)
+        {
+            LegacySniff.CloseFile();
+            LegacySniff = null!;
         }
         if (AuthClient != null)
         {

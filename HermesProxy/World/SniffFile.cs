@@ -19,6 +19,8 @@ public sealed class SniffFile
     // buffer means more frequent syscalls. Larger buffer reduces kernel transitions.
     private const int FileBufferSize = 64 * 1024;
 
+    public readonly string FilePath;
+
     public SniffFile(string fileName, ushort build)
     {
         string dir = "PacketsLog";
@@ -28,6 +30,8 @@ public sealed class SniffFile
         int seq = Interlocked.Increment(ref _sessionCounter);
         string file = fileName + "_" + build + "_" + Time.UnixTime + "_" + seq + ".pkt";
         string path = Path.Combine(dir, file);
+
+        this.FilePath = path;
 
         var stream = new FileStream(
             path,
@@ -87,20 +91,33 @@ public sealed class SniffFile
                 _fileWriter.Write(opcode2);
                 _fileWriter.Write(data);
             }
+
+            // Flush so that the .pkt is parseable mid-session — e.g. when a test
+            // harness uses Stop-Process -Force on the proxy (no graceful Dispose),
+            // the 64 KB FileStream buffer would otherwise keep recent packets
+            // in-process and the on-disk file would appear empty/short.
+            _fileWriter.Flush();
         }
     }
 
     public void CloseFile()
     {
-        // Guard against races with an in-flight WritePacket on another thread — session teardown
-        // can run concurrently with the last packets being flushed.
-        // Flush() is redundant here (BinaryWriter.Close -> FileStream.Dispose flushes the 64 KB
-        // buffer before closing the handle) but makes the intent explicit, and keeps the invariant
-        // that "CloseFile returned cleanly => all previously-written bytes are in the OS page cache".
+        // Idempotent + thread-safe. Both modern sockets (Realm + Instance) hit
+        // `CMSG_LOG_DISCONNECT` independently when the V3_4_3 client tears down,
+        // so this can be called twice in rapid succession from different threads.
+        // The lock serialises access; the _closed flag stops a second close-call
+        // from invoking Flush/Close on an already-disposed BinaryWriter (which
+        // previously threw ObjectDisposedException in the proxy's session-cleanup
+        // path — observed on every disconnect with reason=7).
         lock (_lock)
         {
+            if (_closed)
+                return;
+            _closed = true;
             _fileWriter.Flush();
             _fileWriter.Close();
         }
     }
+
+    private bool _closed;
 }

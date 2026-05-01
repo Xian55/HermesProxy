@@ -832,6 +832,53 @@ public class SetActiveMover : ClientPacket
     public WowGuid128 MoverGUID;
 }
 
+public class MoveSetActiveMover : ServerPacket
+{
+    public MoveSetActiveMover() : base(Opcode.SMSG_MOVE_SET_ACTIVE_MOVER, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(MoverGUID);
+    }
+
+    public WowGuid128 MoverGUID;
+}
+
+public class PhaseShiftChange : ServerPacket
+{
+    public PhaseShiftChange() : base(Opcode.SMSG_PHASE_SHIFT_CHANGE, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(Client);
+        _worldPacket.WriteUInt32(PhaseShiftFlags);
+        _worldPacket.WriteUInt32((uint)Phases.Count);
+        _worldPacket.WritePackedGuid128(PersonalGUID);
+        foreach (var phase in Phases)
+        {
+            _worldPacket.WriteUInt16(phase.Flags);
+            _worldPacket.WriteUInt16(phase.Id);
+        }
+        _worldPacket.WriteUInt32((uint)VisibleMapIDs.Count);
+        foreach (var mapId in VisibleMapIDs)
+            _worldPacket.WriteUInt16(mapId);
+        _worldPacket.WriteUInt32((uint)PreloadMapIDs.Count);
+        foreach (var mapId in PreloadMapIDs)
+            _worldPacket.WriteUInt16(mapId);
+        _worldPacket.WriteUInt32((uint)UiMapPhaseIDs.Count);
+        foreach (var uiMapPhase in UiMapPhaseIDs)
+            _worldPacket.WriteUInt16(uiMapPhase);
+    }
+
+    public WowGuid128 Client;
+    public uint PhaseShiftFlags = 8; // 8 = Unphased — default for normal world entry
+    public WowGuid128 PersonalGUID;
+    public List<(ushort Flags, ushort Id)> Phases = new();
+    public List<ushort> VisibleMapIDs = new();
+    public List<ushort> PreloadMapIDs = new();
+    public List<ushort> UiMapPhaseIDs = new();
+}
+
 public class InitActiveMoverComplete : ClientPacket
 {
     public InitActiveMoverComplete(WorldPacket packet) : base(packet) { }
