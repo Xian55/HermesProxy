@@ -22,6 +22,7 @@ using System.Text;
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using Framework.Logging;
 using HermesProxy.World.Enums;
 
 namespace HermesProxy.World.Server.Packets;
@@ -1039,6 +1040,8 @@ public class UpdateActionButtons : ServerPacket
 
     public override void Write()
     {
+        int nonZero = 0;
+        var sample = new System.Text.StringBuilder();
         for (int i = 0; i < PlayerConst.MaxActionButtonsModern; i++)
         {
             int legacy = i < ActionButtons.Count ? ActionButtons[i] : 0;
@@ -1046,8 +1049,19 @@ public class UpdateActionButtons : ServerPacket
             byte type = (byte)(((uint)legacy >> 24) & 0xFFu);
             ulong packed = action | ((ulong)type << 56);
             _worldPacket.WriteInt64((long)packed);
+
+            if (legacy != 0)
+            {
+                nonZero++;
+                if (nonZero <= 5)
+                    sample.Append($" [{i}]act={action},type={type}");
+            }
         }
         _worldPacket.WriteUInt8(Reason);
+
+        Log.Print(LogType.Trace,
+            $"[ActionButtonsTrace] SMSG_UPDATE_ACTION_BUTTONS write: legacyCount={ActionButtons.Count} " +
+            $"nonZeroSlots={nonZero} paddedTo={PlayerConst.MaxActionButtonsModern} Reason={Reason} sample:{sample}");
     }
 }
 
