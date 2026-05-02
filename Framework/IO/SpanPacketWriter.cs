@@ -19,15 +19,15 @@ using System;
 using System.Buffers.Binary;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using Framework.GameMath;
 
 namespace Framework.IO;
 
 /// <summary>
-/// High-performance packet writer over a <see cref="Span{T}"/> of
-/// <see cref="byte"/> for zero-allocation writes. This is a
-/// <see langword="ref struct"/> that lives on the stack.
+/// High-performance packet writer over a <see cref="Span{T}"/> of <see cref="byte"/>
+/// for zero-allocation writes. This is a <see langword="ref struct"/> that lives on the stack.
 /// </summary>
 public ref struct SpanPacketWriter
 {
@@ -138,35 +138,66 @@ public ref struct SpanPacketWriter
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteVector2(Vector2 value)
     {
-        WriteFloat(value.X);
-        WriteFloat(value.Y);
+        FlushBits();
+        var dst = _buffer.Slice(_position);
+        if (BitConverter.IsLittleEndian)
+        {
+            MemoryMarshal.Write(dst, in value);
+        }
+        else
+        {
+            BinaryPrimitives.WriteSingleLittleEndian(dst, value.X);
+            BinaryPrimitives.WriteSingleLittleEndian(dst.Slice(4), value.Y);
+        }
+        _position += 8;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteVector3(Vector3 value)
     {
-        WriteFloat(value.X);
-        WriteFloat(value.Y);
-        WriteFloat(value.Z);
+        FlushBits();
+        var dst = _buffer.Slice(_position);
+        if (BitConverter.IsLittleEndian)
+        {
+            MemoryMarshal.Write(dst, in value);
+        }
+        else
+        {
+            BinaryPrimitives.WriteSingleLittleEndian(dst, value.X);
+            BinaryPrimitives.WriteSingleLittleEndian(dst.Slice(4), value.Y);
+            BinaryPrimitives.WriteSingleLittleEndian(dst.Slice(8), value.Z);
+        }
+        _position += 12;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteVector4(Vector4 value)
     {
-        WriteFloat(value.X);
-        WriteFloat(value.Y);
-        WriteFloat(value.Z);
-        WriteFloat(value.W);
+        FlushBits();
+        var dst = _buffer.Slice(_position);
+        if (BitConverter.IsLittleEndian)
+        {
+            MemoryMarshal.Write(dst, in value);
+        }
+        else
+        {
+            BinaryPrimitives.WriteSingleLittleEndian(dst, value.X);
+            BinaryPrimitives.WriteSingleLittleEndian(dst.Slice(4), value.Y);
+            BinaryPrimitives.WriteSingleLittleEndian(dst.Slice(8), value.Z);
+            BinaryPrimitives.WriteSingleLittleEndian(dst.Slice(12), value.W);
+        }
+        _position += 16;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WritePackXYZ(Vector3 pos)
     {
-        // Pack X (11 bits), Y (11 bits), Z (10 bits) into a single uint32
-        uint packed = 0;
-        packed |= (uint)((int)(pos.X / 0.25f)) & 0x7FF;
-        packed |= ((uint)((int)(pos.Y / 0.25f)) & 0x7FF) << 11;
-        packed |= ((uint)((int)(pos.Z / 0.25f)) & 0x3FF) << 22;
+        // Pack X (11 bits), Y (11 bits), Z (10 bits) into a single uint32.
+        // Multiply by 4f instead of dividing by 0.25f — the JIT cannot rewrite
+        // float division to multiplication automatically due to rounding semantics.
+        uint packed = (uint)(int)(pos.X * 4f) & 0x7FF;
+        packed |= ((uint)(int)(pos.Y * 4f) & 0x7FF) << 11;
+        packed |= ((uint)(int)(pos.Z * 4f) & 0x3FF) << 22;
         WriteUInt32(packed);
     }
 
@@ -186,30 +217,28 @@ public ref struct SpanPacketWriter
     public void WriteBool(bool value)
     {
         FlushBits();
-        _buffer[_position++] = value ? (byte)1 : (byte)0;
+        _buffer[_position++] = Unsafe.As<bool, byte>(ref value);
     }
 
-    //FIXME: refactor this function please
-    public void WriteCString(string value)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void WriteCString(string? value)
     {
-        if (string.IsNullOrEmpty(value))
-        {
-            WriteUInt8(0);
-            return;
-        }
+        FlushBits();
 
-        WriteString(value);
-        WriteUInt8(0);
+        if (!string.IsNullOrEmpty(value))
+            _position += Encoding.UTF8.GetBytes(value, _buffer.Slice(_position));
+
+        _buffer[_position++] = 0;
     }
 
-    public void WriteString(string value)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void WriteString(string? value)
     {
         if (string.IsNullOrEmpty(value))
             return;
 
         FlushBits();
-        int bytesWritten = Encoding.UTF8.GetBytes(value, _buffer.Slice(_position));
-        _position += bytesWritten;
+        _position += Encoding.UTF8.GetBytes(value, _buffer.Slice(_position));
     }
 
     #endregion
@@ -236,8 +265,25 @@ public ref struct SpanPacketWriter
 
     public void WriteBits(uint value, int bitCount)
     {
-        for (int i = bitCount - 1; i >= 0; --i)
-            WriteBit(((value >> i) & 1) != 0);
+        // Batched packing: take min(bitCount, _bitPosition) bits per iteration,
+        // OR them into the pending byte at the right shift, emit when full.
+        // Identical wire output to the per-bit loop, ~10-30x fewer iterations.
+        while (bitCount > 0)
+        {
+            int take = Math.Min(bitCount, (int)_bitPosition);
+            int shift = bitCount - take;
+            uint chunk = (value >> shift) & ((1u << take) - 1u);
+            _bitPosition -= (byte)take;
+            _bitValue |= (byte)(chunk << _bitPosition);
+            bitCount = shift;
+
+            if (_bitPosition == 0)
+            {
+                _buffer[_position++] = _bitValue;
+                _bitPosition = 8;
+                _bitValue = 0;
+            }
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
