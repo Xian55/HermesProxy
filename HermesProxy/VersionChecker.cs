@@ -306,8 +306,8 @@ public static class LegacyVersion
         Opcodes.GetOpcodesDefiningBuild(Build) switch
         {
             ClientVersionBuild.V1_12_1_5875 => typeof(World.Enums.V1_12_1_5875.ResponseCodes),
-            ClientVersionBuild.V2_4_3_8606
-                or ClientVersionBuild.V3_3_5a_12340 => typeof(World.Enums.V2_4_3_8606.ResponseCodes),
+            ClientVersionBuild.V2_4_3_8606 => typeof(World.Enums.V2_4_3_8606.ResponseCodes),
+            ClientVersionBuild.V3_3_5a_12340 => typeof(World.Enums.V3_3_5a_12340.ResponseCodes),
             _ => null,
         };
 
