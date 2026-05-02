@@ -94,6 +94,13 @@ public partial class WorldSocket
     void HandleConvertRaid(ConvertRaid raid)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CONVERT_RAID);
+        // wotlk_classic TC reads a single bit: true = ConvertToRaid, false = ConvertToGroup.
+        // Without this bit the server reads past EOF, defaults to "raid", and "Convert to Party" silently no-ops.
+        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_4_3_54261))
+        {
+            packet.WriteBit(raid.Raid);
+            packet.FlushBits();
+        }
         SendPacketToServer(packet);
     }
 
