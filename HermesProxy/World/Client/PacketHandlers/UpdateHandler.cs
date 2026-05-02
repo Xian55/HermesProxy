@@ -1392,10 +1392,16 @@ public partial class WorldClient
     public QuestLog? ReadQuestLogEntry(int i, BitArray? updateMaskArray, Dictionary<int, UpdateField> updates)
     {
         int PLAYER_QUEST_LOG_1_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_QUEST_LOG_1_1);
-        int sizePerEntry = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_4_0_8089) ? 4 : 3;
+        // WotLK (V2_4_0+) quest log: 5 fields per entry —
+        //   +0 QuestID, +1 StateFlags, +2 Progress lo (obj 0,1 as uint16),
+        //   +3 Progress hi (obj 2,3 as uint16), +4 Timer/EndTime
+        // Vanilla (pre-V2_4_0): 3 fields — QuestID, StateFlags(+progress packed), Timer.
+        bool isWotLKLayout = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_4_0_8089);
+        int sizePerEntry = isWotLKLayout ? 5 : 3;
         int stateOffset = 1;
-        int progressOffset = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_4_0_8089) ? 2 : -1;
-        int timerOffset = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_4_0_8089) ? 3 : 2;
+        int progressOffset = isWotLKLayout ? 2 : -1;     // field +2 = progress lo (obj 0,1)
+        int progressOffsetHi = isWotLKLayout ? 3 : -1;   // field +3 = progress hi (obj 2,3)
+        int timerOffset = isWotLKLayout ? 4 : 2;
         QuestLog? questLog = null;
 
         int index = PLAYER_QUEST_LOG_1_1 + i * sizePerEntry;
@@ -1406,6 +1412,9 @@ public partial class WorldClient
                 questLog = new QuestLog();
 
             questLog.QuestID = updates[index].Int32Value;
+            // Cache the QuestID for this slot so partial state-only updates can
+            // recover it. Mirrors the fork's behavior at WorldClient.cs:10857.
+            GetSession().GameState.QuestLogQuestIDs[i] = questLog.QuestID.Value;
         }
         if ((updateMaskArray != null && updateMaskArray[index + stateOffset]) ||
             (updateMaskArray == null && updates.ContainsKey(index + stateOffset)))
@@ -1415,17 +1424,20 @@ public partial class WorldClient
 
             if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_4_0_8089))
             {
-                // first 3 bytes are objective progress, each counter is 6 bits long, total 4 counters
+                // Vanilla: first 3 bytes are objective progress, each counter is 6 bits long, total 4 counters
                 uint rawValue = updates[index + stateOffset].UInt32Value;
-                questLog.ObjectiveProgress[0] = (byte)(rawValue & 0x3F);
-                questLog.ObjectiveProgress[1] = (byte)((rawValue & (0x3F << 6)) >> 6);
-                questLog.ObjectiveProgress[2] = (byte)((rawValue & (0x3F << 12)) >> 12);
-                questLog.ObjectiveProgress[3] = (byte)((rawValue & (0x3F << 18)) >> 18);
+                questLog.ObjectiveProgress[0] = (short)(rawValue & 0x3F);
+                questLog.ObjectiveProgress[1] = (short)((rawValue & (0x3F << 6)) >> 6);
+                questLog.ObjectiveProgress[2] = (short)((rawValue & (0x3F << 12)) >> 12);
+                questLog.ObjectiveProgress[3] = (short)((rawValue & (0x3F << 18)) >> 18);
                 questLog.StateFlags = ((rawValue >> 24) & 0xFF);
             }
             else
                 questLog.StateFlags = updates[index + stateOffset].UInt32Value;
         }
+        // WotLK progress: each field holds 2× uint16 counters.
+        //   field +2 = (obj0 lo16) | (obj1 hi16)
+        //   field +3 = (obj2 lo16) | (obj3 hi16)
         if (progressOffset != -1 &&
            ((updateMaskArray != null && updateMaskArray[index + progressOffset]) ||
            (updateMaskArray == null && updates.ContainsKey(index + progressOffset))))
@@ -1433,10 +1445,20 @@ public partial class WorldClient
             if (questLog == null)
                 questLog = new QuestLog();
 
-            questLog.ObjectiveProgress[0] = (byte)(updates[index + progressOffset].UInt32Value & 0xFF);
-            questLog.ObjectiveProgress[1] = (byte)((updates[index + progressOffset].UInt32Value >> 8) & 0xFF);
-            questLog.ObjectiveProgress[2] = (byte)((updates[index + progressOffset].UInt32Value >> 16) & 0xFF);
-            questLog.ObjectiveProgress[3] = (byte)((updates[index + progressOffset].UInt32Value >> 24) & 0xFF);
+            uint progressLo = updates[index + progressOffset].UInt32Value;
+            questLog.ObjectiveProgress[0] = (short)(progressLo & 0xFFFF);
+            questLog.ObjectiveProgress[1] = (short)((progressLo >> 16) & 0xFFFF);
+        }
+        if (progressOffsetHi != -1 &&
+           ((updateMaskArray != null && updateMaskArray[index + progressOffsetHi]) ||
+           (updateMaskArray == null && updates.ContainsKey(index + progressOffsetHi))))
+        {
+            if (questLog == null)
+                questLog = new QuestLog();
+
+            uint progressHi = updates[index + progressOffsetHi].UInt32Value;
+            questLog.ObjectiveProgress[2] = (short)(progressHi & 0xFFFF);
+            questLog.ObjectiveProgress[3] = (short)((progressHi >> 16) & 0xFFFF);
         }
         if ((updateMaskArray != null && updateMaskArray[index + timerOffset]) ||
             (updateMaskArray == null && updates.ContainsKey(index + timerOffset)))
@@ -1447,6 +1469,35 @@ public partial class WorldClient
             questLog.EndTime = updates[index + timerOffset].UInt32Value;
         }
 
+        // Cache fallback: if this update touched the slot but QuestID wasn't
+        // marked dirty (TC commonly sends state/progress-only updates), populate
+        // QuestID from the cached value. Otherwise the slot would surface as
+        // QuestID=0 and the writer treats it as empty → quest "disappears" from
+        // the V3_4_3 client log even though it's still in the player's log.
+        if (questLog != null && !questLog.QuestID.HasValue)
+        {
+            int cachedId = GetSession().GameState.QuestLogQuestIDs[i];
+            if (cachedId != 0)
+                questLog.QuestID = cachedId;
+        }
+
+        // QuestID explicitly cleared (quest abandoned/completed) → clear cache.
+        if (questLog != null && questLog.QuestID.HasValue && questLog.QuestID.Value == 0)
+            GetSession().GameState.QuestLogQuestIDs[i] = 0;
+
+        bool anyFieldPresent =
+            updates.ContainsKey(index) ||
+            updates.ContainsKey(index + stateOffset) ||
+            (progressOffset != -1 && updates.ContainsKey(index + progressOffset)) ||
+            (progressOffsetHi != -1 && updates.ContainsKey(index + progressOffsetHi)) ||
+            updates.ContainsKey(index + timerOffset);
+        if (anyFieldPresent || (questLog != null && questLog.QuestID.HasValue && questLog.QuestID.Value != 0))
+        {
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[QuestLogRead] slot={i} questId={(questLog?.QuestID.GetValueOrDefault() ?? 0)} state={(questLog?.StateFlags ?? 0)} " +
+                $"baseFieldIndex={index} sizePerEntry={sizePerEntry} hasQID={updates.ContainsKey(index)} " +
+                $"hasState={updates.ContainsKey(index + stateOffset)} hasTimer={updates.ContainsKey(index + timerOffset)}");
+        }
         return questLog;
     }
 
@@ -2440,10 +2491,20 @@ public partial class WorldClient
             if (PLAYER_QUEST_LOG_1_1 >= 0)
             {
                 int questsCount = LegacyVersion.GetQuestLogSize();
+                int populatedSlots = 0;
+                System.Text.StringBuilder slotSummary = new();
                 for (int i = 0; i < questsCount; i++)
                 {
-                    updateData.PlayerData.QuestLog[i] = ReadQuestLogEntry(i, updateMaskArray, updates)!;
+                    QuestLog? entry = ReadQuestLogEntry(i, updateMaskArray, updates);
+                    updateData.PlayerData.QuestLog[i] = entry!;
+                    if (entry != null && entry.QuestID.HasValue && entry.QuestID.Value != 0)
+                    {
+                        populatedSlots++;
+                        slotSummary.Append($" [{i}]={entry.QuestID.Value}");
+                    }
                 }
+                Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                    $"[QuestLogReadLoop] questsCount={questsCount} populated={populatedSlots} slots:{slotSummary}");
             }
             int PLAYER_CHOSEN_TITLE = LegacyVersion.GetUpdateField(PlayerField.PLAYER_CHOSEN_TITLE);
             if (PLAYER_CHOSEN_TITLE >= 0 && updateMaskArray[PLAYER_CHOSEN_TITLE])

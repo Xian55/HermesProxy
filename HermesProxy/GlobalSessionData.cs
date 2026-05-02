@@ -104,6 +104,12 @@ public sealed class GameSessionData
     public uint CurrentGuildNumAccounts;
     public WowGuid128 CurrentInteractedWithNPC;
     public WowGuid128 CurrentInteractedWithGO;
+    // Per-slot QuestID cache used by ReadQuestLogEntry. Legacy 3.3.5a often sends
+    // partial Values updates where StateFlags / Progress changes but the QuestID
+    // field isn't re-marked dirty. Without this cache, those partial updates
+    // produce QuestLog entries with QuestID=null which our writer treats as
+    // empty slots — making active quests "disappear" from the V3_4_3 client log.
+    public readonly int[] QuestLogQuestIDs = new int[QuestConst.MaxQuestLogSize];
     public uint LastWhoRequestId;
     public WowGuid128 CurrentPetGuid;
     public WowGuid64 CurrentAttackTarget;        // active CMSG_ATTACK_SWING victim, cleared on ATTACK_STOP/CANCEL_COMBAT
@@ -1036,6 +1042,7 @@ public sealed class GameSessionData
             return array;
         }
     }
+
 }
 
 public class ClientCastRequest
