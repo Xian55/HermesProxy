@@ -6,6 +6,7 @@ using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace HermesProxy.World.Server;
 
@@ -84,6 +85,31 @@ public partial class WorldSocket
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_QUEST_GIVER_HELLO);
         packet.WriteGuid(hello.QuestGiverGUID.To64());
+        SendPacketToServer(packet);
+    }
+    // [PacketHandler(Opcode.CMSG_QUEST_GIVER_CLOSE_QUEST)]
+    // void HandleQuestGiverCloseQuest(QuestGiverCloseQuest close)
+    // {
+    //     // Modern client carries QuestID; legacy CMSG_QUEST_GIVER_CANCEL is empty —
+    //     // 3.3.5a just closes whatever NPC interaction the session is currently in.
+    //     _ = close;
+    //     WorldPacket packet = new WorldPacket(Opcode.CMSG_QUEST_GIVER_CANCEL);
+    //     SendPacketToServer(packet);
+    // }
+
+    [PacketHandler(Opcode.CMSG_QUEST_POI_QUERY)]
+    void HandleQuestPOIQuery(QuestPOIQuery query)
+    {
+        // Both legacy 3.3.5a and modern V3_4_3 use the same wire shape:
+        // int32 count, int32[] questIds. Forward only the populated prefix.
+        // Note: SMSG_QUEST_COMPLETION_NPC_RESPONSE is synthesized by the legacy
+        // SMSG_QUEST_POI_QUERY_RESPONSE handler — there it's emitted right after
+        // the POI translation, matching CypherCore's order and using
+        // SendPacketToClient (auto-routes by ConnectionType.Instance).
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_QUEST_POI_QUERY);
+        packet.WriteInt32(query.MissingQuestPOIs.Length);
+        foreach (int questId in query.MissingQuestPOIs)
+            packet.WriteInt32(questId);
         SendPacketToServer(packet);
     }
     [PacketHandler(Opcode.CMSG_QUEST_GIVER_REQUEST_REWARD)]

@@ -19,6 +19,8 @@
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using Framework.Logging;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -53,6 +55,18 @@ public class QuestGiverQuestDetails : ServerPacket
 
     public override void Write()
     {
+        // V3_4_3 (WotLK Classic) wire layout adds QuestFlags[2], QuestInfoID,
+        // QuestGiverCreatureID, ConditionalDescriptionText.size, reorders the
+        // Objectives field as (Id, Type:i32, ObjectID, Amount), and rebuilds
+        // QuestRewards. Without this dispatch the client mis-reads a count and
+        // attempts a ~112 GB allocation. Layout mirrors TC wotlk_classic
+        // QuestPackets.cpp:458 exactly.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            WriteWotLK();
+            return;
+        }
+
         _worldPacket.WritePackedGuid128(QuestGiverGUID);
         _worldPacket.WritePackedGuid128(InformUnit);
         _worldPacket.WriteUInt32(QuestID);
@@ -96,6 +110,76 @@ public class QuestGiverQuestDetails : ServerPacket
         _worldPacket.WriteBits(PortraitTurnInName.GetByteCount(), 8);
         _worldPacket.WriteBit(AutoLaunched);
         _worldPacket.WriteBit(false);   // unused in client
+        _worldPacket.WriteBit(StartCheat);
+        _worldPacket.WriteBit(DisplayPopup);
+        _worldPacket.FlushBits();
+
+        Rewards.Write(_worldPacket);
+
+        _worldPacket.WriteString(QuestTitle);
+        _worldPacket.WriteString(DescriptionText);
+        _worldPacket.WriteString(LogDescription);
+        _worldPacket.WriteString(PortraitGiverText);
+        _worldPacket.WriteString(PortraitGiverName);
+        _worldPacket.WriteString(PortraitTurnInText);
+        _worldPacket.WriteString(PortraitTurnInName);
+    }
+
+    // Mirrors WPP V3_4_0 SMSG_QUEST_GIVER_QUEST_DETAILS parser (range
+    // V3_4_3_51505 → V3_4_4_59817). Diff vs retail Write: adds QuestFlags[2],
+    // QuestGiverCreatureID, ConditionalDescriptionTextCount; QuestRewards block
+    // is the same as retail (NOT the V3_4_4+ shape). Objectives have the same
+    // (Id, ObjectID, Amount, Type:u8) shape as retail. Newer V3_4_4 layouts
+    // (QuestInfoID, Items-first QuestRewards, Objective Type:i32 reordered)
+    // are NOT present in build 54261.
+    private void WriteWotLK()
+    {
+        _worldPacket.WritePackedGuid128(QuestGiverGUID);
+        _worldPacket.WritePackedGuid128(InformUnit);
+        _worldPacket.WriteInt32((int)QuestID);
+        _worldPacket.WriteInt32(QuestPackageID);
+        _worldPacket.WriteInt32((int)PortraitGiver);
+        _worldPacket.WriteInt32((int)PortraitGiverMount);
+        _worldPacket.WriteInt32((int)PortraitGiverModelSceneID);
+        _worldPacket.WriteInt32((int)PortraitTurnIn);
+        _worldPacket.WriteUInt32(QuestFlags[0]);    // Flags
+        _worldPacket.WriteUInt32(QuestFlags[1]);    // FlagsEx
+        _worldPacket.WriteUInt32(0);                // FlagsEx2 (V3_4_3 only)
+        _worldPacket.WriteInt32((int)SuggestedPartyMembers);
+        _worldPacket.WriteUInt32((uint)LearnSpells.Count);
+        _worldPacket.WriteUInt32((uint)DescEmotes.Length);
+        _worldPacket.WriteUInt32((uint)Objectives.Count);
+        _worldPacket.WriteInt32(QuestStartItemID);
+        _worldPacket.WriteInt32(QuestSessionBonus);
+        _worldPacket.WriteInt32(0);                 // QuestGiverCreatureID
+        _worldPacket.WriteUInt32(0);                // ConditionalDescriptionText.size
+
+        foreach (uint spell in LearnSpells)
+            _worldPacket.WriteInt32((int)spell);
+
+        foreach (QuestDescEmote emote in DescEmotes)
+        {
+            _worldPacket.WriteInt32((int)emote.Type);
+            _worldPacket.WriteUInt32(emote.Delay);
+        }
+
+        foreach (QuestObjectiveSimple obj in Objectives)
+        {
+            _worldPacket.WriteUInt32(obj.Id);
+            _worldPacket.WriteInt32(obj.ObjectID);
+            _worldPacket.WriteInt32(obj.Amount);
+            _worldPacket.WriteUInt8(obj.Type);
+        }
+
+        _worldPacket.WriteBits(QuestTitle.GetByteCount(), 9);
+        _worldPacket.WriteBits(DescriptionText.GetByteCount(), 12);
+        _worldPacket.WriteBits(LogDescription.GetByteCount(), 12);
+        _worldPacket.WriteBits(PortraitGiverText.GetByteCount(), 10);
+        _worldPacket.WriteBits(PortraitGiverName.GetByteCount(), 8);
+        _worldPacket.WriteBits(PortraitTurnInText.GetByteCount(), 10);
+        _worldPacket.WriteBits(PortraitTurnInName.GetByteCount(), 8);
+        _worldPacket.WriteBit(AutoLaunched);
+        _worldPacket.WriteBit(false);
         _worldPacket.WriteBit(StartCheat);
         _worldPacket.WriteBit(DisplayPopup);
         _worldPacket.FlushBits();
@@ -286,6 +370,113 @@ public class QuestLogRemoveQuest : ClientPacket
     public byte Slot;
 }
 
+public class QuestGiverCloseQuest : ClientPacket
+{
+    public QuestGiverCloseQuest(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        QuestID = _worldPacket.ReadInt32();
+    }
+
+    public int QuestID;
+}
+
+public class QuestPOIQuery : ClientPacket
+{
+    public QuestPOIQuery(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        // Wire: int32 count, int32[count] questIds. CypherCore over-allocates a
+        // 175-slot array but only reads `count` ints from the stream — only the
+        // populated prefix is on the wire.
+        int count = _worldPacket.ReadInt32();
+        MissingQuestPOIs = new int[count];
+        for (int i = 0; i < count; i++)
+            MissingQuestPOIs[i] = _worldPacket.ReadInt32();
+    }
+
+    public int[] MissingQuestPOIs = Array.Empty<int>();
+}
+
+public class QuestPOIBlobPoint
+{
+    public short X;
+    public short Y;
+    public short Z;
+}
+
+public class QuestPOIBlobData
+{
+    public int BlobIndex;
+    public int ObjectiveIndex;
+    public int QuestObjectiveID;
+    public int QuestObjectID;
+    public int MapID;
+    public int UiMapID;
+    public int Priority;
+    public int Flags;
+    public int WorldEffectID;
+    public int PlayerConditionID;
+    public int NavigationPlayerConditionID;
+    public int SpawnTrackingID;
+    public bool AlwaysAllowMergingBlobs;
+    public List<QuestPOIBlobPoint> Points = new();
+}
+
+public class QuestPOIData
+{
+    public int QuestID;
+    public List<QuestPOIBlobData> Blobs = new();
+}
+
+public class QuestPOIQueryResponse : ServerPacket
+{
+    public QuestPOIQueryResponse() : base(Opcode.SMSG_QUEST_POI_QUERY_RESPONSE) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt32(QuestPOIDataStats.Count);
+        _worldPacket.WriteInt32(QuestPOIDataStats.Count);
+
+        foreach (QuestPOIData questPOIData in QuestPOIDataStats)
+        {
+            _worldPacket.WriteInt32(questPOIData.QuestID);
+            _worldPacket.WriteInt32(questPOIData.Blobs.Count);
+
+            foreach (QuestPOIBlobData blob in questPOIData.Blobs)
+            {
+                _worldPacket.WriteInt32(blob.BlobIndex);
+                _worldPacket.WriteInt32(blob.ObjectiveIndex);
+                _worldPacket.WriteInt32(blob.QuestObjectiveID);
+                _worldPacket.WriteInt32(blob.QuestObjectID);
+                _worldPacket.WriteInt32(blob.MapID);
+                _worldPacket.WriteInt32(blob.UiMapID);
+                _worldPacket.WriteInt32(blob.Priority);
+                _worldPacket.WriteInt32(blob.Flags);
+                _worldPacket.WriteInt32(blob.WorldEffectID);
+                _worldPacket.WriteInt32(blob.PlayerConditionID);
+                _worldPacket.WriteInt32(blob.NavigationPlayerConditionID);
+                _worldPacket.WriteInt32(blob.SpawnTrackingID);
+                _worldPacket.WriteInt32(blob.Points.Count);
+
+                foreach (QuestPOIBlobPoint p in blob.Points)
+                {
+                    _worldPacket.WriteInt16(p.X);
+                    _worldPacket.WriteInt16(p.Y);
+                    _worldPacket.WriteInt16(p.Z);
+                }
+
+                _worldPacket.WriteBit(blob.AlwaysAllowMergingBlobs);
+                _worldPacket.FlushBits();
+            }
+        }
+    }
+
+    public List<QuestPOIData> QuestPOIDataStats = new();
+}
+
 public class QuestGiverStatusQuery : ClientPacket
 {
     public QuestGiverStatusQuery(WorldPacket packet) : base(packet) { }
@@ -314,18 +505,40 @@ public class QuestGiverStatusPkt : ServerPacket, ISpanWritable
 
     public override void Write()
     {
+        bool useV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        uint encoded = useV343
+            ? QuestGiverStatusV343Converter.FromModern(QuestGiver.Status)
+            : (uint)QuestGiver.Status;
+        Log.Print(LogType.Trace,
+            $"[QuestStatusTrace] SMSG_QUEST_GIVER_STATUS write: GUID={QuestGiver.Guid} entry={QuestGiver.Guid.GetEntry()} " +
+            $"modern={QuestGiver.Status} (0x{encoded:X}) build={ModernVersion.Build}");
         _worldPacket.WritePackedGuid128(QuestGiver.Guid);
-        _worldPacket.WriteUInt32((uint)QuestGiver.Status);
+        // V3_4_3 (8.0+ engine) widened the status field to uint64 — see CypherCore
+        // QuestPackets.cs:55. Older clients still use uint32.
+        if (useV343)
+            _worldPacket.WriteUInt64(encoded);
+        else
+            _worldPacket.WriteUInt32(encoded);
     }
 
-    // GUID(18) + uint(4) = 22 bytes
-    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4;
+    // GUID(18) + status(8 V3_4_3 / 4 retail) — use 8 to be safe across versions.
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 8;
 
     public int WriteToSpan(Span<byte> buffer)
     {
+        bool useV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        uint encoded = useV343
+            ? QuestGiverStatusV343Converter.FromModern(QuestGiver.Status)
+            : (uint)QuestGiver.Status;
+        Log.Print(LogType.Trace,
+            $"[QuestStatusTrace] SMSG_QUEST_GIVER_STATUS write(span): GUID={QuestGiver.Guid} entry={QuestGiver.Guid.GetEntry()} " +
+            $"modern={QuestGiver.Status} (0x{encoded:X}) build={ModernVersion.Build}");
         var writer = new SpanPacketWriter(buffer);
         writer.WritePackedGuid128(QuestGiver.Guid.Low, QuestGiver.Guid.High);
-        writer.WriteUInt32((uint)QuestGiver.Status);
+        if (useV343)
+            writer.WriteUInt64(encoded);
+        else
+            writer.WriteUInt32(encoded);
         return writer.Position;
     }
 
@@ -338,30 +551,57 @@ public class QuestGiverStatusMultiple : ServerPacket, ISpanWritable
 
     public override void Write()
     {
+        bool useV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        Log.Print(LogType.Trace,
+            $"[QuestStatusTrace] SMSG_QUEST_GIVER_STATUS_MULTIPLE write: count={QuestGivers.Count} build={ModernVersion.Build}");
         _worldPacket.WriteInt32(QuestGivers.Count);
-        foreach (QuestGiverInfo questGiver in QuestGivers)
+        for (int i = 0; i < QuestGivers.Count; i++)
         {
+            QuestGiverInfo questGiver = QuestGivers[i];
+            uint encoded = useV343
+                ? QuestGiverStatusV343Converter.FromModern(questGiver.Status)
+                : (uint)questGiver.Status;
+            Log.Print(LogType.Trace,
+                $"[QuestStatusTrace]   [{i}] GUID={questGiver.Guid} entry={questGiver.Guid.GetEntry()} " +
+                $"modern={questGiver.Status} (0x{encoded:X})");
             _worldPacket.WritePackedGuid128(questGiver.Guid);
-            _worldPacket.WriteUInt32((uint)questGiver.Status);
+            // V3_4_3 widened status to uint64 — CypherCore QuestPackets.cs:71.
+            if (useV343)
+                _worldPacket.WriteUInt64(encoded);
+            else
+                _worldPacket.WriteUInt32(encoded);
         }
     }
 
     // Cap for quest givers in view - typically only a handful visible at once
     private const int MaxQuestGivers = 32;
-    // Each entry: PackedGuid128 (18) + uint (4) = 22 bytes
-    public int MaxSize => 4 + MaxQuestGivers * (PackedGuidHelper.MaxPackedGuid128Size + 4);
+    // Each entry: PackedGuid128 (18) + status (8 V3_4_3 / 4 retail) — use 8 to be safe.
+    public int MaxSize => 4 + MaxQuestGivers * (PackedGuidHelper.MaxPackedGuid128Size + 8);
 
     public int WriteToSpan(Span<byte> buffer)
     {
         if (QuestGivers.Count > MaxQuestGivers)
             return -1;
 
+        bool useV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        Log.Print(LogType.Trace,
+            $"[QuestStatusTrace] SMSG_QUEST_GIVER_STATUS_MULTIPLE write(span): count={QuestGivers.Count} build={ModernVersion.Build}");
         var writer = new SpanPacketWriter(buffer);
         writer.WriteInt32(QuestGivers.Count);
-        foreach (QuestGiverInfo questGiver in QuestGivers)
+        for (int i = 0; i < QuestGivers.Count; i++)
         {
+            QuestGiverInfo questGiver = QuestGivers[i];
+            uint encoded = useV343
+                ? QuestGiverStatusV343Converter.FromModern(questGiver.Status)
+                : (uint)questGiver.Status;
+            Log.Print(LogType.Trace,
+                $"[QuestStatusTrace]   (span)[{i}] GUID={questGiver.Guid} entry={questGiver.Guid.GetEntry()} " +
+                $"modern={questGiver.Status} (0x{encoded:X})");
             writer.WritePackedGuid128(questGiver.Guid.Low, questGiver.Guid.High);
-            writer.WriteUInt32((uint)questGiver.Status);
+            if (useV343)
+                writer.WriteUInt64(encoded);
+            else
+                writer.WriteUInt32(encoded);
         }
         return writer.Position;
     }
@@ -400,6 +640,12 @@ public class QuestGiverQuestListMessage : ServerPacket
 
     public override void Write()
     {
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            WriteWotLK();
+            return;
+        }
+
         _worldPacket.WritePackedGuid128(QuestGiverGUID);
         _worldPacket.WriteUInt32(GreetEmoteDelay);
         _worldPacket.WriteUInt32(GreetEmoteType);
@@ -409,6 +655,24 @@ public class QuestGiverQuestListMessage : ServerPacket
 
         foreach (ClientGossipQuest quest in QuestOptions)
             quest.Write(_worldPacket);
+
+        _worldPacket.WriteString(Greeting);
+    }
+
+    // V3_4_3 (WotLK Classic) wire layout — header is identical to retail; the only
+    // difference is each per-quest entry uses the wotlk-shaped ClientGossipText
+    // layout (see ClientGossipQuest.WriteWotLK).
+    private void WriteWotLK()
+    {
+        _worldPacket.WritePackedGuid128(QuestGiverGUID);
+        _worldPacket.WriteUInt32(GreetEmoteDelay);
+        _worldPacket.WriteUInt32(GreetEmoteType);
+        _worldPacket.WriteUInt32((uint)QuestOptions.Count);
+        _worldPacket.WriteBits(Greeting.GetByteCount(), 11);
+        _worldPacket.FlushBits();
+
+        foreach (ClientGossipQuest quest in QuestOptions)
+            quest.WriteWotLK(_worldPacket);
 
         _worldPacket.WriteString(Greeting);
     }
@@ -426,6 +690,12 @@ public class QuestGiverRequestItems : ServerPacket
 
     public override void Write()
     {
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            WriteWotLK();
+            return;
+        }
+
         _worldPacket.WritePackedGuid128(QuestGiverGUID);
         _worldPacket.WriteUInt32(QuestGiverCreatureID);
         _worldPacket.WriteUInt32(QuestID);
@@ -456,6 +726,53 @@ public class QuestGiverRequestItems : ServerPacket
 
         _worldPacket.WriteBits(QuestTitle.GetByteCount(), 9);
         _worldPacket.WriteBits(CompletionText.GetByteCount(), 12);
+
+        _worldPacket.WriteString(QuestTitle);
+        _worldPacket.WriteString(CompletionText);
+    }
+
+    // V3_4_3.54261 layout — matches CypherCore Source/Game/Networking/Packets/QuestPackets.cs
+    // QuestGiverRequestItems.Write at line 537. Includes QuestFlagsEx2, per-Collect
+    // Flags, duplicated CreatureID, and ConditionalCompletionText.Count (=0) —
+    // omitting any of these causes V3_4_3 client to read garbage as a count and
+    // attempt a multi-TB allocation (`?AUConditionalQuestText@@` OOM crash).
+    private void WriteWotLK()
+    {
+        _worldPacket.WritePackedGuid128(QuestGiverGUID);
+        _worldPacket.WriteInt32((int)QuestGiverCreatureID);
+        _worldPacket.WriteInt32((int)QuestID);
+        _worldPacket.WriteUInt32(CompEmoteDelay);
+        _worldPacket.WriteInt32((int)CompEmoteType);
+        _worldPacket.WriteUInt32(QuestFlags[0]);
+        _worldPacket.WriteUInt32(QuestFlags[1]);
+        _worldPacket.WriteUInt32(0);                   // QuestFlagsEx2
+        _worldPacket.WriteInt32((int)SuggestPartyMembers);
+        _worldPacket.WriteInt32(MoneyToGet);
+        _worldPacket.WriteInt32(Collect.Count);
+        _worldPacket.WriteInt32(Currency.Count);
+        _worldPacket.WriteInt32((int)StatusFlags);
+
+        foreach (QuestObjectiveCollect obj in Collect)
+        {
+            _worldPacket.WriteInt32((int)obj.ObjectID);
+            _worldPacket.WriteInt32((int)obj.Amount);
+            _worldPacket.WriteUInt32(obj.Flags);        // V3_4_3 only
+        }
+        foreach (QuestCurrency cur in Currency)
+        {
+            _worldPacket.WriteInt32((int)cur.CurrencyID);
+            _worldPacket.WriteInt32(cur.Amount);
+        }
+
+        _worldPacket.WriteBit(AutoLaunched);
+        _worldPacket.FlushBits();
+
+        _worldPacket.WriteInt32((int)QuestGiverCreatureID);  // duplicated
+        _worldPacket.WriteInt32(0);                          // ConditionalCompletionText.Count
+
+        _worldPacket.WriteBits(QuestTitle.GetByteCount(), 9);
+        _worldPacket.WriteBits(CompletionText.GetByteCount(), 12);
+        _worldPacket.FlushBits();
 
         _worldPacket.WriteString(QuestTitle);
         _worldPacket.WriteString(CompletionText);
@@ -510,6 +827,12 @@ public class QuestGiverOfferRewardMessage : ServerPacket
 
     public override void Write()
     {
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            WriteWotLK();
+            return;
+        }
+
         QuestData.Write(_worldPacket);
         _worldPacket.WriteUInt32(QuestPackageID);
         _worldPacket.WriteUInt32(PortraitGiver);
@@ -523,6 +846,40 @@ public class QuestGiverOfferRewardMessage : ServerPacket
         _worldPacket.WriteBits(PortraitGiverName.GetByteCount(), 8);
         _worldPacket.WriteBits(PortraitTurnInText.GetByteCount(), 10);
         _worldPacket.WriteBits(PortraitTurnInName.GetByteCount(), 8);
+
+        _worldPacket.WriteString(QuestTitle);
+        _worldPacket.WriteString(RewardText);
+        _worldPacket.WriteString(PortraitGiverText);
+        _worldPacket.WriteString(PortraitGiverName);
+        _worldPacket.WriteString(PortraitTurnInText);
+        _worldPacket.WriteString(PortraitTurnInName);
+    }
+
+    // V3_4_3.54261 layout — matches CypherCore Source/Game/Networking/Packets/QuestPackets.cs
+    // QuestGiverOfferRewardMessage.Write at line 311. The CRITICAL field versus
+    // the simpler retail layout is the int32 ConditionalRewardText.Count = 0 —
+    // omitting it causes the V3_4_3 client to read garbage as a count and try
+    // to allocate multi-TB arrays (`?AUConditionalQuestText@@` OOM crash).
+    // QuestData sub-block delegates to QuestGiverOfferReward.WriteWotLK which
+    // emits 3 QuestFlags (FlagsEx2 added) and writes Rewards LAST.
+    private void WriteWotLK()
+    {
+        QuestData.WriteWotLK(_worldPacket);
+        _worldPacket.WriteInt32((int)QuestPackageID);
+        _worldPacket.WriteInt32((int)PortraitGiver);
+        _worldPacket.WriteInt32((int)PortraitGiverMount);
+        _worldPacket.WriteInt32((int)PortraitGiverModelSceneID);
+        _worldPacket.WriteInt32((int)PortraitTurnIn);
+        _worldPacket.WriteInt32((int)QuestData.QuestGiverCreatureID);  // duplicated
+        _worldPacket.WriteInt32(0);                                    // ConditionalRewardText.Count
+
+        _worldPacket.WriteBits(QuestTitle.GetByteCount(), 9);
+        _worldPacket.WriteBits(RewardText.GetByteCount(), 12);
+        _worldPacket.WriteBits(PortraitGiverText.GetByteCount(), 10);
+        _worldPacket.WriteBits(PortraitGiverName.GetByteCount(), 8);
+        _worldPacket.WriteBits(PortraitTurnInText.GetByteCount(), 10);
+        _worldPacket.WriteBits(PortraitTurnInName.GetByteCount(), 8);
+        _worldPacket.FlushBits();
 
         _worldPacket.WriteString(QuestTitle);
         _worldPacket.WriteString(RewardText);
@@ -570,6 +927,34 @@ public class QuestGiverOfferReward
 
         Rewards.Write(data);
     }
+
+    // V3_4_3.54261 layout — matches CypherCore QuestGiverOfferReward.Write at
+    // QuestPackets.cs:1192. Adds QuestFlagsEx2 (3rd uint32 flag, =0) which retail
+    // doesn't have.
+    public void WriteWotLK(WorldPacket data)
+    {
+        data.WritePackedGuid128(QuestGiverGUID);
+        data.WriteUInt32(QuestGiverCreatureID);
+        data.WriteUInt32(QuestID);
+        data.WriteUInt32(QuestFlags[0]); // Flags
+        data.WriteUInt32(QuestFlags[1]); // FlagsEx
+        data.WriteUInt32(0);             // FlagsEx2 (V3_4_3 only)
+        data.WriteUInt32(SuggestedPartyMembers);
+
+        data.WriteInt32(Emotes.Count);
+        foreach (QuestDescEmote emote in Emotes)
+        {
+            data.WriteUInt32(emote.Type);
+            data.WriteUInt32(emote.Delay);
+        }
+
+        data.WriteBit(AutoLaunched);
+        data.WriteBit(false);   // Unused
+        data.FlushBits();
+
+        Rewards.Write(data);
+    }
+
 
     public WowGuid128 QuestGiverGUID;
     public uint QuestGiverCreatureID = 0;
