@@ -1123,7 +1123,7 @@ public class ObjectUpdateBuilder
                 m_fields.SetUpdateField<uint>(PlayerField.PLAYER_DUEL_TEAM, (uint)playerData.DuelTeam);
             if (playerData.GuildTimeStamp != null)
                 m_fields.SetUpdateField<int>(PlayerField.PLAYER_GUILD_TIMESTAMP, (int)playerData.GuildTimeStamp);
-            for (int i = 0; i < 25; i++)
+            for (int i = 0; i < HermesProxy.World.Enums.QuestConst.MaxQuestLogSize; i++)
             {
                 int startIndex = (int)PlayerField.PLAYER_QUEST_LOG;
                 int sizePerEntry = 16;

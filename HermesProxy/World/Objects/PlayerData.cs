@@ -1,4 +1,5 @@
-﻿using HermesProxy.World.Server.Packets;
+﻿using HermesProxy.World.Enums;
+using HermesProxy.World.Server.Packets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -34,7 +35,7 @@ public class PlayerData
     public byte? PvPRank;
     public uint? DuelTeam;
     public int? GuildTimeStamp;
-    public QuestLog[] QuestLog = new QuestLog[25];
+    public QuestLog[] QuestLog = new QuestLog[QuestConst.MaxQuestLogSize];
     public VisibleItem?[] VisibleItems = new VisibleItem?[19];
     public int? ChosenTitle;
     public int? FakeInebriation;
