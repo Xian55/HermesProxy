@@ -19,6 +19,7 @@
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -171,6 +172,21 @@ class PartyInviteResponse : ClientPacket
 
     public override void Read()
     {
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 wire layout: 3 header bits first, then optional bytes.
+            // /reload emits this packet with all flags=0 (size=1) as a state flush.
+            bool hasPartyIndex = _worldPacket.HasBit();
+            Accept = _worldPacket.HasBit();
+            bool hasRolesDesiredV343 = _worldPacket.HasBit();
+
+            if (hasPartyIndex)
+                PartyIndex = _worldPacket.ReadUInt8();
+            if (hasRolesDesiredV343)
+                RolesDesired = _worldPacket.ReadUInt8();
+            return;
+        }
+
         PartyIndex = _worldPacket.ReadUInt8();
 
         Accept = _worldPacket.HasBit();
