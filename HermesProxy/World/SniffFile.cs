@@ -5,14 +5,15 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Framework.Logging;
 
 namespace HermesProxy.World;
 
 public sealed class SniffFile
 {
-    // Monotonic counter suffixed to filenames so simultaneous sessions can't collide on the
-    // one-second-granular Unix timestamp (two logins in the same second previously raced for
-    // the same path).
+    // Monotonic counter suffixed to filenames so multiple captures within a single proxy
+    // process (e.g. realm-switch, reconnect) get distinct paths even though they share the
+    // process-wide StartupStamp.
     private static int _sessionCounter = 0;
 
     // 64 KB FileStream buffer — packet logging is bursty sequential writes; the default 4 KB
@@ -28,7 +29,10 @@ public sealed class SniffFile
             Directory.CreateDirectory(dir);
 
         int seq = Interlocked.Increment(ref _sessionCounter);
-        string file = fileName + "_" + build + "_" + Time.UnixTime + "_" + seq + ".pkt";
+        // Filename embeds Log.StartupStamp (yyyyMMdd_HHmmss) so the .pkt shares its token
+        // with hermes-<StartupStamp>.log — enables exact-match correlation between the
+        // text log and the binary capture instead of fuzzy unix-time proximity.
+        string file = fileName + "_" + build + "_" + Log.StartupStamp + "_" + seq + ".pkt";
         string path = Path.Combine(dir, file);
 
         this.FilePath = path;
