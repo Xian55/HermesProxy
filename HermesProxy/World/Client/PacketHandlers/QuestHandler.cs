@@ -136,7 +136,11 @@ public partial class WorldClient
     {
         QuestGiverStatusPkt response = new QuestGiverStatusPkt();
         response.QuestGiver.Guid = packet.ReadGuid().To128(GetSession().GameState);
-        response.QuestGiver.Status = LegacyVersion.ConvertQuestGiverStatus(packet.ReadUInt8());
+        byte legacyStatus = packet.ReadUInt8();
+        response.QuestGiver.Status = LegacyVersion.ConvertQuestGiverStatus(legacyStatus);
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+            $"[QuestStatusTrace] SMSG_QUEST_GIVER_STATUS recv: GUID={response.QuestGiver.Guid} entry={response.QuestGiver.Guid.GetEntry()} " +
+            $"legacyByte={legacyStatus} → modern={response.QuestGiver.Status}");
         SendPacketToClient(response);
     }
 
@@ -145,11 +149,17 @@ public partial class WorldClient
     {
         QuestGiverStatusMultiple response = new QuestGiverStatusMultiple();
         int count = packet.ReadInt32();
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+            $"[QuestStatusTrace] SMSG_QUEST_GIVER_STATUS_MULTIPLE recv: count={count}");
         for (int i = 0; i < count; i++)
         {
             QuestGiverInfo info = new();
             info.Guid = packet.ReadGuid().To128(GetSession().GameState);
-            info.Status = LegacyVersion.ConvertQuestGiverStatus(packet.ReadUInt8());
+            byte legacyStatus = packet.ReadUInt8();
+            info.Status = LegacyVersion.ConvertQuestGiverStatus(legacyStatus);
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[QuestStatusTrace]   recv[{i}] GUID={info.Guid} entry={info.Guid.GetEntry()} " +
+                $"legacyByte={legacyStatus} → modern={info.Status}");
             response.QuestGivers.Add(info);
         }
         SendPacketToClient(response);
@@ -178,12 +188,28 @@ public partial class WorldClient
     {
         ClientGossipQuest quest = new();
         quest.QuestID = packet.ReadUInt32();
-        QuestGiverStatusModern dialogStatus = LegacyVersion.ConvertQuestGiverStatus((byte)packet.ReadInt32());
-
-        if (dialogStatus.HasAnyFlag(QuestGiverStatusModern.Available | QuestGiverStatusModern.AvailableCovenantCalling | QuestGiverStatusModern.AvailableJourney | QuestGiverStatusModern.AvailableLegendaryQuest | QuestGiverStatusModern.AvailableRep | QuestGiverStatusModern.LowLevelAvailable | QuestGiverStatusModern.LowLevelAvailableRep))
-            quest.QuestType = 2; // available
+        int rawIcon = packet.ReadInt32();
+        // TBC+ (V2_0_1+) legacy backends already emit QuestIcon as the modern
+        // GossipQuestIcon convention (Available=2, Complete=4). Pass through.
+        // Vanilla pre-2.0 emits the QuestGiverStatusVanilla ordinal (0..7) —
+        // translate to GossipQuestIcon so the modern client renders correctly.
+        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
+        {
+            quest.QuestType = rawIcon;
+        }
         else
-            quest.QuestType = 4; // complete
+        {
+            quest.QuestType = (int)((QuestGiverStatusVanilla)rawIcon switch
+            {
+                QuestGiverStatusVanilla.LowLevelAvailable => GossipQuestIcon.Available,
+                QuestGiverStatusVanilla.Available         => GossipQuestIcon.Available,
+                QuestGiverStatusVanilla.Incomplete        => GossipQuestIcon.Complete,
+                QuestGiverStatusVanilla.RewardRep         => GossipQuestIcon.Complete,
+                QuestGiverStatusVanilla.Reward2           => GossipQuestIcon.Complete,
+                QuestGiverStatusVanilla.Reward            => GossipQuestIcon.Complete,
+                _                                         => GossipQuestIcon.AvailableRepeatable,
+            });
+        }
 
         quest.QuestLevel = packet.ReadInt32();
 
@@ -277,6 +303,18 @@ public partial class WorldClient
 
         ReadExtraQuestInfo(packet, quest.QuestData.Rewards, true);
 
+        // Proactively query the quest template if it isn't cached. The proxy-side
+        // CHOOSE_REWARD handler needs `QuestTemplate.UnfilteredChoiceItems` to map
+        // the modern client's ItemID back to the legacy choice index. Without
+        // this query the user's first reward click fails with QUEST_FAILED until
+        // they retry (after the cache populates from a manual query).
+        if (GameData.GetQuestTemplate(quest.QuestData.QuestID) == null)
+        {
+            WorldPacket queryQuest = new WorldPacket(Opcode.CMSG_QUERY_QUEST_INFO);
+            queryQuest.WriteUInt32(quest.QuestData.QuestID);
+            SendPacketToServer(queryQuest);
+        }
+
         SendPacketToClient(quest);
     }
 
@@ -367,6 +405,8 @@ public partial class WorldClient
     {
         QuestGiverInvalidQuest quest = new QuestGiverInvalidQuest();
         quest.Reason = (QuestFailedReasons)packet.ReadUInt32();
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+            $"[QuestInvalidTrace] Reason={quest.Reason} ({(uint)quest.Reason})");
         SendPacketToClient(quest);
     }
 
@@ -438,5 +478,55 @@ public partial class WorldClient
         quest.SenderGUID = packet.ReadGuid().To128(GetSession().GameState);
         quest.Result = (QuestPushReason)packet.ReadUInt8();
         SendPacketToClient(quest);
+    }
+
+    [PacketHandler(Opcode.SMSG_QUEST_POI_QUERY_RESPONSE)]
+    void HandleQuestPOIQueryResponse(WorldPacket packet)
+    {
+        // Legacy 3.3.5a wire layout (mangos-wotlk QueryHandler.cpp:526):
+        //   uint32 count
+        //   per quest:
+        //     uint32 questID, uint32 blobs.Count
+        //     per blob:
+        //       uint32 BlobIndex, int32 ObjectiveIndex, uint32 MapID,
+        //       uint32 WorldMapAreaID, uint32 FloorID, uint32 Unk3, uint32 Unk4,
+        //       uint32 points.Count
+        //       per point: int32 X, int32 Y
+        // Translate to V3_4_3 layout (CypherCore QuestPOIData at ObjectManager.cs:13841):
+        //   13 int32 fields per blob, X/Y/Z (int16) per point, AlwaysAllowMergingBlobs bit.
+        QuestPOIQueryResponse response = new();
+        uint count = packet.ReadUInt32();
+        for (uint i = 0; i < count; i++)
+        {
+            QuestPOIData data = new();
+            data.QuestID = (int)packet.ReadUInt32();
+            uint blobCount = packet.ReadUInt32();
+            for (uint b = 0; b < blobCount; b++)
+            {
+                QuestPOIBlobData blob = new();
+                blob.BlobIndex = (int)packet.ReadUInt32();
+                blob.ObjectiveIndex = packet.ReadInt32();
+                blob.MapID = (int)packet.ReadUInt32();
+                int worldMapAreaID = (int)packet.ReadUInt32();
+                blob.UiMapID = GameData.GetUiMapId(worldMapAreaID);
+                packet.ReadUInt32(); // FloorID — no V3_4_3 equivalent
+                packet.ReadUInt32(); // Unk3
+                packet.ReadUInt32(); // Unk4
+                uint pointsCount = packet.ReadUInt32();
+                for (uint p = 0; p < pointsCount; p++)
+                {
+                    QuestPOIBlobPoint point = new()
+                    {
+                        X = (short)packet.ReadInt32(),
+                        Y = (short)packet.ReadInt32(),
+                        Z = 0
+                    };
+                    blob.Points.Add(point);
+                }
+                data.Blobs.Add(blob);
+            }
+            response.QuestPOIDataStats.Add(data);
+        }
+        SendPacketToClient(response);
     }
 }
