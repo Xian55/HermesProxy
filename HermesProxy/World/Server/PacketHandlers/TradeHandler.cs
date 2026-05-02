@@ -83,8 +83,8 @@ public partial class WorldSocket
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_TRADE_ITEM);
         packet.WriteUInt8(trade.TradeSlot);
-        byte containerSlot = trade.PackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(trade.PackSlot) : trade.PackSlot;
-        byte slot = trade.PackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(trade.ItemSlotInPack) : trade.ItemSlotInPack;
+        byte containerSlot = trade.PackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(trade.PackSlot) : trade.PackSlot;
+        byte slot = trade.PackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(trade.ItemSlotInPack) : trade.ItemSlotInPack;
         packet.WriteUInt8(containerSlot);
         packet.WriteUInt8(slot);
         SendPacketToServer(packet);
