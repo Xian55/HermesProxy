@@ -170,12 +170,25 @@ public partial class WorldClient
         GetSession().GameState.LastMasterLootSentTarget = default;
         PartyUpdate party = new PartyUpdate();
         party.SequenceNum = GetSession().GameState.GroupUpdateCounter++;
-        bool isRaid = packet.ReadBool();
-        bool isBattleground = packet.ReadBool();
+        // Wire format on 2.x/3.3.x is a single byte of flags, not two bools.
+        // TC/CMaNGOS agree: BG/FakeRaid=0x01, Raid=0x02, Lfg=0x08.
+        byte groupType = packet.ReadUInt8();
+        bool isBattleground = (groupType & 0x01) != 0;
+        bool isRaid = (groupType & 0x02) != 0;
+        bool isLfg = (groupType & 0x08) != 0;
         byte ownSubGroup = packet.ReadUInt8();
         byte ownGroupFlags = packet.ReadUInt8();
+        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
+            packet.ReadUInt8(); // own LFG roles
+        if (isLfg)
+        {
+            packet.ReadUInt8();  // LFG dungeon status
+            packet.ReadUInt32(); // LFG dungeon ID
+        }
         party.PartyIndex = (byte)(isBattleground ? 1 : 0);
         party.PartyGUID = packet.ReadGuid().To128(GetSession().GameState);
+        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
+            packet.ReadUInt32(); // group counter
         if (party.PartyIndex != 0)
             party.PartyFlags |= GroupFlags.FakeRaid;
 
@@ -208,6 +221,8 @@ public partial class WorldClient
                 member.Status = (GroupMemberOnlineStatus)packet.ReadUInt8();
                 member.Subgroup = packet.ReadUInt8();
                 member.Flags = (GroupMemberFlags)packet.ReadUInt8();
+                if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
+                    packet.ReadUInt8(); // member LFG roles
                 member.ClassId = GetSession().GameState.GetUnitClass(member.GUID);
                 if (!member.Flags.HasAnyFlag(GroupMemberFlags.Assistant))
                     allAssist = false;
@@ -617,10 +632,14 @@ public partial class WorldClient
             state.StatusFlags = packet.ReadUInt16();// GroupMemberOnlineStatus
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.CurrentHealth))
-            state.CurrentHealth = packet.ReadUInt16();
+            state.CurrentHealth = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
+                ? packet.ReadUInt32()
+                : packet.ReadUInt16();
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.MaxHealth))
-            state.MaxHealth = packet.ReadUInt16();
+            state.MaxHealth = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
+                ? packet.ReadUInt32()
+                : packet.ReadUInt16();
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PowerType))
             state.PowerType = packet.ReadUInt8();
@@ -657,7 +676,9 @@ public partial class WorldClient
                     continue;
 
                 PartyMemberAuraStates aura = new PartyMemberAuraStates();
-                aura.SpellId = packet.ReadUInt16();
+                aura.SpellId = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
+                    ? packet.ReadUInt32()
+                    : packet.ReadUInt16();
                 packet.ReadUInt8(); // unk
                 if (aura.SpellId != 0)
                 {
@@ -694,14 +715,18 @@ public partial class WorldClient
         {
             if (state.Pet == null)
                 state.Pet = new PartyMemberPetStats();
-            state.Pet.Health = packet.ReadUInt16();
+            state.Pet.Health = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
+                ? packet.ReadUInt32()
+                : packet.ReadUInt16();
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetMaxHealth))
         {
             if (state.Pet == null)
                 state.Pet = new PartyMemberPetStats();
-            state.Pet.MaxHealth = packet.ReadUInt16();
+            state.Pet.MaxHealth = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
+                ? packet.ReadUInt32()
+                : packet.ReadUInt16();
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetPowerType))
@@ -728,7 +753,9 @@ public partial class WorldClient
                     continue;
 
                 PartyMemberAuraStates aura = new PartyMemberAuraStates();
-                aura.SpellId = packet.ReadUInt16();
+                aura.SpellId = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
+                    ? packet.ReadUInt32()
+                    : packet.ReadUInt16();
                 packet.ReadUInt8(); // unk
                 if (aura.SpellId != 0)
                 {
@@ -979,6 +1006,10 @@ public partial class WorldClient
             state.PartyType[1] = 0;
         }
 
+        // 3.0+ legacy server prefixes the packet with a "for enemy / group type" byte.
+        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
+            packet.ReadUInt8(); // ForEnemy flag (not forwarded)
+
         state.MemberGuid = packet.ReadPackedGuid().To128(GetSession().GameState);
         var updateFlags = (GroupUpdateFlagTBC)packet.ReadUInt32();
 
@@ -986,10 +1017,14 @@ public partial class WorldClient
             state.StatusFlags = (GroupMemberOnlineStatus)packet.ReadUInt16();
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.CurrentHealth))
-            state.CurrentHealth = packet.ReadUInt16();
+            state.CurrentHealth = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
+                ? (int)packet.ReadUInt32()
+                : packet.ReadUInt16();
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.MaxHealth))
-            state.MaxHealth = packet.ReadUInt16();
+            state.MaxHealth = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
+                ? (int)packet.ReadUInt32()
+                : packet.ReadUInt16();
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PowerType))
             state.PowerType = packet.ReadUInt8();
@@ -1025,7 +1060,9 @@ public partial class WorldClient
                     continue;
 
                 PartyMemberAuraStates aura = new PartyMemberAuraStates();
-                aura.SpellId = packet.ReadUInt16();
+                aura.SpellId = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
+                    ? packet.ReadUInt32()
+                    : packet.ReadUInt16();
                 packet.ReadUInt8(); // unk
                 if (aura.SpellId != 0)
                 {
@@ -1062,14 +1099,18 @@ public partial class WorldClient
         {
             if (state.Pet == null)
                 state.Pet = new PartyMemberPetStats();
-            state.Pet.Health = packet.ReadUInt16();
+            state.Pet.Health = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
+                ? packet.ReadUInt32()
+                : packet.ReadUInt16();
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetMaxHealth))
         {
             if (state.Pet == null)
                 state.Pet = new PartyMemberPetStats();
-            state.Pet.MaxHealth = packet.ReadUInt16();
+            state.Pet.MaxHealth = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
+                ? packet.ReadUInt32()
+                : packet.ReadUInt16();
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetPowerType))
@@ -1096,7 +1137,9 @@ public partial class WorldClient
                     continue;
 
                 PartyMemberAuraStates aura = new PartyMemberAuraStates();
-                aura.SpellId = packet.ReadUInt16();
+                aura.SpellId = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
+                    ? packet.ReadUInt32()
+                    : packet.ReadUInt16();
                 packet.ReadUInt8(); // unk
                 if (aura.SpellId != 0)
                 {
