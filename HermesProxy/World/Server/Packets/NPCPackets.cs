@@ -217,21 +217,21 @@ public class ClientGossipQuest
         data.WriteString(QuestTitle);
     }
 
-    // V3_4_3 layout adds an extra reserved bit between Repeatable and the title
-    // length. Without it, the V3_4_3 client reads the title length 1 bit shifted
-    // and then mis-parses the next field as a ConditionalQuestText length prefix,
-    // producing absurd allocation requests (~5 TB) → client OOM crash.
+    // V3_4_3.54261 wire layout (WPP V3_4_0 ReadGossipQuestTextData range
+    // V3_4_3_51505 → V3_4_4_59817). Two bits before the bits9 title length:
+    // Repeatable and Important. Newer V3_4_4+ adds Unused1102, QuestFlags[2],
+    // ResetByScheduler/Meta — those are NOT present in build 54261.
     public void WriteWotLK(WorldPacket data)
     {
         data.WriteInt32((int)QuestID);
         data.WriteInt32((int)ContentTuningID);
         data.WriteInt32(QuestType);
         data.WriteInt32(QuestLevel);
-        data.WriteInt32(QuestMaxLevel);
+        data.WriteInt32(QuestMaxLevel);     // QuestMaxScalingLevel
         data.WriteInt32((int)QuestFlags);
         data.WriteInt32((int)QuestFlagsEx);
         data.WriteBit(Repeatable);
-        data.WriteBit(false);
+        data.WriteBit(false);               // Important
         data.WriteBits(QuestTitle.GetByteCount(), 9);
         data.FlushBits();
         data.WriteString(QuestTitle);
