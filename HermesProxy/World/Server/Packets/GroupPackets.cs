@@ -380,11 +380,23 @@ class PartyUninvite : ClientPacket
 
     public override void Read()
     {
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 wire layout: bits first, then GUID, then optional PartyIndex byte.
+            bool hasPartyIndex = _worldPacket.HasBit();
+            byte reasonLen = _worldPacket.ReadBits<byte>(8);
+            TargetGUID = _worldPacket.ReadPackedGuid128();
+            if (hasPartyIndex)
+                PartyIndex = _worldPacket.ReadUInt8();
+            Reason = _worldPacket.ReadString(reasonLen);
+            return;
+        }
+
         PartyIndex = _worldPacket.ReadUInt8();
         TargetGUID = _worldPacket.ReadPackedGuid128();
 
-        byte reasonLen = _worldPacket.ReadBits<byte>(8);
-        Reason = _worldPacket.ReadString(reasonLen);
+        byte legacyReasonLen = _worldPacket.ReadBits<byte>(8);
+        Reason = _worldPacket.ReadString(legacyReasonLen);
     }
 
     public byte PartyIndex;
