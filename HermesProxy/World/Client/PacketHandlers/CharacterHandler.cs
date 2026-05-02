@@ -338,18 +338,6 @@ public partial class WorldClient
             PhaseShiftChange phaseShift = new();
             phaseShift.Client = GetSession().GameState.CurrentPlayerGuid;
             SendPacketToClient(phaseShift);
-
-            // TC reference (`World_login_parsed.txt` packet #138) sends
-            // SMSG_MOVE_SET_ACTIVE_MOVER BEFORE the player CreateObject — the client
-            // immediately acks with CMSG_SET_ACTIVE_MOVER (#139), then receives the
-            // CreateObject batch. This early "the GUID you're about to receive is
-            // your active mover" announcement is what wires the client's input layer
-            // to the player object as soon as it appears.
-            MoveSetActiveMover setActiveMover = new()
-            {
-                MoverGUID = GetSession().GameState.CurrentPlayerGuid,
-            };
-            SendPacketToClient(setActiveMover);
         }
     }
 
