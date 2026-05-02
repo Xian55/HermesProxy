@@ -317,7 +317,7 @@ public partial class WorldClient
         {
             uint displayId = packet.ReadUInt32();
             if (displayId != 0)
-                creature.Display.CreatureDisplay.Add(new CreatureXDisplay(displayId, 1, 0));
+                creature.Display.CreatureDisplay.Add(new CreatureXDisplay(displayId, 1, 100));
         }
 
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
@@ -349,7 +349,6 @@ public partial class WorldClient
         }
 
         // Placeholders
-        creature.Flags[0] |= 134217728;
         creature.MovementInfoID = 1693;
         creature.Class = 1;
 
