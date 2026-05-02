@@ -49,6 +49,12 @@ public static class Log
     public const string CategoryStorage = "Storage";
     public const string CategoryPacket = "Packet";
 
+    // Per-process session token (yyyyMMdd_HHmmss of process start). Embedded in the rolling
+    // log filename (`hermes-<StartupStamp>.log`) and reused by SniffFile so that .pkt captures
+    // share the same token as the log file — enables exact-match correlation between
+    // hermes-*.log and PacketsLog/*.pkt instead of fuzzy unix-time proximity matching.
+    public static readonly string StartupStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
     // Console template uses the ANSI-pre-colored category letter so each category keeps its own color
     // (Server=Blue, Network=Green, Storage=Cyan, Packet=Magenta). The level letter is colored by the
     // custom theme below. The message text stays the terminal's default color.
@@ -191,9 +197,8 @@ public static class Log
                     // separation; retainedFileCountLimit caps disk usage at the latest 30 runs.
                     // File sink has no additional filter — it captures whatever passes the
                     // per-category switches, which is typically the more verbose view.
-                    var startupStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                     a.File(
-                        path: Path.Combine(directory, $"hermes-{startupStamp}.log"),
+                        path: Path.Combine(directory, $"hermes-{StartupStamp}.log"),
                         rollingInterval: RollingInterval.Infinite,
                         retainedFileCountLimit: 30,
                         outputTemplate: FileOutputTemplate,
