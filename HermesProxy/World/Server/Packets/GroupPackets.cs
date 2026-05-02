@@ -214,6 +214,8 @@ public class PartyUpdate : ServerPacket
         _worldPacket.WritePackedGuid128(PartyGUID);
         _worldPacket.WriteInt32(SequenceNum);
         _worldPacket.WritePackedGuid128(LeaderGUID);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            _worldPacket.WriteUInt8(LeaderFactionGroup);
         _worldPacket.WriteInt32(PlayerList.Count);
         _worldPacket.WriteBit(LfgInfos != null);
         _worldPacket.WriteBit(LootSettings != null);
@@ -239,6 +241,7 @@ public class PartyUpdate : ServerPacket
 
     public WowGuid128 PartyGUID;
     public WowGuid128 LeaderGUID;
+    public byte LeaderFactionGroup;
 
     public int MyIndex;
     public int SequenceNum;
@@ -256,14 +259,33 @@ public struct PartyPlayerInfo
     {
         data.WriteBits(Name.GetByteCount(), 6);
         data.WriteBits(VoiceStateID.GetByteCount() + 1, 6);
-        data.WriteBit(FromSocialQueue);
-        data.WriteBit(VoiceChatSilenced);
+
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            bool isConnected = Connected || Status != GroupMemberOnlineStatus.Offline;
+            data.WriteBit(isConnected);
+            data.WriteBit(VoiceChatSilenced);
+            data.WriteBit(FromSocialQueue);
+        }
+        else
+        {
+            data.WriteBit(FromSocialQueue);
+            data.WriteBit(VoiceChatSilenced);
+        }
+
         data.WritePackedGuid128(GUID);
-        data.WriteUInt8((byte)Status);
+
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+            data.WriteUInt8((byte)Status);
+
         data.WriteUInt8(Subgroup);
         data.WriteUInt8((byte)Flags);
         data.WriteUInt8(RolesAssigned);
         data.WriteUInt8((byte)ClassId);
+
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            data.WriteUInt8(FactionGroup);
+
         data.WriteString(Name);
         if (!VoiceStateID.IsEmpty())
             data.WriteString(VoiceStateID);
@@ -277,8 +299,10 @@ public struct PartyPlayerInfo
     public byte Subgroup;
     public GroupMemberFlags Flags;
     public byte RolesAssigned;
+    public byte FactionGroup;
     public bool FromSocialQueue;
     public bool VoiceChatSilenced;
+    public bool Connected;
 }
 
 public class PartyLFGInfo
