@@ -347,6 +347,20 @@ public class UpdateObject : ServerPacket
         // (UnitData/PlayerData/ActivePlayerData) themselves may be non-null but contain
         // only nullable fields all set to null — the V3_4_3 client treats the resulting
         // bit-mask body as malformed.
+
+        // ObjectData fields apply to every entity type. A Values update that only
+        // clears UNIT_DYNAMIC_FLAGS (e.g. dropping the Lootable bit after loot
+        // release) populates ObjectData.DynamicFlags = 0 and nothing else; without
+        // this probe the filter classified that as empty and dropped it, leaving
+        // the corpse sparkly on the modern client.
+        var obj = u.ObjectData;
+        if (obj != null)
+        {
+            if (obj.DynamicFlags.HasValue) return false;
+            if (obj.EntryID.HasValue) return false;
+            if (obj.Scale.HasValue) return false;
+        }
+
         var unit = u.UnitData;
         if (unit != null)
         {
