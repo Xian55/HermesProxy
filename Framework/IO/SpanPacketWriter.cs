@@ -189,6 +189,7 @@ public ref struct SpanPacketWriter
         _buffer[_position++] = value ? (byte)1 : (byte)0;
     }
 
+    //FIXME: refactor this function please
     public void WriteCString(string value)
     {
         if (string.IsNullOrEmpty(value))
