@@ -687,10 +687,12 @@ public class ObjectUpdateBuilder
         data.WriteUInt32(player.DuelTeam.GetValueOrDefault());
         data.WriteInt32(player.GuildTimeStamp.GetValueOrDefault());
 
-        // QuestLog[25] — gated by PartyMember flag (0x02) in TC343.
+        // QuestLog[QuestConst.MaxQuestLogSize] — gated by PartyMember flag (0x02) in TC343.
         if (IsOwner)
         {
-            for (int q = 0; q < 25; q++)
+            int questCount = 0;
+            System.Text.StringBuilder slotSummary = new();
+            for (int q = 0; q < QuestConst.MaxQuestLogSize; q++)
             {
                 var quest = player.QuestLog != null && q < player.QuestLog.Length ? player.QuestLog[q] : null;
                 data.WriteInt64(quest?.EndTime ?? 0);
@@ -698,7 +700,14 @@ public class ObjectUpdateBuilder
                 data.WriteUInt32(quest?.StateFlags ?? 0);
                 for (int obj = 0; obj < 24; obj++)
                     data.WriteUInt16((ushort)(quest?.ObjectiveProgress[obj] ?? 0));
+                if (quest != null && quest.QuestID.HasValue && quest.QuestID.Value != 0)
+                {
+                    questCount++;
+                    slotSummary.Append($" [{q}]={quest.QuestID.Value}");
+                }
             }
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[QuestLogCreate] populated={questCount} slots:{slotSummary}");
         }
 
         for (int j = 0; j < 19; j++)
@@ -2217,7 +2226,7 @@ public class ObjectUpdateBuilder
 
         // QuestLog (header 35, elements 36-60)
         bool hasAnyQuestLog = false;
-        for (int i = 0; i < 25; i++)
+        for (int i = 0; i < QuestConst.MaxQuestLogSize; i++)
         {
             if (p.QuestLog[i] != null && p.QuestLog[i].QuestID.HasValue)
             {
@@ -2239,7 +2248,7 @@ public class ObjectUpdateBuilder
             }
         }
 
-        Framework.Logging.Log.Print(Framework.Logging.LogType.Debug, $"[PlayerDataUpdate] blocks=[0x{blocks[0]:X8},0x{blocks[1]:X8},0x{blocks[2]:X8},0x{blocks[3]:X8}]");
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace, $"[PlayerDataUpdate] blocks=[0x{blocks[0]:X8},0x{blocks[1]:X8},0x{blocks[2]:X8},0x{blocks[3]:X8}]");
 
         // Write blocksMask (4 bits)
         byte blocksMask = 0;
@@ -2288,7 +2297,7 @@ public class ObjectUpdateBuilder
         // QuestLog entries (bits 35-60) — WriteCreate format
         if (hasAnyQuestLog)
         {
-            for (int i = 0; i < 25; i++)
+            for (int i = 0; i < QuestConst.MaxQuestLogSize; i++)
             {
                 if (IsBitSet(36 + i))
                 {
