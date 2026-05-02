@@ -84,16 +84,22 @@ public partial class WorldClient
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 char1.Flags2 = packet.ReadUInt32(); // Customization Flags
 
-            // Read but ignore the legacy FirstLogin flag for V3_4_3. When a fresh char
-            // is included (FirstLogin=True), the V3_4_3 client validates ZoneId/MapId
-            // against the race's starting-zone DB; the legacy backend often sends
-            // ZoneId=0 which fails that check and the whole enum is rejected. Forcing
-            // FirstLogin=False makes the client skip that validation so multi-char
-            // enums render even with a freshly-created char in the list.
             byte legacyFirstLogin = packet.ReadUInt8();
-            char1.FirstLogin = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
-                ? false
-                : (legacyFirstLogin != 0);
+            char1.FirstLogin = legacyFirstLogin != 0;
+
+            // V3_4_3 client validates ZoneId/MapId against the race's starting-zone DB
+            // iff FirstLogin=true. cMangos returns ZoneId=0/MapId=0 for a freshly-created
+            // char, which fails that check and the whole enum is rejected. Synthesize
+            // the canonical starting (Map, Zone, Position) per race so the validation
+            // passes — the legacy server will overwrite these on actual login. Keeping
+            // FirstLogin=true is what tells the V3_4_3 client to auto-select this char
+            // as the just-created one (the previous blanket-false override broke that).
+            if (char1.FirstLogin
+                && ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+                && (char1.MapId == 0 && char1.ZoneId == 0))
+            {
+                ApplyStartingLocation(char1);
+            }
             char1.PetCreatureDisplayId = packet.ReadUInt32();
             char1.PetExperienceLevel = packet.ReadUInt32();
             char1.PetCreatureFamilyId = packet.ReadUInt32();
@@ -726,5 +732,74 @@ public partial class WorldClient
             rename.Name = packet.ReadCString();
         }
         SendPacketToClient(rename);
+    }
+
+    // Synthesizes the canonical (MapId, ZoneId, Position) for a freshly-created
+    // character when the legacy backend (e.g. cMangos) returns ZoneId=0/MapId=0
+    // in SMSG_ENUM_CHARACTERS_RESULT. Without this, the V3_4_3 client rejects
+    // the entire enum because FirstLogin=true triggers a starting-zone DB
+    // lookup that fails on (0, 0). Death Knights (class 6) take precedence
+    // over the race default since they share a starting area regardless of race.
+    static void ApplyStartingLocation(EnumCharactersResult.CharacterInfo char1)
+    {
+        if (char1.ClassId == Class.Deathknight)
+        {
+            char1.MapId = 609;          // Plaguelands: The Scarlet Enclave
+            char1.ZoneId = 4298;
+            char1.PreloadPos = new Vector3(2381.33f, -5894.55f, 154.626f);
+            return;
+        }
+
+        switch (char1.RaceId)
+        {
+            case Race.Human:
+                char1.MapId = 0;        // Eastern Kingdoms
+                char1.ZoneId = 12;      // Elwynn Forest
+                char1.PreloadPos = new Vector3(-8949.95f, -132.493f, 83.5312f);
+                break;
+            case Race.Orc:
+            case Race.Troll:
+                char1.MapId = 1;        // Kalimdor
+                char1.ZoneId = 14;      // Durotar
+                char1.PreloadPos = new Vector3(-618.518f, -4251.67f, 38.718f);
+                break;
+            case Race.Dwarf:
+            case Race.Gnome:
+                char1.MapId = 0;
+                char1.ZoneId = 1;       // Dun Morogh
+                char1.PreloadPos = new Vector3(-6240.32f, 331.033f, 382.758f);
+                break;
+            case Race.NightElf:
+                char1.MapId = 1;
+                char1.ZoneId = 141;     // Teldrassil
+                char1.PreloadPos = new Vector3(10311.3f, 832.463f, 1326.41f);
+                break;
+            case Race.Undead:
+                char1.MapId = 0;
+                char1.ZoneId = 85;      // Tirisfal Glades
+                char1.PreloadPos = new Vector3(1676.71f, 1677.45f, 121.671f);
+                break;
+            case Race.Tauren:
+                char1.MapId = 1;
+                char1.ZoneId = 215;     // Mulgore
+                char1.PreloadPos = new Vector3(-2917.58f, -257.98f, 52.9968f);
+                break;
+            case Race.BloodElf:
+                char1.MapId = 530;      // Outland
+                char1.ZoneId = 3431;    // Eversong Woods
+                char1.PreloadPos = new Vector3(10349.6f, -6357.29f, 33.4308f);
+                break;
+            case Race.Draenei:
+                char1.MapId = 530;
+                char1.ZoneId = 3524;    // Azuremyst Isle
+                char1.PreloadPos = new Vector3(-3961.64f, -13931.2f, 100.615f);
+                break;
+            default:
+                // Last-resort fallback to keep the enum valid even for unknown races.
+                char1.MapId = 0;
+                char1.ZoneId = 12;
+                char1.PreloadPos = new Vector3(-8949.95f, -132.493f, 83.5312f);
+                break;
+        }
     }
 }
