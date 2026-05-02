@@ -314,6 +314,8 @@ public sealed class MovementInfo
             moveInfo.FlagsExtra = data.ReadBits<uint>(18);
         }
 
+        // V3_4_3 client adds two extra header bits (hasStandingOnGameObjectGUID, hasAdvFlying).
+        bool hasStandingOnGameObjectGUID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && data.HasBit();
         bool hasTransport = data.HasBit();
         bool hasFall = data.HasBit();
         bool hasSpline = data.HasBit(); // todo 6.x read this infos
@@ -321,9 +323,13 @@ public sealed class MovementInfo
         data.ReadBit(); // HeightChangeFailed
         data.ReadBit(); // RemoteTimeValid
         bool hasInertia = ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3) ? data.HasBit() : false;
+        bool hasAdvFlying = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && data.HasBit();
 
         if (hasTransport)
             ReadTransportInfoModern(data);
+
+        if (hasStandingOnGameObjectGUID)
+            data.ReadPackedGuid128();
 
         if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
         {
@@ -333,6 +339,12 @@ public sealed class MovementInfo
                 data.ReadVector3(); // Force
                 data.ReadUInt32(); // Lifetime
             }
+        }
+
+        if (hasAdvFlying)
+        {
+            data.ReadFloat(); // forwardVelocity
+            data.ReadFloat(); // upVelocity
         }
 
         if (hasFall)
