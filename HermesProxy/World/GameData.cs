@@ -64,6 +64,7 @@ public static partial class GameData
     public static FrozenDictionary<uint, TaxiPath> TaxiPaths = FrozenDictionary<uint, TaxiPath>.Empty;
     public static int[,] TaxiNodesGraph = new int[250, 250];
     public static FrozenDictionary<uint /*questId*/, uint /*questBit*/> QuestBits = FrozenDictionary<uint, uint>.Empty;
+    public static FrozenDictionary<int /*worldMapAreaId (legacy 3.3.5a)*/, int /*uiMapId (V3_4_3)*/> WorldMapAreaIDToUiMapID = FrozenDictionary<int, int>.Empty;
 
     // From Server
     public static Dictionary<uint, ItemTemplate> ItemTemplates = [];
@@ -585,6 +586,7 @@ public static partial class GameData
             LoadTaxiPaths,
             LoadTaxiPathNodesGraph,
             LoadQuestBits,
+            LoadWorldMapAreaIDToUiMapID,
             LoadHotfixes
         );
 
@@ -1415,6 +1417,24 @@ public static partial class GameData
         }
         QuestBits = dict.ToFrozenDictionary();
     }
+
+    public static void LoadWorldMapAreaIDToUiMapID()
+    {
+        var path = Path.Combine("CSV", "WorldMapAreaIDToUiMapID.csv");
+        using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+
+        Dictionary<int, int> dict = [];
+        foreach (var row in reader)
+        {
+            int worldMapAreaId = int.Parse(row[0].Span);
+            int uiMapId = int.Parse(row[1].Span);
+            dict[worldMapAreaId] = uiMapId;
+        }
+        WorldMapAreaIDToUiMapID = dict.ToFrozenDictionary();
+    }
+
+    public static int GetUiMapId(int worldMapAreaId) =>
+        WorldMapAreaIDToUiMapID.TryGetValue(worldMapAreaId, out int uiMapId) ? uiMapId : 0;
 
     #endregion
     #region HotFixes
