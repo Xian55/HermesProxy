@@ -6,6 +6,7 @@ using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using Xunit;
 using System;
+using System.Buffers.Binary;
 using HermesProxy.World.Server.Packets;
 
 namespace HermesProxy.Tests.Framework;
@@ -492,6 +493,63 @@ public class SpanPacketReaderTests
         Assert.True(reader.CanRead);
         reader.ReadUInt32();
         Assert.False(reader.CanRead);
+    }
+}
+
+/// <summary>
+/// Coverage for <see cref="SpanPacketReader.ReadBits{T}(int)"/> — locks the
+/// post-fix behavior. Mirrors <c>ByteBufferReadBitsTests</c> for the same
+/// surfaces. Previous formulation threw <see cref="OverflowException"/> at
+/// <c>bitCount=32</c> with the high bit set.
+/// </summary>
+public class SpanPacketReaderReadBitsTests
+{
+    private static byte[] MsbFirst32(uint value)
+    {
+        var data = new byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(data, value);
+        return data;
+    }
+
+    [Theory]
+    [InlineData(0x80000000u)]
+    [InlineData(0xFFFFFFFFu)]
+    [InlineData(0xCAFEBABEu)]
+    [InlineData(0xAAAAAAAAu)]
+    [InlineData(0x55555555u)]
+    [InlineData(0u)]
+    public void ReadBits_uint_32bit(uint expected)
+    {
+        var reader = new SpanPacketReader(MsbFirst32(expected));
+        Assert.Equal(expected, reader.ReadBits<uint>(32));
+    }
+
+    [Fact]
+    public void ReadBits_int_32bit_AllOnes_IsMinusOne()
+    {
+        var reader = new SpanPacketReader(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF });
+        Assert.Equal(-1, reader.ReadBits<int>(32));
+    }
+
+    [Fact]
+    public void ReadBits_int_32bit_HighBitOnly_IsIntMinValue()
+    {
+        var reader = new SpanPacketReader(new byte[] { 0x80, 0x00, 0x00, 0x00 });
+        Assert.Equal(int.MinValue, reader.ReadBits<int>(32));
+    }
+
+    [Fact]
+    public void ReadBits_byte_8bit_RoundTrip()
+    {
+        var reader = new SpanPacketReader(new byte[] { 0xAA });
+        Assert.Equal((byte)0xAA, reader.ReadBits<byte>(8));
+    }
+
+    [Fact]
+    public void ReadBits_ushort_16bit_RoundTrip()
+    {
+        var reader = new SpanPacketReader(new byte[] { 0xCA, 0xFE });
+        Assert.Equal((ushort)0xCAFE, reader.ReadBits<ushort>(16));
     }
 }
 
