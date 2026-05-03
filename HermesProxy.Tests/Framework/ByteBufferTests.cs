@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Text;
 using Framework.IO;
 using Xunit;
@@ -290,30 +291,111 @@ public class ByteBufferGetDataTests
 }
 
 /// <summary>
+/// Coverage for <see cref="ByteBuffer.ReadBits{T}(int)"/> — locks the post-fix
+/// behavior. The previous formulation used an <c>int</c> accumulator and
+/// <see cref="Convert.ChangeType(object, Type)"/>, which threw
+/// <see cref="OverflowException"/> at <c>bitCount=32</c> with the high bit set
+/// (the negative-int → uint conversion path). The fix switches to a
+/// <see cref="uint"/> accumulator and a
+/// <see cref="System.Runtime.CompilerServices.Unsafe.As{TFrom, TTo}(ref TFrom)"/>
+/// reinterpret. These tests exercise the previously broken cases at the bit
+/// boundaries plus a sampling of small-T cases to confirm the reinterpret
+/// truncates correctly.
+/// </summary>
+public class ByteBufferReadBitsTests
+{
+    private static byte[] MsbFirst32(uint value)
+    {
+        // ReadBits reads MSB-first per byte, so for a 32-bit value we want
+        // the most significant byte at offset 0 — i.e., big-endian encoding.
+        var data = new byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(data, value);
+        return data;
+    }
+
+    [Theory]
+    [InlineData(0x80000000u)] // the bit that triggered the original OverflowException
+    [InlineData(0xFFFFFFFFu)]
+    [InlineData(0xCAFEBABEu)]
+    [InlineData(0xAAAAAAAAu)]
+    [InlineData(0x55555555u)]
+    [InlineData(0u)]
+    public void ReadBits_uint_32bit(uint expected)
+    {
+        using var buffer = new ByteBuffer(MsbFirst32(expected));
+        Assert.Equal(expected, buffer.ReadBits<uint>(32));
+    }
+
+    [Fact]
+    public void ReadBits_int_32bit_AllOnes_IsMinusOne()
+    {
+        using var buffer = new ByteBuffer(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF });
+        Assert.Equal(-1, buffer.ReadBits<int>(32));
+    }
+
+    [Fact]
+    public void ReadBits_int_32bit_HighBitOnly_IsIntMinValue()
+    {
+        using var buffer = new ByteBuffer(new byte[] { 0x80, 0x00, 0x00, 0x00 });
+        Assert.Equal(int.MinValue, buffer.ReadBits<int>(32));
+    }
+
+    [Theory]
+    [InlineData(0u, 8)]
+    [InlineData(0xFFu, 8)]
+    [InlineData(0xAAu, 8)]
+    [InlineData(0x7u, 3)]
+    [InlineData(0x1Fu, 5)]
+    public void ReadBits_byte_RoundTrip(uint value, int bitCount)
+    {
+        // Pad the 8-bit value into the high bits of a single byte for MSB-first reading.
+        byte b = (byte)(value << (8 - bitCount));
+        using var buffer = new ByteBuffer(new byte[] { b });
+        Assert.Equal((byte)value, buffer.ReadBits<byte>(bitCount));
+    }
+
+    [Theory]
+    [InlineData(0u, 16)]
+    [InlineData(0xFFFFu, 16)]
+    [InlineData(0xCAFEu, 16)]
+    [InlineData(0x7FFu, 11)]    // ItemLevel — actual production caller
+    public void ReadBits_ushort_RoundTrip(uint value, int bitCount)
+    {
+        var data = new byte[2];
+        BinaryPrimitives.WriteUInt16BigEndian(data, (ushort)(value << (16 - bitCount)));
+        using var buffer = new ByteBuffer(data);
+        Assert.Equal((ushort)value, buffer.ReadBits<ushort>(bitCount));
+    }
+
+    [Fact]
+    public void ReadBits_uint_30bit_AllOnes_StillCorrect()
+    {
+        // MovementInfo.Flags is a real 30-bit production read. Locks that the
+        // fix doesn't regress it.
+        const uint expected = (1u << 30) - 1u;
+        var data = new byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(data, expected << 2);
+        using var buffer = new ByteBuffer(data);
+        Assert.Equal(expected, buffer.ReadBits<uint>(30));
+    }
+
+    [Fact]
+    public void ReadBits_Zero_BitCount_ReturnsZero()
+    {
+        using var buffer = new ByteBuffer(new byte[] { 0xFF });
+        Assert.Equal(0u, buffer.ReadBits<uint>(0));
+    }
+}
+
+/// <summary>
 /// Round-trip coverage for ByteBuffer.WriteBits across bit widths, value patterns,
-/// and starting bit positions. Locks the wire format so the upcoming chunked-packing
-/// optimization (mirroring <c>SpanPacketWriter</c> commit 27d7e52) is byte-identical.
-/// Pattern: write via write-mode ByteBuffer → FlushBits → GetData → wrap in
-/// read-mode ByteBuffer → reconstruct via per-bit <c>ReadBit</c> loop.
-///
-/// We deliberately avoid <c>ReadBits&lt;uint&gt;(N)</c> because that helper has a
-/// latent overflow bug at <c>N=32</c> with the high bit set (uses <c>int value</c>
-/// internally, then <c>Convert.ChangeType</c> throws on the negative-int → uint
-/// conversion). The bug is shared with <c>SpanPacketReader.ReadBits&lt;T&gt;</c>;
-/// neither suite currently exercises it. Out of scope for this perf commit —
-/// tracked as a follow-up.
+/// and starting bit positions. Locks the wire format byte-identical to the
+/// SpanPacketWriter chunked-packing path (commit 27d7e52). Pattern: write via
+/// write-mode ByteBuffer → FlushBits → GetData → wrap in read-mode ByteBuffer →
+/// <see cref="ByteBuffer.ReadBits{T}(int)"/>.
 /// </summary>
 public class ByteBufferWriteBitsRoundTripTests
 {
-    private static uint ReadBitsAsUInt(ByteBuffer reader, int bitCount)
-    {
-        uint value = 0;
-        for (int i = bitCount - 1; i >= 0; --i)
-            if (reader.ReadBit())
-                value |= 1u << i;
-        return value;
-    }
-
     [Theory]
     [InlineData(1)] [InlineData(2)] [InlineData(3)] [InlineData(4)]
     [InlineData(5)] [InlineData(6)] [InlineData(7)] [InlineData(8)]
@@ -327,7 +409,7 @@ public class ByteBufferWriteBitsRoundTripTests
         var data = writer.GetData();
 
         using var reader = new ByteBuffer(data);
-        uint actual = ReadBitsAsUInt(reader, bitCount);
+        uint actual = reader.ReadBits<uint>(bitCount);
         Assert.Equal(0u, actual);
     }
 
@@ -346,7 +428,7 @@ public class ByteBufferWriteBitsRoundTripTests
         var data = writer.GetData();
 
         using var reader = new ByteBuffer(data);
-        uint actual = ReadBitsAsUInt(reader, bitCount);
+        uint actual = reader.ReadBits<uint>(bitCount);
         Assert.Equal(expected, actual);
     }
 
@@ -372,8 +454,8 @@ public class ByteBufferWriteBitsRoundTripTests
 
         using var reader = new ByteBuffer(data);
         if (paddingBits > 0)
-            ReadBitsAsUInt(reader, paddingBits);
-        uint actual = ReadBitsAsUInt(reader, bitCount);
+            reader.ReadBits<uint>(paddingBits);
+        uint actual = reader.ReadBits<uint>(bitCount);
         Assert.Equal(value, actual);
     }
 
@@ -391,7 +473,7 @@ public class ByteBufferWriteBitsRoundTripTests
         var data = writer.GetData();
 
         using var reader = new ByteBuffer(data);
-        uint actual = ReadBitsAsUInt(reader, 32);
+        uint actual = reader.ReadBits<uint>(32);
         Assert.Equal(value, actual);
     }
 
@@ -410,7 +492,7 @@ public class ByteBufferWriteBitsRoundTripTests
         var data = writer.GetData();
 
         using var reader = new ByteBuffer(data);
-        uint actual = ReadBitsAsUInt(reader, bitCount);
+        uint actual = reader.ReadBits<uint>(bitCount);
         Assert.Equal(value, actual);
     }
 
@@ -428,12 +510,12 @@ public class ByteBufferWriteBitsRoundTripTests
         var data = writer.GetData();
 
         using var reader = new ByteBuffer(data);
-        Assert.Equal(0xAu, ReadBitsAsUInt(reader, 4));
-        Assert.Equal(0x5u, ReadBitsAsUInt(reader, 4));
+        Assert.Equal(0xAu, reader.ReadBits<uint>(4));
+        Assert.Equal(0x5u, reader.ReadBits<uint>(4));
         Assert.Equal((byte)0x42, reader.ReadUInt8());
-        Assert.Equal(0x7u, ReadBitsAsUInt(reader, 3));
+        Assert.Equal(0x7u, reader.ReadBits<uint>(3));
         Assert.Equal(1.5f, reader.ReadFloat());
-        Assert.Equal(0x123456u, ReadBitsAsUInt(reader, 24));
+        Assert.Equal(0x123456u, reader.ReadBits<uint>(24));
     }
 }
 
@@ -666,15 +748,6 @@ public class ByteBufferWriteStringRoundTripTests
 /// </summary>
 public class ByteBufferCrossModeRoundTripTests
 {
-    private static uint ReadBitsAsUInt(ByteBuffer reader, int bitCount)
-    {
-        uint value = 0;
-        for (int i = bitCount - 1; i >= 0; --i)
-            if (reader.ReadBit())
-                value |= 1u << i;
-        return value;
-    }
-
     [Fact]
     public void CrossMode_WriteBits_ByteBuffer_ReadVia_SpanPacketReader()
     {
@@ -700,8 +773,8 @@ public class ByteBufferCrossModeRoundTripTests
         var data = spanWriter.ToArray();
 
         using var reader = new ByteBuffer(data);
-        Assert.Equal(0x123u, ReadBitsAsUInt(reader, 9));
-        Assert.Equal(0xFFu, ReadBitsAsUInt(reader, 8));
+        Assert.Equal(0x123u, reader.ReadBits<uint>(9));
+        Assert.Equal(0xFFu, reader.ReadBits<uint>(8));
     }
 
     [Fact]

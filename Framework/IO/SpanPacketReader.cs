@@ -25,8 +25,9 @@ using Framework.GameMath;
 namespace Framework.IO;
 
 /// <summary>
-/// High-performance packet reader using ReadOnlySpan&lt;byte&gt; for zero-allocation reads.
-/// This is a ref struct that lives on the stack.
+/// High-performance packet reader over a <see cref="ReadOnlySpan{T}"/> of
+/// <see cref="byte"/> for zero-allocation reads. This is a
+/// <see langword="ref struct"/> that lives on the stack.
 /// </summary>
 public ref struct SpanPacketReader
 {
@@ -245,15 +246,29 @@ public ref struct SpanPacketReader
         return (returnValue >> 7) != 0;
     }
 
+    /// <summary>
+    /// Reads <paramref name="bitCount"/> bits MSB-first into a <see cref="uint"/>
+    /// accumulator and reinterprets it as <typeparamref name="T"/>. Supports
+    /// <c>bitCount</c> in [0, 32]. <typeparamref name="T"/> must be at most
+    /// 4 bytes (byte/sbyte, ushort/short, uint/int) — larger types would read
+    /// uninitialized stack bytes.
+    ///
+    /// The previous formulation used <c>int</c> as the accumulator, which made
+    /// the bit-31 contribution equal to <see cref="int.MinValue"/>; the trailing
+    /// <see cref="Convert.ChangeType(object, Type)"/> then threw
+    /// <see cref="OverflowException"/> when converting that negative int back to
+    /// <see cref="uint"/>. The new <see cref="uint"/> accumulator + reinterpret
+    /// also drops the per-call <c>Convert.ChangeType</c> boxing.
+    /// </summary>
     public T ReadBits<T>(int bitCount) where T : unmanaged
     {
-        int value = 0;
+        uint value = 0;
 
         for (int i = bitCount - 1; i >= 0; --i)
             if (ReadBit())
-                value |= (1 << i);
+                value |= 1u << i;
 
-        return (T)Convert.ChangeType(value, typeof(T));
+        return Unsafe.As<uint, T>(ref value);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

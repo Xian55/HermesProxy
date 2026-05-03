@@ -25,8 +25,9 @@ using Framework.GameMath;
 namespace Framework.IO;
 
 /// <summary>
-/// High-performance packet writer using Span&lt;byte&gt; for zero-allocation writes.
-/// This is a ref struct that lives on the stack.
+/// High-performance packet writer over a <see cref="Span{T}"/> of
+/// <see cref="byte"/> for zero-allocation writes. This is a
+/// <see langword="ref struct"/> that lives on the stack.
 /// </summary>
 public ref struct SpanPacketWriter
 {
