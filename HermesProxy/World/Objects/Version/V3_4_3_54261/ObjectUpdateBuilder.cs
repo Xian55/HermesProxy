@@ -387,10 +387,10 @@ public class ObjectUpdateBuilder
             data.WriteUInt32(0u);
         data.WriteUInt32(0u);
         data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
         if (IsOwner)
             data.WriteUInt16(0);
-        data.WriteInt32(0);
+        data.WriteBits(0u, 6);
+        data.FlushBits();
     }
 
     private void WriteEmptyItemCreate(WorldPacket data)
@@ -433,10 +433,10 @@ public class ObjectUpdateBuilder
             data.WriteUInt32(0u);
         data.WriteUInt32(0u);
         data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
         if (IsOwner)
             data.WriteUInt16(0);
-        data.WriteInt32(0);
+        data.WriteBits(0u, 6);
+        data.FlushBits();
     }
 
     private void WriteCreateContainerData(WorldPacket data)
@@ -910,7 +910,7 @@ public class ObjectUpdateBuilder
         data.WriteUInt8(0);
         data.WriteUInt8(0);
         data.WriteUInt8(0);
-        data.WriteInt32(0);
+        data.WriteInt32((int)active.AmmoID.GetValueOrDefault());
         data.WriteUInt32(0u);
         for (int n = 0; n < 12; n++)
         {
