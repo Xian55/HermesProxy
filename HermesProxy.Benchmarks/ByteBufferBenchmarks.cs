@@ -146,11 +146,11 @@ public class ByteBufferReadCStringBenchmarks
 }
 
 // =====================================================================
-// Write-side benchmarks added for the ByteBuffer hot-path tightening port
-// of SpanPacketWriter commit 27d7e52. Single benchmark per surface today;
-// the follow-up perf commit will pair each with a `*_Original` baseline
-// using the same internal-`*Original` pattern as ReadCStringOriginal /
-// GetDataOriginal already in this file.
+// Write-side benchmarks for the ByteBuffer hot-path tightening port of
+// SpanPacketWriter commit 27d7e52. Each benchmark class pairs the new
+// optimized impl (Optimized) against the frozen-original baseline kept
+// internally in ByteBuffer (Original) — same precedent as the existing
+// ReadCStringOriginal / GetDataOriginal benchmark pattern.
 // =====================================================================
 
 [MemoryDiagnoser]
@@ -169,8 +169,18 @@ public class ByteBufferWriteBitsBenchmarks
         _value = BitWidth == 32 ? 0xCAFEBABEu : (1u << BitWidth) - 1u;
     }
 
+    [Benchmark(Baseline = true)]
+    public byte[] WriteBits_Original()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+            buffer.WriteBitsOriginal(_value, BitWidth);
+        buffer.FlushBits();
+        return buffer.GetData();
+    }
+
     [Benchmark]
-    public byte[] WriteBits_Current()
+    public byte[] WriteBits_Optimized()
     {
         using var buffer = new ByteBuffer();
         for (int i = 0; i < Iterations; i++)
@@ -189,8 +199,17 @@ public class ByteBufferWriteVectorBenchmarks
     private static readonly Vector3 V3 = new(1.5f, -2.25f, 0.125f);
     private static readonly Vector4 V4 = new(1.5f, -2.25f, 0.125f, 1024.0f);
 
+    [Benchmark(Baseline = true)]
+    public byte[] WriteVector2_Original()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+            buffer.WriteVector2Original(V2);
+        return buffer.GetData();
+    }
+
     [Benchmark]
-    public byte[] WriteVector2_Current()
+    public byte[] WriteVector2_Optimized()
     {
         using var buffer = new ByteBuffer();
         for (int i = 0; i < Iterations; i++)
@@ -199,7 +218,16 @@ public class ByteBufferWriteVectorBenchmarks
     }
 
     [Benchmark]
-    public byte[] WriteVector3_Current()
+    public byte[] WriteVector3_Original()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+            buffer.WriteVector3Original(V3);
+        return buffer.GetData();
+    }
+
+    [Benchmark]
+    public byte[] WriteVector3_Optimized()
     {
         using var buffer = new ByteBuffer();
         for (int i = 0; i < Iterations; i++)
@@ -208,7 +236,16 @@ public class ByteBufferWriteVectorBenchmarks
     }
 
     [Benchmark]
-    public byte[] WriteVector4_Current()
+    public byte[] WriteVector4_Original()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+            buffer.WriteVector4Original(V4);
+        return buffer.GetData();
+    }
+
+    [Benchmark]
+    public byte[] WriteVector4_Optimized()
     {
         using var buffer = new ByteBuffer();
         for (int i = 0; i < Iterations; i++)
@@ -224,8 +261,16 @@ public class ByteBufferWriteCStringBenchmarks
     [Params("hello", "Player_Name_Goes_Here_Filling_Sixty_Four_Bytes_Or_Thereabouts!", "héllo wörld 你好")]
     public string Value = null!;
 
+    [Benchmark(Baseline = true)]
+    public byte[] WriteCString_Original()
+    {
+        using var buffer = new ByteBuffer();
+        buffer.WriteCStringOriginal(Value);
+        return buffer.GetData();
+    }
+
     [Benchmark]
-    public byte[] WriteCString_Current()
+    public byte[] WriteCString_Optimized()
     {
         using var buffer = new ByteBuffer();
         buffer.WriteCString(Value);
@@ -233,7 +278,15 @@ public class ByteBufferWriteCStringBenchmarks
     }
 
     [Benchmark]
-    public byte[] WriteCString_Empty_Current()
+    public byte[] WriteCString_Empty_Original()
+    {
+        using var buffer = new ByteBuffer();
+        buffer.WriteCStringOriginal(string.Empty);
+        return buffer.GetData();
+    }
+
+    [Benchmark]
+    public byte[] WriteCString_Empty_Optimized()
     {
         using var buffer = new ByteBuffer();
         buffer.WriteCString(string.Empty);
@@ -248,8 +301,16 @@ public class ByteBufferWriteStringBenchmarks
     [Params("hello", "Player_Name_Goes_Here_Filling_Sixty_Four_Bytes_Or_Thereabouts!", "héllo wörld 你好")]
     public string Value = null!;
 
+    [Benchmark(Baseline = true)]
+    public byte[] WriteString_Original()
+    {
+        using var buffer = new ByteBuffer();
+        buffer.WriteStringOriginal(Value);
+        return buffer.GetData();
+    }
+
     [Benchmark]
-    public byte[] WriteString_Current()
+    public byte[] WriteString_Optimized()
     {
         using var buffer = new ByteBuffer();
         buffer.WriteString(Value);
@@ -263,8 +324,17 @@ public class ByteBufferWriteBoolBenchmarks
 {
     private const int Iterations = 1024;
 
+    [Benchmark(Baseline = true)]
+    public byte[] WriteBool_Original()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+            buffer.WriteBoolOriginal((i & 1) == 0);
+        return buffer.GetData();
+    }
+
     [Benchmark]
-    public byte[] WriteBool_Current()
+    public byte[] WriteBool_Optimized()
     {
         using var buffer = new ByteBuffer();
         for (int i = 0; i < Iterations; i++)
@@ -280,8 +350,17 @@ public class ByteBufferWritePackXYZBenchmarks
     private const int Iterations = 1024;
     private static readonly Vector3 Pos = new(100.5f, -200.25f, 50.125f);
 
+    [Benchmark(Baseline = true)]
+    public byte[] WritePackXYZ_Original()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+            buffer.WritePackXYZOriginal(Pos);
+        return buffer.GetData();
+    }
+
     [Benchmark]
-    public byte[] WritePackXYZ_Current()
+    public byte[] WritePackXYZ_Optimized()
     {
         using var buffer = new ByteBuffer();
         for (int i = 0; i < Iterations; i++)
@@ -301,8 +380,28 @@ public class ByteBufferMixedWorkloadBenchmarks
 
     // Approximates a small bit-packed packet: 4×WriteBits (typical mask widths)
     // + 2×WriteCString + 1×WriteVector3 + 8×WriteBool, repeated 32 times.
+    [Benchmark(Baseline = true)]
+    public byte[] Mixed_Original()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+        {
+            buffer.WriteBitsOriginal(0xAu, 4);
+            buffer.WriteBitsOriginal(0x123u, 9);
+            buffer.WriteBitsOriginal(0xCAFEu, 16);
+            buffer.WriteBitsOriginal(0xFFFFFFu, 24);
+            buffer.FlushBits();
+            buffer.WriteCStringOriginal(Name);
+            buffer.WriteCStringOriginal(Title);
+            buffer.WriteVector3Original(Pos);
+            for (int b = 0; b < 8; b++)
+                buffer.WriteBoolOriginal((b & 1) == 0);
+        }
+        return buffer.GetData();
+    }
+
     [Benchmark]
-    public byte[] Mixed_Current()
+    public byte[] Mixed_Optimized()
     {
         using var buffer = new ByteBuffer();
         for (int i = 0; i < Iterations; i++)
