@@ -59,7 +59,7 @@ These shipped before any WotLK-specific work; every entry below assumes them.
 |---|---|---|---|
 | Auth + char-select | ✅ | ✅ | |
 | World-enter + walk + camera | ✅ | ✅ | cMangos blocker resolved by recent fixes |
-| New-char first login (post-cinematic movement) | ⚠️ | ✅ | TC: character can't move until logout + relog |
+| New-char first login (post-cinematic movement) | ✅ | ❌ | TC: fixed (`772a728` — `CMSG_LOADING_SCREEN_NOTIFY` `0xFFFFFFFF` sentinel was poisoning `CurrentMapId`). Caveat: skipping the cinematic too early can still disconnect (timing-related). cMangos: still broken (untested with the TC fix). |
 | Player render (incl. equipped items) | ✅ | ✅ | |
 | Combat — auto-attack | ✅ | ✅ | packet-split fix (player Values → separate `SMSG_UPDATE_OBJECT`) |
 | Combat — special abilities | ✅ | ❌ | cMangos: "invalid target" on e.g. Heroic Strike |
