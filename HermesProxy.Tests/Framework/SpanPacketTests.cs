@@ -618,6 +618,178 @@ public class SpanPacketRoundTripTests
         reader.ResetBitPos();
         Assert.Equal(name, reader.ReadCString());
     }
+
+    // ---- WriteBits round-trip coverage ----
+    // These tests pin down the exact wire output of WriteBits across bit widths,
+    // starting positions, and value patterns. They MUST pass against the current
+    // per-bit loop so the batch-packing rewrite can be verified by re-running them.
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(9)]
+    [InlineData(12)]
+    [InlineData(16)]
+    [InlineData(24)]
+    [InlineData(31)]
+    [InlineData(32)]
+    public void WriteBits_RoundTrip_Zero(int bitCount)
+    {
+        Span<byte> span = stackalloc byte[8];
+        var writer = new SpanPacketWriter(span);
+        writer.WriteBits(0u, bitCount);
+        writer.FlushBits();
+
+        var reader = new SpanPacketReader(writer.GetWrittenSpan());
+        uint actual = reader.ReadBits<uint>(bitCount);
+        Assert.Equal(0u, actual);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(9)]
+    [InlineData(12)]
+    [InlineData(16)]
+    [InlineData(24)]
+    [InlineData(31)]
+    [InlineData(32)]
+    public void WriteBits_RoundTrip_AllOnes(int bitCount)
+    {
+        uint expected = bitCount == 32 ? uint.MaxValue : (1u << bitCount) - 1u;
+
+        Span<byte> span = stackalloc byte[8];
+        var writer = new SpanPacketWriter(span);
+        writer.WriteBits(expected, bitCount);
+        writer.FlushBits();
+
+        var reader = new SpanPacketReader(writer.GetWrittenSpan());
+        uint actual = reader.ReadBits<uint>(bitCount);
+        Assert.Equal(expected, actual);
+    }
+
+    [Theory]
+    [InlineData(0, 1)] [InlineData(1, 1)] [InlineData(3, 1)] [InlineData(5, 1)] [InlineData(7, 1)]
+    [InlineData(0, 4)] [InlineData(1, 4)] [InlineData(3, 4)] [InlineData(5, 4)] [InlineData(7, 4)]
+    [InlineData(0, 8)] [InlineData(1, 8)] [InlineData(3, 8)] [InlineData(5, 8)] [InlineData(7, 8)]
+    [InlineData(0, 9)] [InlineData(1, 9)] [InlineData(3, 9)] [InlineData(5, 9)] [InlineData(7, 9)]
+    [InlineData(0, 16)] [InlineData(1, 16)] [InlineData(3, 16)] [InlineData(5, 16)] [InlineData(7, 16)]
+    [InlineData(0, 24)] [InlineData(1, 24)] [InlineData(3, 24)] [InlineData(5, 24)] [InlineData(7, 24)]
+    [InlineData(0, 32)] [InlineData(1, 32)] [InlineData(3, 32)] [InlineData(5, 32)] [InlineData(7, 32)]
+    public void WriteBits_RoundTrip_StartingPositions(int paddingBits, int bitCount)
+    {
+        uint mask = bitCount == 32 ? uint.MaxValue : (1u << bitCount) - 1u;
+        uint value = 0xCAFEBABEu & mask;
+
+        Span<byte> span = stackalloc byte[16];
+        var writer = new SpanPacketWriter(span);
+        if (paddingBits > 0)
+            writer.WriteBits(0u, paddingBits);
+        writer.WriteBits(value, bitCount);
+        writer.FlushBits();
+
+        var reader = new SpanPacketReader(writer.GetWrittenSpan());
+        if (paddingBits > 0)
+            reader.ReadBits<uint>(paddingBits);
+        uint actual = reader.ReadBits<uint>(bitCount);
+        Assert.Equal(value, actual);
+    }
+
+    [Theory]
+    [InlineData(0)] [InlineData(1)] [InlineData(2)] [InlineData(3)]
+    [InlineData(7)] [InlineData(8)] [InlineData(9)] [InlineData(15)]
+    [InlineData(16)] [InlineData(23)] [InlineData(24)] [InlineData(31)]
+    public void WriteBits_RoundTrip_SingleBitSet(int bitPos)
+    {
+        uint value = 1u << bitPos;
+
+        Span<byte> span = stackalloc byte[8];
+        var writer = new SpanPacketWriter(span);
+        writer.WriteBits(value, 32);
+        writer.FlushBits();
+
+        var reader = new SpanPacketReader(writer.GetWrittenSpan());
+        uint actual = reader.ReadBits<uint>(32);
+        Assert.Equal(value, actual);
+    }
+
+    [Theory]
+    [InlineData(0xAAAAAAAAu, 32)]
+    [InlineData(0x55555555u, 32)]
+    [InlineData(0xAAAAu, 16)]
+    [InlineData(0x5555u, 16)]
+    [InlineData(0xAAu, 8)]
+    [InlineData(0x55u, 8)]
+    public void WriteBits_RoundTrip_AlternatingPattern(uint value, int bitCount)
+    {
+        Span<byte> span = stackalloc byte[8];
+        var writer = new SpanPacketWriter(span);
+        writer.WriteBits(value, bitCount);
+        writer.FlushBits();
+
+        var reader = new SpanPacketReader(writer.GetWrittenSpan());
+        uint actual = reader.ReadBits<uint>(bitCount);
+        Assert.Equal(value, actual);
+    }
+
+    [Fact]
+    public void WriteBits_InterleavedWithBytesAndFloats()
+    {
+        Span<byte> span = stackalloc byte[64];
+        var writer = new SpanPacketWriter(span);
+        writer.WriteBits(0xAu, 4);          // byte0 hi nibble
+        writer.WriteBits(0x5u, 4);          // byte0 lo nibble — flushes byte0 = 0xA5
+        writer.WriteUInt8(0x42);            // byte1 = 0x42
+        writer.WriteBits(0x7u, 3);          // byte2 hi 3 bits = 0b111
+        writer.WriteFloat(1.5f);            // FlushBits emits byte2, then 4 float bytes
+        writer.WriteBits(0x123456u, 24);    // 3 byte-aligned bytes
+        writer.FlushBits();
+
+        var reader = new SpanPacketReader(writer.GetWrittenSpan());
+        Assert.Equal(0xAu, reader.ReadBits<uint>(4));
+        Assert.Equal(0x5u, reader.ReadBits<uint>(4));
+        Assert.Equal((byte)0x42, reader.ReadUInt8());
+        Assert.Equal(0x7u, reader.ReadBits<uint>(3));
+        Assert.Equal(1.5f, reader.ReadFloat());
+        Assert.Equal(0x123456u, reader.ReadBits<uint>(24));
+    }
+
+    private enum ByteEnum : byte { B = 5 }
+    private enum UShortEnum : ushort { B = 0x1234 }
+    private enum IntEnum { B = 0x12345678 }
+    private enum UIntEnum : uint { B = 0x80000001u }
+
+    [Fact]
+    public void WriteBits_GenericEnum_MatchesExplicitUintCast()
+    {
+        Span<byte> spanA = stackalloc byte[32];
+        var generic = new SpanPacketWriter(spanA);
+        generic.WriteBits(IntEnum.B, 32);
+        generic.WriteBits(ByteEnum.B, 8);
+        generic.WriteBits(UShortEnum.B, 16);
+        generic.WriteBits(UIntEnum.B, 32);
+        generic.FlushBits();
+        var bytesGeneric = generic.GetWrittenSpan().ToArray();
+
+        Span<byte> spanB = stackalloc byte[32];
+        var explicitCast = new SpanPacketWriter(spanB);
+        explicitCast.WriteBits((uint)IntEnum.B, 32);
+        explicitCast.WriteBits((uint)ByteEnum.B, 8);
+        explicitCast.WriteBits((uint)UShortEnum.B, 16);
+        explicitCast.WriteBits((uint)UIntEnum.B, 32);
+        explicitCast.FlushBits();
+        var bytesExplicit = explicitCast.GetWrittenSpan().ToArray();
+
+        Assert.Equal(bytesExplicit, bytesGeneric);
+    }
 }
 
 /// <summary>

@@ -517,6 +517,59 @@ public class ByteBufferWriteBitsRoundTripTests
         Assert.Equal(1.5f, reader.ReadFloat());
         Assert.Equal(0x123456u, reader.ReadBits<uint>(24));
     }
+
+    private enum ByteEnum : byte { A = 0, B = 5, Max = 0xFF }
+    private enum ShortEnum : short { A = 0, B = 0x1234, Max = 0x7FFF }
+    private enum UShortEnum : ushort { A = 0, B = 0x1234, Max = 0xFFFF }
+    private enum IntEnum { A = 0, B = 0x12345678, Max = int.MaxValue }
+    private enum UIntEnum : uint { A = 0, B = 0x80000001u, Max = uint.MaxValue }
+    private enum LongEnum : long { A = 0, B = 0x1_2345_6789L, Max = long.MaxValue }
+    private enum ULongEnum : ulong { A = 0, B = 0x1_2345_6789UL, Max = ulong.MaxValue }
+
+    [Fact]
+    public void WriteBits_GenericEnum_AllUnderlyingSizes_RoundTrip()
+    {
+        using var writer = new ByteBuffer();
+        writer.WriteBits(ByteEnum.B, 8);
+        writer.WriteBits(ShortEnum.B, 16);
+        writer.WriteBits(UShortEnum.B, 16);
+        writer.WriteBits(IntEnum.B, 32);
+        writer.WriteBits(UIntEnum.B, 32);
+        writer.WriteBits((LongEnum)0x1_2345_6789L, 32);   // truncates to low 32 bits
+        writer.WriteBits((ULongEnum)0x1_2345_6789UL, 32); // truncates to low 32 bits
+        writer.FlushBits();
+        var data = writer.GetData();
+
+        using var reader = new ByteBuffer(data);
+        Assert.Equal((byte)ByteEnum.B,            (byte)reader.ReadBits<uint>(8));
+        Assert.Equal((ushort)ShortEnum.B,         (ushort)reader.ReadBits<uint>(16));
+        Assert.Equal((ushort)UShortEnum.B,        (ushort)reader.ReadBits<uint>(16));
+        Assert.Equal((uint)IntEnum.B,             reader.ReadBits<uint>(32));
+        Assert.Equal((uint)UIntEnum.B,            reader.ReadBits<uint>(32));
+        Assert.Equal(0x2345_6789u,                reader.ReadBits<uint>(32));
+        Assert.Equal(0x2345_6789u,                reader.ReadBits<uint>(32));
+    }
+
+    [Fact]
+    public void WriteBits_GenericEnum_MatchesExplicitUintCast()
+    {
+        // The new generic overload must produce bit-identical output to the
+        // existing WriteBits(uint, int) path that callers used to invoke via
+        // an explicit (uint) cast.
+        using var generic = new ByteBuffer();
+        generic.WriteBits(IntEnum.B, 32);
+        generic.WriteBits(ByteEnum.B, 8);
+        generic.WriteBits(UShortEnum.B, 16);
+        generic.FlushBits();
+
+        using var explicitCast = new ByteBuffer();
+        explicitCast.WriteBits((uint)IntEnum.B, 32);
+        explicitCast.WriteBits((uint)ByteEnum.B, 8);
+        explicitCast.WriteBits((uint)UShortEnum.B, 16);
+        explicitCast.FlushBits();
+
+        Assert.Equal(explicitCast.GetData(), generic.GetData());
+    }
 }
 
 /// <summary>

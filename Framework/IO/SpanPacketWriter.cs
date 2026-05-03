@@ -240,6 +240,21 @@ public ref struct SpanPacketWriter
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void WriteBits<T>(T value, int bitCount) where T : unmanaged, Enum
+    {
+        uint v;
+        if (Unsafe.SizeOf<T>() == 1)
+            v = Unsafe.As<T, byte>(ref value);
+        else if (Unsafe.SizeOf<T>() == 2)
+            v = Unsafe.As<T, ushort>(ref value);
+        else if (Unsafe.SizeOf<T>() == 4)
+            v = Unsafe.As<T, uint>(ref value);
+        else
+            v = (uint)Unsafe.As<T, ulong>(ref value);
+        WriteBits(v, bitCount);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void FlushBits()
     {
         if (_bitPosition == 8)

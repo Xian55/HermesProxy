@@ -758,6 +758,27 @@ public class ByteBuffer : IDisposable
     public void WriteBits(int value, int bitCount) => WriteBits((uint)value, bitCount);
 
     /// <summary>
+    /// Non-boxing overload for enum arguments. The <c>unmanaged, Enum</c>
+    /// constraint forces a per-enum value-type generic instantiation, and the
+    /// <see cref="Unsafe.SizeOf{T}"/> branches are JIT-folded to a constant per
+    /// specialization — so this compiles to a direct reinterpret + WriteBits.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void WriteBits<T>(T value, int bitCount) where T : unmanaged, Enum
+    {
+        uint v;
+        if (Unsafe.SizeOf<T>() == 1)
+            v = Unsafe.As<T, byte>(ref value);
+        else if (Unsafe.SizeOf<T>() == 2)
+            v = Unsafe.As<T, ushort>(ref value);
+        else if (Unsafe.SizeOf<T>() == 4)
+            v = Unsafe.As<T, uint>(ref value);
+        else
+            v = (uint)Unsafe.As<T, ulong>(ref value);
+        WriteBits(v, bitCount);
+    }
+
+    /// <summary>
     /// Legacy overload kept for source compatibility — boxes via
     /// <see cref="Convert.ToUInt32(object)"/>. Prefer <c>WriteBits(uint,int)</c>
     /// or <c>WriteBits(int,int)</c>.
