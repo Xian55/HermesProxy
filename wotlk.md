@@ -59,6 +59,7 @@ These shipped before any WotLK-specific work; every entry below assumes them.
 |---|---|---|---|
 | Auth + char-select | ✅ | ✅ | |
 | World-enter + walk + camera | ✅ | ✅ | cMangos blocker resolved by recent fixes |
+| New-char first login (post-cinematic movement) | ⚠️ | ✅ | TC: character can't move until logout + relog |
 | Player render (incl. equipped items) | ✅ | ✅ | |
 | Combat — auto-attack | ✅ | ✅ | packet-split fix (player Values → separate `SMSG_UPDATE_OBJECT`) |
 | Combat — special abilities | ✅ | ❌ | cMangos: "invalid target" on e.g. Heroic Strike |
@@ -163,6 +164,10 @@ The fork received a thorough class-by-class test matrix from `kasperfriend` (202
   - Holy Wrath / Holy Shock: animate but no damage / no heal → `SMSG_SPELL_GO` effect translation might be losing damage/heal payload for hybrid school spells.
 
 **Suggested triage order**: Patterns A (1 fix unblocks 10+ spells) → C (combo points, ~5 spells) → E (form cancel, ~10 abilities) → B (ground AOE, ~6 spells) → G-Hunter (whole class blocked) → G-Warlock-soulshard. Patterns D/F/H drop out as the underlying descriptor/translation work in A/C/E lands.
+
+### TC-specific gaps (cMangos works for these)
+
+- **First login after character creation: character cannot move until relog (TC).** Create a fresh character on local TC, click Enter World, watch (or skip) the intro cinematic — once control returns, the character is frozen: no walk, no jump, no turn. Logging out and back in clears it; subsequent logins on the same character work normally. cMangos does not exhibit this — first-login post-creation works directly. Likely a `SMSG_MOVE_SET_ACTIVE_MOVER` / movement-permission-bag timing or ordering issue specific to the *first* world-enter (when the player record was just inserted), e.g. a movement-control packet that TC sends post-cinematic isn't being forwarded, or the relog path re-sends something the create-then-enter path skips. Note `69999dc` ("drop early `SMSG_MOVE_SET_ACTIVE_MOVER` from `HandleLoginVerifyWorld`") was the most recent active-mover change — re-check whether the drop is correct on the first-login-post-creation path or whether TC depends on the early send specifically for fresh chars.
 
 ### cMangos-specific gaps (TC works for these)
 
