@@ -1175,7 +1175,9 @@ public class SpellTargetData
 {
     public void Read(WorldPacket data)
     {
-        Flags = (SpellCastTargetFlags)data.ReadBits<uint>(26);
+        // V3_4_3 client uses 28-bit target flags (WPP V3_4_0 module gates 28 at V3_4_1+).
+        int flagBits = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 28 : 26;
+        Flags = (SpellCastTargetFlags)data.ReadBits<uint>(flagBits);
         if (data.HasBit())
             SrcLocation = new();
         if (data.HasBit())
@@ -1206,7 +1208,9 @@ public class SpellTargetData
 
     public void Write(WorldPacket data)
     {
-        data.WriteBits((uint)Flags, 26);
+        // V3_4_3 client uses 28-bit target flags (WPP V3_4_0 module gates 28 at V3_4_1+).
+        int flagBits = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 28 : 26;
+        data.WriteBits((uint)Flags, flagBits);
         data.WriteBit(SrcLocation != null);
         data.WriteBit(DstLocation != null);
         data.WriteBit(Orientation.HasValue);
