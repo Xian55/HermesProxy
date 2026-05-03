@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Text;
 using BenchmarkDotNet.Attributes;
 using Framework.IO;
@@ -143,5 +142,182 @@ public class ByteBufferReadCStringBenchmarks
     {
         using var buffer = new ByteBuffer(_mediumStringData);
         return buffer.ReadCString();
+    }
+}
+
+// =====================================================================
+// Write-side benchmarks added for the ByteBuffer hot-path tightening port
+// of SpanPacketWriter commit 27d7e52. Single benchmark per surface today;
+// the follow-up perf commit will pair each with a `*_Original` baseline
+// using the same internal-`*Original` pattern as ReadCStringOriginal /
+// GetDataOriginal already in this file.
+// =====================================================================
+
+[MemoryDiagnoser]
+[ShortRunJob]
+public class ByteBufferWriteBitsBenchmarks
+{
+    [Params(4, 6, 8, 9, 16, 24, 32)]
+    public int BitWidth;
+
+    private const int Iterations = 64;
+    private uint _value;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _value = BitWidth == 32 ? 0xCAFEBABEu : (1u << BitWidth) - 1u;
+    }
+
+    [Benchmark]
+    public byte[] WriteBits_Current()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+            buffer.WriteBits(_value, BitWidth);
+        buffer.FlushBits();
+        return buffer.GetData();
+    }
+}
+
+[MemoryDiagnoser]
+[ShortRunJob]
+public class ByteBufferWriteVectorBenchmarks
+{
+    private const int Iterations = 256;
+    private static readonly Vector2 V2 = new(1.5f, -2.25f);
+    private static readonly Vector3 V3 = new(1.5f, -2.25f, 0.125f);
+    private static readonly Vector4 V4 = new(1.5f, -2.25f, 0.125f, 1024.0f);
+
+    [Benchmark]
+    public byte[] WriteVector2_Current()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+            buffer.WriteVector2(V2);
+        return buffer.GetData();
+    }
+
+    [Benchmark]
+    public byte[] WriteVector3_Current()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+            buffer.WriteVector3(V3);
+        return buffer.GetData();
+    }
+
+    [Benchmark]
+    public byte[] WriteVector4_Current()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+            buffer.WriteVector4(V4);
+        return buffer.GetData();
+    }
+}
+
+[MemoryDiagnoser]
+[ShortRunJob]
+public class ByteBufferWriteCStringBenchmarks
+{
+    [Params("hello", "Player_Name_Goes_Here_Filling_Sixty_Four_Bytes_Or_Thereabouts!", "héllo wörld 你好")]
+    public string Value = null!;
+
+    [Benchmark]
+    public byte[] WriteCString_Current()
+    {
+        using var buffer = new ByteBuffer();
+        buffer.WriteCString(Value);
+        return buffer.GetData();
+    }
+
+    [Benchmark]
+    public byte[] WriteCString_Empty_Current()
+    {
+        using var buffer = new ByteBuffer();
+        buffer.WriteCString(string.Empty);
+        return buffer.GetData();
+    }
+}
+
+[MemoryDiagnoser]
+[ShortRunJob]
+public class ByteBufferWriteStringBenchmarks
+{
+    [Params("hello", "Player_Name_Goes_Here_Filling_Sixty_Four_Bytes_Or_Thereabouts!", "héllo wörld 你好")]
+    public string Value = null!;
+
+    [Benchmark]
+    public byte[] WriteString_Current()
+    {
+        using var buffer = new ByteBuffer();
+        buffer.WriteString(Value);
+        return buffer.GetData();
+    }
+}
+
+[MemoryDiagnoser]
+[ShortRunJob]
+public class ByteBufferWriteBoolBenchmarks
+{
+    private const int Iterations = 1024;
+
+    [Benchmark]
+    public byte[] WriteBool_Current()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+            buffer.WriteBool((i & 1) == 0);
+        return buffer.GetData();
+    }
+}
+
+[MemoryDiagnoser]
+[ShortRunJob]
+public class ByteBufferWritePackXYZBenchmarks
+{
+    private const int Iterations = 1024;
+    private static readonly Vector3 Pos = new(100.5f, -200.25f, 50.125f);
+
+    [Benchmark]
+    public byte[] WritePackXYZ_Current()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+            buffer.WritePackXYZ(Pos);
+        return buffer.GetData();
+    }
+}
+
+[MemoryDiagnoser]
+[ShortRunJob]
+public class ByteBufferMixedWorkloadBenchmarks
+{
+    private const int Iterations = 32;
+    private static readonly Vector3 Pos = new(100.5f, -200.25f, 50.125f);
+    private const string Name = "TestPlayerName";
+    private const string Title = "Defender of the Realm";
+
+    // Approximates a small bit-packed packet: 4×WriteBits (typical mask widths)
+    // + 2×WriteCString + 1×WriteVector3 + 8×WriteBool, repeated 32 times.
+    [Benchmark]
+    public byte[] Mixed_Current()
+    {
+        using var buffer = new ByteBuffer();
+        for (int i = 0; i < Iterations; i++)
+        {
+            buffer.WriteBits(0xAu, 4);
+            buffer.WriteBits(0x123u, 9);
+            buffer.WriteBits(0xCAFEu, 16);
+            buffer.WriteBits(0xFFFFFFu, 24);
+            buffer.FlushBits();
+            buffer.WriteCString(Name);
+            buffer.WriteCString(Title);
+            buffer.WriteVector3(Pos);
+            for (int b = 0; b < 8; b++)
+                buffer.WriteBool((b & 1) == 0);
+        }
+        return buffer.GetData();
     }
 }

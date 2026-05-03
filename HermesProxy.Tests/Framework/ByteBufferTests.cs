@@ -288,3 +288,479 @@ public class ByteBufferGetDataTests
         Assert.Equal(testData, result);
     }
 }
+
+/// <summary>
+/// Round-trip coverage for ByteBuffer.WriteBits across bit widths, value patterns,
+/// and starting bit positions. Locks the wire format so the upcoming chunked-packing
+/// optimization (mirroring <c>SpanPacketWriter</c> commit 27d7e52) is byte-identical.
+/// Pattern: write via write-mode ByteBuffer → FlushBits → GetData → wrap in
+/// read-mode ByteBuffer → reconstruct via per-bit <c>ReadBit</c> loop.
+///
+/// We deliberately avoid <c>ReadBits&lt;uint&gt;(N)</c> because that helper has a
+/// latent overflow bug at <c>N=32</c> with the high bit set (uses <c>int value</c>
+/// internally, then <c>Convert.ChangeType</c> throws on the negative-int → uint
+/// conversion). The bug is shared with <c>SpanPacketReader.ReadBits&lt;T&gt;</c>;
+/// neither suite currently exercises it. Out of scope for this perf commit —
+/// tracked as a follow-up.
+/// </summary>
+public class ByteBufferWriteBitsRoundTripTests
+{
+    private static uint ReadBitsAsUInt(ByteBuffer reader, int bitCount)
+    {
+        uint value = 0;
+        for (int i = bitCount - 1; i >= 0; --i)
+            if (reader.ReadBit())
+                value |= 1u << i;
+        return value;
+    }
+
+    [Theory]
+    [InlineData(1)] [InlineData(2)] [InlineData(3)] [InlineData(4)]
+    [InlineData(5)] [InlineData(6)] [InlineData(7)] [InlineData(8)]
+    [InlineData(9)] [InlineData(12)] [InlineData(16)] [InlineData(24)]
+    [InlineData(32)]
+    public void WriteBits_RoundTrip_Zero(int bitCount)
+    {
+        using var writer = new ByteBuffer();
+        writer.WriteBits(0u, bitCount);
+        writer.FlushBits();
+        var data = writer.GetData();
+
+        using var reader = new ByteBuffer(data);
+        uint actual = ReadBitsAsUInt(reader, bitCount);
+        Assert.Equal(0u, actual);
+    }
+
+    [Theory]
+    [InlineData(1)] [InlineData(2)] [InlineData(3)] [InlineData(4)]
+    [InlineData(5)] [InlineData(6)] [InlineData(7)] [InlineData(8)]
+    [InlineData(9)] [InlineData(12)] [InlineData(16)] [InlineData(24)]
+    [InlineData(31)] [InlineData(32)]
+    public void WriteBits_RoundTrip_AllOnes(int bitCount)
+    {
+        uint expected = bitCount == 32 ? uint.MaxValue : (1u << bitCount) - 1u;
+
+        using var writer = new ByteBuffer();
+        writer.WriteBits(expected, bitCount);
+        writer.FlushBits();
+        var data = writer.GetData();
+
+        using var reader = new ByteBuffer(data);
+        uint actual = ReadBitsAsUInt(reader, bitCount);
+        Assert.Equal(expected, actual);
+    }
+
+    [Theory]
+    [InlineData(0, 1)] [InlineData(1, 1)] [InlineData(3, 1)] [InlineData(5, 1)] [InlineData(7, 1)]
+    [InlineData(0, 4)] [InlineData(1, 4)] [InlineData(3, 4)] [InlineData(5, 4)] [InlineData(7, 4)]
+    [InlineData(0, 8)] [InlineData(1, 8)] [InlineData(3, 8)] [InlineData(5, 8)] [InlineData(7, 8)]
+    [InlineData(0, 9)] [InlineData(1, 9)] [InlineData(3, 9)] [InlineData(5, 9)] [InlineData(7, 9)]
+    [InlineData(0, 16)] [InlineData(1, 16)] [InlineData(3, 16)] [InlineData(5, 16)] [InlineData(7, 16)]
+    [InlineData(0, 24)] [InlineData(1, 24)] [InlineData(3, 24)] [InlineData(5, 24)] [InlineData(7, 24)]
+    [InlineData(0, 32)] [InlineData(1, 32)] [InlineData(3, 32)] [InlineData(5, 32)] [InlineData(7, 32)]
+    public void WriteBits_RoundTrip_StartingPositions(int paddingBits, int bitCount)
+    {
+        uint mask = bitCount == 32 ? uint.MaxValue : (1u << bitCount) - 1u;
+        uint value = 0xCAFEBABEu & mask;
+
+        using var writer = new ByteBuffer();
+        if (paddingBits > 0)
+            writer.WriteBits(0u, paddingBits);
+        writer.WriteBits(value, bitCount);
+        writer.FlushBits();
+        var data = writer.GetData();
+
+        using var reader = new ByteBuffer(data);
+        if (paddingBits > 0)
+            ReadBitsAsUInt(reader, paddingBits);
+        uint actual = ReadBitsAsUInt(reader, bitCount);
+        Assert.Equal(value, actual);
+    }
+
+    [Theory]
+    [InlineData(0)] [InlineData(1)] [InlineData(2)] [InlineData(3)]
+    [InlineData(7)] [InlineData(8)] [InlineData(9)] [InlineData(15)]
+    [InlineData(16)] [InlineData(23)] [InlineData(24)] [InlineData(31)]
+    public void WriteBits_RoundTrip_SingleBitSet(int bitPos)
+    {
+        uint value = 1u << bitPos;
+
+        using var writer = new ByteBuffer();
+        writer.WriteBits(value, 32);
+        writer.FlushBits();
+        var data = writer.GetData();
+
+        using var reader = new ByteBuffer(data);
+        uint actual = ReadBitsAsUInt(reader, 32);
+        Assert.Equal(value, actual);
+    }
+
+    [Theory]
+    [InlineData(0xAAAAAAAAu, 32)]
+    [InlineData(0x55555555u, 32)]
+    [InlineData(0xAAAAu, 16)]
+    [InlineData(0x5555u, 16)]
+    [InlineData(0xAAu, 8)]
+    [InlineData(0x55u, 8)]
+    public void WriteBits_RoundTrip_AlternatingPattern(uint value, int bitCount)
+    {
+        using var writer = new ByteBuffer();
+        writer.WriteBits(value, bitCount);
+        writer.FlushBits();
+        var data = writer.GetData();
+
+        using var reader = new ByteBuffer(data);
+        uint actual = ReadBitsAsUInt(reader, bitCount);
+        Assert.Equal(value, actual);
+    }
+
+    [Fact]
+    public void WriteBits_InterleavedWithBytesAndFloats()
+    {
+        using var writer = new ByteBuffer();
+        writer.WriteBits(0xAu, 4);          // byte0 hi nibble
+        writer.WriteBits(0x5u, 4);          // byte0 lo nibble — flushes byte0 = 0xA5
+        writer.WriteUInt8(0x42);            // byte1 = 0x42
+        writer.WriteBits(0x7u, 3);          // byte2 hi 3 bits = 0b111
+        writer.WriteFloat(1.5f);            // FlushBits emits byte2, then 4 float bytes
+        writer.WriteBits(0x123456u, 24);    // 3 byte-aligned bytes
+        writer.FlushBits();
+        var data = writer.GetData();
+
+        using var reader = new ByteBuffer(data);
+        Assert.Equal(0xAu, ReadBitsAsUInt(reader, 4));
+        Assert.Equal(0x5u, ReadBitsAsUInt(reader, 4));
+        Assert.Equal((byte)0x42, reader.ReadUInt8());
+        Assert.Equal(0x7u, ReadBitsAsUInt(reader, 3));
+        Assert.Equal(1.5f, reader.ReadFloat());
+        Assert.Equal(0x123456u, ReadBitsAsUInt(reader, 24));
+    }
+}
+
+/// <summary>
+/// Round-trip coverage for ByteBuffer's write primitives that the upcoming
+/// optimization commit will touch: WriteBool, WriteVector{2,3,4}, WritePackXYZ.
+/// These freeze the wire format so the LE-blit / branchless changes don't drift.
+/// </summary>
+public class ByteBufferWritePrimitiveRoundTripTests
+{
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void WriteBool_RoundTrip(bool value)
+    {
+        using var writer = new ByteBuffer();
+        writer.WriteBool(value);
+        var data = writer.GetData();
+
+        Assert.Single(data);
+        Assert.Equal(value ? (byte)1 : (byte)0, data[0]);
+
+        using var reader = new ByteBuffer(data);
+        Assert.Equal(value, reader.ReadBool());
+    }
+
+    [Fact]
+    public void WriteVector2_RoundTrip()
+    {
+        var value = new Vector2(1.5f, -2.25f);
+
+        using var writer = new ByteBuffer();
+        writer.WriteVector2(value);
+        var data = writer.GetData();
+
+        Assert.Equal(8, data.Length);
+
+        using var reader = new ByteBuffer(data);
+        var actual = reader.ReadVector2();
+        Assert.Equal(value.X, actual.X);
+        Assert.Equal(value.Y, actual.Y);
+    }
+
+    [Fact]
+    public void WriteVector3_RoundTrip()
+    {
+        var value = new Vector3(1.5f, -2.25f, 0.125f);
+
+        using var writer = new ByteBuffer();
+        writer.WriteVector3(value);
+        var data = writer.GetData();
+
+        Assert.Equal(12, data.Length);
+
+        using var reader = new ByteBuffer(data);
+        var actual = reader.ReadVector3();
+        Assert.Equal(value.X, actual.X);
+        Assert.Equal(value.Y, actual.Y);
+        Assert.Equal(value.Z, actual.Z);
+    }
+
+    [Fact]
+    public void WriteVector4_RoundTrip()
+    {
+        var value = new Vector4(1.5f, -2.25f, 0.125f, 1024.0f);
+
+        using var writer = new ByteBuffer();
+        writer.WriteVector4(value);
+        var data = writer.GetData();
+
+        Assert.Equal(16, data.Length);
+
+        using var reader = new ByteBuffer(data);
+        // ByteBuffer doesn't expose ReadVector4 by name in its API; re-read via floats.
+        Assert.Equal(value.X, reader.ReadFloat());
+        Assert.Equal(value.Y, reader.ReadFloat());
+        Assert.Equal(value.Z, reader.ReadFloat());
+        Assert.Equal(value.W, reader.ReadFloat());
+    }
+
+    [Theory]
+    [InlineData(0.0f, 0.0f, 0.0f)]
+    [InlineData(1.5f, -2.25f, 0.125f)]
+    [InlineData(-100.5f, 100.5f, -50.0f)] // negative coords — two's-complement preservation
+    [InlineData(255.75f, -255.75f, 127.5f)]
+    public void WritePackXYZ_RoundTrip(float x, float y, float z)
+    {
+        var value = new Vector3(x, y, z);
+
+        using var writer = new ByteBuffer();
+        writer.WritePackXYZ(value);
+        var data = writer.GetData();
+
+        Assert.Equal(4, data.Length);
+
+        using var reader = new ByteBuffer(data);
+        var actual = reader.ReadPackedVector3();
+
+        // 0.25 = quantization step (X/Y 11 bits, Z 10 bits)
+        Assert.True(Math.Abs(actual.X - value.X) < 0.25f, $"X off by {actual.X - value.X}");
+        Assert.True(Math.Abs(actual.Y - value.Y) < 0.25f, $"Y off by {actual.Y - value.Y}");
+        Assert.True(Math.Abs(actual.Z - value.Z) < 0.25f, $"Z off by {actual.Z - value.Z}");
+    }
+}
+
+/// <summary>
+/// Round-trip coverage for WriteCString / WriteString. Locks current null-handling
+/// behavior before the upcoming string? signature change in the perf commit.
+/// </summary>
+public class ByteBufferWriteStringRoundTripTests
+{
+    [Fact]
+    public void WriteCString_Empty_WritesSingleNul()
+    {
+        using var writer = new ByteBuffer();
+        writer.WriteCString(string.Empty);
+        var data = writer.GetData();
+
+        Assert.Equal(new byte[] { 0x00 }, data);
+
+        using var reader = new ByteBuffer(data);
+        Assert.Equal(string.Empty, reader.ReadCString());
+    }
+
+    [Fact]
+    public void WriteCString_Null_WritesSingleNul()
+    {
+        using var writer = new ByteBuffer();
+        writer.WriteCString(null!);
+        var data = writer.GetData();
+
+        Assert.Equal(new byte[] { 0x00 }, data);
+
+        using var reader = new ByteBuffer(data);
+        Assert.Equal(string.Empty, reader.ReadCString());
+    }
+
+    [Theory]
+    [InlineData("hello")]
+    [InlineData("Hello, World!")]
+    [InlineData("héllo wörld 你好")]
+    [InlineData("Test 🎮 游戏")]
+    public void WriteCString_RoundTrip(string value)
+    {
+        using var writer = new ByteBuffer();
+        writer.WriteCString(value);
+        var data = writer.GetData();
+
+        int byteCount = Encoding.UTF8.GetByteCount(value);
+        Assert.Equal(byteCount + 1, data.Length);
+        Assert.Equal(0, data[^1]);
+
+        using var reader = new ByteBuffer(data);
+        Assert.Equal(value, reader.ReadCString());
+    }
+
+    [Fact]
+    public void WriteCString_Long_ForcesBufferGrow_RoundTrip()
+    {
+        // 1024 chars > DefaultWriteCapacity (256) — exercises EnsureCapacity grow path.
+        var value = new string('A', 1024);
+
+        using var writer = new ByteBuffer();
+        writer.WriteCString(value);
+        var data = writer.GetData();
+
+        Assert.Equal(1025, data.Length); // 1024 + NUL
+
+        using var reader = new ByteBuffer(data);
+        Assert.Equal(value, reader.ReadCString());
+    }
+
+    [Fact]
+    public void WriteString_Empty_WritesNothing()
+    {
+        using var writer = new ByteBuffer();
+        writer.WriteString(string.Empty);
+        var data = writer.GetData();
+
+        Assert.Empty(data);
+    }
+
+    [Fact]
+    public void WriteString_Null_WritesNothing()
+    {
+        using var writer = new ByteBuffer();
+        writer.WriteString(null!);
+        var data = writer.GetData();
+
+        Assert.Empty(data);
+    }
+
+    [Theory]
+    [InlineData("hello")]
+    [InlineData("héllo wörld 你好")]
+    [InlineData("Test 🎮 游戏")]
+    public void WriteString_RoundTrip(string value)
+    {
+        using var writer = new ByteBuffer();
+        writer.WriteString(value);
+        var data = writer.GetData();
+
+        int byteCount = Encoding.UTF8.GetByteCount(value);
+        Assert.Equal(byteCount, data.Length);
+
+        using var reader = new ByteBuffer(data);
+        Assert.Equal(value, reader.ReadString((uint)byteCount));
+    }
+
+    [Fact]
+    public void WriteString_Long_ForcesBufferGrow_RoundTrip()
+    {
+        var value = new string('B', 1024);
+
+        using var writer = new ByteBuffer();
+        writer.WriteString(value);
+        var data = writer.GetData();
+
+        Assert.Equal(1024, data.Length);
+
+        using var reader = new ByteBuffer(data);
+        Assert.Equal(value, reader.ReadString(1024));
+    }
+}
+
+/// <summary>
+/// Cross-mode layout-equivalence tests proving that ByteBuffer and SpanPacket{Reader,Writer}
+/// produce/consume the same wire bytes for the surfaces touched by the perf commit.
+/// Small, targeted set — exhaustive coverage lives in the same-implementation tests above.
+/// </summary>
+public class ByteBufferCrossModeRoundTripTests
+{
+    private static uint ReadBitsAsUInt(ByteBuffer reader, int bitCount)
+    {
+        uint value = 0;
+        for (int i = bitCount - 1; i >= 0; --i)
+            if (reader.ReadBit())
+                value |= 1u << i;
+        return value;
+    }
+
+    [Fact]
+    public void CrossMode_WriteBits_ByteBuffer_ReadVia_SpanPacketReader()
+    {
+        using var writer = new ByteBuffer();
+        writer.WriteBits(0x123u, 9);
+        writer.WriteBits(0xFFu, 8);
+        writer.FlushBits();
+        var data = writer.GetData();
+
+        var reader = new SpanPacketReader(data);
+        Assert.Equal(0x123u, reader.ReadBits<uint>(9));
+        Assert.Equal(0xFFu, reader.ReadBits<uint>(8));
+    }
+
+    [Fact]
+    public void CrossMode_WriteBits_SpanPacketWriter_ReadVia_ByteBuffer()
+    {
+        Span<byte> span = stackalloc byte[8];
+        var spanWriter = new SpanPacketWriter(span);
+        spanWriter.WriteBits(0x123u, 9);
+        spanWriter.WriteBits(0xFFu, 8);
+        spanWriter.FlushBits();
+        var data = spanWriter.ToArray();
+
+        using var reader = new ByteBuffer(data);
+        Assert.Equal(0x123u, ReadBitsAsUInt(reader, 9));
+        Assert.Equal(0xFFu, ReadBitsAsUInt(reader, 8));
+    }
+
+    [Fact]
+    public void CrossMode_WriteVector3_ByteBuffer_ReadVia_SpanPacketReader()
+    {
+        var value = new Vector3(100.5f, -200.25f, 300.125f);
+
+        using var writer = new ByteBuffer();
+        writer.WriteVector3(value);
+        var data = writer.GetData();
+
+        var reader = new SpanPacketReader(data);
+        var actual = reader.ReadVector3();
+        Assert.Equal(value.X, actual.X);
+        Assert.Equal(value.Y, actual.Y);
+        Assert.Equal(value.Z, actual.Z);
+    }
+
+    [Fact]
+    public void CrossMode_WriteVector3_SpanPacketWriter_ReadVia_ByteBuffer()
+    {
+        var value = new Vector3(100.5f, -200.25f, 300.125f);
+
+        Span<byte> span = stackalloc byte[12];
+        var spanWriter = new SpanPacketWriter(span);
+        spanWriter.WriteVector3(value);
+        var data = spanWriter.ToArray();
+
+        using var reader = new ByteBuffer(data);
+        var actual = reader.ReadVector3();
+        Assert.Equal(value.X, actual.X);
+        Assert.Equal(value.Y, actual.Y);
+        Assert.Equal(value.Z, actual.Z);
+    }
+
+    [Fact]
+    public void CrossMode_WriteCString_ByteBuffer_ReadVia_SpanPacketReader()
+    {
+        const string value = "héllo wörld 你好";
+
+        using var writer = new ByteBuffer();
+        writer.WriteCString(value);
+        var data = writer.GetData();
+
+        var reader = new SpanPacketReader(data);
+        Assert.Equal(value, reader.ReadCString());
+    }
+
+    [Fact]
+    public void CrossMode_WriteCString_SpanPacketWriter_ReadVia_ByteBuffer()
+    {
+        const string value = "héllo wörld 你好";
+
+        Span<byte> span = stackalloc byte[64];
+        var spanWriter = new SpanPacketWriter(span);
+        spanWriter.WriteCString(value);
+        var data = spanWriter.ToArray();
+
+        using var reader = new ByteBuffer(data);
+        Assert.Equal(value, reader.ReadCString());
+    }
+}
