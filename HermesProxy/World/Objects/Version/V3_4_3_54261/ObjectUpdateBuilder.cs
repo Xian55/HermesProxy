@@ -39,6 +39,14 @@ public class ObjectUpdateBuilder
             if (updateData.CreateData.ThisIsYou)
                 objectType = ObjectType.ActivePlayer;
         }
+        else if (_gameState.OriginalObjectTypes.TryGetValue(updateData.Guid, out var cachedType))
+        {
+            // Values updates: GUID-derived type can't distinguish Container vs Item
+            // (both share HighGuid.Item) or ActivePlayer vs Player. Prefer the type
+            // captured on CreateObject so Container Values updates correctly include
+            // the Container bit in _objectTypeMask and route to WriteUpdateContainerData.
+            objectType = cachedType;
+        }
         if (objectType == ObjectType.Player && _gameState.CurrentPlayerGuid == updateData.Guid)
             objectType = ObjectType.ActivePlayer;
 
@@ -1242,12 +1250,14 @@ public class ObjectUpdateBuilder
         bool hasObjectChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Object) && _updateData.ObjectData != null && (_updateData.ObjectData.EntryID.HasValue || _updateData.ObjectData.DynamicFlags.HasValue || _updateData.ObjectData.Scale.HasValue);
         bool hasUnitChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Unit) && _updateData.UnitData != null && HasAnyUnitFieldSet();
         bool hasItemChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Item) && _updateData.ItemData != null;
+        bool hasContainerChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Container) && _updateData.ContainerData != null && HasAnyContainerFieldSet();
         bool hasActivePlayerChanges = HasActivePlayerChanges();
         bool hasPlayerChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Player) && HasAnyPlayerFieldSet();
         bool hasGameObjectChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.GameObject) && _updateData.GameObjectData != null && HasAnyGameObjectFieldSet();
 
         if (hasObjectChanges) changedMask |= 1;
         if (hasItemChanges) changedMask |= 2;
+        if (hasContainerChanges) changedMask |= 0x04;
         if (hasUnitChanges) changedMask |= 0x20;
         if (hasPlayerChanges) changedMask |= 0x40;
         if (hasActivePlayerChanges) changedMask |= 0x80;
@@ -1265,10 +1275,21 @@ public class ObjectUpdateBuilder
         data.WriteUInt32(changedMask);
         if (hasObjectChanges) WriteUpdateObjectData(data);
         if (hasItemChanges) WriteUpdateItemData(data);
+        if (hasContainerChanges) WriteUpdateContainerData(data);
         if (hasUnitChanges) WriteUpdateUnitData(data);
         if (hasPlayerChanges) WriteUpdatePlayerData(data);
         if (hasActivePlayerChanges) WriteUpdateActivePlayerData(data);
         if (hasGameObjectChanges) WriteUpdateGameObjectData(data);
+    }
+
+    private bool HasAnyContainerFieldSet()
+    {
+        var c = _updateData.ContainerData;
+        if (c == null) return false;
+        if (c.NumSlots.HasValue) return true;
+        for (int i = 0; i < 36; i++)
+            if (c.Slots[i].HasValue) return true;
+        return false;
     }
 
     // === HasAnyUnitFieldSet (fork lines 1140-1196) ===
@@ -3076,6 +3097,47 @@ public class ObjectUpdateBuilder
                     if (item.Enchantment[i].Charges.HasValue) data.WriteUInt16(item.Enchantment[i].Charges.Value);
                 }
             }
+        }
+    }
+
+    private void WriteUpdateContainerData(WorldPacket data)
+    {
+        ContainerData container = _updateData.ContainerData;
+        if (container == null)
+        {
+            data.WriteBits(0, 2);
+            data.FlushBits();
+            return;
+        }
+
+        // ContainerData changesMask: 39 bits in 2 blocks of 32
+        // bit 0: group bit for NumSlots (block 0)
+        // bit 1: NumSlots
+        // bit 2: group bit for Slots[36]
+        // bits 3..38: Slots[0..35] individual change bits
+        uint[] blocks = new uint[2];
+        void SetBit(int bit) { blocks[bit / 32] |= (1u << (bit % 32)); }
+
+        if (container.NumSlots.HasValue) { SetBit(0); SetBit(1); }
+        for (int i = 0; i < 36; i++)
+            if (container.Slots[i].HasValue) { SetBit(2); SetBit(3 + i); }
+
+        byte blocksMask = 0;
+        if (blocks[0] != 0) blocksMask |= 1;
+        if (blocks[1] != 0) blocksMask |= 2;
+        data.WriteBits(blocksMask, 2);
+        for (int b = 0; b < 2; b++)
+            if ((blocksMask & (1 << b)) != 0)
+                data.WriteBits(blocks[b], 32);
+        data.FlushBits();
+
+        if ((blocks[0] & (1u << 1)) != 0)
+            data.WriteUInt32(container.NumSlots.Value);
+        if ((blocks[0] & (1u << 2)) != 0)
+        {
+            for (int i = 0; i < 36; i++)
+                if (container.Slots[i].HasValue)
+                    data.WritePackedGuid128(container.Slots[i].Value);
         }
     }
 

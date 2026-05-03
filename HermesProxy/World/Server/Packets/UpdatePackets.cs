@@ -403,6 +403,19 @@ public class UpdateObject : ServerPacket
             if (player.GuildRankID.HasValue || player.GuildLevel.HasValue) return false;
             if (player.DuelArbiter != null || player.WowAccount != null || player.LootTargetGUID != null) return false;
         }
+        // ContainerData carries equipped-bag NumSlots and per-slot item GUIDs. A Values
+        // update that clears Slots[X] (e.g. when an item moves out of the quiver into
+        // the main backpack on TC 3.3.5a) populates ContainerData.Slots[X] = Empty and
+        // nothing else — without this probe the filter classified that as empty and
+        // dropped it, leaving a "ghost" item rendered in the source slot of the V3_4_3
+        // bag UI until relog.
+        var ctr = u.ContainerData;
+        if (ctr != null)
+        {
+            if (ctr.NumSlots.HasValue) return false;
+            for (int i = 0; i < 36; i++)
+                if (ctr.Slots[i].HasValue) return false;
+        }
         // ActivePlayerData has hundreds of fields; check the most common ones cMangos
         // populates as part of real updates. If none are set, treat as empty.
         var ap = u.ActivePlayerData;
