@@ -935,6 +935,18 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
                 availableRaces.Add(race);
             }
 
+            // Death Knight is gated by SMSG_AUTH_RESPONSE.AvailableClasses, NOT by
+            // EnumCharactersResult — the V3_4_3 create-character UI only offers classes
+            // listed here. Per CypherCore parse, DK appears under every WotLK race with
+            // ActiveExpansionLevel=2, AccountExpansionLevel=0, MinActiveExpansionLevel=2.
+            // The level-55-on-account requirement is enforced separately via
+            // EnumCharactersResult.MaxCharacterLevel (already populated correctly).
+            if (ModernVersion.ExpansionVersion >= 3 && LegacyVersion.ExpansionVersion >= 3)
+            {
+                foreach (var r in availableRaces)
+                    r.Classes.Add(new ClassAvailability(6, 2, 0) { MinActiveExpansionLevel = 2 });
+            }
+
             response.SuccessInfo.AvailableClasses = availableRaces;
         }
 
