@@ -31,13 +31,14 @@ Examples:
 
 Infer the build number from the client version. Use the **latest build** in the range for lookups.
 
-| Version | Expansion   | Recommended Build |
-|---------|-------------|-------------------|
-| 1.14.0  | Classic Era | 40618             |
-| 1.14.1  | Classic Era | 42032             |
-| 1.14.2  | Classic Era | 42597             |
-| 2.5.2   | TBC Classic | 41510             |
-| 2.5.3   | TBC Classic | 42598             |
+| Version | Expansion     | Recommended Build |
+|---------|---------------|-------------------|
+| 1.14.0  | Classic Era   | 40618             |
+| 1.14.1  | Classic Era   | 42032             |
+| 1.14.2  | Classic Era   | 42597             |
+| 2.5.2   | TBC Classic   | 41510             |
+| 2.5.3   | TBC Classic   | 42598             |
+| 3.4.3   | Wotlk Classic | 54261             |
 
 Default to **42597** (1.14.2) unless the user specifies otherwise.
 
