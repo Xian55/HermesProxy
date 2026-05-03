@@ -394,6 +394,11 @@ public partial class WorldClient
         SpellGo spell = new SpellGo();
         spell.Cast = HandleSpellStartOrGo(packet, true);
 
+        // 3.3.5a SpellGo doesn't set HasTrajectory but the V3_4_3 client requires it
+        // on SpellGo (not SpellStart) to render projectile/missile visuals.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            spell.Cast.CastFlags |= (uint)CastFlag.HasTrajectory;
+
         // Dequeue completed cast (queue-based, FIFO order)
         if (GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit &&
             GetSession().GameState.TryDequeuePendingNormalCast((uint)spell.Cast.SpellID, out var pendingCast))
