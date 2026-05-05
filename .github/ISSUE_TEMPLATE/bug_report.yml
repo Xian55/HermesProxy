@@ -1,0 +1,125 @@
+name: "Report bug/issue"
+description: Create a report to help us improve HermesProxy
+labels: 'bug'
+body:
+- type: markdown
+  attributes:
+    value: |
+      Please [search for existing issues](https://github.com/Xian55/HermesProxy/issues) before creating a new one.
+
+      **Log files are required.** Issues without both an application log and a packet capture will be closed unactioned, because they cannot be triaged. See the README section "Reporting bugs" if you need help locating these files.
+
+      **Reproduce with verbose logging.** For the highest-quality triage, please reproduce the issue with verbose logs enabled:
+
+      ```
+      HermesProxy --set Log.MinimumLevel=Verbose --set Log.Console.MinimumLevel=Verbose --set Log.Packet.MinimumLevel=Verbose
+      ```
+
+      Then attach the resulting `Logs/hermes-*.log` and matching `PacketsLog/*.pkt` from that session.
+
+- type: textarea
+  attributes:
+    label: Description
+    description: What did you expect to happen and what happened instead?
+  validations:
+    required: true
+
+- type: input
+  attributes:
+    label: HermesProxy Version
+    description: |
+      The version printed at startup. If you compiled it manually, the git commit hash.
+      ![Example Version](https://i.imgur.com/MRZnQsp.png)
+    placeholder: "v0.x.x or git hash"
+  validations:
+    required: true
+
+- type: dropdown
+  id: client
+  attributes:
+    label: Modern Client
+    description: |
+      The client you connect from (the modern WoW client launched via Battle.net).
+      The build number is the `ClientBuild` value in your config; it also appears in the `.pkt` filename (`modern_<ClientBuild>_...`).
+    options:
+      - 1.14.0 Classic Era / Season of Mastery (build 40618)
+      - 1.14.1 Classic Era (build 41794)
+      - 1.14.2 Classic Era (build 42597)
+      - 2.5.2 TBC Classic (build 40892)
+      - 2.5.3 TBC Classic (build 42328)
+      - 3.4.3 WotLK Classic (build 54261)
+      - Other
+  validations:
+    required: true
+
+- type: dropdown
+  id: emulator
+  attributes:
+    label: Server Emulator
+    description: The emulator software running on the legacy server.
+    options:
+      - cMaNGOS
+      - VMaNGOS
+      - TrinityCore
+      - AzerothCore
+      - Other
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Reproduction Steps
+    description: Please list out the steps to reproduce your bug.
+    placeholder: |
+      1. Go to '...'
+      2. Click on '....'
+      3. Scroll down to '....'
+      4. See error
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Application Log
+    description: |
+      Drag-drop the relevant `Logs/hermes-<timestamp>.log` file here (e.g. `hermes-20260505_025453.log`). GitHub will upload it and replace the dropped file with an attachment link.
+      Attach the **full** log covering the affected session, not a snippet.
+    placeholder: Drop your hermes-*.log file in this box.
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Packet Capture
+    description: |
+      Drag-drop the matching `PacketsLog/modern_<ClientBuild>_<timestamp>_<n>.pkt` file here (e.g. `modern_12340_20260505_025453_1.pkt`).
+      The `<timestamp>` (`YYYYMMDD_HHMMSS`) must match the application log above — that is how the two files get correlated to a single session.
+    placeholder: Drop your .pkt file in this box.
+  validations:
+    required: true
+
+- type: checkboxes
+  attributes:
+    label: Confirmation
+    description: Both attachments are required for the issue to be triaged.
+    options:
+      - label: I have attached the application log from `Logs/`.
+        required: true
+      - label: I have attached the packet capture from `PacketsLog/`.
+        required: true
+
+- type: input
+  attributes:
+    label: Last Good Version
+    description: Was it working in a previous version? If yes, which was the last good one?
+    placeholder: "v0.x.x or git hash"
+  validations:
+    required: false
+
+- type: textarea
+  attributes:
+    label: Screenshots
+    description: If applicable, add screenshots to help explain your problem.
+    placeholder: Click here to attach your screenshots via the editor button in the top right.
+  validations:
+    required: false
