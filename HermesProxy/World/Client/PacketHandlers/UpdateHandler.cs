@@ -3239,6 +3239,34 @@ public partial class WorldClient
         // GameObject Fields
         if (objectType == ObjectType.GameObject)
         {
+            Log.Print(LogType.Trace,
+                $"[Trace][GO ingest ENTER] guid={guid} entry={updateData.ObjectData.EntryID} " +
+                $"dynFlagsBefore={(updateData.ObjectData.DynamicFlags.HasValue ? "0x" + updateData.ObjectData.DynamicFlags.Value.ToString("X8") : "null")} " +
+                $"isTransport={guid.IsTransport()}");
+
+            // V3_4_3 packs path-progress into the high 16 bits of ObjectData.DynamicFlags.
+            // Static (non-transport) GameObjects must report progress=1.0 (0xFFFF) or the
+            // modern client treats them as path objects stuck at 0% and refuses to render.
+            // Legacy 3.3.5 servers never write the high 16 bits, so we seed 0xFFFF0000 on
+            // CREATE for non-transport GOs. The legacy GAMEOBJECT_DYN_FLAGS branch below
+            // OR's any Activate/Sparkle/etc. low bits the server provides on top of this
+            // seed. Low bits are NOT synthesized here — the legacy server is authoritative
+            // for interactivity (both cMangos BuildValuesUpdate and TC ViewerDependentValue
+            // compute Activate/Sparkle per-player based on quest eligibility).
+            //
+            // Only fires on CREATE blocks. Partial values-updates that omit
+            // GAMEOBJECT_DYN_FLAGS leave DynamicFlags=null intentionally; clobbering it
+            // would overwrite the client's cached state.
+            const uint pathProgressMaxHi = 0xFFFF0000u;
+            if (ModernVersion.ExpansionVersion >= 3
+                && updateData.CreateData != null
+                && !guid.IsTransport())
+            {
+                uint currentDyn = updateData.ObjectData.DynamicFlags ?? 0u;
+                if ((currentDyn & pathProgressMaxHi) == 0u)
+                    updateData.ObjectData.DynamicFlags = currentDyn | pathProgressMaxHi;
+            }
+
             int GAMEOBJECT_FIELD_CREATED_BY = LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_FIELD_CREATED_BY);
             if (GAMEOBJECT_FIELD_CREATED_BY >= 0 && updateMaskArray[GAMEOBJECT_FIELD_CREATED_BY])
             {
@@ -3277,6 +3305,25 @@ public partial class WorldClient
                 var r = updateData.CreateData.MoveInfo.Rotation;
                 if (r.X == 0f && r.Y == 0f && r.Z == 0f && r.W == 0f)
                     updateData.CreateData.MoveInfo.Rotation = Quaternion.Identity;
+
+                // V3_4_3 split rotation into two distinct fields:
+                //   1. GameObjectData.ParentRotation — the stored placement quaternion
+                //   2. MovementUpdate HasRotation block — the live world-space rotation
+                // CypherCore reference for entry 191747 (Acherus Runeforge) shows these
+                // can disagree: ParentRotation=(0,0,0.292,0.956) (cMangos's quaternion)
+                // vs live Rotation=(0,0,-0.472,0.882) (derived from orientation 5.3 rad).
+                // cMangos's GAMEOBJECT_PARENTROTATION is the right value for ParentRotation;
+                // for live Rotation we re-derive from MoveInfo.Position.Orientation so the
+                // visible facing matches the orientation field (cMangos's stored quaternion
+                // is desynced for some entries — runeforge faces 34° instead of 304°).
+                if (ModernVersion.ExpansionVersion >= 3)
+                {
+                    var rot = updateData.CreateData.MoveInfo.Rotation;
+                    updateData.GameObjectData.ParentRotation = new float?[] { rot.X, rot.Y, rot.Z, rot.W };
+
+                    float ori = updateData.CreateData.MoveInfo.Orientation;
+                    updateData.CreateData.MoveInfo.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, ori);
+                }
 
                 // Fix for invalid movement of Deeprun Tram, some carts were going through the wall (in the opposite direction)
                 // Entry IDs of Trams:
@@ -3337,7 +3384,15 @@ public partial class WorldClient
                 updateData.GameObjectData.State         = (sbyte)(packed & 0xFF);
                 updateData.GameObjectData.TypeID        = (sbyte)((packed >> 8) & 0xFF);
                 updateData.GameObjectData.ArtKit        = (byte)((packed >> 16) & 0xFF);
-                updateData.GameObjectData.PercentHealth = (byte)((packed >> 24) & 0xFF);
+                // V3_4_3.54261 renamed the byte-3 slot from AnimProgress (0..255 anim
+                // phase) to PercentHealth (0..100 destructible HP); the legacy server's
+                // AnimProgress value (e.g. 255/149/110 for static chests) reads as invalid
+                // HP and the V3_4_3 client may treat the GO as damaged/destroyed and
+                // refuse interaction. For 3.4.3 we drop the byte entirely and let the
+                // writer's `?? 0` fallback emit 0. V1_14 / V2_5 still use the legacy
+                // AnimProgress semantics, so propagate byte 3 unchanged for those builds.
+                if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+                    updateData.GameObjectData.PercentHealth = (byte)((packed >> 24) & 0xFF);
             }
             int GAMEOBJECT_STATE = LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_STATE);
             if (GAMEOBJECT_STATE >= 0 && updateMaskArray[GAMEOBJECT_STATE])
@@ -3345,6 +3400,14 @@ public partial class WorldClient
                 updateData.GameObjectData.State = (sbyte)updates[GAMEOBJECT_STATE].Int32Value;
             }
             int GAMEOBJECT_DYN_FLAGS = LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_DYN_FLAGS);
+            // V3_3_5a (cMangos / TrinityCore wotlk_classic) renamed the field to
+            // GAMEOBJECT_DYNAMIC. Wire offset and semantics are identical to
+            // V1_12 / V2_4_3 GAMEOBJECT_DYN_FLAGS — without this fallback the
+            // legacy server's per-player Activate/Sparkle bits are silently
+            // dropped, which makes quest GameObjects (chests, herbs, etc.)
+            // appear inert on the V3_4_3 client.
+            if (GAMEOBJECT_DYN_FLAGS < 0)
+                GAMEOBJECT_DYN_FLAGS = LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_DYNAMIC);
             if (GAMEOBJECT_DYN_FLAGS >= 0 && updateMaskArray[GAMEOBJECT_DYN_FLAGS])
             {
                 uint oldValue = 0;
@@ -3354,7 +3417,12 @@ public partial class WorldClient
                     oldValue = 4294901760;
 
                 GameObjectDynamicFlagsLegacy flags = (GameObjectDynamicFlagsLegacy)(updates[GAMEOBJECT_DYN_FLAGS].UInt32Value);
-                updateData.ObjectData.DynamicFlags = (oldValue | (uint)flags.CastFlags<GameObjectDynamicFlagsModern>());
+                uint newLow = (uint)flags.CastFlags<GameObjectDynamicFlagsModern>();
+                updateData.ObjectData.DynamicFlags = (oldValue | newLow);
+                Log.Print(LogType.Trace,
+                    $"[Trace][GO DYN_FLAGS] guid={guid} entry={updateData.ObjectData.EntryID} " +
+                    $"legacyRaw=0x{updates[GAMEOBJECT_DYN_FLAGS].UInt32Value:X8} ({flags}) " +
+                    $"-> modernLow=0x{newLow:X8}, oldDyn=0x{oldValue:X8}, finalDyn=0x{updateData.ObjectData.DynamicFlags.Value:X8}");
             }
             int GAMEOBJECT_FACTION = LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_FACTION);
             if (GAMEOBJECT_FACTION >= 0 && updateMaskArray[GAMEOBJECT_FACTION])
