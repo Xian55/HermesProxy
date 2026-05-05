@@ -1392,16 +1392,23 @@ public partial class WorldClient
     public QuestLog? ReadQuestLogEntry(int i, BitArray? updateMaskArray, Dictionary<int, UpdateField> updates)
     {
         int PLAYER_QUEST_LOG_1_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_QUEST_LOG_1_1);
-        // WotLK (V2_4_0+) quest log: 5 fields per entry —
-        //   +0 QuestID, +1 StateFlags, +2 Progress lo (obj 0,1 as uint16),
-        //   +3 Progress hi (obj 2,3 as uint16), +4 Timer/EndTime
-        // Vanilla (pre-V2_4_0): 3 fields — QuestID, StateFlags(+progress packed), Timer.
-        bool isWotLKLayout = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_4_0_8089);
-        int sizePerEntry = isWotLKLayout ? 5 : 3;
-        int stateOffset = 1;
-        int progressOffset = isWotLKLayout ? 2 : -1;     // field +2 = progress lo (obj 0,1)
-        int progressOffsetHi = isWotLKLayout ? 3 : -1;   // field +3 = progress hi (obj 2,3)
-        int timerOffset = isWotLKLayout ? 4 : 2;
+        // Quest log slot stride is backend-version dependent (verified against the
+        // proxy's own per-version PlayerField enums by enum-offset arithmetic):
+        //   Vanilla     (pre-V2_4_0): 3 fields — QuestID, StateFlags(+progress packed), Timer.
+        //   BC          (V2_4_0..V3_0_2): 4 fields — QuestID, StateFlags, Progress(packed 4× uint8), Timer.
+        //                              See V2_4_3_8606/UpdateFields.cs:152-156, _2_1 - _1_1 = 4.
+        //   WotLK+      (V3_0_2_9056+): 5 fields — QuestID, StateFlags, ProgressLo (obj 0,1 as uint16),
+        //                              ProgressHi (obj 2,3 as uint16), Timer.
+        //                              See V3_3_5a_12340/UpdateFields.cs:196-200, _2_1 - _1_1 = 5.
+        // Pre-fix (commit 0e1f311) used 5 unconditionally for V2_4_0+, which mis-strides the
+        // V2_4_3 backend by 1 field — slot N's QuestID gets read into slot N-1's EndTime.
+        bool isVanillaLayout = LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_4_0_8089);
+        bool isWotLKLayout   = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056);
+        int sizePerEntry     = isVanillaLayout ? 3 : (isWotLKLayout ? 5 : 4);
+        int stateOffset      = 1;
+        int progressOffset   = isVanillaLayout ? -1 : 2;                      // BC: single packed-byte uint32; WotLK: progress lo
+        int progressOffsetHi = isWotLKLayout ? 3 : -1;                        // WotLK only: progress hi (obj 2,3 as uint16)
+        int timerOffset      = isVanillaLayout ? 2 : (isWotLKLayout ? 4 : 3); // sits in last slot field
         QuestLog? questLog = null;
 
         int index = PLAYER_QUEST_LOG_1_1 + i * sizePerEntry;
@@ -1435,9 +1442,10 @@ public partial class WorldClient
             else
                 questLog.StateFlags = updates[index + stateOffset].UInt32Value;
         }
-        // WotLK progress: each field holds 2× uint16 counters.
-        //   field +2 = (obj0 lo16) | (obj1 hi16)
-        //   field +3 = (obj2 lo16) | (obj3 hi16)
+        // BC (single uint32, 4× uint8) and WotLK (uint32, 2× uint16) progress decode.
+        // Field +2 holds:
+        //   BC:    (obj0 b0) | (obj1 b1) | (obj2 b2) | (obj3 b3)        — 4 counters per field
+        //   WotLK: (obj0 lo16) | (obj1 hi16)                            — 2 counters per field, hi pair lives at +3
         if (progressOffset != -1 &&
            ((updateMaskArray != null && updateMaskArray[index + progressOffset]) ||
            (updateMaskArray == null && updates.ContainsKey(index + progressOffset))))
@@ -1445,9 +1453,19 @@ public partial class WorldClient
             if (questLog == null)
                 questLog = new QuestLog();
 
-            uint progressLo = updates[index + progressOffset].UInt32Value;
-            questLog.ObjectiveProgress[0] = (short)(progressLo & 0xFFFF);
-            questLog.ObjectiveProgress[1] = (short)((progressLo >> 16) & 0xFFFF);
+            uint progress = updates[index + progressOffset].UInt32Value;
+            if (isWotLKLayout)
+            {
+                questLog.ObjectiveProgress[0] = (short)(progress & 0xFFFF);
+                questLog.ObjectiveProgress[1] = (short)((progress >> 16) & 0xFFFF);
+            }
+            else
+            {
+                questLog.ObjectiveProgress[0] = (short)(progress & 0xFF);
+                questLog.ObjectiveProgress[1] = (short)((progress >> 8) & 0xFF);
+                questLog.ObjectiveProgress[2] = (short)((progress >> 16) & 0xFF);
+                questLog.ObjectiveProgress[3] = (short)((progress >> 24) & 0xFF);
+            }
         }
         if (progressOffsetHi != -1 &&
            ((updateMaskArray != null && updateMaskArray[index + progressOffsetHi]) ||
