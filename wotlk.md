@@ -53,28 +53,33 @@ These shipped before any WotLK-specific work; every entry below assumes them.
 
 ---
 
-## What's working / what's not (as of 2026-05-03)
+## What's working / what's not (as of 2026-05-05)
 
 | Subsystem | TC 3.3.5a | cMangos 3.3.5a | Notes |
 |---|---|---|---|
 | Auth + char-select | ✅ | ✅ | |
 | World-enter + walk + camera | ✅ | ✅ | cMangos blocker resolved by recent fixes |
-| New-char first login (post-cinematic movement) | ✅ | ❌ | TC: fixed (`772a728` — `CMSG_LOADING_SCREEN_NOTIFY` `0xFFFFFFFF` sentinel was poisoning `CurrentMapId`). Caveat: skipping the cinematic too early can still disconnect (timing-related). cMangos: still broken (untested with the TC fix). |
+| New-char first login (post-cinematic movement) | ✅ | ❓ | TC: fixed (`21d0e1a` — `CMSG_LOADING_SCREEN_NOTIFY` `0xFFFFFFFF` sentinel was poisoning `CurrentMapId`). Caveat: skipping the cinematic too early can still disconnect (timing-related). cMangos: untested with the TC fix. |
 | Player render (incl. equipped items) | ✅ | ✅ | |
 | Combat — auto-attack | ✅ | ✅ | packet-split fix (player Values → separate `SMSG_UPDATE_OBJECT`) |
 | Combat — special abilities | ✅ | ❌ | cMangos: "invalid target" on e.g. Heroic Strike |
+| Channel spells (cast bar / kneel anim / ESC unblock) | ✅ | ❓ | `fc238f9` — wire-format only; cMangos untested |
+| Channel spells (loop animation) | ❌ | ❌ | character starts channel then drops to idle pose; cast bar continues. Suspect `ChannelObject` / `SMSG_SPELL_CHANNEL_START` translation gap |
+| Flying projectiles (arrows / fireball / missiles) | ✅ | ✅ | `49ace55` |
+| Death Knight character create | ✅ | ❓ | `43957ff` + `39cf991` — DK class offered in create UI on TC; cMangos untested |
 | Battle Shout / self-aura | ✅ | ✅ | |
 | Action bar | ✅ | ✅ | embedded `ActivePlayer.ActionButtons` descriptor populated |
 | Inventory equip / unequip / drag-drop | ✅ | ✅ | |
 | Inventory — "on use" items | ✅ | ❌ | cMangos: food / consumables don't trigger |
 | Vendor — buy | ✅ | ✅ | |
 | Vendor — sell | ✅ | ❌ | cMangos: items go permanent grey |
-| Looting (items + money) | ✅ | ✅ | |
+| Looting (items + money) | ⚠️ | ❓ | single item OK; with 2+ lootable items, clicking item 1 blocks item 2 from being clicked at all — see Open issues |
 | Quest log + tracker | ✅ | ⚠️ | cMangos: log desyncs on pickup; relog refreshes |
 | Quest pickup + completion | ✅ | ✅ | gossip dialogs render fully |
 | Quest map markers (mini + world) | ✅ | ✅ | |
 | Hotfix data | ✅ | ✅ | wago.tools build 3.4.3.54261, ~700K records |
 | Static GameObjects | ✅ | ✅ | mailboxes / doodads / chests |
+| Quest-objective GameObject interaction | ✅ | ❓ | `39cf991` — DK runeblade rack (object 190584, quest 12619) interacts and advances quest state on TC; cMangos untested |
 | Zeppelins / elevators (MOTransport) | ❓ | ❓ | untested; filter still in place |
 | Auras / aura ticks | ✅ | ✅ | live ticks animate |
 | Spellbook (incl. trainer learning) | ✅ | ✅ | |
@@ -102,7 +107,7 @@ These shipped before any WotLK-specific work; every entry below assumes them.
 | 2026-04-26 | Phase 5a — `ObjectUpdateBuilder` hand-port (3,419 LOC) | PR #50 |
 | 2026-04-26 | Phase 5a-7b — real WotLK hotfix data via wago.tools (~700K rows) | PR #51 |
 | 2026-04-28 | Static GameObjects + empty-Values suppression (login unblocked) | `989b929` |
-| 2026-04-29 → 2026-05-03 | ~30 follow-up `fix(v3_4_3): …` commits — see themed bullets below | feature branch |
+| 2026-04-29 → 2026-05-05 | ~38 follow-up `fix(v3_4_3): …` commits — see themed bullets below | feature branch |
 
 Post-5a opcode-fix flood, grouped by theme:
 
@@ -115,7 +120,13 @@ Post-5a opcode-fix flood, grouped by theme:
 - **Container Values updates (bag slot population + drag-out clear)** — implemented the Container Values-update wire path for V3_4_3 so post-Create bag changes reach the client: (a) added `WriteUpdateContainerData` matching WPP V3_4_0_45166 `ReadUpdateContainerData` byte-for-byte (2-bit `blocksMask`, up to 2×32-bit `changesMask` blocks, then `NumSlots` and `PackedGuid128` `Slots[i]` per set bit), (b) wired `hasContainerChanges` (`changedMask |= 0x04`) into the `WriteValuesUpdate` dispatcher, (c) made `ObjectUpdateBuilder` consult `_gameState.OriginalObjectTypes` for non-Create updates so bag GUIDs (HighGuid::Item but ObjectType::Container) get the Container bit in `_objectTypeMask`, and (d) added a `ContainerData` probe to `IsEmptyValuesDelta` so Container Values updates that only carry `Slots[]` clears aren't classified as empty and dropped by `FilterV3_4_3Values`. Net effect: `.additem 2512 N` populates new quiver slots immediately, and dragging an item out of an equipped bag clears the source slot in the V3_4_3 UI without requiring a relog (previously left a "grey-outlined ghost" there).
 - **Chat** — CMSG + SMSG layouts + NUL trim + emote lang (`3b478e3`), `SMSG_QUERY_PLAYER_NAMES_RESPONSE` plural-form layout (`08821be`).
 - **Movement** — `hasStandingOnGameObjectGUID` + `hasAdvFlying` bits (`cab673e`).
-- **Auth / login** — port `V3_3_5a/ResponseCodes`, route 3.3.5a backends to it (`7687fdf`); pass `FirstLogin` through and synthesize start zone for new chars (`652ceaa`); drop early `SMSG_MOVE_SET_ACTIVE_MOVER` from `HandleLoginVerifyWorld` (`69999dc`).
+- **Auth / login** — port `V3_3_5a/ResponseCodes`, route 3.3.5a backends to it (`7687fdf`); pass `FirstLogin` through and synthesize start zone for new chars (`652ceaa`); drop early `SMSG_MOVE_SET_ACTIVE_MOVER` from `HandleLoginVerifyWorld` (`69999dc`); filter the `0xFFFFFFFF` sentinel from `CMSG_LOADING_SCREEN_NOTIFY.MapID` so the authoritative `CurrentMapId` from `SMSG_LOGIN_VERIFY_WORLD` / `SMSG_NEW_WORLD` survives the loading-screen exit on TC first-login post-creation (`21d0e1a`).
+- **Spell casting** — `CMSG_CAST_SPELL` was throwing `IndexOutOfRange` on V3_4_3 because (a) `SpellCastRequest` was missing the V3_4_1+ extras (`removedModificationsCount` count-only uint32, `hasCraftingOrderID` bit-only) and (b) `SpellTargetData` needed a `packet.ResetBitReader()` between sections — without it, 9 cached bits from `SpellCastRequest` got consumed by `Target`'s 39-bit prefix, shifting the byte stream by 1 byte and making the Unit `PackedGuid128` mask read past end-of-packet. New `ByteBuffer.ResetBitReader()` mirrors WPP's helper (`7af45f8`); `SpellCastRequest` reads gated to `V3_4_3_54261` (`557310f`). Symptom in-game was "Invalid target" on the DK runeblade rack interaction (object 190584); plausibly also fixes Pattern A self-cast-dispel and Pattern B ground-targeted-AOE rejections, but those were not re-tested as of writing.
+- **Channel spells (partial)** — `UnitChannel.ChannelData` Values write was emitting a 4-bit `WriteBits(3 or 7, 4) + FlushBits` prefix that injected 1 byte of garbage before `SpellID`, shifting the V3_4_3 client's read so it parsed random `(ChannelData) SpellID: 13252976` instead of the real spell. CypherCore's `UnitChannel.WriteUpdate` writes `SpellID` + `SpellXSpellVisualID` directly with no inner bit prefix; removed the prefix (`fc238f9`). Cast bar now renders, kneel anim plays, ESC unblocks. **Still open**: the channel *loop* animation isn't playing — the character starts the channel and immediately drops to the idle pose while the cast bar continues. Suspect `ChannelObject` (separate Unit DynamicUpdateField in CypherCore) or `SMSG_SPELL_CHANNEL_START` / `SMSG_SPELL_CHANNEL_UPDATE` translation. Tracked under "Open issues" below.
+- **GameObject interactivity (DK runeblade rack and similar quest GOs)** — Four layered ingest fixes for V3_4_3 (`39cf991`): (1) seed `0xFFFF0000` path-progress in the high 16 bits of `ObjectData.DynamicFlags` on CREATE only — V3_4_3 packs path-progress there and 3.3.5a never writes it, so the modern client treated every static GO as a 0%-progress path object and refused to render; (2) `GAMEOBJECT_DYN_FLAGS` lookup fallback to `GAMEOBJECT_DYNAMIC` for V3_3_5a (the rename silently dropped the legacy server's per-player Activate/Sparkle bits); (3) split stored `ParentRotation` (DB quaternion) from live `HasRotation` (re-derived from `MoveInfo.Position.Orientation`) — cMangos's stored quaternion is desynced for some entries (runeforge faces 34° instead of 304°); (4) drop `GAMEOBJECT_BYTES_1` byte-3 for V3_4_3 — the slot was renamed `AnimProgress` → `PercentHealth` and the writer's `?? 0` fallback now emits a valid HP. Companion fix `ceeada5`: `WriteCreateGameObjectData` defaults `PercentHealth` to 0 (CypherCore's default for non-destructibles) instead of 100, and `ParentRotation` to identity only as a fallback.
+- **Item hotfix / icon stability** — `Item*` hotfix RecordIDs must align with the V3_4_3.54261 baked-in DBC slot or the client stores the row but doesn't re-route the tooltip "Use:" line through it. Loaded `CSV/Hotfix/ItemEffect3.csv` into a `(itemId, slot) → RecordID` lookup and reuse the baked RecordID when present, so the wire packet becomes an UPDATE (re-read) instead of a stranded INSERT (`4fa85c1`). Also: skip the `Item` hotfix entirely when DisplayID has no FileDataID mapping in our V3_4_3 hotfix table — TC's DisplayID 50887 (Battle-worn Sword) doesn't exist in V3_4_3 `ItemDisplayInfo` and the V3_4_3 client has `IconFileDataID=135410` baked in, so sending a broken hotfix replaces 135410 with 0 → red "?" icon. `CMSG_DB_QUERY_BULK` is the correct fallback path for genuinely missing rows. Class 12 (quest items) is now flagged as needing `ItemAppearance` + `ItemModifiedAppearance` hotfixes — without them the modern client falls back to red "?" for looted quest items. `GetFirstFreeId` went from O(N) per call to amortised O(1) by threading a per-store cursor `ref uint` (saves ~50M `ContainsKey` calls for 10K hotfixes, append-only callers).
+- **Death Knight unlock** — DK didn't appear in the V3_4_3 create-character UI even with the level-55 prerequisite met, because the modern client populates that class list from `SMSG_AUTH_RESPONSE.AvailableClasses` rather than `EnumCharactersResult`. Inject `ClassID=6` into every WotLK race with `MinActiveExpansionLevel=2` (`43957ff`); existing `MaxCharacterLevel` propagation continues to gate the level-55-on-account requirement. Combined with `39cf991` (runeblade rack interactivity for quest 12619) the class is no longer entirely blocked.
+- **Projectile rendering (arrows / fireball / missiles)** — Two wire-format bugs (`49ace55`): `SpellTargetData` flag width was 26 bits but V3_4_3 expects 28 (WPP's V3_4_0 module gates the 28 at V3_4_1+); the 2-bit shortfall slid the next has-bit fields into Flags and the client saw `TargetFlags=UnitParty` on hostile-creature targets. And `SMSG_SPELL_GO` needs `CastFlag.HasTrajectory` (`0x2`) ORed in — the 3.3.5a server doesn't set it, but the V3_4_3 client requires it on `SpellGo` (not `SpellStart`) to play the missile visual. Both gated to V3_4_3_54261.
 
 Individual commits beyond what's listed here are auditable via `git log --grep="(v3_4_3|phase5)"`.
 
@@ -126,7 +137,7 @@ Individual commits beyond what's listed here are auditable via `git log --grep="
 ### Critical (proxy crash — both backends affected)
 
 - **`CMSG_SET_ASSISTANT_LEADER` bits-first parse bug.** Stack trace: `IndexOutOfRangeException` in `ByteBuffer.HasBit()` at `Framework/IO/ByteBuffer.cs:353`, called from `SetAssistantLeader.Read()` at `HermesProxy/World/Server/Packets/GroupPackets.cs:426`, opcode `CMSG_SET_ASSISTANT_LEADER` (13906). Same family as the bits-first party fixes already shipped (`c0a6934`, `1d1ed8b`, `34b63a8`) — V3_4_3 client emits bits-first, upstream parser reads byte-first, runs off the end. Rewrite `SetAssistantLeader.Read()` bits-first. Repros on cMangos but the bug is in our parser, not the legacy server, so it should reproduce on TC too.
-- **Druid Typhoon crashes HermesProxy** (fork issue #14). Class-ability spell that takes the proxy down. Need a stack-trace capture at next repro to localize.
+- **Druid Typhoon crashes HermesProxy** (fork issue #14). Class-ability spell that takes the proxy down. Need a stack-trace capture at next repro to localize. Possibly related to the `SpellCastRequest` parse bug fixed in `557310f` (same opcode family); re-verify against current HEAD before triaging further.
 
 ### Critical (client crash — TC backend)
 
@@ -136,10 +147,10 @@ Individual commits beyond what's listed here are auditable via `git log --grep="
 
 The fork received a thorough class-by-class test matrix from `kasperfriend` (2026-04-18, against fork build 2026-04-16, TC backend). The individual symptoms group into a small number of recurring patterns — most are likely single opcode-translation fixes that would unblock dozens of abilities at once. **These results predate our 2026-04-29 → 2026-05-03 work; re-verify against current HEAD before treating each as open.**
 
-**Pattern A — self-cast dispel/cleanse rejects with "can't mount here"** (5+ classes affected). Likely a `CMSG_CAST_SPELL` target-encoding gap for self-targeted dispel/cure spells, or an `SMSG_CAST_FAILED` reason-code translation that maps a generic reject onto `SPELL_FAILED_NOT_MOUNTED`.
+**Pattern A — self-cast dispel/cleanse rejects with "can't mount here"** (5+ classes affected). Likely a `CMSG_CAST_SPELL` target-encoding gap for self-targeted dispel/cure spells, or an `SMSG_CAST_FAILED` reason-code translation that maps a generic reject onto `SPELL_FAILED_NOT_MOUNTED`. **May be resolved by `557310f` (`SpellCastRequest` V3_4_1+ wire-fields + `ResetBitReader`) — that fix corrected an `IndexOutOfRange` on every `CMSG_CAST_SPELL` and was confirmed to clear at least the DK runeblade rack "Invalid target" symptom. Re-verify Pattern A against current HEAD before treating it as open.**
   - Paladin: Cleanse, Purify · Priest: Dispel Magic (self), Cure Disease · Shaman: Purge, Cleanse Spirit, Cure Toxins · Mage: Remove Curse · Druid: Cure Poison, Remove Curse
 
-**Pattern B — ground-targeted AOE rejects with "item is not ready yet"** (4+ classes). All `DEST_LOCATION` / ground-click spells. Likely a `CMSG_CAST_SPELL` ground-target position-vector layout gap in V3_4_3.
+**Pattern B — ground-targeted AOE rejects with "item is not ready yet"** (4+ classes). All `DEST_LOCATION` / ground-click spells. Likely a `CMSG_CAST_SPELL` ground-target position-vector layout gap in V3_4_3. **May also be resolved by `557310f` — the same `SpellCastRequest` / `SpellTargetData` bit-stream desync that produced "Invalid target" likely produced bogus `TargetFlags` reads on ground-target spells too. Re-verify before treating as open.**
   - Priest: Mass Dispel, Lightwell · Druid: Hurricane, Force of Nature · Mage: Flamestrike, Blizzard · Warlock: Shadowfury
 
 **Pattern C — combo-point finishers reject with "requires combo points"**. Likely combo-point descriptor (`PlayerData.ComboPoints`) not propagating to the V3_4_3 client, or modern-client reads it from a different descriptor slot than what we write.
@@ -156,7 +167,7 @@ The fork received a thorough class-by-class test matrix from `kasperfriend` (202
 
 **Pattern G — class-blocker DCs / character-create gating** (severe):
   - **Hunter — total DC on every world enter.** Class-specific hard block in the fork test matrix. **Update 2026-05-03: RESOLVED on TC.** Hunter login + ammo render + auto-shot all work end-to-end. The fork's "DC on world enter" symptom and our follow-up "ammo invisible / quiver not openable / `.additem` client crash" symptoms were a single root cause: `WriteCreateItemData` was over-writing 7 bytes per Item descriptor (Retail-only fields the V3_4_3 client doesn't read), corrupting all subsequent descriptor offsets — which manifests differently depending on what items the hunter has equipped. Fix detailed in the "Hunter ammo + quiver bag render" entry under "Done so far". Ammo decrement on each shot not yet verified — that's an Item Update path test.
-  - **Death Knight — cannot be created at character-select** (even with 80-level prerequisites met). Likely a class/race-availability flag in our `EnumCharactersResult` or `CMSG_CREATE_CHARACTER` path. DK abilities mostly do not work either; class is effectively blocked.
+  - **Death Knight — cannot be created at character-select.** **RESOLVED 2026-05-03/05.** Two fixes: (a) `43957ff` injects `ClassID=6` into `SMSG_AUTH_RESPONSE.AvailableClasses` for every WotLK race with `MinActiveExpansionLevel=2` — the V3_4_3 create UI populates from there, not `EnumCharactersResult`, so the class was absent from the UI entirely regardless of `MaxCharacterLevel`; (b) `39cf991` makes the runeblade rack quest GO (object 190584, DK starting quest 12619) render and interact correctly. DK abilities not yet exhaustively tested, but the class is no longer blocked at create or at the runeblade rack.
   - **Warlock — adding a soulshard to inventory causes DC.** Pet/inventory item type cross-talk; likely a soulshard `Item` create-data write issue.
 
 **Pattern H — misc one-offs**:
@@ -169,7 +180,7 @@ The fork received a thorough class-by-class test matrix from `kasperfriend` (202
 
 ### TC-specific gaps (cMangos works for these)
 
-- **First login after character creation: character cannot move until relog (TC).** Create a fresh character on local TC, click Enter World, watch (or skip) the intro cinematic — once control returns, the character is frozen: no walk, no jump, no turn. Logging out and back in clears it; subsequent logins on the same character work normally. cMangos does not exhibit this — first-login post-creation works directly. Likely a `SMSG_MOVE_SET_ACTIVE_MOVER` / movement-permission-bag timing or ordering issue specific to the *first* world-enter (when the player record was just inserted), e.g. a movement-control packet that TC sends post-cinematic isn't being forwarded, or the relog path re-sends something the create-then-enter path skips. Note `69999dc` ("drop early `SMSG_MOVE_SET_ACTIVE_MOVER` from `HandleLoginVerifyWorld`") was the most recent active-mover change — re-check whether the drop is correct on the first-login-post-creation path or whether TC depends on the early send specifically for fresh chars.
+- ~~**First login after character creation: character cannot move until relog (TC).**~~ **RESOLVED 2026-05-03 (`21d0e1a`).** Root cause: `CMSG_LOADING_SCREEN_NOTIFY.MapID` is `uint`; a `>= 0` guard was tautological and let the client's `0xFFFFFFFF` "exit loading screen" sentinel slip into `GameState.CurrentMapId`. `UpdatePackets` truncated that to `(ushort)0xFFFF=65535`, poisoning every subsequent `SMSG_UPDATE_OBJECT.MapID`; the V3_4_3 client read that as an invalid map and refused to apply Values updates, so the camera stayed anchored at the cinematic-start frame with no character control. Filtering the sentinel keeps the authoritative `CurrentMapId` from `SMSG_LOGIN_VERIFY_WORLD` / `SMSG_NEW_WORLD` intact across the loading-screen exit. Verified end-to-end on TC: fresh Human character plays the cinematic, camera releases, character moves, logout works. **Caveat (still open)**: skipping the cinematic too early can still disconnect the client (reason 7) — separate timing-related issue where the legacy server's world-emit burst is mid-flight when `CMSG_COMPLETE_CINEMATIC` fires.
 
 ### cMangos-specific gaps (TC works for these)
 
@@ -178,6 +189,10 @@ The fork received a thorough class-by-class test matrix from `kasperfriend` (202
 - **Vendor sell.** Selling items leaves the slot rendered as a permanent grey item — the slot doesn't free up. Buy works, so the inventory packet scaffolding is there. Likely a `CMSG_SELL_ITEM` / `SMSG_SELL_ITEM_RESPONSE` translation gap on cMangos.
 - **"On use" inventory items don't trigger.** Food (Shiny Red Apple), bandages, potions, etc. don't fire when right-clicked from inventory. Likely a `CMSG_USE_ITEM` legacy wire-format gap specific to cMangos's expected layout (the `db63f01` fix targeted modern→legacy translation; cMangos may want a different field order or slot index).
 - **Raid kick disbands the whole raid (party uninvite is fine).** In raid mode, kicking a single member disbands the entire raid; in party mode, uninvite works. So the `34b63a8` `CMSG_PARTY_UNINVITE` fix is OK for party. The raid-only path likely takes a different opcode (`CMSG_GROUP_UNINVITE_GUID` or the V3_4_3-renamed variant) that translates to a legacy disband instead of single-member uninvite.
+
+### Loot
+
+- **Multi-item loot: clicking the first item blocks the second (TC observed).** With a corpse / chest that has two lootable items in the loot window, clicking item 1 takes the item correctly but the second slot becomes unclickable — the cursor doesn't register hover or click on it. Closing the loot window and re-looting the same corpse shows item 2 still present and lootable in a fresh window, so the item isn't actually consumed; only the in-window state is broken. cMangos status untested. Likely candidates: (a) `SMSG_LOOT_REMOVED` slot index translation off-by-one between V3_4_3 client and 3.3.5a server (V3_4_3 may use 0-based packed slots while we forward 1-based, or vice versa), so the client thinks the wrong slot was removed and grays out item 2's row; (b) the proxy is forwarding an `SMSG_LOOT_RELEASE_RESPONSE` or equivalent loot-session-end packet too eagerly after the first `CMSG_AUTOSTORE_LOOT_ITEM`, ending the loot session client-side before item 2 can be clicked; (c) `LOOT_SLOT_TYPE` per-slot state byte not being updated for surviving slots. Next step: WPP-diff the post-click sequence (`CMSG_AUTOSTORE_LOOT_ITEM` → `SMSG_LOOT_REMOVED` → `SMSG_LOOT_RELEASE_RESPONSE`) against a TC-native client capture.
 
 ### Mail
 
@@ -189,6 +204,7 @@ The fork received a thorough class-by-class test matrix from `kasperfriend` (202
 
 ### Combat & state propagation
 
+- **Channel-spell loop animation missing (TC + cMangos).** With the `fc238f9` `UnitChannel.ChannelData` fix the cast bar now renders correctly during channelled spells (Drain Soul, Mind Flay, Mind Sear, etc.) and the kneel start-anim plays, but the character drops to the **idle pose** for the duration of the channel instead of playing the channel-loop animation. The cast bar continues counting down and the spell tick effects do happen — only the visual loop is missing. Likely candidates: (a) the `ChannelObject` Unit DynamicUpdateField (which target the player is channeling on) isn't being populated — the `fc238f9` commit body explicitly noted "ChannelObject is a separate Unit DynamicUpdateField in CypherCore, handled independently elsewhere if needed"; (b) `SMSG_SPELL_CHANNEL_START` / `SMSG_SPELL_CHANNEL_UPDATE` translation may be losing the visual-spell field the modern client uses to pick the loop animation; (c) `UNIT_NPC_EMOTESTATE` or a similar animation-state slot needs a wire-side write we're skipping. Next step: WPP-diff a TC-native channel-spell capture (Drain Soul on a target dummy) against our proxy's wire output to see which Unit field or spell-channel packet differs.
 - **No-handler warnings — silent state drops.** Each gates a UI feature; prioritize by user-visibility:
   - `SMSG_CRITERIA_UPDATE` — achievement progress
   - `SMSG_THREAT_UPDATE` — threat meter / boss frames
