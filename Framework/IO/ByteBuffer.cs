@@ -388,6 +388,22 @@ public class ByteBuffer : IDisposable
 
         return Unsafe.As<uint, T>(ref value);
     }
+
+    /// <summary>
+    /// Discards any unread bits in the cached partial byte and forces the next bit-read
+    /// to load a fresh byte from the stream. Equivalent to WPP's <c>packet.ResetBitReader</c>.
+    /// Required between two adjacent bit-reading sections where the wire format pads the
+    /// cached byte and starts the next section on a fresh byte boundary — e.g. between
+    /// <c>SpellCastRequest</c>'s bit fields and <c>SpellTargetData</c>'s bit fields. Without
+    /// this, the second section continues consuming the cached partial byte and the byte
+    /// stream falls 1 byte behind the wire layout, corrupting subsequent byte-aligned
+    /// reads (observed: <c>IndexOutOfRangeException</c> in <c>ReadPackedGuid128</c> for
+    /// the Unit GUID of <c>CMSG_CAST_SPELL</c> on V3_4_3_54261).
+    /// </summary>
+    public void ResetBitReader()
+    {
+        _bitPosition = 8;
+    }
     #endregion
 
     #region Write Methods
