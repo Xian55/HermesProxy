@@ -3,7 +3,9 @@ using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace HermesProxy.World.Client;
 
@@ -88,15 +90,14 @@ public partial class WorldClient
             char1.FirstLogin = legacyFirstLogin != 0;
 
             // V3_4_3 client validates ZoneId/MapId against the race's starting-zone DB
-            // iff FirstLogin=true. cMangos returns ZoneId=0/MapId=0 for a freshly-created
-            // char, which fails that check and the whole enum is rejected. Synthesize
-            // the canonical starting (Map, Zone, Position) per race so the validation
-            // passes — the legacy server will overwrite these on actual login. Keeping
-            // FirstLogin=true is what tells the V3_4_3 client to auto-select this char
-            // as the just-created one (the previous blanket-false override broke that).
+            // iff FirstLogin=true. Both cMangos (Map=0, Zone=0) and TC (Map=valid,
+            // Zone=0) under-populate the new char's location; either shape breaks the
+            // client's auto-select on the just-created entry. Synthesize the canonical
+            // starting (Map, Zone, Position) whenever ZoneId=0 — the legacy server
+            // overwrites these on the real login.
             if (char1.FirstLogin
                 && ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
-                && (char1.MapId == 0 && char1.ZoneId == 0))
+                && char1.ZoneId == 0)
             {
                 ApplyStartingLocation(char1);
             }
@@ -145,7 +146,7 @@ public partial class WorldClient
             char1.BoostInProgress = false;
             char1.unkWod61x = 0;
             char1.ExpansionChosen = true;
-            Log.Print(LogType.Network,
+            Log.Print(LogType.Trace,
                 $"[Trace] HandleEnumCharactersResult: built char[{i}] guid={char1.Guid} name='{char1.Name}' " +
                 $"race={char1.RaceId} class={char1.ClassId} sex={char1.SexId} level={char1.ExperienceLevel} " +
                 $"zone={char1.ZoneId} map={char1.MapId} guildGuid={char1.GuildGuid} customizations={char1.Customizations.Count}");
@@ -179,10 +180,36 @@ public partial class WorldClient
             charEnum.RaceUnlockData.Add(new EnumCharactersResult.RaceUnlock(10, true, false, false));
             charEnum.RaceUnlockData.Add(new EnumCharactersResult.RaceUnlock(11, true, false, false));
         }
-        Log.Print(LogType.Network,
+        Log.Print(LogType.Trace,
             $"[Trace] HandleEnumCharactersResult: SEND — chars={charEnum.Characters.Count} maxLvl={charEnum.MaxCharacterLevel} " +
             $"races={charEnum.RaceUnlockData.Count} success={charEnum.Success} isNewPlayer={charEnum.IsNewPlayer} " +
             $"disabledClassesMask={(charEnum.DisabledClassesMask.HasValue ? "set" : "null")}");
+
+        // Internal-enum consumer: this enum was requested by HandleCreateChar to
+        // resolve the just-created char's GUID. Look up the FirstLogin entry by
+        // name, send the deferred SMSG_CREATE_CHAR with the real GUID, and DO
+        // NOT forward this enum to the modern client (the client will request
+        // its own next, in response to SMSG_CREATE_CHAR).
+        var state = GetSession().GameState;
+        if (state.IsInternalCharEnumPending && state.PendingCreateCharLegacyResult.HasValue)
+        {
+            // Case-insensitive match: legacy server normalises names to title case
+            // ("dk" submitted → "Dk" stored), so the requested-name string we cached
+            // on CMSG_CREATE_CHARACTER won't byte-match the enum entry.
+            var match = charEnum.Characters.FirstOrDefault(c =>
+                c.FirstLogin && string.Equals(c.Name, state.PendingCreateCharName, StringComparison.OrdinalIgnoreCase));
+
+            CreateChar createChar = new CreateChar();
+            createChar.Code = ModernVersion.ConvertResponseCodesValue(state.PendingCreateCharLegacyResult.Value);
+            createChar.Guid = match != null ? match.Guid : new WowGuid128();
+            SendPacketToClient(createChar);
+
+            state.PendingCreateCharName = null;
+            state.PendingCreateCharLegacyResult = null;
+            state.IsInternalCharEnumPending = false;
+            return;
+        }
+
         SendPacketToClient(charEnum);
         Log.Print(LogType.Trace, "[Trace] HandleEnumCharactersResult: EXIT — translation complete, packet queued for modern client");
     }
@@ -191,6 +218,28 @@ public partial class WorldClient
     void HandleCreateChar(WorldPacket packet)
     {
         byte result = packet.ReadUInt8();
+        var state = GetSession().GameState;
+
+        // V3_4_3 client uses the GUID in SMSG_CREATE_CHAR to auto-select the
+        // just-created character on the next char-list render. Legacy 3.3.5
+        // SMSG_CHAR_CREATE doesn't carry a GUID, so we defer the modern reply,
+        // request a fresh CMSG_CHAR_ENUM ourselves, and stamp the matching
+        // FirstLogin entry's GUID into SMSG_CREATE_CHAR before forwarding.
+        // Failure paths skip this dance (no GUID needed for an error reply).
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            && result == (byte)Enums.V3_3_5a_12340.ResponseCodes.CharCreateSuccess
+            && !string.IsNullOrEmpty(state.PendingCreateCharName))
+        {
+            state.PendingCreateCharLegacyResult = result;
+            state.IsInternalCharEnumPending = true;
+            SendPacketToServer(new WorldPacket(Opcode.CMSG_ENUM_CHARACTERS));
+            return;
+        }
+
+        // Failure or non-V3_4_3 path — clear pending state and forward as before.
+        state.PendingCreateCharName = null;
+        state.PendingCreateCharLegacyResult = null;
+        state.IsInternalCharEnumPending = false;
 
         CreateChar createChar = new CreateChar();
         createChar.Guid = new WowGuid128();

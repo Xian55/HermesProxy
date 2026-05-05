@@ -62,6 +62,11 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_CREATE_CHARACTER)]
     void HandleCreateCharacter(CreateCharacter charCreate)
     {
+        // Cache the requested name so HandleCreateChar can resolve the new char's
+        // GUID via an internal CMSG_CHAR_ENUM and stamp it into SMSG_CREATE_CHAR
+        // (V3_4_3 client uses that GUID for auto-select on the next char list).
+        GetSession().GameState.PendingCreateCharName = charCreate.CreateInfo.Name;
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CREATE_CHARACTER);
         packet.WriteCString(charCreate.CreateInfo.Name);
         packet.WriteUInt8((byte)charCreate.CreateInfo.RaceId);
