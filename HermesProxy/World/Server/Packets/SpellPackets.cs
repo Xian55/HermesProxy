@@ -727,17 +727,24 @@ public class SpellCastRequest
         MissileTrajectory.Read(data);
         CraftingNPC = data.ReadPackedGuid128();
 
-        var optionalReagents = data.ReadUInt32();
-        var optionalCurrencies = data.ReadUInt32();
+        // V3_4_3.54261 wire quirks: `removedModificationsCount` is a count-only uint32
+        // (no per-entry payload), and `hasCraftingOrderID` is bit-only (no UInt64
+        // follow-up). Newer V3_4_4+ ships per-entry payloads for both — adding those
+        // reads on 54261 throws IndexOutOfRange.
+        var optionalReagentsCount = data.ReadUInt32();
+        var optionalCurrenciesCount = data.ReadUInt32();
+        // V3_4_1+ wire field; not present in V1_14 / V2_5 SpellCastRequest layout.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            _ = data.ReadUInt32(); // removedModificationsCount — count only, no per-entry payload in 54261
 
-        for (var i = 0; i < optionalReagents; ++i)
+        for (var i = 0; i < optionalReagentsCount; ++i)
         {
             var reagent = new SpellOptionalReagent();
             reagent.Read(data);
             OptionalReagents.Add(reagent);
         }
 
-        for (var i = 0; i < optionalCurrencies; ++i)
+        for (var i = 0; i < optionalCurrenciesCount; ++i)
         {
             var currency = new SpellExtraCurrencyCost();
             currency.Read(data);
@@ -748,6 +755,9 @@ public class SpellCastRequest
         if (data.HasBit())
             MoveUpdate = new();
         var weightCount = data.ReadBits<uint>(2);
+        // V3_4_1+ bit; not present in V1_14 / V2_5 SpellCastRequest layout.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            _ = data.HasBit(); // hasCraftingOrderID — bit only, no UInt64 follow-up in 54261
         Target.Read(data);
 
         if (MoveUpdate != null)
@@ -1175,6 +1185,20 @@ public class SpellTargetData
 {
     public void Read(WorldPacket data)
     {
+        // WPP V8_0_1 ReadSpellTargetData calls packet.ResetBitReader() FIRST, discarding
+        // any unread bits in the cached partial byte left over from the prior section.
+        // Without this, the V3_4_3 SpellCastRequest's 9 bit-fields (5+1+2+1) leave 7 bits
+        // cached; Target's 39 bits (28 Flags + 4 has-bits + 7 nameLength) consume those
+        // 7 cached bits first and end up reading 1 byte fewer from the stream than the
+        // wire contains — pushing Unit's PackedGuid128 mask byte 1 byte earlier than it
+        // should be, which makes ReadPackedUInt64 try to read past end-of-packet and
+        // throws IndexOutOfRange (observed on every CMSG_CAST_SPELL after the V3_4_1+
+        // hasCraftingOrderID bit was added to SpellCastRequest.Read).
+        // Gated to V3_4_3_54261: V1_14 / V2_5 SpellCastRequest doesn't leave dangling
+        // cached bits, so a reset there would not corrupt anything but is unnecessary.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            data.ResetBitReader();
+
         // V3_4_3 client uses 28-bit target flags (WPP V3_4_0 module gates 28 at V3_4_1+).
         int flagBits = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 28 : 26;
         Flags = (SpellCastTargetFlags)data.ReadBits<uint>(flagBits);
