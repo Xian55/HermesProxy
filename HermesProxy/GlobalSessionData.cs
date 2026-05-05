@@ -96,6 +96,16 @@ public sealed class GameSessionData
     public World.Server.Packets.PartyUpdate?[] CurrentGroups = new World.Server.Packets.PartyUpdate?[2];
     public bool WeWantToLeaveGroup; // Only send kick message when we dont initiated the group-leave
     public List<OwnCharacterInfo> OwnCharacters = [];
+
+    // V3_4_3 SMSG_CREATE_CHAR.Guid synthesis. Legacy 3.3.5 SMSG_CHAR_CREATE is a
+    // 1-byte response (code only) — but the V3_4_3 client uses the GUID in the
+    // modern reply to auto-select the just-created char on the next char-list
+    // render. We cache the requested name on CMSG_CREATE_CHARACTER, defer the
+    // modern SMSG_CREATE_CHAR until we issue our own internal CMSG_CHAR_ENUM,
+    // look up the FirstLogin entry by name, and stamp its GUID into the reply.
+    public string? PendingCreateCharName;
+    public byte? PendingCreateCharLegacyResult;
+    public bool IsInternalCharEnumPending;
     public WowGuid128 CurrentPlayerGuid;
     public long CurrentPlayerCreateTime;
     public OwnCharacterInfo? CurrentPlayerInfo;

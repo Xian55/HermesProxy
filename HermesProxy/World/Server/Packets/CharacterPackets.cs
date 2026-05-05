@@ -138,9 +138,9 @@ public sealed class EnumCharactersResult : ServerPacket
         string customSummary = Characters.Count > 0 && Characters[0].Customizations.Count > 0
             ? string.Join(",", Characters[0].Customizations.Select(c => $"{c.ChrCustomizationOptionID}/{c.ChrCustomizationChoiceID}"))
             : "(none)";
-        Framework.Logging.Log.Print(Framework.Logging.LogType.Network,
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
             $"[CharEnumEnv] charsCount={Characters.Count} maxLevel={MaxCharacterLevel} raceCount={RaceUnlockData.Count} envBytes={len} envFirst40={hex}");
-        Framework.Logging.Log.Print(Framework.Logging.LogType.Network,
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
             $"[CharEnumEnv] customizations[0]={customSummary}");
     }
 
@@ -190,12 +190,12 @@ public sealed class EnumCharactersResult : ServerPacket
             int lastLen = Math.Min(30, totalSize);
             string firstHex = BitConverter.ToString(all, startSize, firstLen);
             string lastHex = BitConverter.ToString(all, startSize + totalSize - lastLen, lastLen);
-            Framework.Logging.Log.Print(Framework.Logging.LogType.Network,
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
                 $"[CharInfo] name={Name} race={RaceId} class={ClassId} level={ExperienceLevel} " +
                 $"visItems={VisualItems.Length} bytes={totalSize}");
-            Framework.Logging.Log.Print(Framework.Logging.LogType.Network,
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
                 $"[CharInfo] first40={firstHex}");
-            Framework.Logging.Log.Print(Framework.Logging.LogType.Network,
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
                 $"[CharInfo] last30={lastHex}");
         }
 
