@@ -188,14 +188,39 @@ public partial class WorldClient
     {
         ClientGossipQuest quest = new();
         quest.QuestID = packet.ReadUInt32();
+        // The per-quest gossip icon byte's encoding is backend-version specific:
+        //   WotLK+ (V3_0_2+): backend already emits modern GossipQuestIcon values
+        //                     directly. TC wotlk_classic `Player.cpp:13572-13598`
+        //                     calls AddMenuItem(quest_id, 0|2|4) using exactly the
+        //                     {AvailableRepeatable=0, Available=2, Complete=4} set.
+        //                     Pass through.
+        //   TBC   (V2_0_1..V3_0_2): backend emits QuestGiverStatusTBC ordinal
+        //                     (Incomplete=3, AvailableRep=5, Available=6, etc).
+        //                     Translate to GossipQuestIcon — verified against
+        //                     `hermes-20260505_015835.log:283` where V2_4_3 emitted
+        //                     byte 3 for the in-progress quest 179.
+        //   Vanilla (pre-V2_0_1): backend emits QuestGiverStatusVanilla ordinal.
+        // Note: do NOT route through ConvertQuestGiverStatus here; that converter
+        // is for the byte in SMSG_QUEST_GIVER_STATUS (the world-space `?`/`!`
+        // over the NPC's head), not the per-quest gossip icon byte.
         int rawIcon = packet.ReadInt32();
-        // TBC+ (V2_0_1+) legacy backends already emit QuestIcon as the modern
-        // GossipQuestIcon convention (Available=2, Complete=4). Pass through.
-        // Vanilla pre-2.0 emits the QuestGiverStatusVanilla ordinal (0..7) —
-        // translate to GossipQuestIcon so the modern client renders correctly.
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
+        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
         {
             quest.QuestType = rawIcon;
+        }
+        else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
+        {
+            quest.QuestType = (int)((QuestGiverStatusTBC)rawIcon switch
+            {
+                QuestGiverStatusTBC.LowLevelAvailable => GossipQuestIcon.Available,
+                QuestGiverStatusTBC.Incomplete        => GossipQuestIcon.Complete,
+                QuestGiverStatusTBC.RewardRep         => GossipQuestIcon.Complete,
+                QuestGiverStatusTBC.AvailableRep      => GossipQuestIcon.Available,
+                QuestGiverStatusTBC.Available         => GossipQuestIcon.Available,
+                QuestGiverStatusTBC.Reward2           => GossipQuestIcon.Complete,
+                QuestGiverStatusTBC.Reward            => GossipQuestIcon.Complete,
+                _                                     => GossipQuestIcon.AvailableRepeatable,
+            });
         }
         else
         {
@@ -210,6 +235,8 @@ public partial class WorldClient
                 _                                         => GossipQuestIcon.AvailableRepeatable,
             });
         }
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+            $"[QuestStatusTrace] ReadGossipQuestOption: questId={quest.QuestID} legacyIcon={rawIcon} → modernQuestType={quest.QuestType}");
 
         quest.QuestLevel = packet.ReadInt32();
 
