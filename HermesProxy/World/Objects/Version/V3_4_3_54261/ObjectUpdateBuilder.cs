@@ -652,15 +652,28 @@ public class ObjectUpdateBuilder
         data.WriteInt32(unit.LookAtControllerID.GetValueOrDefault());
         data.WriteInt32(0);
         data.WritePackedGuid128(unit.GuildGUID ?? WowGuid128.Empty);
-        data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
+        data.WriteUInt32(0u);                                   // PassiveSpells.size()
+        data.WriteUInt32(0u);                                   // WorldEffects.size()
+        // ChannelObjects.size() — DynamicUpdateField<ObjectGuid,0,4> in TC.
+        // Without this count + the matching GUID body at the end of the
+        // create block, the V3_4_3 client receives an empty channel target
+        // list and drops the channel-loop animation after the start anim
+        // finishes (Drain Soul / Mind Flay went idle-pose mid-channel).
+        // Legacy 3.3.5a server publishes the target via UNIT_FIELD_CHANNEL_OBJECT;
+        // the reader populates UnitData.ChannelObject at UpdateHandler.cs:1918.
+        bool hasChannelObject = unit.ChannelObject.HasValue && !unit.ChannelObject.Value.IsEmpty();
+        data.WriteUInt32(hasChannelObject ? 1u : 0u);           // ChannelObjects.size()
         data.WritePackedGuid128(WowGuid128.Empty);
         data.WriteInt32(0);
         data.WriteFloat(0f);
         data.WriteUInt32(0u);
         if (IsOwner)
             data.WritePackedGuid128(WowGuid128.Empty);
+        // ChannelObjects body (TC UpdateFields.cpp:856-859). PassiveSpells and
+        // WorldEffects bodies are size-0 so emit nothing; only the channel
+        // target GUID is written here when present.
+        if (hasChannelObject)
+            data.WritePackedGuid128(unit.ChannelObject!.Value);
     }
 
     private void WriteCreatePlayerData(WorldPacket data)
@@ -1643,6 +1656,12 @@ public class ObjectUpdateBuilder
         {
             SetBit(22);
         }
+        // ChannelObjects DynamicUpdateField — bit 4 of UnitData changesMask.
+        // Sustains the channel-loop animation on V3_4_3 client by populating
+        // the channel-target list. Reader at UpdateHandler.cs:1918 only assigns
+        // ChannelObject when the legacy mask bit is set, so this naturally
+        // covers both channel-start (target GUID) and channel-end (Empty GUID).
+        if (unit.ChannelObject != null) SetBit(4);
         if (unit.RaceId.HasValue)
         {
             SetBit(24);
@@ -1947,9 +1966,28 @@ public class ObjectUpdateBuilder
         {
         }
         data.FlushBits();
+        // Dynamic update masks for the changesMask[2/3/4] field group
+        // (PassiveSpells/WorldEffects/ChannelObjects). Mirrors TC
+        // UpdateFields.cpp:908-931 + UpdateField.cpp:43-63
+        // (WriteCompleteDynamicFieldUpdateMask). Only ChannelObjects is wired
+        // here — the other two are size-0 placeholders.
+        if ((blockMasks[0] & (1u << 4)) != 0)
+        {
+            uint channelObjectsSize = (unit.ChannelObject.HasValue && !unit.ChannelObject.Value.IsEmpty()) ? 1u : 0u;
+            data.WriteBits(channelObjectsSize, 32);
+            if (channelObjectsSize != 0)
+                data.WriteBits(0xFFFFFFFFu, (int)channelObjectsSize); // one set bit per element
+        }
         data.FlushBits();
         if ((blockMasks[0] & 1) != 0)
         {
+            // ChannelObjects body — written BEFORE Health to match TC
+            // UpdateFields.cpp:957-963 ordering inside the changesMask[0] body.
+            if ((blockMasks[0] & (1u << 4)) != 0
+                && unit.ChannelObject.HasValue && !unit.ChannelObject.Value.IsEmpty())
+            {
+                data.WritePackedGuid128(unit.ChannelObject.Value);
+            }
             if (unit.Health.HasValue)
             {
                 data.WriteInt64(unit.Health.Value);

@@ -374,7 +374,7 @@ public class UpdateObject : ServerPacket
             if (unit.Health.HasValue || unit.MaxHealth.HasValue || unit.DisplayID.HasValue) return false;
             if (unit.Charm != null || unit.Summon != null || unit.CharmedBy != null) return false;
             if (unit.SummonedBy != null || unit.CreatedBy != null || unit.Target != null) return false;
-            if (unit.ChannelData != null) return false;
+            if (unit.ChannelData != null || unit.ChannelObject != null) return false;
             if (unit.RaceId.HasValue || unit.ClassId.HasValue || unit.SexId.HasValue) return false;
             if (unit.Level.HasValue || unit.EffectiveLevel.HasValue || unit.DisplayPower.HasValue) return false;
             if (unit.FactionTemplate.HasValue || unit.Flags.HasValue || unit.Flags2.HasValue || unit.Flags3.HasValue) return false;

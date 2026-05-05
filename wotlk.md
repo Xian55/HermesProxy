@@ -64,7 +64,7 @@ These shipped before any WotLK-specific work; every entry below assumes them.
 | Combat — auto-attack | ✅ | ✅ | packet-split fix (player Values → separate `SMSG_UPDATE_OBJECT`) |
 | Combat — special abilities | ✅ | ❌ | cMangos: "invalid target" on e.g. Heroic Strike |
 | Channel spells (cast bar / kneel anim / ESC unblock) | ✅ | ❓ | `fc238f9` — wire-format only; cMangos untested |
-| Channel spells (loop animation) | ❌ | ❌ | character starts channel then drops to idle pose; cast bar continues. Suspect `ChannelObject` / `SMSG_SPELL_CHANNEL_START` translation gap |
+| Channel spells (loop animation) | ✅ | ❓ | fixed by writing `ChannelObjects` DynamicUpdateField (bit 4) in V3_4_3 ObjectUpdateBuilder; cMangos retest pending |
 | Flying projectiles (arrows / fireball / missiles) | ✅ | ✅ | `49ace55` |
 | Death Knight character create | ✅ | ❓ | `43957ff` + `39cf991` — DK class offered in create UI on TC; cMangos untested |
 | Battle Shout / self-aura | ✅ | ✅ | |
@@ -204,7 +204,7 @@ The fork received a thorough class-by-class test matrix from `kasperfriend` (202
 
 ### Combat & state propagation
 
-- **Channel-spell loop animation missing (TC + cMangos).** With the `fc238f9` `UnitChannel.ChannelData` fix the cast bar now renders correctly during channelled spells (Drain Soul, Mind Flay, Mind Sear, etc.) and the kneel start-anim plays, but the character drops to the **idle pose** for the duration of the channel instead of playing the channel-loop animation. The cast bar continues counting down and the spell tick effects do happen — only the visual loop is missing. Likely candidates: (a) the `ChannelObject` Unit DynamicUpdateField (which target the player is channeling on) isn't being populated — the `fc238f9` commit body explicitly noted "ChannelObject is a separate Unit DynamicUpdateField in CypherCore, handled independently elsewhere if needed"; (b) `SMSG_SPELL_CHANNEL_START` / `SMSG_SPELL_CHANNEL_UPDATE` translation may be losing the visual-spell field the modern client uses to pick the loop animation; (c) `UNIT_NPC_EMOTESTATE` or a similar animation-state slot needs a wire-side write we're skipping. Next step: WPP-diff a TC-native channel-spell capture (Drain Soul on a target dummy) against our proxy's wire output to see which Unit field or spell-channel packet differs.
+- **Channel-spell loop animation (TC fixed 2026-05-06; cMangos retest pending).** Root cause was hypothesis (a): the V3_4_3 `ChannelObjects` DynamicUpdateField (bit 4 of UnitData changesMask) was never being written by `ObjectUpdateBuilder.cs`, so the modern client received an empty channel-target list and dropped the loop animation after the start anim. The legacy reader (`UpdateHandler.cs:1918`) was already populating `UnitData.ChannelObject` from `UNIT_FIELD_CHANNEL_OBJECT`; the data was being silently dropped at the V3_4_3 writer. Fix: write `uint32(ChannelObjects.size())` + the GUID body in the create path, and `WriteCompleteDynamicFieldUpdateMask` + GUID body (before Health, per TC ordering) in the values path; also added `ChannelObject` probe to `IsEmptyValuesDelta` so a channel-end clear isn't dropped.
 - **No-handler warnings — silent state drops.** Each gates a UI feature; prioritize by user-visibility:
   - `SMSG_CRITERIA_UPDATE` — achievement progress
   - `SMSG_THREAT_UPDATE` — threat meter / boss frames
