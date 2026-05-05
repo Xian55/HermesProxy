@@ -136,7 +136,14 @@ public class ObjectUpdate
         {
             if ((GameObjectData.PercentHealth == null) &&
                 (GameObjectData.State != null || GameObjectData.TypeID != null || GameObjectData.ArtKit != null))
-                GameObjectData.PercentHealth = 255;
+            {
+                // Legacy V1_14/V2_5: byte 3 of GAMEOBJECT_BYTES_1 is AnimProgress (0..255),
+                // 255 = max anim phase. V3_4_3 renamed the slot to PercentHealth (0..100);
+                // 255 reads as invalid HP on non-destructible CHEST and the client refuses
+                // to render — observed for entry 190584 (Battle-worn Sword) in Acherus DK
+                // starter, where CypherCore reference ships PercentHealth=0.
+                GameObjectData.PercentHealth = (byte)(ModernVersion.ExpansionVersion >= 3 ? 0 : 255);
+            }
             if (GameObjectData.ParentRotation[3] == null)
                 GameObjectData.ParentRotation[3] = 1;
             if (GameObjectData.StateAnimID == null)

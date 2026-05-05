@@ -1016,14 +1016,21 @@ public class ObjectUpdateBuilder
         data.WritePackedGuid128(go.CreatedBy ?? WowGuid128.Empty);
         data.WritePackedGuid128(WowGuid128.Empty);
         data.WriteUInt32(go.Flags.GetValueOrDefault());
-        var createData = _updateData.CreateData;
-        if (createData != null && createData.MoveInfo != null)
+        // ParentRotation = the stored quaternion of the GameObject (cMangos's
+        // GAMEOBJECT_PARENTROTATION value, plumbed through UpdateHandler.cs's GO ingest
+        // for V3_4_3+). For most static GOs this matches CypherCore's DB-stored value;
+        // for runeblade entry 190584 it's identity (0,0,0,1), for runeforge entry 191747
+        // it's (0,0,0.292,0.956). Falls back to identity only if no rotation field was
+        // ever ingested (defensive — should not happen for V3_4_3 since the ingest now
+        // always populates this from cMangos). ParentRotation is float?[4] X/Y/Z/W.
+        if (go.ParentRotation != null
+            && (go.ParentRotation[0].HasValue || go.ParentRotation[1].HasValue
+                || go.ParentRotation[2].HasValue || go.ParentRotation[3].HasValue))
         {
-            var rot = createData.MoveInfo.Rotation;
-            data.WriteFloat(rot.X);
-            data.WriteFloat(rot.Y);
-            data.WriteFloat(rot.Z);
-            data.WriteFloat(rot.W);
+            data.WriteFloat(go.ParentRotation[0].GetValueOrDefault(0f));
+            data.WriteFloat(go.ParentRotation[1].GetValueOrDefault(0f));
+            data.WriteFloat(go.ParentRotation[2].GetValueOrDefault(0f));
+            data.WriteFloat(go.ParentRotation[3].GetValueOrDefault(1f));
         }
         else
         {
@@ -1036,7 +1043,7 @@ public class ObjectUpdateBuilder
         data.WriteInt32(go.Level.GetValueOrDefault());
         data.WriteInt8(go.State.GetValueOrDefault());
         data.WriteInt8(go.TypeID.GetValueOrDefault());
-        data.WriteUInt8(go.PercentHealth ?? 100);
+        data.WriteUInt8(go.PercentHealth ?? 0);
         data.WriteUInt32(go.ArtKit.GetValueOrDefault());
         data.WriteUInt32(0u);
         data.WriteUInt32(go.CustomParam.GetValueOrDefault());
