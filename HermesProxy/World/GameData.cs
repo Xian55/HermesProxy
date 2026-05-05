@@ -30,6 +30,13 @@ public static partial class GameData
     public static SortedDictionary<uint, BroadcastText> BroadcastTextStore = [];
     public static FrozenDictionary<uint, uint> ItemDisplayIdStore = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<uint, uint> ItemDisplayIdToFileDataIdStore = FrozenDictionary<uint, uint>.Empty;
+    // (itemId, slot) -> baked-in V3_4_3.54261 ItemEffect.RecordID. Populated from
+    // CSV/Hotfix/ItemEffect3.csv (extracted from wago build 3.4.3.54261).
+    // When AddItemEffectRecord is asked to create a hotfix for an item already
+    // present in this lookup, it must reuse the baked-in RecordID so the V3_4_3
+    // client's pre-built ItemEffect-by-ParentItemID index points at our row.
+    public static FrozenDictionary<(uint itemId, byte slot), uint> V3_4_3ItemEffectRecordIdByItemSlot
+        = FrozenDictionary<(uint itemId, byte slot), uint>.Empty;
     public static FrozenDictionary<uint, ItemSpellsData> ItemSpellsDataStore = FrozenDictionary<uint, ItemSpellsData>.Empty;
     public static Dictionary<uint, ItemRecord> ItemRecordsStore = [];
     public static Dictionary<uint, ItemSparseRecord> ItemSparseRecordsStore = [];
@@ -231,11 +238,24 @@ public static partial class GameData
         return null;
     }
 
-    public static uint GetFirstFreeId<T>(Dictionary<uint, T> dict, uint after = 0)
+    // Caller-provided cursor turns the linear ContainsKey scan from O(N) per call
+    // into amortized O(1). Append-only callers (hotfix RecordIDs) would otherwise
+    // re-scan from `after+1` every time, doing O(N²) work over a session. The
+    // cursor is just a hint — correctness is preserved by walking past any
+    // occupied slots from there. Pass `ref` to a static field per store.
+    private static uint _hotfixesCursor;
+    private static uint _itemEffectCursor;
+    private static uint _itemAppearanceCursor;
+    private static uint _itemModifiedAppearanceCursor;
+
+    public static uint GetFirstFreeId<T>(Dictionary<uint, T> dict, ref uint cursor, uint after = 0)
     {
         uint candidate = after + 1;
+        if (cursor > candidate)
+            candidate = cursor;
         while (dict.ContainsKey(candidate))
             candidate++;
+        cursor = candidate + 1;
         return candidate;
     }
 
@@ -930,6 +950,37 @@ public static partial class GameData
         ItemDisplayIdToFileDataIdStore = dict.ToFrozenDictionary();
     }
 
+    // Builds a (itemId, slot) -> baked-in V3_4_3.54261 ItemEffect.RecordID lookup
+    // from CSV/Hotfix/ItemEffect3.csv (extracted directly from wago.tools for build
+    // 3.4.3.54261). Used by AddItemEffectRecord to keep our hotfix RecordID aligned
+    // with the slot the V3_4_3 client's pre-built ItemEffect-by-ParentItemID index
+    // already points at — INSERT at a fresh ID (whether 1 or HotfixItemBegin+) does
+    // not extend that index, so the tooltip "Use:" line stays blank even when the
+    // hotfix bytes are byte-perfect (observed for items 38607 and 41751).
+    public static void LoadV3_4_3ItemEffectLookup()
+    {
+        var path = Path.Combine("CSV", "Hotfix", "ItemEffect3.csv");
+        if (!File.Exists(path))
+        {
+            Log.Print(LogType.Server,
+                $"LoadV3_4_3ItemEffectLookup: {path} not found — Item* hotfix RecordID alignment disabled.");
+            return;
+        }
+
+        using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+        var dict = new Dictionary<(uint, byte), uint>(EstimateRowCount(path, 50));
+        foreach (var row in reader)
+        {
+            uint recordId = uint.Parse(row[0].Span);   // ID
+            byte slot     = byte.Parse(row[1].Span);   // LegacySlotIndex
+            uint itemId   = uint.Parse(row[9].Span);   // ParentItemID
+            dict[(itemId, slot)] = recordId;
+        }
+        V3_4_3ItemEffectRecordIdByItemSlot = dict.ToFrozenDictionary();
+        Log.Print(LogType.Server,
+            $"LoadV3_4_3ItemEffectLookup: loaded {V3_4_3ItemEffectRecordIdByItemSlot.Count} (itemId, slot) -> RecordID entries.");
+    }
+
     public static void LoadBattlegrounds()
     {
         var path = Path.Combine("CSV", "Battlegrounds.csv");
@@ -1494,6 +1545,7 @@ public static partial class GameData
         {
             LoadChrCustomizationChoiceHotfixes();
             LoadChrCustomizationOptionHotfixes();
+            LoadV3_4_3ItemEffectLookup();
         }
     }
 
@@ -3034,7 +3086,7 @@ public static partial class GameData
                 HotfixRecord record = new HotfixRecord();
                 record.Status = remove ? HotfixStatus.RecordRemoved : HotfixStatus.Valid;
                 record.TableHash = table;
-                record.HotfixId = GetFirstFreeId(Hotfixes, HotfixItemBegin);
+                record.HotfixId = GetFirstFreeId(Hotfixes, ref _hotfixesCursor, HotfixItemBegin);
                 record.UniqueId = record.HotfixId;
                 record.RecordId = recordId;
                 writer?.Invoke(record.HotfixContent);
@@ -3082,6 +3134,23 @@ public static partial class GameData
 
     public static Server.Packets.HotFixMessage? GenerateItemUpdateIfNeeded(ItemTemplate item)
     {
+        // Skip proactive Item hotfix when our DisplayID -> FileDataID lookup fails.
+        // The hotfix would set IconFileDataID=0 and OVERRIDE the client's baked-in
+        // (correct) value — observed for item 38607 (Battle-worn Sword): TC's
+        // DisplayID 50887 doesn't exist in V3_4_3 ItemDisplayInfo (0 rows on wago);
+        // the V3_4_3 client has Item.IconFileDataID=135410 baked in and uses it
+        // directly for the inventory icon, bypassing DisplayID. Sending our broken
+        // hotfix replaces 135410 with 0 -> red "?" icon. If the client ever needs
+        // Item table data we don't have baked in, it requests via CMSG_DB_QUERY_BULK
+        // and HotfixHandler.HandleDbQueryBulk answers — that path is unaffected.
+        if (GetItemIconFileDataIdByDisplayId(item.DisplayID) == 0)
+        {
+            Log.Print(LogType.Storage,
+                $"Item #{item.Entry} (DisplayID {item.DisplayID}): no FileDataID mapping — " +
+                "skipping Item hotfix to preserve V3_4_3 client's baked-in IconFileDataID.");
+            return null;
+        }
+
         if (ItemRecordsStore.TryGetValue(item.Entry, out var row))
         {
             int iconFileDataId = (int)GetItemIconFileDataIdByDisplayId(item.DisplayID);
@@ -3807,9 +3876,34 @@ public static partial class GameData
 
     public static ItemEffect AddItemEffectRecord(ItemTemplate item, byte slot)
     {
+        // Prefer the V3_4_3.54261 baked-in DBC RecordID for this (item, slot) when
+        // we have it. Pushing the hotfix at the same RecordID lands it in the slot
+        // the client's pre-built ItemEffect-by-ParentItemID index already points at,
+        // turning the wire packet into an UPDATE (which the client re-reads) rather
+        // than an INSERT (which the client stores but doesn't re-index). Observed
+        // for items 38607 / 41751 — byte-correct hotfix at fresh RecordID (1 or
+        // HotfixItemBegin+) produced no "Use:" tooltip; matching the baked-in
+        // 141239 / 142989 should re-route the existing index entry to our row.
+        // For items genuinely missing from the baked-in lookup, fall back to
+        // HotfixItemBegin+ so we don't collide with anything else.
+        // Gated to V3_4_3_54261: V1_14 / V2_5 have different baked-in DBC RecordIDs;
+        // applying this lookup there would map V3_4_3 IDs onto the wrong client.
+        int id;
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            && V3_4_3ItemEffectRecordIdByItemSlot.TryGetValue(((uint)item.Entry, slot), out var bakedRecordId))
+        {
+            id = (int)bakedRecordId;
+            Log.Print(LogType.Storage,
+                $"AddItemEffect: item={item.Entry} slot={slot} -> using BAKED-IN V3_4_3.54261 RecordID={id}.");
+        }
+        else
+        {
+            id = (int)GetFirstFreeId(ItemEffectStore, ref _itemEffectCursor, HotfixItemBegin);
+        }
+
         ItemEffect record = new()
         {
-            Id = (int)GetFirstFreeId(ItemEffectStore),
+            Id = id,
             LegacySlotIndex = slot
         };
         UpdateItemEffectRecord(record, item);
@@ -3842,7 +3936,8 @@ public static partial class GameData
     public static ItemAppearance AddItemAppearanceRecord(ItemTemplate item)
     {
         ItemAppearance record = new();
-        record.Id = (int)GetFirstFreeId(ItemAppearanceStore);
+        // Above baked-in DBC namespace (see AddItemEffectRecord comment).
+        record.Id = (int)GetFirstFreeId(ItemAppearanceStore, ref _itemAppearanceCursor, HotfixItemBegin);
         UpdateItemAppearanceRecord(record, item);
         ItemAppearanceStore.Add((uint)record.Id, record);
         Log.Print(LogType.Storage, $"ItemAppearance #{record.Id} created for DisplayID #{item.DisplayID}.");
@@ -3868,7 +3963,8 @@ public static partial class GameData
     public static ItemModifiedAppearance? AddItemModifiedAppearanceRecord(ItemTemplate item)
     {
         ItemModifiedAppearance record = new();
-        record.Id = (int)GetFirstFreeId(ItemModifiedAppearanceStore);
+        // Above baked-in DBC namespace (see AddItemEffectRecord comment).
+        record.Id = (int)GetFirstFreeId(ItemModifiedAppearanceStore, ref _itemModifiedAppearanceCursor, HotfixItemBegin);
         UpdateItemModifiedAppearanceRecord(record, item);
         if (record.ItemID != item.Entry)
         {
@@ -3925,6 +4021,16 @@ public static partial class GameData
 
         // quivers
         if (item.Class == 11 && item.SubClass == 2)
+            return true;
+
+        // Quest items (Class 12) — many use weapon/armor display data and need
+        // ItemAppearance + ItemModifiedAppearance pushed for the icon to render.
+        // Without this, the modern V3_4_3 client falls back to the red "?" icon
+        // for looted quest items (observed: Battle-worn Sword item 38607 from
+        // DK starter quest 12619 — name showed via baked-in ItemSparse but the
+        // icon was missing because the proxy never emitted DisplayID -> file
+        // mapping records).
+        if (item.Class == 12)
             return true;
 
         return false;
