@@ -1988,15 +1988,21 @@ public class ObjectUpdateBuilder
             }
             if (unit.ChannelData != null)
             {
-                bool hasChannelObject = unit.ChannelObject != null && !unit.ChannelObject.Value.IsEmpty();
-                data.WriteBits(hasChannelObject ? 7 : 3, 4);
-                data.FlushBits();
+                // CypherCore UnitChannel.WriteUpdate (UpdateFields.cs:744-748) writes
+                // SpellID + SpellXSpellVisualID DIRECTLY — no inner bit-prefix, no
+                // FlushBits, no ChannelObject sub-field. The previous code wrote
+                // `WriteBits(3 or 7, 4) + FlushBits` which inserted 1 byte of garbage
+                // before SpellID, shifting the V3_4_3 client's read by 1 byte. WPP
+                // parsed our wire as `(ChannelData) SpellID: 13252976
+                // SpellXSpellVisualID: 88256768` (random) instead of `SpellID: 51769
+                // SpellXSpellVisualID: 0`. Result: cast bar didn't render, kneel
+                // animation didn't play, ESC stayed blocked because the client
+                // believed the player was channeling an unknown spell. Note:
+                // ChannelObject is a SEPARATE Unit field (DynamicUpdateField in
+                // CypherCore), not part of the ChannelData write — handle it
+                // independently elsewhere if needed.
                 data.WriteInt32(unit.ChannelData.Value.SpellID);
                 data.WriteInt32(unit.ChannelData.Value.SpellXSpellVisualID);
-                if (hasChannelObject)
-                {
-                    data.WritePackedGuid128(unit.ChannelObject.Value);
-                }
             }
             if (unit.RaceId.HasValue)
             {
