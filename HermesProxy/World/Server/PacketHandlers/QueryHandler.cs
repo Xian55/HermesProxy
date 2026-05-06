@@ -58,8 +58,13 @@ public partial class WorldSocket
     void HandleQueryPetName(QueryPetName queryName)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_QUERY_PET_NAME);
-        packet.WriteUInt32(queryName.UnitGUID.GetEntry());
-        packet.WriteGuid(queryName.UnitGUID.To64());
+        // The legacy CMSG body wants pet_number (per-character spawn counter), which on
+        // cMaNGOS-style backends is the legacy GUID's entry slot. The modern Pet GUID's
+        // entry slot now carries creature_template.entry post-fix, so we reverse-resolve.
+        var legacy = GetSession().GameState.GetLegacyPetGuid(queryName.UnitGUID);
+        uint petNumber = legacy?.GetEntry() ?? queryName.UnitGUID.GetEntry();
+        packet.WriteUInt32(petNumber);
+        packet.WriteGuid(legacy ?? queryName.UnitGUID.To64(GetSession().GameState));
         SendPacketToServer(packet);
     }
     [PacketHandler(Opcode.CMSG_WHO)]
