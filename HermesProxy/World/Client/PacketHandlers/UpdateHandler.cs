@@ -2301,7 +2301,16 @@ public partial class WorldClient
                         updateData.UnitData.StatNegBuff[i] = updates[UNIT_FIELD_NEGSTAT0 + i].Int32Value;
                 }
             }
+            // V3_3_5a (cMangos / TrinityCore wotlk_classic) emits the resistance arrays
+            // as per-element enums (UNIT_FIELD_RESISTANCES_ARMOR/_HOLY/_FIRE/...) instead
+            // of the parent UNIT_FIELD_RESISTANCES used by V1_12 / V1_14 / V2_x / V3_4_3.
+            // Wire offsets are contiguous and identical, so slot 0 of the array sits at
+            // _ARMOR. Without this fallback Armor (Resistances[0]) and the BuffMods
+            // arrays stay zero on the V3_4_3 client — visible in the character panel as
+            // Armor=0 and a broken Stamina-tooltip Health-bonus calculation.
             int UNIT_FIELD_RESISTANCES = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCES);
+            if (UNIT_FIELD_RESISTANCES < 0)
+                UNIT_FIELD_RESISTANCES = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCES_ARMOR);
             if (UNIT_FIELD_RESISTANCES >= 0)
             {
                 for (int i = 0; i < 7; i++)
@@ -2311,6 +2320,8 @@ public partial class WorldClient
                 }
             }
             int UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE);
+            if (UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE < 0)
+                UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE_ARMOR);
             if (UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE >= 0)
             {
                 for (int i = 0; i < 7; i++)
@@ -2320,6 +2331,8 @@ public partial class WorldClient
                 }
             }
             int UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE);
+            if (UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE < 0)
+                UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE_ARMOR);
             if (UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE >= 0)
             {
                 for (int i = 0; i < 7; i++)
