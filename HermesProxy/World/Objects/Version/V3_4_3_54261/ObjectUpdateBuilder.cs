@@ -1601,6 +1601,11 @@ public class ObjectUpdateBuilder
             {
                 data.WriteFloat(obj.Scale.Value);
             }
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[ObjectData write] guid={_updateData.Guid} typeMask={_objectTypeMask} mask=0x{mask:X1} " +
+                $"entry={(obj.EntryID.HasValue ? obj.EntryID.Value.ToString() : "—")} " +
+                $"dynFlags={(obj.DynamicFlags.HasValue ? "0x" + obj.DynamicFlags.Value.ToString("X8") : "—")} " +
+                $"scale={(obj.Scale.HasValue ? obj.Scale.Value.ToString("F4") : "—")}");
         }
     }
 
@@ -3223,14 +3228,52 @@ public class ObjectUpdateBuilder
         if (go.ArtKit.HasValue) { SetBit(0); SetBit(18); }
         if (go.CustomParam.HasValue) { SetBit(0); SetBit(19); }
 
-        // 1 block, 20 bits — write blocksMask (1 bit) then block mask
-        byte blocksMask = (mask != 0) ? (byte)1 : (byte)0;
-        data.WriteBits(blocksMask, 1);
-        if (blocksMask != 0)
-            data.WriteBits(mask, 20);
+        if (mask != 0)
+        {
+            var fields = new System.Collections.Generic.List<string>(8);
+            if (IsBitSet(4)) fields.Add($"DisplayID={go.DisplayID.Value}");
+            if (IsBitSet(5)) fields.Add($"SpellVisualID={go.SpellVisualID.Value}");
+            if (IsBitSet(6)) fields.Add($"StateSpellVisualID={go.StateSpellVisualID.Value}");
+            if (IsBitSet(7)) fields.Add($"StateAnimID={go.StateAnimID.Value}");
+            if (IsBitSet(8)) fields.Add($"StateAnimKitID={go.StateAnimKitID.Value}");
+            if (IsBitSet(9)) fields.Add($"CreatedBy={go.CreatedBy.Value}");
+            if (IsBitSet(10)) fields.Add($"GuildGUID={go.GuildGUID.Value}");
+            if (IsBitSet(11)) fields.Add($"Flags=0x{go.Flags.Value:X8}");
+            if (IsBitSet(12)) fields.Add($"ParentRotation=({go.ParentRotation[0] ?? 0f},{go.ParentRotation[1] ?? 0f},{go.ParentRotation[2] ?? 0f},{go.ParentRotation[3] ?? 1f})");
+            if (IsBitSet(13)) fields.Add($"FactionTemplate={go.FactionTemplate.Value}");
+            if (IsBitSet(14)) fields.Add($"Level={go.Level.Value}");
+            if (IsBitSet(15)) fields.Add($"State={go.State.Value}");
+            if (IsBitSet(16)) fields.Add($"TypeID={go.TypeID.Value}");
+            if (IsBitSet(17)) fields.Add($"PercentHealth={go.PercentHealth.Value}");
+            if (IsBitSet(18)) fields.Add($"ArtKit={go.ArtKit.Value}");
+            if (IsBitSet(19)) fields.Add($"CustomParam={go.CustomParam.Value}");
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[GO write] guid={_updateData.Guid} mask=0x{mask:X8} fields={{ {string.Join(", ", fields)} }}");
+        }
 
-        // No dynamic fields
+        // V3_4_3 GameObjectData wire format is a flat 20-bit changesMask — no 1-bit
+        // blocksMask prefix (see TC wotlk_classic UpdateFields.cpp:4918-4920 and WPP
+        // V3_4_0 UpdateFieldsHandler343.ReadUpdateGameObjectData line 3704). The
+        // earlier `WriteBits(blocksMask, 1) + WriteBits(mask, 20)` shifted every bit
+        // by one position; the client decoded `0x58801` as `0xAC400`, tried to parse
+        // GuildGUID/Level/State at bogus offsets, and disconnected with reason=7
+        // immediately after the SMSG_UPDATE_OBJECT (signature: chained-initiate
+        // unlock cast → cage GO Values update → DC).
+        data.WriteBits(mask, 20);
+
+        // Boundary 1 — TC UpdateFields.cpp:4936. Aligns after the optional bit-1
+        // StateWorldEffectIDs sub-section (size + entries). We don't translate
+        // StateWorldEffectIDs from the legacy server yet, but the alignment is
+        // still required because the byte-aligned field writes below would
+        // otherwise see 4 stray bits left over from the 20-bit changesMask above.
         data.FlushBits();
+
+        // (Implicit boundary 2 — TC UpdateFields.cpp:4954.) Would align after the
+        // optional bit-2/3 EnableDoodadSets / WorldEffects DynamicUpdateField mask
+        // preambles. We don't emit those either, so a second FlushBits would be a
+        // no-op today (FlushBits short-circuits when already byte-aligned). If
+        // support for bits 1/2/3 is added later, restore a FlushBits() call here
+        // BEFORE the field-value block.
 
         // Write field values in TC343 order (bits 4-19)
         if (IsBitSet(0))
@@ -3271,16 +3314,17 @@ public class ObjectUpdateBuilder
 
         var valuesData = valuesBuffer.GetData();
 
-        // Debug: dump the bytes we produce for Values updates targeting the player
-        // so we can compare against TC's accepted format. CMSG_OBJECT_UPDATE_FAILED on
-        // the player guid means the V3_4_3 client cannot parse what we wrote.
+        // Debug: dump the bytes we produce for Values updates so we can compare against
+        // TC's accepted format. CMSG_OBJECT_UPDATE_FAILED or `CMSG_LOG_DISCONNECT(reason=7)`
+        // immediately after an UPDATE_OBJECT means the V3_4_3 client cannot parse what we
+        // wrote — diff the hex against a known-good capture to find the bad byte.
         if (_updateData.Type == UpdateTypeModern.Values
-            && _objectTypeMask.HasAnyFlag(ObjectTypeMask.Unit))
+            && _objectTypeMask.HasAnyFlag(ObjectTypeMask.Unit | ObjectTypeMask.GameObject | ObjectTypeMask.DynamicObject | ObjectTypeMask.Corpse))
         {
             int dumpLen = System.Math.Min(96, valuesData.Length);
             string hex = System.BitConverter.ToString(valuesData, 0, dumpLen);
             Framework.Logging.Log.Print(Framework.Logging.LogType.Debug,
-                $"[ValuesUpdateHex] guid={_updateData.Guid} type={_objectType} size={valuesData.Length} hasUnit={_updateData.UnitData != null} hasPlayer={_updateData.PlayerData != null} hasActive={_updateData.ActivePlayerData != null} hex={hex}");
+                $"[ValuesUpdateHex] guid={_updateData.Guid} type={_objectType} size={valuesData.Length} hasUnit={_updateData.UnitData != null} hasPlayer={_updateData.PlayerData != null} hasActive={_updateData.ActivePlayerData != null} hasGO={_updateData.GameObjectData != null} hex={hex}");
         }
 
         packet.WriteUInt32((uint)valuesData.Length);
