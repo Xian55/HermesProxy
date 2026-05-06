@@ -578,47 +578,76 @@ public partial class WorldClient
 
             if (flags.HasAnyFlag(CastFlag.RuneInfo))
             {
-                // TC 3.3.5 wire here = V3_4_3 RuneData wire layout: u8 RechargingMask,
-                // u8 UsableMask, then one u8 cooldown per rune that's recharging-but-not-usable
-                // (i.e. consumed by THIS cast). RuneData's Start/Count fields are misleadingly
-                // named (legacy V2_5 inheritance) but their byte order matches; we just feed it.
+                // Legacy 3.3.5 wire: u8 rechargingMask (= pre-cast usable mask, normally 0x3F),
+                // u8 usableMask (= post-cast usable mask), then one u8 cooldown byte per rune
+                // consumed by THIS cast (i.e. set in rechargingMask AND cleared in usableMask).
+                // Cooldown byte semantics match V3_4_3: 255 = ready, 0 = full cooldown.
                 var rechargingMask = packet.ReadUInt8();
                 var usableMask = packet.ReadUInt8();
 
-                var runes = new RuneData
+                var runeStateCache = GetSession().GameState.RuneState;
+                Span<byte> consumed = stackalloc byte[RuneStateData.MaxRunes];
+                for (var i = 0; i < RuneStateData.MaxRunes; i++)
                 {
-                    Start = rechargingMask,
-                    Count = usableMask,
-                };
-
-                for (var i = 0; i < 6; i++)
-                {
-                    var mask = 1 << i;
-                    if ((mask & rechargingMask) == 0)
+                    var bit = 1 << i;
+                    if ((bit & rechargingMask) == 0)
                         continue;
-
-                    if ((mask & usableMask) != 0)
+                    if ((bit & usableMask) != 0)
                         continue;
-
-                    runes.Cooldowns.Add(packet.ReadUInt8());
+                    consumed[i] = packet.ReadUInt8();
                 }
 
-                dbdata.RemainingRunes = runes;
-
-                // Keep the cached RuneState snapshot fresh so subsequent player CREATE
-                // (zone change, mount/dismount) reflects the latest cooldowns without
-                // having to wait for SMSG_RESYNC_RUNES.
-                var runeStateCache = GetSession().GameState.RuneState;
                 if (runeStateCache != null)
                 {
-                    int cdIdx = 0;
+                    // Sync the cached RuneState so the next CREATE (zone change / mount)
+                    // reflects the latest state, and emit a V3_4_3-shaped RemainingRunes
+                    // (per CypherCore native sniff): Start always 0x3F, Count = post-cast
+                    // usable mask, full 6-byte Cooldowns snapshot.
                     for (int i = 0; i < RuneStateData.MaxRunes; i++)
                     {
                         var bit = 1 << i;
                         if ((bit & usableMask) != 0)
-                            runeStateCache.Cooldowns[i] = 0;
-                        else if ((bit & rechargingMask) != 0 && cdIdx < runes.Cooldowns.Count)
-                            runeStateCache.Cooldowns[i] = runes.Cooldowns[cdIdx++];
+                            runeStateCache.Cooldowns[i] = 255;
+                        else if ((bit & rechargingMask) != 0)
+                            runeStateCache.Cooldowns[i] = consumed[i];
+                        // else: leave alone — already on cooldown from an earlier cast.
+                    }
+
+                    var runes = new RuneData
+                    {
+                        Start = (byte)((1 << RuneStateData.MaxRunes) - 1),
+                        Count = usableMask,
+                    };
+                    for (int i = 0; i < RuneStateData.MaxRunes; i++)
+                        runes.Cooldowns.Add(runeStateCache.Cooldowns[i]);
+                    dbdata.RemainingRunes = runes;
+
+                    // Per CypherCore native sniff: V3_4_3 SpellGo carries RemainingPower
+                    // entries for each rune type consumed by the cast (Cost=0, Type=RuneXxx)
+                    // PLUS a Type=RunicPower entry with the post-cast runic-power value.
+                    // The client appears to use the bundled RemainingPower entries as the
+                    // trigger to render the per-rune cooldown swirl; without them the rune
+                    // frame stays visually idle even though RemainingRunes carries the cooldown bytes.
+                    bool anyRuneEntryAdded = false;
+                    for (int i = 0; i < RuneStateData.MaxRunes; i++)
+                    {
+                        var bit = 1 << i;
+                        if ((bit & rechargingMask) == 0 || (bit & usableMask) != 0)
+                            continue;
+                        // Rune i was consumed by THIS cast. Map base type -> PowerType.
+                        var pt = RuneTypeToPowerType(runeStateCache.RuneTypes[i]);
+                        if (pt == PowerType.Invalid)
+                            continue;
+                        dbdata.RemainingPower.Add(new SpellPowerData { Cost = 0, Type = pt });
+                        anyRuneEntryAdded = true;
+                    }
+                    if (anyRuneEntryAdded)
+                    {
+                        dbdata.RemainingPower.Add(new SpellPowerData
+                        {
+                            Cost = runeStateCache.LastRunicPower,
+                            Type = PowerType.RunicPower,
+                        });
                     }
                 }
             }
@@ -1318,11 +1347,26 @@ public partial class WorldClient
         update.Powers.Add(new PowerUpdatePower(power, powerType));
         SendPacketToClient(update);
         Log.Print(LogType.Trace, $"[PowerUpdateTrace] guid={guid} type={(PowerType)powerType} power={power}");
+
+        // Cache RunicPower for the local player so SpellGo can embed a RemainingPower
+        // entry with the post-cast value (V3_4_3 wire shape — see CastFlag.RuneInfo branch).
+        var runeState = GetSession().GameState.RuneState;
+        if (runeState != null && (PowerType)powerType == PowerType.RunicPower &&
+            guid == GetSession().GameState.CurrentPlayerGuid)
+        {
+            runeState.LastRunicPower = power;
+        }
     }
 
-    // V3_4_3 DK rune state from the legacy 3.3.5 server. Older modern targets
-    // (V1_14 / V2_5) pre-date Death Knights and never allocate RuneState, so the
-    // null-guard makes these handlers no-ops there.
+    // V3_4_3 DK rune-state legacy handlers. Older modern targets (V1_14 / V2_5) pre-date
+    // Death Knights and never allocate RuneState, so the null-guard makes these no-ops.
+    // None of these forward to the V3_4_3 client — TC fires the rune opcodes thousands of
+    // times per session (especially RESYNC_RUNES with constantly-decaying cooldown values),
+    // and forwarding overwhelmed the client (observed: WoW #132 ACCESS_VIOLATION crash).
+    // SpellGo's embedded RemainingRunes carries the per-cast snapshot, and the V3_4_3
+    // client manages the visual cooldown swirl from that snapshot — that's the dominant
+    // path. We only mutate the cached RuneState here so the next CREATE block reflects
+    // authoritative state on zone change / mount.
 
     [PacketHandler(Opcode.SMSG_RESYNC_RUNES)]
     void HandleResyncRunes(WorldPacket packet)
@@ -1331,7 +1375,9 @@ public partial class WorldClient
         if (runeState == null)
             return;
 
-        // TC 3.3.5 wire: for i in 0..MAX_RUNES { u8 type; u8 cooldown }.
+        // TC 3.3.5 wire: u32 count (always MAX_RUNES, payload is junk on some builds);
+        // for i in 0..count { u8 type; u8 cooldown }.
+        packet.ReadUInt32();
         for (int i = 0; i < RuneStateData.MaxRunes; i++)
         {
             runeState.RuneTypes[i] = packet.ReadUInt8();
@@ -1346,7 +1392,6 @@ public partial class WorldClient
         if (runeState == null)
             return;
 
-        // TC 3.3.5 wire: u8 index; u8 newType.
         byte index = packet.ReadUInt8();
         byte newType = packet.ReadUInt8();
         if (index < RuneStateData.MaxRunes)
@@ -1360,14 +1405,31 @@ public partial class WorldClient
         if (runeState == null)
             return;
 
-        // TC 3.3.5 wire: u32 mask of runes that just refreshed (cooldown → 0).
+        // u32 mask of rune slots that just refreshed (cooldown -> ready, byte 255).
         uint mask = packet.ReadUInt32();
         for (int i = 0; i < RuneStateData.MaxRunes; i++)
         {
             if ((mask & (1u << i)) != 0)
-                runeState.Cooldowns[i] = 0;
+                runeState.Cooldowns[i] = 255;
         }
     }
+
+    // Map TC's per-slot rune type byte (Blood=0, Unholy=1, Frost=2, Death=3) to
+    // the V3_4_3 per-rune-type power slot the client uses for cooldown animation.
+    // Death runes are temporary conversions; the client tracks them by slot, so we
+    // fall back to PowerType.Invalid (caller skips emitting an entry — the rune
+    // visual will lag for one cycle until the slot reverts to its base type).
+    private static PowerType RuneTypeToPowerType(byte runeType)
+    {
+        return runeType switch
+        {
+            0 => PowerType.RuneBlood,
+            1 => PowerType.RuneUnholy,
+            2 => PowerType.RuneFrost,
+            _ => PowerType.Invalid,
+        };
+    }
+
 
     [PacketHandler(Opcode.SMSG_RESURRECT_REQUEST)]
     void HandleResurrectRequest(WorldPacket packet)
