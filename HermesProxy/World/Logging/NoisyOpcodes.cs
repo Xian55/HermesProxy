@@ -23,6 +23,11 @@ internal static class NoisyOpcodes
         // visible. Reasonable to silence at Debug; Verbose still shows them.
         Opcode.SMSG_ON_MONSTER_MOVE,
         Opcode.SMSG_MONSTER_MOVE_TRANSPORT,
+        // TC fires SMSG_RESYNC_RUNES on every rune-regen tick (~25/sec while any
+        // DK rune is recharging). The V3_4_3 client manages its own rune-cooldown
+        // visual timer locally and we don't forward these, so the Debug log line
+        // is pure noise during DK combat.
+        Opcode.SMSG_RESYNC_RUNES,
     }.ToFrozenSet();
 
     public static bool IsNoisy(Opcode opcode) => s_noisy.Contains(opcode);
