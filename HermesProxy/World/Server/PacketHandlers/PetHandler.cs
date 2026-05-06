@@ -14,7 +14,7 @@ public partial class WorldSocket
     void HandlePetAction(PetAction act)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_ACTION);
-        packet.WriteGuid(act.PetGUID.To64());
+        packet.WriteGuid(act.PetGUID.To64(GetSession().GameState));
         packet.WriteUInt32(act.Action);
         packet.WriteGuid(act.TargetGUID.To64());
         SendPacketToServer(packet);
@@ -24,7 +24,7 @@ public partial class WorldSocket
     void HandlePetStopAttack(PetStopAttack stop)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_STOP_ATTACK);
-        packet.WriteGuid(stop.PetGUID.To64());
+        packet.WriteGuid(stop.PetGUID.To64(GetSession().GameState));
         SendPacketToServer(packet);
     }
 
@@ -32,7 +32,7 @@ public partial class WorldSocket
     void HandlePetStopAttack(PetSetAction action)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_SET_ACTION);
-        packet.WriteGuid(action.PetGUID.To64());
+        packet.WriteGuid(action.PetGUID.To64(GetSession().GameState));
         packet.WriteUInt32(action.Index);
         packet.WriteUInt32(action.Action);
         SendPacketToServer(packet);
@@ -42,7 +42,7 @@ public partial class WorldSocket
     void HandlePetRename(PetRename pet)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_RENAME);
-        packet.WriteGuid(pet.RenameData.PetGUID.To64());
+        packet.WriteGuid(pet.RenameData.PetGUID.To64(GetSession().GameState));
         packet.WriteCString(pet.RenameData.NewName);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
@@ -76,7 +76,7 @@ public partial class WorldSocket
     void HandlePetAbandon(PetAbandon pet)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_ABANDON);
-        packet.WriteGuid(pet.PetGUID.To64());
+        packet.WriteGuid(pet.PetGUID.To64(GetSession().GameState));
         SendPacketToServer(packet);
     }
 
@@ -110,7 +110,7 @@ public partial class WorldSocket
     void HandlePetCancelAura(PetCancelAura cancel)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_CANCEL_AURA);
-        packet.WriteGuid(cancel.PetGUID.To64());
+        packet.WriteGuid(cancel.PetGUID.To64(GetSession().GameState));
         packet.WriteUInt32(cancel.SpellID);
         SendPacketToServer(packet);
     }

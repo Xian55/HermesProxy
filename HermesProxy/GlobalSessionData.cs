@@ -196,7 +196,7 @@ public sealed class GameSessionData
     public Dictionary<WowGuid128, UpdateFieldsArray> ObjectCacheModern = [];
     public Dictionary<WowGuid128, ObjectType> OriginalObjectTypes = [];
     public Dictionary<WowGuid128, uint[]> ItemGems = [];
-    public Dictionary<uint, Class> CreatureClasses = [];
+    public Dictionary<WowGuid128, Class> CreatureClasses = [];
 
     // Per-GUID monster-move throttle. The V3_4_3 client OOMs when it receives
     // hundreds of monster-moves per minute (observed: legacy server emits ~20/sec
@@ -220,6 +220,17 @@ public sealed class GameSessionData
     public Dictionary<WowGuid64, ushort> ObjectSpawnCount = [];
     public HashSet<WowGuid64> DespawnedGameObjects = [];
     public HashSet<WowGuid128> HunterPetGuids = [];
+
+    // Pet GUID translation tables for cMaNGOS-style backends. MaNGOS-era TBC/WotLK
+    // encodes Pet GUIDs with pet_number (a per-character spawn counter) in the entry
+    // slot, while the modern client expects creature_template.entry there. The legacy
+    // server's OBJECT_FIELD_ENTRY does carry the real entry, so on the first
+    // CreateObject for a pet we register the mapping and rewrite the modern GUID.
+    // On TC backends pet_number == real entry, so the rewrite branch is skipped.
+    // All access guarded by ObjectCacheLock to match ObjectCacheLegacy/Modern style.
+    public Dictionary<WowGuid64, uint> PetRealEntryByLegacyGuid = [];
+    public Dictionary<WowGuid128, WowGuid64> PetLegacyGuidByModern = [];
+    public Dictionary<uint, WowGuid128> PetModernGuidByNumber = [];
     // GUIDs for which we've successfully forwarded a modern CreateObject to the V3_4_3
     // client. Used by the Values-update filter so we don't ship deltas for objects the
     // client doesn't have in its world model — those would round-trip as
@@ -997,15 +1008,33 @@ public sealed class GameSessionData
     {
         lock (ObjectCacheLock)
         {
-            foreach (var itr in ObjectCacheModern)
-            {
-                if (itr.Key.GetHighType() == HighGuidType.Pet &&
-                    itr.Key.GetEntry() == petNumber)
-                {
-                    return itr.Key;
-                }
-            }
-            return default;
+            return PetModernGuidByNumber.TryGetValue(petNumber, out var guid) ? guid : default;
+        }
+    }
+
+    public void RegisterPet(WowGuid64 legacyGuid, WowGuid128 modernGuid, uint realEntry, uint petNumber)
+    {
+        lock (ObjectCacheLock)
+        {
+            PetRealEntryByLegacyGuid[legacyGuid] = realEntry;
+            PetLegacyGuidByModern[modernGuid] = legacyGuid;
+            PetModernGuidByNumber[petNumber] = modernGuid;
+        }
+    }
+
+    public uint? GetPetRealEntryFromLegacy(WowGuid64 legacyGuid)
+    {
+        lock (ObjectCacheLock)
+        {
+            return PetRealEntryByLegacyGuid.TryGetValue(legacyGuid, out var entry) ? entry : null;
+        }
+    }
+
+    public WowGuid64? GetLegacyPetGuid(WowGuid128 modernGuid)
+    {
+        lock (ObjectCacheLock)
+        {
+            return PetLegacyGuidByModern.TryGetValue(modernGuid, out var legacy) ? legacy : null;
         }
     }
     public void StoreOriginalObjectType(WowGuid128 guid, ObjectType type)
@@ -1024,9 +1053,9 @@ public sealed class GameSessionData
     {
         return RealSpellToLearnSpell.TryGetValue(spellId, out var learnSpell) ? learnSpell : spellId;
     }
-    public void StoreCreatureClass(uint entry, Class classId)
+    public void StoreCreatureClass(WowGuid128 guid, Class classId)
     {
-        CreatureClasses[entry] = classId;
+        CreatureClasses[guid] = classId;
     }
     public void SetItemBuyCount(uint itemId, uint buyCount)
     {
@@ -1096,7 +1125,7 @@ public sealed class GameSessionData
         if (CachedPlayers.TryGetValue(guid, out var cache))
             return cache.ClassId;
 
-        if (CreatureClasses.TryGetValue(guid.GetEntry(), out var classId))
+        if (CreatureClasses.TryGetValue(guid, out var classId))
             return classId;
 
         return Class.Warrior;

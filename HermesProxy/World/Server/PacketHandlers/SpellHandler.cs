@@ -213,7 +213,7 @@ public partial class WorldSocket
         SpellCastTargetFlags targetFlags = ConvertSpellTargetFlags(cast.Cast.Target);
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_CAST_SPELL);
-        packet.WriteGuid(cast.PetGUID.To64());
+        packet.WriteGuid(cast.PetGUID.To64(GetSession().GameState));
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             packet.WriteUInt8(0); // cast count
         packet.WriteUInt32(cast.Cast.SpellID);

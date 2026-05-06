@@ -70,7 +70,7 @@ public partial class WorldClient
                     ObjectUpdate updateData = new ObjectUpdate(guid, UpdateTypeModern.Values, GetSession());
                     AuraUpdate auraUpdate = new AuraUpdate(guid, false);
                     PowerUpdate powerUpdate = new PowerUpdate(guid);
-                    ReadValuesUpdateBlock(packet, guid, updateData, auraUpdate, powerUpdate, i);
+                    ReadValuesUpdateBlock(packet, ref guid, updateData, auraUpdate, powerUpdate, i);
 
                     // Trace per-Values-update so we can correlate legacy-side reads with
                     // the modern-side WriteValuesUpdate output. We log:
@@ -186,7 +186,7 @@ public partial class WorldClient
 
                     ObjectUpdate updateData = new ObjectUpdate(guid, UpdateTypeModern.CreateObject1, GetSession());
                     AuraUpdate auraUpdate = new AuraUpdate(guid, true);
-                    ReadCreateObjectBlock(packet, guid, updateData, auraUpdate, i);
+                    ReadCreateObjectBlock(packet, ref guid, updateData, auraUpdate, i);
 
                     // The TC reference parse (CypherCoreClassicWOTLK World_login_parsed.txt
                     // packet #140) sends the player as CreateObject1, not CreateObject2 —
@@ -266,7 +266,7 @@ public partial class WorldClient
 
                     ObjectUpdate updateData = new ObjectUpdate(guid, UpdateTypeModern.CreateObject2, GetSession());
                     AuraUpdate auraUpdate = new AuraUpdate(guid, true);
-                    ReadCreateObjectBlock(packet, guid, updateData, auraUpdate, i);
+                    ReadCreateObjectBlock(packet, ref guid, updateData, auraUpdate, i);
 
                     if (guid.IsItem() && updateData.ObjectData.EntryID != null &&
                        !GameData.ItemTemplates.ContainsKey((uint)updateData.ObjectData.EntryID))
@@ -629,31 +629,31 @@ public partial class WorldClient
         }
     }
 
-    private void ReadCreateObjectBlock(WorldPacket packet, WowGuid128 guid, ObjectUpdate updateData, AuraUpdate auraUpdate, object index)
+    private void ReadCreateObjectBlock(WorldPacket packet, ref WowGuid128 guid, ObjectUpdate updateData, AuraUpdate auraUpdate, object index)
     {
         updateData.CreateData.ObjectType = ObjectTypeConverter.Convert((ObjectTypeLegacy)packet.ReadUInt8());
         GetSession().GameState.StoreOriginalObjectType(guid, updateData.CreateData.ObjectType);
         ReadMovementUpdateBlock(packet, guid, updateData, index);
-        ReadValuesUpdateBlockOnCreate(packet, guid, updateData.CreateData.ObjectType, updateData, auraUpdate, index);
+        ReadValuesUpdateBlockOnCreate(packet, ref guid, updateData.CreateData.ObjectType, updateData, auraUpdate, index);
     }
 
-    public void ReadValuesUpdateBlockOnCreate(WorldPacket packet, WowGuid128 guid, ObjectType type, ObjectUpdate updateData, AuraUpdate auraUpdate, object index)
+    public void ReadValuesUpdateBlockOnCreate(WorldPacket packet, ref WowGuid128 guid, ObjectType type, ObjectUpdate updateData, AuraUpdate auraUpdate, object index)
     {
         BitArray? updateMaskArray = null;
         var updates = ReadValuesUpdateBlock(packet, ref type, index, true, null, out updateMaskArray, out var actuallyChangedValuesMaskArray);
-        StoreObjectUpdate(guid, type, updateMaskArray, updates, auraUpdate, null, true, updateData, actuallyChangedValuesMaskArray);
+        StoreObjectUpdate(ref guid, type, updateMaskArray, updates, auraUpdate, null, true, updateData, actuallyChangedValuesMaskArray);
         lock (GetSession().GameState.ObjectCacheLock)
         {
             GetSession().GameState.ObjectCacheLegacy[guid] = updates;
         }
     }
 
-    public void ReadValuesUpdateBlock(WorldPacket packet, WowGuid128 guid, ObjectUpdate updateData, AuraUpdate auraUpdate, PowerUpdate powerUpdate, int index)
+    public void ReadValuesUpdateBlock(WorldPacket packet, ref WowGuid128 guid, ObjectUpdate updateData, AuraUpdate auraUpdate, PowerUpdate powerUpdate, int index)
     {
         BitArray? updateMaskArray = null;
         ObjectType type = GetSession().GameState.GetOriginalObjectType(guid);
         var updates = ReadValuesUpdateBlock(packet, ref type, index, false, GetSession().GameState.GetCachedObjectFieldsLegacy(guid), out updateMaskArray, out var actuallyChangedValuesMaskArray);
-        StoreObjectUpdate(guid, type, updateMaskArray, updates, auraUpdate, powerUpdate, false, updateData, actuallyChangedValuesMaskArray);
+        StoreObjectUpdate(ref guid, type, updateMaskArray, updates, auraUpdate, powerUpdate, false, updateData, actuallyChangedValuesMaskArray);
     }
 
     private string GetIndexString(params object[] values)
@@ -1636,9 +1636,9 @@ public partial class WorldClient
         return flags;
     }
 
-    public void StoreObjectUpdate(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData, BitArray actuallyChangedValuesMaskArray)
+    public void StoreObjectUpdate(ref WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData, BitArray actuallyChangedValuesMaskArray)
     {
-        StoreObjectUpdateInternal(guid, objectType, updateMaskArray, updates, auraUpdate, powerUpdate, isCreate, updateData);
+        StoreObjectUpdateInternal(ref guid, objectType, updateMaskArray, updates, auraUpdate, powerUpdate, isCreate, updateData);
         AfterStoreObjectUpdateHook(guid, objectType, updateMaskArray, updates, auraUpdate, powerUpdate, isCreate, updateData, actuallyChangedValuesMaskArray);
     }
 
@@ -1704,7 +1704,7 @@ public partial class WorldClient
         }
     }
     
-    private void StoreObjectUpdateInternal(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData)
+    private void StoreObjectUpdateInternal(ref WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData)
     {
         // Object Fields
         int OBJECT_FIELD_GUID = LegacyVersion.GetUpdateField(ObjectField.OBJECT_FIELD_GUID);
@@ -1716,6 +1716,36 @@ public partial class WorldClient
         if (OBJECT_FIELD_ENTRY >= 0 && updateMaskArray[OBJECT_FIELD_ENTRY])
         {
             updateData.ObjectData.EntryID = updates[OBJECT_FIELD_ENTRY].Int32Value;
+
+            // Pet GUID translation fix: legacy MaNGOS-style backends encode pet_number
+            // (a per-character spawn counter) in the Pet GUID's entry slot, while the
+            // modern client expects creature_template.entry there. The first time we
+            // process a Pet's CreateObject we discover the real entry from
+            // OBJECT_FIELD_ENTRY and rewrite the modern GUID. Subsequent legacy→modern
+            // conversions hit the registration map and return the corrected GUID.
+            // Detection clause is false on TC backends (entry slot already matches),
+            // making this a zero-cost no-op there.
+            if (objectType == ObjectType.Unit
+                && guid.GetHighType() == HighGuidType.Pet
+                && updateData.ObjectData.EntryID.HasValue
+                && (uint)updateData.ObjectData.EntryID.Value != guid.GetEntry())
+            {
+                uint realEntry = (uint)updateData.ObjectData.EntryID.Value;
+                uint petNumber = guid.GetEntry();
+                ulong counter = guid.GetCounter();
+                var legacyGuid = new WowGuid64(HighGuidTypeLegacy.Pet, petNumber, (uint)counter);
+                var corrected = WowGuid128.Create(HighGuidType703.Pet, 0, realEntry, counter);
+
+                GetSession().GameState.RegisterPet(legacyGuid, corrected, realEntry, petNumber);
+
+                updateData.Guid = corrected;
+                updateData.ObjectData.Guid = corrected;
+                auraUpdate.UnitGUID = corrected;
+                guid = corrected;
+
+                Log.Print(LogType.Trace,
+                    $"[PetGuidFix] pet_number={petNumber} realEntry={realEntry} counter={counter} corrected={corrected}");
+            }
         }
         int OBJECT_FIELD_SCALE_X = LegacyVersion.GetUpdateField(ObjectField.OBJECT_FIELD_SCALE_X);
         if (OBJECT_FIELD_SCALE_X >= 0 && updateMaskArray[OBJECT_FIELD_SCALE_X])
@@ -1981,7 +2011,7 @@ public partial class WorldClient
                     GetSession().GameState.HunterPetGuids.Add(guid);
 
                 if (objectType == ObjectType.Unit)
-                    GetSession().GameState.StoreCreatureClass(guid.GetEntry(), (Class)updateData.UnitData.ClassId);
+                    GetSession().GameState.StoreCreatureClass(guid, (Class)updateData.UnitData.ClassId);
                 else
                     updateData.PlayerData.ArenaFaction = (byte)(GameData.IsAllianceRace((Race)updateData.UnitData.RaceId) ? 1 : 0);
 

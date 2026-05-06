@@ -88,6 +88,21 @@ public static class WowGuid128Extensions
 
         public WowGuid64 To64() => WowGuid64.Create(guid);
 
+        // Session-aware reverse for Pet GUIDs: looks up the original legacy GUID
+        // (which carries pet_number in its entry slot) registered when the pet's
+        // first CreateObject was parsed. Falls back to entry pass-through when
+        // no registration exists (TC backends, or pre-registration code paths).
+        public WowGuid64 To64(GameSessionData gameState)
+        {
+            if (guid.GetHighType() == HighGuidType.Pet)
+            {
+                var legacy = gameState.GetLegacyPetGuid(guid);
+                if (legacy.HasValue)
+                    return legacy.Value;
+            }
+            return WowGuid64.Create(guid);
+        }
+
         public WowGuid128 To128(GameSessionData gameState) => guid;
 
         public string ToString()

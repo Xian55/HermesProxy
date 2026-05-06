@@ -24,7 +24,7 @@ public readonly record struct WowGuid128(ulong Low, ulong High)
         HighGuidType.RaidGroup => Create(HighGuidType703.RaidGroup, guid.GetCounter()),
         HighGuidType.GameObject => Create(HighGuidType703.GameObject, gamestate.GetObjectSpawnCounter(guid), guid.GetEntry(), guid.GetCounter()),
         HighGuidType.Creature => Create(HighGuidType703.Creature, gamestate.GetObjectSpawnCounter(guid), guid.GetEntry(), guid.GetCounter()),
-        HighGuidType.Pet => Create(HighGuidType703.Pet, 0, guid.GetEntry(), guid.GetCounter()),
+        HighGuidType.Pet => Create(HighGuidType703.Pet, 0, gamestate.GetPetRealEntryFromLegacy(guid) ?? guid.GetEntry(), guid.GetCounter()),
         HighGuidType.Vehicle => Create(HighGuidType703.Vehicle, 0, guid.GetEntry(), guid.GetCounter()),
         HighGuidType.DynamicObject => Create(HighGuidType703.DynamicObject, 0, guid.GetEntry(), guid.GetCounter()),
         HighGuidType.Corpse => Create(HighGuidType703.Corpse, 0, guid.GetEntry(), guid.GetCounter()),
