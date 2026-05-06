@@ -159,6 +159,16 @@ public partial class WorldSocket
         GetSession().GameState.CurrentPlayerInfo = GetSession().GameState.OwnCharacters.Single(x => x.CharacterGuid == playerLogin.Guid);
         GetSession().GameState.CurrentPlayerStorage.LoadCurrentPlayer();
 
+        // V3_4_3-only: DKs need rune state in ActivePlayerData CREATE. Without it
+        // the client starts up believing all 6 runes are on cooldown and refuses to
+        // send rune-cost CMSG_CAST_SPELL until a SpellGo proves otherwise. SMSG_RESYNC_RUNES
+        // from the legacy server later overwrites this default with authoritative values.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+            GetSession().GameState.CurrentPlayerInfo!.ClassId == Class.Deathknight)
+        {
+            GetSession().GameState.RuneState = new RuneStateData();
+        }
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PLAYER_LOGIN);
         packet.WriteGuid(playerLogin.Guid.To64());
         SendPacketToServer(packet);

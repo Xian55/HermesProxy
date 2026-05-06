@@ -56,6 +56,36 @@ public sealed class PendingObjectUpdate
     public required HashSet<uint> WaitingForItemIds;
 }
 
+// Death Knight rune snapshot. Allocated only for DK players on V3_4_3, where
+// the modern client expects rune state inside ActivePlayerData (CREATE) and in
+// SpellCastData.RemainingRunes (per cast). The legacy 3.3.5 server delivers
+// state via SMSG_RESYNC_RUNES / SMSG_CONVERT_RUNE / SMSG_ADD_RUNE_POWER plus
+// embedded CastFlag.RuneInfo; those handlers mutate this snapshot.
+public sealed class RuneStateData
+{
+    public const int MaxRunes = 6;
+
+    // 0 = usable, 1..255 = cooldown ratio remaining (0xFF = full cooldown).
+    public readonly byte[] Cooldowns = new byte[MaxRunes];
+
+    // Current rune type per slot: Blood=0, Unholy=1, Frost=2, Death=3 (TC convention).
+    public readonly byte[] RuneTypes = { 0, 0, 1, 1, 2, 2 };
+
+    public byte RechargingRuneMask
+    {
+        get
+        {
+            byte mask = 0;
+            for (int i = 0; i < MaxRunes; i++)
+                if (Cooldowns[i] != 0)
+                    mask |= (byte)(1 << i);
+            return mask;
+        }
+    }
+
+    public byte UsableRuneMask => (byte)(~RechargingRuneMask & 0x3F);
+}
+
 public sealed class GameSessionData
 {
     // Back-reference to the owning session. Set by CreateNewGameSessionData. Used by writers
@@ -136,6 +166,11 @@ public sealed class GameSessionData
     public List<int> ActionButtons = [];
     public ushort[] ActiveGlyphs = new ushort[6];
     public byte GlyphsEnabled;
+    // V3_4_3 DK rune snapshot. Null for non-DK or non-V3_4_3 sessions; allocated by
+    // CharacterHandler.HandlePlayerLogin when the chosen char is a DK and the modern
+    // client is V3_4_3_54261. Read by V3_4_3 ObjectUpdateBuilder (CREATE path) and
+    // mutated by the rune handlers in SpellHandler.
+    public RuneStateData? RuneState;
     public Dictionary<WowGuid128, Dictionary<byte, int>> UnitAuraDurationUpdateTime = [];
     public Dictionary<WowGuid128, Dictionary<byte, int>> UnitAuraDurationLeft = [];
     public Dictionary<WowGuid128, Dictionary<byte, int>> UnitAuraDurationFull = [];

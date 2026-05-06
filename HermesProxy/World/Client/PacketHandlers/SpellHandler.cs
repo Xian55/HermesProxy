@@ -578,19 +578,48 @@ public partial class WorldClient
 
             if (flags.HasAnyFlag(CastFlag.RuneInfo))
             {
-                var spellRuneState = packet.ReadUInt8();
-                var playerRuneState = packet.ReadUInt8();
+                // TC 3.3.5 wire here = V3_4_3 RuneData wire layout: u8 RechargingMask,
+                // u8 UsableMask, then one u8 cooldown per rune that's recharging-but-not-usable
+                // (i.e. consumed by THIS cast). RuneData's Start/Count fields are misleadingly
+                // named (legacy V2_5 inheritance) but their byte order matches; we just feed it.
+                var rechargingMask = packet.ReadUInt8();
+                var usableMask = packet.ReadUInt8();
+
+                var runes = new RuneData
+                {
+                    Start = rechargingMask,
+                    Count = usableMask,
+                };
 
                 for (var i = 0; i < 6; i++)
                 {
                     var mask = 1 << i;
-                    if ((mask & spellRuneState) == 0)
+                    if ((mask & rechargingMask) == 0)
                         continue;
 
-                    if ((mask & playerRuneState) != 0)
+                    if ((mask & usableMask) != 0)
                         continue;
 
-                    packet.ReadUInt8(); // Rune Cooldown Passed
+                    runes.Cooldowns.Add(packet.ReadUInt8());
+                }
+
+                dbdata.RemainingRunes = runes;
+
+                // Keep the cached RuneState snapshot fresh so subsequent player CREATE
+                // (zone change, mount/dismount) reflects the latest cooldowns without
+                // having to wait for SMSG_RESYNC_RUNES.
+                var runeStateCache = GetSession().GameState.RuneState;
+                if (runeStateCache != null)
+                {
+                    int cdIdx = 0;
+                    for (int i = 0; i < RuneStateData.MaxRunes; i++)
+                    {
+                        var bit = 1 << i;
+                        if ((bit & usableMask) != 0)
+                            runeStateCache.Cooldowns[i] = 0;
+                        else if ((bit & rechargingMask) != 0 && cdIdx < runes.Cooldowns.Count)
+                            runeStateCache.Cooldowns[i] = runes.Cooldowns[cdIdx++];
+                    }
                 }
             }
 
@@ -1289,6 +1318,55 @@ public partial class WorldClient
         update.Powers.Add(new PowerUpdatePower(power, powerType));
         SendPacketToClient(update);
         Log.Print(LogType.Trace, $"[PowerUpdateTrace] guid={guid} type={(PowerType)powerType} power={power}");
+    }
+
+    // V3_4_3 DK rune state from the legacy 3.3.5 server. Older modern targets
+    // (V1_14 / V2_5) pre-date Death Knights and never allocate RuneState, so the
+    // null-guard makes these handlers no-ops there.
+
+    [PacketHandler(Opcode.SMSG_RESYNC_RUNES)]
+    void HandleResyncRunes(WorldPacket packet)
+    {
+        var runeState = GetSession().GameState.RuneState;
+        if (runeState == null)
+            return;
+
+        // TC 3.3.5 wire: for i in 0..MAX_RUNES { u8 type; u8 cooldown }.
+        for (int i = 0; i < RuneStateData.MaxRunes; i++)
+        {
+            runeState.RuneTypes[i] = packet.ReadUInt8();
+            runeState.Cooldowns[i] = packet.ReadUInt8();
+        }
+    }
+
+    [PacketHandler(Opcode.SMSG_CONVERT_RUNE)]
+    void HandleConvertRune(WorldPacket packet)
+    {
+        var runeState = GetSession().GameState.RuneState;
+        if (runeState == null)
+            return;
+
+        // TC 3.3.5 wire: u8 index; u8 newType.
+        byte index = packet.ReadUInt8();
+        byte newType = packet.ReadUInt8();
+        if (index < RuneStateData.MaxRunes)
+            runeState.RuneTypes[index] = newType;
+    }
+
+    [PacketHandler(Opcode.SMSG_ADD_RUNE_POWER)]
+    void HandleAddRunePower(WorldPacket packet)
+    {
+        var runeState = GetSession().GameState.RuneState;
+        if (runeState == null)
+            return;
+
+        // TC 3.3.5 wire: u32 mask of runes that just refreshed (cooldown → 0).
+        uint mask = packet.ReadUInt32();
+        for (int i = 0; i < RuneStateData.MaxRunes; i++)
+        {
+            if ((mask & (1u << i)) != 0)
+                runeState.Cooldowns[i] = 0;
+        }
     }
 
     [PacketHandler(Opcode.SMSG_RESURRECT_REQUEST)]
