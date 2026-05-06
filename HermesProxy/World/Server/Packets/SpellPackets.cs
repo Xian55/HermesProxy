@@ -567,7 +567,13 @@ public class AuraDataInfo
         data.WriteUInt16(CastLevel);
         data.WriteUInt8(Applications);
         data.WriteInt32(ContentTuningID);
-        data.WriteBit(CastUnit != default);
+        // NoCaster modern flag (bit 0x01) tells the V3_4_3 client the caster GUID is
+        // implicit (self-cast / environmental) — do NOT transmit a CastUnit GUID. CypherCore
+        // omits it for self-cast shapeshift forms; if we transmit it anyway the V3_4_3
+        // stance-bar / right-click-buff / `/cancelform` paths refuse to bind, leaving the
+        // player visually shapeshifted with no in-client cancel route.
+        bool writeCastUnit = CastUnit != default && (Flags & AuraFlagsModern.NoCaster) == 0;
+        data.WriteBit(writeCastUnit);
         data.WriteBit(Duration.HasValue);
         data.WriteBit(Remaining.HasValue);
         data.WriteBit(TimeMod.HasValue);
@@ -578,7 +584,7 @@ public class AuraDataInfo
         if (ContentTuning != null)
             ContentTuning.Write(data);
 
-        if (CastUnit != default)
+        if (writeCastUnit)
             data.WritePackedGuid128(CastUnit);
 
         if (Duration.HasValue)
