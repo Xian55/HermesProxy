@@ -577,10 +577,10 @@ public partial class WorldClient
 
             if (playerCreateInBatch)
             {
-                var playerAuraSync = new AuraUpdate(currentPlayerGuid, true);
+                var playerAuraSync = BuildPlayerAuraSync(currentPlayerGuid);
                 SendPacketToClient(playerAuraSync);
                 Log.Print(LogType.Trace,
-                    $"[PlayerEnterTrace] post-CreateObject AURA_UPDATE_ALL sent for player guid={currentPlayerGuid}");
+                    $"[PlayerEnterTrace] post-CreateObject AURA_UPDATE_ALL sent for player guid={currentPlayerGuid} populatedAuras={playerAuraSync.Auras.Count}");
             }
         }
     }
@@ -1517,6 +1517,35 @@ public partial class WorldClient
                 $"hasState={updates.ContainsKey(index + stateOffset)} hasTimer={updates.ContainsKey(index + timerOffset)}");
         }
         return questLog;
+    }
+
+    // Build a fully-populated SMSG_AURA_UPDATE_ALL for the player, sourcing aura state
+    // from the GameSessionData.KnownAuras tracker (populated incrementally by
+    // SpellHandler.HandleAuraUpdate). Used by the post-CreateObject deferred-flush —
+    // the V3_4_3 client drops aura updates for objects it hasn't created yet, so the
+    // proxy's pre-Create per-aura forwards are ignored client-side. We re-emit a
+    // complete sync AFTER the player CreateObject to restore buff-bar state that would
+    // otherwise be wiped by an empty UpdateAll marker.
+    //
+    // Reading from KnownAuras (not from legacy UNIT_FIELD_AURA cached fields) is
+    // required because TC delivers shapeshift / debuff state via SMSG_AURA_UPDATE only,
+    // not via the UpdateFields cache — so the cached UpdateFields lookup returned
+    // unrelated data (e.g. UNIT_FIELD_BOUNDINGRADIUS read as a spell ID = 1065353216
+    // = float 1.0f) and produced garbage AuraInfo entries.
+    //
+    // Returns an empty UpdateAll sync if the player has no tracked auras yet — safe
+    // for fresh / unbuffed characters.
+    public AuraUpdate BuildPlayerAuraSync(WowGuid128 playerGuid)
+    {
+        var sync = new AuraUpdate(playerGuid, true);
+        var knownAuras = GetSession().GameState.KnownAuras;
+        if (!knownAuras.TryGetValue(playerGuid, out var slotMap))
+            return sync;
+
+        foreach (var kvp in slotMap)
+            sync.Auras.Add(kvp.Value);
+
+        return sync;
     }
 
     public AuraDataInfo? ReadAuraSlot(byte i, WowGuid128 guid, Dictionary<int, UpdateField> updates)

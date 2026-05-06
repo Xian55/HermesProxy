@@ -230,6 +230,15 @@ public sealed class GameSessionData
     public Dictionary<byte, Dictionary<byte, int>> FlatSpellMods = [];
     public Dictionary<byte, Dictionary<byte, int>> PctSpellMods = [];
     public Dictionary<WowGuid128, Dictionary<uint, WowGuid128>> LastAuraCasterOnTarget = [];
+
+    // Live aura state per unit, keyed by slot. Updated on every legacy SMSG_AURA_UPDATE
+    // (and SMSG_AURA_UPDATE_ALL clears the unit's dict before reapplying). Used by the
+    // post-CreateObject deferred-flush to re-send the player's auras AFTER the V3_4_3
+    // client has created the player object — pre-Create aura updates are dropped client-
+    // side, and the cached legacy UNIT_FIELD_AURA fields don't carry SMSG_AURA_UPDATE
+    // payloads (TC sends shapeshift / debuff state via the aura packet, not via the
+    // CreateObject's UnitData), so a separate authoritative tracker is required.
+    public Dictionary<WowGuid128, Dictionary<byte, AuraInfo>> KnownAuras = [];
     public TradeSession? CurrentTrade = null;
     public HashSet<uint> RequestedItemHotfixes = [];
     public HashSet<uint> RequestedItemSparseHotfixes = [];

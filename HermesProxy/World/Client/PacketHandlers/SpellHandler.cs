@@ -1245,9 +1245,29 @@ public partial class WorldClient
             ReadSingleAura(packet, guid, update);
         }
 
+        // Track live aura state per unit so the post-CreateObject deferred-flush can
+        // re-emit the player's actual auras (V3_4_3 client drops aura updates that
+        // arrive before its CreateObject for the unit). For UpdateAll=True we replace
+        // the unit's slot table; for UpdateAll=False we patch individual slots.
+        var knownAuras = GetSession().GameState.KnownAuras;
+        if (!knownAuras.TryGetValue(guid, out var slotMap))
+        {
+            slotMap = new Dictionary<byte, AuraInfo>();
+            knownAuras[guid] = slotMap;
+        }
+        if (isAll)
+            slotMap.Clear();
+        foreach (var aura in update.Auras)
+        {
+            if (aura.AuraData == null)
+                slotMap.Remove(aura.Slot);
+            else
+                slotMap[aura.Slot] = aura;
+        }
+
         Log.Print(LogType.Trace,
             $"[AuraUpdateTrace] guid={guid} isAll={isAll} isPlayer={isPlayer} " +
-            $"incomingBytes={incomingBytes} aurasShipped={update.Auras.Count}");
+            $"incomingBytes={incomingBytes} aurasShipped={update.Auras.Count} trackedTotal={slotMap.Count}");
 
         if (update.Auras.Count > 0)
             SendPacketToClient(update);
@@ -1290,6 +1310,7 @@ public partial class WorldClient
         // Bit 0x40 indicates the packet carries explicit point floats.
         if ((legacyFlags & 0x10) != 0) data.Flags |= AuraFlagsModern.Positive;
         if ((legacyFlags & 0x20) != 0) data.Flags |= AuraFlagsModern.Duration;
+        if ((legacyFlags & 0x08) != 0) data.Flags |= AuraFlagsModern.NoCaster;
         if ((legacyFlags & 0x01) != 0) data.ActiveFlags |= 1u;
         if ((legacyFlags & 0x02) != 0) data.ActiveFlags |= 2u;
         if ((legacyFlags & 0x04) != 0) data.ActiveFlags |= 4u;
@@ -1297,6 +1318,18 @@ public partial class WorldClient
         data.CastUnit = (legacyFlags & 0x08) == 0
             ? packet.ReadPackedGuid().To128(GetSession().GameState)
             : guid;
+
+        // Cancelable: V3_4_3 client requires this flag for right-click-buff and the
+        // CancelShapeshiftForm() Lua path (i.e. `/cancelform`, stance-bar toggle, and
+        // direct buff right-click) to emit CMSG_CANCEL_AURA. Legacy 3.3.5a doesn't carry
+        // a Cancelable bit on the wire — the client decides based on aura attributes.
+        // Mirror CypherCore (canonical V3_4_3 reference): self-cast positive auras on the
+        // player are cancelable. Without this, druids stuck in Bear Form had no in-client
+        // way to exit even though Bear Form is a player-cancelable shapeshift aura.
+        bool isPositive = (legacyFlags & 0x10) != 0;
+        bool isSelfCast = guid == GetSession().GameState.CurrentPlayerGuid && data.CastUnit == guid;
+        if (isPositive && isSelfCast)
+            data.Flags |= AuraFlagsModern.Cancelable;
 
         if ((legacyFlags & 0x20) != 0)
         {

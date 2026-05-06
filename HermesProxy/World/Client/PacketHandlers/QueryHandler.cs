@@ -594,10 +594,10 @@ public partial class WorldClient
                     // SMSG_MOVE_SET_ACTIVE_MOVER is intentionally NOT in this block.
                     // TC sends it BEFORE the player CreateObject (#138), so we send it
                     // early in CharacterHandler.HandleLoginVerifyWorld instead.
-                    var playerAuraSync = new AuraUpdate(currentPlayerGuid, true);
+                    var playerAuraSync = session.WorldClient!.BuildPlayerAuraSync(currentPlayerGuid);
                     SendPacketToClient(playerAuraSync);
                     Log.Print(LogType.Trace,
-                        $"[PlayerEnterTrace] deferred-flush post-CreateObject AURA_UPDATE_ALL sent for player guid={currentPlayerGuid}");
+                        $"[PlayerEnterTrace] deferred-flush post-CreateObject AURA_UPDATE_ALL sent for player guid={currentPlayerGuid} populatedAuras={playerAuraSync.Auras.Count}");
 
                     var phaseShiftAfter = new PhaseShiftChange
                     {
