@@ -63,6 +63,15 @@ public static class ClassPowerTypes
                 }
                 break;
             }
+            case Class.Deathknight:
+            {
+                switch (power)
+                {
+                    case PowerType.RunicPower:
+                        return 0;
+                }
+                break;
+            }
             case Class.Shaman:
             {
                 switch (power)
