@@ -65,11 +65,24 @@ public sealed class RuneStateData
 {
     public const int MaxRunes = 6;
 
-    // 0 = usable, 1..255 = cooldown ratio remaining (0xFF = full cooldown).
-    public readonly byte[] Cooldowns = new byte[MaxRunes];
+    // Wire byte semantics confirmed against a CypherCore native V3_4_3 sniff:
+    //   255 = rune is fully ready (cooldown elapsed)
+    //     0 = rune is on full cooldown (just consumed)
+    // Initialize to 255 so a freshly-allocated RuneState (e.g. on player login)
+    // represents all 6 runes available.
+    public readonly byte[] Cooldowns =
+    {
+        255, 255, 255, 255, 255, 255,
+    };
 
     // Current rune type per slot: Blood=0, Unholy=1, Frost=2, Death=3 (TC convention).
     public readonly byte[] RuneTypes = { 0, 0, 1, 1, 2, 2 };
+
+    // Last seen RunicPower value (from SMSG_POWER_UPDATE for the local player).
+    // V3_4_3 SpellGo for rune-cost spells embeds a RemainingPower entry with
+    // Type=RunicPower, Cost=<post-cast value>. We cache the most recent value so
+    // we can inject it inline per CypherCore's wire shape.
+    public int LastRunicPower;
 
     public byte RechargingRuneMask
     {
@@ -77,7 +90,7 @@ public sealed class RuneStateData
         {
             byte mask = 0;
             for (int i = 0; i < MaxRunes; i++)
-                if (Cooldowns[i] != 0)
+                if (Cooldowns[i] != 255)
                     mask |= (byte)(1 << i);
             return mask;
         }

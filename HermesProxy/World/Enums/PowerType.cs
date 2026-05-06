@@ -17,4 +17,10 @@ public enum PowerType : sbyte
     Rune                          = 5,            // UNIT_FIELD_POWER6
     RunicPower                    = 6,            // UNIT_FIELD_POWER7
     ComboPoints                   = 14,           // not real, so we know to set PLAYER_FIELD_BYTES,1
+    // Per-rune-type power slots used by V3_4_3 retail (TC-wotlk_classic Powers enum).
+    // The V3_4_3 client expects SMSG_SPELL_GO RemainingPower entries with these types
+    // to trigger the per-rune cooldown swirl after a rune-cost cast.
+    RuneBlood                     = 20,
+    RuneFrost                     = 21,
+    RuneUnholy                    = 22,
 };
