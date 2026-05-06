@@ -279,6 +279,8 @@ public partial class WorldClient
         if (id.Value) // entry is masked
         {
             response.Allow = false;
+            Log.Print(LogType.Trace,
+                $"[CreatureQueryTrace][resp] entry={response.CreatureID} allow=false (masked)");
             SendPacketToClient(response);
             return;
         }
@@ -353,6 +355,13 @@ public partial class WorldClient
         creature.Class = 1;
 
         GameData.StoreCreatureTemplate(response.CreatureID, creature);
+
+        uint firstDisplayId = creature.Display.CreatureDisplay.Count > 0
+            ? creature.Display.CreatureDisplay[0].CreatureDisplayID
+            : 0;
+        Log.Print(LogType.Trace,
+            $"[CreatureQueryTrace][resp] entry={response.CreatureID} allow=true name=\"{creature.Name[0]}\" type={creature.Type} family={creature.Family} classif={creature.Classification} flags=0x{creature.Flags[0]:X8}/0x{creature.Flags[1]:X8} displays={creature.Display.CreatureDisplay.Count} firstDisplay={firstDisplayId} healthScalingExp={creature.HealthScalingExpansion} reqExp={creature.RequiredExpansion} creatureClass={creature.Class} movementInfo={creature.MovementInfoID}");
+
         SendPacketToClient(response);
     }
     [PacketHandler(Opcode.SMSG_QUERY_GAME_OBJECT_RESPONSE)]

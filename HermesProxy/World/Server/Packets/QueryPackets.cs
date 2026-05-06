@@ -21,6 +21,7 @@ using System;
 using System.Text;
 using HermesProxy.World.Objects;
 using Framework.Constants;
+using Framework.Logging;
 using System.Collections.Generic;
 using Framework.IO;
 using Framework.GameMath;
@@ -608,6 +609,17 @@ public class QueryCreatureResponse : ServerPacket
 
             foreach (var questItem in Stats.QuestItems)
                 _worldPacket.WriteUInt32(questItem);
+        }
+
+        if (Allow)
+        {
+            Log.Print(LogType.Trace,
+                $"[CreatureQueryTrace][write] entry={CreatureID} allow=true packetBytes={_worldPacket.GetSize()} healthScalingExp={Stats.HealthScalingExpansion} reqExp={Stats.RequiredExpansion} creatureClass={Stats.Class} displays={Stats.Display.CreatureDisplay.Count} totalProb={Stats.Display.TotalProbability}");
+        }
+        else
+        {
+            Log.Print(LogType.Trace,
+                $"[CreatureQueryTrace][write] entry={CreatureID} allow=false packetBytes={_worldPacket.GetSize()}");
         }
     }
 
