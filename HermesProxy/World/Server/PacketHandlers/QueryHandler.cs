@@ -1,4 +1,5 @@
 ﻿using Framework.Constants;
+using Framework.Logging;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -25,6 +26,10 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_QUERY_CREATURE)]
     void HandleQueryCreature(QueryCreature queryCreature)
     {
+        bool cached = GameData.GetCreatureTemplate(queryCreature.CreatureID) != null;
+        Log.Print(LogType.Trace,
+            $"[CreatureQueryTrace][req] entry={queryCreature.CreatureID} cached={cached}");
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_QUERY_CREATURE);
         packet.WriteUInt32(queryCreature.CreatureID);
         packet.WriteGuid(new WowGuid64(HighGuidTypeLegacy.Creature, queryCreature.CreatureID, 1));
