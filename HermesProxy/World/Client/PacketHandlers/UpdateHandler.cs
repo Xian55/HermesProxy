@@ -3244,23 +3244,41 @@ public partial class WorldClient
                 $"dynFlagsBefore={(updateData.ObjectData.DynamicFlags.HasValue ? "0x" + updateData.ObjectData.DynamicFlags.Value.ToString("X8") : "null")} " +
                 $"isTransport={guid.IsTransport()}");
 
-            // V3_4_3 packs path-progress into the high 16 bits of ObjectData.DynamicFlags.
-            // Static (non-transport) GameObjects must report progress=1.0 (0xFFFF) or the
-            // modern client treats them as path objects stuck at 0% and refuses to render.
-            // Legacy 3.3.5 servers never write the high 16 bits, so we seed 0xFFFF0000 on
-            // CREATE for non-transport GOs. The legacy GAMEOBJECT_DYN_FLAGS branch below
-            // OR's any Activate/Sparkle/etc. low bits the server provides on top of this
-            // seed. Low bits are NOT synthesized here — the legacy server is authoritative
-            // for interactivity (both cMangos BuildValuesUpdate and TC ViewerDependentValue
-            // compute Activate/Sparkle per-player based on quest eligibility).
+            // Diagnostic: dump every GAMEOBJECT_* field actually set in this incoming
+            // values-update mask, so we don't silently miss fields the current handler
+            // doesn't read. GO updates are infrequent vs Unit/Player so volume is fine.
+            foreach (GameObjectField goField in Enum.GetValues(typeof(GameObjectField)))
+            {
+                if (goField == GameObjectField.GAMEOBJECT_END) continue;
+                int idx = LegacyVersion.GetUpdateField(goField);
+                if (idx < 0 || idx >= updateMaskArray.Length) continue;
+                if (!updateMaskArray[idx]) continue;
+                Log.Print(LogType.Trace,
+                    $"[Trace][GO field in] guid={guid} {goField}@{idx} " +
+                    $"u32=0x{updates[idx].UInt32Value:X8} ({updates[idx].UInt32Value}) " +
+                    $"i32={updates[idx].Int32Value} f32={updates[idx].FloatValue}");
+            }
+
+            // V3_4_3 ObjectData::DynamicFlags for non-transport GameObjects is a pure
+            // GO_DYNFLAG_LO_* bitmask (low 16 bits, max 0x8000 = STATE_TRANSITION_ANIM_DONE).
+            // Anim/Path-progress is NOT in the high 16 bits — TC wotlk_classic's
+            // ViewerDependentValue<ObjectData::DynamicFlagsTag> computes a value made up of
+            // GO_DYNFLAG_LO_STATE_TRANSITION_ANIM_DONE plus per-viewer LO flags, then
+            // returns it directly. Sending high bits (e.g. legacy 3.3.5 AnimProgress=0xFFFF)
+            // makes the client interpret them as unknown LO flags and disconnect with
+            // reason=7 right after the next SMSG_UPDATE_OBJECT.
             //
-            // Only fires on CREATE blocks. Partial values-updates that omit
-            // GAMEOBJECT_DYN_FLAGS leave DynamicFlags=null intentionally; clobbering it
-            // would overwrite the client's cached state.
+            // Pre-V3_4_3 clients (V1_14, V2_5) keep the legacy WotLK convention where
+            // GAMEOBJECT_DYN_FLAGS high 16 bits hold AnimProgress, so we still seed
+            // 0xFFFF0000 for those builds — the field shape on the wire is unchanged
+            // from the legacy 3.3.5 representation. Transports preserve the full 32 bits
+            // on every build (TC v3.4.3 keeps the legacy semantics for transport GOs).
             const uint pathProgressMaxHi = 0xFFFF0000u;
-            if (ModernVersion.ExpansionVersion >= 3
-                && updateData.CreateData != null
-                && !guid.IsTransport())
+            bool seedHighBits = ModernVersion.ExpansionVersion >= 3
+                                && ModernVersion.Build != ClientVersionBuild.V3_4_3_54261
+                                && updateData.CreateData != null
+                                && !guid.IsTransport();
+            if (seedHighBits)
             {
                 uint currentDyn = updateData.ObjectData.DynamicFlags ?? 0u;
                 if ((currentDyn & pathProgressMaxHi) == 0u)
@@ -3410,19 +3428,42 @@ public partial class WorldClient
                 GAMEOBJECT_DYN_FLAGS = LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_DYNAMIC);
             if (GAMEOBJECT_DYN_FLAGS >= 0 && updateMaskArray[GAMEOBJECT_DYN_FLAGS])
             {
-                uint oldValue = 0;
-                if (updateData.ObjectData.DynamicFlags != null)
-                    oldValue = (uint)updateData.ObjectData.DynamicFlags;
-                else if (!guid.IsTransport())
-                    oldValue = 4294901760;
+                uint legacyRaw = updates[GAMEOBJECT_DYN_FLAGS].UInt32Value;
 
-                GameObjectDynamicFlagsLegacy flags = (GameObjectDynamicFlagsLegacy)(updates[GAMEOBJECT_DYN_FLAGS].UInt32Value);
+                // V3_4_3 non-transport GO ObjectData::DynamicFlags is a low-16-bit
+                // GO_DYNFLAG_LO_* bitmask only — high 16 bits in legacy 3.3.5 hold
+                // AnimProgress and have no V3_4_3 equivalent in this field. Strip them
+                // so the client sees a valid bitmask (otherwise it disconnects with
+                // reason=7 right after consuming the SMSG_UPDATE_OBJECT).
+                bool stripHighBits = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+                                     && !guid.IsTransport();
+                uint effectiveLegacyRaw = stripHighBits ? (legacyRaw & 0x0000FFFFu) : legacyRaw;
+
+                uint oldValue = 0;
+                string oldDynSource;
+                if (updateData.ObjectData.DynamicFlags != null)
+                {
+                    oldValue = (uint)updateData.ObjectData.DynamicFlags;
+                    oldDynSource = "cache";
+                }
+                else if (!guid.IsTransport() && ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+                {
+                    // Pre-V3_4_3 clients still expect AnimProgress in the high 16 bits.
+                    oldValue = 4294901760;
+                    oldDynSource = "fallback";
+                }
+                else
+                {
+                    oldDynSource = stripHighBits ? "v343NoSeed" : "transport0";
+                }
+
+                GameObjectDynamicFlagsLegacy flags = (GameObjectDynamicFlagsLegacy)effectiveLegacyRaw;
                 uint newLow = (uint)flags.CastFlags<GameObjectDynamicFlagsModern>();
                 updateData.ObjectData.DynamicFlags = (oldValue | newLow);
                 Log.Print(LogType.Trace,
                     $"[Trace][GO DYN_FLAGS] guid={guid} entry={updateData.ObjectData.EntryID} " +
-                    $"legacyRaw=0x{updates[GAMEOBJECT_DYN_FLAGS].UInt32Value:X8} ({flags}) " +
-                    $"-> modernLow=0x{newLow:X8}, oldDyn=0x{oldValue:X8}, finalDyn=0x{updateData.ObjectData.DynamicFlags.Value:X8}");
+                    $"legacyRaw=0x{legacyRaw:X8} effective=0x{effectiveLegacyRaw:X8} ({flags}) " +
+                    $"-> modernLow=0x{newLow:X8}, oldDyn=0x{oldValue:X8} oldDynSource={oldDynSource}, finalDyn=0x{updateData.ObjectData.DynamicFlags.Value:X8}");
             }
             int GAMEOBJECT_FACTION = LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_FACTION);
             if (GAMEOBJECT_FACTION >= 0 && updateMaskArray[GAMEOBJECT_FACTION])
