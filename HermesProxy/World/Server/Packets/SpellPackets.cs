@@ -1091,22 +1091,51 @@ public class SpellCastData
         data.WriteBit(AmmoInventoryType != null);
         data.FlushBits();
 
-        foreach (SpellMissStatus missStatus in MissStatus)
-            missStatus.Write(data);
+        // Field order changed at V3_4_3.51505 (per WPP V3_4_0_45166 ReadSpellCastData
+        // lines 126-140): pre-3.4.3.51505 reads MissStatus first, then Target;
+        // 3.4.3.51505+ reads Target / HitTargets / MissTargets / MissStatus.
+        // Mis-ordering scrambles the bit-stream for any spell with misses
+        // (Death Grip on an immune target observed crashing the V3_4_3 client) and
+        // misaligns the embedded RuneData. Branch on ModernVersion so V1_14 / V2_5
+        // (pre-3.4.3.51505) keep the layout they've used since the codebase shipped.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            Target.Write(data);
 
-        Target.Write(data);
+            foreach (WowGuid128 hitTarget in HitTargets)
+                data.WritePackedGuid128(hitTarget);
 
-        foreach (WowGuid128 hitTarget in HitTargets)
-            data.WritePackedGuid128(hitTarget);
+            foreach (WowGuid128 missTarget in MissTargets)
+                data.WritePackedGuid128(missTarget);
 
-        foreach (WowGuid128 missTarget in MissTargets)
-            data.WritePackedGuid128(missTarget);
+            foreach (SpellMissStatus missStatus in MissStatus)
+                missStatus.Write(data);
 
-        foreach (SpellPowerData power in RemainingPower)
-            power.Write(data);
+            foreach (SpellPowerData power in RemainingPower)
+                power.Write(data);
 
-        if (RemainingRunes != null)
-            RemainingRunes.Write(data);
+            if (RemainingRunes != null)
+                RemainingRunes.Write(data);
+        }
+        else
+        {
+            foreach (SpellMissStatus missStatus in MissStatus)
+                missStatus.Write(data);
+
+            Target.Write(data);
+
+            foreach (WowGuid128 hitTarget in HitTargets)
+                data.WritePackedGuid128(hitTarget);
+
+            foreach (WowGuid128 missTarget in MissTargets)
+                data.WritePackedGuid128(missTarget);
+
+            foreach (SpellPowerData power in RemainingPower)
+                power.Write(data);
+
+            if (RemainingRunes != null)
+                RemainingRunes.Write(data);
+        }
 
         foreach (TargetLocation targetLoc in TargetPoints)
             targetLoc.Write(data);
@@ -1152,6 +1181,20 @@ public struct SpellMissStatus
 
     public void Write(WorldPacket data)
     {
+        // V3_4_3.51505+ uses byte-aligned Reason / ReflectStatus (per WPP V3_4_0_45166
+        // ReadSpellMissStatus at line 35-40). Earlier modern builds packed them as 4-bit
+        // fields. Sending the 4-bit form to the V3_4_3 client produces a high-nibble byte
+        // (e.g. Reason=7 -> wire byte 0x70 = 112) which the client interprets as an
+        // invalid miss reason and aborts spell handling — observed as a #132 ACCESS_VIOLATION
+        // on Death Grip cast against an immune target (MissStatusCount=1, Reason=Immune1).
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            data.WriteUInt8((byte)Reason);
+            if (Reason == SpellMissInfo.Reflect)
+                data.WriteUInt8((byte)ReflectStatus);
+            return;
+        }
+
         data.WriteBits((byte)Reason, 4);
         if (Reason == SpellMissInfo.Reflect)
             data.WriteBits(ReflectStatus, 4);
@@ -1298,6 +1341,8 @@ public class RuneData
     public byte Count;
     public List<byte> Cooldowns = new();
 }
+
+
 
 public struct MissileTrajectoryResult
 {
