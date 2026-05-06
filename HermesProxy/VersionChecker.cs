@@ -383,6 +383,21 @@ public static class LegacyVersion
 
     public static uint ConvertSpellCastResult(uint result)
     {
+        // V3_4_3.54261 client uses a renumbered SpellCastResult enum (matches CypherCore)
+        // — diverges from the V1_14 / V2_5 SpellCastResultClassic enum starting at index 16
+        // and again at 31. Without this dispatch, NotShapeshift (TC reason 68) name-mapped to
+        // SpellCastResultClassic.NotShapeshift=89, but 89 in the V3_4_3 client is `NotOnTaxi`
+        // — Bear Form / shapeshift cast errors displayed as flight-related text.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            if (AddedInVersion(ClientVersionBuild.V3_0_2_9056))
+                return (uint)((SpellCastResultWotLK)result).CastEnum<SpellCastResultV343>();
+            else if (AddedInVersion(ClientVersionBuild.V2_0_1_6180))
+                return (uint)((SpellCastResultTBC)result).CastEnum<SpellCastResultV343>();
+            else
+                return (uint)((SpellCastResultVanilla)result).CastEnum<SpellCastResultV343>();
+        }
+
         if (AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             return (uint)((SpellCastResultWotLK)result).CastEnum<SpellCastResultClassic>();
         else if (AddedInVersion(ClientVersionBuild.V2_0_1_6180))
