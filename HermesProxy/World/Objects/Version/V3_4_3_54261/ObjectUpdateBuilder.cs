@@ -2072,7 +2072,16 @@ public class ObjectUpdateBuilder
             {
                 data.WriteUInt8(unit.SexId.Value);
             }
-            if (unit.DisplayPower.HasValue) data.WriteUInt32(unit.DisplayPower.Value);
+            // V3_4_3 client reads DisplayPower as a single byte (WPP UpdateFieldsHandler343
+            // line 926 + TC wotlk_classic UpdateFields.h: `UpdateField<uint8, 0, 30> DisplayPower`).
+            // Writing UInt32 here over-shot by 3 bytes and shifted every downstream Values field
+            // by 3 — Stamina (Stats[2]) read as ~520M, ShapeshiftForm always read 0 (so the
+            // V3_4_3 client thought the player was never in any form, breaking /cancelform and
+            // the right-click-buff cancel path entirely). The CREATE writer at line 510 already
+            // emits this as UInt8 — the bug was Values-only.
+            if (unit.DisplayPower.HasValue) {
+                data.WriteUInt8((byte)unit.DisplayPower.Value);
+            }
             if (unit.Level.HasValue)
             {
                 data.WriteInt32(unit.Level.Value);
