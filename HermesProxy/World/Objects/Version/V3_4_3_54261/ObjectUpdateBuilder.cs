@@ -261,12 +261,25 @@ public class ObjectUpdateBuilder
         if (Has(CreateObjectBits.ActivePlayer))
         {
             const bool hasSceneInstanceIDs = false;
-            const bool hasRuneState = false;
+            // RuneState is allocated for V3_4_3 DK sessions in CharacterHandler.HandlePlayerLogin.
+            // The 3.3.5 server overwrites the seeded "all usable" defaults with authoritative
+            // values via SMSG_RESYNC_RUNES; without this block (was hardcoded false), the V3_4_3
+            // client starts up believing all 6 runes are on cooldown and refuses every rune-cost cast.
+            bool hasRuneState = _gameState.RuneState != null;
             const bool hasActionButtons = true;
             data.WriteBit(hasSceneInstanceIDs);
             data.WriteBit(hasRuneState);
             data.WriteBit(hasActionButtons);
             data.FlushBits();
+            if (hasRuneState)
+            {
+                var runeState = _gameState.RuneState;
+                data.WriteUInt8(runeState.RechargingRuneMask);
+                data.WriteUInt8(runeState.UsableRuneMask);
+                data.WriteUInt32(RuneStateData.MaxRunes);
+                for (int i = 0; i < RuneStateData.MaxRunes; i++)
+                    data.WriteUInt8(runeState.Cooldowns[i]);
+            }
             // Embedded ActivePlayer.ActionButtons — 180 × int32 (legacy packed action+type).
             // V3_4_3 client uses this as the authoritative bar state; the standalone
             // SMSG_UPDATE_ACTION_BUTTONS only carries updates relative to it. Writing zeros
