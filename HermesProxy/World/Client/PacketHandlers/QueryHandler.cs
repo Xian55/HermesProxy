@@ -541,6 +541,105 @@ public partial class WorldClient
 
         foreach (var entry in toFlush)
         {
+            // V3_4_3-only: if this is the player's deferred CreateObject batch and we
+            // held any pet UpdateObject batches while waiting (login race — pet's
+            // CreateObject arrived before player's), merge their ObjectUpdates into
+            // the player's batch so the SAME SMSG_UPDATE_OBJECT carries both. Pet
+            // before player would leave the V3_4_3 client unable to bind the pet UI
+            // (pet's SummonedBy references a player object that doesn't exist yet).
+            bool mergedPetBatchHasPetCreate = false;
+            WowGuid128 mergedPetGuid = WowGuid128.Empty;
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                var currentPlayerGuidForMerge = session.GameState.CurrentPlayerGuid;
+                bool playerInThisBatch = false;
+                foreach (var u in entry.UpdateObject.ObjectUpdates)
+                {
+                    if (u.CreateData != null && u.Guid == currentPlayerGuidForMerge &&
+                        (u.Type == UpdateTypeModern.CreateObject1 || u.Type == UpdateTypeModern.CreateObject2))
+                    {
+                        playerInThisBatch = true;
+                        break;
+                    }
+                }
+                if (playerInThisBatch)
+                {
+                    var pendingPet = session.GameState.PendingPetUpdateBatches;
+                    if (pendingPet.Count > 0)
+                    {
+                        int merged = 0;
+                        foreach (var petBatch in pendingPet)
+                        {
+                            foreach (var u in petBatch.ObjectUpdates)
+                            {
+                                entry.UpdateObject.ObjectUpdates.Add(u);
+                                merged++;
+                                if (u.CreateData != null && u.Guid.GetHighType() == HighGuidType.Pet)
+                                {
+                                    mergedPetBatchHasPetCreate = true;
+                                    mergedPetGuid = u.Guid;
+                                }
+                            }
+                        }
+                        pendingPet.Clear();
+                        Log.Print(LogType.Trace,
+                            $"[PlayerEnterTrace] merged {merged} held pet ObjectUpdate(s) into player deferred batch (petGuid={mergedPetGuid})");
+                    }
+
+                    // Stamp the pet/player binding explicitly. The legacy 3.3.5 server
+                    // (TC repack at least) does NOT include UNIT_FIELD_SUMMON in the
+                    // player's CreateObject UnitData — it sends Summon in a separate
+                    // Values update that arrives AFTER the world-enter handshake, which
+                    // is too late for the V3_4_3 client to bind the pet UI. CypherCore
+                    // native ALSO sends Summon in a Values update (sniff line 1551), but
+                    // 8ms after the CreateObject, before any "world-ready" state.
+                    // Inject the binding directly into the merged batch's UnitData so
+                    // it ships in the SAME atomic SMSG_UPDATE_OBJECT — no race possible.
+                    if (mergedPetBatchHasPetCreate)
+                    {
+                        foreach (var u in entry.UpdateObject.ObjectUpdates)
+                        {
+                            if (u.UnitData == null || u.CreateData == null) continue;
+                            if (u.Guid == currentPlayerGuidForMerge && (u.UnitData.Summon == null || u.UnitData.Summon.Value.IsEmpty()))
+                            {
+                                u.UnitData.Summon = mergedPetGuid;
+                                Log.Print(LogType.Trace,
+                                    $"[PlayerEnterTrace] stamped player.UnitData.Summon={mergedPetGuid} (legacy server omitted UNIT_FIELD_SUMMON in CreateObject)");
+
+                                // Phase 10 attempts (both reverted):
+                                // a) PetSpellPower=1: every pet stat became 1.
+                                // b) PetSpellPower=50 (computed): Spell Bonus correctly read +50,
+                                //    but the V3_4_3 client switched the pet sheet into "scaling
+                                //    mode" — Damage went 20-26 → 1-1, Armor 623 → 0 (the
+                                //    creature_template-backed values regressed).
+                                // The V3_4_3 retail design expects ALL pet stats from
+                                // owner-driven scaling fields PLUS the pet's own
+                                // UnitData.Resistances[] / MinDamage / MaxDamage / Stats[]
+                                // written via the (currently IsOwner-gated) sections of
+                                // WriteCreateUnitData. A proper fix needs to also extend
+                                // ObjectUpdateBuilder to write these fields for pets owned by
+                                // the active player — an architectural change deferred from
+                                // this fix. Pet character sheet stats remain 0 / from
+                                // creature_template until then.
+                            }
+                            else if (u.Guid == mergedPetGuid && (u.UnitData.SummonedBy == null || u.UnitData.SummonedBy.Value.IsEmpty()))
+                            {
+                                u.UnitData.SummonedBy = currentPlayerGuidForMerge;
+                                Log.Print(LogType.Trace,
+                                    $"[PlayerEnterTrace] stamped pet.UnitData.SummonedBy={currentPlayerGuidForMerge}");
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Re-resolve pet-pointing UnitData fields against the now-populated pet
+            // map. The player's UnitData.Summon was set at *read* time (before the
+            // pet batch arrived) so its entry slot is pet_number; reseat to realEntry
+            // here, otherwise player.Summon won't match the pet's CreateObject GUID
+            // and the V3_4_3 client can't bind the pet UI. No-op on TC native repacks.
+            UpdateObject.ReseatStalePetGuids(entry.UpdateObject, session.GameState);
+
             // Pre-filter Values updates BEFORE the emptiness check (mirrors the
             // UpdateHandler.HandleUpdateObject path) so we don't ship empty
             // SMSG_UPDATE_OBJECT packets to the V3_4_3 client.
@@ -550,6 +649,103 @@ public partial class WorldClient
                 entry.UpdateObject.DestroyedGuids.Count != 0 ||
                 entry.UpdateObject.OutOfRangeGuids.Count != 0)
                 SendPacketToClient(entry.UpdateObject);
+
+            // After the merged player+pet batch shipped, synthesize a follow-up
+            // Values update for the pet carrying its server-populated stats
+            // (Stats[5], AttackPower, MinDamage/MaxDamage, Resistances, BaseHealth).
+            // WriteCreateUnitData skips these fields when IsOwner=false (which is
+            // true for pets, since IsOwner is gated to ActivePlayer/Item/Container).
+            // The Values write path uses bit-mask dispatch (no IsOwner gate), so a
+            // follow-up Values update with these fields set ships them correctly
+            // without disturbing the wire format of the CreateObject. Without this,
+            // the V3_4_3 pet character sheet shows Stats=0/Power=0/etc. even though
+            // the legacy 3.3.5a server already computed and sent the values.
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && mergedPetBatchHasPetCreate)
+            {
+                ObjectUpdate? petCreateOu = null;
+                foreach (var u in entry.UpdateObject.ObjectUpdates)
+                {
+                    if (u.Guid == mergedPetGuid && u.UnitData != null)
+                    {
+                        petCreateOu = u;
+                        break;
+                    }
+                }
+                if (petCreateOu != null)
+                {
+                    var srcUnit = petCreateOu.UnitData;
+                    var statsUpdateObject = new UpdateObject(session.GameState);
+                    var petValuesOu = new ObjectUpdate(mergedPetGuid, UpdateTypeModern.Values, session);
+                    var dstUnit = petValuesOu.UnitData;
+
+                    bool any = false;
+                    if (srcUnit.Stats != null)
+                    {
+                        for (int i = 0; i < 5; i++)
+                            if (srcUnit.Stats[i].HasValue)
+                            {
+                                dstUnit.Stats[i] = srcUnit.Stats[i];
+                                any = true;
+                            }
+                    }
+                    if (srcUnit.AttackPower.HasValue) { dstUnit.AttackPower = srcUnit.AttackPower; any = true; }
+                    if (srcUnit.AttackPowerModPos.HasValue) { dstUnit.AttackPowerModPos = srcUnit.AttackPowerModPos; any = true; }
+                    if (srcUnit.AttackPowerModNeg.HasValue) { dstUnit.AttackPowerModNeg = srcUnit.AttackPowerModNeg; any = true; }
+                    if (srcUnit.AttackPowerMultiplier.HasValue) { dstUnit.AttackPowerMultiplier = srcUnit.AttackPowerMultiplier; any = true; }
+                    if (srcUnit.MinDamage.HasValue) { dstUnit.MinDamage = srcUnit.MinDamage; any = true; }
+                    if (srcUnit.MaxDamage.HasValue) { dstUnit.MaxDamage = srcUnit.MaxDamage; any = true; }
+                    if (srcUnit.BaseHealth.HasValue) { dstUnit.BaseHealth = srcUnit.BaseHealth; any = true; }
+                    if (srcUnit.Resistances != null)
+                    {
+                        for (int i = 0; i < 7; i++)
+                            if (srcUnit.Resistances[i].HasValue)
+                            {
+                                dstUnit.Resistances[i] = srcUnit.Resistances[i];
+                                any = true;
+                            }
+                    }
+                    if (any)
+                    {
+                        statsUpdateObject.ObjectUpdates.Add(petValuesOu);
+                        Log.Print(LogType.Trace,
+                            $"[PetStatsValuesSynth] sending follow-up Values for pet {mergedPetGuid} with Stats={(srcUnit.Stats != null ? "[" + string.Join(",", new[] { srcUnit.Stats[0], srcUnit.Stats[1], srcUnit.Stats[2], srcUnit.Stats[3], srcUnit.Stats[4] }) + "]" : "n")} AP={srcUnit.AttackPower} minDmg={srcUnit.MinDamage} maxDmg={srcUnit.MaxDamage} armor={srcUnit.Resistances?[0]} baseHP={srcUnit.BaseHealth}");
+                        SendPacketToClient(statsUpdateObject);
+                    }
+                }
+            }
+
+            // After the merged player+pet batch shipped, flush the cached
+            // SMSG_PET_SPELLS_MESSAGE (Phase 1 cache) — re-translate PetGUID via the
+            // legacy guid since the map is now fully populated. Without this, the
+            // login scenario's spells message either was forwarded too early (pet
+            // wasn't bound to the player yet) or got cached and never released.
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && mergedPetBatchHasPetCreate)
+            {
+                var pendingSpells = session.GameState.PendingPetSpells;
+                var pendingLegacy = session.GameState.PendingPetSpellsLegacyGuid;
+                if (pendingSpells != null && pendingLegacy.HasValue)
+                {
+                    var corrected = pendingLegacy.Value.To128(session.GameState);
+                    if (corrected == mergedPetGuid)
+                    {
+                        var stale = pendingSpells.PetGUID;
+                        pendingSpells.PetGUID = corrected;
+
+                        // Synthesize SMSG_PET_LEARNED_SPELLS BEFORE the spells message so
+                        // the V3_4_3 client registers pet-castable spells (legacy server
+                        // doesn't re-emit LEARNED_SPELLS on resummon — see Phase 9).
+                        // Without this, the spellbook's pet tab is hidden and bar slots
+                        // referencing those spells render as blank.
+                        EmitSynthesizedPetLearnedSpells(pendingSpells);
+
+                        Log.Print(LogType.Trace,
+                            $"[PetSpellsFlush] (deferred) sending cached SMSG_PET_SPELLS_MESSAGE — stale={stale} corrected={corrected}");
+                        SendPacketToClient(pendingSpells);
+                        session.GameState.PendingPetSpells = null;
+                        session.GameState.PendingPetSpellsLegacyGuid = null;
+                    }
+                }
+            }
 
             foreach (var auraUpdate in entry.AuraUpdates)
                 SendPacketToClient(auraUpdate);

@@ -489,6 +489,28 @@ public partial class WorldClient
             return;
         }
 
+        // V3_4_3-only: hold pet CreateObject batches when the player isn't yet known
+        // to the client (i.e. player's CreateObject is still in DeferredObjectUpdates
+        // waiting on item hotfixes). The V3_4_3 client requires the player object to
+        // exist BEFORE a child pet arrives — otherwise the pet's SummonedBy back-ref
+        // can't bind and the pet UI (portrait, action bar) never renders. Held pet
+        // batches are merged into the player's deferred batch in QueryHandler
+        // .FlushDeferredUpdatesFor so they ship atomically alongside the player.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+            ContainsPetCreateObject(updateObject) &&
+            !GetSession().GameState.ClientKnownGuids.Contains(GetSession().GameState.CurrentPlayerGuid))
+        {
+            Log.Print(LogType.Trace,
+                $"[PetHoldTrace] holding pet update batch ({updateObject.ObjectUpdates.Count} obj(s)) — player CreateObject not yet delivered");
+            GetSession().GameState.PendingPetUpdateBatches.Add(updateObject);
+            return;
+        }
+
+        // Re-resolve pet-pointing UnitData fields. Mirrors the
+        // QueryHandler.FlushDeferredUpdatesFor call so non-deferred batches also
+        // get the player.Summon → realEntry rebind. No-op on TC native repacks.
+        UpdateObject.ReseatStalePetGuids(updateObject, GetSession().GameState);
+
         // Pre-filter Values updates BEFORE the emptiness check so we don't ship
         // 11-byte empty SMSG_UPDATE_OBJECT packets to the V3_4_3 client. cmangos
         // sends Values updates for ~6 nearby GameObjects every ~500ms; without
@@ -531,6 +553,47 @@ public partial class WorldClient
             updateObject.DestroyedGuids.Count != 0 ||
             updateObject.OutOfRangeGuids.Count != 0)
             SendPacketToClient(updateObject);
+
+        // V3_4_3-only: if a SMSG_PET_SPELLS_MESSAGE was held back because its pet
+        // wasn't in ClientKnownGuids yet, and the batch we just sent contained a
+        // CreateObject for that pet, flush the cached spells with the corrected
+        // PetGUID (the pet was registered during ReadCreateObjectBlock, so
+        // legacyGuid.To128 now resolves correctly).
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            var pendingSpells = GetSession().GameState.PendingPetSpells;
+            var pendingLegacy = GetSession().GameState.PendingPetSpellsLegacyGuid;
+            if (pendingSpells != null && pendingLegacy.HasValue)
+            {
+                WowGuid128 correctedPetGuid = pendingLegacy.Value.To128(GetSession().GameState);
+                bool petWasCreatedInBatch = false;
+                foreach (var u in updateObject.ObjectUpdates)
+                {
+                    if (u.CreateData != null
+                        && (u.Type == UpdateTypeModern.CreateObject1 || u.Type == UpdateTypeModern.CreateObject2)
+                        && u.Guid == correctedPetGuid)
+                    {
+                        petWasCreatedInBatch = true;
+                        break;
+                    }
+                }
+                if (petWasCreatedInBatch)
+                {
+                    var stalePetGuid = pendingSpells.PetGUID;
+                    pendingSpells.PetGUID = correctedPetGuid;
+
+                    // Synthesize SMSG_PET_LEARNED_SPELLS BEFORE the spells message so
+                    // the V3_4_3 client registers pet-castable spells (Phase 9).
+                    EmitSynthesizedPetLearnedSpells(pendingSpells);
+
+                    Log.Print(LogType.Trace,
+                        $"[PetSpellsFlush] sending cached SMSG_PET_SPELLS_MESSAGE — stale={stalePetGuid} corrected={correctedPetGuid}");
+                    SendPacketToClient(pendingSpells);
+                    GetSession().GameState.PendingPetSpells = null;
+                    GetSession().GameState.PendingPetSpellsLegacyGuid = null;
+                }
+            }
+        }
 
         if (playerValuesUpdates != null && playerValuesUpdates.Count > 0)
         {
@@ -627,6 +690,18 @@ public partial class WorldClient
             }
             updateObject.OutOfRangeGuids.Add(guid);
         }
+    }
+
+    private static bool ContainsPetCreateObject(UpdateObject obj)
+    {
+        foreach (var u in obj.ObjectUpdates)
+        {
+            if (u.CreateData != null
+                && (u.Type == UpdateTypeModern.CreateObject1 || u.Type == UpdateTypeModern.CreateObject2)
+                && u.Guid.GetHighType() == HighGuidType.Pet)
+                return true;
+        }
+        return false;
     }
 
     private void ReadCreateObjectBlock(WorldPacket packet, ref WowGuid128 guid, ObjectUpdate updateData, AuraUpdate auraUpdate, object index)

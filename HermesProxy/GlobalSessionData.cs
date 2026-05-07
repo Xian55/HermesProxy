@@ -14,7 +14,6 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using Framework.Realm;
-using HermesProxy.World.Server.Packets;
 using ArenaTeamInspectData = HermesProxy.World.Server.Packets.ArenaTeamInspectData;
 using System;
 
@@ -1037,6 +1036,47 @@ public sealed class GameSessionData
             return PetLegacyGuidByModern.TryGetValue(modernGuid, out var legacy) ? legacy : null;
         }
     }
+
+    // Re-resolve a possibly-stale modern Pet GUID (entry=pet_number, because the .To128
+    // translation ran before RegisterPet had populated the map) to the corrected modern
+    // Pet GUID (entry=creature_template.entry). PetModernGuidByNumber maps pet_number →
+    // corrected GUID. Returns null if not a Pet GUID or the pet isn't registered (TC
+    // native repacks where realEntry is encoded directly — lookup by realEntry returns
+    // nothing, leaving the field unchanged).
+    public WowGuid128? ResolveStalePetGuid(WowGuid128 stale)
+    {
+        if (stale.GetHighType() != HighGuidType.Pet) return null;
+        lock (ObjectCacheLock)
+        {
+            return PetModernGuidByNumber.TryGetValue(stale.GetEntry(), out var corrected)
+                ? corrected
+                : null;
+        }
+    }
+
+    // Buffer for SMSG_PET_SPELLS_MESSAGE that arrives before its pet's CreateObject
+    // has been delivered to the modern client. cmangos sends the spells message
+    // FIRST (forwarded immediately) then the pet's CreateObject in a follow-up
+    // SMSG_COMPRESSED_UPDATE_OBJECT. The legacy pet GUID's entry slot is pet_number,
+    // and at parse-time RegisterPet hasn't fired yet — so .To128 falls back to
+    // pet_number instead of creature_template.entry. The spells message ends up
+    // with PetGUID=(entry=pet_number) but the pet's later CreateObject ships with
+    // PetGUID=(entry=realEntry). The V3_4_3 client sees these as two different
+    // GUIDs and never binds the pet UI. Hold the parsed message here, then once
+    // the pet CreateObject is in ClientKnownGuids (post-RegisterPet), re-translate
+    // PetGUID and forward. No-op when pet is already known (TC backends, second
+    // tame on the same login, pet already in client world).
+    public PetSpells? PendingPetSpells;
+    public WowGuid64? PendingPetSpellsLegacyGuid;
+
+    // SMSG_UPDATE_OBJECT batches that contain a Pet CreateObject but arrived while the
+    // player CreateObject was still in the DeferredObjectUpdates queue (waiting on item
+    // hotfixes). The V3_4_3 client needs the player object to exist in its world model
+    // BEFORE a child pet arrives, otherwise the pet's SummonedBy back-reference can't
+    // bind and the pet UI (portrait, action bar) never renders. Merged into the player's
+    // deferred batch in QueryHandler.FlushDeferredUpdatesFor so they ship in a single
+    // SMSG_UPDATE_OBJECT alongside the player. No-op when not V3_4_3.
+    public List<UpdateObject> PendingPetUpdateBatches = [];
     public void StoreOriginalObjectType(WowGuid128 guid, ObjectType type)
     {
         OriginalObjectTypes[guid] = type;

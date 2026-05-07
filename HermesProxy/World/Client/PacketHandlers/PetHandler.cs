@@ -1,9 +1,11 @@
 ﻿using Framework;
+using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 using System;
+using System.Collections.Generic;
 
 namespace HermesProxy.World.Client;
 
@@ -20,6 +22,8 @@ public partial class WorldClient
         // Equal to "Clear spells" pre cataclysm
         if (guid.IsEmpty())
         {
+            GetSession().GameState.PendingPetSpells = null;
+            GetSession().GameState.PendingPetSpellsLegacyGuid = null;
             PetClearSpells clear = new();
             SendPacketToClient(clear);
             return;
@@ -82,8 +86,79 @@ public partial class WorldClient
 
             spells.Cooldowns.Add(cooldown);
         }
-        
+
+        // V3_4_3 + cmangos: SMSG_PET_SPELLS_MESSAGE arrives BEFORE the pet's
+        // CreateObject. spells.PetGUID was just translated against an empty pet
+        // map, so its entry slot is pet_number (e.g. 9568) instead of
+        // creature_template.entry (e.g. 2031). The pet's CreateObject will later
+        // ship with the corrected GUID — so the client receives a spells message
+        // for a unit GUID that never appears, and never binds the pet UI.
+        // Hold the parsed message; UpdateHandler.HandleUpdateObject flushes it
+        // (with re-translated PetGUID) right after the pet's CreateObject is
+        // sent. If the pet is already in ClientKnownGuids (TC backends, or a
+        // second SMSG_PET_SPELLS_MESSAGE on the same pet), forward immediately.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+            !GetSession().GameState.ClientKnownGuids.Contains(spells.PetGUID))
+        {
+            GetSession().GameState.PendingPetSpells = spells;
+            GetSession().GameState.PendingPetSpellsLegacyGuid = guid;
+            Log.Print(LogType.Trace,
+                $"[PetSpellsHold] caching SMSG_PET_SPELLS_MESSAGE for legacy guid={guid} stalePetGUID={spells.PetGUID} (pet not yet in ClientKnownGuids)");
+            return;
+        }
+
+        // V3_4_3: synthesize SMSG_PET_LEARNED_SPELLS from the spells message contents
+        // BEFORE forwarding the spells message. Legacy 3.3.5 servers don't re-emit
+        // LEARNED_SPELLS for an existing pet on resummon, so without synthesis the
+        // V3_4_3 client doesn't register pet-castable spells in its spellbook (the
+        // spellbook's pet tab is hidden and bar slots referencing those spells render
+        // as blank). CypherCore native sends 4× LEARNED_SPELLS before each pet bar
+        // creation; we mirror that ordering by synthesizing from ActionButtons + Actions.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            EmitSynthesizedPetLearnedSpells(spells);
+
         SendPacketToClient(spells);
+    }
+
+    private void EmitSynthesizedPetLearnedSpells(PetSpells spells)
+    {
+        var seen = ExtractPetCastableSpellIds(spells);
+        if (seen.Count == 0) return;
+
+        Log.Print(LogType.Trace,
+            $"[PetSpellsSynthesize] emitting {seen.Count} synthesized SMSG_PET_LEARNED_SPELLS before SMSG_PET_SPELLS_MESSAGE: ids=[{string.Join(",", seen)}]");
+        foreach (uint spellId in seen)
+        {
+            var learned = new PetLearnedSpells();
+            learned.Spells.Add(spellId);
+            SendPacketToClient(learned);
+        }
+    }
+
+    // ActionButton slots {0, 0x1 (Passive), 0x101 (Manual), 0x181 (AutoCast)} carry
+    // castable spell IDs; slots {6 ReactState, 7 CommandState} carry command/react codes
+    // (NOT spells — skipped). The Actions list (TC's wider "all known pet spells" array)
+    // is included verbatim. Public-static so QueryHandler.FlushDeferredUpdatesFor can
+    // call it on the cached PendingPetSpells before flushing.
+    public static HashSet<uint> ExtractPetCastableSpellIds(PetSpells spells)
+    {
+        var seen = new HashSet<uint>();
+        foreach (uint button in spells.ActionButtons)
+        {
+            if (button == 0) continue;
+            uint slot = button >> 23;
+            uint spellId = button & 0x7FFFFF;
+            if (spellId == 0) continue;
+            if (slot == 6 || slot == 7) continue; // command / react — not spells
+            seen.Add(spellId);
+        }
+        foreach (uint action in spells.Actions)
+        {
+            uint spellId = action & 0x7FFFFF;
+            if (spellId != 0)
+                seen.Add(spellId);
+        }
+        return seen;
     }
 
     [PacketHandler(Opcode.SMSG_PET_ACTION_SOUND)]
