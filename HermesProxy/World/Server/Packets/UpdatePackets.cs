@@ -369,6 +369,51 @@ public class UpdateObject : ServerPacket
         return valuesUnknownStripped + valuesEmptyStripped;
     }
 
+    /// <summary>
+    /// Re-resolve pet-pointing GUID fields on every UnitData in the batch against
+    /// the (now-fully-populated) PetModernGuidByNumber map. Fixes the cmangos-style
+    /// race: when the player's CreateObject is read BEFORE the pet's batch arrives,
+    /// the player's UNIT_FIELD_SUMMON gets translated against an empty pet map and
+    /// stores entry=pet_number instead of entry=realEntry. Pet's later CreateObject
+    /// has the corrected entry — without this reseat, the V3_4_3 client sees them
+    /// as different GUIDs and can't bind the pet UI.
+    /// No-op on TC native repacks (PetModernGuidByNumber empty) and on non-Pet GUIDs.
+    /// </summary>
+    public static void ReseatStalePetGuids(UpdateObject obj, GameSessionData gs)
+    {
+        int fixedCount = 0;
+        foreach (var u in obj.ObjectUpdates)
+        {
+            var unit = u.UnitData;
+            if (unit == null) continue;
+            Reseat(ref unit.Summon,        gs, ref fixedCount, u.Guid, "Summon");
+            Reseat(ref unit.SummonedBy,    gs, ref fixedCount, u.Guid, "SummonedBy");
+            Reseat(ref unit.Charm,         gs, ref fixedCount, u.Guid, "Charm");
+            Reseat(ref unit.CharmedBy,     gs, ref fixedCount, u.Guid, "CharmedBy");
+            Reseat(ref unit.CreatedBy,     gs, ref fixedCount, u.Guid, "CreatedBy");
+            Reseat(ref unit.Target,        gs, ref fixedCount, u.Guid, "Target");
+            Reseat(ref unit.ChannelObject, gs, ref fixedCount, u.Guid, "ChannelObject");
+        }
+        if (fixedCount > 0)
+        {
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[ReseatStalePetGuids] reseated {fixedCount} pet-pointing field(s) in batch");
+        }
+    }
+
+    private static void Reseat(ref WowGuid128? field, GameSessionData gs, ref int fixedCount, WowGuid128 ownerGuid, string fieldName)
+    {
+        if (!field.HasValue) return;
+        var corrected = gs.ResolveStalePetGuid(field.Value);
+        if (corrected.HasValue)
+        {
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[ReseatStalePetGuids] owner={ownerGuid} field={fieldName} stale={field.Value} -> {corrected.Value}");
+            field = corrected.Value;
+            fixedCount++;
+        }
+    }
+
     private static bool IsEmptyValuesDelta(ObjectUpdate u)
     {
         // A Values delta is "empty" if no concrete field has a value. The data objects
