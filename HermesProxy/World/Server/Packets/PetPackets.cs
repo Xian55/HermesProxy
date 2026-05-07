@@ -113,6 +113,37 @@ public class PetClearSpells : ServerPacket, ISpanWritable
     public int WriteToSpan(Span<byte> buffer) => 0;
 }
 
+// V3_4_3 wire format verified against CypherCore native sniff (World_pet_actionbar_portrait.pkt
+// SMSG_PET_LEARNED_SPELLS opcode 0x2C4C, body = uint32 count + uint32[] spells, 8 bytes for 1 spell).
+// Legacy 3.3.5a opcode 1177 ships ONE spell per packet — wrap into length-1 list at the handler.
+public class PetLearnedSpells : ServerPacket
+{
+    public PetLearnedSpells() : base(Opcode.SMSG_PET_LEARNED_SPELLS, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt32(Spells.Count);
+        foreach (uint spell in Spells)
+            _worldPacket.WriteUInt32(spell);
+    }
+
+    public List<uint> Spells = new();
+}
+
+public class PetUnlearnedSpells : ServerPacket
+{
+    public PetUnlearnedSpells() : base(Opcode.SMSG_PET_UNLEARNED_SPELLS, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt32(Spells.Count);
+        foreach (uint spell in Spells)
+            _worldPacket.WriteUInt32(spell);
+    }
+
+    public List<uint> Spells = new();
+}
+
 class PetAction : ClientPacket
 {
     public PetAction(WorldPacket packet) : base(packet) { }

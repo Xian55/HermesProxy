@@ -177,6 +177,28 @@ public partial class WorldClient
         SendPacketToClient(tameFailure);
     }
 
+    [PacketHandler(Opcode.SMSG_PET_LEARNED_SPELLS)]
+    void HandlePetLearnedSpells(WorldPacket packet)
+    {
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+            return;
+
+        var learned = new PetLearnedSpells();
+        learned.Spells.Add(packet.ReadUInt32());
+        SendPacketToClient(learned);
+    }
+
+    [PacketHandler(Opcode.SMSG_PET_UNLEARNED_SPELLS)]
+    void HandlePetUnlearnedSpells(WorldPacket packet)
+    {
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+            return;
+
+        var unlearned = new PetUnlearnedSpells();
+        unlearned.Spells.Add(packet.ReadUInt32());
+        SendPacketToClient(unlearned);
+    }
+
     // Translate a 3.3.5a ActionButton (8-bit state byte at bits 24-31, 16-bit spell at
     // bits 0-15) into the V3_4_3 modern wire layout (9-bit slot at bits 23-31, 23-bit
     // spell at bits 0-22). Without this, low-spell-id buttons happen to read with the
