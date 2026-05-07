@@ -49,8 +49,18 @@ public partial class WorldClient
         spells.Flag = packet.ReadUInt8();
 
         const int maxCreatureSpells = 10;
+        bool translateActionEncoding = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
         for (int i = 0; i < maxCreatureSpells; i++) // Read pet/vehicle spell ids
-            spells.ActionButtons[i] = packet.ReadUInt32();
+        {
+            uint raw = packet.ReadUInt32();
+            // ActionButton encoding differs: 3.3.5a uses (state:8 | reserved:8 | spell:16),
+            // V3_4_3 modern uses (slot:9 | spell:23). Translate only for V3_4_3 — V1_14
+            // and V2_5 modern clients haven't been verified to use the same modern format,
+            // so preserve the verbatim forward there.
+            spells.ActionButtons[i] = translateActionEncoding
+                ? TranslateLegacyPetActionButtonToV343(raw)
+                : raw;
+        }
 
         byte spellCount = packet.ReadUInt8();
         for (int i = 0; i < spellCount; i++)
@@ -165,5 +175,35 @@ public partial class WorldClient
         PetTameFailure tameFailure = new PetTameFailure();
         tameFailure.Reason = packet.ReadUInt8();
         SendPacketToClient(tameFailure);
+    }
+
+    // Translate a 3.3.5a ActionButton (8-bit state byte at bits 24-31, 16-bit spell at
+    // bits 0-15) into the V3_4_3 modern wire layout (9-bit slot at bits 23-31, 23-bit
+    // spell at bits 0-22). Without this, low-spell-id buttons happen to read with the
+    // right spell value but a junk slot, and high-spell-id auto-cast buttons render as
+    // blank icons because slot 0xC1 doesn't map to anything the modern client knows.
+    //
+    // Slot mapping mirrors cMangos's ActiveStates enum and matches WPP V3_4_4
+    // ReadPetAction344 modern slot vocabulary {0, 1, 6, 7, 0x101, 0x181}.
+    private static uint TranslateLegacyPetActionButtonToV343(uint legacy)
+    {
+        if (legacy == 0)
+            return 0;
+
+        byte legacyState = (byte)((legacy >> 24) & 0xFF);
+        ushort spellId = (ushort)(legacy & 0xFFFF);
+
+        uint v343Slot = legacyState switch
+        {
+            0x07 => 7,      // CommandState (Attack/Follow/Stay)
+            0x06 => 6,      // ReactState (Aggressive/Defensive/Passive)
+            0x01 => 0x1,    // PassiveSpell
+            0xC1 => 0x181,  // AutoCastSpell (enabled with autocast)
+            0xC0 => 0x101,  // ManualSpell (active, no autocast)
+            0x81 => 0x101,  // Disabled — keep spell visible, autocast off
+            _    => 0,
+        };
+
+        return (v343Slot << 23) | spellId;
     }
 }
