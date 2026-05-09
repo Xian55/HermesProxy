@@ -93,6 +93,18 @@ public partial class WorldClient
         control.Guid = packet.ReadPackedGuid().To128(GetSession().GameState);
         control.HasControl = packet.ReadBool();
         SendPacketToClient(control);
+
+        // V3_4_3 client routes WASD via a separate active-mover slot updated only by
+        // SMSG_MOVE_SET_ACTIVE_MOVER. 3.3.5 only emits SMSG_CLIENT_CONTROL_UPDATE, so
+        // without this synthesis the modern client treats CONTROL_UPDATE as camera-only
+        // and never sends client movement for vehicle/charm/possess targets like the
+        // Eye of Acherus (quest 12641).
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && control.HasControl)
+        {
+            MoveSetActiveMover setMover = new MoveSetActiveMover();
+            setMover.MoverGUID = control.Guid;
+            SendPacketToClient(setMover);
+        }
     }
 
     [PacketHandler(Opcode.MSG_MOVE_TELEPORT_ACK)]
