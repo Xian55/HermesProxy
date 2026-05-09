@@ -3280,6 +3280,19 @@ public static partial class GameData
 
     public static Server.Packets.HotFixMessage? GenerateItemSparseUpdateIfNeeded(ItemTemplate item)
     {
+        // Same skip heuristic as GenerateItemUpdateIfNeeded: if the V3_4_3 client has no
+        // DisplayID -> FileDataID mapping for this item, it likely has no baked Item DBC
+        // entry either. Sending an ItemSparse hotfix for a missing-from-baked-DBC item
+        // crashed the V3_4_3.54261 client (Error 132 ACCESS_VIOLATION at 0x0 — observed
+        // 2026-05-09 with .additem 45805). Let the client fall back to CMSG_DB_QUERY_BULK
+        // for unknown items; HotfixHandler.HandleDbQueryBulk answers from server-authoritative data.
+        if (GetItemIconFileDataIdByDisplayId(item.DisplayID) == 0)
+        {
+            Log.Print(LogType.Storage,
+                $"Item #{item.Entry}: skipping ItemSparse hotfix (no V3_4_3 DisplayID mapping; client falls back to CMSG_DB_QUERY_BULK).");
+            return null;
+        }
+
         ItemSparseRecordsStore.TryGetValue(item.Entry, out var row);
         if (row != null)
         {
@@ -3519,6 +3532,17 @@ public static partial class GameData
 
     public static Server.Packets.HotFixMessage? GenerateItemEffectUpdateIfNeeded(ItemTemplate item, byte slot)
     {
+        // Same skip heuristic as GenerateItemUpdateIfNeeded / GenerateItemSparseUpdateIfNeeded:
+        // unknown-to-V3_4_3-client items get NO hotfix updates. Sending an ItemEffect for an
+        // item with no baked Item DBC entry is part of the .additem 45805 client-crash chain
+        // (iter-15 — see GenerateItemSparseUpdateIfNeeded for the full diagnosis).
+        if (GetItemIconFileDataIdByDisplayId(item.DisplayID) == 0)
+        {
+            Log.Print(LogType.Storage,
+                $"Item #{item.Entry} slot #{slot}: skipping ItemEffect hotfix (no V3_4_3 DisplayID mapping).");
+            return null;
+        }
+
         ItemEffect? effect = GetItemEffectByItemId(item.Entry, slot);
         if (effect != null)
         {
