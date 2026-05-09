@@ -2925,6 +2925,42 @@ public partial class WorldClient
             {
                 updateData.ActivePlayerData.CharacterPoints = updates[PLAYER_CHARACTER_POINTS1].Int32Value;
             }
+            // Glyph slot unlock bitmask. Bit N = slot N is unlocked. Legacy 3.3.5a server
+            // sets bits as the player levels through 15/30/50/70/80 (final two slots both
+            // at 80). Without forwarding this, GameSessionData.GlyphsEnabled stays 0 and
+            // V3_4_3 client locks every slot ("requires level 15 to unlock").
+            int PLAYER_GLYPHS_ENABLED = LegacyVersion.GetUpdateField(PlayerField.PLAYER_GLYPHS_ENABLED);
+            if (PLAYER_GLYPHS_ENABLED >= 0 && updateMaskArray[PLAYER_GLYPHS_ENABLED])
+            {
+                byte mask = (byte)(updates[PLAYER_GLYPHS_ENABLED].UInt32Value & 0xFF);
+                GetSession().GameState.GlyphsEnabled = mask;
+                Log.Print(LogType.Network, $"[Glyphs] PLAYER_GLYPHS_ENABLED bitmask=0x{mask:X2}");
+            }
+            // PLAYER_FIELD_GLYPHS_1..6 (uint32 each). Legacy server sends these as Values
+            // updates on glyph apply/remove and on dual-spec switch. Without reading them,
+            // GameState.ActiveGlyphs stays at the value last set by TalentHandler — which
+            // is correct for spec switch (TalentHandler updates it) but misses standalone
+            // glyph removal. Mirror into the cache and mark dirty so the next player
+            // Values update re-emits GlyphSlots in the modern descriptor (iter-14).
+            PlayerField[] glyphFields = {
+                PlayerField.PLAYER_FIELD_GLYPHS_1, PlayerField.PLAYER_FIELD_GLYPHS_2,
+                PlayerField.PLAYER_FIELD_GLYPHS_3, PlayerField.PLAYER_FIELD_GLYPHS_4,
+                PlayerField.PLAYER_FIELD_GLYPHS_5, PlayerField.PLAYER_FIELD_GLYPHS_6,
+            };
+            for (int gi = 0; gi < 6; gi++)
+            {
+                int gIdx = LegacyVersion.GetUpdateField(glyphFields[gi]);
+                if (gIdx >= 0 && updateMaskArray[gIdx])
+                {
+                    ushort glyphId = (ushort)(updates[gIdx].UInt32Value & 0xFFFF);
+                    if (GetSession().GameState.ActiveGlyphs[gi] != glyphId)
+                    {
+                        GetSession().GameState.ActiveGlyphs[gi] = glyphId;
+                        GetSession().GameState.ActiveGlyphsDirty = true;
+                        Log.Print(LogType.Network, $"[Glyphs] PLAYER_FIELD_GLYPHS_{gi + 1} GlyphID={glyphId} (slot {gi})");
+                    }
+                }
+            }
             int PLAYER_TRACK_CREATURES = LegacyVersion.GetUpdateField(PlayerField.PLAYER_TRACK_CREATURES);
             if (PLAYER_TRACK_CREATURES >= 0 && updateMaskArray[PLAYER_TRACK_CREATURES])
             {

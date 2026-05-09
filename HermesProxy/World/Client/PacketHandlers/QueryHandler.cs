@@ -731,15 +731,13 @@ public partial class WorldClient
                         var stale = pendingSpells.PetGUID;
                         pendingSpells.PetGUID = corrected;
 
-                        // Synthesize SMSG_PET_LEARNED_SPELLS BEFORE the spells message so
-                        // the V3_4_3 client registers pet-castable spells (legacy server
-                        // doesn't re-emit LEARNED_SPELLS on resummon — see Phase 9).
-                        // Without this, the spellbook's pet tab is hidden and bar slots
-                        // referencing those spells render as blank.
-                        EmitSynthesizedPetLearnedSpells(pendingSpells);
-
+                        // LEARNED_SPELLS were already emitted at HandlePetSpellsMessage
+                        // entry (iter-10), BEFORE the pet's CreateObject — the V3_4_3
+                        // spellbook pet tab requires that pre-create ordering. Don't
+                        // re-emit here or the client gets duplicates.
+                        pendingSpells.Specialization = 0;
                         Log.Print(LogType.Trace,
-                            $"[PetSpellsFlush] (deferred) sending cached SMSG_PET_SPELLS_MESSAGE — stale={stale} corrected={corrected}");
+                            $"[PetSpellsFlush] (deferred) sending cached SMSG_PET_SPELLS_MESSAGE — stale={stale} corrected={corrected} spec=0");
                         SendPacketToClient(pendingSpells);
                         session.GameState.PendingPetSpells = null;
                         session.GameState.PendingPetSpellsLegacyGuid = null;

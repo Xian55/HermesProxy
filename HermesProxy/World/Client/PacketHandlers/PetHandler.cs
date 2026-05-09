@@ -87,6 +87,18 @@ public partial class WorldClient
             spells.Cooldowns.Add(cooldown);
         }
 
+        // SMSG_PET_LEARNED_SPELLS must arrive BEFORE the pet's CreateObject — the V3_4_3
+        // client's HasPetSpells() (which gates the spellbook pet-tab visibility) registers
+        // spells from LEARNED_SPELLS into a buffer that gets bound at pet-create time.
+        // Once the pet exists, post-create LEARNED_SPELLS go to action-bar bindings only,
+        // not the spellbook. Capture-diff (World_native_pet_parsed.txt Numbers 1916-1924)
+        // shows native order: 4× LEARNED_SPELLS at T=06.880-881 → pet CreateObject at
+        // T=06.885 → PET_SPELLS_MESSAGE at T=06.891. Iter-10: emit LEARNED_SPELLS NOW,
+        // before any cache-or-forward branch, so they reach the client before pet's
+        // CreateObject regardless of which path PetSpells takes.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            EmitSynthesizedPetLearnedSpells(spells);
+
         // V3_4_3 + cmangos: SMSG_PET_SPELLS_MESSAGE arrives BEFORE the pet's
         // CreateObject. spells.PetGUID was just translated against an empty pet
         // map, so its entry slot is pet_number (e.g. 9568) instead of
@@ -103,30 +115,29 @@ public partial class WorldClient
             GetSession().GameState.PendingPetSpells = spells;
             GetSession().GameState.PendingPetSpellsLegacyGuid = guid;
             Log.Print(LogType.Trace,
-                $"[PetSpellsHold] caching SMSG_PET_SPELLS_MESSAGE for legacy guid={guid} stalePetGUID={spells.PetGUID} (pet not yet in ClientKnownGuids)");
+                $"[PetSpellsHold] caching SMSG_PET_SPELLS_MESSAGE for legacy guid={guid} stalePetGUID={spells.PetGUID} (pet not yet in ClientKnownGuids; LEARNED_SPELLS already emitted ahead of CreateObject)");
             return;
         }
 
-        // V3_4_3: synthesize SMSG_PET_LEARNED_SPELLS from the spells message contents
-        // BEFORE forwarding the spells message. Legacy 3.3.5 servers don't re-emit
-        // LEARNED_SPELLS for an existing pet on resummon, so without synthesis the
-        // V3_4_3 client doesn't register pet-castable spells in its spellbook (the
-        // spellbook's pet tab is hidden and bar slots referencing those spells render
-        // as blank). CypherCore native sends 4× LEARNED_SPELLS before each pet bar
-        // creation; we mirror that ordering by synthesizing from ActionButtons + Actions.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-            EmitSynthesizedPetLearnedSpells(spells);
-
+        // Specialization=0 matches CypherCore native (`Source/Game/Networking/Packets/PetPackets.cs:79`
+        // writes WriteUInt16((ushort)Specialization) where m_petSpecialization defaults to 0).
+        // Default `-1` here writes 0xFFFF on the wire — the V3_4_3 client may treat that as
+        // an invalid spec and refuse to render the spellbook tab.
+        spells.Specialization = 0;
+        Log.Print(LogType.Trace,
+            $"[PetSpellbookTab] emit summary: PetGUID={spells.PetGUID} family={spells.CreatureFamily} spec={spells.Specialization} → SMSG_PET_SPELLS_MESSAGE");
         SendPacketToClient(spells);
     }
 
     private void EmitSynthesizedPetLearnedSpells(PetSpells spells)
     {
         var seen = ExtractPetCastableSpellIds(spells);
+        int totalActionButtons = 0;
+        foreach (uint b in spells.ActionButtons) if (b != 0) totalActionButtons++;
+        Log.Print(LogType.Trace,
+            $"[PetSpellbookTab] castable count={seen.Count} ids=[{string.Join(",", seen)}] (filtered from {totalActionButtons} non-zero ActionButtons + {spells.Actions.Count} Actions; slot ∈ {{0x101, 0x181}})");
         if (seen.Count == 0) return;
 
-        Log.Print(LogType.Trace,
-            $"[PetSpellsSynthesize] emitting {seen.Count} synthesized SMSG_PET_LEARNED_SPELLS before SMSG_PET_SPELLS_MESSAGE: ids=[{string.Join(",", seen)}]");
         foreach (uint spellId in seen)
         {
             var learned = new PetLearnedSpells();
@@ -135,11 +146,26 @@ public partial class WorldClient
         }
     }
 
-    // ActionButton slots {0, 0x1 (Passive), 0x101 (Manual), 0x181 (AutoCast)} carry
-    // castable spell IDs; slots {6 ReactState, 7 CommandState} carry command/react codes
-    // (NOT spells — skipped). The Actions list (TC's wider "all known pet spells" array)
-    // is included verbatim. Public-static so QueryHandler.FlushDeferredUpdatesFor can
-    // call it on the cached PendingPetSpells before flushing.
+    // ActionButton slot encoding (modern V3_4_3 after TranslateLegacyPetActionButtonToV343):
+    //   0x000 = Passive / Show
+    //   0x001 = Hidden
+    //   0x006 = ReactState (command/react byte, not a spell)
+    //   0x007 = CommandState
+    //   0x101 = Manual cast — castable spell, autocast off
+    //   0x181 = AutoCast — castable spell, autocast on
+    //
+    // BOTH 0x101 (manual) and 0x181 (autocast) represent castable pet spells that should
+    // appear in the spellbook tab. Whether autocast is on or off is a per-spell user toggle
+    // (right-click in WoW UI), not a "this isn't a spell" signal. CypherCore native happens
+    // to ship all 4 castables in 0x101 state, but TC pets routinely have autocast enabled
+    // on default abilities (Bite, Claw, etc.) — they ship as 0x181.
+    //
+    // Iter-7 mistakenly restricted to 0x101 only (capture-diff saw native's 4×0x101 and
+    // generalized incorrectly). Iter-9 fixed: include 0x181 too.
+    //
+    // The wider Actions list (passives + family abilities) is intentionally NOT replicated
+    // as LEARNED_SPELLS — those aren't castable spellbook entries.
+    // Public-static so QueryHandler.FlushDeferredUpdatesFor can call it on cached PendingPetSpells.
     public static HashSet<uint> ExtractPetCastableSpellIds(PetSpells spells)
     {
         var seen = new HashSet<uint>();
@@ -149,14 +175,8 @@ public partial class WorldClient
             uint slot = button >> 23;
             uint spellId = button & 0x7FFFFF;
             if (spellId == 0) continue;
-            if (slot == 6 || slot == 7) continue; // command / react — not spells
+            if (slot != 0x101 && slot != 0x181) continue;  // castable: manual OR autocast
             seen.Add(spellId);
-        }
-        foreach (uint action in spells.Actions)
-        {
-            uint spellId = action & 0x7FFFFF;
-            if (spellId != 0)
-                seen.Add(spellId);
         }
         return seen;
     }
@@ -274,19 +294,38 @@ public partial class WorldClient
         SendPacketToClient(unlearned);
     }
 
-    // Translate a 3.3.5a ActionButton (8-bit state byte at bits 24-31, 16-bit spell at
-    // bits 0-15) into the V3_4_3 modern wire layout (9-bit slot at bits 23-31, 23-bit
-    // spell at bits 0-22). Without this, low-spell-id buttons happen to read with the
-    // right spell value but a junk slot, and high-spell-id auto-cast buttons render as
-    // blank icons because slot 0xC1 doesn't map to anything the modern client knows.
+    // Translate a pet ActionButton from the legacy backend's wire format into V3_4_3
+    // modern (`slot:9 | spell:23`). Two backends ship different formats:
     //
-    // Slot mapping mirrors cMangos's ActiveStates enum and matches WPP V3_4_4
-    // ReadPetAction344 modern slot vocabulary {0, 1, 6, 7, 0x101, 0x181}.
+    //   - **CMaNGOS 3.3.5a** uses pre-WotLK-Classic encoding: `state:8 | reserved:8 | spell:16`
+    //     where `state ∈ {0x01 Passive, 0x06 React, 0x07 Command, 0x81 Disabled, 0xC1 Enabled}`
+    //     (Unit.h:869-874 ActiveStates). We unpack and remap.
+    //
+    //   - **TrinityCore wotlk_classic** has been forward-ported and emits **modern V3_4_3 slot
+    //     values directly** (`UnitDefines.h:504-507`): `ACT_DISABLED = 0x101`, `ACT_ENABLED = 0x181`,
+    //     `ACT_COMMAND = 0x07`, `ACT_REACTION = 0x06`, `ACT_PASSIVE = 0x01`. The wire packing
+    //     is already `slot:9 | spell:23` — no translation needed.
+    //
+    // We auto-detect: if the high 9 bits are a modern slot value, pass through. Otherwise
+    // treat the high byte as a CMaNGOS state byte and translate.
+    //
+    // Without this, TC's already-modern manual-cast buttons (slot=0x101, high byte=0x80)
+    // hit the legacy switch's `_ => 0` fallback — the slot becomes 0 ("Passive"), which the
+    // pet spellbook tab logic ignores. Spell IDs survive (low 16 bits) so the action bar
+    // still displays icons, but the spellbook tab never renders.
     private static uint TranslateLegacyPetActionButtonToV343(uint legacy)
     {
         if (legacy == 0)
             return 0;
 
+        // Modern V3_4_3 slot vocabulary (matches WPP ReadPetAction344): pass through.
+        uint maybeModernSlot = legacy >> 23;
+        if (maybeModernSlot == 0x000 || maybeModernSlot == 0x001 ||
+            maybeModernSlot == 0x006 || maybeModernSlot == 0x007 ||
+            maybeModernSlot == 0x101 || maybeModernSlot == 0x181)
+            return legacy;
+
+        // Otherwise treat as CMaNGOS legacy state-byte format.
         byte legacyState = (byte)((legacy >> 24) & 0xFF);
         ushort spellId = (ushort)(legacy & 0xFFFF);
 

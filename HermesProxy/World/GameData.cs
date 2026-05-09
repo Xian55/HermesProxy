@@ -55,6 +55,7 @@ public static partial class GameData
     public static FrozenDictionary<uint, uint> LearnSpells = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<uint, uint> TotemSpells = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<uint, uint> Gems = FrozenDictionary<uint, uint>.Empty;
+    public static FrozenDictionary<ushort, uint> GlyphSpellById = FrozenDictionary<ushort, uint>.Empty;
     public static FrozenDictionary<uint, CreatureDisplayInfo> CreatureDisplayInfos = FrozenDictionary<uint, CreatureDisplayInfo>.Empty;
     public static FrozenDictionary<uint, CreatureModelCollisionHeight> CreatureModelCollisionHeights = FrozenDictionary<uint, CreatureModelCollisionHeight>.Empty;
     public static FrozenDictionary<uint, uint> TransportPeriods = FrozenDictionary<uint, uint>.Empty;
@@ -590,6 +591,7 @@ public static partial class GameData
             LoadLearnSpells,
             LoadTotemSpells,
             LoadGems,
+            LoadGlyphProperties,
             LoadCreatureDisplayInfo,
             LoadCreatureModelCollisionHeights,
             LoadTransports,
@@ -1101,6 +1103,32 @@ public static partial class GameData
             dict.Add(enchantId, itemId);
         }
         Gems = dict.ToFrozenDictionary();
+    }
+
+    // GlyphProperties.dbc — maps GlyphID (row ID, what 3.3.5a sends in PLAYER_FIELD_GLYPHS_*
+    // and SMSG_UPDATE_TALENT_DATA's glyph block) to the SpellID of the passive that the
+    // glyph applies. The V3_4_3 client's SMSG_ACTIVE_GLYPHS expects (SpellID, GlyphID) pairs;
+    // legacy 3.3.5a only has the GlyphID, so we look up the SpellID here. Sourced from
+    // wago.tools at ?build=3.4.3.54261. CSV columns: ID, SpellID, ..., SpellIconFileDataID, GlyphSlotFlags.
+    public static void LoadGlyphProperties()
+    {
+        if (ModernVersion.ExpansionVersion < 3)
+            return;
+
+        var path = Path.Combine("CSV", "Hotfix", $"GlyphProperties{ModernVersion.ExpansionVersion}.csv");
+        if (!File.Exists(path))
+            return;
+
+        using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+        var dict = new Dictionary<ushort, uint>(EstimateRowCount(path, 40));
+
+        foreach (var row in reader)
+        {
+            ushort glyphId = ushort.Parse(row[0].Span);
+            uint spellId = uint.Parse(row[1].Span);
+            dict[glyphId] = spellId;
+        }
+        GlyphSpellById = dict.ToFrozenDictionary();
     }
 
     public static void LoadCreatureDisplayInfo()

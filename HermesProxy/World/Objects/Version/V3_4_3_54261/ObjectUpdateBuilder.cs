@@ -2460,11 +2460,17 @@ public class ObjectUpdateBuilder
             }
         }
 
-        // Pre-compute GlyphSlots/Glyphs from GameSessionData
-        // NOTE: Glyphs only change via specific packets, not update fields.
-        // Sending them in every Values update is wasteful and may cause format issues.
-        // Glyphs are already set correctly in the CREATE path.
-        bool hasGlyphChanges = false;
+        // GlyphSlots/Glyphs Values-update emit. Driven by `_gameState.ActiveGlyphsDirty`,
+        // which is set by:
+        //   - TalentHandler.HandleTalentsInfoUpdate (talent push, dual-spec switch)
+        //   - UpdateHandler PLAYER_FIELD_GLYPHS_1..6 reads (legacy Values updates on
+        //     glyph apply/remove via item use)
+        // Without re-emitting on dirty, the modern client's UnitData.GlyphSlots[6] stays
+        // stale across spec switch and the "you have already applied this glyph" check
+        // fires against the previous spec's glyphs (iter-14).
+        bool hasGlyphChanges = _gameState.ActiveGlyphsDirty;
+        if (hasGlyphChanges)
+            _gameState.ActiveGlyphsDirty = false;  // consume — only one Values emit per dirty event
 
         // ============================================================
         // SET BITS — Block 0 scalar fields (group bit 0, fields 26-37)
