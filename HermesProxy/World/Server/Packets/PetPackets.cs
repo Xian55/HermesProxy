@@ -113,6 +113,18 @@ public class PetClearSpells : ServerPacket, ISpanWritable
     public int WriteToSpan(Span<byte> buffer) => 0;
 }
 
+// V3_4_3 SMSG_SET_PET_SPECIALIZATION (opcode 0x2625 / 9765). Body is a single uint16
+// SpecID. CypherCore (X:/Programming/CypherCoreClassicWOTLK/Source/Game/Networking/Packets/PetPackets.cs:263)
+// emits this after PetSpells when the pet's specialization changes — the V3_4_3 client
+// uses it to bind the pet's spell list to a spellbook tab. Legacy 3.3.5a doesn't send
+// this opcode, so we synthesize it after every SMSG_PET_SPELLS_MESSAGE forward.
+public sealed class SetPetSpecialization : ServerPacket
+{
+    public ushort SpecID;
+    public SetPetSpecialization() : base(Opcode.SMSG_SET_PET_SPECIALIZATION, ConnectionType.Instance) { }
+    public override void Write() => _worldPacket.WriteUInt16(SpecID);
+}
+
 // V3_4_3 wire format verified against CypherCore native sniff (World_pet_actionbar_portrait.pkt
 // SMSG_PET_LEARNED_SPELLS opcode 0x2C4C, body = uint32 count + uint32[] spells, 8 bytes for 1 spell).
 // Legacy 3.3.5a opcode 1177 ships ONE spell per packet — wrap into length-1 list at the handler.

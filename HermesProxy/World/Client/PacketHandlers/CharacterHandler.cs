@@ -388,8 +388,16 @@ public partial class WorldClient
             SendPacketToClient(new EmptySetupCurrency());
             SendPacketToClient(new EmptySpellHistory());
             SendPacketToClient(new EmptySpellCharges());
-            SendPacketToClient(new EmptyTalentData());
-            SendPacketToClient(new EmptyActiveGlyphs());
+            // Use cached talent state if the legacy server already pushed it (relog case);
+            // otherwise send the empty stub as a placeholder. The legacy server emits
+            // SMSG_UPDATE_TALENT_DATA after world-enter on first login, and the handler
+            // (TalentHandler.HandleTalentsInfoUpdate) will refresh the panel then.
+            var talentCache = GetSession().GameState.TalentInfo;
+            if (talentCache != null)
+                SendPacketToClient(talentCache.ToPacket());
+            else
+                SendPacketToClient(new EmptyTalentData());
+            SendPacketToClient(BuildActiveGlyphsPacket(GetSession().GameState));
             SendPacketToClient(new EmptyEquipmentSetList());
             SendPacketToClient(new EmptyAccountMountUpdate());
             SendPacketToClient(new EmptyAccountToyUpdate());
@@ -400,6 +408,27 @@ public partial class WorldClient
             phaseShift.Client = GetSession().GameState.CurrentPlayerGuid;
             SendPacketToClient(phaseShift);
         }
+    }
+
+    // Build a real SMSG_ACTIVE_GLYPHS packet from cached glyph state. The cache is
+    // populated by TalentHandler.HandleTalentsInfoUpdate (active spec's glyph block from
+    // legacy SMSG_UPDATE_TALENT_DATA). Each non-zero GlyphID is mapped to its passive
+    // SpellID via GameData.GlyphSpellById (loaded from CSV/Hotfix/GlyphProperties3.csv).
+    // IsFullUpdate=true means "this is the complete current glyph set" — what the client
+    // needs at world-enter and on talent push.
+    static ActiveGlyphs BuildActiveGlyphsPacket(GameSessionData state)
+    {
+        var packet = new ActiveGlyphs { IsFullUpdate = true };
+        foreach (ushort glyphId in state.ActiveGlyphs)
+        {
+            if (glyphId == 0)
+                continue;
+            uint spellId = GameData.GlyphSpellById.GetValueOrDefault(glyphId);
+            if (spellId == 0)
+                continue;  // glyph not in our DBC — drop rather than emit a half-built entry
+            packet.Glyphs.Add((spellId, glyphId));
+        }
+        return packet;
     }
 
     [PacketHandler(Opcode.SMSG_CHARACTER_LOGIN_FAILED)]

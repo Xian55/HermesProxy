@@ -85,16 +85,20 @@ public class EmptyTalentData : ServerPacket
 {
     public EmptyTalentData() : base(Opcode.SMSG_UPDATE_TALENT_DATA, ConnectionType.Instance) { }
 
+    // Layout matches WPP's V3_4_0 parser ReadTalentInfoUpdate (canonical reader for
+    // V3_4_3.54261). PrimarySpecialization (after SpecID) and the wider Rank field
+    // are V3_4_4_59817+ only — do not emit them on V3_4_3, or the bit stream
+    // desyncs and the client renders learned talents as grey.
     public override void Write()
     {
         _worldPacket.WriteUInt32(0u);  // UnspentTalentPoints
         _worldPacket.WriteUInt8(0);    // ActiveGroup
-        _worldPacket.WriteUInt32(1u);  // GroupCount = 1
-        _worldPacket.WriteUInt8(0);    // TalentCount (byte)
-        _worldPacket.WriteUInt32(0u);  // TalentCount (dword)
-        _worldPacket.WriteUInt8(0);    // GlyphCount (byte)
-        _worldPacket.WriteUInt32(0u);  // GlyphCount (dword)
-        _worldPacket.WriteUInt8(4);    // SpecID = MAX_SPECIALIZATIONS (no spec)
+        _worldPacket.WriteUInt32(1u);  // TalentGroups.size() = 1
+        _worldPacket.WriteUInt8(0);    // Talents.size() byte
+        _worldPacket.WriteUInt32(0u);  // Talents.size() uint32
+        _worldPacket.WriteUInt8(0);    // Glyphs.size() byte
+        _worldPacket.WriteUInt32(0u);  // Glyphs.size() uint32
+        _worldPacket.WriteUInt8(0);    // SpecID
         _worldPacket.WriteBit(false);  // IsPetTalents
         _worldPacket.FlushBits();
     }

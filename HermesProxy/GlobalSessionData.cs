@@ -178,6 +178,17 @@ public sealed class GameSessionData
     public List<int> ActionButtons = [];
     public ushort[] ActiveGlyphs = new ushort[6];
     public byte GlyphsEnabled;
+    // Set true when ActiveGlyphs[6] changes (talent push, spec switch, glyph apply/remove
+    // via legacy PLAYER_FIELD_GLYPHS_1..6). Consumed by V3_4_3 ObjectUpdateBuilder, which
+    // writes the new GlyphSlots in the next player Values update. Without this re-emit,
+    // the modern client's UnitData.GlyphSlots stays stale after a spec switch and the
+    // "already applied this glyph" check fires against the previous spec's glyphs.
+    public bool ActiveGlyphsDirty;
+    // Last-received talent state from legacy SMSG_UPDATE_TALENT_DATA. Populated by
+    // WorldClient.HandleTalentsInfoUpdate; consumed by CharacterHandler.HandleLoginVerifyWorld
+    // (V3_4_3) so a relog re-emits real data without waiting for the legacy server's
+    // post-login push.
+    public TalentInfoCache? TalentInfo;
     // V3_4_3 DK rune snapshot. Null for non-DK or non-V3_4_3 sessions; allocated by
     // CharacterHandler.HandlePlayerLogin when the chosen char is a DK and the modern
     // client is V3_4_3_54261. Read by V3_4_3 ObjectUpdateBuilder (CREATE path) and

@@ -268,7 +268,14 @@ public partial class WorldSocket
             packet.WriteUInt8(0); // cast_count
             packet.WriteUInt32(resolvedSpellId);
             packet.WriteGuid(use.CastItem.To64());
-            packet.WriteUInt32(0); // glyphIndex
+            // Modern V3_4_3 client encodes the target glyph slot in SpellCastRequest.Misc[0]
+            // when applying a glyph item (drag-drop onto a slot). Was hardcoded to 0 — every
+            // glyph cast went to slot 0 regardless of the dropped slot.
+            packet.WriteUInt32(use.Cast.Misc[0]); // glyphIndex
+            // Always log item-use casts so we can correlate slot index, spell, and item GUID
+            // when investigating glyph-apply rejections (iter-16).
+            Log.Print(LogType.Network,
+                $"[Glyphs] CMSG_USE_ITEM glyphIndex={use.Cast.Misc[0]} itemSpellID={use.Cast.SpellID} itemGUID={use.CastItem}");
             packet.WriteUInt8((byte)use.Cast.SendCastFlags);
         }
         SpellCastTargetFlags targetFlags = ConvertSpellTargetFlags(use.Cast.Target);
