@@ -800,9 +800,10 @@ public partial class WorldClient
                     // 1ms later — the client uses that last packet of the world-entry
                     // burst as its "world ready" trigger.
                     //
-                    // SMSG_MOVE_SET_ACTIVE_MOVER is intentionally NOT in this block.
-                    // TC sends it BEFORE the player CreateObject (#138), so we send it
-                    // early in CharacterHandler.HandleLoginVerifyWorld instead.
+                    // SMSG_MOVE_SET_ACTIVE_MOVER is not synthesized at login — the V3_4_3
+                    // client defaults its active mover to the player itself on world entry.
+                    // It is synthesized mid-session in WorldClient.HandleControlUpdate when
+                    // the legacy server transfers control (vehicle / charm / Eye of Acherus).
                     var playerAuraSync = session.WorldClient!.BuildPlayerAuraSync(currentPlayerGuid);
                     SendPacketToClient(playerAuraSync);
                     Log.Print(LogType.Trace,
