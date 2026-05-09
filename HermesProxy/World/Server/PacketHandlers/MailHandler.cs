@@ -32,7 +32,7 @@ public partial class WorldSocket
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MAIL_CREATE_TEXT_ITEM);
         packet.WriteGuid(mail.Mailbox.To64());
-        packet.WriteUInt32(mail.MailID);
+        packet.WriteUInt32((uint)mail.MailID);
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V3_0_2_9056))
             packet.WriteUInt32(0); // Mail Template Id
         SendPacketToServer(packet);
@@ -43,7 +43,7 @@ public partial class WorldSocket
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MAIL_DELETE);
         packet.WriteGuid(GetSession().GameState.CurrentInteractedWithGO.To64());
-        packet.WriteUInt32(mail.MailID);
+        packet.WriteUInt32((uint)mail.MailID);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             packet.WriteUInt32(0); // Mail Template Id
         SendPacketToServer(packet);
@@ -54,7 +54,7 @@ public partial class WorldSocket
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MAIL_MARK_AS_READ);
         packet.WriteGuid(mail.Mailbox.To64());
-        packet.WriteUInt32(mail.MailID);
+        packet.WriteUInt32((uint)mail.MailID);
         SendPacketToServer(packet);
     }
 
@@ -63,7 +63,7 @@ public partial class WorldSocket
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MAIL_RETURN_TO_SENDER);
         packet.WriteGuid(GetSession().GameState.CurrentInteractedWithGO.To64());
-        packet.WriteUInt32(mail.MailID);
+        packet.WriteUInt32((uint)mail.MailID);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             packet.WriteGuid(mail.SenderGUID.To64());
         SendPacketToServer(packet);
@@ -74,9 +74,9 @@ public partial class WorldSocket
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MAIL_TAKE_ITEM);
         packet.WriteGuid(mail.Mailbox.To64());
-        packet.WriteUInt32(mail.MailID);
+        packet.WriteUInt32((uint)mail.MailID);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-            packet.WriteUInt32(mail.AttachID);
+            packet.WriteUInt32((uint)mail.AttachID);
         SendPacketToServer(packet);
     }
 
@@ -85,7 +85,7 @@ public partial class WorldSocket
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MAIL_TAKE_MONEY);
         packet.WriteGuid(mail.Mailbox.To64());
-        packet.WriteUInt32(mail.MailID);
+        packet.WriteUInt32((uint)mail.MailID);
         SendPacketToServer(packet);
     }
 

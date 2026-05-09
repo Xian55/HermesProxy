@@ -102,7 +102,7 @@ public partial class WorldClient
                     GetSession().GameState.RequestedItemTextIds.Add(mail.ItemTextId);
                     WorldPacket query = new WorldPacket(Opcode.CMSG_ITEM_TEXT_QUERY);
                     query.WriteUInt32(mail.ItemTextId);
-                    query.WriteInt32(mail.MailID);
+                    query.WriteInt32((int)mail.MailID);
                     query.WriteUInt32(0); // unk
                     SendPacket(query);
                 }

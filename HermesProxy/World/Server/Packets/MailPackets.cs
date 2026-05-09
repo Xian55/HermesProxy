@@ -19,6 +19,7 @@
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -138,7 +139,43 @@ public class MailListEntry
 {
     public void Write(WorldPacket data)
     {
-        data.WriteInt32(MailID);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 layout (per CypherCore Source/Game/Networking/Packets/MailPackets.cs:395-435)
+            data.WriteInt64(MailID);
+            data.WriteUInt32((uint)SenderType);
+            data.WriteInt64((long)Cod);
+            data.WriteInt32(StationeryID);
+            data.WriteInt64((long)SentMoney);
+            data.WriteInt32((int)Flags);
+            data.WriteFloat(DaysLeft);
+            data.WriteInt32(MailTemplateID);
+            data.WriteInt32(Attachments.Count);
+
+            switch (SenderType)
+            {
+                case MailType.Normal:
+                    data.WritePackedGuid128(SenderCharacter);
+                    break;
+                case MailType.Auction:
+                case MailType.Creature:
+                case MailType.GameObject:
+                    data.WriteInt32((int)(AltSenderID ?? 0));
+                    break;
+            }
+
+            data.WriteBits(Subject.GetByteCount(), 8);
+            data.WriteBits(Body.GetByteCount(), 13);
+            data.FlushBits();
+
+            Attachments.ForEach(p => p.Write(data));
+
+            data.WriteString(Subject);
+            data.WriteString(Body);
+            return;
+        }
+
+        data.WriteInt32((int)MailID);
         data.WriteUInt8((byte)SenderType);
         data.WriteUInt64(Cod);
         data.WriteInt32(StationeryID);
@@ -166,7 +203,7 @@ public class MailListEntry
         data.WriteString(Body);
     }
 
-    public int MailID;
+    public long MailID;
     public MailType SenderType;
     public WowGuid128 SenderCharacter;
     public uint? AltSenderID;
@@ -187,11 +224,25 @@ public class MailAttachedItem
     public void Write(WorldPacket data)
     {
         data.WriteUInt8(Position);
-        data.WriteInt32(AttachID);
-        data.WriteUInt32(Count);
-        data.WriteInt32(Charges);
-        data.WriteUInt32(MaxDurability);
-        data.WriteUInt32(Durability);
+
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 layout (per CypherCore Source/Game/Networking/Packets/MailPackets.cs:321-340)
+            data.WriteInt64(AttachID);
+            data.WriteInt32((int)Count);
+            data.WriteInt32(Charges);
+            data.WriteInt32((int)MaxDurability);
+            data.WriteInt32((int)Durability);
+        }
+        else
+        {
+            data.WriteInt32((int)AttachID);
+            data.WriteUInt32(Count);
+            data.WriteInt32(Charges);
+            data.WriteUInt32(MaxDurability);
+            data.WriteUInt32(Durability);
+        }
+
         Item.Write(data);
         data.WriteBits(Enchants.Count, 4);
         data.WriteBits(Gems.Count, 2);
@@ -206,7 +257,7 @@ public class MailAttachedItem
     }
 
     public byte Position;
-    public int AttachID;
+    public long AttachID;
     public ItemInstance Item = new();
     public uint Count;
     public int Charges;
@@ -224,11 +275,13 @@ public class MailCreateTextItem : ClientPacket
     public override void Read()
     {
         Mailbox = _worldPacket.ReadPackedGuid128();
-        MailID = _worldPacket.ReadUInt32();
+        MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            ? _worldPacket.ReadInt64()
+            : _worldPacket.ReadUInt32();
     }
 
     public WowGuid128 Mailbox;
-    public uint MailID;
+    public long MailID;
 }
 
 public class MailDelete : ClientPacket
@@ -237,11 +290,13 @@ public class MailDelete : ClientPacket
 
     public override void Read()
     {
-        MailID = _worldPacket.ReadUInt32();
+        MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            ? _worldPacket.ReadInt64()
+            : _worldPacket.ReadUInt32();
         DeleteReason = _worldPacket.ReadInt32();
     }
 
-    public uint MailID;
+    public long MailID;
     public int DeleteReason;
 }
 
@@ -252,11 +307,13 @@ public class MailMarkAsRead : ClientPacket
     public override void Read()
     {
         Mailbox = _worldPacket.ReadPackedGuid128();
-        MailID = _worldPacket.ReadUInt32();
+        MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            ? _worldPacket.ReadInt64()
+            : _worldPacket.ReadUInt32();
     }
 
     public WowGuid128 Mailbox;
-    public uint MailID;
+    public long MailID;
 }
 
 public class MailReturnToSender : ClientPacket
@@ -265,11 +322,13 @@ public class MailReturnToSender : ClientPacket
 
     public override void Read()
     {
-        MailID = _worldPacket.ReadUInt32();
+        MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            ? _worldPacket.ReadInt64()
+            : _worldPacket.ReadUInt32();
         SenderGUID = _worldPacket.ReadPackedGuid128();
     }
 
-    public uint MailID;
+    public long MailID;
     public WowGuid128 SenderGUID;
 }
 
@@ -280,13 +339,21 @@ public class MailTakeItem : ClientPacket
     public override void Read()
     {
         Mailbox = _worldPacket.ReadPackedGuid128();
-        MailID = _worldPacket.ReadUInt32();
-        AttachID = _worldPacket.ReadUInt32();
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            MailID = _worldPacket.ReadInt64();
+            AttachID = _worldPacket.ReadInt64();
+        }
+        else
+        {
+            MailID = _worldPacket.ReadUInt32();
+            AttachID = _worldPacket.ReadUInt32();
+        }
     }
 
     public WowGuid128 Mailbox;
-    public uint MailID;
-    public uint AttachID;
+    public long MailID;
+    public long AttachID;
 }
 
 public class MailTakeMoney : ClientPacket
@@ -296,12 +363,14 @@ public class MailTakeMoney : ClientPacket
     public override void Read()
     {
         Mailbox = _worldPacket.ReadPackedGuid128();
-        MailID = _worldPacket.ReadUInt32();
+        MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            ? _worldPacket.ReadInt64()
+            : _worldPacket.ReadUInt32();
         Money = _worldPacket.ReadInt64();
     }
 
     public WowGuid128 Mailbox;
-    public uint MailID;
+    public long MailID;
     public long Money;
 }
 
@@ -360,32 +429,56 @@ public class MailCommandResult : ServerPacket, ISpanWritable
 
     public override void Write()
     {
-        _worldPacket.WriteUInt32(MailID);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 layout (per CypherCore Source/Game/Networking/Packets/MailPackets.cs:115-123)
+            _worldPacket.WriteInt64(MailID);
+            _worldPacket.WriteInt32((int)Command);
+            _worldPacket.WriteInt32((int)ErrorCode);
+            _worldPacket.WriteInt32((int)BagResult);
+            _worldPacket.WriteInt64(AttachID);
+            _worldPacket.WriteInt32((int)QtyInInventory);
+            return;
+        }
+
+        _worldPacket.WriteUInt32((uint)MailID);
         _worldPacket.WriteUInt32((uint)Command);
         _worldPacket.WriteUInt32((uint)ErrorCode);
         _worldPacket.WriteUInt32((uint)BagResult);
-        _worldPacket.WriteUInt32(AttachID);
+        _worldPacket.WriteUInt32((uint)AttachID);
         _worldPacket.WriteUInt32(QtyInInventory);
     }
 
-    public int MaxSize => 24; // 6 uints
+    public int MaxSize => ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 32 : 24;
 
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
-        writer.WriteUInt32(MailID);
-        writer.WriteUInt32((uint)Command);
-        writer.WriteUInt32((uint)ErrorCode);
-        writer.WriteUInt32((uint)BagResult);
-        writer.WriteUInt32(AttachID);
-        writer.WriteUInt32(QtyInInventory);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            writer.WriteInt64(MailID);
+            writer.WriteInt32((int)Command);
+            writer.WriteInt32((int)ErrorCode);
+            writer.WriteInt32((int)BagResult);
+            writer.WriteInt64(AttachID);
+            writer.WriteInt32((int)QtyInInventory);
+        }
+        else
+        {
+            writer.WriteUInt32((uint)MailID);
+            writer.WriteUInt32((uint)Command);
+            writer.WriteUInt32((uint)ErrorCode);
+            writer.WriteUInt32((uint)BagResult);
+            writer.WriteUInt32((uint)AttachID);
+            writer.WriteUInt32(QtyInInventory);
+        }
         return writer.Position;
     }
 
-    public uint MailID;
+    public long MailID;
     public MailActionType Command;
     public MailErrorType ErrorCode;
     public InventoryResult BagResult;
-    public uint AttachID;
+    public long AttachID;
     public uint QtyInInventory;
 }
