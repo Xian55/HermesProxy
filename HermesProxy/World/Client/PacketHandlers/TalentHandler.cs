@@ -134,8 +134,8 @@ public partial class WorldClient
             byte rank = packet.ReadUInt8();
             group.Talents.Add(new TalentEntry { TalentID = talentId, Rank = rank });
         }
-        // Pad to MaxGlyphSlotIndex=6 with zero glyphs to match CypherCore's wire shape.
-        for (int g = 0; g < 6; ++g)
+        // Pad to PlayerConst.MaxGlyphSlots with zero glyphs to match CypherCore's wire shape.
+        for (int g = 0; g < PlayerConst.MaxGlyphSlots; ++g)
             group.Glyphs.Add(0);
 
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
