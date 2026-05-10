@@ -176,4 +176,30 @@ public partial class WorldClient
         log.Victim = packet.ReadGuid().To128(GetSession().GameState);
         SendPacketToClient(log);
     }
+
+    // SMSG_THREAT_UPDATE / SMSG_HIGHEST_THREAT_UPDATE intentionally NOT handled.
+    // Attempted translation using WPP's V3_4_4_59817+ shape (PackedGuid128 + int32 count
+    // + (PackedGuid128 + int64 threat)*) caused a catastrophic OOM on V3_4_3.54261:
+    // crash file `.?AVWOWGUID@@` requested ~18 GiB of WOWGUID storage (~1.2 billion
+    // entries), classic signature of the client misreading our `count` field. V3_4_3.54261
+    // uses an unknown wire shape — needs a real sniff before re-implementation. Letting
+    // the proxy drop these is annoying (no threat meter data) but won't crash the client.
+    // SMSG_THREAT_REMOVE / SMSG_THREAT_CLEAR are kept because they have no count field —
+    // worst-case malformed-shape is a no-op, not a billion-entry alloc.
+    [PacketHandler(Opcode.SMSG_THREAT_REMOVE)]
+    void HandleThreatRemove(WorldPacket packet)
+    {
+        ThreatRemove threat = new();
+        threat.UnitGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
+        threat.AboutGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
+        SendPacketToClient(threat);
+    }
+
+    [PacketHandler(Opcode.SMSG_THREAT_CLEAR)]
+    void HandleThreatClear(WorldPacket packet)
+    {
+        ThreatClear threat = new();
+        threat.GUID = packet.ReadPackedGuid().To128(GetSession().GameState);
+        SendPacketToClient(threat);
+    }
 }

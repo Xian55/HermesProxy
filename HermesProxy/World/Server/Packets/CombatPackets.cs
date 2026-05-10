@@ -339,3 +339,48 @@ class PartyKillLog : ServerPacket, ISpanWritable
     public WowGuid128 Player;
     public WowGuid128 Victim;
 }
+
+class ThreatRemove : ServerPacket, ISpanWritable
+{
+    public ThreatRemove() : base(Opcode.SMSG_THREAT_REMOVE, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(UnitGUID);
+        _worldPacket.WritePackedGuid128(AboutGUID);
+    }
+
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(UnitGUID.Low, UnitGUID.High);
+        writer.WritePackedGuid128(AboutGUID.Low, AboutGUID.High);
+        return writer.Position;
+    }
+
+    public WowGuid128 UnitGUID;
+    public WowGuid128 AboutGUID;
+}
+
+class ThreatClear : ServerPacket, ISpanWritable
+{
+    public ThreatClear() : base(Opcode.SMSG_THREAT_CLEAR, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(GUID);
+    }
+
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(GUID.Low, GUID.High);
+        return writer.Position;
+    }
+
+    public WowGuid128 GUID;
+}
