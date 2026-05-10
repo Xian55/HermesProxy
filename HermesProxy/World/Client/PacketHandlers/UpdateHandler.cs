@@ -3172,6 +3172,9 @@ public partial class WorldClient
                 
                 updateData.ActivePlayerData.MultiActionBars = (byte)((updates[PLAYER_FIELD_BYTES].UInt32Value >> 16) & 0xFF);
                 updateData.ActivePlayerData.LifetimeMaxRank = (byte)((updates[PLAYER_FIELD_BYTES].UInt32Value >> 24) & 0xFF);
+                Log.Print(LogType.Trace,
+                    $"[ActionBarTrace] PLAYER_FIELD_BYTES extracted: MultiActionBars=0x{updateData.ActivePlayerData.MultiActionBars:X2} " +
+                    $"({System.Convert.ToString(updateData.ActivePlayerData.MultiActionBars.Value, 2).PadLeft(8, '0')}b) raw32=0x{updates[PLAYER_FIELD_BYTES].UInt32Value:X8} guid={guid}");
             }
             int PLAYER_AMMO_ID = LegacyVersion.GetUpdateField(PlayerField.PLAYER_AMMO_ID);
             if (PLAYER_AMMO_ID >= 0 && updateMaskArray[PLAYER_AMMO_ID])

@@ -91,6 +91,24 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     private readonly string _externalAddress;
     private readonly int _instancePort;
 
+    // [ActionBarTrace] Ring-buffered SMSG history for diagnosing client
+    // disconnect-with-reason-7 events (the V3_4_3 client emits this when it
+    // rejects a server packet but doesn't tell us which one). On every
+    // SendPacket we append a one-line summary; on CMSG_LOG_DISCONNECT we
+    // dump the buffer. The ring is also gated by an "active watch window"
+    // set by paths suspected of triggering crashes (e.g. CMSG_SET_ACTION_BUTTON)
+    // — when the window is open we additionally Trace-log every send so the
+    // raw flow is in the file.
+    private const int RecentSentCap = 40;
+    private readonly Queue<string> _recentSentOpcodes = new(RecentSentCap + 1);
+    private long _actionButtonWatchUntilTicks;
+
+    public void MarkActionButtonWatchWindow()
+    {
+        // Open / extend a 10-second watch window starting now.
+        _actionButtonWatchUntilTicks = DateTime.UtcNow.AddSeconds(10).Ticks;
+    }
+
     public WorldSocket(Socket socket, IOptions<ProxyNetworkOptions> networkOptions) : base(socket)
     {
         _externalAddress = networkOptions.Value.ExternalAddress;
@@ -310,6 +328,19 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             case Opcode.CMSG_LOG_DISCONNECT:
                 uint reason = packet.ReadUInt32();
                 Log.Print(LogType.Server, $"Client disconnected with reason {reason}.");
+
+                // [ActionBarTrace] Dump the recent SMSG history. Reason 7 is
+                // "client rejected a server packet"; the offending packet is
+                // almost always within the last ~30 sends. The dump only fires
+                // on the disconnect path, so it doesn't add per-packet cost.
+                if (reason == 7 && _recentSentOpcodes.Count > 0)
+                {
+                    Log.Print(LogType.Trace,
+                        $"[ActionBarTrace] reason=7 — last {_recentSentOpcodes.Count} SMSG packets sent to this client (oldest first):");
+                    int n = 0;
+                    foreach (var entry in _recentSentOpcodes)
+                        Log.Print(LogType.Trace, $"[ActionBarTrace]   #{++n,2} {entry}");
+                }
                 if (_connectType == ConnectionType.Realm)
                 {
                     if (GetSession().AuthClient != null)
@@ -412,6 +443,18 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
                 WorldSocketLogMessages.PacketSentNoisy(_melLog, _sourceFile, _netDirSend, universalOpcode, (uint)opcode);
             else
                 WorldSocketLogMessages.PacketSent(_melLog, _sourceFile, _netDirSend, universalOpcode, (uint)opcode);
+
+            // [ActionBarTrace] Append to ring buffer + verbose Trace inside the
+            // active watch window. Ring buffer is capped — drop the oldest entry
+            // when full so the dump on CMSG_LOG_DISCONNECT shows just the most
+            // recent activity.
+            string entry = $"{DateTime.Now:HH:mm:ss.fff} {universalOpcode}({opcode}) sz={data.Length}";
+            _recentSentOpcodes.Enqueue(entry);
+            while (_recentSentOpcodes.Count > RecentSentCap)
+                _recentSentOpcodes.Dequeue();
+
+            if (DateTime.UtcNow.Ticks < _actionButtonWatchUntilTicks)
+                Log.Print(LogType.Trace, $"[ActionBarTrace] inWatchWindow → {entry}");
 
             // Trace-level enrichment for the modern V3_4_3 SMSG_UPDATE_OBJECT envelope.
             // Layout: u32 NumObjUpdates, u16 MapID, then per-update body. Read the first
@@ -1154,7 +1197,51 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         for (int i = 0; i < count; i++)
             accountData.AccountTimes[i] = GetSession().AccountDataMgr.Data[i] != null ? GetSession().AccountDataMgr.Data[i].Timestamp : 0;
 
+        // V3_4_3 client only sends CMSG_REQUEST_ACCOUNT_DATA when the advertised
+        // timestamp is newer than its local cache. Once it has received a type-0
+        // blob (without action-bar CVars) it caches it locally and never asks
+        // again on subsequent logins — leaving Phase 7's response augmentation
+        // dead. Bumping the type-0 timestamp to "now" each login forces the
+        // client to re-fetch, which gives ClientConfigHandler.HandleRequestAccountData
+        // the chance to inject the saved bottomLeftActionBar / etc. CVars.
+        // Only do this when we actually have something to inject (saved mask).
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            byte? mask = GetSession().GameState.CurrentPlayerStorage?.Settings?.MultiActionBarsMask;
+            if (mask.HasValue && (uint)AccountDataType.GlobalConfigCache < count)
+            {
+                long bumped = Time.UnixTime;
+                Log.Print(LogType.Trace,
+                    $"[ActionBarTrace] bumping type-0 timestamp {accountData.AccountTimes[(int)AccountDataType.GlobalConfigCache]} → {bumped} to force re-request (mask=0x{mask.Value:X2})");
+                accountData.AccountTimes[(int)AccountDataType.GlobalConfigCache] = bumped;
+            }
+        }
+
+        // [ActionBarTrace] Show which slots have a non-zero timestamp — those tell
+        // the client "I have data for this AccountDataType, ask me for it".
+        var nonZero = new System.Text.StringBuilder();
+        for (int i = 0; i < count; i++)
+        {
+            if (accountData.AccountTimes[i] != 0)
+            {
+                if (nonZero.Length > 0) nonZero.Append(", ");
+                nonZero.Append($"{i}({(AccountDataType)i})={accountData.AccountTimes[i]}");
+            }
+        }
+        Log.Print(LogType.Trace,
+            $"[ActionBarTrace] SendAccountDataTimes guid={guid} count={count} nonZeroSlots=[{(nonZero.Length == 0 ? "<all zero>" : nonZero.ToString())}]");
+
         SendPacket(accountData);
+
+        // Note: do NOT push any unsolicited SMSG_UPDATE_ACCOUNT_DATA from here.
+        // - Phase 3 tried pushing every populated slot (1/2/4/7) and regressed
+        //   the V3_4_3 client (CMSG_LOG_DISCONNECT reason=7 after combat).
+        // - Phase 4/6 tried pushing only synthesised type-0 CVars and the
+        //   client's own CMSG_REQUEST_ACCOUNT_DATA(type=0) response then
+        //   overwrote our push (the request response wins).
+        // Phase 7 moved the action-bar CVar synthesis into the request-response
+        // path (ClientConfigHandler.HandleRequestAccountData type=0). See that
+        // handler for the V3_4_3 augmentation.
     }
 
     public void SendRpcMessage(uint serviceId, OriginalHash service, uint methodId, uint token, BattlenetRpcErrorCode status, IMessage? message)
