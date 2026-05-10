@@ -230,23 +230,97 @@ public partial class WorldSocket
         //   bytes 1-4 = packed uint32 (low 24 bits = action ID, high 8 bits = type)
         // Total: 5 bytes.
         //
-        // Previously we wrote `WriteUInt16(Action) + WriteUInt16(Type)` which
-        // happened to match the legacy byte sequence for spell IDs < 65536 and
-        // type=Spell(0), but corrupts both fields for larger action IDs. Switch
-        // to explicit packed uint32 to match TC/mangos exactly.
+        // The CLIENT-side wire format differs by version:
+        //   - V1_14 / V2_5 (per WPP V1_13_2 ActionBarHandler.cs): two
+        //     INDEPENDENT fields — Int16 Action + Int16 Type + Byte Slot.
+        //     SetActionButton.Read() reads them as such; we just repack the
+        //     byte-shifted legacy form.
+        //   - V3_4_3 (per WPP V3_4_0_45166): Int32 packed (low 24 = action,
+        //     high 8 = ActionButtonType) + Byte Slot. SetActionButton.Read()
+        //     splits that int32 across two uint16 fields (Action = low 16,
+        //     Type = high 16 = (action_high8 | (type<<8))), so the V3_4_3
+        //     branch must recombine the bits.
+        //
+        // Picking the wrong branch silently miscoded macros/items/mounts/
+        // equipment-sets/companions as SPELLs with truncated IDs — observed
+        // crashing the V3_4_3 client when the resulting bogus slot was
+        // rendered on a side bar.
+        ushort actionLow16 = button.Action;
+        ushort typeHi16    = button.Type;
+        uint actionReal;
+        byte typeReal;
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            actionReal = (uint)actionLow16 | (((uint)typeHi16 & 0xFFu) << 16);
+            typeReal   = (byte)((typeHi16 >> 8) & 0xFFu);
+        }
+        else
+        {
+            // V1_14 / V2_5 / pre-V3_4_3: independent uint16 fields.
+            actionReal = (uint)actionLow16;
+            typeReal   = (byte)(typeHi16 & 0xFFu);
+        }
+        uint packed = (actionReal & 0x00FFFFFFu) | ((uint)typeReal << 24);
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_ACTION_BUTTON);
         packet.WriteUInt8(button.Index);
-        uint packed = ((uint)button.Action & 0x00FFFFFFu) | (((uint)button.Type & 0xFFu) << 24);
         packet.WriteUInt32(packed);
         SendPacketToServer(packet);
 
         Log.Print(LogType.Debug,
-            $"[V343Trace][SaveButton] modern→legacy idx={button.Index} action={button.Action} type={button.Type} → packedLE=0x{packed:X8}");
+            $"[V343Trace][SaveButton] modern→legacy idx={button.Index} ({DescribeActionButtonSlot(button.Index)}) " +
+            $"wire(action=0x{actionLow16:X4} type=0x{typeHi16:X4}) build={ModernVersion.Build} → " +
+            $"actionReal={actionReal} typeReal=0x{typeReal:X2} ({DescribeActionButtonType(typeReal)}) " +
+            $"packedLE=0x{packed:X8}");
+
+        // Mark a 10-second watch window so SendPacket dumps every SMSG that
+        // follows. The client crashes ~6s after a problematic CMSG_SET_ACTION_BUTTON
+        // and we want to know exactly which SMSG it choked on.
+        GetSession().RealmSocket?.MarkActionButtonWatchWindow();
     }
+
+    // 3.3.5a action-button slot mapping (idx → "which bar"). Helps spot
+    // off-by-bar issues and matches the labels the user sees in Options.
+    private static string DescribeActionButtonSlot(byte idx) => idx switch
+    {
+        < 12  => $"MainBar btn{idx + 1}",
+        < 24  => $"BonusBar btn{idx - 11}",
+        < 36  => $"MultiBarRight (Bar 4) btn{idx - 23}",
+        < 48  => $"MultiBarLeft (Bar 5) btn{idx - 35}",
+        < 60  => $"MultiBarBottomRight (Bar 3) btn{idx - 47}",
+        < 72  => $"MultiBarBottomLeft (Bar 2) btn{idx - 59}",
+        < 84  => $"PetBar/Bonus2 btn{idx - 71}",
+        < 144 => $"slot {idx}",
+        _     => $"OOB slot {idx}"
+    };
+
+    private static string DescribeActionButtonType(byte t) => t switch
+    {
+        0x00 => "SPELL",
+        0x01 => "C",
+        0x20 => "EQSET",
+        0x30 => "DROPDOWN",
+        0x40 => "MACRO",
+        0x50 => "CMACRO",
+        0x60 => "MOUNT",
+        0x80 => "ITEM",
+        0x90 => "COMPANION",
+        _    => $"unknown 0x{t:X2}"
+    };
 
     [PacketHandler(Opcode.CMSG_SET_ACTION_BAR_TOGGLES)]
     void HandleSetActionBarToggles(SetActionBarToggles bars)
     {
+        Log.Print(LogType.Trace,
+            $"[ActionBarTrace] CMSG_SET_ACTION_BAR_TOGGLES mask=0x{bars.Mask:X2} ({Convert.ToString(bars.Mask, 2).PadLeft(8, '0')}b) → forwarding to legacy server");
+
+        // V3_4_3 fires this with mask=0 a few seconds after every login (its modern
+        // UI starts in the "no extra bars" CVar state and pushes that to the server,
+        // wiping the legacy DB). Only persist non-zero masks so the next login can
+        // re-inject CVars matching the user's last real toggle.
+        if (bars.Mask != 0)
+            GetSession().GameState.CurrentPlayerStorage.Settings.SetMultiActionBarsMask(bars.Mask);
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_ACTION_BAR_TOGGLES);
         packet.WriteUInt8(bars.Mask);
         SendPacketToServer(packet);
