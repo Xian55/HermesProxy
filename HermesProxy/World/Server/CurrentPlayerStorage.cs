@@ -46,6 +46,21 @@ public class PlayerSettings
         Save();
     }
 
+    // V3_4_3 modern client never reads the legacy MultiActionBars descriptor field
+    // and immediately overwrites the legacy DB with mask=0 a few seconds after every
+    // login. To make Action Bar 2/3/4/5 checkboxes sticky, the proxy persists the last
+    // user-intended mask here and re-injects matching CVars (bottomLeftActionBar, etc.)
+    // via an unsolicited SMSG_UPDATE_ACCOUNT_DATA(type=0) on the next login.
+    public byte? MultiActionBarsMask => _internalStorage.MultiActionBarsMask;
+
+    public void SetMultiActionBarsMask(byte mask)
+    {
+        if (_internalStorage.MultiActionBarsMask == mask)
+            return;
+        _internalStorage.MultiActionBarsMask = mask;
+        Save();
+    }
+
     public void PatchFlags(ref PlayerFlags flags)
     {
         _lastCapturedFlags = flags;
@@ -77,6 +92,13 @@ public class PlayerSettings
         // The player can request a change in the Interface settings
         // but the actual value has to be reflected in the local CharacterFlags
         public bool AutoBlockGuildInvites { get; set; }
+
+        // V3_4_3 action bar visibility checkbox state (bit 0=Action Bar 2,
+        // bit 1=Action Bar 3, bit 2=Action Bar 4, bit 3=Action Bar 5).
+        // Null = never set; mask is replayed via synthesised account-data CVars
+        // on next login because the V3_4_3 client overwrites the legacy
+        // MultiActionBars descriptor with 0 right after every login.
+        public byte? MultiActionBarsMask { get; set; }
     }
 
     public void Reload()
