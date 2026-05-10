@@ -68,6 +68,7 @@ public static partial class GameData
     public static FrozenSet<uint> NextMeleeSpells = FrozenSet<uint>.Empty;
     public static FrozenSet<uint> AutoRepeatSpells = FrozenSet<uint>.Empty;
     public static FrozenSet<uint> AuraSpells = FrozenSet<uint>.Empty;
+    public static FrozenSet<uint> PassiveSpells = FrozenSet<uint>.Empty;
     public static FrozenDictionary<uint, int> AuraDurations = FrozenDictionary<uint, int>.Empty;
     public static FrozenDictionary<uint, TaxiPath> TaxiPaths = FrozenDictionary<uint, TaxiPath>.Empty;
     public static int[,] TaxiNodesGraph = new int[250, 250];
@@ -604,6 +605,7 @@ public static partial class GameData
             LoadMeleeSpells,
             LoadAutoRepeatSpells,
             LoadAuraSpells,
+            LoadPassiveSpells,
             LoadAuraDurations,
             LoadTaxiPaths,
             LoadTaxiPathNodesGraph,
@@ -1320,6 +1322,17 @@ public static partial class GameData
             set.Add(spellId);
         }
         AuraSpells = set.ToFrozenSet();
+    }
+    public static void LoadPassiveSpells()
+    {
+        var path = Path.Combine("CSV", $"PassiveSpells{LegacyVersion.ExpansionVersion}.csv");
+        if (!File.Exists(path))
+            return;
+        using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+        var set = new HashSet<uint>(EstimateRowCount(path, 8));
+        foreach (var row in reader)
+            set.Add(uint.Parse(row[0].Span));
+        PassiveSpells = set.ToFrozenSet();
     }
 
     public static void LoadAuraDurations()

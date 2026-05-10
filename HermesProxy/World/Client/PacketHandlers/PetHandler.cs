@@ -359,6 +359,20 @@ public partial class WorldClient
         // spell ID must be a vehicle/charm castable; map to ManualCast (0x101) so the V3_4_3
         // client renders it as a clickable bar entry and EmitSynthesizedPetLearnedSpells
         // adds it to PET_LEARNED_SPELLS. Empty slots (high byte = index, spell = 0) stay 0.
+        // EXCEPTION: vehicle slots may also hold passive control auras (e.g. Frostbrood
+        // Vanquisher Flight 53112 in DK quest 12779). TC's VehicleSpellInitialize ships
+        // every m_spells[] entry — including IsPassive() ones — into the action bar with
+        // the slot_idx-in-high-byte encoding. Native Blizzard wow showed an empty slot for
+        // these (the passive aura is cast on the vehicle server-side, no action button).
+        // Drop the entry (return 0) for known passives via GameData.PassiveSpells so the
+        // V3_4_3 client renders the slot as empty.
+        if (legacyState != 0x07 && legacyState != 0x06 && legacyState != 0x01 &&
+            legacyState != 0xC1 && legacyState != 0xC0 && legacyState != 0x81 &&
+            spellId != 0 && GameData.PassiveSpells.Contains(spellId))
+        {
+            return 0;
+        }
+
         uint v343Slot = legacyState switch
         {
             0x07 => 7,      // CommandState (Attack/Follow/Stay)
