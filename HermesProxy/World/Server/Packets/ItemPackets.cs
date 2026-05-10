@@ -279,25 +279,45 @@ public class SellResponse : ServerPacket, ISpanWritable
 
     public override void Write()
     {
-        _worldPacket.WritePackedGuid128(VendorGUID);
-        _worldPacket.WritePackedGuid128(ItemGUID);
-        _worldPacket.WriteUInt8(Reason);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            _worldPacket.WritePackedGuid128(VendorGUID);
+            _worldPacket.WriteUInt32(1);
+            _worldPacket.WriteInt32(Reason);
+            _worldPacket.WritePackedGuid128(ItemGUID);
+        }
+        else
+        {
+            _worldPacket.WritePackedGuid128(VendorGUID);
+            _worldPacket.WritePackedGuid128(ItemGUID);
+            _worldPacket.WriteUInt8((byte)Reason);
+        }
     }
 
-    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 1; // 2 GUIDs + byte
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 8; // 2 GUIDs + max(uint32 count + int32 reason, uint8 reason)
 
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
-        writer.WritePackedGuid128(VendorGUID.Low, VendorGUID.High);
-        writer.WritePackedGuid128(ItemGUID.Low, ItemGUID.High);
-        writer.WriteUInt8(Reason);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            writer.WritePackedGuid128(VendorGUID.Low, VendorGUID.High);
+            writer.WriteUInt32(1);
+            writer.WriteInt32(Reason);
+            writer.WritePackedGuid128(ItemGUID.Low, ItemGUID.High);
+        }
+        else
+        {
+            writer.WritePackedGuid128(VendorGUID.Low, VendorGUID.High);
+            writer.WritePackedGuid128(ItemGUID.Low, ItemGUID.High);
+            writer.WriteUInt8((byte)Reason);
+        }
         return writer.Position;
     }
 
     public WowGuid128 VendorGUID;
     public WowGuid128 ItemGUID;
-    public byte Reason;
+    public int Reason;
 }
 
 public class SplitItem : ClientPacket
