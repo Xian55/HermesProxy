@@ -958,6 +958,17 @@ class ClientCinematicPkt : ClientPacket
     public override void Read() { }
 }
 
+// Modern V3_4_3 client emits CMSG_REQUEST_VEHICLE_EXIT / _PREV_SEAT / _NEXT_SEAT
+// with no payload (verified via CypherCore Source/Game/Networking/Packets/VehiclePackets.cs).
+// Legacy 3.3.5a CMSG_REQUEST_VEHICLE_EXIT also reads no payload — TC's HandleRequestVehicleExit
+// resolves the vehicle from session state. One empty class covers all three opcodes.
+class RequestVehicleSeatChange : ClientPacket
+{
+    public RequestVehicleSeatChange(WorldPacket packet) : base(packet) { }
+
+    public override void Read() { }
+}
+
 class FarSight : ClientPacket
 {
     public FarSight(WorldPacket packet) : base(packet) { }

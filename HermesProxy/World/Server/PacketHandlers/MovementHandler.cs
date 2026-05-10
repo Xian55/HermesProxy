@@ -13,7 +13,6 @@ public partial class WorldSocket
 {
     // Handlers for CMSG opcodes coming from the modern client
     [PacketHandler(Opcode.CMSG_MOVE_CHANGE_TRANSPORT)]
-    [PacketHandler(Opcode.CMSG_MOVE_DISMISS_VEHICLE)]
     [PacketHandler(Opcode.CMSG_MOVE_FALL_LAND)]
     [PacketHandler(Opcode.CMSG_MOVE_FALL_RESET)]
     [PacketHandler(Opcode.CMSG_MOVE_HEARTBEAT)]
@@ -203,6 +202,28 @@ public partial class WorldSocket
         else
             packet.WriteGuid(movement.MoverGUID.To64());
         packet.WriteUInt32(movement.TimeSkipped);
+        SendPacketToServer(packet);
+    }
+
+    // "Leave Vehicle" button on the modern V3_4_3 vehicle UI emits CMSG_MOVE_DISMISS_VEHICLE
+    // (with a MovementInfo body) — the legacy 3.3.5a equivalent is CMSG_REQUEST_VEHICLE_EXIT,
+    // which is empty and resolves the vehicle from session state. Rewrite the opcode and drop
+    // the body to translate. Without this the click was getting routed through HandlePlayerMove
+    // and silently degraded to MSG_MOVE_SET_FACING, leaving the player stuck in the vehicle
+    // (e.g. Grand Theft Palomino quest 12680).
+    //
+    // PREV_SEAT / NEXT_SEAT / REQUEST_VEHICLE_EXIT all share the same empty wire shape and
+    // are wired here as well, since they did not have any handler at all before.
+    [PacketHandler(Opcode.CMSG_REQUEST_VEHICLE_EXIT)]
+    [PacketHandler(Opcode.CMSG_REQUEST_VEHICLE_PREV_SEAT)]
+    [PacketHandler(Opcode.CMSG_REQUEST_VEHICLE_NEXT_SEAT)]
+    [PacketHandler(Opcode.CMSG_MOVE_DISMISS_VEHICLE)]
+    void HandleRequestVehicleSeatChange(RequestVehicleSeatChange request)
+    {
+        Opcode targetOpcode = request.GetUniversalOpcode();
+        if (targetOpcode == Opcode.CMSG_MOVE_DISMISS_VEHICLE)
+            targetOpcode = Opcode.CMSG_REQUEST_VEHICLE_EXIT;
+        WorldPacket packet = new WorldPacket(targetOpcode);
         SendPacketToServer(packet);
     }
 }
