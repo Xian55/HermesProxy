@@ -187,6 +187,7 @@ public partial class WorldSocket
             packet.WriteUInt8((byte)cast.Cast.SendCastFlags);
         }
         WriteSpellTargets(cast.Cast.Target, targetFlags, packet);
+        WriteClientCastFlagsTrailer(cast.Cast.SendCastFlags, cast.Cast.MissileTrajectory, packet);
         SendPacketToServer(packet);
     }
     [PacketHandler(Opcode.CMSG_PET_CAST_SPELL)]
@@ -220,7 +221,25 @@ public partial class WorldSocket
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             packet.WriteUInt8((byte)cast.Cast.SendCastFlags);
         WriteSpellTargets(cast.Cast.Target, targetFlags, packet);
+        WriteClientCastFlagsTrailer(cast.Cast.SendCastFlags, cast.Cast.MissileTrajectory, packet);
         SendPacketToServer(packet);
+    }
+
+    // 3.3.5+ HandleClientCastFlags reads 9 extra bytes (elevation+speed floats + hasMovementData
+    // byte) when cast_flags has CastFlag.HasTrajectory set. The modern V3_4_3 client sets this
+    // bit for trajectory spells (e.g. Scarlet Cannon 52435 in quest 12701) and ships pitch+speed
+    // in SpellCastRequest.MissileTrajectory. Without these trailing bytes the legacy server's
+    // ByteBuffer read throws and the opcode is silently dropped.
+    void WriteClientCastFlagsTrailer(uint castFlags, MissileTrajectoryRequest trajectory, WorldPacket packet)
+    {
+        if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V3_0_2_9056))
+            return;
+        if ((castFlags & (uint)CastFlag.HasTrajectory) == 0)
+            return;
+
+        packet.WriteFloat(trajectory.Pitch);
+        packet.WriteFloat(trajectory.Speed);
+        packet.WriteUInt8(0); // hasMovementData — proxy doesn't relay client movement here
     }
     [PacketHandler(Opcode.CMSG_USE_ITEM)]
     void HandleUseItem(UseItem use)
@@ -280,6 +299,7 @@ public partial class WorldSocket
         }
         SpellCastTargetFlags targetFlags = ConvertSpellTargetFlags(use.Cast.Target);
         WriteSpellTargets(use.Cast.Target, targetFlags, packet);
+        WriteClientCastFlagsTrailer(use.Cast.SendCastFlags, use.Cast.MissileTrajectory, packet);
         SendPacketToServer(packet);
     }
     [PacketHandler(Opcode.CMSG_CANCEL_CAST)]
