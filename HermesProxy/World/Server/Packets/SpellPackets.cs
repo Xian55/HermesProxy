@@ -24,6 +24,7 @@ using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Text;
 
 namespace HermesProxy.World.Server.Packets;
@@ -555,7 +556,18 @@ public struct AuraInfo
     public AuraDataInfo AuraData;
 }
 
-public class AuraDataInfo
+// Record class so the compiler synthesizes Equals/GetHashCode over the auto-properties
+// below. The dedup in HandleAuraUpdate (SpellHandler.cs) compares incoming vs cached
+// AuraDataInfo via the record's auto-Equals to skip no-op SMSG_AURA_UPDATE_ALL resyncs.
+//
+// Tick fields (Duration / Remaining / TimeMod) are kept as plain instance fields below,
+// NOT as auto-properties — records' synthesized equality only considers properties, so
+// fields are excluded automatically. This is intentional: those values tick monotonically
+// every server refresh; including them would prevent dedup from ever matching.
+//
+// Points / EstimatedPoints use ImmutableArray<float> so the record's auto-Equals can do
+// structural element-by-element comparison (List<T>'s default comparer is reference-only).
+public record class AuraDataInfo
 {
     public void Write(WorldPacket data)
     {
@@ -577,8 +589,8 @@ public class AuraDataInfo
         data.WriteBit(Duration.HasValue);
         data.WriteBit(Remaining.HasValue);
         data.WriteBit(TimeMod.HasValue);
-        data.WriteBits(Points.Count, 6);
-        data.WriteBits(EstimatedPoints.Count, 6);
+        data.WriteBits(Points.Length, 6);
+        data.WriteBits(EstimatedPoints.Length, 6);
         data.WriteBit(ContentTuning != null);
 
         if (ContentTuning != null)
@@ -603,24 +615,29 @@ public class AuraDataInfo
             data.WriteFloat(point);
     }
 
-    public WowGuid128 CastID;
-    public uint SpellID;
-    public uint SpellXSpellVisualID;
-    public AuraFlagsModern Flags;
-    public uint ActiveFlags;
-    public ushort CastLevel = 1;
-    public byte Applications = 1;
-    public int ContentTuningID;
-    ContentTuningParams ContentTuning = null!;
-    public WowGuid128 CastUnit;
+    // Auto-properties — included in the record's compiler-generated Equals.
+    public WowGuid128 CastID { get; set; }
+    public uint SpellID { get; set; }
+    public uint SpellXSpellVisualID { get; set; }
+    public AuraFlagsModern Flags { get; set; }
+    public uint ActiveFlags { get; set; }
+    public ushort CastLevel { get; set; } = 1;
+    public byte Applications { get; set; } = 1;
+    public int ContentTuningID { get; set; }
+    public ContentTuningParams? ContentTuning { get; set; }
+    public WowGuid128 CastUnit { get; set; }
+    public ImmutableArray<float> Points { get; set; } = ImmutableArray<float>.Empty;
+    public ImmutableArray<float> EstimatedPoints { get; set; } = ImmutableArray<float>.Empty;
+
+    // Plain instance fields — EXCLUDED from the record's compiler-generated Equals.
+    // Server resyncs that differ only in these tick values are dropped by the dedup;
+    // the V3_4_3 client decrements its local Duration copy between refreshes anyway.
     public int? Duration;
     public int? Remaining;
-    float? TimeMod = null;
-    public List<float> Points = new();
-    public List<float> EstimatedPoints = new();
+    public float? TimeMod;
 }
 
-class ContentTuningParams
+public class ContentTuningParams
 {
     public void Write(WorldPacket data)
     {

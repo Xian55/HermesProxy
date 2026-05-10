@@ -6,6 +6,7 @@ using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 
 namespace HermesProxy.World.Client;
@@ -266,6 +267,13 @@ public partial class WorldClient
         SendPacketToClient(failed);
     }
 
+    // Both SMSG_SPELL_FAILURE (own cast failed) and SMSG_SPELL_FAILED_OTHER share the
+    // same legacy wire layout (PackedGuid caster, [u8 castCount], u32 spellId, u8 reason).
+    // The proxy emits both modern packets unconditionally so the V3_4_3 client gets the
+    // failure for either path — without this, SMSG_SPELL_FAILURE was being silently
+    // dropped, leaving the client's cast-state UI hung waiting for a never-arriving
+    // success/fail and accumulating in the suspect window for `reason=7` disconnects.
+    [PacketHandler(Opcode.SMSG_SPELL_FAILURE)]
     [PacketHandler(Opcode.SMSG_SPELL_FAILED_OTHER)]
     void HandleSpellFailedOther(WorldPacket packet)
     {
@@ -822,29 +830,46 @@ public partial class WorldClient
         bool debugOutput = packet.ReadBool();
         if (debugOutput)
         {
-            if (!spell.Flags.HasAnyFlag(SpellHitType.Split))
+            // The debug-float block (flags-gated diagnostic fields, not consumed by the
+            // modern client) is wrapped because TC 3.4.3 sometimes ships debugOutput=1
+            // without the matching trailing floats — read overshoots end-of-buffer and
+            // throws ArgumentOutOfRangeException out of ByteBuffer.ReadFloat, killing
+            // the WorldClient receive loop and disconnecting the user mid-combat
+            // (observed in hermes-20260510_220015.log:84606 after ~21 min of combat).
+            // Swallowing the truncation is strictly better than dropping the connection;
+            // the spell.Damage / SchoolMask / etc. fields we already read are sufficient
+            // for the modern client to render the combat log entry.
+            try
             {
-                if (spell.Flags.HasAnyFlag(SpellHitType.CritDebug))
+                if (!spell.Flags.HasAnyFlag(SpellHitType.Split))
                 {
-                    packet.ReadFloat(); // roll
-                    packet.ReadFloat(); // needed
-                }
+                    if (spell.Flags.HasAnyFlag(SpellHitType.CritDebug))
+                    {
+                        packet.ReadFloat(); // roll
+                        packet.ReadFloat(); // needed
+                    }
 
-                if (spell.Flags.HasAnyFlag(SpellHitType.HitDebug))
-                {
-                    packet.ReadFloat(); // roll
-                    packet.ReadFloat(); // needed
-                }
+                    if (spell.Flags.HasAnyFlag(SpellHitType.HitDebug))
+                    {
+                        packet.ReadFloat(); // roll
+                        packet.ReadFloat(); // needed
+                    }
 
-                if (spell.Flags.HasAnyFlag(SpellHitType.AttackTableDebug))
-                {
-                    packet.ReadFloat(); // miss chance
-                    packet.ReadFloat(); // dodge chance
-                    packet.ReadFloat(); // parry chance
-                    packet.ReadFloat(); // block chance
-                    packet.ReadFloat(); // glance chance
-                    packet.ReadFloat(); // crush chance
+                    if (spell.Flags.HasAnyFlag(SpellHitType.AttackTableDebug))
+                    {
+                        packet.ReadFloat(); // miss chance
+                        packet.ReadFloat(); // dodge chance
+                        packet.ReadFloat(); // parry chance
+                        packet.ReadFloat(); // block chance
+                        packet.ReadFloat(); // glance chance
+                        packet.ReadFloat(); // crush chance
+                    }
                 }
+            }
+            catch (Exception ex) when (ex is ArgumentOutOfRangeException || ex is System.IO.EndOfStreamException)
+            {
+                Log.Print(LogType.Warn,
+                    $"[SpellNonMeleeDamageLog] truncated debug block — flags=0x{(uint)spell.Flags:X} damage={spell.Damage} (recovered, packet shipped to client): {ex.Message}");
             }
         }
 
@@ -1283,6 +1308,19 @@ public partial class WorldClient
             slotMap = new Dictionary<byte, AuraInfo>();
             knownAuras[guid] = slotMap;
         }
+
+        // Dedup: skip the outbound send when an isAll resync is byte-identical to what
+        // the client already has (modulo monotonic duration ticks, which the client
+        // counts down locally). In dense scripted events (e.g. DK quest 12800 Light's
+        // Hope battle) the legacy server bursts ~9 SMSG_AURA_UPDATE_ALL/sec per nearby
+        // unit, almost all of which are no-op refreshes. Forwarding every one
+        // accumulates client-side allocations and contributes to mid-session
+        // CMSG_LOG_DISCONNECT(reason=7). KnownAuras is still kept in sync below — we
+        // only suppress the wire send.
+        bool dedupHit = isAll && update.Auras.Count == slotMap.Count
+                              && update.Auras.Count > 0
+                              && AllAurasEquivalent(update.Auras, slotMap);
+
         if (isAll)
             slotMap.Clear();
         foreach (var aura in update.Auras)
@@ -1295,10 +1333,34 @@ public partial class WorldClient
 
         Log.Print(LogType.Trace,
             $"[AuraUpdateTrace] guid={guid} isAll={isAll} isPlayer={isPlayer} " +
-            $"incomingBytes={incomingBytes} aurasShipped={update.Auras.Count} trackedTotal={slotMap.Count}");
+            $"incomingBytes={incomingBytes} aurasShipped={update.Auras.Count} trackedTotal={slotMap.Count} dedupHit={dedupHit}");
+
+        if (dedupHit)
+        {
+            Log.Print(LogType.Trace, $"[AuraDedup] skipped no-op resync guid={guid} slots={update.Auras.Count}");
+            return;
+        }
 
         if (update.Auras.Count > 0)
             SendPacketToClient(update);
+    }
+
+    // Whole-list equality for AURA_UPDATE_ALL dedup. Returns true iff every incoming
+    // slot has a cached counterpart that is equal under AuraDataInfo's compiler-
+    // synthesized record-class Equals (which deliberately excludes Duration / Remaining /
+    // TimeMod tick fields — those are plain instance fields, not auto-properties, and
+    // records skip non-property fields). Slot sets must match exactly (caller checks
+    // count first).
+    private static bool AllAurasEquivalent(List<AuraInfo> incoming, Dictionary<byte, AuraInfo> cached)
+    {
+        foreach (var aura in incoming)
+        {
+            if (!cached.TryGetValue(aura.Slot, out var prev))
+                return false;
+            if (aura.AuraData != prev.AuraData)  // record-class auto-Equals
+                return false;
+        }
+        return true;
     }
 
     void ReadSingleAura(WorldPacket packet, WowGuid128 guid, AuraUpdate update)
@@ -1367,9 +1429,11 @@ public partial class WorldClient
 
         if ((legacyFlags & 0x40) != 0)
         {
-            if ((legacyFlags & 0x01) != 0) data.Points.Add(packet.ReadFloat());
-            if ((legacyFlags & 0x02) != 0) data.Points.Add(packet.ReadFloat());
-            if ((legacyFlags & 0x04) != 0) data.Points.Add(packet.ReadFloat());
+            var points = ImmutableArray.CreateBuilder<float>(3);
+            if ((legacyFlags & 0x01) != 0) points.Add(packet.ReadFloat());
+            if ((legacyFlags & 0x02) != 0) points.Add(packet.ReadFloat());
+            if ((legacyFlags & 0x04) != 0) points.Add(packet.ReadFloat());
+            data.Points = points.ToImmutable();
         }
 
         aura.AuraData = data;

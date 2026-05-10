@@ -549,6 +549,50 @@ public partial class WorldClient
             }
         }
 
+        // V3_4_3-only: split CreateObject entries into per-packet SMSG_UPDATE_OBJECT
+        // sends. The V3_4_3.54261 client OOMs when one envelope carries multiple
+        // CreateObjects in dense scripted-event spawns (observed: 11-Create batch at
+        // 8771 bytes → ~6 GB WOWGUID-array allocation → freeze → reason=7; 5-Create
+        // batch at 3632 bytes survives). Splitting keeps each packet's per-object
+        // allocation bounded; total wire bytes are unchanged. Creates ship first so
+        // any same-tick Values updates the client receives next reference already-
+        // known guids (FilterV3_4_3Values already populated ClientKnownGuids).
+        List<ObjectUpdate>? createsToSplit = null;
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            int createCount = 0;
+            foreach (var u in updateObject.ObjectUpdates)
+            {
+                if (u.Type == UpdateTypeModern.CreateObject1 || u.Type == UpdateTypeModern.CreateObject2)
+                    createCount++;
+            }
+            if (createCount > 1)
+            {
+                createsToSplit = new List<ObjectUpdate>(createCount);
+                foreach (var u in updateObject.ObjectUpdates)
+                {
+                    if (u.Type == UpdateTypeModern.CreateObject1 || u.Type == UpdateTypeModern.CreateObject2)
+                        createsToSplit.Add(u);
+                }
+                updateObject.ObjectUpdates.RemoveAll(u =>
+                    u.Type == UpdateTypeModern.CreateObject1 || u.Type == UpdateTypeModern.CreateObject2);
+                Log.Print(LogType.Trace,
+                    $"[UpdateObjectTrace] V3_4_3 CreateObject split: extracted {createsToSplit.Count} Creates to per-packet sends (avoid client OOM on multi-Create batches)");
+            }
+        }
+
+        // Ship the per-Create packets first so their guids are known before any
+        // remaining Values reach the client.
+        if (createsToSplit != null)
+        {
+            foreach (var create in createsToSplit)
+            {
+                UpdateObject perCreate = new UpdateObject(GetSession().GameState);
+                perCreate.ObjectUpdates.Add(create);
+                SendPacketToClient(perCreate);
+            }
+        }
+
         if (updateObject.ObjectUpdates.Count != 0 ||
             updateObject.DestroyedGuids.Count != 0 ||
             updateObject.OutOfRangeGuids.Count != 0)
@@ -567,6 +611,7 @@ public partial class WorldClient
             {
                 WowGuid128 correctedPetGuid = pendingLegacy.Value.To128(GetSession().GameState);
                 bool petWasCreatedInBatch = false;
+                // Search both lists — Creates may have been moved to createsToSplit.
                 foreach (var u in updateObject.ObjectUpdates)
                 {
                     if (u.CreateData != null
@@ -575,6 +620,17 @@ public partial class WorldClient
                     {
                         petWasCreatedInBatch = true;
                         break;
+                    }
+                }
+                if (!petWasCreatedInBatch && createsToSplit != null)
+                {
+                    foreach (var u in createsToSplit)
+                    {
+                        if (u.CreateData != null && u.Guid == correctedPetGuid)
+                        {
+                            petWasCreatedInBatch = true;
+                            break;
+                        }
                     }
                 }
                 if (petWasCreatedInBatch)
@@ -1654,7 +1710,9 @@ public partial class WorldClient
             if (updates.ContainsKey(flagsIndex))
             {
                 ushort flags = (ushort)((updates[flagsIndex].UInt32Value >> ((i % 4) * 8)) & 0xFF);
-                ModernVersion.ConvertAuraFlags(flags, i, out data.Flags, out data.ActiveFlags);
+                ModernVersion.ConvertAuraFlags(flags, i, out var convertedFlags, out var convertedActiveFlags);
+                data.Flags = convertedFlags;
+                data.ActiveFlags = convertedActiveFlags;
             }
         }
         else
@@ -1663,7 +1721,9 @@ public partial class WorldClient
             if (updates.ContainsKey(flagsIndex))
             {
                 ushort flags = (ushort)((updates[flagsIndex].UInt32Value >> ((i % 8) * 4)) & 0xF);
-                ModernVersion.ConvertAuraFlags(flags, i, out data.Flags, out data.ActiveFlags);
+                ModernVersion.ConvertAuraFlags(flags, i, out var convertedFlags, out var convertedActiveFlags);
+                data.Flags = convertedFlags;
+                data.ActiveFlags = convertedActiveFlags;
             }
         }
 
@@ -1683,7 +1743,7 @@ public partial class WorldClient
             data.Applications++;
 
         if (GameData.SpellEffectPoints.TryGetValue(spellId, out var basePoints))
-            data.Points = basePoints;
+            data.Points = basePoints;  // ImmutableArray<float> from GameData (cached, allocation-free reuse)
 
         return data;
     }
