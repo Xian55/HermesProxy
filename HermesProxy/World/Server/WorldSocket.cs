@@ -99,7 +99,12 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     // set by paths suspected of triggering crashes (e.g. CMSG_SET_ACTION_BUTTON)
     // — when the window is open we additionally Trace-log every send so the
     // raw flow is in the file.
-    private const int RecentSentCap = 40;
+    // 512 captures ~4 seconds of history at the observed peak burst rate (~125 SMSG/sec
+    // in dense scripted events like DK quest 12800). Needed because the user-reported
+    // sudden RAM jump → freeze → reason=7 disconnect path puts several seconds between
+    // the trigger packet and the disconnect dump; smaller windows aged the suspect out.
+    private const int RecentSentCap = 512;
+    private const int RecentSentHexPreviewBytes = 48; // first ~48 bytes of each packet body in the reason=7 dump
     private readonly Queue<string> _recentSentOpcodes = new(RecentSentCap + 1);
     private long _actionButtonWatchUntilTicks;
 
@@ -447,8 +452,15 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             // [ActionBarTrace] Append to ring buffer + verbose Trace inside the
             // active watch window. Ring buffer is capped — drop the oldest entry
             // when full so the dump on CMSG_LOG_DISCONNECT shows just the most
-            // recent activity.
-            string entry = $"{DateTime.Now:HH:mm:ss.fff} {universalOpcode}({opcode}) sz={data.Length}";
+            // recent activity. Hex preview captures the leading bytes of each
+            // packet body so reason=7 dumps reveal *what* (not just which opcode)
+            // was sent — needed when we don't have a known-good wire-format
+            // reference to compare against.
+            int hexBytes = Math.Min(data.Length, RecentSentHexPreviewBytes);
+            string hex = hexBytes > 0 ? BitConverter.ToString(data, 0, hexBytes) : "(empty)";
+            string entry = data.Length > hexBytes
+                ? $"{DateTime.Now:HH:mm:ss.fff} {universalOpcode}({opcode}) sz={data.Length} hex[{hexBytes}/{data.Length}]={hex}…"
+                : $"{DateTime.Now:HH:mm:ss.fff} {universalOpcode}({opcode}) sz={data.Length} hex={hex}";
             _recentSentOpcodes.Enqueue(entry);
             while (_recentSentOpcodes.Count > RecentSentCap)
                 _recentSentOpcodes.Dequeue();
