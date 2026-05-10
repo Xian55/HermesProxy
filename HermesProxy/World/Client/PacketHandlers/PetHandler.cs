@@ -136,6 +136,18 @@ public partial class WorldClient
         foreach (uint b in spells.ActionButtons) if (b != 0) totalActionButtons++;
         Log.Print(LogType.Trace,
             $"[PetSpellbookTab] castable count={seen.Count} ids=[{string.Join(",", seen)}] (filtered from {totalActionButtons} non-zero ActionButtons + {spells.Actions.Count} Actions; slot ∈ {{0x101, 0x181}})");
+        if (seen.Count == 0 && totalActionButtons > 0)
+        {
+            // Diagnostic: dump raw button slot/spell pairs when the filter rejected all
+            // non-zero buttons. Helps identify slot-encoding quirks for vehicles vs. pets.
+            for (int i = 0; i < spells.ActionButtons.Length; i++)
+            {
+                uint b = spells.ActionButtons[i];
+                if (b == 0) continue;
+                Log.Print(LogType.Trace,
+                    $"[PetSpellbookTab][rejected] slot[{i}]=0x{(b >> 23):X3} spellId={b & 0x7FFFFF} raw=0x{b:X8}");
+            }
+        }
         if (seen.Count == 0) return;
 
         foreach (uint spellId in seen)
@@ -323,12 +335,30 @@ public partial class WorldClient
         if (maybeModernSlot == 0x000 || maybeModernSlot == 0x001 ||
             maybeModernSlot == 0x006 || maybeModernSlot == 0x007 ||
             maybeModernSlot == 0x101 || maybeModernSlot == 0x181)
+        {
+            // TC's CharmInfo ships vehicle action-bar abilities with slot=0x000 ("Decide"
+            // in CypherCore's enum). The V3_4_3 client doesn't render slot=0 as a clickable
+            // button — IsSpell returns false. Rewrite slot=0 + non-zero spellId to ManualCast
+            // (0x101) so vehicles like the Havenshire Mare (Grand Theft Palomino quest 12680)
+            // get their abilities (52264 Charge, 52268 Buck) shown as clickable bar entries.
+            // True passive auras live in the Actions list, not ActionButtons, so this won't
+            // misclassify pet passives.
+            uint modernSpellId = legacy & 0x7FFFFF;
+            if (maybeModernSlot == 0x000 && modernSpellId != 0)
+                return (0x101u << 23) | modernSpellId;
             return legacy;
+        }
 
         // Otherwise treat as CMaNGOS legacy state-byte format.
         byte legacyState = (byte)((legacy >> 24) & 0xFF);
         ushort spellId = (ushort)(legacy & 0xFFFF);
 
+        // TC packs vehicle action buttons as (slot_index:8 | 0:8 | spellId:16) — the high
+        // byte is a UI position (0x08..0x11 for the vehicle bar), not a CharmInfo state.
+        // Anything outside the known CharmInfo state values that still carries a non-zero
+        // spell ID must be a vehicle/charm castable; map to ManualCast (0x101) so the V3_4_3
+        // client renders it as a clickable bar entry and EmitSynthesizedPetLearnedSpells
+        // adds it to PET_LEARNED_SPELLS. Empty slots (high byte = index, spell = 0) stay 0.
         uint v343Slot = legacyState switch
         {
             0x07 => 7,      // CommandState (Attack/Follow/Stay)
@@ -337,7 +367,7 @@ public partial class WorldClient
             0xC1 => 0x181,  // AutoCastSpell (enabled with autocast)
             0xC0 => 0x101,  // ManualSpell (active, no autocast)
             0x81 => 0x101,  // Disabled — keep spell visible, autocast off
-            _    => 0,
+            _    => spellId != 0 ? 0x101u : 0u,  // TC vehicle button (e.g. Havenshire Mare 28606 → 52264 Charge)
         };
 
         return (v343Slot << 23) | spellId;
