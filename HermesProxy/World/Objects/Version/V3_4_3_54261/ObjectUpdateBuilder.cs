@@ -996,11 +996,13 @@ public class ObjectUpdateBuilder
         data.WriteUInt32(0u);
         data.WriteUInt32(0u);
 
-        // GlyphSlots[6] / Glyphs[6] interleaved. WotLK GlyphSlot.db2 IDs.
-        ReadOnlySpan<uint> glyphSlotIds = [21, 22, 23, 24, 25, 26];
-        for (int g = 0; g < 6; g++)
+        // GlyphSlots[6] / Glyphs[6] interleaved. Slot IDs read from legacy
+        // PLAYER_FIELD_GLYPH_SLOTS_1..6 (UpdateHandler.cs glyphSlotFields loop) and
+        // mirrored into _gameState.ActiveGlyphSlotIds. Defaults to {21..26} for
+        // sessions that haven't received the legacy update yet.
+        for (int g = 0; g < PlayerConst.MaxGlyphSlots; g++)
         {
-            data.WriteUInt32(glyphSlotIds[g]);
+            data.WriteUInt32(_gameState.ActiveGlyphSlotIds[g]);
             data.WriteUInt32(_gameState.ActiveGlyphs[g]);
         }
         data.WriteUInt8(_gameState.GlyphsEnabled);
@@ -2679,8 +2681,7 @@ public class ObjectUpdateBuilder
         if (hasGlyphChanges)
         {
             SetBit(1512); // shared header
-            uint[] glyphSlotIds = { 21, 22, 23, 24, 25, 26 };
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
             {
                 SetBit(1513 + i); // GlyphSlots[i]
                 SetBit(1519 + i); // Glyphs[i]
@@ -3005,13 +3006,14 @@ public class ObjectUpdateBuilder
         }
 
         // GlyphSlots (header 1512, elements 1513-1518) + Glyphs (elements 1519-1524)
+        // Slot IDs sourced from _gameState.ActiveGlyphSlotIds (populated from legacy
+        // PLAYER_FIELD_GLYPH_SLOTS_1..6). Was hardcoded {21..26}.
         if (IsBitSet(1512))
         {
-            uint[] glyphSlotIds = { 21, 22, 23, 24, 25, 26 };
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
                 if (IsBitSet(1513 + i))
-                    data.WriteUInt32(glyphSlotIds[i]);
-            for (int i = 0; i < 6; i++)
+                    data.WriteUInt32(_gameState.ActiveGlyphSlotIds[i]);
+            for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
                 if (IsBitSet(1519 + i))
                     data.WriteUInt32((uint)(this._gameState.ActiveGlyphs[i]));
         }

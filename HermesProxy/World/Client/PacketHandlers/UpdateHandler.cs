@@ -3007,7 +3007,7 @@ public partial class WorldClient
                 PlayerField.PLAYER_FIELD_GLYPHS_3, PlayerField.PLAYER_FIELD_GLYPHS_4,
                 PlayerField.PLAYER_FIELD_GLYPHS_5, PlayerField.PLAYER_FIELD_GLYPHS_6,
             };
-            for (int gi = 0; gi < 6; gi++)
+            for (int gi = 0; gi < PlayerConst.MaxGlyphSlots; gi++)
             {
                 int gIdx = LegacyVersion.GetUpdateField(glyphFields[gi]);
                 if (gIdx >= 0 && updateMaskArray[gIdx])
@@ -3018,6 +3018,32 @@ public partial class WorldClient
                         GetSession().GameState.ActiveGlyphs[gi] = glyphId;
                         GetSession().GameState.ActiveGlyphsDirty = true;
                         Log.Print(LogType.Network, $"[Glyphs] PLAYER_FIELD_GLYPHS_{gi + 1} GlyphID={glyphId} (slot {gi})");
+                    }
+                }
+            }
+            // PLAYER_FIELD_GLYPH_SLOTS_1..6 (uint32 each). Per-class GlyphSlot.dbc record IDs
+            // pushed by Player::InitGlyphsForLevel on the legacy side. Each index determines
+            // (a) which UI position the V3_4_3 client renders, and (b) the Type (Major/Minor)
+            // it checks when applying a glyph. Previously HermesProxy fabricated {21..26},
+            // which sometimes mismatched what the legacy server actually has — leading the
+            // V3_4_3 client to route drag-drops to a wrong array index (e.g. dropping on a
+            // visibly empty Major slot sent Misc[0]=0, an already-filled slot).
+            PlayerField[] glyphSlotFields = {
+                PlayerField.PLAYER_FIELD_GLYPH_SLOTS_1, PlayerField.PLAYER_FIELD_GLYPH_SLOTS_2,
+                PlayerField.PLAYER_FIELD_GLYPH_SLOTS_3, PlayerField.PLAYER_FIELD_GLYPH_SLOTS_4,
+                PlayerField.PLAYER_FIELD_GLYPH_SLOTS_5, PlayerField.PLAYER_FIELD_GLYPH_SLOTS_6,
+            };
+            for (int gi = 0; gi < PlayerConst.MaxGlyphSlots; gi++)
+            {
+                int gIdx = LegacyVersion.GetUpdateField(glyphSlotFields[gi]);
+                if (gIdx >= 0 && updateMaskArray[gIdx])
+                {
+                    uint slotId = updates[gIdx].UInt32Value;
+                    if (GetSession().GameState.ActiveGlyphSlotIds[gi] != slotId)
+                    {
+                        GetSession().GameState.ActiveGlyphSlotIds[gi] = slotId;
+                        GetSession().GameState.ActiveGlyphsDirty = true;
+                        Log.Print(LogType.Network, $"[Glyphs] PLAYER_FIELD_GLYPH_SLOTS_{gi + 1} SlotID={slotId} (index {gi})");
                     }
                 }
             }
