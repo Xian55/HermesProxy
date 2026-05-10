@@ -176,7 +176,11 @@ public sealed class GameSessionData
     public List<WowGuid128>? MasterLootCandidates;
     public WowGuid64 LastMasterLootSentTarget;
     public List<int> ActionButtons = [];
-    public ushort[] ActiveGlyphs = new ushort[6];
+    public ushort[] ActiveGlyphs = new ushort[PlayerConst.MaxGlyphSlots];
+    // Per-class GlyphSlot.dbc record IDs, read from legacy PLAYER_FIELD_GLYPH_SLOTS_1..6.
+    // Default {21..26} preserves prior hardcoded behavior until the legacy server's first
+    // Values update arrives. The V3_4_3 client renders UI position + Major/Minor from these.
+    public uint[] ActiveGlyphSlotIds = [21, 22, 23, 24, 25, 26];
     public byte GlyphsEnabled;
     // Set true when ActiveGlyphs[6] changes (talent push, spec switch, glyph apply/remove
     // via legacy PLAYER_FIELD_GLYPHS_1..6). Consumed by V3_4_3 ObjectUpdateBuilder, which
