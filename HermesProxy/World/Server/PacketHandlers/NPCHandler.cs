@@ -15,6 +15,7 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_BANKER_ACTIVATE)]
     [PacketHandler(Opcode.CMSG_BINDER_ACTIVATE)]
     [PacketHandler(Opcode.CMSG_LIST_INVENTORY)]
+    [PacketHandler(Opcode.CMSG_SPELL_CLICK)]
     [PacketHandler(Opcode.CMSG_SPIRIT_HEALER_ACTIVATE)]
     [PacketHandler(Opcode.CMSG_TALK_TO_GOSSIP)]
     [PacketHandler(Opcode.CMSG_TRAINER_LIST)]
