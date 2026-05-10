@@ -8,8 +8,10 @@ using HermesProxy.World.Objects;
 using nietras.SeparatedValues;
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -62,7 +64,7 @@ public static partial class GameData
     public static FrozenDictionary<uint, string> AreaNames = FrozenDictionary<uint, string>.Empty;
     public static FrozenDictionary<uint, uint> RaceFaction = FrozenDictionary<uint, uint>.Empty;
     public static FrozenSet<uint> DispellSpells = FrozenSet<uint>.Empty;
-    public static Dictionary<uint, List<float>> SpellEffectPoints = [];
+    public static Dictionary<uint, ImmutableArray<float>> SpellEffectPoints = [];
     public static FrozenSet<uint> StackableAuras = FrozenSet<uint>.Empty;
     public static FrozenSet<uint> MountAuras = FrozenSet<uint>.Empty;
     public static FrozenSet<uint> NextMeleeSpells = FrozenSet<uint>.Empty;
@@ -250,7 +252,7 @@ public static partial class GameData
     private static uint _itemAppearanceCursor;
     private static uint _itemModifiedAppearanceCursor;
 
-    public static uint GetFirstFreeId<T>(Dictionary<uint, T> dict, ref uint cursor, uint after = 0)
+    public static uint GetFirstFreeId<T>(IDictionary<uint, T> dict, ref uint cursor, uint after = 0)
     {
         uint candidate = after + 1;
         if (cursor > candidate)
@@ -1250,7 +1252,7 @@ public static partial class GameData
             if (basePointsEff3 != 0)
                 basePointsEff3 += 1;
 
-            SpellEffectPoints.Add(spellId, new List<float> { basePointsEff1, basePointsEff2, basePointsEff3 });
+            SpellEffectPoints.Add(spellId, ImmutableArray.Create<float>(basePointsEff1, basePointsEff2, basePointsEff3));
         }
     }
 
@@ -1556,38 +1558,47 @@ public static partial class GameData
     public const uint HotfixCreatureDisplayInfoOptionBegin = 2_900_000;
     public const uint HotfixChrCustomizationChoiceBegin = 3_000_000;
     public const uint HotfixChrCustomizationOptionBegin = 3_100_000;
-    public static Dictionary<uint, HotfixRecord> Hotfixes = [];
+    // ConcurrentDictionary so LoadHotfixes can run its sub-loaders in parallel — each
+    // sub-loader writes to a disjoint HotfixId key range (per the HotfixXxxBegin constants
+    // above), so there's no actual contention on writes; we just need a thread-safe Add.
+    // V3_4_3 sequential load was ~2 sec vs ~400 ms for V1_14/V2_5 (the modern hotfix CSVs
+    // are 5-10× larger), and the inner pipeline was the bottleneck.
+    public static ConcurrentDictionary<uint, HotfixRecord> Hotfixes = [];
     public static void LoadHotfixes()
     {
-        LoadAreaTriggerHotfixes();
-        LoadSkillLineHotfixes();
-        LoadSkillRaceClassInfoHotfixes();
-        LoadSkillLineAbilityHotfixes();
-        LoadSpellHotfixes();
-        LoadSpellNameHotfixes();
-        LoadSpellLevelsHotfixes();
-        LoadSpellAuraOptionsHotfixes();
-        LoadSpellMiscHotfixes();
-        LoadSpellEffectHotfixes();
-        LoadSpellXSpellVisualHotfixes();
-        LoadItemSparseHotfixes();
-        LoadItemHotfixes();
-        LoadItemEffectHotfixes();
-        LoadItemDisplayInfoHotfixes();
-        LoadCreatureDisplayInfoHotfixes();
-        LoadCreatureDisplayInfoExtraHotfixes();
-        LoadCreatureDisplayInfoOptionHotfixes();
-        // ChrCustomizationChoice / ChrCustomizationOption hotfix CSVs only exist for V3_4_3
-        // (WotLK Classic, expansion=3). The DB2 tables don't exist in TBC / Vanilla
-        // hotfix data, and the V3_4_3 client is the only modern build that consults them
-        // for character-enum rendering (see Phase 5a-7a notes). Skip the load for older
+        // ChrCustomizationChoice / ChrCustomizationOption / V3_4_3ItemEffectLookup CSVs
+        // only exist for V3_4_3 (WotLK Classic, expansion=3). The DB2 tables don't exist
+        // in TBC / Vanilla hotfix data, and the V3_4_3 client is the only modern build
+        // that consults them for character-enum rendering. Skip those for older
         // expansions to avoid FileNotFoundException at startup.
+        var jobs = new List<Action>(24)
+        {
+            LoadAreaTriggerHotfixes,
+            LoadSkillLineHotfixes,
+            LoadSkillRaceClassInfoHotfixes,
+            LoadSkillLineAbilityHotfixes,
+            LoadSpellHotfixes,
+            LoadSpellNameHotfixes,
+            LoadSpellLevelsHotfixes,
+            LoadSpellAuraOptionsHotfixes,
+            LoadSpellMiscHotfixes,
+            LoadSpellEffectHotfixes,
+            LoadSpellXSpellVisualHotfixes,
+            LoadItemSparseHotfixes,
+            LoadItemHotfixes,
+            LoadItemEffectHotfixes,
+            LoadItemDisplayInfoHotfixes,
+            LoadCreatureDisplayInfoHotfixes,
+            LoadCreatureDisplayInfoExtraHotfixes,
+            LoadCreatureDisplayInfoOptionHotfixes,
+        };
         if (ModernVersion.ExpansionVersion >= 3)
         {
-            LoadChrCustomizationChoiceHotfixes();
-            LoadChrCustomizationOptionHotfixes();
-            LoadV3_4_3ItemEffectLookup();
+            jobs.Add(LoadChrCustomizationChoiceHotfixes);
+            jobs.Add(LoadChrCustomizationOptionHotfixes);
+            jobs.Add(LoadV3_4_3ItemEffectLookup);
         }
+        Parallel.Invoke(jobs.ToArray());
     }
 
     public static void LoadAreaTriggerHotfixes()
@@ -1649,7 +1660,7 @@ public static partial class GameData
             record.HotfixContent.WriteUInt16(at.ShapeId);
             record.HotfixContent.WriteUInt16(at.ActionSetId);
             record.HotfixContent.WriteUInt8(at.Flags);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     public static void LoadSkillLineHotfixes()
@@ -1698,7 +1709,7 @@ public static partial class GameData
             record.HotfixContent.WriteUInt32(parentTierIndex);
             record.HotfixContent.WriteUInt16(flags);
             record.HotfixContent.WriteUInt32(spellBookSpellID);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     public static void LoadSkillRaceClassInfoHotfixes()
@@ -1734,7 +1745,7 @@ public static partial class GameData
             record.HotfixContent.WriteUInt8(availability);
             record.HotfixContent.WriteUInt8(minLevel);
             record.HotfixContent.WriteUInt16(skillTierId);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     public static void LoadSkillLineAbilityHotfixes()
@@ -1790,7 +1801,7 @@ public static partial class GameData
             record.HotfixContent.WriteUInt16(skillUpSkillLineId);
             record.HotfixContent.WriteUInt32(characterPoints1);
             record.HotfixContent.WriteUInt32(characterPoints2);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     public static void LoadSpellHotfixes()
@@ -1817,7 +1828,7 @@ public static partial class GameData
             record.HotfixContent.WriteCString(nameSubText);
             record.HotfixContent.WriteCString(description);
             record.HotfixContent.WriteCString(auraDescription);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     public static void LoadSpellNameHotfixes()
@@ -1840,7 +1851,7 @@ public static partial class GameData
             record.RecordId = id;
             record.Status = HotfixStatus.Valid;
             record.HotfixContent.WriteCString(name);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     public static void LoadSpellLevelsHotfixes()
@@ -1873,7 +1884,7 @@ public static partial class GameData
             record.HotfixContent.WriteUInt16(spellLevel);
             record.HotfixContent.WriteUInt8(maxPassiveAuraLevel);
             record.HotfixContent.WriteUInt32(spellId);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     public static void LoadSpellAuraOptionsHotfixes()
@@ -1912,7 +1923,7 @@ public static partial class GameData
             record.HotfixContent.WriteUInt32(procTypeMask0);
             record.HotfixContent.WriteUInt32(procTypeMask1);
             record.HotfixContent.WriteUInt32(spellId);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     public static void LoadSpellMiscHotfixes()
@@ -1983,7 +1994,7 @@ public static partial class GameData
             record.HotfixContent.WriteUInt32(attributes13);
             record.HotfixContent.WriteUInt32(attributes14);
             record.HotfixContent.WriteUInt32(spellId);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     public static void LoadSpellEffectHotfixes()
@@ -2074,7 +2085,7 @@ public static partial class GameData
             record.HotfixContent.WriteInt16(implicitTarget1);
             record.HotfixContent.WriteInt16(implicitTarget2);
             record.HotfixContent.WriteUInt32(spellId);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     public static void LoadSpellXSpellVisualHotfixes()
@@ -2126,7 +2137,7 @@ public static partial class GameData
             record.HotfixContent.WriteUInt16(casterUnitConditionId);
             record.HotfixContent.WriteUInt32(casterPlayerConditionId);
             record.HotfixContent.WriteUInt32(spellId);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
 
         SpellVisuals = dict.ToFrozenDictionary();
@@ -2477,7 +2488,7 @@ public static partial class GameData
                 record.HotfixContent.WriteInt8(statValue10);
                 record.HotfixContent.WriteInt8(requiredLevel);
             }
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
 
@@ -2981,7 +2992,7 @@ public static partial class GameData
             record.HotfixContent.WriteUInt16(MaxDamage3);
             record.HotfixContent.WriteUInt16(MaxDamage4);
             record.HotfixContent.WriteUInt16(MaxDamage5);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
 
@@ -3131,7 +3142,7 @@ public static partial class GameData
                 record.UniqueId = record.HotfixId;
                 record.RecordId = recordId;
                 writer?.Invoke(record.HotfixContent);
-                Hotfixes.Add(record.HotfixId, record);
+                Hotfixes[record.HotfixId] = record;
             }
             else
             {
@@ -4171,7 +4182,7 @@ public static partial class GameData
             record.HotfixContent.WriteInt32(textureVariationFileDataId1);
             record.HotfixContent.WriteInt32(textureVariationFileDataId2);
             record.HotfixContent.WriteInt32(textureVariationFileDataId3);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     public static void LoadCreatureDisplayInfoExtraHotfixes()
@@ -4221,7 +4232,7 @@ public static partial class GameData
             record.HotfixContent.WriteUInt8(customDisplayOption1);
             record.HotfixContent.WriteUInt8(customDisplayOption2);
             record.HotfixContent.WriteUInt8(customDisplayOption3);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     public static void LoadCreatureDisplayInfoOptionHotfixes()
@@ -4247,7 +4258,7 @@ public static partial class GameData
             record.HotfixContent.WriteInt32(chrCustomizationOptionId);
             record.HotfixContent.WriteInt32(chrCustomizationChoiceId);
             record.HotfixContent.WriteInt32(creatureDisplayInfoExtraId);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     public static void LoadItemEffectHotfixes()
@@ -4285,7 +4296,7 @@ public static partial class GameData
             record.HotfixContent.WriteInt32(spellId);
             record.HotfixContent.WriteInt16(chrSpecializationId);
             record.HotfixContent.WriteInt32(parentItemId);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
 
@@ -4364,7 +4375,7 @@ public static partial class GameData
             record.HotfixContent.WriteInt32(attachmentGeosetGroup6);
             record.HotfixContent.WriteInt32(helmetGeosetVis1);
             record.HotfixContent.WriteInt32(helmetGeosetVis2);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
 
@@ -4413,7 +4424,7 @@ public static partial class GameData
             record.HotfixContent.WriteInt32(soundKitId);
             record.HotfixContent.WriteInt32(swatchColor0);
             record.HotfixContent.WriteInt32(swatchColor1);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
 
@@ -4460,7 +4471,7 @@ public static partial class GameData
             record.HotfixContent.WriteInt32(chrCustomizationId);
             record.HotfixContent.WriteInt32(chrCustomizationReqId);
             record.HotfixContent.WriteInt32(uiOrderIndex);
-            Hotfixes.Add(record.HotfixId, record);
+            Hotfixes[record.HotfixId] = record;
         }
     }
     #endregion
