@@ -1,9 +1,9 @@
 name: Release
 
 on:
-  pull_request:
-    types: [closed]
-    branches: [master]
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       version:
@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # Multi-SDK: 10.0.x covers master (targets net10.0). The pinned 11.0
+  # Multi-SDK: 10.0.x covers main (targets net10.0). The pinned 11.0
   # preview is available for branches like feature/dotnet11 that target
   # net11.0 — without it, setup-dotnet@10.0.x fails with NETSDK1045.
   # Bump the preview pin when a newer preview becomes the local baseline.
@@ -34,7 +34,7 @@ env:
 
 jobs:
   version:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.next.outputs.tag }}
@@ -85,7 +85,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   test:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository content
@@ -112,7 +112,7 @@ jobs:
         run: dotnet test --no-restore
 
   build:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     needs: version
     strategy:
       matrix:

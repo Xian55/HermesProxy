@@ -102,6 +102,75 @@ public static class VersionChecker
                 or ClientVersionBuild.V1_14_2_42082
                 or ClientVersionBuild.V1_14_2_42214
                 or ClientVersionBuild.V1_14_2_42597
+                or ClientVersionBuild.V1_15_0_52146
+                or ClientVersionBuild.V1_15_0_52186
+                or ClientVersionBuild.V1_15_0_52212
+                or ClientVersionBuild.V1_15_0_52302
+                or ClientVersionBuild.V1_15_0_52409
+                or ClientVersionBuild.V1_15_0_52610
+                or ClientVersionBuild.V1_15_1_53181
+                or ClientVersionBuild.V1_15_1_53247
+                or ClientVersionBuild.V1_15_1_53495
+                or ClientVersionBuild.V1_15_1_53623
+                or ClientVersionBuild.V1_15_2_54029
+                or ClientVersionBuild.V1_15_2_54067
+                or ClientVersionBuild.V1_15_2_54092
+                or ClientVersionBuild.V1_15_2_54262
+                or ClientVersionBuild.V1_15_2_54332
+                or ClientVersionBuild.V1_15_2_54649
+                or ClientVersionBuild.V1_15_2_54902
+                or ClientVersionBuild.V1_15_2_55002
+                or ClientVersionBuild.V1_15_2_55140
+                or ClientVersionBuild.V1_15_3_55515
+                or ClientVersionBuild.V1_15_3_55563
+                or ClientVersionBuild.V1_15_3_55646
+                or ClientVersionBuild.V1_15_3_55917
+                or ClientVersionBuild.V1_15_3_56488
+                or ClientVersionBuild.V1_15_3_56626
+                or ClientVersionBuild.V1_15_4_56738
+                or ClientVersionBuild.V1_15_4_56760
+                or ClientVersionBuild.V1_15_4_56817
+                or ClientVersionBuild.V1_15_4_56857
+                or ClientVersionBuild.V1_15_4_57134
+                or ClientVersionBuild.V1_15_5_57638
+                or ClientVersionBuild.V1_15_5_57716
+                or ClientVersionBuild.V1_15_5_57807
+                or ClientVersionBuild.V1_15_5_57917
+                or ClientVersionBuild.V1_15_5_57979
+                or ClientVersionBuild.V1_15_5_58534
+                or ClientVersionBuild.V1_15_5_58555
+                or ClientVersionBuild.V1_15_6_58797
+                or ClientVersionBuild.V1_15_6_58844
+                or ClientVersionBuild.V1_15_6_58866
+                or ClientVersionBuild.V1_15_6_58912
+                or ClientVersionBuild.V1_15_6_59415
+                or ClientVersionBuild.V1_15_7_60141
+                or ClientVersionBuild.V1_15_7_60191
+                or ClientVersionBuild.V1_15_7_60249
+                or ClientVersionBuild.V1_15_7_60277
+                or ClientVersionBuild.V1_15_7_60663
+                or ClientVersionBuild.V1_15_7_60932
+                or ClientVersionBuild.V1_15_7_61124
+                or ClientVersionBuild.V1_15_7_61186
+                or ClientVersionBuild.V1_15_7_61257
+                or ClientVersionBuild.V1_15_7_61582
+                or ClientVersionBuild.V1_15_7_62797
+                or ClientVersionBuild.V1_15_7_62915
+                or ClientVersionBuild.V1_15_7_63306
+                or ClientVersionBuild.V1_15_7_63696
+                or ClientVersionBuild.V1_15_8_63829
+                or ClientVersionBuild.V1_15_8_64057
+                or ClientVersionBuild.V1_15_8_64130
+                or ClientVersionBuild.V1_15_8_64272
+                or ClientVersionBuild.V1_15_8_64344
+                or ClientVersionBuild.V1_15_8_64858
+                or ClientVersionBuild.V1_15_8_64907
+                or ClientVersionBuild.V1_15_8_65300
+                or ClientVersionBuild.V1_15_8_65888
+                or ClientVersionBuild.V1_15_8_65989
+                or ClientVersionBuild.V1_15_8_66129
+                or ClientVersionBuild.V1_15_8_66564
+                or ClientVersionBuild.V1_15_8_67156
                 or ClientVersionBuild.V3_4_3_54261 => true,
             _ => false,
         };
@@ -527,6 +596,75 @@ public static class ModernVersion
                 or ClientVersionBuild.V1_14_2_42082
                 or ClientVersionBuild.V1_14_2_42214
                 or ClientVersionBuild.V1_14_2_42597 => ClientVersionBuild.V1_14_1_40688,
+            ClientVersionBuild.V1_15_0_52146
+                or ClientVersionBuild.V1_15_0_52186
+                or ClientVersionBuild.V1_15_0_52212
+                or ClientVersionBuild.V1_15_0_52302
+                or ClientVersionBuild.V1_15_0_52409
+                or ClientVersionBuild.V1_15_0_52610
+                or ClientVersionBuild.V1_15_1_53181
+                or ClientVersionBuild.V1_15_1_53247
+                or ClientVersionBuild.V1_15_1_53495
+                or ClientVersionBuild.V1_15_1_53623
+                or ClientVersionBuild.V1_15_2_54029
+                or ClientVersionBuild.V1_15_2_54067
+                or ClientVersionBuild.V1_15_2_54092
+                or ClientVersionBuild.V1_15_2_54262
+                or ClientVersionBuild.V1_15_2_54332
+                or ClientVersionBuild.V1_15_2_54649
+                or ClientVersionBuild.V1_15_2_54902
+                or ClientVersionBuild.V1_15_2_55002
+                or ClientVersionBuild.V1_15_2_55140
+                or ClientVersionBuild.V1_15_3_55515
+                or ClientVersionBuild.V1_15_3_55563
+                or ClientVersionBuild.V1_15_3_55646
+                or ClientVersionBuild.V1_15_3_55917
+                or ClientVersionBuild.V1_15_3_56488
+                or ClientVersionBuild.V1_15_3_56626
+                or ClientVersionBuild.V1_15_4_56738
+                or ClientVersionBuild.V1_15_4_56760
+                or ClientVersionBuild.V1_15_4_56817
+                or ClientVersionBuild.V1_15_4_56857
+                or ClientVersionBuild.V1_15_4_57134
+                or ClientVersionBuild.V1_15_5_57638
+                or ClientVersionBuild.V1_15_5_57716
+                or ClientVersionBuild.V1_15_5_57807
+                or ClientVersionBuild.V1_15_5_57917
+                or ClientVersionBuild.V1_15_5_57979
+                or ClientVersionBuild.V1_15_5_58534
+                or ClientVersionBuild.V1_15_5_58555
+                or ClientVersionBuild.V1_15_6_58797
+                or ClientVersionBuild.V1_15_6_58844
+                or ClientVersionBuild.V1_15_6_58866
+                or ClientVersionBuild.V1_15_6_58912
+                or ClientVersionBuild.V1_15_6_59415
+                or ClientVersionBuild.V1_15_7_60141
+                or ClientVersionBuild.V1_15_7_60191
+                or ClientVersionBuild.V1_15_7_60249
+                or ClientVersionBuild.V1_15_7_60277
+                or ClientVersionBuild.V1_15_7_60663
+                or ClientVersionBuild.V1_15_7_60932
+                or ClientVersionBuild.V1_15_7_61124
+                or ClientVersionBuild.V1_15_7_61186
+                or ClientVersionBuild.V1_15_7_61257
+                or ClientVersionBuild.V1_15_7_61582
+                or ClientVersionBuild.V1_15_7_62797
+                or ClientVersionBuild.V1_15_7_62915
+                or ClientVersionBuild.V1_15_7_63306
+                or ClientVersionBuild.V1_15_7_63696
+                or ClientVersionBuild.V1_15_8_63829
+                or ClientVersionBuild.V1_15_8_64057
+                or ClientVersionBuild.V1_15_8_64130
+                or ClientVersionBuild.V1_15_8_64272
+                or ClientVersionBuild.V1_15_8_64344
+                or ClientVersionBuild.V1_15_8_64858
+                or ClientVersionBuild.V1_15_8_64907
+                or ClientVersionBuild.V1_15_8_65300
+                or ClientVersionBuild.V1_15_8_65888
+                or ClientVersionBuild.V1_15_8_65989
+                or ClientVersionBuild.V1_15_8_66129
+                or ClientVersionBuild.V1_15_8_66564
+                or ClientVersionBuild.V1_15_8_67156 => ClientVersionBuild.V1_15_0_52186,
             ClientVersionBuild.V2_5_2_39570
                 or ClientVersionBuild.V2_5_2_39618
                 or ClientVersionBuild.V2_5_2_39926
@@ -628,6 +766,7 @@ public static class ModernVersion
             ClientVersionBuild.V2_5_3_41750
                 or ClientVersionBuild.V1_14_1_40688 => typeof(World.Enums.V1_14_1_40688.ResponseCodes),
             ClientVersionBuild.V3_4_3_54261 => typeof(World.Enums.V3_4_3_54261.ResponseCodes),
+            ClientVersionBuild.V1_15_0_52186 => typeof(World.Enums.V1_15_0_52186.ResponseCodes),
             _ => null,
         };
 
