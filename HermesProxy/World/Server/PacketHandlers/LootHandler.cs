@@ -13,6 +13,7 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_LOOT_RELEASE)]
     void HandleLootRelease(LootRelease loot)
     {
+        GetSession().GameState.ExpectingLootReleaseResponse = true;
         WorldPacket packet = new WorldPacket(Opcode.CMSG_LOOT_RELEASE);
         packet.WriteGuid(loot.Owner.To64());
         SendPacketToServer(packet);
@@ -21,6 +22,22 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_LOOT_ITEM)]
     void HandleLootItem(LootItemPkt loot)
     {
+        var state = GetSession().GameState;
+
+        // TC 3.3.5 master auto-loots all items + closes the loot session on the FIRST
+        // CMSG_AUTOSTORE_LOOT_ITEM. Any unclaimed coins are orphaned (subsequent
+        // CMSG_LOOT_MONEY lands on an empty AELootView and returns money=0, never
+        // crediting the player). Pre-claim the gold *before* the item forward so the
+        // server processes money first; the client's matching CMSG_LOOT_MONEY half of
+        // the auto-loot pair is suppressed below in HandleLootMoney.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            && state.RemainingLootCoins > 0)
+        {
+            WorldPacket moneyPacket = new WorldPacket(Opcode.CMSG_LOOT_MONEY);
+            SendPacketToServer(moneyPacket);
+            state.LootMoneyPreClaimed = true;
+        }
+
         foreach (var item in loot.Loot)
         {
             WorldPacket packet = new WorldPacket(Opcode.CMSG_AUTOSTORE_LOOT_ITEM);
@@ -41,6 +58,17 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_LOOT_MONEY)]
     void HandleLootMoney(LootMoney loot)
     {
+        var state = GetSession().GameState;
+        // V3_4_3 auto-loot pair: HandleLootItem already pre-claimed the gold to dodge
+        // TC 3.3.5 master's session-close-on-item race. The client's matching
+        // CMSG_LOOT_MONEY would now land on a closed legacy loot and produce
+        // "+0 copper" feedback — drop it.
+        if (state.LootMoneyPreClaimed)
+        {
+            state.LootMoneyPreClaimed = false;
+            return;
+        }
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_LOOT_MONEY);
         SendPacketToServer(packet);
     }

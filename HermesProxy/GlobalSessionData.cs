@@ -175,6 +175,22 @@ public sealed class GameSessionData
     public WowGuid64 LastLootTargetGuid;
     public List<WowGuid128>? MasterLootCandidates;
     public WowGuid64 LastMasterLootSentTarget;
+    // V3_4_3 only: legacy 3.3.5a backends emit SMSG_LOOT_RELEASE mid-drain (after each
+    // auto-looted item), which closes the modern client's loot session before subsequent
+    // SMSG_LOOT_REMOVED packets can clear the remaining slots. We track which legacy
+    // LootListIDs are still un-drained, plus coins, to recognize a genuinely-drained
+    // session, and a flag for client-initiated releases. The list also doubles as the
+    // slot-translation table for TC 3.3.5 master's auto-loot, which echoes the *clicked*
+    // slot byte for every drained item rather than the real per-item slot.
+    public bool ExpectingLootReleaseResponse;
+    public List<byte> RemainingLootSlots = new();
+    public uint RemainingLootCoins;
+    // V3_4_3 only: set when HandleLootItem pre-claims coins via an injected CMSG_LOOT_MONEY
+    // (TC 3.3.5 master closes the loot session after auto-looting items, orphaning any
+    // un-claimed coins). The next CMSG_LOOT_MONEY from the modern client is the redundant
+    // half of the client's auto-loot pair and must be suppressed to avoid "+0 copper"
+    // feedback when the legacy session is already drained.
+    public bool LootMoneyPreClaimed;
     public List<int> ActionButtons = [];
     public ushort[] ActiveGlyphs = new ushort[PlayerConst.MaxGlyphSlots];
     // Per-class GlyphSlot.dbc record IDs, read from legacy PLAYER_FIELD_GLYPH_SLOTS_1..6.
