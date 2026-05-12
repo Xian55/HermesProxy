@@ -1,6 +1,6 @@
-name: Build Proxy
+name: CI
 
-on: ['push', 'workflow_dispatch']
+on: ['push', 'pull_request', 'workflow_dispatch']
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -127,9 +127,44 @@ jobs:
           if-no-files-found: error
           compression-level: 1
 
-  # Gate: fails the workflow if tests failed, even though builds may have succeeded
+  version-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository content
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check next-version was incremented
+        run: |
+          branch_version=$(grep -E "^\s*next-version:" GitVersion.yml \
+            | sed -E "s/.*next-version:\s*['\"]?([0-9]+\.[0-9]+\.[0-9]+)['\"]?.*/\1/" \
+            | head -1)
+          base_version=$(git show origin/${{ github.base_ref }}:GitVersion.yml \
+            | grep -E "^\s*next-version:" \
+            | sed -E "s/.*next-version:\s*['\"]?([0-9]+\.[0-9]+\.[0-9]+)['\"]?.*/\1/" \
+            | head -1)
+
+          echo "Base (${{ github.base_ref }}): $base_version"
+          echo "Branch (${{ github.head_ref }}): $branch_version"
+
+          if [ "$branch_version" = "$base_version" ]; then
+            echo "::error file=GitVersion.yml::next-version was not incremented (still $branch_version). Bump it in GitVersion.yml before merging."
+            exit 1
+          fi
+
+          lower=$(printf '%s\n' "$base_version" "$branch_version" | sort -V | head -1)
+          if [ "$lower" = "$branch_version" ]; then
+            echo "::error file=GitVersion.yml::next-version was DECREMENTED from $base_version to $branch_version."
+            exit 1
+          fi
+
+          echo "next-version incremented: $base_version -> $branch_version"
+
+  # Gate: fails the workflow if tests or version-check failed, even though builds may have succeeded
   verify:
-    needs: [test, build]
+    needs: [test, build, version-check]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -137,5 +172,9 @@ jobs:
         run: |
           if [ "${{ needs.test.result }}" != "success" ]; then
             echo "Tests failed — artifacts from this run should not be trusted"
+            exit 1
+          fi
+          if [ "${{ needs.version-check.result }}" = "failure" ]; then
+            echo "Version check failed — next-version in GitVersion.yml must be incremented"
             exit 1
           fi
