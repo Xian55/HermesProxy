@@ -41,7 +41,7 @@ These changes shipped before any WotLK-specific work started; every phase below 
 
 ## Phased roadmap
 
-Each phase ships in a single PR and leaves `master` buildable and runnable for the existing 1.14/2.5 clients.
+Each phase ships in a single PR and leaves `main` buildable and runnable for the existing 1.14/2.5 clients.
 
 ### Phase 0 — Un-gate WotLK 3.3.5a legacy server backend
 

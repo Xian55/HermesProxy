@@ -7,7 +7,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Multi-SDK: 10.0.x covers master (targets net10.0). The pinned 11.0
+  # Multi-SDK: 10.0.x covers main (targets net10.0). The pinned 11.0
   # preview is available for branches like feature/dotnet11 that target
   # net11.0 — without it, setup-dotnet@10.0.x fails with NETSDK1045.
   # Bump the preview pin when a newer preview becomes the local baseline.
