@@ -1,0 +1,203 @@
+name: Pre-Release
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+  workflow_dispatch:
+
+# Cancel in-progress pre-release runs — unlike production releases it's fine
+# to abort a mid-upload if a newer commit arrives on the same branch.
+concurrency:
+  group: pre-release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: |
+    10.0.x
+    11.0.100-preview.3.26207.106
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      branch_slug: ${{ steps.tag.outputs.branch_slug }}
+    steps:
+      - name: Compute pre-release tag
+        id: tag
+        run: |
+          branch="${{ github.ref_name }}"
+          slug=$(echo "$branch" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-\+/-/g' | sed 's/^-//;s/-$//')
+          short_sha="${{ github.sha }}"
+          short_sha="${short_sha:0:7}"
+          tag="pre-${slug}-${short_sha}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "branch_slug=$slug" >> "$GITHUB_OUTPUT"
+          echo "Pre-release tag: $tag"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository content
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET Core SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ hashFiles('Directory.Packages.props') }}
+          restore-keys: nuget-
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Test
+        run: dotnet test --no-restore
+
+  build:
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - os: windows
+            artifact: Windows
+            runtimeArg: '--use-current-runtime'
+          - os: ubuntu
+            artifact: Ubuntu
+            runtimeArg: '--use-current-runtime'
+          - os: ubuntu
+            artifact: Ubuntu-arm64
+            runtimeArg: '--runtime linux-arm64'
+          - os: macos
+            artifact: MacOS
+            runtimeArg: ''
+    runs-on: ${{ matrix.os }}-latest
+
+    steps:
+      - name: Checkout repository content
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET Core SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Publish
+        if: matrix.os != 'macos'
+        run: dotnet publish HermesProxy --configuration Release ${{ matrix.runtimeArg }} -p:UsePublishBuildSettings=true
+
+      - name: Publish (MacOS x86_64 and arm64)
+        if: matrix.os == 'macos'
+        run: |
+          dotnet publish HermesProxy --configuration Release --runtime osx-arm64 -p:UsePublishBuildSettings=true
+          dotnet publish HermesProxy --configuration Release --runtime osx-x64 -p:UsePublishBuildSettings=true
+          lipo ./HermesProxy/bin/Release/osx-arm64/publish/HermesProxy ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy -create -output ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy_universal
+          mv ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy_universal ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy
+          rm -rf ./HermesProxy/bin/Release/osx-arm64
+
+      - name: Copy files
+        run: cp -r ./HermesProxy/bin/Release/*/publish/ publish
+
+      - name: Mark as executable
+        if: matrix.os != 'windows'
+        run: chmod a+x publish/HermesProxy
+
+      - name: Package (tar.gz for Linux)
+        if: matrix.os == 'ubuntu'
+        run: |
+          mv publish HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}
+          tar -czvf HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}.tar.gz HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}
+
+      - name: Package (zip for Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          Rename-Item publish "HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}"
+          Compress-Archive -Path "HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}" -DestinationPath "HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}.zip"
+
+      - name: Package (zip for MacOS)
+        if: matrix.os == 'macos'
+        run: |
+          mv publish HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}
+          zip -r HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}.zip HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}
+          path: HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}.*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  release:
+    needs: [version, test, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository content
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete previous pre-releases for this branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          slug="${{ needs.version.outputs.branch_slug }}"
+          gh release list --limit 100 --json tagName \
+            | jq -r '.[] | .tagName' \
+            | grep "^pre-${slug}-" \
+            | while read -r old_tag; do
+                echo "Deleting old pre-release: $old_tag"
+                gh release delete "$old_tag" --yes --cleanup-tag || true
+              done
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect release assets and generate checksums
+        run: |
+          mkdir release-assets
+          find artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" \) -exec cp {} release-assets/ \;
+          cd release-assets
+          sha256sum *.zip *.tar.gz > checksums-sha256.txt
+          echo "=== Release assets ==="
+          ls -lh
+
+      - name: Create pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ needs.version.outputs.tag }}"
+          branch="${{ github.ref_name }}"
+          sha="${{ github.sha }}"
+          date=$(date +%Y-%m-%d)
+
+          gh release create "$tag" \
+            --title "Pre-release: $branch ($date)" \
+            --notes "Pre-release build from branch \`$branch\` at commit \`${sha:0:7}\`. Not for production use." \
+            --prerelease \
+            release-assets/*
