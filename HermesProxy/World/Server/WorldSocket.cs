@@ -407,6 +407,14 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
             WorldSocketLogMessages.PacketSent(_melLog, _sourceFile, _netDirSend, universalOpcode, (uint)opcode);
 
+            // Diagnostic trace for issue #64. Each outgoing SMSG to the modern client lands
+            // a single Info-level line in hermes-*.log so the next macOS crash report tells us
+            // the exact last opcode emitted before the client closed the socket. Cheap (one
+            // string alloc per packet, comparable to the existing structured log above) and
+            // can be removed once the V1_14_x stability issue is closed out.
+            Log.PrintNet(LogType.Network, LogNetDir.P2C,
+                $"{universalOpcode} ({data.Length} bytes) [{packet.GetConnection()}]");
+
             ByteBuffer buffer = new();
 
             int packetSize = data.Length;
