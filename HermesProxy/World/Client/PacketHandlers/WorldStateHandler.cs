@@ -1,4 +1,5 @@
 ﻿using Framework;
+using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -36,6 +37,20 @@ public partial class WorldClient
                 GetSession().GameState.HasWsgHordeFlagCarrier = value == 2;
         }
         states.AddClassicStates();
+
+        // V1_14_x Classic Era / V2_5_x TBC Classic clients overflow an on-stack
+        // parse buffer in SMSG_INIT_WORLD_STATES when the count gets large (issue
+        // #64 — V1_14_0 macOS reproduces it intermittently on high-state zones).
+        // The V3_4_3 WotLK Classic client tolerates the full list. Cap the
+        // forwarded count for pre-V3_4_3 modern clients.
+        if (ModernVersion.Build < ClientVersionBuild.V3_4_3_54261)
+        {
+            int dropped = states.TruncateExcess();
+            if (dropped > 0)
+                Log.Print(LogType.Network,
+                    $"[WorldStates] Capped SMSG_INIT_WORLD_STATES at {InitWorldStates.MaxWorldStates} entries for {ModernVersion.Build} — dropped {dropped} hardcoded additions to fit pre-V3_4_3 client buffer.");
+        }
+
         SendPacketToClient(states);
 
         // These packets don't exist in old versions.

@@ -45,9 +45,26 @@ public class InitWorldStates : ServerPacket, ISpanWritable
     }
 
     // Cap for world states - battlegrounds can have many, classic adds ~30
-    private const int MaxWorldStates = 128;
+    public const int MaxWorldStates = 128;
     // 3 uints(12) + count(4) + states(8 each)
     public int MaxSize => 12 + 4 + MaxWorldStates * 8;
+
+    public int Count => Worldstates.Count;
+
+    // Truncate worldstates to the configured cap, returning how many were dropped.
+    // Pre-V3_4_3 modern clients (V1_14_x Classic Era, V2_5_x TBC Classic) crash
+    // mid world-enter on oversized SMSG_INIT_WORLD_STATES — issue #64. Server-side
+    // states are added first by HandleInitWorldStates, then AddClassicStates() appends
+    // the hardcoded modern-era IDs, so trimming the tail keeps server state and
+    // drops hardcoded additions when forced to choose.
+    public int TruncateExcess()
+    {
+        if (Worldstates.Count <= MaxWorldStates)
+            return 0;
+        int dropped = Worldstates.Count - MaxWorldStates;
+        Worldstates.RemoveRange(MaxWorldStates, dropped);
+        return dropped;
+    }
 
     public int WriteToSpan(Span<byte> buffer)
     {
