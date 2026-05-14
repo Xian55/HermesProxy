@@ -114,6 +114,19 @@ public partial class WorldSocket
 
         HotfixConnect connect = new HotfixConnect();
 
+        // GameData.Hotfixes carries V3_4_3 WotLK Classic hotfix rows (sourced from
+        // wago.tools — see 6b2fe8c). Earlier modern clients (V1_14_x Classic Era,
+        // V2_5_x TBC Classic) deserialize them against incompatible DB2 schemas
+        // and crash mid world-enter (issue #64, V1_14_0 macOS). Reply with an
+        // empty SMSG_HOTFIX_CONNECT for those clients.
+        if (ModernVersion.Build < ClientVersionBuild.V3_4_3_54261)
+        {
+            Log.Print(LogType.Network,
+                $"[Hotfix] Modern client build {ModernVersion.Build} < V3_4_3_54261 — sending EMPTY SMSG_HOTFIX_CONNECT (WotLK hotfix dataset is incompatible).");
+            SendPacket(connect);
+            return;
+        }
+
         int matched = 0;
         foreach (uint id in request.Hotfixes)
         {
