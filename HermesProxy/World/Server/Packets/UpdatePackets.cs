@@ -124,13 +124,25 @@ public class ObjectUpdate
                 CreateData.MoveInfo.PitchRate = CreateData.MoveInfo.TurnRate;
             if (CreateData.MoveInfo.Flags.HasAnyFlag(MovementFlagModern.WalkMode) && (CreateData.MoveSpline != null))
                 CreateData.MoveInfo.Flags &= ~(uint)MovementFlagModern.WalkMode;
-            if (CreateData.MoveInfo.FlagsExtra == 0)
+            // V3_4_3-tuned placeholder. `FlagsExtra = 512` (VehiclePassengerIsTransitionAllowed)
+            // and the SplineFlags default below were added so that legacy-server-spawned creatures
+            // would render correctly under the WotLK Classic 3.4.3 client. Applied unconditionally,
+            // they emit modern-only spline / movement bits that the V1_14_x Classic Era client
+            // doesn't understand — works fine on Windows V1_14_0, crashes the macOS V1_14_0
+            // hardened runtime mid-loading-screen on dense zones (issue #64, bug 5).
+            if (ModernVersion.ExpansionVersion >= 3 && CreateData.MoveInfo.FlagsExtra == 0)
                 CreateData.MoveInfo.FlagsExtra = 512;
         }
         if (CreateData.MoveSpline != null)
         {
-            if (CreateData.MoveSpline.SplineFlags == 0)
-                CreateData.MoveSpline.SplineFlags = (SplineFlagModern)2432696320;
+            // Same gating as FlagsExtra above — modern spline-flag bits V1_14_x / V2_5_x don't
+            // recognise. Was previously written as the decimal literal cast `(SplineFlagModern)2432696320`
+            // which is just `Unknown5 | Steering | Unknown10` (`0x01000000 | 0x10000000 | 0x80000000`),
+            // the same combination spelled out at the other 3-4 sites that set V3_4_3 spline defaults.
+            if (ModernVersion.ExpansionVersion >= 3 && CreateData.MoveSpline.SplineFlags == 0)
+                CreateData.MoveSpline.SplineFlags = SplineFlagModern.Unknown5
+                                                  | SplineFlagModern.Steering
+                                                  | SplineFlagModern.Unknown10;
         }
         if (GameObjectData != null)
         {

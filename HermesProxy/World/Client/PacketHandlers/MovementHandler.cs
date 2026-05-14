@@ -443,11 +443,16 @@ public partial class WorldClient
 
             if (splineFlags == SplineFlagVanilla.Runmode) // Default spline flags used by Vanilla and TBC servers
             {
-                moveSpline.SplineFlags = SplineFlagModern.Unknown5;
+                // V3_4_3-tuned modern spline decoration. Unknown5/Steering/Unknown10 are post-WotLK
+                // bits the V1_14_x Classic Era / V2_5_x TBC Classic clients don't recognise — issue
+                // #64, bug 5. For older modern clients leave the translated flags alone (default 0
+                // / CanSwim only) so the client uses its native Vanilla-era spline animation path.
+                if (ModernVersion.ExpansionVersion >= 3)
+                    moveSpline.SplineFlags = SplineFlagModern.Unknown5;
                 UnitFlagsVanilla unitFlags = (UnitFlagsVanilla)GetSession().GameState.GetLegacyFieldValueUInt32(guid, UnitField.UNIT_FIELD_FLAGS);
                 if (unitFlags.HasFlag(UnitFlagsVanilla.CanSwim))
                     moveSpline.SplineFlags |= SplineFlagModern.CanSwim;
-                if (type == SplineTypeLegacy.Normal && !unitFlags.HasFlag(UnitFlagsVanilla.InCombat))
+                if (ModernVersion.ExpansionVersion >= 3 && type == SplineTypeLegacy.Normal && !unitFlags.HasFlag(UnitFlagsVanilla.InCombat))
                     moveSpline.SplineFlags |= SplineFlagModern.Steering | SplineFlagModern.Unknown10;
             }
             else
@@ -463,11 +468,13 @@ public partial class WorldClient
 
             if (splineFlags == SplineFlagTBC.Runmode) // Default spline flags used by Vanilla and TBC servers
             {
-                moveSpline.SplineFlags = SplineFlagModern.Unknown5;
+                // Same V3_4_3+ gate as the Vanilla branch above — see issue #64 bug 5.
+                if (ModernVersion.ExpansionVersion >= 3)
+                    moveSpline.SplineFlags = SplineFlagModern.Unknown5;
                 UnitFlags unitFlags = (UnitFlags)GetSession().GameState.GetLegacyFieldValueUInt32(guid, UnitField.UNIT_FIELD_FLAGS);
                 if (unitFlags.HasFlag(UnitFlags.CanSwim))
                     moveSpline.SplineFlags |= SplineFlagModern.CanSwim;
-                if (type == SplineTypeLegacy.Normal && !unitFlags.HasFlag(UnitFlags.InCombat))
+                if (ModernVersion.ExpansionVersion >= 3 && type == SplineTypeLegacy.Normal && !unitFlags.HasFlag(UnitFlags.InCombat))
                     moveSpline.SplineFlags |= SplineFlagModern.Steering | SplineFlagModern.Unknown10;
             }
             else
@@ -557,13 +564,17 @@ public partial class WorldClient
             update.HasControl = false;
             SendPacketToClient(update);
 
+            // Taxi-flight spline decoration. V3_4_3-tuned high bits (Unknown5/Steering/Unknown10)
+            // crash V1_14_x macOS — issue #64, bug 5. Keep the cross-version Flying / CatmullRom /
+            // CanSwim / UncompressedPath bits; gate the V3_4_3-only decoration.
             moveSpline.SplineFlags = SplineFlagModern.Flying |
                                      SplineFlagModern.CatmullRom |
                                      SplineFlagModern.CanSwim |
-                                     SplineFlagModern.UncompressedPath |
-                                     SplineFlagModern.Unknown5 |
-                                     SplineFlagModern.Steering |
-                                     SplineFlagModern.Unknown10;
+                                     SplineFlagModern.UncompressedPath;
+            if (ModernVersion.ExpansionVersion >= 3)
+                moveSpline.SplineFlags |= SplineFlagModern.Unknown5 |
+                                          SplineFlagModern.Steering |
+                                          SplineFlagModern.Unknown10;
 
             if (!hasCatmullRom && moveSpline.EndPosition != Vector3.Zero)
                 moveSpline.SplinePoints.Add(moveSpline.EndPosition);

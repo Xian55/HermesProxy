@@ -1059,13 +1059,15 @@ public partial class WorldClient
                 if (hasTaxiFlightFlags && guid.IsPlayer() &&
                     flags.HasAnyFlag(UpdateFlag.Self))
                 {
+                    // Same V3_4_3+ gate as MovementHandler.HandleMonsterMove — issue #64 bug 5.
                     monsterMove.SplineFlags = SplineFlagModern.Flying |
                                               SplineFlagModern.CatmullRom |
                                               SplineFlagModern.CanSwim |
-                                              SplineFlagModern.UncompressedPath |
-                                              SplineFlagModern.Unknown5 |
-                                              SplineFlagModern.Steering |
-                                              SplineFlagModern.Unknown10;
+                                              SplineFlagModern.UncompressedPath;
+                    if (ModernVersion.ExpansionVersion >= 3)
+                        monsterMove.SplineFlags |= SplineFlagModern.Unknown5 |
+                                                   SplineFlagModern.Steering |
+                                                   SplineFlagModern.Unknown10;
                 }
 
                 monsterMove.SplineTime = packet.ReadUInt32();
