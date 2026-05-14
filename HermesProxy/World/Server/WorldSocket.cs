@@ -802,8 +802,24 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         if (code == BattlenetRpcErrorCode.Ok)
         {
             response.SuccessInfo = new AuthResponse.AuthSuccessInfo();
-            response.SuccessInfo.ActiveExpansionLevel = (byte)LegacyVersion.ExpansionVersion;
-            response.SuccessInfo.AccountExpansionLevel = (byte)LegacyVersion.ExpansionVersion;
+            // 21e5be8 raised both values from `ExpansionVersion - 1` to `ExpansionVersion`
+            // because the 3.4.3 WotLK Classic client refuses to enter a realm whose
+            // ActiveExpansionLevel is reported lower than its own client expansion (= 3).
+            // Doing it unconditionally puts V1_14_0 Classic Era on `ActiveExpansionLevel = 1`
+            // (TBC) instead of 0 (Classic Era), and the client takes that to mean it's on a
+            // TBC realm — world enter then crashes on dense zones (issue #64, Stormwind on
+            // V1_14_0 macOS). Keep the V3_4_3+ workaround but restore the standard
+            // `ExpansionVersion - 1` mapping for older modern clients.
+            if (ModernVersion.Build >= ClientVersionBuild.V3_4_3_54261)
+            {
+                response.SuccessInfo.ActiveExpansionLevel = (byte)LegacyVersion.ExpansionVersion;
+                response.SuccessInfo.AccountExpansionLevel = (byte)LegacyVersion.ExpansionVersion;
+            }
+            else
+            {
+                response.SuccessInfo.ActiveExpansionLevel = (byte)(LegacyVersion.ExpansionVersion - 1);
+                response.SuccessInfo.AccountExpansionLevel = (byte)(LegacyVersion.ExpansionVersion - 1);
+            }
             response.SuccessInfo.VirtualRealmAddress = _realmId.GetAddress();
             response.SuccessInfo.Time = (uint)Time.UnixTime;
 
