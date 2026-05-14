@@ -4,6 +4,7 @@ using System.Reflection;
 using Framework.Constants;
 using Google.Protobuf;
 using HermesProxy;
+using HermesProxy.Enums;
 
 namespace BNetServer.Services;
 
@@ -90,13 +91,21 @@ public partial class BnetServices
                 BnetServicesLogMessages.ServiceNotImplemented(
                     BnetServices._melNet, BnetServices._sourceFile, BnetServices._netDirNone,
                     _serviceHolder.BuildSessionPrefix(), serviceHash, methodId);
-                // Send OK with empty payload, NOT an RpcNotImplemented error. The 3.4.3 WotLK
-                // Classic client requests `ResourcesService/m:1` early in character-select and
-                // treats an error response as fatal (character list never renders). The fork
-                // does the same — see HermesProxy-WOTLK BnetServices.cs:121 "sending OK stub".
-                Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
-                    $"[Trace] BNet ServiceManager: unimplemented service {serviceHash}/m:{methodId} — sending OK stub (was: RpcNotImplemented)");
-                SendRpcMessage(BattlenetRpcErrorCode.Ok, null);
+                // V3_4_3 WotLK Classic requests `ResourcesService/m:1` very early in
+                // character-select and treats RpcNotImplemented as fatal — it needs an
+                // Ok+empty stub. Earlier clients (V1_14_0 Classic Era, V2_5_x TBC Classic)
+                // tolerate RpcNotImplemented but crash mid world-enter on the empty Ok
+                // payload (issue #64, V1_14_0 macOS). Gate the stub to V3_4_3+.
+                if (ModernVersion.Build >= ClientVersionBuild.V3_4_3_54261)
+                {
+                    Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                        $"[Trace] BNet ServiceManager: unimplemented service {serviceHash}/m:{methodId} — sending OK stub for V3_4_3+ (was: RpcNotImplemented)");
+                    SendRpcMessage(BattlenetRpcErrorCode.Ok, null);
+                }
+                else
+                {
+                    SendErrorResponse(BattlenetRpcErrorCode.RpcNotImplemented);
+                }
                 return;
             }
 
