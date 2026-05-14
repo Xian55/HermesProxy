@@ -565,15 +565,7 @@ public class ObjectUpdateBuilder
 
             if (hasActionButtons)
             {
-                // Classic Era V1_14_x reads 120 action buttons (vanilla-protocol count).
-                // Hardcoded 132 here writes an extra 12 Int32s (48 bytes) that the client
-                // never consumes, shifting every downstream Player field by 48 bytes —
-                // garbled GUID, garbled stats, memory corruption mid loading-screen. Windows
-                // V1_14_0 walks past it, macOS V1_14_0 hardened runtime kills the client
-                // (issue #64, bug 6). m_gameState.ActionButtons is padded to 132 entries by
-                // CharacterHandler.HandleUpdateActionButtons, so the first 120 are correct
-                // and the trailing 12 are zero-padding we simply don't emit.
-                for (int i = 0; i < 120; i++)
+                for (int i = 0; i < 132; i++)
                     data.WriteInt32(m_gameState.ActionButtons[i]);
             }
         }

@@ -565,9 +565,7 @@ public class ObjectUpdateBuilder
 
             if (hasActionButtons)
             {
-                // Classic Era V1_14_x reads 120 action buttons — see V1_14_0_40237 sibling
-                // builder for full rationale. Issue #64 bug 6.
-                for (int i = 0; i < 120; i++)
+                for (int i = 0; i < 132; i++)
                     data.WriteInt32(m_gameState.ActionButtons[i]);
             }
         }
