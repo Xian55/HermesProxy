@@ -191,6 +191,7 @@ public partial class WorldClient
     void HandleNewWorld(WorldPacket packet)
     {
         NewWorld teleport = new NewWorld();
+        GetSession().GameState.LastLegacyAreaTriggerSendTickMs.Clear();
         GetSession().GameState.CurrentMapId = teleport.MapID = packet.ReadUInt32();
         teleport.Position = packet.ReadVector3();
         teleport.Orientation = packet.ReadFloat();

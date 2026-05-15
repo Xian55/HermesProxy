@@ -235,6 +235,15 @@ public sealed class GameSessionData
     // of the previous one for that GUID.
     public Dictionary<WowGuid128, long> LastMonsterMoveTickMs = [];
     public const int MonsterMoveMinIntervalMs = 250;
+
+    // Last tick at which we synthesized CMSG_AREA_TRIGGER for each legacy id, used to
+    // throttle resends while the player remains inside the proxy-side ghost-trigger
+    // sphere. We can't one-shot: our sphere is generous and fires before the player
+    // enters the server's stricter AreaTrigger.dbc volume — we need to keep re-firing
+    // so the next heartbeat after the player crosses the server-side boundary
+    // actually teleports them. Cleared on SMSG_NEW_WORLD.
+    public Dictionary<uint, long> LastLegacyAreaTriggerSendTickMs = [];
+    public const int LegacyAreaTriggerResendIntervalMs = 250;
     public Dictionary<string, int> ChannelIds = [];
     public Dictionary<int, string> ChannelNamesById = [];
     public Dictionary<uint, uint> ItemBuyCount = [];
