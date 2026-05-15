@@ -20,6 +20,7 @@ using System;
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
@@ -58,6 +59,34 @@ public class ShowTaxiNodes : ServerPacket, ISpanWritable
 
     public override void Write()
     {
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3.54261 wire layout (matches CypherCore TaxiPackets.cs ShowTaxiNodes::Write):
+            // count is in uint64 blocks, payload is fixed bytes (must be a multiple of 8).
+            // Confirmed by sniff: every SMSG_SHOW_TAXI_NODES carries count=7 and 56-byte arrays.
+            byte[] landBytes = BuildFixedSizeMask(CanLandNodes, TaxiMaskBytesV3_4_3);
+            byte[] useBytes = BuildFixedSizeMask(CanUseNodes, TaxiMaskBytesV3_4_3);
+
+            _worldPacket.WriteBit(WindowInfo != null);
+            _worldPacket.FlushBits();
+
+            _worldPacket.WriteInt32(landBytes.Length / 8);
+            _worldPacket.WriteInt32(useBytes.Length / 8);
+
+            if (WindowInfo != null)
+            {
+                _worldPacket.WritePackedGuid128(WindowInfo.UnitGUID);
+                _worldPacket.WriteUInt32(WindowInfo.CurrentNode);
+            }
+
+            foreach (var node in landBytes)
+                _worldPacket.WriteUInt8(node);
+
+            foreach (var node in useBytes)
+                _worldPacket.WriteUInt8(node);
+            return;
+        }
+
         _worldPacket.WriteBit(WindowInfo != null);
         _worldPacket.FlushBits();
 
@@ -81,6 +110,9 @@ public class ShowTaxiNodes : ServerPacket, ISpanWritable
             _worldPacket.WriteUInt8(node);
     }
 
+    // V3_4_3.54261 client's baked TaxiNodes.db2 spans 7 uint64 blocks (= 56 bytes).
+    private const int TaxiMaskBytesV3_4_3 = 56;
+
     // Cap for taxi node bitmasks - enough for all taxi nodes
     private const int MaxNodeBytes = 128;
     // 1 bit(1) + 2 ints(8) + optional WindowInfo (GUID(18)+uint(4)) + 2 node lists
@@ -88,6 +120,36 @@ public class ShowTaxiNodes : ServerPacket, ISpanWritable
 
     public int WriteToSpan(Span<byte> buffer)
     {
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBit(WindowInfo != null);
+            writer.FlushBits();
+
+            writer.WriteInt32(TaxiMaskBytesV3_4_3 / 8);
+            writer.WriteInt32(TaxiMaskBytesV3_4_3 / 8);
+
+            if (WindowInfo != null)
+            {
+                writer.WritePackedGuid128(WindowInfo.UnitGUID.Low, WindowInfo.UnitGUID.High);
+                writer.WriteUInt32(WindowInfo.CurrentNode);
+            }
+
+            int landCopy = Math.Min(CanLandNodes.Count, TaxiMaskBytesV3_4_3);
+            for (int i = 0; i < landCopy; i++)
+                writer.WriteUInt8(CanLandNodes[i]);
+            for (int i = landCopy; i < TaxiMaskBytesV3_4_3; i++)
+                writer.WriteUInt8(0);
+
+            int useCopy = Math.Min(CanUseNodes.Count, TaxiMaskBytesV3_4_3);
+            for (int i = 0; i < useCopy; i++)
+                writer.WriteUInt8(CanUseNodes[i]);
+            for (int i = useCopy; i < TaxiMaskBytesV3_4_3; i++)
+                writer.WriteUInt8(0);
+
+            return writer.Position;
+        }
+
         // Calculate cleaned lengths (don't modify originals)
         int landLength = GetCleanedLength(CanLandNodes);
         int useLength = GetCleanedLength(CanUseNodes);
@@ -95,26 +157,35 @@ public class ShowTaxiNodes : ServerPacket, ISpanWritable
         if (landLength > MaxNodeBytes || useLength > MaxNodeBytes)
             return -1;
 
-        var writer = new SpanPacketWriter(buffer);
-        writer.WriteBit(WindowInfo != null);
-        writer.FlushBits();
+        var writer2 = new SpanPacketWriter(buffer);
+        writer2.WriteBit(WindowInfo != null);
+        writer2.FlushBits();
 
-        writer.WriteInt32(landLength);
-        writer.WriteInt32(useLength);
+        writer2.WriteInt32(landLength);
+        writer2.WriteInt32(useLength);
 
         if (WindowInfo != null)
         {
-            writer.WritePackedGuid128(WindowInfo.UnitGUID.Low, WindowInfo.UnitGUID.High);
-            writer.WriteUInt32(WindowInfo.CurrentNode);
+            writer2.WritePackedGuid128(WindowInfo.UnitGUID.Low, WindowInfo.UnitGUID.High);
+            writer2.WriteUInt32(WindowInfo.CurrentNode);
         }
 
         for (int i = 0; i < landLength; i++)
-            writer.WriteUInt8(CanLandNodes[i]);
+            writer2.WriteUInt8(CanLandNodes[i]);
 
         for (int i = 0; i < useLength; i++)
-            writer.WriteUInt8(CanUseNodes[i]);
+            writer2.WriteUInt8(CanUseNodes[i]);
 
-        return writer.Position;
+        return writer2.Position;
+    }
+
+    private static byte[] BuildFixedSizeMask(List<byte> source, int targetSize)
+    {
+        byte[] result = new byte[targetSize];
+        int copyCount = Math.Min(source.Count, targetSize);
+        for (int i = 0; i < copyCount; i++)
+            result[i] = source[i];
+        return result;
     }
 
     // Get cleaned length without modifying the list
