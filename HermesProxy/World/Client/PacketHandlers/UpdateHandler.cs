@@ -2934,6 +2934,7 @@ public partial class WorldClient
             if (PLAYER_FIELD_COMBO_TARGET >= 0 && updateMaskArray[PLAYER_FIELD_COMBO_TARGET])
             {
                 updateData.ActivePlayerData.ComboTarget = GetGuidValue(updates, PlayerField.PLAYER_FIELD_COMBO_TARGET).To128(GetSession().GameState);
+                updateData.UnitData.ComboTarget = updateData.ActivePlayerData.ComboTarget;
             }
             int PLAYER_FIELD_KNOWN_TITLES = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_KNOWN_TITLES);
             if (PLAYER_FIELD_KNOWN_TITLES >= 0)
