@@ -30,9 +30,19 @@ public partial class WorldSocket
         if (at.Entered == false)
             return;
 
-        GetSession().GameState.LastEnteredAreaTrigger = at.AreaTriggerID;
+        // Reconcile post-Cataclysm DB2 ids back to the 3.3.5a-era ids the
+        // legacy server's areatrigger_teleport table is keyed on. V3_4_3 only.
+        // See AreaTriggerReconciliation.cs for the table.
+        uint idToForward = at.AreaTriggerID;
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+            AreaTriggerReconciliation.ModernToLegacy.TryGetValue(at.AreaTriggerID, out var legacyId))
+        {
+            idToForward = legacyId;
+        }
+
+        GetSession().GameState.LastEnteredAreaTrigger = idToForward;
         WorldPacket packet = new WorldPacket(Opcode.CMSG_AREA_TRIGGER);
-        packet.WriteUInt32(at.AreaTriggerID);
+        packet.WriteUInt32(idToForward);
         SendPacketToServer(packet);
     }
 

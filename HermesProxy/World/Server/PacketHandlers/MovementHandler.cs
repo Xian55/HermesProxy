@@ -55,6 +55,53 @@ public partial class WorldSocket
             packet.WritePackedGuid(movement.Guid.To64());
         movement.MoveInfo.WriteMovementInfoLegacy(packet);
         SendPacketToServer(packet);
+
+        CheckLegacyAreaTriggerProximity(movement.MoveInfo.Position);
+    }
+
+    // V3_4_3 client's AreaTrigger.db2 is missing legacy walk-through triggers
+    // (notably the Blasted Lands Dark Portal). When the player walks into a
+    // known legacy trigger volume, synthesize CMSG_AREA_TRIGGER to the legacy
+    // server. One-shot per entry into the sphere; cleared on map change.
+    void CheckLegacyAreaTriggerProximity(Vector3 pos)
+    {
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+            return;
+
+        var mapId = GetSession().GameState.CurrentMapId;
+        if (mapId is null)
+            return;
+
+        if (!AreaTriggerReconciliation.ProximityByMap.TryGetValue(mapId.Value, out var entries))
+            return;
+
+        var lastSent = GetSession().GameState.LastLegacyAreaTriggerSendTickMs;
+        long nowMs = Environment.TickCount64;
+
+        foreach (var e in entries)
+        {
+            float distSq = Vector3.DistanceSquared(pos, e.Center);
+            bool inside = distSq <= e.Radius * e.Radius;
+
+            if (!inside)
+            {
+                lastSent.Remove(e.LegacyId);
+                continue;
+            }
+
+            // While inside our generous proxy-side sphere, re-fire CMSG_AREA_TRIGGER
+            // every ~250ms so that whichever heartbeat first sees the player cross
+            // the server's stricter DBC volume actually gets accepted and teleports.
+            if (lastSent.TryGetValue(e.LegacyId, out var last) &&
+                nowMs - last < GameSessionData.LegacyAreaTriggerResendIntervalMs)
+                continue;
+
+            lastSent[e.LegacyId] = nowMs;
+
+            WorldPacket packet = new WorldPacket(Opcode.CMSG_AREA_TRIGGER);
+            packet.WriteUInt32(e.LegacyId);
+            SendPacketToServer(packet);
+        }
     }
 
     [PacketHandler(Opcode.CMSG_MOVE_TELEPORT_ACK)]
