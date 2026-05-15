@@ -421,6 +421,18 @@ class SetAssistantLeader : ClientPacket
 
     public override void Read()
     {
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 wire layout: 2 header bits, then GUID, then optional PartyIndex byte.
+            // Mirrors CypherCore WorldPackets::Party::SetAssistantLeader::Read.
+            bool hasPartyIndex = _worldPacket.HasBit();
+            Apply = _worldPacket.HasBit();
+            TargetGUID = _worldPacket.ReadPackedGuid128();
+            if (hasPartyIndex)
+                PartyIndex = _worldPacket.ReadUInt8();
+            return;
+        }
+
         PartyIndex = _worldPacket.ReadUInt8();
         TargetGUID = _worldPacket.ReadPackedGuid128();
         Apply = _worldPacket.HasBit();
@@ -437,6 +449,17 @@ class SetEveryoneIsAssistant : ClientPacket
 
     public override void Read()
     {
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 wire layout: 2 header bits, then optional PartyIndex byte.
+            // Mirrors CypherCore WorldPackets::Party::SetEveryoneIsAssistant::Read.
+            bool hasPartyIndex = _worldPacket.HasBit();
+            Apply = _worldPacket.HasBit();
+            if (hasPartyIndex)
+                PartyIndex = _worldPacket.ReadUInt8();
+            return;
+        }
+
         PartyIndex = _worldPacket.ReadUInt8();
         Apply = _worldPacket.HasBit();
     }
