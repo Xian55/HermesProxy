@@ -326,7 +326,13 @@ public class ObjectUpdateBuilder
                 data.WriteVector3(moveSpline.FinalFacingSpot);
                 break;
             case SplineTypeModern.FacingTarget:
-                data.WriteFloat(moveSpline.FinalOrientation);
+                // Modern wire layout: PackedGuid128 only — no leading orientation float.
+                // The earlier extra WriteFloat shifted SplinePoints/PauseTimesCount by
+                // 4 bytes, the client read garbage PauseTimesCount (~2.8 GiB array
+                // alloc), froze, then sent CMSG_LOG_DISCONNECT reason=7. Triggered
+                // mid-combat whenever a creature spawning into LoS had a FacingTarget
+                // spline (TC AI casting/aiming at the player). Matches V2_5_3 / V1_14
+                // writers.
                 data.WritePackedGuid128(moveSpline.FinalFacingGuid);
                 break;
             case SplineTypeModern.FacingAngle:
