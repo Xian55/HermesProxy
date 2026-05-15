@@ -591,6 +591,7 @@ public partial class WorldClient
     {
         ObjectUpdate updateData = new ObjectUpdate(GetSession().GameState.CurrentPlayerGuid, UpdateTypeModern.Values, GetSession());
         updateData.ActivePlayerData.ComboTarget = packet.ReadPackedGuid().To128(GetSession().GameState);
+        updateData.UnitData.ComboTarget = updateData.ActivePlayerData.ComboTarget;
         byte comboPoints = packet.ReadUInt8();
         sbyte powerSlot = ClassPowerTypes.GetPowerSlotForClass(GetSession().GameState.GetUnitClass(GetSession().GameState.CurrentPlayerGuid), PowerType.ComboPoints);
         if (powerSlot >= 0)

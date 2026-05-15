@@ -142,6 +142,7 @@ public class UnitData
     public int? LooksLikeCreatureID;
     public int? LookAtControllerID;
     public WowGuid128? GuildGUID;
+    public WowGuid128? ComboTarget;
 
     // Dynamic Fields
     public WowGuid128? ChannelObject;

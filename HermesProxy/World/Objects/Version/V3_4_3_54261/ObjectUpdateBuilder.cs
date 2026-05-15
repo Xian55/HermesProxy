@@ -1808,6 +1808,11 @@ public class ObjectUpdateBuilder
         {
             SetBit(107);
         }
+        // 108-111 = SkinningOwnerGUID / FlightCapabilityID / GlideEventSpeedDivisor / CurrentAreaID (not tracked)
+        if (unit.ComboTarget != null)
+        {
+            SetBit(112);
+        }
         if (unit.NpcFlags != null)
         {
             bool hasAnyNpcFlag = false;
@@ -2201,6 +2206,14 @@ public class ObjectUpdateBuilder
             if (unit.GuildGUID != null)
             {
                 data.WritePackedGuid128(unit.GuildGUID.Value);
+            }
+            // 108-111 = SkinningOwnerGUID / FlightCapabilityID / GlideEventSpeedDivisor / CurrentAreaID not tracked
+            // 112 = ComboTarget — combo points are target-stuck in 3.3.5a/3.4.3 Classic;
+            // without the target GUID the client rejects finishers with "requires combo points"
+            // even when Power[combo-slot] > 0.
+            if (unit.ComboTarget != null)
+            {
+                data.WritePackedGuid128(unit.ComboTarget.Value);
             }
             // NpcFlags array (parent bit 113, elements 114-115) — gated by block 3
             if (unit.NpcFlags != null)
