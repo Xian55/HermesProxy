@@ -2766,10 +2766,18 @@ public partial class WorldClient
                 int offset = 2;
                 for (int i = 0; i < 19; i++)
                 {
-                    if (updateMaskArray[PLAYER_VISIBLE_ITEM_1_ENTRYID + i * offset])
+                    int itemIdIndex = PLAYER_VISIBLE_ITEM_1_ENTRYID + i * offset;
+                    int enchantIndex = itemIdIndex + 1;
+                    if (updateMaskArray[itemIdIndex] || updateMaskArray[enchantIndex])
                     {
-                        int itemId = updates[PLAYER_VISIBLE_ITEM_1_ENTRYID + i * offset].Int32Value;
-                        updateData.PlayerData.VisibleItems[i] = new VisibleItem(itemId, 0, 0);
+                        int itemId = updates.ContainsKey(itemIdIndex) ? updates[itemIdIndex].Int32Value : 0;
+                        // WotLK packs both perm and temp enchant visuals into one PLAYER_VISIBLE_ITEM_X_ENCHANTMENT
+                        // dword (TC's SetVisibleItemSlot resolves perm vs. temp server-side); shaman imbues
+                        // and similar temp enchants flow through this same field for the visual-glow path.
+                        ushort itemVisual = updates.ContainsKey(enchantIndex)
+                            ? (ushort)GameData.GetItemEnchantVisual(updates[enchantIndex].UInt32Value)
+                            : (ushort)0;
+                        updateData.PlayerData.VisibleItems[i] = new VisibleItem(itemId, 0, itemVisual);
                     }
                 }
             }
