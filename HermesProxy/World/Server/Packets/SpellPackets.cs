@@ -138,6 +138,26 @@ public class SupercededSpells : ServerPacket, ISpanWritable
 
     public override void Write()
     {
+        // V3_4_3 uses the same per-spell LearnedSpellInfo bit-cascade as
+        // SMSG_LEARNED_SPELLS (see CypherCore SpellPackets.cs:302-315 + 1905-1931).
+        // SpellID and Superceded are paired one-for-one by HandleSupercededSpells.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            int pairCount = Math.Min(SpellID.Count, Superceded.Count);
+            _worldPacket.WriteInt32(pairCount);
+            for (int i = 0; i < pairCount; ++i)
+            {
+                _worldPacket.WriteInt32((int)SpellID[i]);    // new spell
+                _worldPacket.WriteBit(false);                // IsFavorite
+                _worldPacket.WriteBit(false);                // field_8.HasValue
+                _worldPacket.WriteBit(true);                 // Superceded.HasValue
+                _worldPacket.WriteBit(false);                // TraitDefinitionID.HasValue
+                _worldPacket.FlushBits();
+                _worldPacket.WriteInt32((int)Superceded[i]); // old spell
+            }
+            return;
+        }
+
         _worldPacket.WriteInt32(SpellID.Count);
         _worldPacket.WriteInt32(Superceded.Count);
         _worldPacket.WriteInt32(FavoriteSpellID.Count);
@@ -159,6 +179,27 @@ public class SupercededSpells : ServerPacket, ISpanWritable
 
     public int WriteToSpan(Span<byte> buffer)
     {
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            int pairCount = Math.Min(SpellID.Count, Superceded.Count);
+            if (pairCount > MaxSpellsPerList)
+                return -1;
+
+            var v343 = new SpanPacketWriter(buffer);
+            v343.WriteInt32(pairCount);
+            for (int i = 0; i < pairCount; ++i)
+            {
+                v343.WriteInt32((int)SpellID[i]);    // new spell
+                v343.WriteBit(false);                // IsFavorite
+                v343.WriteBit(false);                // field_8.HasValue
+                v343.WriteBit(true);                 // Superceded.HasValue
+                v343.WriteBit(false);                // TraitDefinitionID.HasValue
+                v343.FlushBits();
+                v343.WriteInt32((int)Superceded[i]); // old spell
+            }
+            return v343.Position;
+        }
+
         if (SpellID.Count > MaxSpellsPerList ||
             Superceded.Count > MaxSpellsPerList ||
             FavoriteSpellID.Count > MaxSpellsPerList)
