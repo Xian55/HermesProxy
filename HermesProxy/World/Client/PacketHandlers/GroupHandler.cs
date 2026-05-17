@@ -1,4 +1,5 @@
-﻿using HermesProxy.Enums;
+﻿using Framework.Logging;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -624,40 +625,106 @@ public partial class WorldClient
             }
         }
 
+        // NPCBot / Playerbot truncates: it sets `mask = GROUP_UPDATE_FULL` (0x7FFFF) but only
+        // writes the leading subset of fields (typically through POSITION). Trusting the mask
+        // would over-read the buffer. The parser catches ArgumentOutOfRangeException internally
+        // and returns the partial state filled up to the truncation point so the modern client
+        // still gets HP / power / position updates instead of nothing.
+        PartyMemberPartialState state = ParsePartyMemberPartialState(packet);
+        SendPacketToClient(state);
+    }
+
+    // NPCBot/Playerbot wire bug: bot sets `mask = GROUP_UPDATE_FULL (0x7FFFF)` claiming all 19
+    // group-update flags but only writes the leading subset of fields (typically through
+    // POSITION). To avoid trusting the mask blindly, every conditional field read below first
+    // checks `packet.CanRead(N)` and bails cleanly through `WarnTruncated` when the payload
+    // runs out — the partial state already populated is what gets forwarded to the client.
+    // Rate-limited warn (first 3 per process) preserves diagnostic value without spamming.
+    private static int s_partyMemberDumpBudget = 3;
+
+    private static bool WarnTruncated(string opcodeName, WorldPacket packet, string field, int needed)
+    {
+        int remaining = System.Threading.Interlocked.Decrement(ref s_partyMemberDumpBudget);
+        if (remaining >= 0)
+        {
+            byte[] all = packet.GetData();
+            int len = (int)packet.GetSize();
+            int dumpLen = Math.Min(160, len);
+            string hex = BitConverter.ToString(all, 0, dumpLen);
+            Log.Print(LogType.Warn,
+                $"{opcodeName} truncated at field={field}: need {needed} bytes, have {packet.Remaining()} (size={len}). Forwarding partial state. hex={hex}");
+        }
+        return false;
+    }
+
+    private PartyMemberPartialState ParsePartyMemberPartialState(WorldPacket packet)
+    {
         PartyMemberPartialState state = new PartyMemberPartialState();
+        const string Op = nameof(Opcode.SMSG_PARTY_MEMBER_PARTIAL_STATE);
+
+        // PackedGuid is variable-size; trust the upstream framing for it (a malformed mask
+        // byte here would be a wire-level problem, not the mask-truncation bug we handle below).
         state.AffectedGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
-        var updateFlags = (GroupUpdateFlagTBC)packet.ReadUInt32();
+
+        GroupUpdateFlagTBC updateFlags;
+        if (!packet.CanRead(4)) return WarnTruncatedReturn(Op, packet, nameof(updateFlags), 4, state);
+        updateFlags = (GroupUpdateFlagTBC)packet.ReadUInt32();
+
+        bool wotlk = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056);
+        int hpSize = wotlk ? 4 : 2;
+        int auraEntrySize = wotlk ? 5 : 3; // uint32 spellid + uint8 flags  vs  uint16 spellid + uint8 flags
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.Status))
-            state.StatusFlags = packet.ReadUInt16();// GroupMemberOnlineStatus
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.Status), 2, state);
+            state.StatusFlags = packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.CurrentHealth))
-            state.CurrentHealth = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
-                ? packet.ReadUInt32()
-                : packet.ReadUInt16();
+        {
+            if (!packet.CanRead(hpSize)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.CurrentHealth), hpSize, state);
+            state.CurrentHealth = wotlk ? packet.ReadUInt32() : packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.MaxHealth))
-            state.MaxHealth = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
-                ? packet.ReadUInt32()
-                : packet.ReadUInt16();
+        {
+            if (!packet.CanRead(hpSize)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.MaxHealth), hpSize, state);
+            state.MaxHealth = wotlk ? packet.ReadUInt32() : packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PowerType))
+        {
+            if (!packet.CanRead(1)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PowerType), 1, state);
             state.PowerType = packet.ReadUInt8();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.CurrentPower))
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.CurrentPower), 2, state);
             state.CurrentPower = packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.MaxPower))
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.MaxPower), 2, state);
             state.MaxPower = packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.Level))
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.Level), 2, state);
             state.Level = packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.Zone))
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.Zone), 2, state);
             state.ZoneID = packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.Position))
         {
+            if (!packet.CanRead(4)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.Position), 4, state);
             state.Position = new PartyMemberPartialState.Vector3_UInt16();
             state.Position.X = packet.ReadInt16();
             state.Position.Y = packet.ReadInt16();
@@ -665,108 +732,122 @@ public partial class WorldClient
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.Auras))
         {
-            if (state.Auras == null)
-                state.Auras = new List<PartyMemberAuraStates>();
-
-            var auraMask = packet.ReadUInt64();
-
-            for (byte i = 0; i < LegacyVersion.GetAuraSlotsCount(); ++i)
-            {
-                if ((auraMask & (1ul << i)) == 0)
-                    continue;
-
-                PartyMemberAuraStates aura = new PartyMemberAuraStates();
-                aura.SpellId = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
-                    ? packet.ReadUInt32()
-                    : packet.ReadUInt16();
-                packet.ReadUInt8(); // unk
-                if (aura.SpellId != 0)
-                {
-                    aura.ActiveFlags = 1;
-                    aura.AuraFlags = (ushort)AuraFlagsModern.Positive;
-                }
-                state.Auras.Add(aura);
-            }
+            if (!packet.CanRead(8)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.Auras), 8, state);
+            state.Auras ??= new List<PartyMemberAuraStates>();
+            if (!TryReadPartyMemberAuras(packet, state.Auras, auraEntrySize, Op, nameof(GroupUpdateFlagTBC.Auras))) return state;
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetGuid))
         {
-            if (state.Pet == null)
-                state.Pet = new PartyMemberPetStats();
+            if (!packet.CanRead(8)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetGuid), 8, state);
+            state.Pet ??= new PartyMemberPetStats();
             state.Pet.NewPetGuid = packet.ReadGuid().To128(GetSession().GameState);
         }
 
-
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetName))
         {
-            if (state.Pet == null)
-                state.Pet = new PartyMemberPetStats();
+            // CString is variable-size; bail if at least the terminator byte isn't there.
+            if (!packet.CanRead(1)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetName), 1, state);
+            state.Pet ??= new PartyMemberPetStats();
             state.Pet.NewPetName = packet.ReadCString();
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetModelId))
         {
-            if (state.Pet == null)
-                state.Pet = new PartyMemberPetStats();
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetModelId), 2, state);
+            state.Pet ??= new PartyMemberPetStats();
             state.Pet.DisplayID = packet.ReadUInt16();
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetCurrentHealth))
         {
-            if (state.Pet == null)
-                state.Pet = new PartyMemberPetStats();
-            state.Pet.Health = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
-                ? packet.ReadUInt32()
-                : packet.ReadUInt16();
+            if (!packet.CanRead(hpSize)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetCurrentHealth), hpSize, state);
+            state.Pet ??= new PartyMemberPetStats();
+            state.Pet.Health = wotlk ? packet.ReadUInt32() : packet.ReadUInt16();
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetMaxHealth))
         {
-            if (state.Pet == null)
-                state.Pet = new PartyMemberPetStats();
-            state.Pet.MaxHealth = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
-                ? packet.ReadUInt32()
-                : packet.ReadUInt16();
+            if (!packet.CanRead(hpSize)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetMaxHealth), hpSize, state);
+            state.Pet ??= new PartyMemberPetStats();
+            state.Pet.MaxHealth = wotlk ? packet.ReadUInt32() : packet.ReadUInt16();
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetPowerType))
-            packet.ReadUInt8(); // Pet Power Type
+        {
+            if (!packet.CanRead(1)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetPowerType), 1, state);
+            packet.ReadUInt8();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetCurrentPower))
-            packet.ReadInt16(); // Pet Current Power
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetCurrentPower), 2, state);
+            packet.ReadInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetMaxPower))
-            packet.ReadInt16(); // Pet Max Power
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetMaxPower), 2, state);
+            packet.ReadInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetAuras))
         {
-            if (state.Pet == null)
-                state.Pet = new PartyMemberPetStats();
-            if (state.Pet.Auras == null)
-                state.Pet.Auras = new List<PartyMemberAuraStates>();
-
-            var auraMask = packet.ReadUInt64();
-
-            for (byte i = 0; i < LegacyVersion.GetAuraSlotsCount(); ++i)
-            {
-                if ((auraMask & (1ul << i)) == 0)
-                    continue;
-
-                PartyMemberAuraStates aura = new PartyMemberAuraStates();
-                aura.SpellId = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
-                    ? packet.ReadUInt32()
-                    : packet.ReadUInt16();
-                packet.ReadUInt8(); // unk
-                if (aura.SpellId != 0)
-                {
-                    aura.ActiveFlags = 1;
-                    aura.AuraFlags = (ushort)AuraFlagsModern.Positive;
-                }
-                state.Pet.Auras.Add(aura);
-            }
+            if (!packet.CanRead(8)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetAuras), 8, state);
+            state.Pet ??= new PartyMemberPetStats();
+            state.Pet.Auras ??= new List<PartyMemberAuraStates>();
+            if (!TryReadPartyMemberAuras(packet, state.Pet.Auras, auraEntrySize, Op, nameof(GroupUpdateFlagTBC.PetAuras))) return state;
         }
 
-        SendPacketToClient(state);
+        if (wotlk && updateFlags.HasFlag(GroupUpdateFlagTBC.VehicleSeat))
+        {
+            if (!packet.CanRead(4)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.VehicleSeat), 4, state);
+            state.VehicleSeatRecID = packet.ReadUInt32();
+        }
+
+        return state;
+    }
+
+    // Wrapper that returns the partially-populated state after warning. Lets callers do
+    // `return WarnTruncatedReturn(...)` in one line instead of WarnTruncated + return state.
+    private static T WarnTruncatedReturn<T>(string opcodeName, WorldPacket packet, string field, int needed, T state)
+    {
+        WarnTruncated(opcodeName, packet, field, needed);
+        return state;
+    }
+
+    // Consumes one player/pet aura section as written by 3.0+ legacy servers:
+    //   uint64 visible-aura mask, then for each set bit:
+    //     uint16 (pre-3.0) / uint32 (WotLK+) spell id
+    //     uint8  flags / type
+    // Returns false (with warn) if the per-entry payload runs short of what the mask claims.
+    // Older code iterated a hard-coded GetAuraSlotsCount which on WotLK underreads bits 56-63.
+    private static bool TryReadPartyMemberAuras(WorldPacket packet, List<PartyMemberAuraStates> output, int entrySize, string opcodeName, string field)
+    {
+        ulong auraMask = packet.ReadUInt64();
+        bool wotlk = entrySize == 5;
+        while (auraMask != 0)
+        {
+            // Pop the lowest set bit so the loop runs exactly once per aura entry written.
+            auraMask &= auraMask - 1;
+
+            if (!packet.CanRead(entrySize))
+            {
+                WarnTruncated(opcodeName, packet, field + "Entry", entrySize);
+                return false;
+            }
+
+            PartyMemberAuraStates aura = new PartyMemberAuraStates();
+            aura.SpellId = wotlk ? packet.ReadUInt32() : packet.ReadUInt16();
+            packet.ReadUInt8(); // aura flags / charge byte (unused by modern packet)
+            if (aura.SpellId != 0)
+            {
+                aura.ActiveFlags = 1;
+                aura.AuraFlags = (ushort)AuraFlagsModern.Positive;
+            }
+            output.Add(aura);
+        }
+        return true;
     }
 
     [PacketHandler(Opcode.SMSG_PARTY_MEMBER_FULL_STATE, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
@@ -994,7 +1075,15 @@ public partial class WorldClient
             }
         }
 
+        PartyMemberFullState state = ParsePartyMemberFullStateTbc(packet);
+        SendPacketToClient(state);
+    }
+
+    private PartyMemberFullState ParsePartyMemberFullStateTbc(WorldPacket packet)
+    {
         PartyMemberFullState state = new PartyMemberFullState();
+        const string Op = nameof(Opcode.SMSG_PARTY_MEMBER_PARTIAL_STATE);
+
         if (GetSession().GameState.IsInBattleground())
         {
             state.PartyType[0] = 0;
@@ -1006,151 +1095,154 @@ public partial class WorldClient
             state.PartyType[1] = 0;
         }
 
+        bool wotlk = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056);
+        int hpSize = wotlk ? 4 : 2;
+        int auraEntrySize = wotlk ? 5 : 3;
+
         // 3.0+ legacy server prefixes the packet with a "for enemy / group type" byte.
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
+        if (wotlk)
+        {
+            if (!packet.CanRead(1)) return WarnTruncatedReturn(Op, packet, nameof(PartyMemberFullState.ForEnemy), 1, state);
             packet.ReadUInt8(); // ForEnemy flag (not forwarded)
+        }
 
         state.MemberGuid = packet.ReadPackedGuid().To128(GetSession().GameState);
-        var updateFlags = (GroupUpdateFlagTBC)packet.ReadUInt32();
+
+        GroupUpdateFlagTBC updateFlags;
+        if (!packet.CanRead(4)) return WarnTruncatedReturn(Op, packet, nameof(updateFlags), 4, state);
+        updateFlags = (GroupUpdateFlagTBC)packet.ReadUInt32();
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.Status))
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.Status), 2, state);
             state.StatusFlags = (GroupMemberOnlineStatus)packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.CurrentHealth))
-            state.CurrentHealth = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
-                ? (int)packet.ReadUInt32()
-                : packet.ReadUInt16();
+        {
+            if (!packet.CanRead(hpSize)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.CurrentHealth), hpSize, state);
+            state.CurrentHealth = wotlk ? (int)packet.ReadUInt32() : packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.MaxHealth))
-            state.MaxHealth = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
-                ? (int)packet.ReadUInt32()
-                : packet.ReadUInt16();
+        {
+            if (!packet.CanRead(hpSize)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.MaxHealth), hpSize, state);
+            state.MaxHealth = wotlk ? (int)packet.ReadUInt32() : packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PowerType))
+        {
+            if (!packet.CanRead(1)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PowerType), 1, state);
             state.PowerType = packet.ReadUInt8();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.CurrentPower))
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.CurrentPower), 2, state);
             state.CurrentPower = packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.MaxPower))
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.MaxPower), 2, state);
             state.MaxPower = packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.Level))
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.Level), 2, state);
             state.Level = packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.Zone))
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.Zone), 2, state);
             state.ZoneID = packet.ReadUInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.Position))
         {
+            if (!packet.CanRead(4)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.Position), 4, state);
             state.PositionX = packet.ReadInt16();
             state.PositionY = packet.ReadInt16();
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.Auras))
         {
-            if (state.Auras == null)
-                state.Auras = new List<PartyMemberAuraStates>();
-
-            var auraMask = packet.ReadUInt64();
-
-            for (byte i = 0; i < LegacyVersion.GetAuraSlotsCount(); ++i)
-            {
-                if ((auraMask & (1ul << i)) == 0)
-                    continue;
-
-                PartyMemberAuraStates aura = new PartyMemberAuraStates();
-                aura.SpellId = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
-                    ? packet.ReadUInt32()
-                    : packet.ReadUInt16();
-                packet.ReadUInt8(); // unk
-                if (aura.SpellId != 0)
-                {
-                    aura.ActiveFlags = 1;
-                    aura.AuraFlags = (ushort)AuraFlagsModern.Positive;
-                }
-                state.Auras.Add(aura);
-            }
+            if (!packet.CanRead(8)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.Auras), 8, state);
+            state.Auras ??= new List<PartyMemberAuraStates>();
+            if (!TryReadPartyMemberAuras(packet, state.Auras, auraEntrySize, Op, nameof(GroupUpdateFlagTBC.Auras))) return state;
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetGuid))
         {
-            if (state.Pet == null)
-                state.Pet = new PartyMemberPetStats();
+            if (!packet.CanRead(8)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetGuid), 8, state);
+            state.Pet ??= new PartyMemberPetStats();
             state.Pet.NewPetGuid = packet.ReadGuid().To128(GetSession().GameState);
         }
 
-
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetName))
         {
-            if (state.Pet == null)
-                state.Pet = new PartyMemberPetStats();
+            if (!packet.CanRead(1)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetName), 1, state);
+            state.Pet ??= new PartyMemberPetStats();
             state.Pet.NewPetName = packet.ReadCString();
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetModelId))
         {
-            if (state.Pet == null)
-                state.Pet = new PartyMemberPetStats();
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetModelId), 2, state);
+            state.Pet ??= new PartyMemberPetStats();
             state.Pet.DisplayID = packet.ReadUInt16();
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetCurrentHealth))
         {
-            if (state.Pet == null)
-                state.Pet = new PartyMemberPetStats();
-            state.Pet.Health = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
-                ? packet.ReadUInt32()
-                : packet.ReadUInt16();
+            if (!packet.CanRead(hpSize)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetCurrentHealth), hpSize, state);
+            state.Pet ??= new PartyMemberPetStats();
+            state.Pet.Health = wotlk ? packet.ReadUInt32() : packet.ReadUInt16();
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetMaxHealth))
         {
-            if (state.Pet == null)
-                state.Pet = new PartyMemberPetStats();
-            state.Pet.MaxHealth = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
-                ? packet.ReadUInt32()
-                : packet.ReadUInt16();
+            if (!packet.CanRead(hpSize)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetMaxHealth), hpSize, state);
+            state.Pet ??= new PartyMemberPetStats();
+            state.Pet.MaxHealth = wotlk ? packet.ReadUInt32() : packet.ReadUInt16();
         }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetPowerType))
-            packet.ReadUInt8(); // Pet Power Type
+        {
+            if (!packet.CanRead(1)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetPowerType), 1, state);
+            packet.ReadUInt8();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetCurrentPower))
-            packet.ReadInt16(); // Pet Current Power
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetCurrentPower), 2, state);
+            packet.ReadInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetMaxPower))
-            packet.ReadInt16(); // Pet Max Power
+        {
+            if (!packet.CanRead(2)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetMaxPower), 2, state);
+            packet.ReadInt16();
+        }
 
         if (updateFlags.HasFlag(GroupUpdateFlagTBC.PetAuras))
         {
-            if (state.Pet == null)
-                state.Pet = new PartyMemberPetStats();
-            if (state.Pet.Auras == null)
-                state.Pet.Auras = new List<PartyMemberAuraStates>();
-
-            var auraMask = packet.ReadUInt64();
-
-            for (byte i = 0; i < LegacyVersion.GetAuraSlotsCount(); ++i)
-            {
-                if ((auraMask & (1ul << i)) == 0)
-                    continue;
-
-                PartyMemberAuraStates aura = new PartyMemberAuraStates();
-                aura.SpellId = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056)
-                    ? packet.ReadUInt32()
-                    : packet.ReadUInt16();
-                packet.ReadUInt8(); // unk
-                if (aura.SpellId != 0)
-                {
-                    aura.ActiveFlags = 1;
-                    aura.AuraFlags = (ushort)AuraFlagsModern.Positive;
-                }
-                state.Pet.Auras.Add(aura);
-            }
+            if (!packet.CanRead(8)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.PetAuras), 8, state);
+            state.Pet ??= new PartyMemberPetStats();
+            state.Pet.Auras ??= new List<PartyMemberAuraStates>();
+            if (!TryReadPartyMemberAuras(packet, state.Pet.Auras, auraEntrySize, Op, nameof(GroupUpdateFlagTBC.PetAuras))) return state;
         }
 
-        SendPacketToClient(state);
+        // WotLK trailing uint32 vehicle/mount seat id (see HandlePartyMemberStatsTbc).
+        if (wotlk && updateFlags.HasFlag(GroupUpdateFlagTBC.VehicleSeat))
+        {
+            if (!packet.CanRead(4)) return WarnTruncatedReturn(Op, packet, nameof(GroupUpdateFlagTBC.VehicleSeat), 4, state);
+            state.VehicleSeat = (int)packet.ReadUInt32();
+        }
+
+        return state;
     }
 
     [PacketHandler(Opcode.MSG_MINIMAP_PING)]
