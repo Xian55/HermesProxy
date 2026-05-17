@@ -4,6 +4,7 @@ using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 using System;
+using System.Collections.Generic;
 
 namespace HermesProxy.World.Client;
 
@@ -519,8 +520,16 @@ public partial class WorldClient
         //       uint32 WorldMapAreaID, uint32 FloorID, uint32 Unk3, uint32 Unk4,
         //       uint32 points.Count
         //       per point: int32 X, int32 Y
-        // Translate to V3_4_3 layout (CypherCore QuestPOIData at ObjectManager.cs:13841):
-        //   13 int32 fields per blob, X/Y/Z (int16) per point, AlwaysAllowMergingBlobs bit.
+        //
+        // Field mapping (verified against HermesProxy-WOTLK fork — the community version known
+        // to render the V3_4_3.54261 "Default Quest Helper" blue polygons):
+        //   legacy WorldMapAreaID → modern UiMapID (NO retail-style lookup translation —
+        //     the V3_4_3 client preserves legacy WMA IDs; transforming via UiMap.db2 lookup
+        //     breaks rendering)
+        //   legacy FloorID        → modern Flags (NOT Priority — fork comment "floorId in legacy")
+        //   legacy Unk3/Unk4      → discarded
+        // QuestObjectiveID synthesized from the cached QuestTemplate's objective IDs so the
+        // client can associate the blob with a specific objective row in its tracker.
         QuestPOIQueryResponse response = new();
         uint count = packet.ReadUInt32();
         for (uint i = 0; i < count; i++)
@@ -528,17 +537,34 @@ public partial class WorldClient
             QuestPOIData data = new();
             data.QuestID = (int)packet.ReadUInt32();
             uint blobCount = packet.ReadUInt32();
+            QuestTemplate? template = GameData.GetQuestTemplate((uint)data.QuestID);
             for (uint b = 0; b < blobCount; b++)
             {
                 QuestPOIBlobData blob = new();
                 blob.BlobIndex = (int)packet.ReadUInt32();
                 blob.ObjectiveIndex = packet.ReadInt32();
                 blob.MapID = (int)packet.ReadUInt32();
-                int worldMapAreaID = (int)packet.ReadUInt32();
-                blob.UiMapID = GameData.GetUiMapId(worldMapAreaID);
-                packet.ReadUInt32(); // FloorID — no V3_4_3 equivalent
-                packet.ReadUInt32(); // Unk3
-                packet.ReadUInt32(); // Unk4
+                // V3_4_3.54261 Classic client keeps LEGACY WorldMapAreaID semantics in the
+                // "UiMapID" wire field — despite the modern field name, it wants the raw
+                // legacy WMA (e.g. 41 for Teldrassil), not the modern UiMap.db2 ID (57).
+                // Diagnostic 2026-05-17: ours-with-lookup emitted 57 → no polygon; fork's
+                // raw-passthrough emits 41 → polygon renders. Match fork.
+                blob.UiMapID = (int)packet.ReadUInt32();
+                blob.Flags = (int)packet.ReadUInt32();   // legacy FloorID, repurposed as Flags
+                packet.ReadUInt32(); // Unk3 — discarded
+                packet.ReadUInt32(); // Unk4 — discarded
+                if (template != null && blob.ObjectiveIndex >= 0)
+                {
+                    foreach (QuestObjective objective in template.Objectives)
+                    {
+                        if (objective.StorageIndex == blob.ObjectiveIndex)
+                        {
+                            blob.QuestObjectiveID = (int)objective.Id;
+                            blob.QuestObjectID = objective.ObjectID;
+                            break;
+                        }
+                    }
+                }
                 uint pointsCount = packet.ReadUInt32();
                 for (uint p = 0; p < pointsCount; p++)
                 {
