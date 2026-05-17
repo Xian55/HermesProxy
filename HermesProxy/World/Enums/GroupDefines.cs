@@ -105,8 +105,9 @@ public enum GroupUpdateFlagTBC : uint
     PetCurrentPower  = 0x00010000,       // uint16 pet cur power
     PetMaxPower      = 0x00020000,       // uint16 pet max power
     PetAuras         = 0x00040000,       // uint64 mask, for each bit set uint16 spellid + uint8 unk, pet auras...
+    VehicleSeat      = 0x00080000,       // uint32 vehicle/mount seat id (WotLK addition; not present on TBC)
     Pet              = 0x0007FC00,       // all pet flags
-    Full             = 0x0007FFFF,       // all known flags
+    Full             = 0x000FFFFF,       // all known flags incl. WotLK VehicleSeat
 }
 
 enum PartyResultVanilla : uint
