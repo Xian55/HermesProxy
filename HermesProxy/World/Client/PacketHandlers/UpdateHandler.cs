@@ -188,6 +188,8 @@ public partial class WorldClient
                     AuraUpdate auraUpdate = new AuraUpdate(guid, true);
                     ReadCreateObjectBlock(packet, ref guid, updateData, auraUpdate, i);
 
+                    TraceNpcBotCreateObject("CreateObject1", oldGuid, guid, updateData);
+
                     // The TC reference parse (CypherCoreClassicWOTLK World_login_parsed.txt
                     // packet #140) sends the player as CreateObject1, not CreateObject2 —
                     // the player is part of the first 15-object UPDATE_OBJECT batch and
@@ -267,6 +269,8 @@ public partial class WorldClient
                     ObjectUpdate updateData = new ObjectUpdate(guid, UpdateTypeModern.CreateObject2, GetSession());
                     AuraUpdate auraUpdate = new AuraUpdate(guid, true);
                     ReadCreateObjectBlock(packet, ref guid, updateData, auraUpdate, i);
+
+                    TraceNpcBotCreateObject("CreateObject2", oldGuid, guid, updateData);
 
                     if (guid.IsItem() && updateData.ObjectData.EntryID != null &&
                        !GameData.ItemTemplates.ContainsKey((uint)updateData.ObjectData.EntryID))
@@ -3863,5 +3867,49 @@ public partial class WorldClient
                 updateData.CorpseData.DynamicFlags = updates[CORPSE_FIELD_DYNAMIC_FLAGS].UInt32Value;
             }
         }
+    }
+
+    // Dump the rendering-relevant Values fields for NPCBot creatures so we can debug the
+    // "hired bot is invisible until I mount" reports. Triggered for any Creature CreateObject
+    // whose legacy entry sits in the NPCBot range (>= 70000) so the trace stays quiet for
+    // regular world creatures.
+    private static void TraceNpcBotCreateObject(string source, WowGuid64 oldGuid, WowGuid128 guid, ObjectUpdate updateData)
+    {
+        // Cheap gates first — bail before doing any string work when the trace sink is off
+        // or the object isn't in the NPCBot entry range.
+        if (!Log.IsTraceEnabled)
+            return;
+
+        if (oldGuid.GetHighType() != HighGuidType.Creature)
+            return;
+
+        uint entry = oldGuid.GetEntry();
+        if (entry < 70000)
+            return;
+
+        var u = updateData.UnitData;
+        var o = updateData.ObjectData;
+        var pos = updateData.CreateData?.MoveInfo?.Position;
+
+        Log.Print(LogType.Trace,
+            $"[NpcBotTrace][{source}] guid={guid} entry={entry} " +
+            $"DisplayID={u?.DisplayID?.ToString() ?? "null"} " +
+            $"NativeDisplayID={u?.NativeDisplayID?.ToString() ?? "null"} " +
+            $"MountDisplayID={u?.MountDisplayID?.ToString() ?? "null"} " +
+            $"Race={u?.RaceId?.ToString() ?? "null"} " +
+            $"Class={u?.ClassId?.ToString() ?? "null"} " +
+            $"Sex={u?.SexId?.ToString() ?? "null"} " +
+            $"Faction={u?.FactionTemplate?.ToString() ?? "null"} " +
+            $"Flags=0x{(u?.Flags ?? 0):X8} " +
+            $"Flags2=0x{(u?.Flags2 ?? 0):X8} " +
+            $"Bounding={u?.BoundingRadius?.ToString("F3") ?? "null"} " +
+            $"CombatReach={u?.CombatReach?.ToString("F3") ?? "null"} " +
+            $"Scale={o?.Scale?.ToString("F3") ?? "null"} " +
+            $"DynFlags=0x{(o?.DynamicFlags ?? 0):X8} " +
+            $"CreatedBy={u?.CreatedBy?.ToString() ?? "null"} " +
+            $"SummonedBy={u?.SummonedBy?.ToString() ?? "null"} " +
+            $"Charm={u?.Charm?.ToString() ?? "null"} " +
+            $"CharmedBy={u?.CharmedBy?.ToString() ?? "null"} " +
+            $"Pos=({pos?.X.ToString("F2") ?? "?"},{pos?.Y.ToString("F2") ?? "?"},{pos?.Z.ToString("F2") ?? "?"})");
     }
 }
