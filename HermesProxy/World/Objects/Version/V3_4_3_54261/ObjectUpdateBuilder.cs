@@ -474,6 +474,55 @@ public class ObjectUpdateBuilder
         data.WriteUInt32((container?.NumSlots).GetValueOrDefault());
     }
 
+    // NPCBot / Playerbot frameworks (e.g. trickerer/Trinity-Bots) stamp UNIT_FLAG2_CLONED
+    // (0x10) on every bot creature and populate CreatedBy with the owning player's GUID.
+    // The V3_4_3 client treats CLONED as "render the appearance of CreatedBy"; when
+    // CreatedBy is the local player, the client refuses to render anything (it won't
+    // self-clone), which is why a hired bot is invisible until its mount mesh attaches
+    // and the mount renderer takes over independently of CLONED.
+    //
+    // Strip the bit unconditionally for any Creature-typed object on V3_4_3 so the bot
+    // renders via its real DisplayID. Real Mage Mirror Image (creature entry 31216) also
+    // sets CLONED; it relies on SPELL_AURA_MIRROR_IMAGE (effect 218) for the actual
+    // appearance copy, so stripping the flag should leave the clones rendering via their
+    // own (already mage-shaped) DisplayID instead of invisible. Revisit if Mirror Image
+    // visuals regress.
+    private const uint UNIT_FLAG2_CLONED = 0x00000010;
+    private uint SanitizeFlags2(uint flags2, WowGuid128? createdBy)
+    {
+        if ((flags2 & UNIT_FLAG2_CLONED) == 0)
+            return flags2;
+
+        bool isCreature = _updateData.Guid.GetHighType() == HighGuidType.Creature;
+        uint outFlags = isCreature ? (flags2 & ~UNIT_FLAG2_CLONED) : flags2;
+
+        if (Framework.Logging.Log.IsTraceEnabled)
+        {
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[SanitizeFlags2] guid={_updateData.Guid} highType={_updateData.Guid.GetHighType()} in=0x{flags2:X8} out=0x{outFlags:X8} stripped={isCreature} createdBy={(createdBy?.ToString() ?? "null")}");
+        }
+        return outFlags;
+    }
+
+    // NPCBot/Playerbot creatures wear a player-race DisplayID (e.g. Draenei Male = 17247)
+    // AND set RaceId/ClassId/SexId on the creature so internal AI works. The V3_4_3 client
+    // appears to interpret a creature carrying Race/Class/Sex as a modern-bake character
+    // and tries to look up ChrCustomization records the proxy never forwards — the model
+    // loads but textures don't bake, leaving the bot rendered as a flat-white silhouette.
+    // Real NPCs that share these DisplayIDs (e.g. Velen) leave Race=Class=Sex=0 and render
+    // textured via the CreatureDisplayInfoExtra bake path.
+    //
+    // Detection signal: Creature-typed GUID + CLONED bit on Flags2 (NPCBot stamps it on
+    // every bot creature). Zero Race/Class/Sex on the wire for those objects so the client
+    // takes the legacy bake path.
+    private bool IsImpersonatingCreatureBake()
+    {
+        if (_updateData.Guid.GetHighType() != HighGuidType.Creature) return false;
+        var unit = _updateData.UnitData;
+        if (unit == null || !unit.Flags2.HasValue) return false;
+        return (unit.Flags2.Value & UNIT_FLAG2_CLONED) != 0;
+    }
+
     private void WriteCreateUnitData(WorldPacket data)
     {
         var unit = _updateData.UnitData ?? new UnitData();
@@ -501,10 +550,11 @@ public class ObjectUpdateBuilder
         data.WriteInt32(unit.ChannelData?.SpellID ?? 0);
         data.WriteInt32(unit.ChannelData?.SpellXSpellVisualID ?? 0);
         data.WriteUInt32(0u);
-        data.WriteUInt8(unit.RaceId.GetValueOrDefault());
-        data.WriteUInt8(unit.ClassId.GetValueOrDefault());
+        bool zeroCharBakeIds = IsImpersonatingCreatureBake();
+        data.WriteUInt8(zeroCharBakeIds ? (byte)0 : unit.RaceId.GetValueOrDefault());
+        data.WriteUInt8(zeroCharBakeIds ? (byte)0 : unit.ClassId.GetValueOrDefault());
         data.WriteUInt8(unit.PlayerClassId.GetValueOrDefault());
-        data.WriteUInt8(unit.SexId.GetValueOrDefault());
+        data.WriteUInt8(zeroCharBakeIds ? (byte)0 : unit.SexId.GetValueOrDefault());
         // DisplayPower (PowerType enum: Mana=0/Rage=1/Focus=2/Energy=3/...).
         // Was hardcoded to 0 (Mana), so warriors saw an empty rage bar — the
         // V3_4_3 client UI binds the player power widget to the slot matching
@@ -559,7 +609,7 @@ public class ObjectUpdateBuilder
             data.WriteUInt16(0);
         }
         data.WriteUInt32(unit.Flags.GetValueOrDefault());
-        data.WriteUInt32(unit.Flags2.GetValueOrDefault());
+        data.WriteUInt32(SanitizeFlags2(unit.Flags2.GetValueOrDefault(), unit.CreatedBy));
         data.WriteUInt32(0u);
         data.WriteUInt32(unit.AuraState.GetValueOrDefault());
         for (int m = 0; m < 2; m++)
@@ -2073,17 +2123,18 @@ public class ObjectUpdateBuilder
                 data.WriteInt32(unit.ChannelData.Value.SpellID);
                 data.WriteInt32(unit.ChannelData.Value.SpellXSpellVisualID);
             }
+            bool zeroCharBakeIds = IsImpersonatingCreatureBake();
             if (unit.RaceId.HasValue)
             {
-                data.WriteUInt8(unit.RaceId.Value);
+                data.WriteUInt8(zeroCharBakeIds ? (byte)0 : unit.RaceId.Value);
             }
             if (unit.ClassId.HasValue)
             {
-                data.WriteUInt8(unit.ClassId.Value);
+                data.WriteUInt8(zeroCharBakeIds ? (byte)0 : unit.ClassId.Value);
             }
             if (unit.SexId.HasValue)
             {
-                data.WriteUInt8(unit.SexId.Value);
+                data.WriteUInt8(zeroCharBakeIds ? (byte)0 : unit.SexId.Value);
             }
             // V3_4_3 client reads DisplayPower as a single byte (WPP UpdateFieldsHandler343
             // line 926 + TC wotlk_classic UpdateFields.h: `UpdateField<uint8, 0, 30> DisplayPower`).
@@ -2116,7 +2167,7 @@ public class ObjectUpdateBuilder
             }
             if (unit.Flags2.HasValue)
             {
-                data.WriteUInt32(unit.Flags2.Value);
+                data.WriteUInt32(SanitizeFlags2(unit.Flags2.Value, unit.CreatedBy));
             }
             if (unit.Flags3.HasValue) data.WriteUInt32(unit.Flags3.Value);
             if (unit.AuraState.HasValue)
@@ -3383,10 +3434,11 @@ public class ObjectUpdateBuilder
     public void WriteToPacket(WorldPacket packet)
     {
         int startPos = packet.GetData().Length;
+        bool traceOn = Framework.Logging.Log.IsTraceEnabled;
 
         // Phase 5a diagnostic — log the player's UnitData fields most likely to cause
         // ERROR #132 ACCESS_VIOLATION crashes (null model dereference).
-        if (_updateData.UnitData != null && _objectType == ObjectTypeBCC.ActivePlayer)
+        if (traceOn && _updateData.UnitData != null && _objectType == ObjectTypeBCC.ActivePlayer)
         {
             var u = _updateData.UnitData;
             Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
@@ -3405,7 +3457,7 @@ public class ObjectUpdateBuilder
         {
             packet.WriteUInt8(ConvertTypeId(_objectType));
             SetCreateObjectBits();
-            if (_objectType == ObjectTypeBCC.ActivePlayer)
+            if (traceOn && _objectType == ObjectTypeBCC.ActivePlayer)
             {
                 Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
                     $"[Phase5aTrace] ActivePlayer createBits=0x{(uint)_createBits:X} " +
@@ -3421,7 +3473,7 @@ public class ObjectUpdateBuilder
         // Hex-dump the produced packet body so we can correlate with the client crash dump.
         // Limited to first 80 bytes to avoid log spam — the header + first descriptor section
         // is enough to identify which object type was being written.
-        if (_objectType == ObjectTypeBCC.ActivePlayer)
+        if (traceOn && _objectType == ObjectTypeBCC.ActivePlayer)
         {
             byte[] all = packet.GetData();
             int len = all.Length - startPos;
@@ -3434,7 +3486,8 @@ public class ObjectUpdateBuilder
         // Phase 5a-7c diagnostic — dump the wire bytes for Transport/GameObject creates
         // so we can byte-diff against the fork's working output. Per-object, capped at 200
         // bytes so a populated Stormwind area (5+ MOTransports) doesn't drown the log.
-        if (_updateData.Type != UpdateTypeModern.Values
+        if (traceOn
+            && _updateData.Type != UpdateTypeModern.Values
             && _objectType == ObjectTypeBCC.GameObject)
         {
             byte[] all = packet.GetData();
@@ -3451,6 +3504,22 @@ public class ObjectUpdateBuilder
                 $"flags=0x{go?.Flags?.ToString("X") ?? "null"} " +
                 $"pos=({moveInfo?.Position.X.ToString("F2") ?? "?"},{moveInfo?.Position.Y.ToString("F2") ?? "?"},{moveInfo?.Position.Z.ToString("F2") ?? "?"}) " +
                 $"orient={moveInfo?.Orientation.ToString("F3") ?? "?"} bytes={len} first200={hex}");
+        }
+
+        // NPCBot-render diagnostic — dump the first ~256 bytes of any Creature-typed
+        // CreateObject so we can see the actual Flags2 byte that hit the wire (and confirm
+        // whether SanitizeFlags2 stripped UNIT_FLAG2_CLONED before emit).
+        if (traceOn
+            && _updateData.Type != UpdateTypeModern.Values
+            && _updateData.Guid.GetHighType() == HighGuidType.Creature)
+        {
+            byte[] all = packet.GetData();
+            int len = all.Length - startPos;
+            int dumpLen = Math.Min(256, len);
+            string hex = BitConverter.ToString(all, startPos, dumpLen);
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[CreateObjectHex] guid={_updateData.Guid} entry={_updateData.ObjectData?.EntryID?.ToString() ?? "null"} " +
+                $"type={_objectType} bytes={len} first256={hex}");
         }
     }
 }
