@@ -19,7 +19,7 @@ namespace HermesProxy.World.Objects.Version.V3_4_3_54261;
 // Phase 5a hand-port of the WotLK Classic 3.4.3 descriptor-tree serializer.
 // Phases 5b–5e progressively replace sections with source-generator output,
 // using this hand-port as the byte-equivalence test oracle.
-public class ObjectUpdateBuilder
+public partial class ObjectUpdateBuilder
 {
     private readonly ObjectUpdate _updateData;
     private readonly GameSessionData _gameState;
@@ -348,131 +348,295 @@ public class ObjectUpdateBuilder
             data.WriteVector3(vec);
     }
 
-    private void WriteCreateObjectData(WorldPacket data)
-    {
-        var obj = _updateData.ObjectData;
-        data.WriteInt32(obj.EntryID.GetValueOrDefault());
-        data.WriteUInt32(obj.DynamicFlags.GetValueOrDefault());
-        data.WriteFloat(obj.Scale ?? 1f);
-    }
+    // WriteCreateObjectData emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator
+    // from [DescriptorCreateField] attributes on V3_4_3_54261.ObjectField enum members.
+    // See HermesProxy/obj/Generated/HermesProxy.SourceGen/.../V3_4_3_54261.ObjectUpdateBuilder.g.cs
 
-    private void WriteCreateItemData(WorldPacket data)
+    // WriteCreateItemData + WriteUpdateItemData + HasAnyItemFieldSet emitted by
+    // HermesProxy.SourceGen.ObjectUpdateBuilderGenerator from
+    // V3_4_3_54261.ItemField. WriteEmptyItemCreate was equivalent to
+    // WriteCreateItemData(new ItemData()) — generator subsumes both.
+    //
+    // Custom writers for the per-element ItemEnchantment[13] nested-struct payload.
+    // Referenced by [DescriptorCreateField(CustomWriter = "WriteEnchantmentCreate")]
+    // and [DescriptorUpdateField(CustomWriter = "WriteEnchantmentUpdate")] on
+    // ITEM_ENCHANTMENT in V3_4_3_54261.ItemField.
+    internal void WriteEnchantmentCreate(WorldPacket data, ItemEnchantment[] arr, int i)
     {
-        var item = _updateData.ItemData;
-        if (item == null)
+        var ench = arr[i];
+        if (ench != null)
         {
-            WriteEmptyItemCreate(data);
-            return;
+            data.WriteInt32(ench.ID.GetValueOrDefault());
+            data.WriteUInt32(ench.Duration.GetValueOrDefault());
+            data.WriteInt16((short)ench.Charges.GetValueOrDefault());
+            data.WriteUInt16(ench.Inactive.GetValueOrDefault());
         }
-        data.WritePackedGuid128(item.Owner ?? WowGuid128.Empty);
-        data.WritePackedGuid128(item.ContainedIn ?? WowGuid128.Empty);
-        data.WritePackedGuid128(item.Creator ?? WowGuid128.Empty);
-        data.WritePackedGuid128(item.GiftCreator ?? WowGuid128.Empty);
-        if (IsOwner)
-        {
-            data.WriteUInt32(item.StackCount.GetValueOrDefault());
-            data.WriteUInt32(item.Duration.GetValueOrDefault());
-            for (int i = 0; i < 5; i++)
-                data.WriteInt32(item.SpellCharges[i].GetValueOrDefault());
-        }
-        data.WriteUInt32(item.Flags.GetValueOrDefault());
-        for (int j = 0; j < 13; j++)
-        {
-            var ench = item.Enchantment[j];
-            if (ench != null)
-            {
-                data.WriteInt32(ench.ID.GetValueOrDefault());
-                data.WriteUInt32(ench.Duration.GetValueOrDefault());
-                data.WriteInt16((short)ench.Charges.GetValueOrDefault());
-                data.WriteUInt16(ench.Inactive.GetValueOrDefault());
-            }
-            else
-            {
-                data.WriteInt32(0);
-                data.WriteUInt32(0u);
-                data.WriteInt16(0);
-                data.WriteUInt16(0);
-            }
-        }
-        data.WriteInt32((int)item.PropertySeed.GetValueOrDefault());
-        data.WriteInt32((int)item.RandomProperty.GetValueOrDefault());
-        if (IsOwner)
-        {
-            data.WriteUInt32(item.Durability.GetValueOrDefault());
-            data.WriteUInt32(item.MaxDurability.GetValueOrDefault());
-        }
-        data.WriteUInt32(item.CreatePlayedTime.GetValueOrDefault());
-        data.WriteInt32(0);
-        data.WriteInt64(0L);
-        if (IsOwner)
-        {
-            data.WriteUInt64(0uL);
-            data.WriteUInt8(0);
-        }
-        data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
-        if (IsOwner)
-            data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
-        if (IsOwner)
-            data.WriteUInt16(0);
-        data.WriteBits(0u, 6);
-        data.FlushBits();
-    }
-
-    private void WriteEmptyItemCreate(WorldPacket data)
-    {
-        for (int i = 0; i < 4; i++)
-            data.WritePackedGuid128(WowGuid128.Empty);
-        if (IsOwner)
-        {
-            data.WriteUInt32(0u);
-            data.WriteUInt32(0u);
-            for (int j = 0; j < 5; j++)
-                data.WriteInt32(0);
-        }
-        data.WriteUInt32(0u);
-        for (int k = 0; k < 13; k++)
+        else
         {
             data.WriteInt32(0);
             data.WriteUInt32(0u);
             data.WriteInt16(0);
             data.WriteUInt16(0);
         }
-        data.WriteInt32(0);
-        data.WriteInt32(0);
-        if (IsOwner)
-        {
-            data.WriteUInt32(0u);
-            data.WriteUInt32(0u);
-        }
-        data.WriteUInt32(0u);
-        data.WriteInt32(0);
-        data.WriteInt64(0L);
-        if (IsOwner)
-        {
-            data.WriteUInt64(0uL);
-            data.WriteUInt8(0);
-        }
-        data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
-        if (IsOwner)
-            data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
-        if (IsOwner)
-            data.WriteUInt16(0);
-        data.WriteBits(0u, 6);
-        data.FlushBits();
     }
 
-    private void WriteCreateContainerData(WorldPacket data)
+    internal void WriteEnchantmentUpdate(WorldPacket data, ItemEnchantment[] arr, int i)
     {
-        var container = _updateData.ContainerData;
-        for (int i = 0; i < 36; i++)
-            data.WritePackedGuid128(container?.Slots[i] ?? WowGuid128.Empty);
-        data.WriteUInt32((container?.NumSlots).GetValueOrDefault());
+        var ench = arr[i];   // guaranteed non-null — caller gates on element bit
+        uint enchMask = 0;
+        if (ench.ID.HasValue) enchMask |= 2;
+        if (ench.Duration.HasValue) enchMask |= 4;
+        if (ench.Charges.HasValue) enchMask |= 8;
+        if (enchMask != 0) enchMask |= 1;
+        data.WriteBits(enchMask, 4);
+        data.FlushBits();
+        if (ench.ID.HasValue) data.WriteInt32(ench.ID.Value);
+        if (ench.Duration.HasValue) data.WriteUInt32(ench.Duration.Value);
+        if (ench.Charges.HasValue) data.WriteUInt16(ench.Charges.Value);
+    }
+
+    // WriteCreateContainerData emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator
+    // from V3_4_3_54261.ContainerField.
+
+    // -----------------------------------------------------------------------------------
+    // Unit Create custom writers — referenced by V3_4_3_54261.UnitField placeholder
+    // members with CustomWriter set. Each method takes (WorldPacket data, UnitData src)
+    // matching the generator's emitted call shape. IsOwner gating is applied by the
+    // generator before invocation when the placeholder declares OwnerOnly = true.
+    // -----------------------------------------------------------------------------------
+
+    internal void WriteCreateUnitRaceId(WorldPacket data, UnitData src)
+    {
+        bool zeroCharBakeIds = IsImpersonatingCreatureBake();
+        data.WriteUInt8(zeroCharBakeIds ? (byte)0 : src.RaceId.GetValueOrDefault());
+    }
+
+    internal void WriteCreateUnitClassId(WorldPacket data, UnitData src)
+    {
+        bool zeroCharBakeIds = IsImpersonatingCreatureBake();
+        data.WriteUInt8(zeroCharBakeIds ? (byte)0 : src.ClassId.GetValueOrDefault());
+    }
+
+    internal void WriteCreateUnitSexId(WorldPacket data, UnitData src)
+    {
+        bool zeroCharBakeIds = IsImpersonatingCreatureBake();
+        data.WriteUInt8(zeroCharBakeIds ? (byte)0 : src.SexId.GetValueOrDefault());
+    }
+
+    internal void WriteCreateUnitChannelDataInline(WorldPacket data, UnitData src)
+    {
+        data.WriteInt32(src.ChannelData?.SpellID ?? 0);
+        data.WriteInt32(src.ChannelData?.SpellXSpellVisualID ?? 0);
+    }
+
+    internal void WriteCreateUnitOwnerFloatPairs(WorldPacket data, UnitData src)
+    {
+        // IF IsOwner: 10× (Float 0, Float 0). Generator wraps the call in if (IsOwner).
+        for (int j = 0; j < 10; j++)
+        {
+            data.WriteFloat(0f);
+            data.WriteFloat(0f);
+        }
+    }
+
+    internal void WriteCreateUnitPowerInterleaved(WorldPacket data, UnitData src)
+    {
+        // 10 iterations × (Power[k] if k<7 else 0, MaxPower[k] if k<7 else 0, Float 0)
+        for (int k = 0; k < 10; k++)
+        {
+            data.WriteInt32(k < 7 ? src.Power[k].GetValueOrDefault() : 0);
+            data.WriteInt32(k < 7 ? src.MaxPower[k].GetValueOrDefault() : 0);
+            data.WriteFloat(0f);
+        }
+    }
+
+    internal void WriteCreateUnitEffectiveLevel(WorldPacket data, UnitData src)
+    {
+        data.WriteInt32(src.EffectiveLevel ?? src.Level.GetValueOrDefault());
+    }
+
+    internal void WriteCreateUnitVirtualItems(WorldPacket data, UnitData src)
+    {
+        for (int l = 0; l < 3; l++)
+        {
+            int vItemId = src.VirtualItems != null && src.VirtualItems[l] is VisibleItem vi ? vi.ItemID : 0;
+            // Players don't populate VirtualItems server-side (use PLAYER_VISIBLE_ITEM
+            // descriptors instead). For the local player, fall back to PlayerData.VisibleItems:
+            // slot 0=mainhand(15), 1=offhand(16), 2=ranged(17).
+            if (vItemId == 0 && IsOwner && _updateData.PlayerData?.VisibleItems != null)
+            {
+                int playerSlot = 15 + l;
+                if (playerSlot < _updateData.PlayerData.VisibleItems.Length
+                    && _updateData.PlayerData.VisibleItems[playerSlot] is VisibleItem pv && pv.ItemID != 0)
+                {
+                    vItemId = pv.ItemID;
+                }
+            }
+            data.WriteInt32(vItemId);
+            data.WriteUInt16(0);
+            data.WriteUInt16(0);
+        }
+    }
+
+    internal void WriteCreateUnitFlags2Sanitized(WorldPacket data, UnitData src)
+    {
+        data.WriteUInt32(SanitizeFlags2(src.Flags2.GetValueOrDefault(), src.CreatedBy));
+    }
+
+    internal void WriteCreateUnitRangedAttackTime(WorldPacket data, UnitData src)
+    {
+        // IF IsOwner: bow-default fallback. Generator wraps in if (IsOwner) already.
+        uint rangedTime = src.RangedAttackRoundBaseTime.GetValueOrDefault();
+        if (rangedTime == 0 && _updateData.PlayerData?.VisibleItems != null
+            && _updateData.PlayerData.VisibleItems.Length > 17
+            && _updateData.PlayerData.VisibleItems[17] is VisibleItem ranged && ranged.ItemID != 0)
+        {
+            rangedTime = 2300;
+        }
+        data.WriteUInt32(rangedTime);
+    }
+
+    internal void WriteCreateUnitStatsInterleaved(WorldPacket data, UnitData src)
+    {
+        // IF IsOwner: 5 slots × (Stats[n], StatPosBuff[n], StatNegBuff[n]).
+        for (int n = 0; n < 5; n++)
+        {
+            data.WriteInt32(src.Stats?[n].GetValueOrDefault() ?? 0);
+            data.WriteInt32(src.StatPosBuff?[n].GetValueOrDefault() ?? 0);
+            data.WriteInt32(src.StatNegBuff?[n].GetValueOrDefault() ?? 0);
+        }
+    }
+
+    internal void WriteCreateUnitResistances(WorldPacket data, UnitData src)
+    {
+        // IF IsOwner: 7× Resistances Int32.
+        for (int r = 0; r < 7; r++)
+            data.WriteInt32(src.Resistances?[r].GetValueOrDefault() ?? 0);
+    }
+
+    internal void WriteCreateUnitPowerCostInterleaved(WorldPacket data, UnitData src)
+    {
+        // IF IsOwner: 7 slots × (PowerCostModifier[p] Int32, PowerCostMultiplier[p] Float).
+        for (int p = 0; p < 7; p++)
+        {
+            data.WriteInt32(src.PowerCostModifier?[p].GetValueOrDefault() ?? 0);
+            data.WriteFloat(src.PowerCostMultiplier?[p].GetValueOrDefault() ?? 0f);
+        }
+    }
+
+    internal void WriteCreateUnitResistanceBuffModsInterleaved(WorldPacket data, UnitData src)
+    {
+        // 7 slots × (ResistanceBuffModsPositive[b] Int32, ResistanceBuffModsNegative[b] Int32).
+        for (int b = 0; b < 7; b++)
+        {
+            data.WriteInt32(src.ResistanceBuffModsPositive?[b].GetValueOrDefault() ?? 0);
+            data.WriteInt32(src.ResistanceBuffModsNegative?[b].GetValueOrDefault() ?? 0);
+        }
+    }
+
+    internal void WriteCreateUnitChannelObjectsCount(WorldPacket data, UnitData src)
+    {
+        bool hasChannelObject = src.ChannelObject.HasValue && !src.ChannelObject.Value.IsEmpty();
+        data.WriteUInt32(hasChannelObject ? 1u : 0u);
+    }
+
+    internal void WriteCreateUnitChannelObjectsBody(WorldPacket data, UnitData src)
+    {
+        if (src.ChannelObject.HasValue && !src.ChannelObject.Value.IsEmpty())
+            data.WritePackedGuid128(src.ChannelObject.Value);
+    }
+
+    // -----------------------------------------------------------------------------------
+    // Unit Update custom writers — referenced by V3_4_3_54261.UnitField update-side
+    // attributes. Scalar CustomWriter sig: (WorldPacket, UnitData). Synthetic group +
+    // mask-preamble sig: (WorldPacket, ref StackBitMask, UnitData). Per-element array
+    // CustomWriter sig: (WorldPacket, VisibleItem[], int).
+    // -----------------------------------------------------------------------------------
+
+    internal void WriteUpdateUnitFlags2(WorldPacket data, UnitData src)
+    {
+        data.WriteUInt32(SanitizeFlags2(src.Flags2.Value, src.CreatedBy));
+    }
+
+    internal void WriteUpdateUnitChannelDataInline(WorldPacket data, UnitData src)
+    {
+        // ChannelData composite: 2× Int32 (SpellID + SpellXSpellVisualID). No inner mask,
+        // no FlushBits — TC UpdateFields.cs UnitChannel.WriteUpdate writes raw fields.
+        // The pre-Phase-5b bug history (file:2112-2127 pre-delete) was an erroneous
+        // inner-mask emit that shifted SpellID by 1 byte.
+        data.WriteInt32(src.ChannelData.Value.SpellID);
+        data.WriteInt32(src.ChannelData.Value.SpellXSpellVisualID);
+    }
+
+    internal void WriteUpdateUnitChannelObjectsMaskPreamble(WorldPacket data, ref Framework.Util.StackBitMask blocks, UnitData src)
+    {
+        // DynamicUpdateField preamble for ChannelObjects: 32-bit size + per-element bitmask.
+        // Runs between blocks-mask prefix write and FlushBits (bit-aligned to the prefix,
+        // not byte-aligned with field payload).
+        uint channelObjectsSize = (src.ChannelObject.HasValue && !src.ChannelObject.Value.IsEmpty()) ? 1u : 0u;
+        data.WriteBits(channelObjectsSize, 32);
+        if (channelObjectsSize != 0)
+            data.WriteBits(0xFFFFFFFFu, (int)channelObjectsSize);
+    }
+
+    internal void WriteUpdateUnitChannelObjectsBody(WorldPacket data, UnitData src)
+    {
+        data.WritePackedGuid128(src.ChannelObject.Value);
+    }
+
+    internal void WriteUpdateUnitVirtualItem(WorldPacket data, System.Nullable<VisibleItem>[] arr, int i)
+    {
+        // VirtualItem inner mask: 4-bit (bit 0 = group, 1 = ItemID present). Hand-port
+        // (file:2308-2316 pre-delete) emits mask 0x03 then Int32 ItemID.
+        data.WriteBits(0x03u, 4);
+        data.FlushBits();
+        var vItem = arr[i];
+        data.WriteInt32(vItem.HasValue ? vItem.Value.ItemID : 0);
+    }
+
+    internal void WriteUpdateUnitPowerGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, UnitData src)
+    {
+        int maxLen = 7;
+        if (src.Power != null && src.Power.Length > maxLen) maxLen = src.Power.Length;
+        if (src.MaxPower != null && src.MaxPower.Length > maxLen) maxLen = src.MaxPower.Length;
+        for (int pi = 0; pi < maxLen; pi++)
+        {
+            if (src.Power != null && pi < src.Power.Length && src.Power[pi].HasValue)
+                data.WriteInt32(src.Power[pi].Value);
+            if (src.MaxPower != null && pi < src.MaxPower.Length && src.MaxPower[pi].HasValue)
+                data.WriteInt32(src.MaxPower[pi].Value);
+            if (src.ModPowerRegen != null && pi < src.ModPowerRegen.Length && src.ModPowerRegen[pi].HasValue)
+                data.WriteFloat(src.ModPowerRegen[pi].Value);
+        }
+    }
+
+    internal void WriteUpdateUnitStatsGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, UnitData src)
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            if (src.Stats != null && src.Stats[i].HasValue) data.WriteInt32(src.Stats[i].Value);
+            if (src.StatPosBuff != null && src.StatPosBuff[i].HasValue) data.WriteInt32(src.StatPosBuff[i].Value);
+            if (src.StatNegBuff != null && src.StatNegBuff[i].HasValue) data.WriteInt32(src.StatNegBuff[i].Value);
+        }
+    }
+
+    internal void WriteUpdateUnitResistancesGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, UnitData src)
+    {
+        for (int i = 0; i < 7; i++)
+        {
+            if (src.Resistances != null && src.Resistances[i].HasValue) data.WriteInt32(src.Resistances[i].Value);
+            if (src.PowerCostModifier != null && src.PowerCostModifier[i].HasValue) data.WriteInt32(src.PowerCostModifier[i].Value);
+            if (src.PowerCostMultiplier != null && src.PowerCostMultiplier[i].HasValue) data.WriteFloat(src.PowerCostMultiplier[i].Value);
+        }
+    }
+
+    internal void WriteUpdateUnitResistanceBuffModsGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, UnitData src)
+    {
+        for (int i = 0; i < 7; i++)
+        {
+            if (src.ResistanceBuffModsPositive != null && src.ResistanceBuffModsPositive[i].HasValue) data.WriteInt32(src.ResistanceBuffModsPositive[i].Value);
+            if (src.ResistanceBuffModsNegative != null && src.ResistanceBuffModsNegative[i].HasValue) data.WriteInt32(src.ResistanceBuffModsNegative[i].Value);
+        }
     }
 
     // NPCBot / Playerbot frameworks (e.g. trickerer/Trinity-Bots) stamp UNIT_FLAG2_CLONED
@@ -524,287 +688,61 @@ public class ObjectUpdateBuilder
         return (unit.Flags2.Value & UNIT_FLAG2_CLONED) != 0;
     }
 
-    private void WriteCreateUnitData(WorldPacket data)
-    {
-        var unit = _updateData.UnitData ?? new UnitData();
-        data.WriteInt64(unit.Health.GetValueOrDefault());
-        data.WriteInt64(unit.MaxHealth.GetValueOrDefault());
-        data.WriteInt32(unit.DisplayID.GetValueOrDefault());
-        for (int i = 0; i < 2; i++)
-            data.WriteUInt32(unit.NpcFlags?[i].GetValueOrDefault() ?? 0);
-        data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
-        data.WritePackedGuid128(unit.Charm ?? WowGuid128.Empty);
-        data.WritePackedGuid128(unit.Summon ?? WowGuid128.Empty);
-        if (IsOwner)
-            data.WritePackedGuid128(unit.Critter ?? WowGuid128.Empty);
-        data.WritePackedGuid128(unit.CharmedBy ?? WowGuid128.Empty);
-        data.WritePackedGuid128(unit.SummonedBy ?? WowGuid128.Empty);
-        data.WritePackedGuid128(unit.CreatedBy ?? WowGuid128.Empty);
-        data.WritePackedGuid128(WowGuid128.Empty);
-        data.WritePackedGuid128(WowGuid128.Empty);
-        data.WritePackedGuid128(unit.Target ?? WowGuid128.Empty);
-        data.WritePackedGuid128(WowGuid128.Empty);
-        data.WriteUInt64(0uL);
-        data.WriteInt32(unit.ChannelData?.SpellID ?? 0);
-        data.WriteInt32(unit.ChannelData?.SpellXSpellVisualID ?? 0);
-        data.WriteUInt32(0u);
-        bool zeroCharBakeIds = IsImpersonatingCreatureBake();
-        data.WriteUInt8(zeroCharBakeIds ? (byte)0 : unit.RaceId.GetValueOrDefault());
-        data.WriteUInt8(zeroCharBakeIds ? (byte)0 : unit.ClassId.GetValueOrDefault());
-        data.WriteUInt8(unit.PlayerClassId.GetValueOrDefault());
-        data.WriteUInt8(zeroCharBakeIds ? (byte)0 : unit.SexId.GetValueOrDefault());
-        // DisplayPower (PowerType enum: Mana=0/Rage=1/Focus=2/Energy=3/...).
-        // Was hardcoded to 0 (Mana), so warriors saw an empty rage bar — the
-        // V3_4_3 client UI binds the player power widget to the slot matching
-        // PowerType=DisplayPower for that class. With DisplayPower=0 on a
-        // warrior, the bar reads the (nonexistent) mana slot and stays empty.
-        // CypherCore native-V3_4_3 capture confirmed value should be 1 for
-        // warriors. Reader already populates unit.DisplayPower correctly from
-        // UNIT_FIELD_BYTES_0 at UpdateHandler.cs:1875.
-        data.WriteUInt8((byte)unit.DisplayPower.GetValueOrDefault());
-        data.WriteUInt32(0u);
-        if (IsOwner)
-        {
-            for (int j = 0; j < 10; j++)
-            {
-                data.WriteFloat(0f);
-                data.WriteFloat(0f);
-            }
-        }
-        for (int k = 0; k < 10; k++)
-        {
-            data.WriteInt32(k < 7 ? unit.Power[k].GetValueOrDefault() : 0);
-            data.WriteInt32(k < 7 ? unit.MaxPower[k].GetValueOrDefault() : 0);
-            data.WriteFloat(0f);
-        }
-        data.WriteInt32(unit.Level.GetValueOrDefault());
-        data.WriteInt32(unit.EffectiveLevel ?? unit.Level.GetValueOrDefault());
-        data.WriteInt32(unit.ContentTuningID.GetValueOrDefault());
-        data.WriteInt32(unit.ScalingLevelMin.GetValueOrDefault());
-        data.WriteInt32(unit.ScalingLevelMax.GetValueOrDefault());
-        data.WriteInt32(unit.ScalingLevelDelta.GetValueOrDefault());
-        data.WriteInt32(0);
-        data.WriteInt32(0);
-        data.WriteInt32(0);
-        data.WriteInt32(unit.FactionTemplate.GetValueOrDefault());
-        for (int l = 0; l < 3; l++)
-        {
-            int vItemId = unit.VirtualItems != null && unit.VirtualItems[l] is VisibleItem vi ? vi.ItemID : 0;
-            // Players don't populate VirtualItems on the server side (they use PLAYER_VISIBLE_ITEM
-            // descriptors instead). For the local player, fall back to PlayerData.VisibleItems:
-            // slot 0=mainhand(15), 1=offhand(16), 2=ranged(17).
-            if (vItemId == 0 && IsOwner && _updateData.PlayerData?.VisibleItems != null)
-            {
-                int playerSlot = 15 + l;
-                if (playerSlot < _updateData.PlayerData.VisibleItems.Length
-                    && _updateData.PlayerData.VisibleItems[playerSlot] is VisibleItem pv && pv.ItemID != 0)
-                {
-                    vItemId = pv.ItemID;
-                }
-            }
-            data.WriteInt32(vItemId);
-            data.WriteUInt16(0);
-            data.WriteUInt16(0);
-        }
-        data.WriteUInt32(unit.Flags.GetValueOrDefault());
-        data.WriteUInt32(SanitizeFlags2(unit.Flags2.GetValueOrDefault(), unit.CreatedBy));
-        data.WriteUInt32(0u);
-        data.WriteUInt32(unit.AuraState.GetValueOrDefault());
-        for (int m = 0; m < 2; m++)
-            data.WriteUInt32(unit.AttackRoundBaseTime?[m].GetValueOrDefault() ?? 0);
-        if (IsOwner)
-        {
-            uint rangedTime = unit.RangedAttackRoundBaseTime.GetValueOrDefault();
-            // If the server didn't send a ranged attack time but the player has a ranged weapon
-            // visible, default to 2300ms (standard bow speed) so the client enables Auto Shot.
-            if (rangedTime == 0 && _updateData.PlayerData?.VisibleItems != null
-                && _updateData.PlayerData.VisibleItems.Length > 17
-                && _updateData.PlayerData.VisibleItems[17] is VisibleItem ranged && ranged.ItemID != 0)
-            {
-                rangedTime = 2300;
-            }
-            data.WriteUInt32(rangedTime);
-        }
-        data.WriteFloat(unit.BoundingRadius ?? 0.389f);
-        data.WriteFloat(unit.CombatReach ?? 1.5f);
-        data.WriteFloat(1f);
-        data.WriteInt32(unit.NativeDisplayID.GetValueOrDefault());
-        data.WriteFloat(1f);
-        data.WriteInt32(unit.MountDisplayID.GetValueOrDefault());
-        if (IsOwner)
-        {
-            data.WriteFloat(unit.MinDamage.GetValueOrDefault());
-            data.WriteFloat(unit.MaxDamage.GetValueOrDefault());
-            data.WriteFloat(unit.MinOffHandDamage.GetValueOrDefault());
-            data.WriteFloat(unit.MaxOffHandDamage.GetValueOrDefault());
-        }
-        data.WriteUInt8(unit.StandState.GetValueOrDefault());
-        data.WriteUInt8(unit.PetLoyaltyIndex.GetValueOrDefault());
-        data.WriteUInt8(unit.VisFlags.GetValueOrDefault());
-        data.WriteUInt8(unit.AnimTier.GetValueOrDefault());
-        data.WriteUInt32(unit.PetNumber.GetValueOrDefault());
-        data.WriteUInt32(unit.PetNameTimestamp.GetValueOrDefault());
-        data.WriteUInt32(unit.PetExperience.GetValueOrDefault());
-        data.WriteUInt32(unit.PetNextLevelExperience.GetValueOrDefault());
-        data.WriteFloat(unit.ModCastSpeed ?? 1f);
-        data.WriteFloat(unit.ModCastHaste ?? 1f);
-        data.WriteFloat(1f);
-        data.WriteFloat(1f);
-        data.WriteFloat(1f);
-        data.WriteFloat(1f);
-        data.WriteInt32(unit.CreatedBySpell.GetValueOrDefault());
-        data.WriteInt32(unit.EmoteState.GetValueOrDefault());
-        data.WriteInt16(0);
-        data.WriteInt16(0);
-        if (IsOwner)
-        {
-            for (int n = 0; n < 5; n++)
-            {
-                data.WriteInt32(unit.Stats?[n].GetValueOrDefault() ?? 0);
-                data.WriteInt32(unit.StatPosBuff?[n].GetValueOrDefault() ?? 0);
-                data.WriteInt32(unit.StatNegBuff?[n].GetValueOrDefault() ?? 0);
-            }
-        }
-        if (IsOwner)
-        {
-            for (int r = 0; r < 7; r++)
-                data.WriteInt32(unit.Resistances?[r].GetValueOrDefault() ?? 0);
-        }
-        if (IsOwner)
-        {
-            for (int p = 0; p < 7; p++)
-            {
-                data.WriteInt32(unit.PowerCostModifier?[p].GetValueOrDefault() ?? 0);
-                data.WriteFloat(unit.PowerCostMultiplier?[p].GetValueOrDefault() ?? 0f);
-            }
-        }
-        for (int b = 0; b < 7; b++)
-        {
-            data.WriteInt32(unit.ResistanceBuffModsPositive?[b].GetValueOrDefault() ?? 0);
-            data.WriteInt32(unit.ResistanceBuffModsNegative?[b].GetValueOrDefault() ?? 0);
-        }
-        data.WriteInt32(unit.BaseMana.GetValueOrDefault());
-        if (IsOwner)
-            data.WriteInt32(unit.BaseHealth.GetValueOrDefault());
-        data.WriteUInt8(unit.SheatheState.GetValueOrDefault());
-        data.WriteUInt8(unit.PvpFlags.GetValueOrDefault());
-        data.WriteUInt8(unit.PetFlags.GetValueOrDefault());
-        data.WriteUInt8(unit.ShapeshiftForm.GetValueOrDefault());
-        if (IsOwner)
-        {
-            data.WriteInt32(unit.AttackPower.GetValueOrDefault());
-            data.WriteInt32(unit.AttackPowerModPos.GetValueOrDefault());
-            data.WriteInt32(unit.AttackPowerModNeg.GetValueOrDefault());
-            data.WriteFloat(unit.AttackPowerMultiplier.GetValueOrDefault());
-            data.WriteInt32(unit.RangedAttackPower.GetValueOrDefault());
-            data.WriteInt32(unit.RangedAttackPowerModPos.GetValueOrDefault());
-            data.WriteInt32(unit.RangedAttackPowerModNeg.GetValueOrDefault());
-            data.WriteFloat(unit.RangedAttackPowerMultiplier.GetValueOrDefault());
-            data.WriteInt32(0);
-            data.WriteFloat(0f);
-            data.WriteFloat(unit.MinRangedDamage.GetValueOrDefault());
-            data.WriteFloat(unit.MaxRangedDamage.GetValueOrDefault());
-            data.WriteFloat(unit.MaxHealthModifier ?? 1f);
-        }
-        data.WriteFloat(unit.HoverHeight.GetValueOrDefault());
-        data.WriteInt32(unit.MinItemLevelCutoff.GetValueOrDefault());
-        data.WriteInt32(unit.MinItemLevel.GetValueOrDefault());
-        data.WriteInt32(unit.MaxItemLevel.GetValueOrDefault());
-        data.WriteInt32(unit.WildBattlePetLevel.GetValueOrDefault());
-        data.WriteUInt32(0u);
-        data.WriteInt32(unit.InteractSpellID.GetValueOrDefault());
-        data.WriteInt32(0);
-        data.WriteInt32(unit.LooksLikeMountID.GetValueOrDefault());
-        data.WriteInt32(unit.LooksLikeCreatureID.GetValueOrDefault());
-        data.WriteInt32(unit.LookAtControllerID.GetValueOrDefault());
-        data.WriteInt32(0);
-        data.WritePackedGuid128(unit.GuildGUID ?? WowGuid128.Empty);
-        data.WriteUInt32(0u);                                   // PassiveSpells.size()
-        data.WriteUInt32(0u);                                   // WorldEffects.size()
-        // ChannelObjects.size() — DynamicUpdateField<ObjectGuid,0,4> in TC.
-        // Without this count + the matching GUID body at the end of the
-        // create block, the V3_4_3 client receives an empty channel target
-        // list and drops the channel-loop animation after the start anim
-        // finishes (Drain Soul / Mind Flay went idle-pose mid-channel).
-        // Legacy 3.3.5a server publishes the target via UNIT_FIELD_CHANNEL_OBJECT;
-        // the reader populates UnitData.ChannelObject at UpdateHandler.cs:1918.
-        bool hasChannelObject = unit.ChannelObject.HasValue && !unit.ChannelObject.Value.IsEmpty();
-        data.WriteUInt32(hasChannelObject ? 1u : 0u);           // ChannelObjects.size()
-        data.WritePackedGuid128(WowGuid128.Empty);
-        data.WriteInt32(0);
-        data.WriteFloat(0f);
-        data.WriteUInt32(0u);
-        if (IsOwner)
-            data.WritePackedGuid128(WowGuid128.Empty);
-        // ChannelObjects body (TC UpdateFields.cpp:856-859). PassiveSpells and
-        // WorldEffects bodies are size-0 so emit nothing; only the channel
-        // target GUID is written here when present.
-        if (hasChannelObject)
-            data.WritePackedGuid128(unit.ChannelObject!.Value);
-    }
+    // WriteCreateUnitData emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator from V3_4_3_54261.UnitField.
+    // WriteCreatePlayerData emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator from V3_4_3_54261.PlayerField.
+    // WriteEmptyQuestLog removed — was unused; QuestLog Create handled by WriteCreatePlayerQuestLog custom writer.
 
-    private void WriteCreatePlayerData(WorldPacket data)
-    {
-        var player = _updateData.PlayerData ?? new PlayerData();
-        data.WritePackedGuid128(player.DuelArbiter ?? WowGuid128.Empty);
-        data.WritePackedGuid128(player.WowAccount ?? WowGuid128.Empty);
-        data.WritePackedGuid128(player.LootTargetGUID ?? WowGuid128.Empty);
-        data.WriteUInt32(player.PlayerFlags.GetValueOrDefault());
-        data.WriteUInt32(player.PlayerFlagsEx.GetValueOrDefault());
-        data.WriteUInt32(player.GuildRankID.GetValueOrDefault());
-        data.WriteUInt32(player.GuildDeleteDate.GetValueOrDefault());
-        data.WriteInt32(player.GuildLevel.GetValueOrDefault());
+    // -----------------------------------------------------------------------------------
+    // Player Create + Update custom writers — referenced by V3_4_3_54261.PlayerField.
+    // -----------------------------------------------------------------------------------
 
+    internal void WriteCreatePlayerCustomizationsCount(WorldPacket data, PlayerData src)
+    {
         int customizationCount = 0;
-        for (int i = 0; i < player.Customizations.Length; i++)
+        if (src.Customizations != null)
         {
-            if (player.Customizations[i] != null)
-                customizationCount++;
+            for (int i = 0; i < src.Customizations.Length; i++)
+                if (src.Customizations[i] != null) customizationCount++;
         }
         data.WriteUInt32((uint)customizationCount);
+    }
 
-        data.WriteUInt8(player.PartyType.GetValueOrDefault());
-        data.WriteUInt8(0);
-        data.WriteUInt8(player.NumBankSlots.GetValueOrDefault());
-        data.WriteUInt8(player.NativeSex.GetValueOrDefault());
-        data.WriteUInt8(player.Inebriation.GetValueOrDefault());
-        data.WriteUInt8(player.PvpTitle.GetValueOrDefault());
-        data.WriteUInt8(player.ArenaFaction.GetValueOrDefault());
-        data.WriteUInt8(player.PvPRank.GetValueOrDefault());
-        data.WriteInt32(0);
-        data.WriteUInt32(player.DuelTeam.GetValueOrDefault());
-        data.WriteInt32(player.GuildTimeStamp.GetValueOrDefault());
-
-        // QuestLog[QuestConst.MaxQuestLogSize] — gated by PartyMember flag (0x02) in TC343.
-        if (IsOwner)
+    internal void WriteCreatePlayerCustomizationsData(WorldPacket data, PlayerData src)
+    {
+        if (src.Customizations == null) return;
+        for (int m = 0; m < src.Customizations.Length; m++)
         {
-            int questCount = 0;
-            System.Text.StringBuilder slotSummary = new();
-            for (int q = 0; q < QuestConst.MaxQuestLogSize; q++)
+            var choice = src.Customizations[m];
+            if (choice != null)
             {
-                var quest = player.QuestLog != null && q < player.QuestLog.Length ? player.QuestLog[q] : null;
-                data.WriteInt64(quest?.EndTime ?? 0);
-                data.WriteInt32(quest?.QuestID ?? 0);
-                data.WriteUInt32(quest?.StateFlags ?? 0);
-                for (int obj = 0; obj < 24; obj++)
-                    data.WriteUInt16((ushort)(quest?.ObjectiveProgress[obj] ?? 0));
-                if (quest != null && quest.QuestID.HasValue && quest.QuestID.Value != 0)
-                {
-                    questCount++;
-                    slotSummary.Append($" [{q}]={quest.QuestID.Value}");
-                }
+                data.WriteUInt32(choice.ChrCustomizationOptionID);
+                data.WriteUInt32(choice.ChrCustomizationChoiceID);
             }
-            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
-                $"[QuestLogCreate] populated={questCount} slots:{slotSummary}");
         }
+    }
 
+    internal void WriteCreatePlayerQuestLog(WorldPacket data, PlayerData src)
+    {
+        // Owner-gated by generator (placeholder declares OwnerOnly = true). Iterates
+        // 25 quest slots, writing each entry's 4 fields. Null entries write zeros.
+        for (int q = 0; q < QuestConst.MaxQuestLogSize; q++)
+        {
+            var quest = src.QuestLog != null && q < src.QuestLog.Length ? src.QuestLog[q] : null;
+            data.WriteInt64(quest?.EndTime ?? 0);
+            data.WriteInt32(quest?.QuestID ?? 0);
+            data.WriteUInt32(quest?.StateFlags ?? 0);
+            for (int obj = 0; obj < 24; obj++)
+                data.WriteUInt16((ushort)(quest?.ObjectiveProgress[obj] ?? 0));
+        }
+    }
+
+    internal void WriteCreatePlayerVisibleItems(WorldPacket data, PlayerData src)
+    {
+        // 19× always-write. Null entry → zero placeholder (Int32 ItemID + 2× UInt16 0).
         for (int j = 0; j < 19; j++)
         {
-            if (player.VisibleItems != null && j < player.VisibleItems.Length
-                && player.VisibleItems[j] is VisibleItem pv)
+            if (src.VisibleItems != null && j < src.VisibleItems.Length
+                && src.VisibleItems[j] is VisibleItem pv)
             {
                 data.WriteInt32(pv.ItemID);
                 data.WriteUInt16(pv.ItemAppearanceModID);
@@ -817,110 +755,57 @@ public class ObjectUpdateBuilder
                 data.WriteUInt16(0);
             }
         }
+    }
 
-        data.WriteInt32(player.ChosenTitle.GetValueOrDefault());
-        data.WriteInt32(0);
-        data.WriteUInt32(player.VirtualPlayerRealm.GetValueOrDefault());
-        data.WriteUInt32(player.CurrentSpecID.GetValueOrDefault());
-        data.WriteInt32(0);
-        for (int k = 0; k < 6; k++)
-            data.WriteFloat(0f);
-        data.WriteUInt8(0);
-        data.WriteInt32(player.HonorLevel.GetValueOrDefault());
-        // LogoutTime: TC writes a real Unix timestamp; we previously sent 0, which the client
-        // may interpret as "you are mid-logout". Use current Unix time as a sensible default.
+    internal void WriteCreatePlayerLogoutTime(WorldPacket data, PlayerData src)
+    {
+        // Owner: real UnixTime. Non-owner: 0. Matches hand-port (file:775 pre-delete).
         data.WriteInt64(IsOwner ? (long)Time.UnixTime : 0L);
-        data.WriteUInt32(0u);
-        data.WriteInt32(0);
-        // BnetAccount: TC populates with the real BNet account GUID for the local player.
-        // Empty-stubbed previously, which means the V3_4_3 client cannot bind the player to
-        // an account — likely contributes to the post-CreateObject world-ready stall.
+    }
+
+    internal void WriteCreatePlayerBnetAccount(WorldPacket data, PlayerData src)
+    {
+        // Owner: BNet account GUID lookup. Non-owner: Empty. Matches hand-port file:781-783.
         data.WritePackedGuid128(IsOwner
             ? _gameState.GlobalSession.GetBnetAccountGuidForPlayer(_updateData.Guid)
             : WowGuid128.Empty);
-        data.WriteUInt32(0u);
-        for (int l = 0; l < 19; l++)
-            data.WriteUInt32(0u);
-        for (int m = 0; m < player.Customizations.Length; m++)
-        {
-            var choice = player.Customizations[m];
-            if (choice != null)
-            {
-                data.WriteUInt32(choice.ChrCustomizationOptionID);
-                data.WriteUInt32(choice.ChrCustomizationChoiceID);
-            }
-        }
-        data.WriteFloat(0f);
-        data.WriteFloat(0f);
-        data.WriteUInt32(0u);
     }
 
-    private static void WriteEmptyQuestLog(WorldPacket data)
+    internal void WriteUpdatePlayerQuestLogEntry(WorldPacket data, QuestLog[] arr, int i)
     {
-        data.WriteInt64(0L);
-        data.WriteInt32(0);
-        data.WriteUInt32(0u);
-        for (int i = 0; i < 24; i++)
-            data.WriteUInt16(0);
+        // Per-element write at bit 36+i. Same shape as hand-port file:1576-1583 — uses
+        // WriteCreate format (no inner mask, raw fields) per IsQuestLogChangesMaskSkipped = 1.
+        QuestLog quest = arr[i];
+        data.WriteInt64(quest?.EndTime ?? 0);
+        data.WriteInt32(quest?.QuestID ?? 0);
+        data.WriteUInt32(quest?.StateFlags ?? 0);
+        for (int obj = 0; obj < 24; obj++)
+            data.WriteUInt16((ushort)(quest?.ObjectiveProgress[obj] ?? 0));
     }
 
-    // Maps the modern 3.4.3 InvSlots index (0-140) to the corresponding legacy slot
-    // arrays on ActivePlayerData. Returns null when the modern slot has no legacy
-    // equivalent or the entry is missing.
-    private static WowGuid128? GetModernInvSlot(ActivePlayerData a, int modernIdx)
+    internal void WriteUpdatePlayerVisibleItem(WorldPacket data, System.Nullable<VisibleItem>[] arr, int i)
     {
-        if (modernIdx <= 18)
-        {
-            if (a.InvSlots != null && modernIdx < a.InvSlots.Length)
-                return a.InvSlots[modernIdx];
-        }
-        else if (modernIdx >= 30 && modernIdx <= 33)
-        {
-            int legacyIdx = 19 + (modernIdx - 30);
-            if (a.InvSlots != null && legacyIdx < a.InvSlots.Length)
-                return a.InvSlots[legacyIdx];
-        }
-        else if (modernIdx >= 35 && modernIdx <= 58)
-        {
-            int idx = modernIdx - 35;
-            if (a.PackSlots != null && idx < a.PackSlots.Length)
-                return a.PackSlots[idx];
-        }
-        else if (modernIdx >= 59 && modernIdx <= 86)
-        {
-            int idx = modernIdx - 59;
-            if (a.BankSlots != null && idx < a.BankSlots.Length)
-                return a.BankSlots[idx];
-        }
-        else if (modernIdx >= 87 && modernIdx <= 93)
-        {
-            int idx = modernIdx - 87;
-            if (a.BankBagSlots != null && idx < a.BankBagSlots.Length)
-                return a.BankBagSlots[idx];
-        }
-        else if (modernIdx >= 94 && modernIdx <= 105)
-        {
-            int idx = modernIdx - 94;
-            if (a.BuyBackSlots != null && idx < a.BuyBackSlots.Length)
-                return a.BuyBackSlots[idx];
-        }
-        else if (modernIdx >= 106 && modernIdx <= 137)
-        {
-            int idx = modernIdx - 106;
-            if (a.KeyringSlots != null && idx < a.KeyringSlots.Length)
-                return a.KeyringSlots[idx];
-        }
-        return null;
+        // Per-element write at bit 62+i. Inner 4-bit mask (0x0F = all 4 bits set) +
+        // FlushBits + Int32 ItemID + UInt16 ItemAppearanceModID + UInt16 ItemVisual.
+        // Matches hand-port file:1593-1599.
+        VisibleItem item = arr[i].Value;
+        data.WriteBits(0x0Fu, 4);
+        data.FlushBits();
+        data.WriteInt32(item.ItemID);
+        data.WriteUInt16(item.ItemAppearanceModID);
+        data.WriteUInt16(item.ItemVisual);
     }
 
-    private void WriteCreateActivePlayerData(WorldPacket data)
-    {
-        var active = _updateData.ActivePlayerData ?? new ActivePlayerData();
+    // ============================================================
+    // ActivePlayer custom writers (Phase 5b ActivePlayer migration)
+    // ============================================================
 
-        // InvSlots[141] mapped from legacy arrays via GetModernInvSlot. WPP's
-        // V3_4_0_45166/UpdateFieldsHandler343.cs:2461 reads 141 entries for
-        // V3_4_3.54261 — TC's wotlk_classic source bumped this to 146 in a
-        // later build (V3_4_4+), but our client expects 141.
+    // Whole-Create writer — kept as one method because the byte-stream is mostly
+    // zero placeholders interleaved with a few real fields; declarative per-write
+    // enum members would balloon to ~200 entries with no readability win.
+    internal void WriteCreateActivePlayerAll(WorldPacket data, ActivePlayerData src)
+    {
+        var active = src;
         for (int i = 0; i < 141; i++)
             data.WritePackedGuid128(GetModernInvSlot(active, i) ?? WowGuid128.Empty);
 
@@ -928,7 +813,6 @@ public class ObjectUpdateBuilder
         data.WritePackedGuid128(WowGuid128.Empty);   // SummonedBattlePetGUID
         data.WriteUInt32(0u);                         // KnownTitles.size()
         data.WriteUInt64(active.Coinage.GetValueOrDefault());
-        // No AccountBankCoinage in V3_4_3.54261 (added in a later build).
         data.WriteInt32(active.XP.GetValueOrDefault());
         data.WriteInt32(active.NextLevelXP.GetValueOrDefault());
         data.WriteInt32(0);
@@ -969,14 +853,10 @@ public class ObjectUpdateBuilder
         data.WriteFloat(0f);
         data.WriteFloat(0f);
         data.WriteFloat(0f);
-        // ExploredZones[240] uint64 — V3_4_3.54261 still uses the explored-zones
-        // bitmask array (per WPP V3_4_0/UpdateFieldsHandler343.cs:2509). TC's
-        // wotlk_classic replaced this with a BitVectors struct in a later build,
-        // but for our client this 1920-byte array is correct.
         for (int l = 0; l < 240; l++)
             data.WriteUInt64(0uL);
 
-        // RestInfo[2] — each entry: uint32 Threshold, uint8 StateID.
+        // RestInfo[2]
         data.WriteUInt32(0u);
         data.WriteUInt8(1);
         data.WriteUInt32(0u);
@@ -1053,10 +933,6 @@ public class ObjectUpdateBuilder
         data.WriteUInt32(0u);
         data.WriteUInt32(0u);
 
-        // GlyphSlots[6] / Glyphs[6] interleaved. Slot IDs read from legacy
-        // PLAYER_FIELD_GLYPH_SLOTS_1..6 (UpdateHandler.cs glyphSlotFields loop) and
-        // mirrored into _gameState.ActiveGlyphSlotIds. Defaults to {21..26} for
-        // sessions that haven't received the legacy update yet.
         for (int g = 0; g < PlayerConst.MaxGlyphSlots; g++)
         {
             data.WriteUInt32(_gameState.ActiveGlyphSlotIds[g]);
@@ -1089,51 +965,247 @@ public class ObjectUpdateBuilder
         data.FlushBits();
     }
 
-    private void WriteCreateGameObjectData(WorldPacket data)
+    // MaskMutator — pass-1, sets InvSlots bits (124 parent + 125-265 per-element)
+    // for each modern slot that has a non-null mapped legacy entry.
+    internal void ApplyActivePlayerInvSlotsMaskMutator(ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
     {
-        var go = _updateData.GameObjectData ?? new GameObjectData();
-        data.WriteInt32(go.DisplayID.GetValueOrDefault());
-        data.WriteUInt32(go.SpellVisualID.GetValueOrDefault());
-        data.WriteUInt32(go.StateSpellVisualID.GetValueOrDefault());
-        data.WriteUInt32(go.StateAnimID.GetValueOrDefault());
-        data.WriteUInt32(go.StateAnimKitID.GetValueOrDefault());
-        data.WriteUInt32(0u);
-        data.WritePackedGuid128(go.CreatedBy ?? WowGuid128.Empty);
-        data.WritePackedGuid128(WowGuid128.Empty);
-        data.WriteUInt32(go.Flags.GetValueOrDefault());
-        // ParentRotation = the stored quaternion of the GameObject (cMangos's
-        // GAMEOBJECT_PARENTROTATION value, plumbed through UpdateHandler.cs's GO ingest
-        // for V3_4_3+). For most static GOs this matches CypherCore's DB-stored value;
-        // for runeblade entry 190584 it's identity (0,0,0,1), for runeforge entry 191747
-        // it's (0,0,0.292,0.956). Falls back to identity only if no rotation field was
-        // ever ingested (defensive — should not happen for V3_4_3 since the ingest now
-        // always populates this from cMangos). ParentRotation is float?[4] X/Y/Z/W.
-        if (go.ParentRotation != null
-            && (go.ParentRotation[0].HasValue || go.ParentRotation[1].HasValue
-                || go.ParentRotation[2].HasValue || go.ParentRotation[3].HasValue))
+        for (int i = 0; i < 141; i++)
         {
-            data.WriteFloat(go.ParentRotation[0].GetValueOrDefault(0f));
-            data.WriteFloat(go.ParentRotation[1].GetValueOrDefault(0f));
-            data.WriteFloat(go.ParentRotation[2].GetValueOrDefault(0f));
-            data.WriteFloat(go.ParentRotation[3].GetValueOrDefault(1f));
+            if (GetModernInvSlot(src, i) != null)
+            {
+                blocks.SetBit(124);
+                blocks.SetBit(125 + i);
+            }
         }
-        else
-        {
-            data.WriteFloat(0f);
-            data.WriteFloat(0f);
-            data.WriteFloat(0f);
-            data.WriteFloat(1f);
-        }
-        data.WriteInt32(go.FactionTemplate.GetValueOrDefault());
-        data.WriteInt32(go.Level.GetValueOrDefault());
-        data.WriteInt8(go.State.GetValueOrDefault());
-        data.WriteInt8(go.TypeID.GetValueOrDefault());
-        data.WriteUInt8(go.PercentHealth ?? 0);
-        data.WriteUInt32(go.ArtKit.GetValueOrDefault());
-        data.WriteUInt32(0u);
-        data.WriteUInt32(go.CustomParam.GetValueOrDefault());
-        data.WriteUInt32(0u);
     }
+
+    // MaskMutator — pass-1, captures and clears _gameState.ActiveGlyphsDirty.
+    // When dirty, sets 1512 + 1513-1518 + 1519-1524 (parent + GlyphSlots + Glyphs).
+    internal void ApplyActivePlayerGlyphsMaskMutator(ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        if (!_gameState.ActiveGlyphsDirty)
+            return;
+        _gameState.ActiveGlyphsDirty = false;
+        blocks.SetBit(1512);
+        for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
+        {
+            blocks.SetBit(1513 + i);
+            blocks.SetBit(1519 + i);
+        }
+    }
+
+    // Folds KnownTitles uint?[12] → ulong[6] (lo + hi<<32 per pair). Used by both
+    // preamble (count) and body (data).
+    internal static int FoldKnownTitles(uint?[] knownTitles, ulong[] dest)
+    {
+        if (knownTitles == null)
+            return 0;
+        bool anyTitle = false;
+        for (int i = 0; i < knownTitles.Length; i++)
+            if (knownTitles[i].HasValue) { anyTitle = true; break; }
+        if (!anyTitle)
+            return 0;
+        for (int i = 0; i < 6; i++)
+        {
+            uint lo = (i * 2 < knownTitles.Length && knownTitles[i * 2].HasValue) ? knownTitles[i * 2]!.Value : 0;
+            uint hi = (i * 2 + 1 < knownTitles.Length && knownTitles[i * 2 + 1].HasValue) ? knownTitles[i * 2 + 1]!.Value : 0;
+            dest[i] = (ulong)lo | ((ulong)hi << 32);
+        }
+        return 6;
+    }
+
+    // Static predicate referenced from ActivePlayerField.ACTIVEPLAYER_KNOWN_TITLES CustomPredicate.
+    internal static bool HasAnyKnownTitle(uint?[] knownTitles)
+    {
+        if (knownTitles == null) return false;
+        for (int i = 0; i < knownTitles.Length; i++)
+            if (knownTitles[i].HasValue) return true;
+        return false;
+    }
+
+    // Static wrapper for HasAnySkillChanged — referenced from CustomPredicate.
+    internal static bool HasAnySkillChangedStatic(SkillInfo s) => HasAnySkillChanged(s);
+
+    // KnownTitles preamble — between blocks-mask write and FlushBits.
+    // Emits: WriteBits(count, 32) + count× WriteBit(true).
+    internal void WriteUpdateActivePlayerKnownTitlesPreamble(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        ulong[] folded = new ulong[6];
+        int count = FoldKnownTitles(src.KnownTitles, folded);
+        data.WriteBits((uint)count, 32);
+        for (int i = 0; i < count; i++)
+            data.WriteBit(true);
+    }
+
+    // KnownTitles body — count× WriteUInt64(folded[i]).
+    internal void WriteUpdateActivePlayerKnownTitlesBody(WorldPacket data, ActivePlayerData src)
+    {
+        ulong[] folded = new ulong[6];
+        int count = FoldKnownTitles(src.KnownTitles, folded);
+        for (int i = 0; i < count; i++)
+            data.WriteUInt64(folded[i]);
+    }
+
+    // Skill (bit 32) — nested SkillInfo write via existing WriteUpdateSkillInfo helper.
+    internal void WriteUpdateActivePlayerSkill(WorldPacket data, ActivePlayerData src)
+    {
+        WriteUpdateSkillInfo(data, src.Skill);
+    }
+
+    // InvSlots group (bit 124) — iterate 141 slots, write each via GetModernInvSlot
+    // gated on its element bit (125 + i).
+    internal void WriteUpdateActivePlayerInvSlotsGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        for (int i = 0; i < 141; i++)
+        {
+            if (blocks.IsBitSet(125 + i))
+            {
+                WowGuid128 guid = GetModernInvSlot(src, i) ?? WowGuid128.Empty;
+                data.WritePackedGuid128(guid);
+            }
+        }
+    }
+
+    // RestInfo per-element — 3-bit inner mask (bit 0 group, 1 Threshold, 2 StateID)
+    // + FlushBits + conditional UInt32 Threshold + UInt8 StateID.
+    internal void WriteUpdateActivePlayerRestInfo(WorldPacket data, RestInfo[] arr, int i)
+    {
+        var ri = arr[i];
+        uint restMask = 0;
+        if (ri != null && ri.Threshold.HasValue) restMask |= 2;
+        if (ri != null && ri.StateID.HasValue) restMask |= 4;
+        if (restMask != 0) restMask |= 1;
+        data.WriteBits(restMask, 3);
+        data.FlushBits();
+        if ((restMask & 2) != 0) data.WriteUInt32(ri!.Threshold!.Value);
+        if ((restMask & 4) != 0) data.WriteUInt8((byte)ri!.StateID!.Value);
+    }
+
+    // PvpInfo per-element — 19-bit inner mask + optional Disqualified bit before
+    // flush + FlushBits + conditional UInt32 fields. Mirrors hand-port file:2018-2069.
+    internal void WriteUpdateActivePlayerPvpInfo(WorldPacket data, PVPInfo[] arr, int i)
+    {
+        PVPInfo pi = (arr != null && i < arr.Length) ? arr[i] : null;
+        uint pvpMask = 0;
+        if (pi != null)
+        {
+            if (pi.Disqualified) pvpMask |= (1u << 1);
+            if (pi.WeeklyPlayed != 0) pvpMask |= (1u << 4);
+            if (pi.WeeklyWon != 0) pvpMask |= (1u << 5);
+            if (pi.SeasonPlayed != 0) pvpMask |= (1u << 6);
+            if (pi.SeasonWon != 0) pvpMask |= (1u << 7);
+            if (pi.Rating != 0) pvpMask |= (1u << 8);
+            if (pi.WeeklyBestRating != 0) pvpMask |= (1u << 9);
+            if (pi.SeasonBestRating != 0) pvpMask |= (1u << 10);
+            if (pi.PvpTierID != 0) pvpMask |= (1u << 11);
+            if (pi.WeeklyBestWinPvpTierID != 0) pvpMask |= (1u << 12);
+            if (pi.Field_28 != 0) pvpMask |= (1u << 13);
+            if (pi.Field_2C != 0) pvpMask |= (1u << 14);
+        }
+        if (pvpMask != 0) pvpMask |= 1;
+        data.WriteBits(pvpMask, 19);
+        if ((pvpMask & (1u << 1)) != 0) data.WriteBit(pi!.Disqualified);
+        data.FlushBits();
+        if ((pvpMask & 1) != 0)
+        {
+            if ((pvpMask & (1u << 4)) != 0) data.WriteUInt32(pi!.WeeklyPlayed);
+            if ((pvpMask & (1u << 5)) != 0) data.WriteUInt32(pi!.WeeklyWon);
+            if ((pvpMask & (1u << 6)) != 0) data.WriteUInt32(pi!.SeasonPlayed);
+            if ((pvpMask & (1u << 7)) != 0) data.WriteUInt32(pi!.SeasonWon);
+            if ((pvpMask & (1u << 8)) != 0) data.WriteUInt32(pi!.Rating);
+            if ((pvpMask & (1u << 9)) != 0) data.WriteUInt32(pi!.WeeklyBestRating);
+            if ((pvpMask & (1u << 10)) != 0) data.WriteUInt32(pi!.SeasonBestRating);
+            if ((pvpMask & (1u << 11)) != 0) data.WriteUInt32(pi!.PvpTierID);
+            if ((pvpMask & (1u << 12)) != 0) data.WriteUInt32(pi!.WeeklyBestWinPvpTierID);
+            if ((pvpMask & (1u << 13)) != 0) data.WriteUInt32(pi!.Field_28);
+            if ((pvpMask & (1u << 14)) != 0) data.WriteUInt32(pi!.Field_2C);
+        }
+    }
+
+    // GlyphsEnabled (bit 120) — read from _gameState.
+    internal void WriteUpdateActivePlayerGlyphsEnabled(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        data.WriteUInt8(_gameState.GlyphsEnabled);
+    }
+
+    // Glyphs group (bit 1512) — interleaved GlyphSlots[0..5] then Glyphs[0..5],
+    // each gated on its element bit (1513+i / 1519+i). Source = _gameState.
+    internal void WriteUpdateActivePlayerGlyphsGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
+            if (blocks.IsBitSet(1513 + i))
+                data.WriteUInt32(_gameState.ActiveGlyphSlotIds[i]);
+        for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
+            if (blocks.IsBitSet(1519 + i))
+                data.WriteUInt32((uint)_gameState.ActiveGlyphs[i]);
+    }
+
+    // HasAny helper for the InvSlots mask-mutator. Returns true when any of the 141
+    // modern InvSlots positions has a non-null mapped legacy entry. Required because
+    // the bits set by `ApplyActivePlayerInvSlotsMaskMutator` aren't covered by any
+    // declared UpdateField presence check — without this, loot/bag-pickup that only
+    // touches InvSlots would skip the Values update (items invisible until relog).
+    internal static bool HasAnyInvSlotMapped(ActivePlayerData a)
+    {
+        if (a == null) return false;
+        for (int i = 0; i < 141; i++)
+            if (GetModernInvSlot(a, i) != null)
+                return true;
+        return false;
+    }
+
+    // Maps the modern 3.4.3 InvSlots index (0-140) to the corresponding legacy slot
+    // arrays on ActivePlayerData. Returns null when the modern slot has no legacy
+    // equivalent or the entry is missing.
+    internal static WowGuid128? GetModernInvSlot(ActivePlayerData a, int modernIdx)
+    {
+        if (modernIdx <= 18)
+        {
+            if (a.InvSlots != null && modernIdx < a.InvSlots.Length)
+                return a.InvSlots[modernIdx];
+        }
+        else if (modernIdx >= 30 && modernIdx <= 33)
+        {
+            int legacyIdx = 19 + (modernIdx - 30);
+            if (a.InvSlots != null && legacyIdx < a.InvSlots.Length)
+                return a.InvSlots[legacyIdx];
+        }
+        else if (modernIdx >= 35 && modernIdx <= 58)
+        {
+            int idx = modernIdx - 35;
+            if (a.PackSlots != null && idx < a.PackSlots.Length)
+                return a.PackSlots[idx];
+        }
+        else if (modernIdx >= 59 && modernIdx <= 86)
+        {
+            int idx = modernIdx - 59;
+            if (a.BankSlots != null && idx < a.BankSlots.Length)
+                return a.BankSlots[idx];
+        }
+        else if (modernIdx >= 87 && modernIdx <= 93)
+        {
+            int idx = modernIdx - 87;
+            if (a.BankBagSlots != null && idx < a.BankBagSlots.Length)
+                return a.BankBagSlots[idx];
+        }
+        else if (modernIdx >= 94 && modernIdx <= 105)
+        {
+            int idx = modernIdx - 94;
+            if (a.BuyBackSlots != null && idx < a.BuyBackSlots.Length)
+                return a.BuyBackSlots[idx];
+        }
+        else if (modernIdx >= 106 && modernIdx <= 137)
+        {
+            int idx = modernIdx - 106;
+            if (a.KeyringSlots != null && idx < a.KeyringSlots.Length)
+                return a.KeyringSlots[idx];
+        }
+        return null;
+    }
+
+
+    // WriteCreateGameObjectData emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator
+    // from V3_4_3_54261.GameObjectField (see HermesProxy/obj/Generated/.../V3_4_3_54261.ObjectUpdateBuilder.g.cs).
 
     private void WriteCreateDynamicObjectData(WorldPacket data)
     {
@@ -1165,7 +1237,7 @@ public class ObjectUpdateBuilder
         data.WriteInt32(corpse.FactionTemplate.GetValueOrDefault());
     }
 
-    private static bool HasAnySkillChanged(SkillInfo s)
+    internal static bool HasAnySkillChanged(SkillInfo s)
     {
         for (int i = 0; i < 256; i++)
         {
@@ -1184,7 +1256,7 @@ public class ObjectUpdateBuilder
     //   3) For each set block: WriteBits(block[b], 32)
     //   4) FlushBits
     //   5) Per-skill interleaved data (all 7 fields for skill i before skill i+1).
-    private static void WriteUpdateSkillInfo(WorldPacket data, SkillInfo s)
+    internal static void WriteUpdateSkillInfo(WorldPacket data, SkillInfo s)
     {
         if (s == null)
         {
@@ -1339,11 +1411,11 @@ public class ObjectUpdateBuilder
     private void WriteValuesUpdate(WorldPacket data)
     {
         uint changedMask = 0u;
-        bool hasObjectChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Object) && _updateData.ObjectData != null && (_updateData.ObjectData.EntryID.HasValue || _updateData.ObjectData.DynamicFlags.HasValue || _updateData.ObjectData.Scale.HasValue);
+        bool hasObjectChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Object) && HasAnyObjectFieldSet();
         bool hasUnitChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Unit) && _updateData.UnitData != null && HasAnyUnitFieldSet();
-        bool hasItemChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Item) && _updateData.ItemData != null;
+        bool hasItemChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Item) && HasAnyItemFieldSet();
         bool hasContainerChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Container) && _updateData.ContainerData != null && HasAnyContainerFieldSet();
-        bool hasActivePlayerChanges = HasActivePlayerChanges();
+        bool hasActivePlayerChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.ActivePlayer) && HasAnyActivePlayerFieldSet();
         bool hasPlayerChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Player) && HasAnyPlayerFieldSet();
         bool hasGameObjectChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.GameObject) && _updateData.GameObjectData != null && HasAnyGameObjectFieldSet();
 
@@ -1374,2024 +1446,12 @@ public class ObjectUpdateBuilder
         if (hasGameObjectChanges) WriteUpdateGameObjectData(data);
     }
 
-    private bool HasAnyContainerFieldSet()
-    {
-        var c = _updateData.ContainerData;
-        if (c == null) return false;
-        if (c.NumSlots.HasValue) return true;
-        for (int i = 0; i < 36; i++)
-            if (c.Slots[i].HasValue) return true;
-        return false;
-    }
+    // HasAnyContainerFieldSet emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator.
 
     // === HasAnyUnitFieldSet (fork lines 1140-1196) ===
-    private bool HasAnyUnitFieldSet()
-    {
-        UnitData u = _updateData.UnitData;
-        if (u == null) return false;
-        if (u.Health.HasValue || u.MaxHealth.HasValue || u.DisplayID.HasValue) return true;
-        if (u.Charm != null || u.Summon != null || u.CharmedBy != null) return true;
-        if (u.SummonedBy != null || u.CreatedBy != null || u.Target != null) return true;
-        if (u.ChannelData != null) return true;
-        if (u.RaceId.HasValue || u.ClassId.HasValue || u.SexId.HasValue) return true;
-        if (u.Level.HasValue || u.EffectiveLevel.HasValue || u.DisplayPower.HasValue) return true;
-        if (u.FactionTemplate.HasValue || u.Flags.HasValue || u.Flags2.HasValue || u.Flags3.HasValue) return true;
-        if (u.AuraState.HasValue || u.OverrideDisplayPowerID.HasValue) return true;
-        if (u.BoundingRadius.HasValue || u.CombatReach.HasValue) return true;
-        if (u.DisplayScale.HasValue || u.NativeXDisplayScale.HasValue) return true;
-        if (u.NativeDisplayID.HasValue || u.MountDisplayID.HasValue) return true;
-        if (u.HoverHeight.HasValue || u.GuildGUID != null) return true;
-        if (u.NpcFlags != null)
-            for (int i = 0; i < u.NpcFlags.Length; i++)
-                if (u.NpcFlags[i].HasValue && u.NpcFlags[i] != 0) return true;
-        if (u.Power != null)
-            for (int i = 0; i < u.Power.Length; i++)
-                if (u.Power[i].HasValue) return true;
-        if (u.MaxPower != null)
-            for (int i = 0; i < u.MaxPower.Length; i++)
-                if (u.MaxPower[i].HasValue) return true;
-        // Block 1 continued + Block 2 combat stats
-        if (u.MinDamage.HasValue || u.MaxDamage.HasValue || u.MinOffHandDamage.HasValue || u.MaxOffHandDamage.HasValue) return true;
-        if (u.StandState.HasValue || u.VisFlags.HasValue || u.AnimTier.HasValue) return true;
-        if (u.ModCastSpeed.HasValue || u.ModCastHaste.HasValue || u.EmoteState.HasValue) return true;
-        if (u.SheatheState.HasValue || u.ShapeshiftForm.HasValue) return true;
-        if (u.AttackPower.HasValue || u.AttackPowerModPos.HasValue || u.AttackPowerModNeg.HasValue) return true;
-        if (u.RangedAttackPower.HasValue || u.BaseMana.HasValue || u.BaseHealth.HasValue) return true;
-        // Block 5: Stats
-        if (u.Stats != null)
-            for (int i = 0; i < u.Stats.Length; i++)
-                if (u.Stats[i].HasValue) return true;
-        if (u.StatPosBuff != null)
-            for (int i = 0; i < u.StatPosBuff.Length; i++)
-                if (u.StatPosBuff[i].HasValue) return true;
-        if (u.StatNegBuff != null)
-            for (int i = 0; i < u.StatNegBuff.Length; i++)
-                if (u.StatNegBuff[i].HasValue) return true;
-        // Blocks 5-6: Resistances
-        if (u.Resistances != null)
-            for (int i = 0; i < 7; i++)
-                if (u.Resistances[i].HasValue) return true;
-        if (u.ResistanceBuffModsPositive != null)
-            for (int i = 0; i < 7; i++)
-                if (u.ResistanceBuffModsPositive[i].HasValue) return true;
-        if (u.ResistanceBuffModsNegative != null)
-            for (int i = 0; i < 7; i++)
-                if (u.ResistanceBuffModsNegative[i].HasValue) return true;
-        if (u.AttackRoundBaseTime != null)
-            for (int i = 0; i < u.AttackRoundBaseTime.Length; i++)
-                if (u.AttackRoundBaseTime[i].HasValue) return true;
-        return false;
-    }
-
-    // === HasAnyPlayerFieldSet (fork lines 2637-2659) ===
-    private bool HasAnyPlayerFieldSet()
-    {
-        PlayerData p = _updateData.PlayerData;
-        if (p == null) return false;
-        // Scalar fields (bits 4-31)
-        if (p.DuelArbiter != null || p.WowAccount != null || p.LootTargetGUID != null) return true;
-        if (p.PlayerFlags.HasValue || p.PlayerFlagsEx.HasValue) return true;
-        if (p.GuildRankID.HasValue || p.GuildDeleteDate.HasValue || p.GuildLevel.HasValue) return true;
-        if (p.NumBankSlots.HasValue || p.NativeSex.HasValue || p.Inebriation.HasValue) return true;
-        if (p.PvpTitle.HasValue || p.ArenaFaction.HasValue || p.PvPRank.HasValue) return true;
-        if (p.DuelTeam.HasValue || p.GuildTimeStamp.HasValue || p.ChosenTitle.HasValue) return true;
-        if (p.FakeInebriation.HasValue || p.VirtualPlayerRealm.HasValue || p.CurrentSpecID.HasValue) return true;
-        if (p.HonorLevel.HasValue) return true;
-        // Quest log (bits 35-60)
-        if (p.QuestLog != null)
-            for (int i = 0; i < p.QuestLog.Length; i++)
-                if (p.QuestLog[i] != null && p.QuestLog[i].QuestID.HasValue) return true;
-        // Visible items (bits 61-80)
-        if (p.VisibleItems != null)
-            for (int i = 0; i < p.VisibleItems.Length; i++)
-                if (p.VisibleItems[i] != null) return true;
-        return false;
-    }
-
-    // === HasAnyGameObjectFieldSet (fork lines 3097-3111) ===
-    private bool HasAnyGameObjectFieldSet()
-    {
-        GameObjectData go = _updateData.GameObjectData;
-        if (go == null) return false;
-        if (go.DisplayID.HasValue || go.SpellVisualID.HasValue || go.StateSpellVisualID.HasValue) return true;
-        if (go.StateAnimID.HasValue || go.StateAnimKitID.HasValue) return true;
-        if (go.CreatedBy != null || go.GuildGUID != null) return true;
-        if (go.Flags.HasValue || go.FactionTemplate.HasValue || go.Level.HasValue) return true;
-        if (go.State.HasValue || go.TypeID.HasValue || go.PercentHealth.HasValue) return true;
-        if (go.ArtKit.HasValue || go.CustomParam.HasValue) return true;
-        if (go.ParentRotation != null)
-            for (int i = 0; i < 4; i++)
-                if (go.ParentRotation[i].HasValue) return true;
-        return false;
-    }
-
-    // === HasActivePlayerChanges (fork lines 340-485) ===
-    private bool HasActivePlayerChanges()
-    {
-        if (!_objectTypeMask.HasAnyFlag(ObjectTypeMask.ActivePlayer))
-            return false;
-        ActivePlayerData a = _updateData.ActivePlayerData;
-        if (a == null) return false;
-
-        // Block 0 scalars (bits 26-37)
-        if (a.FarsightObject != null) return true;
-        if (a.Coinage.HasValue || a.XP.HasValue || a.NextLevelXP.HasValue || a.TrialXP.HasValue) return true;
-        if (a.CharacterPoints.HasValue || a.MaxTalentTiers.HasValue) return true;
-        if (a.TrackCreatureMask.HasValue) return true;
-        if (a.MainhandExpertise.HasValue || a.OffhandExpertise.HasValue) return true;
-
-        // Block 38 scalars (bits 39-69)
-        if (a.RangedExpertise.HasValue || a.CombatRatingExpertise.HasValue) return true;
-        if (a.BlockPercentage.HasValue || a.DodgePercentage.HasValue || a.ParryPercentage.HasValue) return true;
-        if (a.CritPercentage.HasValue || a.RangedCritPercentage.HasValue || a.OffhandCritPercentage.HasValue) return true;
-        if (a.ShieldBlock.HasValue || a.Mastery.HasValue) return true;
-        if (a.Speed.HasValue || a.Avoidance.HasValue || a.Sturdiness.HasValue) return true;
-        if (a.Versatility.HasValue || a.VersatilityBonus.HasValue) return true;
-        if (a.PvpPowerDamage.HasValue || a.PvpPowerHealing.HasValue) return true;
-        if (a.ModHealingDonePos.HasValue || a.ModHealingPercent.HasValue) return true;
-        if (a.ModHealingDonePercent.HasValue || a.ModPeriodicHealingDonePercent.HasValue) return true;
-        if (a.ModSpellPowerPercent.HasValue || a.ModResiliencePercent.HasValue) return true;
-        if (a.OverrideSpellPowerByAPPercent.HasValue || a.OverrideAPBySpellPowerPercent.HasValue) return true;
-        if (a.ModTargetResistance.HasValue || a.ModTargetPhysicalResistance.HasValue) return true;
-        if (a.LocalFlags.HasValue) return true;
-
-        // Block 70 scalars (bits 71-101)
-        if (a.GrantableLevels.HasValue || a.MultiActionBars.HasValue) return true;
-        if (a.LifetimeMaxRank.HasValue || a.NumRespecs.HasValue) return true;
-        if (a.AmmoID.HasValue || a.PvpMedals.HasValue) return true;
-        if (a.TodayHonorableKills.HasValue || a.TodayDishonorableKills.HasValue) return true;
-        if (a.YesterdayHonorableKills.HasValue || a.YesterdayDishonorableKills.HasValue) return true;
-        if (a.LastWeekHonorableKills.HasValue || a.LastWeekDishonorableKills.HasValue) return true;
-        if (a.ThisWeekHonorableKills.HasValue || a.ThisWeekDishonorableKills.HasValue) return true;
-        if (a.ThisWeekContribution.HasValue || a.LifetimeHonorableKills.HasValue || a.LifetimeDishonorableKills.HasValue) return true;
-        if (a.YesterdayContribution.HasValue || a.LastWeekContribution.HasValue || a.LastWeekRank.HasValue) return true;
-        if (a.WatchedFactionIndex.HasValue || a.MaxLevel.HasValue) return true;
-        if (a.ScalingPlayerLevelDelta.HasValue || a.MaxCreatureScalingLevel.HasValue) return true;
-        if (a.PetSpellPower.HasValue || a.UiHitModifier.HasValue || a.UiSpellHitModifier.HasValue) return true;
-        if (a.HomeRealmTimeOffset.HasValue || a.ModPetHaste.HasValue || a.LocalRegenFlags.HasValue) return true;
-
-        // Block 102 scalars (bits 103-123)
-        if (a.AuraVision.HasValue || a.NumBackpackSlots.HasValue) return true;
-        if (a.OverrideSpellsID.HasValue || a.LfgBonusFactionID.HasValue || a.LootSpecID.HasValue) return true;
-        if (a.OverrideZonePVPType.HasValue) return true;
-        if (a.Honor.HasValue || a.HonorNextLevel.HasValue) return true;
-        if (a.PvPTierMaxFromWins.HasValue || a.PvPLastWeeksTierMaxFromWins.HasValue) return true;
-        if (a.PvPRankProgress.HasValue) return true;
-
-        // Skill (bit 32) — nested SkillInfo struct
-        if (a.Skill != null && HasAnySkillChanged(a.Skill)) return true;
-
-        // KnownTitles (dynamic field, bit 3)
-        if (a.KnownTitles != null)
-            for (int i = 0; i < a.KnownTitles.Length; i++)
-                if (a.KnownTitles[i].HasValue) return true;
-
-        // InvSlots (bits 124-265)
-        for (int i = 0; i < 141; i++)
-            if (GetModernInvSlot(a, i) != null) return true;
-
-        // TrackResourceMask (bits 266-268)
-        if (a.TrackResourceMask != null)
-            for (int i = 0; i < a.TrackResourceMask.Length; i++)
-                if (a.TrackResourceMask[i].HasValue) return true;
-
-        // SpellCritPercentage / ModDamageDone arrays (bits 269-297)
-        if (a.SpellCritPercentage != null)
-            for (int i = 0; i < 7; i++)
-                if (a.SpellCritPercentage[i].HasValue) return true;
-        if (a.ModDamageDonePos != null)
-            for (int i = 0; i < 7; i++)
-                if (a.ModDamageDonePos[i].HasValue) return true;
-        if (a.ModDamageDoneNeg != null)
-            for (int i = 0; i < 7; i++)
-                if (a.ModDamageDoneNeg[i].HasValue) return true;
-        if (a.ModDamageDonePercent != null)
-            for (int i = 0; i < 7; i++)
-                if (a.ModDamageDonePercent[i].HasValue) return true;
-
-        // ExploredZones (bits 298-538)
-        if (a.ExploredZones != null)
-            for (int i = 0; i < 240; i++)
-                if (a.ExploredZones[i].HasValue) return true;
-
-        // RestInfo (bits 539-541)
-        if (a.RestInfo != null)
-            for (int i = 0; i < 2; i++)
-                if (a.RestInfo[i] != null && (a.RestInfo[i].Threshold.HasValue || a.RestInfo[i].StateID.HasValue)) return true;
-
-        // WeaponDmgMultipliers / WeaponAtkSpeedMultipliers (bits 542-548)
-        if (a.WeaponDmgMultipliers != null)
-            for (int i = 0; i < 3; i++)
-                if (a.WeaponDmgMultipliers[i].HasValue) return true;
-        if (a.WeaponAtkSpeedMultipliers != null)
-            for (int i = 0; i < 3; i++)
-                if (a.WeaponAtkSpeedMultipliers[i].HasValue) return true;
-
-        // Buyback (bits 549-573)
-        if (a.BuybackPrice != null)
-            for (int i = 0; i < 12; i++)
-                if (a.BuybackPrice[i].HasValue) return true;
-        if (a.BuybackTimestamp != null)
-            for (int i = 0; i < 12; i++)
-                if (a.BuybackTimestamp[i].HasValue) return true;
-
-        // CombatRatings (bits 574-606)
-        if (a.CombatRatings != null)
-            for (int i = 0; i < 32; i++)
-                if (a.CombatRatings[i].HasValue) return true;
-
-        // NoReagentCostMask (bits 615-619)
-        if (a.NoReagentCostMask != null)
-            for (int i = 0; i < 4; i++)
-                if (a.NoReagentCostMask[i].HasValue) return true;
-
-        // ProfessionSkillLine (bits 620-622)
-        if (a.ProfessionSkillLine != null)
-            for (int i = 0; i < 2; i++)
-                if (a.ProfessionSkillLine[i].HasValue) return true;
-
-        // BagSlotFlags (bits 623-627)
-        if (a.BagSlotFlags != null)
-            for (int i = 0; i < 4; i++)
-                if (a.BagSlotFlags[i].HasValue) return true;
-
-        // BankBagSlotFlags (bits 628-635)
-        if (a.BankBagSlotFlags != null)
-            for (int i = 0; i < 7; i++)
-                if (a.BankBagSlotFlags[i].HasValue) return true;
-
-        // QuestCompleted (bits 636-1511)
-        if (a.QuestCompleted != null)
-            for (int i = 0; i < 875; i++)
-                if (a.QuestCompleted[i].HasValue) return true;
-
-        // PvpInfo (bits 607-614)
-        if (a.PvpInfo != null)
-            for (int i = 0; i < a.PvpInfo.Length; i++)
-                if (a.PvpInfo[i] != null && (a.PvpInfo[i].Rating != 0 || a.PvpInfo[i].SeasonPlayed != 0 || a.PvpInfo[i].Disqualified)) return true;
-
-        return false;
-    }
-
-    // (HasAnySkillChanged already defined earlier in this file at the create-path
-    //  level; no duplicate needed for the update path.)
-
-    // === WriteUpdateObjectData (fork lines 1391-1428) ===
-    private void WriteUpdateObjectData(WorldPacket data)
-    {
-        ObjectData obj = _updateData.ObjectData;
-        uint mask = 0u;
-        if (obj.EntryID.HasValue)
-        {
-            mask |= 2;
-        }
-        if (obj.DynamicFlags.HasValue)
-        {
-            mask |= 4;
-        }
-        if (obj.Scale.HasValue)
-        {
-            mask |= 8;
-        }
-        if (mask != 0)
-        {
-            mask |= 1;
-        }
-        data.WriteBits(mask, 4);
-        data.FlushBits();
-        if ((mask & 1) != 0)
-        {
-            if (obj.EntryID.HasValue)
-            {
-                data.WriteInt32(obj.EntryID.Value);
-            }
-            if (obj.DynamicFlags.HasValue)
-            {
-                data.WriteUInt32(obj.DynamicFlags.Value);
-            }
-            if (obj.Scale.HasValue)
-            {
-                data.WriteFloat(obj.Scale.Value);
-            }
-            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
-                $"[ObjectData write] guid={_updateData.Guid} typeMask={_objectTypeMask} mask=0x{mask:X1} " +
-                $"entry={(obj.EntryID.HasValue ? obj.EntryID.Value.ToString() : "—")} " +
-                $"dynFlags={(obj.DynamicFlags.HasValue ? "0x" + obj.DynamicFlags.Value.ToString("X8") : "—")} " +
-                $"scale={(obj.Scale.HasValue ? obj.Scale.Value.ToString("F4") : "—")}");
-        }
-    }
-
-    // === WriteUpdateUnitData (fork lines 1902-2518) ===
-    private void WriteUpdateUnitData(WorldPacket data)
-    {
-        UnitData unit = _updateData.UnitData;
-        if (unit == null)
-        {
-            data.WriteBits(0, 8);
-            data.FlushBits();
-            data.FlushBits();
-            return;
-        }
-        Span<uint> blockMasksBuf = stackalloc uint[8];
-        var blockMasks = new StackBitMask(blockMasksBuf);
-        if (unit.Health.HasValue)
-        {
-            blockMasks.SetBit(5);
-        }
-        if (unit.MaxHealth.HasValue)
-        {
-            blockMasks.SetBit(6);
-        }
-        if (unit.DisplayID.HasValue)
-        {
-            blockMasks.SetBit(7);
-        }
-        if (unit.Charm != null)
-        {
-            blockMasks.SetBit(11);
-        }
-        if (unit.Summon != null)
-        {
-            blockMasks.SetBit(12);
-        }
-        if (unit.CharmedBy != null)
-        {
-            blockMasks.SetBit(14);
-        }
-        if (unit.SummonedBy != null)
-        {
-            blockMasks.SetBit(15);
-        }
-        if (unit.CreatedBy != null)
-        {
-            blockMasks.SetBit(16);
-        }
-        if (unit.Target != null)
-        {
-            blockMasks.SetBit(19);
-        }
-        if (unit.ChannelData != null)
-        {
-            blockMasks.SetBit(22);
-        }
-        // ChannelObjects DynamicUpdateField — bit 4 of UnitData changesMask.
-        // Sustains the channel-loop animation on V3_4_3 client by populating
-        // the channel-target list. Reader at UpdateHandler.cs:1918 only assigns
-        // ChannelObject when the legacy mask bit is set, so this naturally
-        // covers both channel-start (target GUID) and channel-end (Empty GUID).
-        if (unit.ChannelObject != null) blockMasks.SetBit(4);
-        if (unit.RaceId.HasValue)
-        {
-            blockMasks.SetBit(24);
-        }
-        if (unit.ClassId.HasValue)
-        {
-            blockMasks.SetBit(25);
-        }
-        if (unit.SexId.HasValue)
-        {
-            blockMasks.SetBit(27);
-        }
-        if (unit.DisplayPower.HasValue) blockMasks.SetBit(28);
-        if (unit.Level.HasValue)
-        {
-            blockMasks.SetBit(30);
-        }
-        if (unit.EffectiveLevel.HasValue)
-        {
-            blockMasks.SetBit(31);
-        }
-        if (unit.FactionTemplate.HasValue)
-        {
-            blockMasks.SetBit(40);
-        }
-        if (unit.Flags.HasValue)
-        {
-            blockMasks.SetBit(41);
-        }
-        if (unit.Flags2.HasValue)
-        {
-            blockMasks.SetBit(42);
-        }
-        if (unit.Flags3.HasValue) blockMasks.SetBit(43);
-        if (unit.AuraState.HasValue)
-        {
-            blockMasks.SetBit(44);
-        }
-        if (unit.OverrideDisplayPowerID.HasValue) blockMasks.SetBit(45);
-        if (unit.BoundingRadius.HasValue)
-        {
-            blockMasks.SetBit(46);
-        }
-        if (unit.CombatReach.HasValue)
-        {
-            blockMasks.SetBit(47);
-        }
-        if (unit.DisplayScale.HasValue) blockMasks.SetBit(48);
-        if (unit.NativeDisplayID.HasValue)
-        {
-            blockMasks.SetBit(49);
-        }
-        if (unit.NativeXDisplayScale.HasValue) blockMasks.SetBit(50);
-        if (unit.MountDisplayID.HasValue)
-        {
-            blockMasks.SetBit(51);
-        }
-        // Block 1 continued: damage, stance bytes, pet fields
-        if (unit.MinDamage.HasValue) blockMasks.SetBit(52);
-        if (unit.MaxDamage.HasValue) blockMasks.SetBit(53);
-        if (unit.MinOffHandDamage.HasValue) blockMasks.SetBit(54);
-        if (unit.MaxOffHandDamage.HasValue) blockMasks.SetBit(55);
-        if (unit.StandState.HasValue) blockMasks.SetBit(56);
-        // 57 = PetTalentPoints (not in UnitData)
-        if (unit.VisFlags.HasValue) blockMasks.SetBit(58);
-        if (unit.AnimTier.HasValue) blockMasks.SetBit(59);
-        if (unit.PetNumber.HasValue) blockMasks.SetBit(60);
-        if (unit.PetNameTimestamp.HasValue) blockMasks.SetBit(61);
-        if (unit.PetExperience.HasValue) blockMasks.SetBit(62);
-        if (unit.PetNextLevelExperience.HasValue) blockMasks.SetBit(63);
-        // Block 2: ModCast/Haste, combat stats, attack power
-        if (unit.ModCastSpeed.HasValue) blockMasks.SetBit(65);
-        if (unit.ModCastHaste.HasValue) blockMasks.SetBit(66);
-        if (unit.ModHaste.HasValue) blockMasks.SetBit(67);
-        if (unit.ModRangedHaste.HasValue) blockMasks.SetBit(68);
-        if (unit.ModHasteRegen.HasValue) blockMasks.SetBit(69);
-        if (unit.ModTimeRate.HasValue) blockMasks.SetBit(70);
-        if (unit.CreatedBySpell.HasValue) blockMasks.SetBit(71);
-        if (unit.EmoteState.HasValue) blockMasks.SetBit(72);
-        if (unit.TrainingPointsUsed.HasValue) blockMasks.SetBit(73);
-        if (unit.TrainingPointsTotal.HasValue) blockMasks.SetBit(74);
-        if (unit.BaseMana.HasValue) blockMasks.SetBit(75);
-        if (unit.BaseHealth.HasValue) blockMasks.SetBit(76);
-        if (unit.SheatheState.HasValue) blockMasks.SetBit(77);
-        if (unit.PvpFlags.HasValue) blockMasks.SetBit(78);
-        if (unit.PetFlags.HasValue) blockMasks.SetBit(79);
-        if (unit.ShapeshiftForm.HasValue) blockMasks.SetBit(80);
-        if (unit.AttackPower.HasValue) blockMasks.SetBit(81);
-        if (unit.AttackPowerModPos.HasValue) blockMasks.SetBit(82);
-        if (unit.AttackPowerModNeg.HasValue) blockMasks.SetBit(83);
-        if (unit.AttackPowerMultiplier.HasValue) blockMasks.SetBit(84);
-        if (unit.RangedAttackPower.HasValue) blockMasks.SetBit(85);
-        if (unit.RangedAttackPowerModPos.HasValue) blockMasks.SetBit(86);
-        if (unit.RangedAttackPowerModNeg.HasValue) blockMasks.SetBit(87);
-        if (unit.RangedAttackPowerMultiplier.HasValue) blockMasks.SetBit(88);
-        if (unit.AttackSpeedAura.HasValue) blockMasks.SetBit(89);
-        if (unit.Lifesteal.HasValue) blockMasks.SetBit(90);
-        if (unit.MinRangedDamage.HasValue) blockMasks.SetBit(91);
-        if (unit.MaxRangedDamage.HasValue) blockMasks.SetBit(92);
-        if (unit.MaxHealthModifier.HasValue) blockMasks.SetBit(93);
-        if (unit.HoverHeight.HasValue)
-        {
-            blockMasks.SetBit(94);
-        }
-        if (unit.MinItemLevelCutoff.HasValue) blockMasks.SetBit(95);
-        // Block 3: MinItemLevel..GuildGUID
-        if (unit.MinItemLevel.HasValue) blockMasks.SetBit(97);
-        if (unit.MaxItemLevel.HasValue) blockMasks.SetBit(98);
-        if (unit.WildBattlePetLevel.HasValue) blockMasks.SetBit(99);
-        // 100 = BattlePetCompanionNameTimestamp (not tracked)
-        if (unit.InteractSpellID.HasValue) blockMasks.SetBit(101);
-        if (unit.ScaleDuration.HasValue) blockMasks.SetBit(102);
-        if (unit.LooksLikeMountID.HasValue) blockMasks.SetBit(103);
-        if (unit.LooksLikeCreatureID.HasValue) blockMasks.SetBit(104);
-        if (unit.LookAtControllerID.HasValue) blockMasks.SetBit(105);
-        // 106 = PerksVendorItemID (not tracked)
-        if (unit.GuildGUID != null)
-        {
-            blockMasks.SetBit(107);
-        }
-        // 108-111 = SkinningOwnerGUID / FlightCapabilityID / GlideEventSpeedDivisor / CurrentAreaID (not tracked)
-        if (unit.ComboTarget != null)
-        {
-            blockMasks.SetBit(112);
-        }
-        if (unit.NpcFlags != null)
-        {
-            bool hasAnyNpcFlag = false;
-            for (int i = 0; i < unit.NpcFlags.Length; i++)
-            {
-                if (unit.NpcFlags[i].HasValue && unit.NpcFlags[i] != 0)
-                {
-                    blockMasks.SetBit(114 + i);
-                    hasAnyNpcFlag = true;
-                }
-            }
-            if (hasAnyNpcFlag)
-                blockMasks.SetBit(113); // parent bit for NpcFlags array
-        }
-        bool hasAnyPowerGroup = false;
-        if (unit.Power != null)
-        {
-            for (int j = 0; j < unit.Power.Length; j++)
-            {
-                if (unit.Power[j].HasValue)
-                {
-                    blockMasks.SetBit(137 + j);
-                    hasAnyPowerGroup = true;
-                }
-            }
-        }
-        if (unit.MaxPower != null)
-        {
-            for (int k = 0; k < unit.MaxPower.Length; k++)
-            {
-                if (unit.MaxPower[k].HasValue)
-                {
-                    blockMasks.SetBit(147 + k);
-                    hasAnyPowerGroup = true;
-                }
-            }
-        }
-        if (unit.ModPowerRegen != null)
-        {
-            for (int j2 = 0; j2 < unit.ModPowerRegen.Length; j2++)
-            {
-                if (unit.ModPowerRegen[j2].HasValue)
-                {
-                    blockMasks.SetBit(157 + j2);
-                    hasAnyPowerGroup = true;
-                }
-            }
-        }
-        if (hasAnyPowerGroup)
-            blockMasks.SetBit(116); // parent bit for Power/MaxPower/Regen arrays
-        // VirtualItems array (parent bit 167, elements 168-170)
-        if (unit.VirtualItems != null)
-        {
-            bool hasAnyVI = false;
-            for (int i = 0; i < 3; i++)
-            {
-                if (unit.VirtualItems[i].HasValue && unit.VirtualItems[i].Value.ItemID != 0)
-                {
-                    blockMasks.SetBit(168 + i);
-                    hasAnyVI = true;
-                }
-            }
-            if (hasAnyVI) blockMasks.SetBit(167);
-        }
-        // RangedAttackRoundBaseTime (bit 170 — shares VirtualItems parent 167? No, separate)
-        // Actually TC343 has RangedAttackRoundBaseTime at a different position. Check:
-        // AttackRoundBaseTime array (parent bit 171, elements 172-173)
-        if (unit.AttackRoundBaseTime != null)
-        {
-            bool hasAnyART = false;
-            for (int i = 0; i < unit.AttackRoundBaseTime.Length && i < 2; i++)
-            {
-                if (unit.AttackRoundBaseTime[i].HasValue)
-                {
-                    blockMasks.SetBit(172 + i);
-                    hasAnyART = true;
-                }
-            }
-            if (hasAnyART) blockMasks.SetBit(171);
-        }
-        // Stats/StatPosBuff/StatNegBuff array (parent bit 174, elements 175-189)
-        bool hasAnyStatsGroup = false;
-        if (unit.Stats != null)
-        {
-            for (int i = 0; i < 5; i++)
-            {
-                if (unit.Stats[i].HasValue) { blockMasks.SetBit(175 + i); hasAnyStatsGroup = true; }
-            }
-        }
-        if (unit.StatPosBuff != null)
-        {
-            for (int i = 0; i < 5; i++)
-            {
-                if (unit.StatPosBuff[i].HasValue) { blockMasks.SetBit(180 + i); hasAnyStatsGroup = true; }
-            }
-        }
-        if (unit.StatNegBuff != null)
-        {
-            for (int i = 0; i < 5; i++)
-            {
-                if (unit.StatNegBuff[i].HasValue) { blockMasks.SetBit(185 + i); hasAnyStatsGroup = true; }
-            }
-        }
-        if (hasAnyStatsGroup) blockMasks.SetBit(174);
-        // Resistances/PowerCostModifier/PowerCostMultiplier array (parent bit 190, elements 191-211)
-        bool hasAnyResistGroup = false;
-        if (unit.Resistances != null)
-        {
-            for (int i = 0; i < 7; i++)
-            {
-                if (unit.Resistances[i].HasValue) { blockMasks.SetBit(191 + i); hasAnyResistGroup = true; }
-            }
-        }
-        if (unit.PowerCostModifier != null)
-        {
-            for (int i = 0; i < 7; i++)
-            {
-                if (unit.PowerCostModifier[i].HasValue) { blockMasks.SetBit(198 + i); hasAnyResistGroup = true; }
-            }
-        }
-        if (unit.PowerCostMultiplier != null)
-        {
-            for (int i = 0; i < 7; i++)
-            {
-                if (unit.PowerCostMultiplier[i].HasValue) { blockMasks.SetBit(205 + i); hasAnyResistGroup = true; }
-            }
-        }
-        if (hasAnyResistGroup) blockMasks.SetBit(190);
-        // ResistanceBuffMods array (parent bit 212, elements 213-226)
-        bool hasAnyResBuffGroup = false;
-        if (unit.ResistanceBuffModsPositive != null)
-        {
-            for (int i = 0; i < 7; i++)
-            {
-                if (unit.ResistanceBuffModsPositive[i].HasValue) { blockMasks.SetBit(213 + i); hasAnyResBuffGroup = true; }
-            }
-        }
-        if (unit.ResistanceBuffModsNegative != null)
-        {
-            for (int i = 0; i < 7; i++)
-            {
-                if (unit.ResistanceBuffModsNegative[i].HasValue) { blockMasks.SetBit(220 + i); hasAnyResBuffGroup = true; }
-            }
-        }
-        if (hasAnyResBuffGroup) blockMasks.SetBit(212);
-        // V3_4_3 UnitData parent-bit cascade: bit 0 of blocks 0/1/2/3 IS the
-        // required parent gate for the field group housed in that block (verified
-        // against WPP UpdateFieldsHandler343.ReadUpdateUnitData — the top-level
-        // `if (changesMask[0..96])` checks wrap reads of Health/MaxHealth/Charm/
-        // Target/Flags/Stats/etc.). For blocks 4/5/6/7 bit 0 is a real field in
-        // an array group (e.g. blockMasks[4] bit 0 == changesMask[128] ==
-        // PowerRegenInterruptedFlatModifier[1], a Single) and must NOT be force-
-        // set — doing so tells the V3_4_3 client to read floats we never wrote,
-        // truncating the cascade and dropping the entire Values update (which is
-        // why the rage bar never updated and XP deltas bundled with rage were
-        // lost too). Verified against CypherCore native-V3_4_3 World.pkt diff.
-        // V3_4_3-only (this file is V3_4_3_54261-specific).
-        for (int bi = 0; bi < 4; bi++)
-        {
-            if (blockMasks[bi] != 0)
-            {
-                blockMasks.SetBit(bi * 32);
-            }
-        }
-        byte blocksMask = 0;
-        for (int l = 0; l < 8; l++)
-        {
-            if (blockMasks[l] != 0)
-            {
-                blocksMask |= (byte)(1 << l);
-            }
-        }
-        data.WriteBits(blocksMask, 8);
-        for (int m = 0; m < 8; m++)
-        {
-            if ((blocksMask & (1 << m)) != 0)
-            {
-                data.WriteBits(blockMasks[m], 32);
-            }
-        }
-        if ((blockMasks[0] & 1) != 0)
-        {
-        }
-        data.FlushBits();
-        // Dynamic update masks for the changesMask[2/3/4] field group
-        // (PassiveSpells/WorldEffects/ChannelObjects). Mirrors TC
-        // UpdateFields.cpp:908-931 + UpdateField.cpp:43-63
-        // (WriteCompleteDynamicFieldUpdateMask). Only ChannelObjects is wired
-        // here — the other two are size-0 placeholders.
-        if ((blockMasks[0] & (1u << 4)) != 0)
-        {
-            uint channelObjectsSize = (unit.ChannelObject.HasValue && !unit.ChannelObject.Value.IsEmpty()) ? 1u : 0u;
-            data.WriteBits(channelObjectsSize, 32);
-            if (channelObjectsSize != 0)
-                data.WriteBits(0xFFFFFFFFu, (int)channelObjectsSize); // one set bit per element
-        }
-        data.FlushBits();
-        if ((blockMasks[0] & 1) != 0)
-        {
-            // ChannelObjects body — written BEFORE Health to match TC
-            // UpdateFields.cpp:957-963 ordering inside the changesMask[0] body.
-            if ((blockMasks[0] & (1u << 4)) != 0
-                && unit.ChannelObject.HasValue && !unit.ChannelObject.Value.IsEmpty())
-            {
-                data.WritePackedGuid128(unit.ChannelObject.Value);
-            }
-            if (unit.Health.HasValue)
-            {
-                data.WriteInt64(unit.Health.Value);
-            }
-            if (unit.MaxHealth.HasValue)
-            {
-                data.WriteInt64(unit.MaxHealth.Value);
-            }
-            if (unit.DisplayID.HasValue)
-            {
-                data.WriteInt32(unit.DisplayID.Value);
-            }
-            if (unit.Charm != null)
-            {
-                data.WritePackedGuid128(unit.Charm.Value);
-            }
-            if (unit.Summon != null)
-            {
-                data.WritePackedGuid128(unit.Summon.Value);
-            }
-            if (unit.CharmedBy != null)
-            {
-                data.WritePackedGuid128(unit.CharmedBy.Value);
-            }
-            if (unit.SummonedBy != null)
-            {
-                data.WritePackedGuid128(unit.SummonedBy.Value);
-            }
-            if (unit.CreatedBy != null)
-            {
-                data.WritePackedGuid128(unit.CreatedBy.Value);
-            }
-            if (unit.Target != null)
-            {
-                data.WritePackedGuid128(unit.Target.Value);
-            }
-            if (unit.ChannelData != null)
-            {
-                // CypherCore UnitChannel.WriteUpdate (UpdateFields.cs:744-748) writes
-                // SpellID + SpellXSpellVisualID DIRECTLY — no inner bit-prefix, no
-                // FlushBits, no ChannelObject sub-field. The previous code wrote
-                // `WriteBits(3 or 7, 4) + FlushBits` which inserted 1 byte of garbage
-                // before SpellID, shifting the V3_4_3 client's read by 1 byte. WPP
-                // parsed our wire as `(ChannelData) SpellID: 13252976
-                // SpellXSpellVisualID: 88256768` (random) instead of `SpellID: 51769
-                // SpellXSpellVisualID: 0`. Result: cast bar didn't render, kneel
-                // animation didn't play, ESC stayed blocked because the client
-                // believed the player was channeling an unknown spell. Note:
-                // ChannelObject is a SEPARATE Unit field (DynamicUpdateField in
-                // CypherCore), not part of the ChannelData write — handle it
-                // independently elsewhere if needed.
-                data.WriteInt32(unit.ChannelData.Value.SpellID);
-                data.WriteInt32(unit.ChannelData.Value.SpellXSpellVisualID);
-            }
-            bool zeroCharBakeIds = IsImpersonatingCreatureBake();
-            if (unit.RaceId.HasValue)
-            {
-                data.WriteUInt8(zeroCharBakeIds ? (byte)0 : unit.RaceId.Value);
-            }
-            if (unit.ClassId.HasValue)
-            {
-                data.WriteUInt8(zeroCharBakeIds ? (byte)0 : unit.ClassId.Value);
-            }
-            if (unit.SexId.HasValue)
-            {
-                data.WriteUInt8(zeroCharBakeIds ? (byte)0 : unit.SexId.Value);
-            }
-            // V3_4_3 client reads DisplayPower as a single byte (WPP UpdateFieldsHandler343
-            // line 926 + TC wotlk_classic UpdateFields.h: `UpdateField<uint8, 0, 30> DisplayPower`).
-            // Writing UInt32 here over-shot by 3 bytes and shifted every downstream Values field
-            // by 3 — Stamina (Stats[2]) read as ~520M, ShapeshiftForm always read 0 (so the
-            // V3_4_3 client thought the player was never in any form, breaking /cancelform and
-            // the right-click-buff cancel path entirely). The CREATE writer at line 510 already
-            // emits this as UInt8 — the bug was Values-only.
-            if (unit.DisplayPower.HasValue) {
-                data.WriteUInt8((byte)unit.DisplayPower.Value);
-            }
-            if (unit.Level.HasValue)
-            {
-                data.WriteInt32(unit.Level.Value);
-            }
-            if (unit.EffectiveLevel.HasValue)
-            {
-                data.WriteInt32(unit.EffectiveLevel.Value);
-            }
-        }
-        if ((blocksMask & 2) != 0)
-        {
-            if (unit.FactionTemplate.HasValue)
-            {
-                data.WriteInt32(unit.FactionTemplate.Value);
-            }
-            if (unit.Flags.HasValue)
-            {
-                data.WriteUInt32(unit.Flags.Value);
-            }
-            if (unit.Flags2.HasValue)
-            {
-                data.WriteUInt32(SanitizeFlags2(unit.Flags2.Value, unit.CreatedBy));
-            }
-            if (unit.Flags3.HasValue) data.WriteUInt32(unit.Flags3.Value);
-            if (unit.AuraState.HasValue)
-            {
-                data.WriteUInt32(unit.AuraState.Value);
-            }
-            if (unit.OverrideDisplayPowerID.HasValue) data.WriteUInt32(unit.OverrideDisplayPowerID.Value);
-            if (unit.BoundingRadius.HasValue)
-            {
-                data.WriteFloat(unit.BoundingRadius.Value);
-            }
-            if (unit.CombatReach.HasValue)
-            {
-                data.WriteFloat(unit.CombatReach.Value);
-            }
-            if (unit.DisplayScale.HasValue) data.WriteFloat(unit.DisplayScale.Value);
-            if (unit.NativeDisplayID.HasValue)
-            {
-                data.WriteInt32(unit.NativeDisplayID.Value);
-            }
-            if (unit.NativeXDisplayScale.HasValue) data.WriteFloat(unit.NativeXDisplayScale.Value);
-            if (unit.MountDisplayID.HasValue)
-            {
-                data.WriteInt32(unit.MountDisplayID.Value);
-            }
-            // Block 1 continued: damage, stance, pet
-            if (unit.MinDamage.HasValue) data.WriteFloat(unit.MinDamage.Value);
-            if (unit.MaxDamage.HasValue) data.WriteFloat(unit.MaxDamage.Value);
-            if (unit.MinOffHandDamage.HasValue) data.WriteFloat(unit.MinOffHandDamage.Value);
-            if (unit.MaxOffHandDamage.HasValue) data.WriteFloat(unit.MaxOffHandDamage.Value);
-            if (unit.StandState.HasValue) data.WriteUInt8(unit.StandState.Value);
-            if (unit.VisFlags.HasValue) data.WriteUInt8(unit.VisFlags.Value);
-            if (unit.AnimTier.HasValue) data.WriteUInt8(unit.AnimTier.Value);
-            if (unit.PetNumber.HasValue) data.WriteUInt32(unit.PetNumber.Value);
-            if (unit.PetNameTimestamp.HasValue) data.WriteUInt32(unit.PetNameTimestamp.Value);
-            if (unit.PetExperience.HasValue) data.WriteUInt32(unit.PetExperience.Value);
-            if (unit.PetNextLevelExperience.HasValue) data.WriteUInt32(unit.PetNextLevelExperience.Value);
-        }
-        // Block 2 (bits 64-95): ModCast/Haste, combat stats, attack power
-        if ((blocksMask & 4) != 0)
-        {
-            if (unit.ModCastSpeed.HasValue) data.WriteFloat(unit.ModCastSpeed.Value);
-            if (unit.ModCastHaste.HasValue) data.WriteFloat(unit.ModCastHaste.Value);
-            if (unit.ModHaste.HasValue) data.WriteFloat(unit.ModHaste.Value);
-            if (unit.ModRangedHaste.HasValue) data.WriteFloat(unit.ModRangedHaste.Value);
-            if (unit.ModHasteRegen.HasValue) data.WriteFloat(unit.ModHasteRegen.Value);
-            if (unit.ModTimeRate.HasValue) data.WriteFloat(unit.ModTimeRate.Value);
-            if (unit.CreatedBySpell.HasValue) data.WriteInt32(unit.CreatedBySpell.Value);
-            if (unit.EmoteState.HasValue) data.WriteInt32(unit.EmoteState.Value);
-            if (unit.TrainingPointsUsed.HasValue) data.WriteUInt16(unit.TrainingPointsUsed.Value);
-            if (unit.TrainingPointsTotal.HasValue) data.WriteUInt16(unit.TrainingPointsTotal.Value);
-            if (unit.BaseMana.HasValue) data.WriteInt32(unit.BaseMana.Value);
-            if (unit.BaseHealth.HasValue) data.WriteInt32(unit.BaseHealth.Value);
-            if (unit.SheatheState.HasValue) data.WriteUInt8(unit.SheatheState.Value);
-            if (unit.PvpFlags.HasValue) data.WriteUInt8(unit.PvpFlags.Value);
-            if (unit.PetFlags.HasValue) data.WriteUInt8(unit.PetFlags.Value);
-            if (unit.ShapeshiftForm.HasValue) data.WriteUInt8(unit.ShapeshiftForm.Value);
-            if (unit.AttackPower.HasValue) data.WriteInt32(unit.AttackPower.Value);
-            if (unit.AttackPowerModPos.HasValue) data.WriteInt32(unit.AttackPowerModPos.Value);
-            if (unit.AttackPowerModNeg.HasValue) data.WriteInt32(unit.AttackPowerModNeg.Value);
-            if (unit.AttackPowerMultiplier.HasValue) data.WriteFloat(unit.AttackPowerMultiplier.Value);
-            if (unit.RangedAttackPower.HasValue) data.WriteInt32(unit.RangedAttackPower.Value);
-            if (unit.RangedAttackPowerModPos.HasValue) data.WriteInt32(unit.RangedAttackPowerModPos.Value);
-            if (unit.RangedAttackPowerModNeg.HasValue) data.WriteInt32(unit.RangedAttackPowerModNeg.Value);
-            if (unit.RangedAttackPowerMultiplier.HasValue) data.WriteFloat(unit.RangedAttackPowerMultiplier.Value);
-            if (unit.AttackSpeedAura.HasValue) data.WriteInt32(unit.AttackSpeedAura.Value);
-            if (unit.Lifesteal.HasValue) data.WriteFloat(unit.Lifesteal.Value);
-            if (unit.MinRangedDamage.HasValue) data.WriteFloat(unit.MinRangedDamage.Value);
-            if (unit.MaxRangedDamage.HasValue) data.WriteFloat(unit.MaxRangedDamage.Value);
-            if (unit.MaxHealthModifier.HasValue) data.WriteFloat(unit.MaxHealthModifier.Value);
-            if (unit.HoverHeight.HasValue) data.WriteFloat(unit.HoverHeight.Value);
-            if (unit.MinItemLevelCutoff.HasValue) data.WriteInt32(unit.MinItemLevelCutoff.Value);
-        }
-        // Block 3 (bits 96-127): MinItemLevel..ComboTarget, GuildGUID, NpcFlags
-        if ((blocksMask & 8) != 0)
-        {
-            if (unit.MinItemLevel.HasValue) data.WriteInt32(unit.MinItemLevel.Value);
-            if (unit.MaxItemLevel.HasValue) data.WriteInt32(unit.MaxItemLevel.Value);
-            if (unit.WildBattlePetLevel.HasValue) data.WriteInt32(unit.WildBattlePetLevel.Value);
-            // 100 = BattlePetCompanionNameTimestamp not tracked
-            if (unit.InteractSpellID.HasValue) data.WriteInt32(unit.InteractSpellID.Value);
-            if (unit.ScaleDuration.HasValue) data.WriteInt32(unit.ScaleDuration.Value);
-            if (unit.LooksLikeMountID.HasValue) data.WriteInt32(unit.LooksLikeMountID.Value);
-            if (unit.LooksLikeCreatureID.HasValue) data.WriteInt32(unit.LooksLikeCreatureID.Value);
-            if (unit.LookAtControllerID.HasValue) data.WriteInt32(unit.LookAtControllerID.Value);
-            // 106 = PerksVendorItemID not tracked
-            if (unit.GuildGUID != null)
-            {
-                data.WritePackedGuid128(unit.GuildGUID.Value);
-            }
-            // 108-111 = SkinningOwnerGUID / FlightCapabilityID / GlideEventSpeedDivisor / CurrentAreaID not tracked
-            // 112 = ComboTarget — combo points are target-stuck in 3.3.5a/3.4.3 Classic;
-            // without the target GUID the client rejects finishers with "requires combo points"
-            // even when Power[combo-slot] > 0.
-            if (unit.ComboTarget != null)
-            {
-                data.WritePackedGuid128(unit.ComboTarget.Value);
-            }
-            // NpcFlags array (parent bit 113, elements 114-115) — gated by block 3
-            if (unit.NpcFlags != null)
-            {
-                for (int n = 0; n < unit.NpcFlags.Length; n++)
-                {
-                    if (unit.NpcFlags[n].HasValue && unit.NpcFlags[n] != 0)
-                    {
-                        data.WriteUInt32(unit.NpcFlags[n].Value);
-                    }
-                }
-            }
-        }
-        // Power group (parent bit 116) — TC343 interleaves all power arrays per-index
-        if ((blocksMask & 0x10) != 0)
-        {
-            int maxLen = 0;
-            if (unit.Power != null && unit.Power.Length > maxLen) maxLen = unit.Power.Length;
-            if (unit.MaxPower != null && unit.MaxPower.Length > maxLen) maxLen = unit.MaxPower.Length;
-            for (int pi = 0; pi < maxLen; pi++)
-            {
-                // PowerRegenFlatModifier[pi] (bits 117+) — not tracked, skip
-                // PowerRegenInterruptedFlatModifier[pi] (bits 127+) — not tracked, skip
-                if (unit.Power != null && pi < unit.Power.Length && unit.Power[pi].HasValue)
-                    data.WriteInt32(unit.Power[pi].Value);
-                if (unit.MaxPower != null && pi < unit.MaxPower.Length && unit.MaxPower[pi].HasValue)
-                    data.WriteInt32(unit.MaxPower[pi].Value);
-                if (unit.ModPowerRegen != null && pi < unit.ModPowerRegen.Length && unit.ModPowerRegen[pi].HasValue)
-                    data.WriteFloat(unit.ModPowerRegen[pi].Value);
-            }
-        }
-        // VirtualItems (parent bit 167, elements 168-170)
-        if ((blockMasks[167 / 32] & (1u << (167 % 32))) != 0)
-        {
-            for (int vi = 0; vi < 3; vi++)
-            {
-                if ((blockMasks[(168 + vi) / 32] & (1u << ((168 + vi) % 32))) != 0)
-                {
-                    var vItem = unit.VirtualItems[vi];
-                    // VirtualItem::WriteUpdate: 4-bit mask + fields
-                    // Bit 0=hasAny, 1=ItemID, 2=ItemAppearanceModID, 3=ItemVisual
-                    data.WriteBits(0x03u, 4); // bits 0+1 set (hasAny + ItemID)
-                    data.FlushBits();
-                    data.WriteInt32(vItem.HasValue ? vItem.Value.ItemID : 0);
-                }
-            }
-        }
-        // AttackRoundBaseTime array (parent bit 171, elements 172-173) — block 5
-        if ((blockMasks[171 / 32] & (1u << (171 % 32))) != 0)
-        {
-            if (unit.AttackRoundBaseTime != null)
-            {
-                for (int i = 0; i < unit.AttackRoundBaseTime.Length && i < 2; i++)
-                {
-                    if (unit.AttackRoundBaseTime[i].HasValue)
-                        data.WriteUInt32(unit.AttackRoundBaseTime[i].Value);
-                }
-            }
-        }
-        // Stats/StatPosBuff/StatNegBuff (parent bit 174, interleaved per TC343) — block 5
-        if ((blockMasks[174 / 32] & (1u << (174 % 32))) != 0)
-        {
-            for (int i = 0; i < 5; i++)
-            {
-                if (unit.Stats != null && unit.Stats[i].HasValue) data.WriteInt32(unit.Stats[i].Value);
-                if (unit.StatPosBuff != null && unit.StatPosBuff[i].HasValue) data.WriteInt32(unit.StatPosBuff[i].Value);
-                if (unit.StatNegBuff != null && unit.StatNegBuff[i].HasValue) data.WriteInt32(unit.StatNegBuff[i].Value);
-            }
-        }
-        // Resistances/PowerCostModifier/PowerCostMultiplier (parent bit 190, spans blocks 5-6)
-        if ((blockMasks[190 / 32] & (1u << (190 % 32))) != 0)
-        {
-            for (int i = 0; i < 7; i++)
-            {
-                if (unit.Resistances != null && unit.Resistances[i].HasValue) data.WriteInt32(unit.Resistances[i].Value);
-                if (unit.PowerCostModifier != null && unit.PowerCostModifier[i].HasValue) data.WriteInt32(unit.PowerCostModifier[i].Value);
-                if (unit.PowerCostMultiplier != null && unit.PowerCostMultiplier[i].HasValue) data.WriteFloat(unit.PowerCostMultiplier[i].Value);
-            }
-        }
-        // ResistanceBuffMods (parent bit 212, elements 213-226, spans blocks 6-7)
-        if ((blockMasks[212 / 32] & (1u << (212 % 32))) != 0)
-        {
-            for (int i = 0; i < 7; i++)
-            {
-                if (unit.ResistanceBuffModsPositive != null && unit.ResistanceBuffModsPositive[i].HasValue) data.WriteInt32(unit.ResistanceBuffModsPositive[i].Value);
-                if (unit.ResistanceBuffModsNegative != null && unit.ResistanceBuffModsNegative[i].HasValue) data.WriteInt32(unit.ResistanceBuffModsNegative[i].Value);
-            }
-        }
-    }
-
-    // === WriteUpdatePlayerData (fork lines 2674-2813) ===
-    private void WriteUpdatePlayerData(WorldPacket data)
-    {
-        PlayerData p = _updateData.PlayerData ?? new PlayerData();
-
-        Span<uint> blocksBuf = stackalloc uint[4];
-        var blocks = new StackBitMask(blocksBuf);
-        // Block 0: scalar fields (bits 4-31)
-        if (p.DuelArbiter != null) { blocks.SetBit(0); blocks.SetBit(4); }
-        if (p.WowAccount != null) { blocks.SetBit(0); blocks.SetBit(5); }
-        if (p.LootTargetGUID != null) { blocks.SetBit(0); blocks.SetBit(6); }
-        if (p.PlayerFlags.HasValue) { blocks.SetBit(0); blocks.SetBit(7); }
-        if (p.PlayerFlagsEx.HasValue) { blocks.SetBit(0); blocks.SetBit(8); }
-        if (p.GuildRankID.HasValue) { blocks.SetBit(0); blocks.SetBit(9); }
-        if (p.GuildDeleteDate.HasValue) { blocks.SetBit(0); blocks.SetBit(10); }
-        if (p.GuildLevel.HasValue) { blocks.SetBit(0); blocks.SetBit(11); }
-        if (p.NumBankSlots.HasValue) { blocks.SetBit(0); blocks.SetBit(12); }
-        if (p.NativeSex.HasValue) { blocks.SetBit(0); blocks.SetBit(13); }
-        if (p.Inebriation.HasValue) { blocks.SetBit(0); blocks.SetBit(14); }
-        if (p.PvpTitle.HasValue) { blocks.SetBit(0); blocks.SetBit(15); }
-        if (p.ArenaFaction.HasValue) { blocks.SetBit(0); blocks.SetBit(16); }
-        if (p.PvPRank.HasValue) { blocks.SetBit(0); blocks.SetBit(17); }
-        // 18: Field_88 — unused
-        if (p.DuelTeam.HasValue) { blocks.SetBit(0); blocks.SetBit(19); }
-        if (p.GuildTimeStamp.HasValue) { blocks.SetBit(0); blocks.SetBit(20); }
-        if (p.ChosenTitle.HasValue) { blocks.SetBit(0); blocks.SetBit(21); }
-        if (p.FakeInebriation.HasValue) { blocks.SetBit(0); blocks.SetBit(22); }
-        if (p.VirtualPlayerRealm.HasValue) { blocks.SetBit(0); blocks.SetBit(23); }
-        if (p.CurrentSpecID.HasValue) { blocks.SetBit(0); blocks.SetBit(24); }
-        // 25: TaxiMountAnimKitID — not tracked
-        // 26: CurrentBattlePetBreedQuality — not tracked
-        if (p.HonorLevel.HasValue) { blocks.SetBit(0); blocks.SetBit(27); }
-        // 28-31: LogoutTime, CurrentBattlePetSpeciesID, BnetAccount, DungeonScore — not tracked
-
-        // QuestLog (header 35, elements 36-60)
-        bool hasAnyQuestLog = false;
-        for (int i = 0; i < QuestConst.MaxQuestLogSize; i++)
-        {
-            if (p.QuestLog[i] != null && p.QuestLog[i].QuestID.HasValue)
-            {
-                blocks.SetBit(35);
-                blocks.SetBit(36 + i);
-                hasAnyQuestLog = true;
-            }
-        }
-
-        // VisibleItems (header 61, elements 62-80)
-        bool hasAnyVisibleItem = false;
-        for (int i = 0; i < 19; i++)
-        {
-            if (p.VisibleItems != null && i < p.VisibleItems.Length && p.VisibleItems[i] != null)
-            {
-                blocks.SetBit(61);
-                blocks.SetBit(62 + i);
-                hasAnyVisibleItem = true;
-            }
-        }
-
-        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace, $"[PlayerDataUpdate] blocks=[0x{blocks[0]:X8},0x{blocks[1]:X8},0x{blocks[2]:X8},0x{blocks[3]:X8}]");
-
-        // Write blocksMask (4 bits)
-        byte blocksMask = 0;
-        for (int i = 0; i < 4; i++)
-            if (blocks[i] != 0) blocksMask |= (byte)(1 << i);
-
-        data.WriteBits(blocksMask, 4);
-        for (int i = 0; i < 4; i++)
-            if ((blocksMask & (1 << i)) != 0)
-                data.WriteBits(blocks[i], 32);
-
-        // IsQuestLogChangesMaskSkipped = true → use WriteCreate format for quest entries
-        data.WriteBit(true);
-
-        // No dynamic fields (bits 1-3 not set)
-        data.FlushBits();
-
-        // Block 0: scalar field values in TC343 bit order (4-31)
-        if (blocks.IsBitSet(0))
-        {
-            if (blocks.IsBitSet(4)) data.WritePackedGuid128(p.DuelArbiter.Value);
-            if (blocks.IsBitSet(5)) data.WritePackedGuid128(p.WowAccount.Value);
-            if (blocks.IsBitSet(6)) data.WritePackedGuid128(p.LootTargetGUID.Value);
-            if (blocks.IsBitSet(7)) data.WriteUInt32(p.PlayerFlags.Value);
-            if (blocks.IsBitSet(8)) data.WriteUInt32(p.PlayerFlagsEx.Value);
-            if (blocks.IsBitSet(9)) data.WriteUInt32(p.GuildRankID.Value);
-            if (blocks.IsBitSet(10)) data.WriteUInt32(p.GuildDeleteDate.Value);
-            if (blocks.IsBitSet(11)) data.WriteInt32(p.GuildLevel.Value);
-            if (blocks.IsBitSet(12)) data.WriteUInt8(p.NumBankSlots.Value);
-            if (blocks.IsBitSet(13)) data.WriteUInt8(p.NativeSex.Value);
-            if (blocks.IsBitSet(14)) data.WriteUInt8(p.Inebriation.Value);
-            if (blocks.IsBitSet(15)) data.WriteUInt8(p.PvpTitle.Value);
-            if (blocks.IsBitSet(16)) data.WriteUInt8(p.ArenaFaction.Value);
-            if (blocks.IsBitSet(17)) data.WriteUInt8(p.PvPRank.Value);
-            // 18: Field_88 skipped
-            if (blocks.IsBitSet(19)) data.WriteUInt32(p.DuelTeam.Value);
-            if (blocks.IsBitSet(20)) data.WriteInt32(p.GuildTimeStamp.Value);
-            if (blocks.IsBitSet(21)) data.WriteInt32(p.ChosenTitle.Value);
-            if (blocks.IsBitSet(22)) data.WriteInt32(p.FakeInebriation.Value);
-            if (blocks.IsBitSet(23)) data.WriteUInt32(p.VirtualPlayerRealm.Value);
-            if (blocks.IsBitSet(24)) data.WriteUInt32(p.CurrentSpecID.Value);
-            // 25-26 skipped
-            if (blocks.IsBitSet(27)) data.WriteInt32(p.HonorLevel.Value);
-        }
-
-        // QuestLog entries (bits 35-60) — WriteCreate format
-        if (hasAnyQuestLog)
-        {
-            for (int i = 0; i < QuestConst.MaxQuestLogSize; i++)
-            {
-                if (blocks.IsBitSet(36 + i))
-                {
-                    QuestLog quest = p.QuestLog[i];
-                    data.WriteInt64(quest?.EndTime ?? 0);
-                    data.WriteInt32(quest?.QuestID ?? 0);
-                    data.WriteUInt32(quest?.StateFlags ?? 0);
-                    for (int obj = 0; obj < 24; obj++)
-                        data.WriteUInt16((ushort)(quest?.ObjectiveProgress[obj] ?? 0));
-                }
-            }
-        }
-
-        // VisibleItems (bits 61-80) — TC343 VisibleItem::WriteUpdate uses WriteBits(mask, 4)
-        if (hasAnyVisibleItem)
-        {
-            for (int i = 0; i < 19; i++)
-            {
-                if (blocks.IsBitSet(62 + i))
-                {
-                    VisibleItem item = p.VisibleItems[i].Value;
-                    // VisibleItem has HasChangesMask<4>: bit 0=hasAny, 1=ItemID, 2=AppearanceModID, 3=ItemVisual
-                    data.WriteBits(0x0F, 4); // all 4 bits set
-                    data.FlushBits();
-                    data.WriteInt32(item.ItemID);
-                    data.WriteUInt16(item.ItemAppearanceModID);
-                    data.WriteUInt16(item.ItemVisual);
-                }
-            }
-        }
-    }
-
-    // === WriteUpdateActivePlayerData (fork lines 501-1138) ===
-    private void WriteUpdateActivePlayerData(WorldPacket data)
-    {
-        ActivePlayerData a = _updateData.ActivePlayerData ?? new ActivePlayerData();
-
-        // Build changesMask (1536 bits = 48 blocks of 32)
-        Span<uint> blocksBuf = stackalloc uint[48];
-        var blocks = new StackBitMask(blocksBuf);
-        // Pre-compute KnownTitles (uint?[12] → ulong[6])
-        int knownTitlesCount = 0;
-        ulong[] knownTitles64 = new ulong[6];
-        if (a.KnownTitles != null)
-        {
-            bool hasAnyTitle = false;
-            for (int i = 0; i < a.KnownTitles.Length; i++)
-                if (a.KnownTitles[i].HasValue) { hasAnyTitle = true; break; }
-            if (hasAnyTitle)
-            {
-                knownTitlesCount = 6;
-                for (int i = 0; i < 6; i++)
-                {
-                    uint lo = (i * 2 < a.KnownTitles.Length && a.KnownTitles[i * 2].HasValue) ? a.KnownTitles[i * 2].Value : 0;
-                    uint hi = (i * 2 + 1 < a.KnownTitles.Length && a.KnownTitles[i * 2 + 1].HasValue) ? a.KnownTitles[i * 2 + 1].Value : 0;
-                    knownTitles64[i] = (ulong)lo | ((ulong)hi << 32);
-                }
-                blocks.SetBit(0); blocks.SetBit(3); // dynamic field KnownTitles
-            }
-        }
-
-        // GlyphSlots/Glyphs Values-update emit. Driven by `_gameState.ActiveGlyphsDirty`,
-        // which is set by:
-        //   - TalentHandler.HandleTalentsInfoUpdate (talent push, dual-spec switch)
-        //   - UpdateHandler PLAYER_FIELD_GLYPHS_1..6 reads (legacy Values updates on
-        //     glyph apply/remove via item use)
-        // Without re-emitting on dirty, the modern client's UnitData.GlyphSlots[6] stays
-        // stale across spec switch and the "you have already applied this glyph" check
-        // fires against the previous spec's glyphs (iter-14).
-        bool hasGlyphChanges = _gameState.ActiveGlyphsDirty;
-        if (hasGlyphChanges)
-            _gameState.ActiveGlyphsDirty = false;  // consume — only one Values emit per dirty event
-
-        // ============================================================
-        // SET BITS — Block 0 scalar fields (group bit 0, fields 26-37)
-        // ============================================================
-        if (a.FarsightObject != null) { blocks.SetBit(0); blocks.SetBit(26); }
-        // 27: SummonedBattlePetGUID — not used in WotLK
-        if (a.Coinage.HasValue) { blocks.SetBit(0); blocks.SetBit(28); }
-        if (a.XP.HasValue) { blocks.SetBit(0); blocks.SetBit(29); }
-        if (a.NextLevelXP.HasValue) { blocks.SetBit(0); blocks.SetBit(30); }
-        if (a.TrialXP.HasValue) { blocks.SetBit(0); blocks.SetBit(31); }
-        if (a.Skill != null && HasAnySkillChanged(a.Skill)) { blocks.SetBit(0); blocks.SetBit(32); }
-        if (a.CharacterPoints.HasValue) { blocks.SetBit(0); blocks.SetBit(33); }
-        if (a.MaxTalentTiers.HasValue) { blocks.SetBit(0); blocks.SetBit(34); }
-        if (a.TrackCreatureMask.HasValue) { blocks.SetBit(0); blocks.SetBit(35); }
-        if (a.MainhandExpertise.HasValue) { blocks.SetBit(0); blocks.SetBit(36); }
-        if (a.OffhandExpertise.HasValue) { blocks.SetBit(0); blocks.SetBit(37); }
-
-        // ============================================================
-        // SET BITS — Block 38 scalar fields (group bit 38, fields 39-69)
-        // ============================================================
-        if (a.RangedExpertise.HasValue) { blocks.SetBit(38); blocks.SetBit(39); }
-        if (a.CombatRatingExpertise.HasValue) { blocks.SetBit(38); blocks.SetBit(40); }
-        if (a.BlockPercentage.HasValue) { blocks.SetBit(38); blocks.SetBit(41); }
-        if (a.DodgePercentage.HasValue) { blocks.SetBit(38); blocks.SetBit(42); }
-        if (a.DodgePercentageFromAttribute.HasValue) { blocks.SetBit(38); blocks.SetBit(43); }
-        if (a.ParryPercentage.HasValue) { blocks.SetBit(38); blocks.SetBit(44); }
-        if (a.ParryPercentageFromAttribute.HasValue) { blocks.SetBit(38); blocks.SetBit(45); }
-        if (a.CritPercentage.HasValue) { blocks.SetBit(38); blocks.SetBit(46); }
-        if (a.RangedCritPercentage.HasValue) { blocks.SetBit(38); blocks.SetBit(47); }
-        if (a.OffhandCritPercentage.HasValue) { blocks.SetBit(38); blocks.SetBit(48); }
-        if (a.ShieldBlock.HasValue) { blocks.SetBit(38); blocks.SetBit(49); }
-        // 50: ShieldBlockCritPercentage — no property
-        if (a.Mastery.HasValue) { blocks.SetBit(38); blocks.SetBit(51); }
-        if (a.Speed.HasValue) { blocks.SetBit(38); blocks.SetBit(52); }
-        if (a.Avoidance.HasValue) { blocks.SetBit(38); blocks.SetBit(53); }
-        if (a.Sturdiness.HasValue) { blocks.SetBit(38); blocks.SetBit(54); }
-        if (a.Versatility.HasValue) { blocks.SetBit(38); blocks.SetBit(55); }
-        if (a.VersatilityBonus.HasValue) { blocks.SetBit(38); blocks.SetBit(56); }
-        if (a.PvpPowerDamage.HasValue) { blocks.SetBit(38); blocks.SetBit(57); }
-        if (a.PvpPowerHealing.HasValue) { blocks.SetBit(38); blocks.SetBit(58); }
-        if (a.ModHealingDonePos.HasValue) { blocks.SetBit(38); blocks.SetBit(59); }
-        if (a.ModHealingPercent.HasValue) { blocks.SetBit(38); blocks.SetBit(60); }
-        if (a.ModHealingDonePercent.HasValue) { blocks.SetBit(38); blocks.SetBit(61); }
-        if (a.ModPeriodicHealingDonePercent.HasValue) { blocks.SetBit(38); blocks.SetBit(62); }
-        if (a.ModSpellPowerPercent.HasValue) { blocks.SetBit(38); blocks.SetBit(63); }
-        if (a.ModResiliencePercent.HasValue) { blocks.SetBit(38); blocks.SetBit(64); }
-        if (a.OverrideSpellPowerByAPPercent.HasValue) { blocks.SetBit(38); blocks.SetBit(65); }
-        if (a.OverrideAPBySpellPowerPercent.HasValue) { blocks.SetBit(38); blocks.SetBit(66); }
-        if (a.ModTargetResistance.HasValue) { blocks.SetBit(38); blocks.SetBit(67); }
-        if (a.ModTargetPhysicalResistance.HasValue) { blocks.SetBit(38); blocks.SetBit(68); }
-        if (a.LocalFlags.HasValue) { blocks.SetBit(38); blocks.SetBit(69); }
-
-        // ============================================================
-        // SET BITS — Block 70 scalar fields (group bit 70, fields 71-101)
-        // ============================================================
-        if (a.GrantableLevels.HasValue) { blocks.SetBit(70); blocks.SetBit(71); }
-        if (a.MultiActionBars.HasValue) { blocks.SetBit(70); blocks.SetBit(72); }
-        if (a.LifetimeMaxRank.HasValue) { blocks.SetBit(70); blocks.SetBit(73); }
-        if (a.NumRespecs.HasValue) { blocks.SetBit(70); blocks.SetBit(74); }
-        if (a.AmmoID.HasValue) { blocks.SetBit(70); blocks.SetBit(75); }
-        if (a.PvpMedals.HasValue) { blocks.SetBit(70); blocks.SetBit(76); }
-        if (a.TodayHonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(77); }
-        if (a.TodayDishonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(78); }
-        if (a.YesterdayHonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(79); }
-        if (a.YesterdayDishonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(80); }
-        if (a.LastWeekHonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(81); }
-        if (a.LastWeekDishonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(82); }
-        if (a.ThisWeekHonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(83); }
-        if (a.ThisWeekDishonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(84); }
-        if (a.ThisWeekContribution.HasValue) { blocks.SetBit(70); blocks.SetBit(85); }
-        if (a.LifetimeHonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(86); }
-        if (a.LifetimeDishonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(87); }
-        // 88: Field_F24 — unused
-        if (a.YesterdayContribution.HasValue) { blocks.SetBit(70); blocks.SetBit(89); }
-        if (a.LastWeekContribution.HasValue) { blocks.SetBit(70); blocks.SetBit(90); }
-        if (a.LastWeekRank.HasValue) { blocks.SetBit(70); blocks.SetBit(91); }
-        if (a.WatchedFactionIndex.HasValue) { blocks.SetBit(70); blocks.SetBit(92); }
-        if (a.MaxLevel.HasValue) { blocks.SetBit(70); blocks.SetBit(93); }
-        if (a.ScalingPlayerLevelDelta.HasValue) { blocks.SetBit(70); blocks.SetBit(94); }
-        if (a.MaxCreatureScalingLevel.HasValue) { blocks.SetBit(70); blocks.SetBit(95); }
-        if (a.PetSpellPower.HasValue) { blocks.SetBit(70); blocks.SetBit(96); }
-        if (a.UiHitModifier.HasValue) { blocks.SetBit(70); blocks.SetBit(97); }
-        if (a.UiSpellHitModifier.HasValue) { blocks.SetBit(70); blocks.SetBit(98); }
-        if (a.HomeRealmTimeOffset.HasValue) { blocks.SetBit(70); blocks.SetBit(99); }
-        if (a.ModPetHaste.HasValue) { blocks.SetBit(70); blocks.SetBit(100); }
-        if (a.LocalRegenFlags.HasValue) { blocks.SetBit(70); blocks.SetBit(101); }
-
-        // ============================================================
-        // SET BITS — Block 102 scalar fields (group bit 102, fields 103-123)
-        // ============================================================
-        if (a.AuraVision.HasValue) { blocks.SetBit(102); blocks.SetBit(103); }
-        if (a.NumBackpackSlots.HasValue) { blocks.SetBit(102); blocks.SetBit(104); }
-        if (a.OverrideSpellsID.HasValue) { blocks.SetBit(102); blocks.SetBit(105); }
-        if (a.LfgBonusFactionID.HasValue) { blocks.SetBit(102); blocks.SetBit(106); }
-        if (a.LootSpecID.HasValue) { blocks.SetBit(102); blocks.SetBit(107); }
-        if (a.OverrideZonePVPType.HasValue) { blocks.SetBit(102); blocks.SetBit(108); }
-        if (a.Honor.HasValue) { blocks.SetBit(102); blocks.SetBit(109); }
-        if (a.HonorNextLevel.HasValue) { blocks.SetBit(102); blocks.SetBit(110); }
-        // 111: Field_F74 — unused
-        if (a.PvPTierMaxFromWins.HasValue) { blocks.SetBit(102); blocks.SetBit(112); }
-        if (a.PvPLastWeeksTierMaxFromWins.HasValue) { blocks.SetBit(102); blocks.SetBit(113); }
-        if (a.PvPRankProgress.HasValue) { blocks.SetBit(102); blocks.SetBit(114); }
-        // 115-123: GlyphsEnabled (120) set in create path only
-        // Sending GlyphsEnabled in every Values update adds block 102 + FlushBits overhead
-
-        // ============================================================
-        // SET BITS — Array fields
-        // ============================================================
-
-        // InvSlots (header 124, elements 125-265)
-        int invSlotsChanged = 0;
-        for (int i = 0; i < 141; i++)
-        {
-            if (GetModernInvSlot(a, i) != null)
-            {
-                blocks.SetBit(124);
-                blocks.SetBit(125 + i);
-                invSlotsChanged++;
-            }
-        }
-
-        // TrackResourceMask (header 266, elements 267-268)
-        if (a.TrackResourceMask != null)
-            for (int i = 0; i < 2; i++)
-                if (a.TrackResourceMask[i].HasValue) { blocks.SetBit(266); blocks.SetBit(267 + i); }
-
-        // Shared header 269: SpellCritPercentage (270-276), ModDamageDonePos (277-283),
-        // ModDamageDoneNeg (284-290), ModDamageDonePercent (291-297)
-        if (a.SpellCritPercentage != null)
-            for (int i = 0; i < 7; i++)
-                if (a.SpellCritPercentage[i].HasValue) { blocks.SetBit(269); blocks.SetBit(270 + i); }
-        if (a.ModDamageDonePos != null)
-            for (int i = 0; i < 7; i++)
-                if (a.ModDamageDonePos[i].HasValue) { blocks.SetBit(269); blocks.SetBit(277 + i); }
-        if (a.ModDamageDoneNeg != null)
-            for (int i = 0; i < 7; i++)
-                if (a.ModDamageDoneNeg[i].HasValue) { blocks.SetBit(269); blocks.SetBit(284 + i); }
-        if (a.ModDamageDonePercent != null)
-            for (int i = 0; i < 7; i++)
-                if (a.ModDamageDonePercent[i].HasValue) { blocks.SetBit(269); blocks.SetBit(291 + i); }
-
-        // ExploredZones (header 298, elements 299-538)
-        if (a.ExploredZones != null)
-            for (int i = 0; i < 240; i++)
-                if (a.ExploredZones[i].HasValue) { blocks.SetBit(298); blocks.SetBit(299 + i); }
-
-        // RestInfo (header 539, elements 540-541)
-        if (a.RestInfo != null)
-            for (int i = 0; i < 2; i++)
-                if (a.RestInfo[i] != null && (a.RestInfo[i].Threshold.HasValue || a.RestInfo[i].StateID.HasValue))
-                { blocks.SetBit(539); blocks.SetBit(540 + i); }
-
-        // Shared header 542: WeaponDmgMultipliers (543-545), WeaponAtkSpeedMultipliers (546-548)
-        if (a.WeaponDmgMultipliers != null)
-            for (int i = 0; i < 3; i++)
-                if (a.WeaponDmgMultipliers[i].HasValue) { blocks.SetBit(542); blocks.SetBit(543 + i); }
-        if (a.WeaponAtkSpeedMultipliers != null)
-            for (int i = 0; i < 3; i++)
-                if (a.WeaponAtkSpeedMultipliers[i].HasValue) { blocks.SetBit(542); blocks.SetBit(546 + i); }
-
-        // Shared header 549: BuybackPrice (550-561), BuybackTimestamp (562-573)
-        if (a.BuybackPrice != null)
-            for (int i = 0; i < 12; i++)
-                if (a.BuybackPrice[i].HasValue) { blocks.SetBit(549); blocks.SetBit(550 + i); }
-        if (a.BuybackTimestamp != null)
-            for (int i = 0; i < 12; i++)
-                if (a.BuybackTimestamp[i].HasValue) { blocks.SetBit(549); blocks.SetBit(562 + i); }
-
-        // CombatRatings (header 574, elements 575-606)
-        if (a.CombatRatings != null)
-            for (int i = 0; i < 32; i++)
-                if (a.CombatRatings[i].HasValue) { blocks.SetBit(574); blocks.SetBit(575 + i); }
-
-        // NoReagentCostMask (header 615, elements 616-619)
-        if (a.NoReagentCostMask != null)
-            for (int i = 0; i < 4; i++)
-                if (a.NoReagentCostMask[i].HasValue) { blocks.SetBit(615); blocks.SetBit(616 + i); }
-
-        // ProfessionSkillLine (header 620, elements 621-622)
-        if (a.ProfessionSkillLine != null)
-            for (int i = 0; i < 2; i++)
-                if (a.ProfessionSkillLine[i].HasValue) { blocks.SetBit(620); blocks.SetBit(621 + i); }
-
-        // BagSlotFlags (header 623, elements 624-627)
-        if (a.BagSlotFlags != null)
-            for (int i = 0; i < 4; i++)
-                if (a.BagSlotFlags[i].HasValue) { blocks.SetBit(623); blocks.SetBit(624 + i); }
-
-        // BankBagSlotFlags (header 628, elements 629-635)
-        if (a.BankBagSlotFlags != null)
-            for (int i = 0; i < 7; i++)
-                if (a.BankBagSlotFlags[i].HasValue) { blocks.SetBit(628); blocks.SetBit(629 + i); }
-
-        // QuestCompleted (header 636, elements 637-1511)
-        if (a.QuestCompleted != null)
-            for (int i = 0; i < 875; i++)
-                if (a.QuestCompleted[i].HasValue) { blocks.SetBit(636); blocks.SetBit(637 + i); }
-
-        // PvpInfo (header 607, elements 608-614)
-        if (a.PvpInfo != null)
-            for (int i = 0; i < Math.Min(a.PvpInfo.Length, 7); i++)
-                if (a.PvpInfo[i] != null && (a.PvpInfo[i].Rating != 0 || a.PvpInfo[i].SeasonPlayed != 0 || a.PvpInfo[i].Disqualified))
-                { blocks.SetBit(607); blocks.SetBit(608 + i); }
-
-        // GlyphSlots (header 1512, elements 1513-1518) + Glyphs (header 1512, elements 1519-1524)
-        if (hasGlyphChanges)
-        {
-            blocks.SetBit(1512); // shared header
-            for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
-            {
-                blocks.SetBit(1513 + i); // GlyphSlots[i]
-                blocks.SetBit(1519 + i); // Glyphs[i]
-            }
-        }
-
-        // ============================================================
-        // DEBUG LOG
-        // ============================================================
-        int setBlockCount = 0;
-        System.Text.StringBuilder dbgBlocks = new System.Text.StringBuilder();
-        for (int b = 0; b < 48; b++)
-        {
-            if (blocks[b] != 0)
-            {
-                setBlockCount++;
-                dbgBlocks.Append($" blk{b}=0x{blocks[b]:X8}");
-            }
-        }
-        Framework.Logging.Log.Print(Framework.Logging.LogType.Debug, $"[ActivePlayerUpdate] {setBlockCount} blocks set, InvSlots={invSlotsChanged}{dbgBlocks}");
-
-        // ============================================================
-        // WRITE BLOCK MASKS
-        // ============================================================
-        uint blocksMask0 = 0;
-        for (int b = 0; b < 32; b++)
-            if (blocks[b] != 0) blocksMask0 |= (1u << b);
-        uint blocksMask1 = 0;
-        for (int b = 32; b < 48; b++)
-            if (blocks[b] != 0) blocksMask1 |= (1u << (b - 32));
-
-        data.WriteUInt32(blocksMask0);
-        data.WriteBits(blocksMask1, 16);
-
-        for (int b = 0; b < 48; b++)
-        {
-            bool blockSet = (b < 32) ? ((blocksMask0 & (1u << b)) != 0) : ((blocksMask1 & (1u << (b - 32))) != 0);
-            if (blockSet)
-                data.WriteBits(blocks[b], 32);
-        }
-
-        // Dynamic field masks (TC343 order: bits 1, 2, 3, 20-25, 4-19)
-        // Bit 1: SortBagsRightToLeft — not used
-        // Bit 2: InsertItemsLeftToRight — not used
-        if (blocks.IsBitSet(3)) // KnownTitles
-        {
-            data.WriteBits((uint)knownTitlesCount, 32); // array element count
-            for (int i = 0; i < knownTitlesCount; i++)
-                data.WriteBit(true); // all elements changed
-        }
-        // Bits 4-25: other dynamic fields — not used
-        data.FlushBits(); // end of dynamic mask section
-
-        // Dynamic field data (TC343 order: Research data, then KnownTitles, then others)
-        if (blocks.IsBitSet(3)) // KnownTitles data
-        {
-            for (int i = 0; i < knownTitlesCount; i++)
-                data.WriteUInt64(knownTitles64[i]);
-        }
-
-        // ============================================================
-        // WRITE SCALAR DATA — Block 0 (bits 26-37)
-        // ============================================================
-        if (blocks.IsBitSet(0))
-        {
-            if (blocks.IsBitSet(26)) data.WritePackedGuid128(a.FarsightObject.Value);
-            // 27: SummonedBattlePetGUID skipped
-            if (blocks.IsBitSet(28)) data.WriteUInt64(a.Coinage.Value);
-            if (blocks.IsBitSet(29)) data.WriteInt32(a.XP.Value);
-            if (blocks.IsBitSet(30)) data.WriteInt32(a.NextLevelXP.Value);
-            if (blocks.IsBitSet(31)) data.WriteInt32(a.TrialXP.Value);
-            if (blocks.IsBitSet(32)) WriteUpdateSkillInfo(data, a.Skill);
-            if (blocks.IsBitSet(33)) data.WriteInt32(a.CharacterPoints.Value);
-            if (blocks.IsBitSet(34)) data.WriteInt32(a.MaxTalentTiers.Value);
-            if (blocks.IsBitSet(35)) data.WriteUInt32(a.TrackCreatureMask.Value);
-            if (blocks.IsBitSet(36)) data.WriteFloat(a.MainhandExpertise.Value);
-            if (blocks.IsBitSet(37)) data.WriteFloat(a.OffhandExpertise.Value);
-        }
-
-        // ============================================================
-        // WRITE SCALAR DATA — Block 38 (bits 39-69)
-        // ============================================================
-        if (blocks.IsBitSet(38))
-        {
-            if (blocks.IsBitSet(39)) data.WriteFloat(a.RangedExpertise.Value);
-            if (blocks.IsBitSet(40)) data.WriteFloat(a.CombatRatingExpertise.Value);
-            if (blocks.IsBitSet(41)) data.WriteFloat(a.BlockPercentage.Value);
-            if (blocks.IsBitSet(42)) data.WriteFloat(a.DodgePercentage.Value);
-            if (blocks.IsBitSet(43)) data.WriteFloat(a.DodgePercentageFromAttribute.Value);
-            if (blocks.IsBitSet(44)) data.WriteFloat(a.ParryPercentage.Value);
-            if (blocks.IsBitSet(45)) data.WriteFloat(a.ParryPercentageFromAttribute.Value);
-            if (blocks.IsBitSet(46)) data.WriteFloat(a.CritPercentage.Value);
-            if (blocks.IsBitSet(47)) data.WriteFloat(a.RangedCritPercentage.Value);
-            if (blocks.IsBitSet(48)) data.WriteFloat(a.OffhandCritPercentage.Value);
-            if (blocks.IsBitSet(49)) data.WriteInt32(a.ShieldBlock.Value);
-            // 50: ShieldBlockCritPercentage skipped
-            if (blocks.IsBitSet(51)) data.WriteFloat(a.Mastery.Value);
-            if (blocks.IsBitSet(52)) data.WriteFloat(a.Speed.Value);
-            if (blocks.IsBitSet(53)) data.WriteFloat(a.Avoidance.Value);
-            if (blocks.IsBitSet(54)) data.WriteFloat(a.Sturdiness.Value);
-            if (blocks.IsBitSet(55)) data.WriteInt32(a.Versatility.Value);
-            if (blocks.IsBitSet(56)) data.WriteFloat(a.VersatilityBonus.Value);
-            if (blocks.IsBitSet(57)) data.WriteFloat(a.PvpPowerDamage.Value);
-            if (blocks.IsBitSet(58)) data.WriteFloat(a.PvpPowerHealing.Value);
-            if (blocks.IsBitSet(59)) data.WriteInt32(a.ModHealingDonePos.Value);
-            if (blocks.IsBitSet(60)) data.WriteFloat(a.ModHealingPercent.Value);
-            if (blocks.IsBitSet(61)) data.WriteFloat(a.ModHealingDonePercent.Value);
-            if (blocks.IsBitSet(62)) data.WriteFloat(a.ModPeriodicHealingDonePercent.Value);
-            if (blocks.IsBitSet(63)) data.WriteFloat(a.ModSpellPowerPercent.Value);
-            if (blocks.IsBitSet(64)) data.WriteFloat(a.ModResiliencePercent.Value);
-            if (blocks.IsBitSet(65)) data.WriteFloat(a.OverrideSpellPowerByAPPercent.Value);
-            if (blocks.IsBitSet(66)) data.WriteFloat(a.OverrideAPBySpellPowerPercent.Value);
-            if (blocks.IsBitSet(67)) data.WriteInt32(a.ModTargetResistance.Value);
-            if (blocks.IsBitSet(68)) data.WriteInt32(a.ModTargetPhysicalResistance.Value);
-            if (blocks.IsBitSet(69)) data.WriteUInt32(a.LocalFlags.Value);
-        }
-
-        // ============================================================
-        // WRITE SCALAR DATA — Block 70 (bits 71-101)
-        // ============================================================
-        if (blocks.IsBitSet(70))
-        {
-            if (blocks.IsBitSet(71)) data.WriteUInt8(a.GrantableLevels.Value);
-            if (blocks.IsBitSet(72)) data.WriteUInt8(a.MultiActionBars.Value);
-            if (blocks.IsBitSet(73)) data.WriteUInt8(a.LifetimeMaxRank.Value);
-            if (blocks.IsBitSet(74)) data.WriteUInt8(a.NumRespecs.Value);
-            if (blocks.IsBitSet(75)) data.WriteInt32((int)a.AmmoID.Value);
-            if (blocks.IsBitSet(76)) data.WriteUInt32(a.PvpMedals.Value);
-            if (blocks.IsBitSet(77)) data.WriteUInt16(a.TodayHonorableKills.Value);
-            if (blocks.IsBitSet(78)) data.WriteUInt16(a.TodayDishonorableKills.Value);
-            if (blocks.IsBitSet(79)) data.WriteUInt16(a.YesterdayHonorableKills.Value);
-            if (blocks.IsBitSet(80)) data.WriteUInt16(a.YesterdayDishonorableKills.Value);
-            if (blocks.IsBitSet(81)) data.WriteUInt16(a.LastWeekHonorableKills.Value);
-            if (blocks.IsBitSet(82)) data.WriteUInt16(a.LastWeekDishonorableKills.Value);
-            if (blocks.IsBitSet(83)) data.WriteUInt16(a.ThisWeekHonorableKills.Value);
-            if (blocks.IsBitSet(84)) data.WriteUInt16(a.ThisWeekDishonorableKills.Value);
-            if (blocks.IsBitSet(85)) data.WriteUInt32(a.ThisWeekContribution.Value);
-            if (blocks.IsBitSet(86)) data.WriteUInt32(a.LifetimeHonorableKills.Value);
-            if (blocks.IsBitSet(87)) data.WriteUInt32(a.LifetimeDishonorableKills.Value);
-            // 88: Field_F24 skipped
-            if (blocks.IsBitSet(89)) data.WriteUInt32(a.YesterdayContribution.Value);
-            if (blocks.IsBitSet(90)) data.WriteUInt32(a.LastWeekContribution.Value);
-            if (blocks.IsBitSet(91)) data.WriteUInt32(a.LastWeekRank.Value);
-            if (blocks.IsBitSet(92)) data.WriteInt32(a.WatchedFactionIndex.Value);
-            if (blocks.IsBitSet(93)) data.WriteInt32(a.MaxLevel.Value);
-            if (blocks.IsBitSet(94)) data.WriteInt32(a.ScalingPlayerLevelDelta.Value);
-            if (blocks.IsBitSet(95)) data.WriteInt32(a.MaxCreatureScalingLevel.Value);
-            if (blocks.IsBitSet(96)) data.WriteInt32(a.PetSpellPower.Value);
-            if (blocks.IsBitSet(97)) data.WriteFloat(a.UiHitModifier.Value);
-            if (blocks.IsBitSet(98)) data.WriteFloat(a.UiSpellHitModifier.Value);
-            if (blocks.IsBitSet(99)) data.WriteInt32(a.HomeRealmTimeOffset.Value);
-            if (blocks.IsBitSet(100)) data.WriteFloat(a.ModPetHaste.Value);
-            if (blocks.IsBitSet(101)) data.WriteUInt8(a.LocalRegenFlags.Value);
-        }
-
-        // ============================================================
-        // WRITE SCALAR DATA — Block 102 (bits 103-123)
-        // ============================================================
-        if (blocks.IsBitSet(102))
-        {
-            if (blocks.IsBitSet(103)) data.WriteUInt8(a.AuraVision.Value);
-            if (blocks.IsBitSet(104)) data.WriteUInt8(a.NumBackpackSlots.Value);
-            if (blocks.IsBitSet(105)) data.WriteInt32(a.OverrideSpellsID.Value);
-            if (blocks.IsBitSet(106)) data.WriteInt32(a.LfgBonusFactionID.Value);
-            if (blocks.IsBitSet(107)) data.WriteUInt16((ushort)a.LootSpecID.Value);
-            if (blocks.IsBitSet(108)) data.WriteUInt32(a.OverrideZonePVPType.Value);
-            if (blocks.IsBitSet(109)) data.WriteInt32(a.Honor.Value);
-            if (blocks.IsBitSet(110)) data.WriteInt32(a.HonorNextLevel.Value);
-            // 111: Field_F74 skipped
-            if (blocks.IsBitSet(112)) data.WriteInt32((int)a.PvPTierMaxFromWins.Value);
-            if (blocks.IsBitSet(113)) data.WriteInt32((int)a.PvPLastWeeksTierMaxFromWins.Value);
-            if (blocks.IsBitSet(114)) data.WriteUInt8(a.PvPRankProgress.Value);
-            // 115-119 skipped
-            if (blocks.IsBitSet(120)) data.WriteUInt8(this._gameState.GlyphsEnabled);
-            // 121-123 skipped
-            data.FlushBits(); // TC343 flushes here before complex struct fields (116/117/122)
-        }
-
-        // ============================================================
-        // WRITE ARRAY DATA — TC343 write order
-        // ============================================================
-
-        // InvSlots (header 124, elements 125-265)
-        if (blocks.IsBitSet(124))
-        {
-            for (int i = 0; i < 141; i++)
-            {
-                if (blocks.IsBitSet(125 + i))
-                {
-                    WowGuid128 guid = GetModernInvSlot(a, i) ?? WowGuid128.Empty;
-                    data.WritePackedGuid128(guid);
-                }
-            }
-        }
-
-        // TrackResourceMask (header 266, elements 267-268)
-        if (blocks.IsBitSet(266))
-        {
-            for (int i = 0; i < 2; i++)
-                if (blocks.IsBitSet(267 + i))
-                    data.WriteUInt32(a.TrackResourceMask[i].Value);
-        }
-
-        // SpellCritPercentage (header 269, elements 270-276)
-        // ModDamageDonePos (header 269, elements 277-283)
-        // ModDamageDoneNeg (header 269, elements 284-290)
-        // ModDamageDonePercent (header 269, elements 291-297)
-        if (blocks.IsBitSet(269))
-        {
-            for (int i = 0; i < 7; i++)
-                if (blocks.IsBitSet(270 + i))
-                    data.WriteFloat(a.SpellCritPercentage[i].Value);
-            for (int i = 0; i < 7; i++)
-                if (blocks.IsBitSet(277 + i))
-                    data.WriteInt32(a.ModDamageDonePos[i].Value);
-            for (int i = 0; i < 7; i++)
-                if (blocks.IsBitSet(284 + i))
-                    data.WriteInt32(a.ModDamageDoneNeg[i].Value);
-            for (int i = 0; i < 7; i++)
-                if (blocks.IsBitSet(291 + i))
-                    data.WriteFloat(a.ModDamageDonePercent[i].Value);
-        }
-
-        // ExploredZones (header 298, elements 299-538)
-        if (blocks.IsBitSet(298))
-        {
-            for (int i = 0; i < 240; i++)
-                if (blocks.IsBitSet(299 + i))
-                    data.WriteUInt64(a.ExploredZones[i].Value);
-        }
-
-        // RestInfo (header 539, elements 540-541) — nested struct HasChangesMask<3>
-        if (blocks.IsBitSet(539))
-        {
-            for (int i = 0; i < 2; i++)
-            {
-                if (blocks.IsBitSet(540 + i))
-                {
-                    var ri = a.RestInfo[i];
-                    uint restMask = 0;
-                    if (ri != null && ri.Threshold.HasValue) restMask |= 2;
-                    if (ri != null && ri.StateID.HasValue) restMask |= 4;
-                    if (restMask != 0) restMask |= 1; // group bit
-                    data.WriteBits(restMask, 3);
-                    data.FlushBits();
-                    if ((restMask & 2) != 0) data.WriteUInt32(ri.Threshold.Value);
-                    if ((restMask & 4) != 0) data.WriteUInt8((byte)ri.StateID.Value);
-                }
-            }
-        }
-
-        // WeaponDmgMultipliers (header 542, elements 543-545)
-        // WeaponAtkSpeedMultipliers (header 542, elements 546-548)
-        if (blocks.IsBitSet(542))
-        {
-            for (int i = 0; i < 3; i++)
-                if (blocks.IsBitSet(543 + i))
-                    data.WriteFloat(a.WeaponDmgMultipliers[i].Value);
-            for (int i = 0; i < 3; i++)
-                if (blocks.IsBitSet(546 + i))
-                    data.WriteFloat(a.WeaponAtkSpeedMultipliers[i].Value);
-        }
-
-        // BuybackPrice (header 549, elements 550-561)
-        // BuybackTimestamp (header 549, elements 562-573)
-        if (blocks.IsBitSet(549))
-        {
-            for (int i = 0; i < 12; i++)
-                if (blocks.IsBitSet(550 + i))
-                    data.WriteUInt32(a.BuybackPrice[i].Value);
-            for (int i = 0; i < 12; i++)
-                if (blocks.IsBitSet(562 + i))
-                    data.WriteInt64((long)a.BuybackTimestamp[i].Value);
-        }
-
-        // CombatRatings (header 574, elements 575-606)
-        if (blocks.IsBitSet(574))
-        {
-            for (int i = 0; i < 32; i++)
-                if (blocks.IsBitSet(575 + i))
-                    data.WriteInt32(a.CombatRatings[i].Value);
-        }
-
-        // NoReagentCostMask (header 615, elements 616-619)
-        if (blocks.IsBitSet(615))
-        {
-            for (int i = 0; i < 4; i++)
-                if (blocks.IsBitSet(616 + i))
-                    data.WriteUInt32(a.NoReagentCostMask[i].Value);
-        }
-
-        // ProfessionSkillLine (header 620, elements 621-622)
-        if (blocks.IsBitSet(620))
-        {
-            for (int i = 0; i < 2; i++)
-                if (blocks.IsBitSet(621 + i))
-                    data.WriteInt32(a.ProfessionSkillLine[i].Value);
-        }
-
-        // BagSlotFlags (header 623, elements 624-627)
-        if (blocks.IsBitSet(623))
-        {
-            for (int i = 0; i < 4; i++)
-                if (blocks.IsBitSet(624 + i))
-                    data.WriteUInt32(a.BagSlotFlags[i].Value);
-        }
-
-        // BankBagSlotFlags (header 628, elements 629-635)
-        if (blocks.IsBitSet(628))
-        {
-            for (int i = 0; i < 7; i++)
-                if (blocks.IsBitSet(629 + i))
-                    data.WriteUInt32(a.BankBagSlotFlags[i].Value);
-        }
-
-        // QuestCompleted (header 636, elements 637-1511)
-        if (blocks.IsBitSet(636))
-        {
-            for (int i = 0; i < 875; i++)
-                if (blocks.IsBitSet(637 + i))
-                    data.WriteUInt64(a.QuestCompleted[i].Value);
-        }
-
-        // GlyphSlots (header 1512, elements 1513-1518) + Glyphs (elements 1519-1524)
-        // Slot IDs sourced from _gameState.ActiveGlyphSlotIds (populated from legacy
-        // PLAYER_FIELD_GLYPH_SLOTS_1..6). Was hardcoded {21..26}.
-        if (blocks.IsBitSet(1512))
-        {
-            for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
-                if (blocks.IsBitSet(1513 + i))
-                    data.WriteUInt32(_gameState.ActiveGlyphSlotIds[i]);
-            for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
-                if (blocks.IsBitSet(1519 + i))
-                    data.WriteUInt32((uint)(this._gameState.ActiveGlyphs[i]));
-        }
-
-        // PvpInfo (header 607, elements 608-614) — nested struct HasChangesMask<19>
-        if (blocks.IsBitSet(607))
-        {
-            for (int i = 0; i < 7; i++)
-            {
-                if (blocks.IsBitSet(608 + i))
-                {
-                    PVPInfo pi = (a.PvpInfo != null && i < a.PvpInfo.Length) ? a.PvpInfo[i] : null;
-                    // Build 19-bit changesMask for this PvpInfo entry
-                    uint pvpMask = 0;
-                    if (pi != null)
-                    {
-                        // Bit 1: Disqualified, 2: Bracket, 3: PvpRatingID
-                        // 4: WeeklyPlayed, 5: WeeklyWon, 6: SeasonPlayed, 7: SeasonWon
-                        // 8: Rating, 9: WeeklyBestRating, 10: SeasonBestRating
-                        // 11: PvpTierID, 12: WeeklyBestWinPvpTierID, 13: Field_28, 14: Field_2C
-                        // 15-18: Round stats (not in HermesProxy PVPInfo)
-                        if (pi.Disqualified) pvpMask |= (1u << 1);
-                        if (pi.WeeklyPlayed != 0) pvpMask |= (1u << 4);
-                        if (pi.WeeklyWon != 0) pvpMask |= (1u << 5);
-                        if (pi.SeasonPlayed != 0) pvpMask |= (1u << 6);
-                        if (pi.SeasonWon != 0) pvpMask |= (1u << 7);
-                        if (pi.Rating != 0) pvpMask |= (1u << 8);
-                        if (pi.WeeklyBestRating != 0) pvpMask |= (1u << 9);
-                        if (pi.SeasonBestRating != 0) pvpMask |= (1u << 10);
-                        if (pi.PvpTierID != 0) pvpMask |= (1u << 11);
-                        if (pi.WeeklyBestWinPvpTierID != 0) pvpMask |= (1u << 12);
-                        if (pi.Field_28 != 0) pvpMask |= (1u << 13);
-                        if (pi.Field_2C != 0) pvpMask |= (1u << 14);
-                    }
-                    if (pvpMask != 0) pvpMask |= 1; // group bit
-
-                    // Write 19-bit mask then data
-                    data.WriteBits(pvpMask, 19);
-                    if ((pvpMask & (1u << 1)) != 0) data.WriteBit(pi.Disqualified);
-                    data.FlushBits();
-                    if ((pvpMask & 1) != 0)
-                    {
-                        // Bit 2: Bracket (int8) — not in HermesProxy, write 0
-                        // Bit 3: PvpRatingID (int32) — not in HermesProxy, write 0
-                        if ((pvpMask & (1u << 4)) != 0) data.WriteUInt32(pi.WeeklyPlayed);
-                        if ((pvpMask & (1u << 5)) != 0) data.WriteUInt32(pi.WeeklyWon);
-                        if ((pvpMask & (1u << 6)) != 0) data.WriteUInt32(pi.SeasonPlayed);
-                        if ((pvpMask & (1u << 7)) != 0) data.WriteUInt32(pi.SeasonWon);
-                        if ((pvpMask & (1u << 8)) != 0) data.WriteUInt32(pi.Rating);
-                        if ((pvpMask & (1u << 9)) != 0) data.WriteUInt32(pi.WeeklyBestRating);
-                        if ((pvpMask & (1u << 10)) != 0) data.WriteUInt32(pi.SeasonBestRating);
-                        if ((pvpMask & (1u << 11)) != 0) data.WriteUInt32(pi.PvpTierID);
-                        if ((pvpMask & (1u << 12)) != 0) data.WriteUInt32(pi.WeeklyBestWinPvpTierID);
-                        if ((pvpMask & (1u << 13)) != 0) data.WriteUInt32(pi.Field_28);
-                        if ((pvpMask & (1u << 14)) != 0) data.WriteUInt32(pi.Field_2C);
-                    }
-                }
-            }
-        }
-
-        data.FlushBits();
-    }
-
-    // === WriteUpdateItemData (fork lines 1554-1660) ===
-    private void WriteUpdateItemData(WorldPacket data)
-    {
-        ItemData item = _updateData.ItemData;
-        if (item == null)
-        {
-            data.WriteBits(0, 2);
-            data.FlushBits();
-            return;
-        }
-
-        // ItemData changesMask: 43 bits = 2 blocks of 32
-        // TC343 bit layout:
-        //   0: group bit for bits 1-22
-        //   1: ArtifactPowers (dynamic), 2: Gems (dynamic)
-        //   3: Owner, 4: ContainedIn, 5: Creator, 6: GiftCreator
-        //   7: StackCount, 8: Expiration/Duration, 9: DynamicFlags/Flags
-        //  10: PropertySeed, 11: RandomPropertiesID, 12: Durability, 13: MaxDurability
-        //  14: CreatePlayedTime, 15: Context, 16: CreateTime, 17: ArtifactXP
-        //  18: ItemAppearanceModID, 19: Modifiers, 20: DynamicFlags2, 21: ItemBonusKey
-        //  22: DEBUGItemLevel
-        //  23: group bit for SpellCharges[5] (bits 24-28)
-        //  29: group bit for Enchantment[13] (bits 30-42)
-        Span<uint> blocksBuf = stackalloc uint[2];
-        var blocks = new StackBitMask(blocksBuf);
-        if (item.Owner != null) { blocks.SetBit(0); blocks.SetBit(3); }
-        if (item.ContainedIn != null) { blocks.SetBit(0); blocks.SetBit(4); }
-        if (item.Creator != null) { blocks.SetBit(0); blocks.SetBit(5); }
-        if (item.GiftCreator != null) { blocks.SetBit(0); blocks.SetBit(6); }
-        if (item.StackCount.HasValue) { blocks.SetBit(0); blocks.SetBit(7); }
-        if (item.Duration.HasValue) { blocks.SetBit(0); blocks.SetBit(8); }
-        if (item.Flags.HasValue) { blocks.SetBit(0); blocks.SetBit(9); }
-        if (item.PropertySeed.HasValue) { blocks.SetBit(0); blocks.SetBit(10); }
-        if (item.RandomProperty.HasValue) { blocks.SetBit(0); blocks.SetBit(11); }
-        if (item.Durability.HasValue) { blocks.SetBit(0); blocks.SetBit(12); }
-        if (item.MaxDurability.HasValue) { blocks.SetBit(0); blocks.SetBit(13); }
-        if (item.CreatePlayedTime.HasValue) { blocks.SetBit(0); blocks.SetBit(14); }
-        if (item.Context.HasValue) { blocks.SetBit(0); blocks.SetBit(15); }
-        if (item.ArtifactXP.HasValue) { blocks.SetBit(0); blocks.SetBit(17); }
-        if (item.ItemAppearanceModID.HasValue) { blocks.SetBit(0); blocks.SetBit(18); }
-        for (int i = 0; i < 5; i++)
-            if (item.SpellCharges[i].HasValue) { blocks.SetBit(23); blocks.SetBit(24 + i); }
-        for (int i = 0; i < 13; i++)
-            if (item.Enchantment[i] != null) { blocks.SetBit(29); blocks.SetBit(30 + i); }
-
-        // Write blocksMask (2 bits) then each set block (32 bits)
-        byte blocksMask = 0;
-        if (blocks[0] != 0) blocksMask |= 1;
-        if (blocks[1] != 0) blocksMask |= 2;
-        data.WriteBits(blocksMask, 2);
-        for (int b = 0; b < 2; b++)
-            if ((blocksMask & (1 << b)) != 0)
-                data.WriteBits(blocks[b], 32);
-
-        // No dynamic fields (ArtifactPowers/Gems not used)
-        data.FlushBits();
-
-        // Group 0 scalar fields (bits 3-22)
-        if ((blocks[0] & 1) != 0)
-        {
-            if (item.Owner != null) data.WritePackedGuid128(item.Owner.Value);
-            if (item.ContainedIn != null) data.WritePackedGuid128(item.ContainedIn.Value);
-            if (item.Creator != null) data.WritePackedGuid128(item.Creator.Value);
-            if (item.GiftCreator != null) data.WritePackedGuid128(item.GiftCreator.Value);
-            if (item.StackCount.HasValue) data.WriteUInt32(item.StackCount.Value);
-            if (item.Duration.HasValue) data.WriteUInt32(item.Duration.Value);
-            if (item.Flags.HasValue) data.WriteUInt32(item.Flags.Value);
-            if (item.PropertySeed.HasValue) data.WriteInt32((int)item.PropertySeed.Value);
-            if (item.RandomProperty.HasValue) data.WriteInt32((int)item.RandomProperty.Value);
-            if (item.Durability.HasValue) data.WriteUInt32(item.Durability.Value);
-            if (item.MaxDurability.HasValue) data.WriteUInt32(item.MaxDurability.Value);
-            if (item.CreatePlayedTime.HasValue) data.WriteUInt32(item.CreatePlayedTime.Value);
-            if (item.Context.HasValue) data.WriteInt32(item.Context.Value);
-            if (item.ArtifactXP.HasValue) data.WriteUInt64(item.ArtifactXP.Value);
-            if (item.ItemAppearanceModID.HasValue) data.WriteUInt8((byte)item.ItemAppearanceModID.Value);
-        }
-
-        // SpellCharges array (group bit 23, entries 24-28)
-        if ((blocks[0] & (1u << 23)) != 0)
-        {
-            for (int i = 0; i < 5; i++)
-                if (item.SpellCharges[i].HasValue)
-                    data.WriteInt32(item.SpellCharges[i].Value);
-        }
-
-        // Enchantment array (group bit 29, entries 30-42)
-        if ((blocks[0] & (1u << 29)) != 0)
-        {
-            for (int i = 0; i < 13; i++)
-            {
-                if (item.Enchantment[i] != null)
-                {
-                    // ItemEnchantment WriteUpdate: 4-bit mask + fields
-                    uint enchMask = 0;
-                    if (item.Enchantment[i].ID.HasValue) enchMask |= 2;
-                    if (item.Enchantment[i].Duration.HasValue) enchMask |= 4;
-                    if (item.Enchantment[i].Charges.HasValue) enchMask |= 8;
-                    if (enchMask != 0) enchMask |= 1;
-                    data.WriteBits(enchMask, 4);
-                    data.FlushBits();
-                    if (item.Enchantment[i].ID.HasValue) data.WriteInt32(item.Enchantment[i].ID.Value);
-                    if (item.Enchantment[i].Duration.HasValue) data.WriteUInt32(item.Enchantment[i].Duration.Value);
-                    if (item.Enchantment[i].Charges.HasValue) data.WriteUInt16(item.Enchantment[i].Charges.Value);
-                }
-            }
-        }
-    }
-
-    private void WriteUpdateContainerData(WorldPacket data)
-    {
-        ContainerData container = _updateData.ContainerData;
-        if (container == null)
-        {
-            data.WriteBits(0, 2);
-            data.FlushBits();
-            return;
-        }
-
-        // ContainerData changesMask: 39 bits in 2 blocks of 32
-        // bit 0: group bit for NumSlots (block 0)
-        // bit 1: NumSlots
-        // bit 2: group bit for Slots[36]
-        // bits 3..38: Slots[0..35] individual change bits
-        Span<uint> blocksBuf = stackalloc uint[2];
-        var blocks = new StackBitMask(blocksBuf);
-        if (container.NumSlots.HasValue) { blocks.SetBit(0); blocks.SetBit(1); }
-        for (int i = 0; i < 36; i++)
-            if (container.Slots[i].HasValue) { blocks.SetBit(2); blocks.SetBit(3 + i); }
-
-        byte blocksMask = 0;
-        if (blocks[0] != 0) blocksMask |= 1;
-        if (blocks[1] != 0) blocksMask |= 2;
-        data.WriteBits(blocksMask, 2);
-        for (int b = 0; b < 2; b++)
-            if ((blocksMask & (1 << b)) != 0)
-                data.WriteBits(blocks[b], 32);
-        data.FlushBits();
-
-        if ((blocks[0] & (1u << 1)) != 0)
-            data.WriteUInt32(container.NumSlots.Value);
-        if ((blocks[0] & (1u << 2)) != 0)
-        {
-            for (int i = 0; i < 36; i++)
-                if (container.Slots[i].HasValue)
-                    data.WritePackedGuid128(container.Slots[i].Value);
-        }
-    }
-
-    // === WriteUpdateGameObjectData (fork lines 3122-3187) ===
-    private void WriteUpdateGameObjectData(WorldPacket data)
-    {
-        GameObjectData go = _updateData.GameObjectData ?? new GameObjectData();
-
-        Span<uint> maskBuf = stackalloc uint[1];
-        var mask = new StackBitMask(maskBuf);
-        // Set bits for changed fields
-        if (go.DisplayID.HasValue) { mask.SetBit(0); mask.SetBit(4); }
-        if (go.SpellVisualID.HasValue) { mask.SetBit(0); mask.SetBit(5); }
-        if (go.StateSpellVisualID.HasValue) { mask.SetBit(0); mask.SetBit(6); }
-        if (go.StateAnimID.HasValue) { mask.SetBit(0); mask.SetBit(7); }
-        if (go.StateAnimKitID.HasValue) { mask.SetBit(0); mask.SetBit(8); }
-        if (go.CreatedBy != null) { mask.SetBit(0); mask.SetBit(9); }
-        if (go.GuildGUID != null) { mask.SetBit(0); mask.SetBit(10); }
-        if (go.Flags.HasValue) { mask.SetBit(0); mask.SetBit(11); }
-        bool hasRotation = false;
-        if (go.ParentRotation != null)
-            for (int i = 0; i < 4; i++)
-                if (go.ParentRotation[i].HasValue) hasRotation = true;
-        if (hasRotation) { mask.SetBit(0); mask.SetBit(12); }
-        if (go.FactionTemplate.HasValue) { mask.SetBit(0); mask.SetBit(13); }
-        if (go.Level.HasValue) { mask.SetBit(0); mask.SetBit(14); }
-        if (go.State.HasValue) { mask.SetBit(0); mask.SetBit(15); }
-        if (go.TypeID.HasValue) { mask.SetBit(0); mask.SetBit(16); }
-        if (go.PercentHealth.HasValue) { mask.SetBit(0); mask.SetBit(17); }
-        if (go.ArtKit.HasValue) { mask.SetBit(0); mask.SetBit(18); }
-        if (go.CustomParam.HasValue) { mask.SetBit(0); mask.SetBit(19); }
-
-        if (mask[0] != 0)
-        {
-            var fields = new System.Collections.Generic.List<string>(8);
-            if (mask.IsBitSet(4)) fields.Add($"DisplayID={go.DisplayID.Value}");
-            if (mask.IsBitSet(5)) fields.Add($"SpellVisualID={go.SpellVisualID.Value}");
-            if (mask.IsBitSet(6)) fields.Add($"StateSpellVisualID={go.StateSpellVisualID.Value}");
-            if (mask.IsBitSet(7)) fields.Add($"StateAnimID={go.StateAnimID.Value}");
-            if (mask.IsBitSet(8)) fields.Add($"StateAnimKitID={go.StateAnimKitID.Value}");
-            if (mask.IsBitSet(9)) fields.Add($"CreatedBy={go.CreatedBy.Value}");
-            if (mask.IsBitSet(10)) fields.Add($"GuildGUID={go.GuildGUID.Value}");
-            if (mask.IsBitSet(11)) fields.Add($"Flags=0x{go.Flags.Value:X8}");
-            if (mask.IsBitSet(12)) fields.Add($"ParentRotation=({go.ParentRotation[0] ?? 0f},{go.ParentRotation[1] ?? 0f},{go.ParentRotation[2] ?? 0f},{go.ParentRotation[3] ?? 1f})");
-            if (mask.IsBitSet(13)) fields.Add($"FactionTemplate={go.FactionTemplate.Value}");
-            if (mask.IsBitSet(14)) fields.Add($"Level={go.Level.Value}");
-            if (mask.IsBitSet(15)) fields.Add($"State={go.State.Value}");
-            if (mask.IsBitSet(16)) fields.Add($"TypeID={go.TypeID.Value}");
-            if (mask.IsBitSet(17)) fields.Add($"PercentHealth={go.PercentHealth.Value}");
-            if (mask.IsBitSet(18)) fields.Add($"ArtKit={go.ArtKit.Value}");
-            if (mask.IsBitSet(19)) fields.Add($"CustomParam={go.CustomParam.Value}");
-            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
-                $"[GO write] guid={_updateData.Guid} mask=0x{mask[0]:X8} fields={{ {string.Join(", ", fields)} }}");
-        }
-
-        // V3_4_3 GameObjectData wire format is a flat 20-bit changesMask — no 1-bit
-        // blocksMask prefix (see TC wotlk_classic UpdateFields.cpp:4918-4920 and WPP
-        // V3_4_0 UpdateFieldsHandler343.ReadUpdateGameObjectData line 3704). The
-        // earlier `WriteBits(blocksMask, 1) + WriteBits(mask, 20)` shifted every bit
-        // by one position; the client decoded `0x58801` as `0xAC400`, tried to parse
-        // GuildGUID/Level/State at bogus offsets, and disconnected with reason=7
-        // immediately after the SMSG_UPDATE_OBJECT (signature: chained-initiate
-        // unlock cast → cage GO Values update → DC).
-        data.WriteBits(mask[0], 20);
-
-        // Boundary 1 — TC UpdateFields.cpp:4936. Aligns after the optional bit-1
-        // StateWorldEffectIDs sub-section (size + entries). We don't translate
-        // StateWorldEffectIDs from the legacy server yet, but the alignment is
-        // still required because the byte-aligned field writes below would
-        // otherwise see 4 stray bits left over from the 20-bit changesMask above.
-        data.FlushBits();
-
-        // (Implicit boundary 2 — TC UpdateFields.cpp:4954.) Would align after the
-        // optional bit-2/3 EnableDoodadSets / WorldEffects DynamicUpdateField mask
-        // preambles. We don't emit those either, so a second FlushBits would be a
-        // no-op today (FlushBits short-circuits when already byte-aligned). If
-        // support for bits 1/2/3 is added later, restore a FlushBits() call here
-        // BEFORE the field-value block.
-
-        // Write field values in TC343 order (bits 4-19)
-        if (mask.IsBitSet(0))
-        {
-            if (mask.IsBitSet(4)) data.WriteInt32(go.DisplayID.Value);
-            if (mask.IsBitSet(5)) data.WriteUInt32(go.SpellVisualID.Value);
-            if (mask.IsBitSet(6)) data.WriteUInt32(go.StateSpellVisualID.Value);
-            if (mask.IsBitSet(7)) data.WriteUInt32(go.StateAnimID.Value);
-            if (mask.IsBitSet(8)) data.WriteUInt32(go.StateAnimKitID.Value);
-            if (mask.IsBitSet(9)) data.WritePackedGuid128(go.CreatedBy.Value);
-            if (mask.IsBitSet(10)) data.WritePackedGuid128(go.GuildGUID.Value);
-            if (mask.IsBitSet(11)) data.WriteUInt32(go.Flags.Value);
-            if (mask.IsBitSet(12))
-            {
-                data.WriteFloat(go.ParentRotation[0] ?? 0f);
-                data.WriteFloat(go.ParentRotation[1] ?? 0f);
-                data.WriteFloat(go.ParentRotation[2] ?? 0f);
-                data.WriteFloat(go.ParentRotation[3] ?? 1f);
-            }
-            if (mask.IsBitSet(13)) data.WriteInt32(go.FactionTemplate.Value);
-            if (mask.IsBitSet(14)) data.WriteInt32(go.Level.Value);
-            if (mask.IsBitSet(15)) data.WriteInt8(go.State.Value);
-            if (mask.IsBitSet(16)) data.WriteInt8(go.TypeID.Value);
-            if (mask.IsBitSet(17)) data.WriteUInt8(go.PercentHealth.Value);
-            if (mask.IsBitSet(18)) data.WriteUInt32(go.ArtKit.Value);
-            if (mask.IsBitSet(19)) data.WriteUInt32(go.CustomParam.Value);
-        }
-    }
+    // HasAnyUnitFieldSet emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator from V3_4_3_54261.UnitField.
+    // HasAnyPlayerFieldSet emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator from V3_4_3_54261.PlayerField.
+    // HasAnyGameObjectFieldSet emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator.
 
 
     private void WriteValuesModern(WorldPacket packet)
