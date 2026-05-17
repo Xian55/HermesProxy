@@ -294,6 +294,18 @@ public class ByteBuffer : IDisposable
         return _position < _length;
     }
 
+    /// <summary>Bytes still readable from the current position.</summary>
+    public int GetRemainingBytes()
+    {
+        return _length - _position;
+    }
+
+    /// <summary>True when at least <paramref name="count"/> more bytes can be read.</summary>
+    public bool CanRead(int count)
+    {
+        return _length - _position >= count;
+    }
+
     public uint ReadPackedTime()
     {
         return (uint)Time.GetUnixTimeFromPackedTime(ReadUInt32());

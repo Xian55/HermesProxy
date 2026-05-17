@@ -361,6 +361,41 @@ public static class Log
         Print(LogType.Error, err.ToString(), method, path);
     }
 
+    /// <summary>
+    /// Cheap caller-side gate to skip building log payloads (string interpolation, hex dumps,
+    /// expensive ToString()s) when the corresponding sink minimum level filters the line out.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsEnabled(LogType type, [CallerFilePath] string path = "")
+    {
+        var (logger, level) = Route(type, path);
+        return logger.IsEnabled(level);
+    }
+
+    /// <summary>
+    /// Inlinable fast-path gate for verbose Trace sites. Equivalent to
+    /// <c>IsEnabled(LogType.Trace)</c> but avoids the <c>[CallerFilePath]</c>
+    /// allocation and the <c>Route()</c> switch — collapses to two
+    /// <see cref="LoggingLevelSwitch.MinimumLevel"/> field reads + two int compares,
+    /// so the JIT can fully inline the gate at call sites. Reads both the global
+    /// and Server switches because Serilog enforces both filters; auto-tracks any
+    /// runtime level change via <see cref="Configure"/>.
+    /// </summary>
+    public static bool IsTraceEnabled
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _globalSwitch.MinimumLevel <= LogEventLevel.Verbose
+            && _serverSwitch.MinimumLevel <= LogEventLevel.Verbose;
+    }
+
+    /// <summary>Same shape as <see cref="IsTraceEnabled"/> for Debug-level sites.</summary>
+    public static bool IsDebugEnabled
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _globalSwitch.MinimumLevel <= LogEventLevel.Debug
+            && _serverSwitch.MinimumLevel <= LogEventLevel.Debug;
+    }
+
     private static (ILogger logger, LogEventLevel level) Route(LogType type, string path)
     {
         return type switch
