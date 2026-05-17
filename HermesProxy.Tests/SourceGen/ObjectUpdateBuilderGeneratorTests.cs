@@ -19,11 +19,11 @@ namespace HermesProxy.Tests.SourceGen;
 /// </summary>
 public class ObjectUpdateBuilderGeneratorTests
 {
-    // FIXME(phase5b): V3_4_3_54261 has no [DescriptorCreateField] attributes while the
-    // hand-port of ObjectUpdateBuilder lands. The generator emits nothing for that version,
-    // so this snapshot has no input. Phase 5b restores attributes at scale and reactivates
-    // this test as the byte-equivalence oracle against the 5a hand-port.
-    [Fact(Skip = "Phase 5a — see FIXME comment above; Phase 5b will reactivate.")]
+    // Phase 5b: snapshot of the generated WriteCreate/WriteUpdate/HasAny methods emitted for
+    // V3_4_3_54261's ObjectField descriptor enum. Pairs with the runtime byte-equivalence
+    // tests in ObjectSectionEquivalenceTests — snapshot guards generator emit drift,
+    // equivalence tests guard semantic drift.
+    [Fact]
     public Task WriteCreateObjectData_V3_4_3_54261()
     {
         var emitted = ReadEmitted(
