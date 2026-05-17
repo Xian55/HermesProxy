@@ -9,6 +9,7 @@
 #nullable disable
 
 using Framework.GameMath;
+using Framework.Util;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
 using System;
@@ -1193,23 +1194,23 @@ public class ObjectUpdateBuilder
             return;
         }
 
-        var skillBlocks = new uint[57];
-        void SB(int bit) => skillBlocks[bit / 32] |= (1u << (bit % 32));
+        Span<uint> skillBlockBuf = stackalloc uint[57];
+        var skillBlocks = new StackBitMask(skillBlockBuf);
 
         bool anyChanged = false;
         for (int i = 0; i < 256; i++)
         {
-            if (s.SkillLineID[i].HasValue) { SB(1 + i); anyChanged = true; }
-            if (s.SkillStep[i].HasValue) { SB(257 + i); anyChanged = true; }
-            if (s.SkillRank[i].HasValue) { SB(513 + i); anyChanged = true; }
-            if (s.SkillStartingRank[i].HasValue) { SB(769 + i); anyChanged = true; }
-            if (s.SkillMaxRank[i].HasValue) { SB(1025 + i); anyChanged = true; }
-            if (s.SkillTempBonus[i].HasValue) { SB(1281 + i); anyChanged = true; }
-            if (s.SkillPermBonus[i].HasValue) { SB(1537 + i); anyChanged = true; }
+            if (s.SkillLineID[i].HasValue) { skillBlocks.SetBit(1 + i); anyChanged = true; }
+            if (s.SkillStep[i].HasValue) { skillBlocks.SetBit(257 + i); anyChanged = true; }
+            if (s.SkillRank[i].HasValue) { skillBlocks.SetBit(513 + i); anyChanged = true; }
+            if (s.SkillStartingRank[i].HasValue) { skillBlocks.SetBit(769 + i); anyChanged = true; }
+            if (s.SkillMaxRank[i].HasValue) { skillBlocks.SetBit(1025 + i); anyChanged = true; }
+            if (s.SkillTempBonus[i].HasValue) { skillBlocks.SetBit(1281 + i); anyChanged = true; }
+            if (s.SkillPermBonus[i].HasValue) { skillBlocks.SetBit(1537 + i); anyChanged = true; }
         }
 
         if (anyChanged)
-            SB(0);
+            skillBlocks.SetBit(0);
 
         uint blocksMask0 = 0;
         for (int b = 0; b < 32; b++)
@@ -1238,19 +1239,19 @@ public class ObjectUpdateBuilder
 
         for (int i = 0; i < 256; i++)
         {
-            if ((skillBlocks[(1 + i) / 32] & (1u << ((1 + i) % 32))) != 0)
+            if (skillBlocks.IsBitSet(1 + i))
                 data.WriteUInt16(s.SkillLineID[i]!.Value);
-            if ((skillBlocks[(257 + i) / 32] & (1u << ((257 + i) % 32))) != 0)
+            if (skillBlocks.IsBitSet(257 + i))
                 data.WriteUInt16(s.SkillStep[i]!.Value);
-            if ((skillBlocks[(513 + i) / 32] & (1u << ((513 + i) % 32))) != 0)
+            if (skillBlocks.IsBitSet(513 + i))
                 data.WriteUInt16(s.SkillRank[i]!.Value);
-            if ((skillBlocks[(769 + i) / 32] & (1u << ((769 + i) % 32))) != 0)
+            if (skillBlocks.IsBitSet(769 + i))
                 data.WriteUInt16(s.SkillStartingRank[i]!.Value);
-            if ((skillBlocks[(1025 + i) / 32] & (1u << ((1025 + i) % 32))) != 0)
+            if (skillBlocks.IsBitSet(1025 + i))
                 data.WriteUInt16(s.SkillMaxRank[i]!.Value);
-            if ((skillBlocks[(1281 + i) / 32] & (1u << ((1281 + i) % 32))) != 0)
+            if (skillBlocks.IsBitSet(1281 + i))
                 data.WriteInt16(s.SkillTempBonus[i]!.Value);
-            if ((skillBlocks[(1537 + i) / 32] & (1u << ((1537 + i) % 32))) != 0)
+            if (skillBlocks.IsBitSet(1537 + i))
                 data.WriteUInt16(s.SkillPermBonus[i]!.Value);
         }
     }
@@ -1691,177 +1692,178 @@ public class ObjectUpdateBuilder
             data.FlushBits();
             return;
         }
-        uint[] blockMasks = new uint[8];
+        Span<uint> blockMasksBuf = stackalloc uint[8];
+        var blockMasks = new StackBitMask(blockMasksBuf);
         if (unit.Health.HasValue)
         {
-            SetBit(5);
+            blockMasks.SetBit(5);
         }
         if (unit.MaxHealth.HasValue)
         {
-            SetBit(6);
+            blockMasks.SetBit(6);
         }
         if (unit.DisplayID.HasValue)
         {
-            SetBit(7);
+            blockMasks.SetBit(7);
         }
         if (unit.Charm != null)
         {
-            SetBit(11);
+            blockMasks.SetBit(11);
         }
         if (unit.Summon != null)
         {
-            SetBit(12);
+            blockMasks.SetBit(12);
         }
         if (unit.CharmedBy != null)
         {
-            SetBit(14);
+            blockMasks.SetBit(14);
         }
         if (unit.SummonedBy != null)
         {
-            SetBit(15);
+            blockMasks.SetBit(15);
         }
         if (unit.CreatedBy != null)
         {
-            SetBit(16);
+            blockMasks.SetBit(16);
         }
         if (unit.Target != null)
         {
-            SetBit(19);
+            blockMasks.SetBit(19);
         }
         if (unit.ChannelData != null)
         {
-            SetBit(22);
+            blockMasks.SetBit(22);
         }
         // ChannelObjects DynamicUpdateField — bit 4 of UnitData changesMask.
         // Sustains the channel-loop animation on V3_4_3 client by populating
         // the channel-target list. Reader at UpdateHandler.cs:1918 only assigns
         // ChannelObject when the legacy mask bit is set, so this naturally
         // covers both channel-start (target GUID) and channel-end (Empty GUID).
-        if (unit.ChannelObject != null) SetBit(4);
+        if (unit.ChannelObject != null) blockMasks.SetBit(4);
         if (unit.RaceId.HasValue)
         {
-            SetBit(24);
+            blockMasks.SetBit(24);
         }
         if (unit.ClassId.HasValue)
         {
-            SetBit(25);
+            blockMasks.SetBit(25);
         }
         if (unit.SexId.HasValue)
         {
-            SetBit(27);
+            blockMasks.SetBit(27);
         }
-        if (unit.DisplayPower.HasValue) SetBit(28);
+        if (unit.DisplayPower.HasValue) blockMasks.SetBit(28);
         if (unit.Level.HasValue)
         {
-            SetBit(30);
+            blockMasks.SetBit(30);
         }
         if (unit.EffectiveLevel.HasValue)
         {
-            SetBit(31);
+            blockMasks.SetBit(31);
         }
         if (unit.FactionTemplate.HasValue)
         {
-            SetBit(40);
+            blockMasks.SetBit(40);
         }
         if (unit.Flags.HasValue)
         {
-            SetBit(41);
+            blockMasks.SetBit(41);
         }
         if (unit.Flags2.HasValue)
         {
-            SetBit(42);
+            blockMasks.SetBit(42);
         }
-        if (unit.Flags3.HasValue) SetBit(43);
+        if (unit.Flags3.HasValue) blockMasks.SetBit(43);
         if (unit.AuraState.HasValue)
         {
-            SetBit(44);
+            blockMasks.SetBit(44);
         }
-        if (unit.OverrideDisplayPowerID.HasValue) SetBit(45);
+        if (unit.OverrideDisplayPowerID.HasValue) blockMasks.SetBit(45);
         if (unit.BoundingRadius.HasValue)
         {
-            SetBit(46);
+            blockMasks.SetBit(46);
         }
         if (unit.CombatReach.HasValue)
         {
-            SetBit(47);
+            blockMasks.SetBit(47);
         }
-        if (unit.DisplayScale.HasValue) SetBit(48);
+        if (unit.DisplayScale.HasValue) blockMasks.SetBit(48);
         if (unit.NativeDisplayID.HasValue)
         {
-            SetBit(49);
+            blockMasks.SetBit(49);
         }
-        if (unit.NativeXDisplayScale.HasValue) SetBit(50);
+        if (unit.NativeXDisplayScale.HasValue) blockMasks.SetBit(50);
         if (unit.MountDisplayID.HasValue)
         {
-            SetBit(51);
+            blockMasks.SetBit(51);
         }
         // Block 1 continued: damage, stance bytes, pet fields
-        if (unit.MinDamage.HasValue) SetBit(52);
-        if (unit.MaxDamage.HasValue) SetBit(53);
-        if (unit.MinOffHandDamage.HasValue) SetBit(54);
-        if (unit.MaxOffHandDamage.HasValue) SetBit(55);
-        if (unit.StandState.HasValue) SetBit(56);
+        if (unit.MinDamage.HasValue) blockMasks.SetBit(52);
+        if (unit.MaxDamage.HasValue) blockMasks.SetBit(53);
+        if (unit.MinOffHandDamage.HasValue) blockMasks.SetBit(54);
+        if (unit.MaxOffHandDamage.HasValue) blockMasks.SetBit(55);
+        if (unit.StandState.HasValue) blockMasks.SetBit(56);
         // 57 = PetTalentPoints (not in UnitData)
-        if (unit.VisFlags.HasValue) SetBit(58);
-        if (unit.AnimTier.HasValue) SetBit(59);
-        if (unit.PetNumber.HasValue) SetBit(60);
-        if (unit.PetNameTimestamp.HasValue) SetBit(61);
-        if (unit.PetExperience.HasValue) SetBit(62);
-        if (unit.PetNextLevelExperience.HasValue) SetBit(63);
+        if (unit.VisFlags.HasValue) blockMasks.SetBit(58);
+        if (unit.AnimTier.HasValue) blockMasks.SetBit(59);
+        if (unit.PetNumber.HasValue) blockMasks.SetBit(60);
+        if (unit.PetNameTimestamp.HasValue) blockMasks.SetBit(61);
+        if (unit.PetExperience.HasValue) blockMasks.SetBit(62);
+        if (unit.PetNextLevelExperience.HasValue) blockMasks.SetBit(63);
         // Block 2: ModCast/Haste, combat stats, attack power
-        if (unit.ModCastSpeed.HasValue) SetBit(65);
-        if (unit.ModCastHaste.HasValue) SetBit(66);
-        if (unit.ModHaste.HasValue) SetBit(67);
-        if (unit.ModRangedHaste.HasValue) SetBit(68);
-        if (unit.ModHasteRegen.HasValue) SetBit(69);
-        if (unit.ModTimeRate.HasValue) SetBit(70);
-        if (unit.CreatedBySpell.HasValue) SetBit(71);
-        if (unit.EmoteState.HasValue) SetBit(72);
-        if (unit.TrainingPointsUsed.HasValue) SetBit(73);
-        if (unit.TrainingPointsTotal.HasValue) SetBit(74);
-        if (unit.BaseMana.HasValue) SetBit(75);
-        if (unit.BaseHealth.HasValue) SetBit(76);
-        if (unit.SheatheState.HasValue) SetBit(77);
-        if (unit.PvpFlags.HasValue) SetBit(78);
-        if (unit.PetFlags.HasValue) SetBit(79);
-        if (unit.ShapeshiftForm.HasValue) SetBit(80);
-        if (unit.AttackPower.HasValue) SetBit(81);
-        if (unit.AttackPowerModPos.HasValue) SetBit(82);
-        if (unit.AttackPowerModNeg.HasValue) SetBit(83);
-        if (unit.AttackPowerMultiplier.HasValue) SetBit(84);
-        if (unit.RangedAttackPower.HasValue) SetBit(85);
-        if (unit.RangedAttackPowerModPos.HasValue) SetBit(86);
-        if (unit.RangedAttackPowerModNeg.HasValue) SetBit(87);
-        if (unit.RangedAttackPowerMultiplier.HasValue) SetBit(88);
-        if (unit.AttackSpeedAura.HasValue) SetBit(89);
-        if (unit.Lifesteal.HasValue) SetBit(90);
-        if (unit.MinRangedDamage.HasValue) SetBit(91);
-        if (unit.MaxRangedDamage.HasValue) SetBit(92);
-        if (unit.MaxHealthModifier.HasValue) SetBit(93);
+        if (unit.ModCastSpeed.HasValue) blockMasks.SetBit(65);
+        if (unit.ModCastHaste.HasValue) blockMasks.SetBit(66);
+        if (unit.ModHaste.HasValue) blockMasks.SetBit(67);
+        if (unit.ModRangedHaste.HasValue) blockMasks.SetBit(68);
+        if (unit.ModHasteRegen.HasValue) blockMasks.SetBit(69);
+        if (unit.ModTimeRate.HasValue) blockMasks.SetBit(70);
+        if (unit.CreatedBySpell.HasValue) blockMasks.SetBit(71);
+        if (unit.EmoteState.HasValue) blockMasks.SetBit(72);
+        if (unit.TrainingPointsUsed.HasValue) blockMasks.SetBit(73);
+        if (unit.TrainingPointsTotal.HasValue) blockMasks.SetBit(74);
+        if (unit.BaseMana.HasValue) blockMasks.SetBit(75);
+        if (unit.BaseHealth.HasValue) blockMasks.SetBit(76);
+        if (unit.SheatheState.HasValue) blockMasks.SetBit(77);
+        if (unit.PvpFlags.HasValue) blockMasks.SetBit(78);
+        if (unit.PetFlags.HasValue) blockMasks.SetBit(79);
+        if (unit.ShapeshiftForm.HasValue) blockMasks.SetBit(80);
+        if (unit.AttackPower.HasValue) blockMasks.SetBit(81);
+        if (unit.AttackPowerModPos.HasValue) blockMasks.SetBit(82);
+        if (unit.AttackPowerModNeg.HasValue) blockMasks.SetBit(83);
+        if (unit.AttackPowerMultiplier.HasValue) blockMasks.SetBit(84);
+        if (unit.RangedAttackPower.HasValue) blockMasks.SetBit(85);
+        if (unit.RangedAttackPowerModPos.HasValue) blockMasks.SetBit(86);
+        if (unit.RangedAttackPowerModNeg.HasValue) blockMasks.SetBit(87);
+        if (unit.RangedAttackPowerMultiplier.HasValue) blockMasks.SetBit(88);
+        if (unit.AttackSpeedAura.HasValue) blockMasks.SetBit(89);
+        if (unit.Lifesteal.HasValue) blockMasks.SetBit(90);
+        if (unit.MinRangedDamage.HasValue) blockMasks.SetBit(91);
+        if (unit.MaxRangedDamage.HasValue) blockMasks.SetBit(92);
+        if (unit.MaxHealthModifier.HasValue) blockMasks.SetBit(93);
         if (unit.HoverHeight.HasValue)
         {
-            SetBit(94);
+            blockMasks.SetBit(94);
         }
-        if (unit.MinItemLevelCutoff.HasValue) SetBit(95);
+        if (unit.MinItemLevelCutoff.HasValue) blockMasks.SetBit(95);
         // Block 3: MinItemLevel..GuildGUID
-        if (unit.MinItemLevel.HasValue) SetBit(97);
-        if (unit.MaxItemLevel.HasValue) SetBit(98);
-        if (unit.WildBattlePetLevel.HasValue) SetBit(99);
+        if (unit.MinItemLevel.HasValue) blockMasks.SetBit(97);
+        if (unit.MaxItemLevel.HasValue) blockMasks.SetBit(98);
+        if (unit.WildBattlePetLevel.HasValue) blockMasks.SetBit(99);
         // 100 = BattlePetCompanionNameTimestamp (not tracked)
-        if (unit.InteractSpellID.HasValue) SetBit(101);
-        if (unit.ScaleDuration.HasValue) SetBit(102);
-        if (unit.LooksLikeMountID.HasValue) SetBit(103);
-        if (unit.LooksLikeCreatureID.HasValue) SetBit(104);
-        if (unit.LookAtControllerID.HasValue) SetBit(105);
+        if (unit.InteractSpellID.HasValue) blockMasks.SetBit(101);
+        if (unit.ScaleDuration.HasValue) blockMasks.SetBit(102);
+        if (unit.LooksLikeMountID.HasValue) blockMasks.SetBit(103);
+        if (unit.LooksLikeCreatureID.HasValue) blockMasks.SetBit(104);
+        if (unit.LookAtControllerID.HasValue) blockMasks.SetBit(105);
         // 106 = PerksVendorItemID (not tracked)
         if (unit.GuildGUID != null)
         {
-            SetBit(107);
+            blockMasks.SetBit(107);
         }
         // 108-111 = SkinningOwnerGUID / FlightCapabilityID / GlideEventSpeedDivisor / CurrentAreaID (not tracked)
         if (unit.ComboTarget != null)
         {
-            SetBit(112);
+            blockMasks.SetBit(112);
         }
         if (unit.NpcFlags != null)
         {
@@ -1870,12 +1872,12 @@ public class ObjectUpdateBuilder
             {
                 if (unit.NpcFlags[i].HasValue && unit.NpcFlags[i] != 0)
                 {
-                    SetBit(114 + i);
+                    blockMasks.SetBit(114 + i);
                     hasAnyNpcFlag = true;
                 }
             }
             if (hasAnyNpcFlag)
-                SetBit(113); // parent bit for NpcFlags array
+                blockMasks.SetBit(113); // parent bit for NpcFlags array
         }
         bool hasAnyPowerGroup = false;
         if (unit.Power != null)
@@ -1884,7 +1886,7 @@ public class ObjectUpdateBuilder
             {
                 if (unit.Power[j].HasValue)
                 {
-                    SetBit(137 + j);
+                    blockMasks.SetBit(137 + j);
                     hasAnyPowerGroup = true;
                 }
             }
@@ -1895,7 +1897,7 @@ public class ObjectUpdateBuilder
             {
                 if (unit.MaxPower[k].HasValue)
                 {
-                    SetBit(147 + k);
+                    blockMasks.SetBit(147 + k);
                     hasAnyPowerGroup = true;
                 }
             }
@@ -1906,13 +1908,13 @@ public class ObjectUpdateBuilder
             {
                 if (unit.ModPowerRegen[j2].HasValue)
                 {
-                    SetBit(157 + j2);
+                    blockMasks.SetBit(157 + j2);
                     hasAnyPowerGroup = true;
                 }
             }
         }
         if (hasAnyPowerGroup)
-            SetBit(116); // parent bit for Power/MaxPower/Regen arrays
+            blockMasks.SetBit(116); // parent bit for Power/MaxPower/Regen arrays
         // VirtualItems array (parent bit 167, elements 168-170)
         if (unit.VirtualItems != null)
         {
@@ -1921,11 +1923,11 @@ public class ObjectUpdateBuilder
             {
                 if (unit.VirtualItems[i].HasValue && unit.VirtualItems[i].Value.ItemID != 0)
                 {
-                    SetBit(168 + i);
+                    blockMasks.SetBit(168 + i);
                     hasAnyVI = true;
                 }
             }
-            if (hasAnyVI) SetBit(167);
+            if (hasAnyVI) blockMasks.SetBit(167);
         }
         // RangedAttackRoundBaseTime (bit 170 — shares VirtualItems parent 167? No, separate)
         // Actually TC343 has RangedAttackRoundBaseTime at a different position. Check:
@@ -1937,11 +1939,11 @@ public class ObjectUpdateBuilder
             {
                 if (unit.AttackRoundBaseTime[i].HasValue)
                 {
-                    SetBit(172 + i);
+                    blockMasks.SetBit(172 + i);
                     hasAnyART = true;
                 }
             }
-            if (hasAnyART) SetBit(171);
+            if (hasAnyART) blockMasks.SetBit(171);
         }
         // Stats/StatPosBuff/StatNegBuff array (parent bit 174, elements 175-189)
         bool hasAnyStatsGroup = false;
@@ -1949,65 +1951,65 @@ public class ObjectUpdateBuilder
         {
             for (int i = 0; i < 5; i++)
             {
-                if (unit.Stats[i].HasValue) { SetBit(175 + i); hasAnyStatsGroup = true; }
+                if (unit.Stats[i].HasValue) { blockMasks.SetBit(175 + i); hasAnyStatsGroup = true; }
             }
         }
         if (unit.StatPosBuff != null)
         {
             for (int i = 0; i < 5; i++)
             {
-                if (unit.StatPosBuff[i].HasValue) { SetBit(180 + i); hasAnyStatsGroup = true; }
+                if (unit.StatPosBuff[i].HasValue) { blockMasks.SetBit(180 + i); hasAnyStatsGroup = true; }
             }
         }
         if (unit.StatNegBuff != null)
         {
             for (int i = 0; i < 5; i++)
             {
-                if (unit.StatNegBuff[i].HasValue) { SetBit(185 + i); hasAnyStatsGroup = true; }
+                if (unit.StatNegBuff[i].HasValue) { blockMasks.SetBit(185 + i); hasAnyStatsGroup = true; }
             }
         }
-        if (hasAnyStatsGroup) SetBit(174);
+        if (hasAnyStatsGroup) blockMasks.SetBit(174);
         // Resistances/PowerCostModifier/PowerCostMultiplier array (parent bit 190, elements 191-211)
         bool hasAnyResistGroup = false;
         if (unit.Resistances != null)
         {
             for (int i = 0; i < 7; i++)
             {
-                if (unit.Resistances[i].HasValue) { SetBit(191 + i); hasAnyResistGroup = true; }
+                if (unit.Resistances[i].HasValue) { blockMasks.SetBit(191 + i); hasAnyResistGroup = true; }
             }
         }
         if (unit.PowerCostModifier != null)
         {
             for (int i = 0; i < 7; i++)
             {
-                if (unit.PowerCostModifier[i].HasValue) { SetBit(198 + i); hasAnyResistGroup = true; }
+                if (unit.PowerCostModifier[i].HasValue) { blockMasks.SetBit(198 + i); hasAnyResistGroup = true; }
             }
         }
         if (unit.PowerCostMultiplier != null)
         {
             for (int i = 0; i < 7; i++)
             {
-                if (unit.PowerCostMultiplier[i].HasValue) { SetBit(205 + i); hasAnyResistGroup = true; }
+                if (unit.PowerCostMultiplier[i].HasValue) { blockMasks.SetBit(205 + i); hasAnyResistGroup = true; }
             }
         }
-        if (hasAnyResistGroup) SetBit(190);
+        if (hasAnyResistGroup) blockMasks.SetBit(190);
         // ResistanceBuffMods array (parent bit 212, elements 213-226)
         bool hasAnyResBuffGroup = false;
         if (unit.ResistanceBuffModsPositive != null)
         {
             for (int i = 0; i < 7; i++)
             {
-                if (unit.ResistanceBuffModsPositive[i].HasValue) { SetBit(213 + i); hasAnyResBuffGroup = true; }
+                if (unit.ResistanceBuffModsPositive[i].HasValue) { blockMasks.SetBit(213 + i); hasAnyResBuffGroup = true; }
             }
         }
         if (unit.ResistanceBuffModsNegative != null)
         {
             for (int i = 0; i < 7; i++)
             {
-                if (unit.ResistanceBuffModsNegative[i].HasValue) { SetBit(220 + i); hasAnyResBuffGroup = true; }
+                if (unit.ResistanceBuffModsNegative[i].HasValue) { blockMasks.SetBit(220 + i); hasAnyResBuffGroup = true; }
             }
         }
-        if (hasAnyResBuffGroup) SetBit(212);
+        if (hasAnyResBuffGroup) blockMasks.SetBit(212);
         // V3_4_3 UnitData parent-bit cascade: bit 0 of blocks 0/1/2/3 IS the
         // required parent gate for the field group housed in that block (verified
         // against WPP UpdateFieldsHandler343.ReadUpdateUnitData — the top-level
@@ -2024,7 +2026,7 @@ public class ObjectUpdateBuilder
         {
             if (blockMasks[bi] != 0)
             {
-                blockMasks[bi] |= 1u;
+                blockMasks.SetBit(bi * 32);
             }
         }
         byte blocksMask = 0;
@@ -2353,10 +2355,6 @@ public class ObjectUpdateBuilder
                 if (unit.ResistanceBuffModsNegative != null && unit.ResistanceBuffModsNegative[i].HasValue) data.WriteInt32(unit.ResistanceBuffModsNegative[i].Value);
             }
         }
-        void SetBit(int idx)
-        {
-            blockMasks[idx / 32] |= (uint)(1 << idx % 32);
-        }
     }
 
     // === WriteUpdatePlayerData (fork lines 2674-2813) ===
@@ -2364,35 +2362,33 @@ public class ObjectUpdateBuilder
     {
         PlayerData p = _updateData.PlayerData ?? new PlayerData();
 
-        uint[] blocks = new uint[4];
-        void SetBit(int bit) { blocks[bit / 32] |= (1u << (bit % 32)); }
-        bool IsBitSet(int bit) { return (blocks[bit / 32] & (1u << (bit % 32))) != 0; }
-
+        Span<uint> blocksBuf = stackalloc uint[4];
+        var blocks = new StackBitMask(blocksBuf);
         // Block 0: scalar fields (bits 4-31)
-        if (p.DuelArbiter != null) { SetBit(0); SetBit(4); }
-        if (p.WowAccount != null) { SetBit(0); SetBit(5); }
-        if (p.LootTargetGUID != null) { SetBit(0); SetBit(6); }
-        if (p.PlayerFlags.HasValue) { SetBit(0); SetBit(7); }
-        if (p.PlayerFlagsEx.HasValue) { SetBit(0); SetBit(8); }
-        if (p.GuildRankID.HasValue) { SetBit(0); SetBit(9); }
-        if (p.GuildDeleteDate.HasValue) { SetBit(0); SetBit(10); }
-        if (p.GuildLevel.HasValue) { SetBit(0); SetBit(11); }
-        if (p.NumBankSlots.HasValue) { SetBit(0); SetBit(12); }
-        if (p.NativeSex.HasValue) { SetBit(0); SetBit(13); }
-        if (p.Inebriation.HasValue) { SetBit(0); SetBit(14); }
-        if (p.PvpTitle.HasValue) { SetBit(0); SetBit(15); }
-        if (p.ArenaFaction.HasValue) { SetBit(0); SetBit(16); }
-        if (p.PvPRank.HasValue) { SetBit(0); SetBit(17); }
+        if (p.DuelArbiter != null) { blocks.SetBit(0); blocks.SetBit(4); }
+        if (p.WowAccount != null) { blocks.SetBit(0); blocks.SetBit(5); }
+        if (p.LootTargetGUID != null) { blocks.SetBit(0); blocks.SetBit(6); }
+        if (p.PlayerFlags.HasValue) { blocks.SetBit(0); blocks.SetBit(7); }
+        if (p.PlayerFlagsEx.HasValue) { blocks.SetBit(0); blocks.SetBit(8); }
+        if (p.GuildRankID.HasValue) { blocks.SetBit(0); blocks.SetBit(9); }
+        if (p.GuildDeleteDate.HasValue) { blocks.SetBit(0); blocks.SetBit(10); }
+        if (p.GuildLevel.HasValue) { blocks.SetBit(0); blocks.SetBit(11); }
+        if (p.NumBankSlots.HasValue) { blocks.SetBit(0); blocks.SetBit(12); }
+        if (p.NativeSex.HasValue) { blocks.SetBit(0); blocks.SetBit(13); }
+        if (p.Inebriation.HasValue) { blocks.SetBit(0); blocks.SetBit(14); }
+        if (p.PvpTitle.HasValue) { blocks.SetBit(0); blocks.SetBit(15); }
+        if (p.ArenaFaction.HasValue) { blocks.SetBit(0); blocks.SetBit(16); }
+        if (p.PvPRank.HasValue) { blocks.SetBit(0); blocks.SetBit(17); }
         // 18: Field_88 — unused
-        if (p.DuelTeam.HasValue) { SetBit(0); SetBit(19); }
-        if (p.GuildTimeStamp.HasValue) { SetBit(0); SetBit(20); }
-        if (p.ChosenTitle.HasValue) { SetBit(0); SetBit(21); }
-        if (p.FakeInebriation.HasValue) { SetBit(0); SetBit(22); }
-        if (p.VirtualPlayerRealm.HasValue) { SetBit(0); SetBit(23); }
-        if (p.CurrentSpecID.HasValue) { SetBit(0); SetBit(24); }
+        if (p.DuelTeam.HasValue) { blocks.SetBit(0); blocks.SetBit(19); }
+        if (p.GuildTimeStamp.HasValue) { blocks.SetBit(0); blocks.SetBit(20); }
+        if (p.ChosenTitle.HasValue) { blocks.SetBit(0); blocks.SetBit(21); }
+        if (p.FakeInebriation.HasValue) { blocks.SetBit(0); blocks.SetBit(22); }
+        if (p.VirtualPlayerRealm.HasValue) { blocks.SetBit(0); blocks.SetBit(23); }
+        if (p.CurrentSpecID.HasValue) { blocks.SetBit(0); blocks.SetBit(24); }
         // 25: TaxiMountAnimKitID — not tracked
         // 26: CurrentBattlePetBreedQuality — not tracked
-        if (p.HonorLevel.HasValue) { SetBit(0); SetBit(27); }
+        if (p.HonorLevel.HasValue) { blocks.SetBit(0); blocks.SetBit(27); }
         // 28-31: LogoutTime, CurrentBattlePetSpeciesID, BnetAccount, DungeonScore — not tracked
 
         // QuestLog (header 35, elements 36-60)
@@ -2401,8 +2397,8 @@ public class ObjectUpdateBuilder
         {
             if (p.QuestLog[i] != null && p.QuestLog[i].QuestID.HasValue)
             {
-                SetBit(35);
-                SetBit(36 + i);
+                blocks.SetBit(35);
+                blocks.SetBit(36 + i);
                 hasAnyQuestLog = true;
             }
         }
@@ -2413,8 +2409,8 @@ public class ObjectUpdateBuilder
         {
             if (p.VisibleItems != null && i < p.VisibleItems.Length && p.VisibleItems[i] != null)
             {
-                SetBit(61);
-                SetBit(62 + i);
+                blocks.SetBit(61);
+                blocks.SetBit(62 + i);
                 hasAnyVisibleItem = true;
             }
         }
@@ -2438,31 +2434,31 @@ public class ObjectUpdateBuilder
         data.FlushBits();
 
         // Block 0: scalar field values in TC343 bit order (4-31)
-        if (IsBitSet(0))
+        if (blocks.IsBitSet(0))
         {
-            if (IsBitSet(4)) data.WritePackedGuid128(p.DuelArbiter.Value);
-            if (IsBitSet(5)) data.WritePackedGuid128(p.WowAccount.Value);
-            if (IsBitSet(6)) data.WritePackedGuid128(p.LootTargetGUID.Value);
-            if (IsBitSet(7)) data.WriteUInt32(p.PlayerFlags.Value);
-            if (IsBitSet(8)) data.WriteUInt32(p.PlayerFlagsEx.Value);
-            if (IsBitSet(9)) data.WriteUInt32(p.GuildRankID.Value);
-            if (IsBitSet(10)) data.WriteUInt32(p.GuildDeleteDate.Value);
-            if (IsBitSet(11)) data.WriteInt32(p.GuildLevel.Value);
-            if (IsBitSet(12)) data.WriteUInt8(p.NumBankSlots.Value);
-            if (IsBitSet(13)) data.WriteUInt8(p.NativeSex.Value);
-            if (IsBitSet(14)) data.WriteUInt8(p.Inebriation.Value);
-            if (IsBitSet(15)) data.WriteUInt8(p.PvpTitle.Value);
-            if (IsBitSet(16)) data.WriteUInt8(p.ArenaFaction.Value);
-            if (IsBitSet(17)) data.WriteUInt8(p.PvPRank.Value);
+            if (blocks.IsBitSet(4)) data.WritePackedGuid128(p.DuelArbiter.Value);
+            if (blocks.IsBitSet(5)) data.WritePackedGuid128(p.WowAccount.Value);
+            if (blocks.IsBitSet(6)) data.WritePackedGuid128(p.LootTargetGUID.Value);
+            if (blocks.IsBitSet(7)) data.WriteUInt32(p.PlayerFlags.Value);
+            if (blocks.IsBitSet(8)) data.WriteUInt32(p.PlayerFlagsEx.Value);
+            if (blocks.IsBitSet(9)) data.WriteUInt32(p.GuildRankID.Value);
+            if (blocks.IsBitSet(10)) data.WriteUInt32(p.GuildDeleteDate.Value);
+            if (blocks.IsBitSet(11)) data.WriteInt32(p.GuildLevel.Value);
+            if (blocks.IsBitSet(12)) data.WriteUInt8(p.NumBankSlots.Value);
+            if (blocks.IsBitSet(13)) data.WriteUInt8(p.NativeSex.Value);
+            if (blocks.IsBitSet(14)) data.WriteUInt8(p.Inebriation.Value);
+            if (blocks.IsBitSet(15)) data.WriteUInt8(p.PvpTitle.Value);
+            if (blocks.IsBitSet(16)) data.WriteUInt8(p.ArenaFaction.Value);
+            if (blocks.IsBitSet(17)) data.WriteUInt8(p.PvPRank.Value);
             // 18: Field_88 skipped
-            if (IsBitSet(19)) data.WriteUInt32(p.DuelTeam.Value);
-            if (IsBitSet(20)) data.WriteInt32(p.GuildTimeStamp.Value);
-            if (IsBitSet(21)) data.WriteInt32(p.ChosenTitle.Value);
-            if (IsBitSet(22)) data.WriteInt32(p.FakeInebriation.Value);
-            if (IsBitSet(23)) data.WriteUInt32(p.VirtualPlayerRealm.Value);
-            if (IsBitSet(24)) data.WriteUInt32(p.CurrentSpecID.Value);
+            if (blocks.IsBitSet(19)) data.WriteUInt32(p.DuelTeam.Value);
+            if (blocks.IsBitSet(20)) data.WriteInt32(p.GuildTimeStamp.Value);
+            if (blocks.IsBitSet(21)) data.WriteInt32(p.ChosenTitle.Value);
+            if (blocks.IsBitSet(22)) data.WriteInt32(p.FakeInebriation.Value);
+            if (blocks.IsBitSet(23)) data.WriteUInt32(p.VirtualPlayerRealm.Value);
+            if (blocks.IsBitSet(24)) data.WriteUInt32(p.CurrentSpecID.Value);
             // 25-26 skipped
-            if (IsBitSet(27)) data.WriteInt32(p.HonorLevel.Value);
+            if (blocks.IsBitSet(27)) data.WriteInt32(p.HonorLevel.Value);
         }
 
         // QuestLog entries (bits 35-60) — WriteCreate format
@@ -2470,7 +2466,7 @@ public class ObjectUpdateBuilder
         {
             for (int i = 0; i < QuestConst.MaxQuestLogSize; i++)
             {
-                if (IsBitSet(36 + i))
+                if (blocks.IsBitSet(36 + i))
                 {
                     QuestLog quest = p.QuestLog[i];
                     data.WriteInt64(quest?.EndTime ?? 0);
@@ -2487,7 +2483,7 @@ public class ObjectUpdateBuilder
         {
             for (int i = 0; i < 19; i++)
             {
-                if (IsBitSet(62 + i))
+                if (blocks.IsBitSet(62 + i))
                 {
                     VisibleItem item = p.VisibleItems[i].Value;
                     // VisibleItem has HasChangesMask<4>: bit 0=hasAny, 1=ItemID, 2=AppearanceModID, 3=ItemVisual
@@ -2507,10 +2503,8 @@ public class ObjectUpdateBuilder
         ActivePlayerData a = _updateData.ActivePlayerData ?? new ActivePlayerData();
 
         // Build changesMask (1536 bits = 48 blocks of 32)
-        uint[] blocks = new uint[48];
-        void SetBit(int bit) { blocks[bit / 32] |= (1u << (bit % 32)); }
-        bool IsBitSet(int bit) { return (blocks[bit / 32] & (1u << (bit % 32))) != 0; }
-
+        Span<uint> blocksBuf = stackalloc uint[48];
+        var blocks = new StackBitMask(blocksBuf);
         // Pre-compute KnownTitles (uint?[12] → ulong[6])
         int knownTitlesCount = 0;
         ulong[] knownTitles64 = new ulong[6];
@@ -2528,7 +2522,7 @@ public class ObjectUpdateBuilder
                     uint hi = (i * 2 + 1 < a.KnownTitles.Length && a.KnownTitles[i * 2 + 1].HasValue) ? a.KnownTitles[i * 2 + 1].Value : 0;
                     knownTitles64[i] = (ulong)lo | ((ulong)hi << 32);
                 }
-                SetBit(0); SetBit(3); // dynamic field KnownTitles
+                blocks.SetBit(0); blocks.SetBit(3); // dynamic field KnownTitles
             }
         }
 
@@ -2547,104 +2541,104 @@ public class ObjectUpdateBuilder
         // ============================================================
         // SET BITS — Block 0 scalar fields (group bit 0, fields 26-37)
         // ============================================================
-        if (a.FarsightObject != null) { SetBit(0); SetBit(26); }
+        if (a.FarsightObject != null) { blocks.SetBit(0); blocks.SetBit(26); }
         // 27: SummonedBattlePetGUID — not used in WotLK
-        if (a.Coinage.HasValue) { SetBit(0); SetBit(28); }
-        if (a.XP.HasValue) { SetBit(0); SetBit(29); }
-        if (a.NextLevelXP.HasValue) { SetBit(0); SetBit(30); }
-        if (a.TrialXP.HasValue) { SetBit(0); SetBit(31); }
-        if (a.Skill != null && HasAnySkillChanged(a.Skill)) { SetBit(0); SetBit(32); }
-        if (a.CharacterPoints.HasValue) { SetBit(0); SetBit(33); }
-        if (a.MaxTalentTiers.HasValue) { SetBit(0); SetBit(34); }
-        if (a.TrackCreatureMask.HasValue) { SetBit(0); SetBit(35); }
-        if (a.MainhandExpertise.HasValue) { SetBit(0); SetBit(36); }
-        if (a.OffhandExpertise.HasValue) { SetBit(0); SetBit(37); }
+        if (a.Coinage.HasValue) { blocks.SetBit(0); blocks.SetBit(28); }
+        if (a.XP.HasValue) { blocks.SetBit(0); blocks.SetBit(29); }
+        if (a.NextLevelXP.HasValue) { blocks.SetBit(0); blocks.SetBit(30); }
+        if (a.TrialXP.HasValue) { blocks.SetBit(0); blocks.SetBit(31); }
+        if (a.Skill != null && HasAnySkillChanged(a.Skill)) { blocks.SetBit(0); blocks.SetBit(32); }
+        if (a.CharacterPoints.HasValue) { blocks.SetBit(0); blocks.SetBit(33); }
+        if (a.MaxTalentTiers.HasValue) { blocks.SetBit(0); blocks.SetBit(34); }
+        if (a.TrackCreatureMask.HasValue) { blocks.SetBit(0); blocks.SetBit(35); }
+        if (a.MainhandExpertise.HasValue) { blocks.SetBit(0); blocks.SetBit(36); }
+        if (a.OffhandExpertise.HasValue) { blocks.SetBit(0); blocks.SetBit(37); }
 
         // ============================================================
         // SET BITS — Block 38 scalar fields (group bit 38, fields 39-69)
         // ============================================================
-        if (a.RangedExpertise.HasValue) { SetBit(38); SetBit(39); }
-        if (a.CombatRatingExpertise.HasValue) { SetBit(38); SetBit(40); }
-        if (a.BlockPercentage.HasValue) { SetBit(38); SetBit(41); }
-        if (a.DodgePercentage.HasValue) { SetBit(38); SetBit(42); }
-        if (a.DodgePercentageFromAttribute.HasValue) { SetBit(38); SetBit(43); }
-        if (a.ParryPercentage.HasValue) { SetBit(38); SetBit(44); }
-        if (a.ParryPercentageFromAttribute.HasValue) { SetBit(38); SetBit(45); }
-        if (a.CritPercentage.HasValue) { SetBit(38); SetBit(46); }
-        if (a.RangedCritPercentage.HasValue) { SetBit(38); SetBit(47); }
-        if (a.OffhandCritPercentage.HasValue) { SetBit(38); SetBit(48); }
-        if (a.ShieldBlock.HasValue) { SetBit(38); SetBit(49); }
+        if (a.RangedExpertise.HasValue) { blocks.SetBit(38); blocks.SetBit(39); }
+        if (a.CombatRatingExpertise.HasValue) { blocks.SetBit(38); blocks.SetBit(40); }
+        if (a.BlockPercentage.HasValue) { blocks.SetBit(38); blocks.SetBit(41); }
+        if (a.DodgePercentage.HasValue) { blocks.SetBit(38); blocks.SetBit(42); }
+        if (a.DodgePercentageFromAttribute.HasValue) { blocks.SetBit(38); blocks.SetBit(43); }
+        if (a.ParryPercentage.HasValue) { blocks.SetBit(38); blocks.SetBit(44); }
+        if (a.ParryPercentageFromAttribute.HasValue) { blocks.SetBit(38); blocks.SetBit(45); }
+        if (a.CritPercentage.HasValue) { blocks.SetBit(38); blocks.SetBit(46); }
+        if (a.RangedCritPercentage.HasValue) { blocks.SetBit(38); blocks.SetBit(47); }
+        if (a.OffhandCritPercentage.HasValue) { blocks.SetBit(38); blocks.SetBit(48); }
+        if (a.ShieldBlock.HasValue) { blocks.SetBit(38); blocks.SetBit(49); }
         // 50: ShieldBlockCritPercentage — no property
-        if (a.Mastery.HasValue) { SetBit(38); SetBit(51); }
-        if (a.Speed.HasValue) { SetBit(38); SetBit(52); }
-        if (a.Avoidance.HasValue) { SetBit(38); SetBit(53); }
-        if (a.Sturdiness.HasValue) { SetBit(38); SetBit(54); }
-        if (a.Versatility.HasValue) { SetBit(38); SetBit(55); }
-        if (a.VersatilityBonus.HasValue) { SetBit(38); SetBit(56); }
-        if (a.PvpPowerDamage.HasValue) { SetBit(38); SetBit(57); }
-        if (a.PvpPowerHealing.HasValue) { SetBit(38); SetBit(58); }
-        if (a.ModHealingDonePos.HasValue) { SetBit(38); SetBit(59); }
-        if (a.ModHealingPercent.HasValue) { SetBit(38); SetBit(60); }
-        if (a.ModHealingDonePercent.HasValue) { SetBit(38); SetBit(61); }
-        if (a.ModPeriodicHealingDonePercent.HasValue) { SetBit(38); SetBit(62); }
-        if (a.ModSpellPowerPercent.HasValue) { SetBit(38); SetBit(63); }
-        if (a.ModResiliencePercent.HasValue) { SetBit(38); SetBit(64); }
-        if (a.OverrideSpellPowerByAPPercent.HasValue) { SetBit(38); SetBit(65); }
-        if (a.OverrideAPBySpellPowerPercent.HasValue) { SetBit(38); SetBit(66); }
-        if (a.ModTargetResistance.HasValue) { SetBit(38); SetBit(67); }
-        if (a.ModTargetPhysicalResistance.HasValue) { SetBit(38); SetBit(68); }
-        if (a.LocalFlags.HasValue) { SetBit(38); SetBit(69); }
+        if (a.Mastery.HasValue) { blocks.SetBit(38); blocks.SetBit(51); }
+        if (a.Speed.HasValue) { blocks.SetBit(38); blocks.SetBit(52); }
+        if (a.Avoidance.HasValue) { blocks.SetBit(38); blocks.SetBit(53); }
+        if (a.Sturdiness.HasValue) { blocks.SetBit(38); blocks.SetBit(54); }
+        if (a.Versatility.HasValue) { blocks.SetBit(38); blocks.SetBit(55); }
+        if (a.VersatilityBonus.HasValue) { blocks.SetBit(38); blocks.SetBit(56); }
+        if (a.PvpPowerDamage.HasValue) { blocks.SetBit(38); blocks.SetBit(57); }
+        if (a.PvpPowerHealing.HasValue) { blocks.SetBit(38); blocks.SetBit(58); }
+        if (a.ModHealingDonePos.HasValue) { blocks.SetBit(38); blocks.SetBit(59); }
+        if (a.ModHealingPercent.HasValue) { blocks.SetBit(38); blocks.SetBit(60); }
+        if (a.ModHealingDonePercent.HasValue) { blocks.SetBit(38); blocks.SetBit(61); }
+        if (a.ModPeriodicHealingDonePercent.HasValue) { blocks.SetBit(38); blocks.SetBit(62); }
+        if (a.ModSpellPowerPercent.HasValue) { blocks.SetBit(38); blocks.SetBit(63); }
+        if (a.ModResiliencePercent.HasValue) { blocks.SetBit(38); blocks.SetBit(64); }
+        if (a.OverrideSpellPowerByAPPercent.HasValue) { blocks.SetBit(38); blocks.SetBit(65); }
+        if (a.OverrideAPBySpellPowerPercent.HasValue) { blocks.SetBit(38); blocks.SetBit(66); }
+        if (a.ModTargetResistance.HasValue) { blocks.SetBit(38); blocks.SetBit(67); }
+        if (a.ModTargetPhysicalResistance.HasValue) { blocks.SetBit(38); blocks.SetBit(68); }
+        if (a.LocalFlags.HasValue) { blocks.SetBit(38); blocks.SetBit(69); }
 
         // ============================================================
         // SET BITS — Block 70 scalar fields (group bit 70, fields 71-101)
         // ============================================================
-        if (a.GrantableLevels.HasValue) { SetBit(70); SetBit(71); }
-        if (a.MultiActionBars.HasValue) { SetBit(70); SetBit(72); }
-        if (a.LifetimeMaxRank.HasValue) { SetBit(70); SetBit(73); }
-        if (a.NumRespecs.HasValue) { SetBit(70); SetBit(74); }
-        if (a.AmmoID.HasValue) { SetBit(70); SetBit(75); }
-        if (a.PvpMedals.HasValue) { SetBit(70); SetBit(76); }
-        if (a.TodayHonorableKills.HasValue) { SetBit(70); SetBit(77); }
-        if (a.TodayDishonorableKills.HasValue) { SetBit(70); SetBit(78); }
-        if (a.YesterdayHonorableKills.HasValue) { SetBit(70); SetBit(79); }
-        if (a.YesterdayDishonorableKills.HasValue) { SetBit(70); SetBit(80); }
-        if (a.LastWeekHonorableKills.HasValue) { SetBit(70); SetBit(81); }
-        if (a.LastWeekDishonorableKills.HasValue) { SetBit(70); SetBit(82); }
-        if (a.ThisWeekHonorableKills.HasValue) { SetBit(70); SetBit(83); }
-        if (a.ThisWeekDishonorableKills.HasValue) { SetBit(70); SetBit(84); }
-        if (a.ThisWeekContribution.HasValue) { SetBit(70); SetBit(85); }
-        if (a.LifetimeHonorableKills.HasValue) { SetBit(70); SetBit(86); }
-        if (a.LifetimeDishonorableKills.HasValue) { SetBit(70); SetBit(87); }
+        if (a.GrantableLevels.HasValue) { blocks.SetBit(70); blocks.SetBit(71); }
+        if (a.MultiActionBars.HasValue) { blocks.SetBit(70); blocks.SetBit(72); }
+        if (a.LifetimeMaxRank.HasValue) { blocks.SetBit(70); blocks.SetBit(73); }
+        if (a.NumRespecs.HasValue) { blocks.SetBit(70); blocks.SetBit(74); }
+        if (a.AmmoID.HasValue) { blocks.SetBit(70); blocks.SetBit(75); }
+        if (a.PvpMedals.HasValue) { blocks.SetBit(70); blocks.SetBit(76); }
+        if (a.TodayHonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(77); }
+        if (a.TodayDishonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(78); }
+        if (a.YesterdayHonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(79); }
+        if (a.YesterdayDishonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(80); }
+        if (a.LastWeekHonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(81); }
+        if (a.LastWeekDishonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(82); }
+        if (a.ThisWeekHonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(83); }
+        if (a.ThisWeekDishonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(84); }
+        if (a.ThisWeekContribution.HasValue) { blocks.SetBit(70); blocks.SetBit(85); }
+        if (a.LifetimeHonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(86); }
+        if (a.LifetimeDishonorableKills.HasValue) { blocks.SetBit(70); blocks.SetBit(87); }
         // 88: Field_F24 — unused
-        if (a.YesterdayContribution.HasValue) { SetBit(70); SetBit(89); }
-        if (a.LastWeekContribution.HasValue) { SetBit(70); SetBit(90); }
-        if (a.LastWeekRank.HasValue) { SetBit(70); SetBit(91); }
-        if (a.WatchedFactionIndex.HasValue) { SetBit(70); SetBit(92); }
-        if (a.MaxLevel.HasValue) { SetBit(70); SetBit(93); }
-        if (a.ScalingPlayerLevelDelta.HasValue) { SetBit(70); SetBit(94); }
-        if (a.MaxCreatureScalingLevel.HasValue) { SetBit(70); SetBit(95); }
-        if (a.PetSpellPower.HasValue) { SetBit(70); SetBit(96); }
-        if (a.UiHitModifier.HasValue) { SetBit(70); SetBit(97); }
-        if (a.UiSpellHitModifier.HasValue) { SetBit(70); SetBit(98); }
-        if (a.HomeRealmTimeOffset.HasValue) { SetBit(70); SetBit(99); }
-        if (a.ModPetHaste.HasValue) { SetBit(70); SetBit(100); }
-        if (a.LocalRegenFlags.HasValue) { SetBit(70); SetBit(101); }
+        if (a.YesterdayContribution.HasValue) { blocks.SetBit(70); blocks.SetBit(89); }
+        if (a.LastWeekContribution.HasValue) { blocks.SetBit(70); blocks.SetBit(90); }
+        if (a.LastWeekRank.HasValue) { blocks.SetBit(70); blocks.SetBit(91); }
+        if (a.WatchedFactionIndex.HasValue) { blocks.SetBit(70); blocks.SetBit(92); }
+        if (a.MaxLevel.HasValue) { blocks.SetBit(70); blocks.SetBit(93); }
+        if (a.ScalingPlayerLevelDelta.HasValue) { blocks.SetBit(70); blocks.SetBit(94); }
+        if (a.MaxCreatureScalingLevel.HasValue) { blocks.SetBit(70); blocks.SetBit(95); }
+        if (a.PetSpellPower.HasValue) { blocks.SetBit(70); blocks.SetBit(96); }
+        if (a.UiHitModifier.HasValue) { blocks.SetBit(70); blocks.SetBit(97); }
+        if (a.UiSpellHitModifier.HasValue) { blocks.SetBit(70); blocks.SetBit(98); }
+        if (a.HomeRealmTimeOffset.HasValue) { blocks.SetBit(70); blocks.SetBit(99); }
+        if (a.ModPetHaste.HasValue) { blocks.SetBit(70); blocks.SetBit(100); }
+        if (a.LocalRegenFlags.HasValue) { blocks.SetBit(70); blocks.SetBit(101); }
 
         // ============================================================
         // SET BITS — Block 102 scalar fields (group bit 102, fields 103-123)
         // ============================================================
-        if (a.AuraVision.HasValue) { SetBit(102); SetBit(103); }
-        if (a.NumBackpackSlots.HasValue) { SetBit(102); SetBit(104); }
-        if (a.OverrideSpellsID.HasValue) { SetBit(102); SetBit(105); }
-        if (a.LfgBonusFactionID.HasValue) { SetBit(102); SetBit(106); }
-        if (a.LootSpecID.HasValue) { SetBit(102); SetBit(107); }
-        if (a.OverrideZonePVPType.HasValue) { SetBit(102); SetBit(108); }
-        if (a.Honor.HasValue) { SetBit(102); SetBit(109); }
-        if (a.HonorNextLevel.HasValue) { SetBit(102); SetBit(110); }
+        if (a.AuraVision.HasValue) { blocks.SetBit(102); blocks.SetBit(103); }
+        if (a.NumBackpackSlots.HasValue) { blocks.SetBit(102); blocks.SetBit(104); }
+        if (a.OverrideSpellsID.HasValue) { blocks.SetBit(102); blocks.SetBit(105); }
+        if (a.LfgBonusFactionID.HasValue) { blocks.SetBit(102); blocks.SetBit(106); }
+        if (a.LootSpecID.HasValue) { blocks.SetBit(102); blocks.SetBit(107); }
+        if (a.OverrideZonePVPType.HasValue) { blocks.SetBit(102); blocks.SetBit(108); }
+        if (a.Honor.HasValue) { blocks.SetBit(102); blocks.SetBit(109); }
+        if (a.HonorNextLevel.HasValue) { blocks.SetBit(102); blocks.SetBit(110); }
         // 111: Field_F74 — unused
-        if (a.PvPTierMaxFromWins.HasValue) { SetBit(102); SetBit(112); }
-        if (a.PvPLastWeeksTierMaxFromWins.HasValue) { SetBit(102); SetBit(113); }
-        if (a.PvPRankProgress.HasValue) { SetBit(102); SetBit(114); }
+        if (a.PvPTierMaxFromWins.HasValue) { blocks.SetBit(102); blocks.SetBit(112); }
+        if (a.PvPLastWeeksTierMaxFromWins.HasValue) { blocks.SetBit(102); blocks.SetBit(113); }
+        if (a.PvPRankProgress.HasValue) { blocks.SetBit(102); blocks.SetBit(114); }
         // 115-123: GlyphsEnabled (120) set in create path only
         // Sending GlyphsEnabled in every Values update adds block 102 + FlushBits overhead
 
@@ -2658,8 +2652,8 @@ public class ObjectUpdateBuilder
         {
             if (GetModernInvSlot(a, i) != null)
             {
-                SetBit(124);
-                SetBit(125 + i);
+                blocks.SetBit(124);
+                blocks.SetBit(125 + i);
                 invSlotsChanged++;
             }
         }
@@ -2667,94 +2661,94 @@ public class ObjectUpdateBuilder
         // TrackResourceMask (header 266, elements 267-268)
         if (a.TrackResourceMask != null)
             for (int i = 0; i < 2; i++)
-                if (a.TrackResourceMask[i].HasValue) { SetBit(266); SetBit(267 + i); }
+                if (a.TrackResourceMask[i].HasValue) { blocks.SetBit(266); blocks.SetBit(267 + i); }
 
         // Shared header 269: SpellCritPercentage (270-276), ModDamageDonePos (277-283),
         // ModDamageDoneNeg (284-290), ModDamageDonePercent (291-297)
         if (a.SpellCritPercentage != null)
             for (int i = 0; i < 7; i++)
-                if (a.SpellCritPercentage[i].HasValue) { SetBit(269); SetBit(270 + i); }
+                if (a.SpellCritPercentage[i].HasValue) { blocks.SetBit(269); blocks.SetBit(270 + i); }
         if (a.ModDamageDonePos != null)
             for (int i = 0; i < 7; i++)
-                if (a.ModDamageDonePos[i].HasValue) { SetBit(269); SetBit(277 + i); }
+                if (a.ModDamageDonePos[i].HasValue) { blocks.SetBit(269); blocks.SetBit(277 + i); }
         if (a.ModDamageDoneNeg != null)
             for (int i = 0; i < 7; i++)
-                if (a.ModDamageDoneNeg[i].HasValue) { SetBit(269); SetBit(284 + i); }
+                if (a.ModDamageDoneNeg[i].HasValue) { blocks.SetBit(269); blocks.SetBit(284 + i); }
         if (a.ModDamageDonePercent != null)
             for (int i = 0; i < 7; i++)
-                if (a.ModDamageDonePercent[i].HasValue) { SetBit(269); SetBit(291 + i); }
+                if (a.ModDamageDonePercent[i].HasValue) { blocks.SetBit(269); blocks.SetBit(291 + i); }
 
         // ExploredZones (header 298, elements 299-538)
         if (a.ExploredZones != null)
             for (int i = 0; i < 240; i++)
-                if (a.ExploredZones[i].HasValue) { SetBit(298); SetBit(299 + i); }
+                if (a.ExploredZones[i].HasValue) { blocks.SetBit(298); blocks.SetBit(299 + i); }
 
         // RestInfo (header 539, elements 540-541)
         if (a.RestInfo != null)
             for (int i = 0; i < 2; i++)
                 if (a.RestInfo[i] != null && (a.RestInfo[i].Threshold.HasValue || a.RestInfo[i].StateID.HasValue))
-                { SetBit(539); SetBit(540 + i); }
+                { blocks.SetBit(539); blocks.SetBit(540 + i); }
 
         // Shared header 542: WeaponDmgMultipliers (543-545), WeaponAtkSpeedMultipliers (546-548)
         if (a.WeaponDmgMultipliers != null)
             for (int i = 0; i < 3; i++)
-                if (a.WeaponDmgMultipliers[i].HasValue) { SetBit(542); SetBit(543 + i); }
+                if (a.WeaponDmgMultipliers[i].HasValue) { blocks.SetBit(542); blocks.SetBit(543 + i); }
         if (a.WeaponAtkSpeedMultipliers != null)
             for (int i = 0; i < 3; i++)
-                if (a.WeaponAtkSpeedMultipliers[i].HasValue) { SetBit(542); SetBit(546 + i); }
+                if (a.WeaponAtkSpeedMultipliers[i].HasValue) { blocks.SetBit(542); blocks.SetBit(546 + i); }
 
         // Shared header 549: BuybackPrice (550-561), BuybackTimestamp (562-573)
         if (a.BuybackPrice != null)
             for (int i = 0; i < 12; i++)
-                if (a.BuybackPrice[i].HasValue) { SetBit(549); SetBit(550 + i); }
+                if (a.BuybackPrice[i].HasValue) { blocks.SetBit(549); blocks.SetBit(550 + i); }
         if (a.BuybackTimestamp != null)
             for (int i = 0; i < 12; i++)
-                if (a.BuybackTimestamp[i].HasValue) { SetBit(549); SetBit(562 + i); }
+                if (a.BuybackTimestamp[i].HasValue) { blocks.SetBit(549); blocks.SetBit(562 + i); }
 
         // CombatRatings (header 574, elements 575-606)
         if (a.CombatRatings != null)
             for (int i = 0; i < 32; i++)
-                if (a.CombatRatings[i].HasValue) { SetBit(574); SetBit(575 + i); }
+                if (a.CombatRatings[i].HasValue) { blocks.SetBit(574); blocks.SetBit(575 + i); }
 
         // NoReagentCostMask (header 615, elements 616-619)
         if (a.NoReagentCostMask != null)
             for (int i = 0; i < 4; i++)
-                if (a.NoReagentCostMask[i].HasValue) { SetBit(615); SetBit(616 + i); }
+                if (a.NoReagentCostMask[i].HasValue) { blocks.SetBit(615); blocks.SetBit(616 + i); }
 
         // ProfessionSkillLine (header 620, elements 621-622)
         if (a.ProfessionSkillLine != null)
             for (int i = 0; i < 2; i++)
-                if (a.ProfessionSkillLine[i].HasValue) { SetBit(620); SetBit(621 + i); }
+                if (a.ProfessionSkillLine[i].HasValue) { blocks.SetBit(620); blocks.SetBit(621 + i); }
 
         // BagSlotFlags (header 623, elements 624-627)
         if (a.BagSlotFlags != null)
             for (int i = 0; i < 4; i++)
-                if (a.BagSlotFlags[i].HasValue) { SetBit(623); SetBit(624 + i); }
+                if (a.BagSlotFlags[i].HasValue) { blocks.SetBit(623); blocks.SetBit(624 + i); }
 
         // BankBagSlotFlags (header 628, elements 629-635)
         if (a.BankBagSlotFlags != null)
             for (int i = 0; i < 7; i++)
-                if (a.BankBagSlotFlags[i].HasValue) { SetBit(628); SetBit(629 + i); }
+                if (a.BankBagSlotFlags[i].HasValue) { blocks.SetBit(628); blocks.SetBit(629 + i); }
 
         // QuestCompleted (header 636, elements 637-1511)
         if (a.QuestCompleted != null)
             for (int i = 0; i < 875; i++)
-                if (a.QuestCompleted[i].HasValue) { SetBit(636); SetBit(637 + i); }
+                if (a.QuestCompleted[i].HasValue) { blocks.SetBit(636); blocks.SetBit(637 + i); }
 
         // PvpInfo (header 607, elements 608-614)
         if (a.PvpInfo != null)
             for (int i = 0; i < Math.Min(a.PvpInfo.Length, 7); i++)
                 if (a.PvpInfo[i] != null && (a.PvpInfo[i].Rating != 0 || a.PvpInfo[i].SeasonPlayed != 0 || a.PvpInfo[i].Disqualified))
-                { SetBit(607); SetBit(608 + i); }
+                { blocks.SetBit(607); blocks.SetBit(608 + i); }
 
         // GlyphSlots (header 1512, elements 1513-1518) + Glyphs (header 1512, elements 1519-1524)
         if (hasGlyphChanges)
         {
-            SetBit(1512); // shared header
+            blocks.SetBit(1512); // shared header
             for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
             {
-                SetBit(1513 + i); // GlyphSlots[i]
-                SetBit(1519 + i); // Glyphs[i]
+                blocks.SetBit(1513 + i); // GlyphSlots[i]
+                blocks.SetBit(1519 + i); // Glyphs[i]
             }
         }
 
@@ -2796,7 +2790,7 @@ public class ObjectUpdateBuilder
         // Dynamic field masks (TC343 order: bits 1, 2, 3, 20-25, 4-19)
         // Bit 1: SortBagsRightToLeft — not used
         // Bit 2: InsertItemsLeftToRight — not used
-        if (IsBitSet(3)) // KnownTitles
+        if (blocks.IsBitSet(3)) // KnownTitles
         {
             data.WriteBits((uint)knownTitlesCount, 32); // array element count
             for (int i = 0; i < knownTitlesCount; i++)
@@ -2806,7 +2800,7 @@ public class ObjectUpdateBuilder
         data.FlushBits(); // end of dynamic mask section
 
         // Dynamic field data (TC343 order: Research data, then KnownTitles, then others)
-        if (IsBitSet(3)) // KnownTitles data
+        if (blocks.IsBitSet(3)) // KnownTitles data
         {
             for (int i = 0; i < knownTitlesCount; i++)
                 data.WriteUInt64(knownTitles64[i]);
@@ -2815,117 +2809,117 @@ public class ObjectUpdateBuilder
         // ============================================================
         // WRITE SCALAR DATA — Block 0 (bits 26-37)
         // ============================================================
-        if (IsBitSet(0))
+        if (blocks.IsBitSet(0))
         {
-            if (IsBitSet(26)) data.WritePackedGuid128(a.FarsightObject.Value);
+            if (blocks.IsBitSet(26)) data.WritePackedGuid128(a.FarsightObject.Value);
             // 27: SummonedBattlePetGUID skipped
-            if (IsBitSet(28)) data.WriteUInt64(a.Coinage.Value);
-            if (IsBitSet(29)) data.WriteInt32(a.XP.Value);
-            if (IsBitSet(30)) data.WriteInt32(a.NextLevelXP.Value);
-            if (IsBitSet(31)) data.WriteInt32(a.TrialXP.Value);
-            if (IsBitSet(32)) WriteUpdateSkillInfo(data, a.Skill);
-            if (IsBitSet(33)) data.WriteInt32(a.CharacterPoints.Value);
-            if (IsBitSet(34)) data.WriteInt32(a.MaxTalentTiers.Value);
-            if (IsBitSet(35)) data.WriteUInt32(a.TrackCreatureMask.Value);
-            if (IsBitSet(36)) data.WriteFloat(a.MainhandExpertise.Value);
-            if (IsBitSet(37)) data.WriteFloat(a.OffhandExpertise.Value);
+            if (blocks.IsBitSet(28)) data.WriteUInt64(a.Coinage.Value);
+            if (blocks.IsBitSet(29)) data.WriteInt32(a.XP.Value);
+            if (blocks.IsBitSet(30)) data.WriteInt32(a.NextLevelXP.Value);
+            if (blocks.IsBitSet(31)) data.WriteInt32(a.TrialXP.Value);
+            if (blocks.IsBitSet(32)) WriteUpdateSkillInfo(data, a.Skill);
+            if (blocks.IsBitSet(33)) data.WriteInt32(a.CharacterPoints.Value);
+            if (blocks.IsBitSet(34)) data.WriteInt32(a.MaxTalentTiers.Value);
+            if (blocks.IsBitSet(35)) data.WriteUInt32(a.TrackCreatureMask.Value);
+            if (blocks.IsBitSet(36)) data.WriteFloat(a.MainhandExpertise.Value);
+            if (blocks.IsBitSet(37)) data.WriteFloat(a.OffhandExpertise.Value);
         }
 
         // ============================================================
         // WRITE SCALAR DATA — Block 38 (bits 39-69)
         // ============================================================
-        if (IsBitSet(38))
+        if (blocks.IsBitSet(38))
         {
-            if (IsBitSet(39)) data.WriteFloat(a.RangedExpertise.Value);
-            if (IsBitSet(40)) data.WriteFloat(a.CombatRatingExpertise.Value);
-            if (IsBitSet(41)) data.WriteFloat(a.BlockPercentage.Value);
-            if (IsBitSet(42)) data.WriteFloat(a.DodgePercentage.Value);
-            if (IsBitSet(43)) data.WriteFloat(a.DodgePercentageFromAttribute.Value);
-            if (IsBitSet(44)) data.WriteFloat(a.ParryPercentage.Value);
-            if (IsBitSet(45)) data.WriteFloat(a.ParryPercentageFromAttribute.Value);
-            if (IsBitSet(46)) data.WriteFloat(a.CritPercentage.Value);
-            if (IsBitSet(47)) data.WriteFloat(a.RangedCritPercentage.Value);
-            if (IsBitSet(48)) data.WriteFloat(a.OffhandCritPercentage.Value);
-            if (IsBitSet(49)) data.WriteInt32(a.ShieldBlock.Value);
+            if (blocks.IsBitSet(39)) data.WriteFloat(a.RangedExpertise.Value);
+            if (blocks.IsBitSet(40)) data.WriteFloat(a.CombatRatingExpertise.Value);
+            if (blocks.IsBitSet(41)) data.WriteFloat(a.BlockPercentage.Value);
+            if (blocks.IsBitSet(42)) data.WriteFloat(a.DodgePercentage.Value);
+            if (blocks.IsBitSet(43)) data.WriteFloat(a.DodgePercentageFromAttribute.Value);
+            if (blocks.IsBitSet(44)) data.WriteFloat(a.ParryPercentage.Value);
+            if (blocks.IsBitSet(45)) data.WriteFloat(a.ParryPercentageFromAttribute.Value);
+            if (blocks.IsBitSet(46)) data.WriteFloat(a.CritPercentage.Value);
+            if (blocks.IsBitSet(47)) data.WriteFloat(a.RangedCritPercentage.Value);
+            if (blocks.IsBitSet(48)) data.WriteFloat(a.OffhandCritPercentage.Value);
+            if (blocks.IsBitSet(49)) data.WriteInt32(a.ShieldBlock.Value);
             // 50: ShieldBlockCritPercentage skipped
-            if (IsBitSet(51)) data.WriteFloat(a.Mastery.Value);
-            if (IsBitSet(52)) data.WriteFloat(a.Speed.Value);
-            if (IsBitSet(53)) data.WriteFloat(a.Avoidance.Value);
-            if (IsBitSet(54)) data.WriteFloat(a.Sturdiness.Value);
-            if (IsBitSet(55)) data.WriteInt32(a.Versatility.Value);
-            if (IsBitSet(56)) data.WriteFloat(a.VersatilityBonus.Value);
-            if (IsBitSet(57)) data.WriteFloat(a.PvpPowerDamage.Value);
-            if (IsBitSet(58)) data.WriteFloat(a.PvpPowerHealing.Value);
-            if (IsBitSet(59)) data.WriteInt32(a.ModHealingDonePos.Value);
-            if (IsBitSet(60)) data.WriteFloat(a.ModHealingPercent.Value);
-            if (IsBitSet(61)) data.WriteFloat(a.ModHealingDonePercent.Value);
-            if (IsBitSet(62)) data.WriteFloat(a.ModPeriodicHealingDonePercent.Value);
-            if (IsBitSet(63)) data.WriteFloat(a.ModSpellPowerPercent.Value);
-            if (IsBitSet(64)) data.WriteFloat(a.ModResiliencePercent.Value);
-            if (IsBitSet(65)) data.WriteFloat(a.OverrideSpellPowerByAPPercent.Value);
-            if (IsBitSet(66)) data.WriteFloat(a.OverrideAPBySpellPowerPercent.Value);
-            if (IsBitSet(67)) data.WriteInt32(a.ModTargetResistance.Value);
-            if (IsBitSet(68)) data.WriteInt32(a.ModTargetPhysicalResistance.Value);
-            if (IsBitSet(69)) data.WriteUInt32(a.LocalFlags.Value);
+            if (blocks.IsBitSet(51)) data.WriteFloat(a.Mastery.Value);
+            if (blocks.IsBitSet(52)) data.WriteFloat(a.Speed.Value);
+            if (blocks.IsBitSet(53)) data.WriteFloat(a.Avoidance.Value);
+            if (blocks.IsBitSet(54)) data.WriteFloat(a.Sturdiness.Value);
+            if (blocks.IsBitSet(55)) data.WriteInt32(a.Versatility.Value);
+            if (blocks.IsBitSet(56)) data.WriteFloat(a.VersatilityBonus.Value);
+            if (blocks.IsBitSet(57)) data.WriteFloat(a.PvpPowerDamage.Value);
+            if (blocks.IsBitSet(58)) data.WriteFloat(a.PvpPowerHealing.Value);
+            if (blocks.IsBitSet(59)) data.WriteInt32(a.ModHealingDonePos.Value);
+            if (blocks.IsBitSet(60)) data.WriteFloat(a.ModHealingPercent.Value);
+            if (blocks.IsBitSet(61)) data.WriteFloat(a.ModHealingDonePercent.Value);
+            if (blocks.IsBitSet(62)) data.WriteFloat(a.ModPeriodicHealingDonePercent.Value);
+            if (blocks.IsBitSet(63)) data.WriteFloat(a.ModSpellPowerPercent.Value);
+            if (blocks.IsBitSet(64)) data.WriteFloat(a.ModResiliencePercent.Value);
+            if (blocks.IsBitSet(65)) data.WriteFloat(a.OverrideSpellPowerByAPPercent.Value);
+            if (blocks.IsBitSet(66)) data.WriteFloat(a.OverrideAPBySpellPowerPercent.Value);
+            if (blocks.IsBitSet(67)) data.WriteInt32(a.ModTargetResistance.Value);
+            if (blocks.IsBitSet(68)) data.WriteInt32(a.ModTargetPhysicalResistance.Value);
+            if (blocks.IsBitSet(69)) data.WriteUInt32(a.LocalFlags.Value);
         }
 
         // ============================================================
         // WRITE SCALAR DATA — Block 70 (bits 71-101)
         // ============================================================
-        if (IsBitSet(70))
+        if (blocks.IsBitSet(70))
         {
-            if (IsBitSet(71)) data.WriteUInt8(a.GrantableLevels.Value);
-            if (IsBitSet(72)) data.WriteUInt8(a.MultiActionBars.Value);
-            if (IsBitSet(73)) data.WriteUInt8(a.LifetimeMaxRank.Value);
-            if (IsBitSet(74)) data.WriteUInt8(a.NumRespecs.Value);
-            if (IsBitSet(75)) data.WriteInt32((int)a.AmmoID.Value);
-            if (IsBitSet(76)) data.WriteUInt32(a.PvpMedals.Value);
-            if (IsBitSet(77)) data.WriteUInt16(a.TodayHonorableKills.Value);
-            if (IsBitSet(78)) data.WriteUInt16(a.TodayDishonorableKills.Value);
-            if (IsBitSet(79)) data.WriteUInt16(a.YesterdayHonorableKills.Value);
-            if (IsBitSet(80)) data.WriteUInt16(a.YesterdayDishonorableKills.Value);
-            if (IsBitSet(81)) data.WriteUInt16(a.LastWeekHonorableKills.Value);
-            if (IsBitSet(82)) data.WriteUInt16(a.LastWeekDishonorableKills.Value);
-            if (IsBitSet(83)) data.WriteUInt16(a.ThisWeekHonorableKills.Value);
-            if (IsBitSet(84)) data.WriteUInt16(a.ThisWeekDishonorableKills.Value);
-            if (IsBitSet(85)) data.WriteUInt32(a.ThisWeekContribution.Value);
-            if (IsBitSet(86)) data.WriteUInt32(a.LifetimeHonorableKills.Value);
-            if (IsBitSet(87)) data.WriteUInt32(a.LifetimeDishonorableKills.Value);
+            if (blocks.IsBitSet(71)) data.WriteUInt8(a.GrantableLevels.Value);
+            if (blocks.IsBitSet(72)) data.WriteUInt8(a.MultiActionBars.Value);
+            if (blocks.IsBitSet(73)) data.WriteUInt8(a.LifetimeMaxRank.Value);
+            if (blocks.IsBitSet(74)) data.WriteUInt8(a.NumRespecs.Value);
+            if (blocks.IsBitSet(75)) data.WriteInt32((int)a.AmmoID.Value);
+            if (blocks.IsBitSet(76)) data.WriteUInt32(a.PvpMedals.Value);
+            if (blocks.IsBitSet(77)) data.WriteUInt16(a.TodayHonorableKills.Value);
+            if (blocks.IsBitSet(78)) data.WriteUInt16(a.TodayDishonorableKills.Value);
+            if (blocks.IsBitSet(79)) data.WriteUInt16(a.YesterdayHonorableKills.Value);
+            if (blocks.IsBitSet(80)) data.WriteUInt16(a.YesterdayDishonorableKills.Value);
+            if (blocks.IsBitSet(81)) data.WriteUInt16(a.LastWeekHonorableKills.Value);
+            if (blocks.IsBitSet(82)) data.WriteUInt16(a.LastWeekDishonorableKills.Value);
+            if (blocks.IsBitSet(83)) data.WriteUInt16(a.ThisWeekHonorableKills.Value);
+            if (blocks.IsBitSet(84)) data.WriteUInt16(a.ThisWeekDishonorableKills.Value);
+            if (blocks.IsBitSet(85)) data.WriteUInt32(a.ThisWeekContribution.Value);
+            if (blocks.IsBitSet(86)) data.WriteUInt32(a.LifetimeHonorableKills.Value);
+            if (blocks.IsBitSet(87)) data.WriteUInt32(a.LifetimeDishonorableKills.Value);
             // 88: Field_F24 skipped
-            if (IsBitSet(89)) data.WriteUInt32(a.YesterdayContribution.Value);
-            if (IsBitSet(90)) data.WriteUInt32(a.LastWeekContribution.Value);
-            if (IsBitSet(91)) data.WriteUInt32(a.LastWeekRank.Value);
-            if (IsBitSet(92)) data.WriteInt32(a.WatchedFactionIndex.Value);
-            if (IsBitSet(93)) data.WriteInt32(a.MaxLevel.Value);
-            if (IsBitSet(94)) data.WriteInt32(a.ScalingPlayerLevelDelta.Value);
-            if (IsBitSet(95)) data.WriteInt32(a.MaxCreatureScalingLevel.Value);
-            if (IsBitSet(96)) data.WriteInt32(a.PetSpellPower.Value);
-            if (IsBitSet(97)) data.WriteFloat(a.UiHitModifier.Value);
-            if (IsBitSet(98)) data.WriteFloat(a.UiSpellHitModifier.Value);
-            if (IsBitSet(99)) data.WriteInt32(a.HomeRealmTimeOffset.Value);
-            if (IsBitSet(100)) data.WriteFloat(a.ModPetHaste.Value);
-            if (IsBitSet(101)) data.WriteUInt8(a.LocalRegenFlags.Value);
+            if (blocks.IsBitSet(89)) data.WriteUInt32(a.YesterdayContribution.Value);
+            if (blocks.IsBitSet(90)) data.WriteUInt32(a.LastWeekContribution.Value);
+            if (blocks.IsBitSet(91)) data.WriteUInt32(a.LastWeekRank.Value);
+            if (blocks.IsBitSet(92)) data.WriteInt32(a.WatchedFactionIndex.Value);
+            if (blocks.IsBitSet(93)) data.WriteInt32(a.MaxLevel.Value);
+            if (blocks.IsBitSet(94)) data.WriteInt32(a.ScalingPlayerLevelDelta.Value);
+            if (blocks.IsBitSet(95)) data.WriteInt32(a.MaxCreatureScalingLevel.Value);
+            if (blocks.IsBitSet(96)) data.WriteInt32(a.PetSpellPower.Value);
+            if (blocks.IsBitSet(97)) data.WriteFloat(a.UiHitModifier.Value);
+            if (blocks.IsBitSet(98)) data.WriteFloat(a.UiSpellHitModifier.Value);
+            if (blocks.IsBitSet(99)) data.WriteInt32(a.HomeRealmTimeOffset.Value);
+            if (blocks.IsBitSet(100)) data.WriteFloat(a.ModPetHaste.Value);
+            if (blocks.IsBitSet(101)) data.WriteUInt8(a.LocalRegenFlags.Value);
         }
 
         // ============================================================
         // WRITE SCALAR DATA — Block 102 (bits 103-123)
         // ============================================================
-        if (IsBitSet(102))
+        if (blocks.IsBitSet(102))
         {
-            if (IsBitSet(103)) data.WriteUInt8(a.AuraVision.Value);
-            if (IsBitSet(104)) data.WriteUInt8(a.NumBackpackSlots.Value);
-            if (IsBitSet(105)) data.WriteInt32(a.OverrideSpellsID.Value);
-            if (IsBitSet(106)) data.WriteInt32(a.LfgBonusFactionID.Value);
-            if (IsBitSet(107)) data.WriteUInt16((ushort)a.LootSpecID.Value);
-            if (IsBitSet(108)) data.WriteUInt32(a.OverrideZonePVPType.Value);
-            if (IsBitSet(109)) data.WriteInt32(a.Honor.Value);
-            if (IsBitSet(110)) data.WriteInt32(a.HonorNextLevel.Value);
+            if (blocks.IsBitSet(103)) data.WriteUInt8(a.AuraVision.Value);
+            if (blocks.IsBitSet(104)) data.WriteUInt8(a.NumBackpackSlots.Value);
+            if (blocks.IsBitSet(105)) data.WriteInt32(a.OverrideSpellsID.Value);
+            if (blocks.IsBitSet(106)) data.WriteInt32(a.LfgBonusFactionID.Value);
+            if (blocks.IsBitSet(107)) data.WriteUInt16((ushort)a.LootSpecID.Value);
+            if (blocks.IsBitSet(108)) data.WriteUInt32(a.OverrideZonePVPType.Value);
+            if (blocks.IsBitSet(109)) data.WriteInt32(a.Honor.Value);
+            if (blocks.IsBitSet(110)) data.WriteInt32(a.HonorNextLevel.Value);
             // 111: Field_F74 skipped
-            if (IsBitSet(112)) data.WriteInt32((int)a.PvPTierMaxFromWins.Value);
-            if (IsBitSet(113)) data.WriteInt32((int)a.PvPLastWeeksTierMaxFromWins.Value);
-            if (IsBitSet(114)) data.WriteUInt8(a.PvPRankProgress.Value);
+            if (blocks.IsBitSet(112)) data.WriteInt32((int)a.PvPTierMaxFromWins.Value);
+            if (blocks.IsBitSet(113)) data.WriteInt32((int)a.PvPLastWeeksTierMaxFromWins.Value);
+            if (blocks.IsBitSet(114)) data.WriteUInt8(a.PvPRankProgress.Value);
             // 115-119 skipped
-            if (IsBitSet(120)) data.WriteUInt8(this._gameState.GlyphsEnabled);
+            if (blocks.IsBitSet(120)) data.WriteUInt8(this._gameState.GlyphsEnabled);
             // 121-123 skipped
             data.FlushBits(); // TC343 flushes here before complex struct fields (116/117/122)
         }
@@ -2935,11 +2929,11 @@ public class ObjectUpdateBuilder
         // ============================================================
 
         // InvSlots (header 124, elements 125-265)
-        if (IsBitSet(124))
+        if (blocks.IsBitSet(124))
         {
             for (int i = 0; i < 141; i++)
             {
-                if (IsBitSet(125 + i))
+                if (blocks.IsBitSet(125 + i))
                 {
                     WowGuid128 guid = GetModernInvSlot(a, i) ?? WowGuid128.Empty;
                     data.WritePackedGuid128(guid);
@@ -2948,10 +2942,10 @@ public class ObjectUpdateBuilder
         }
 
         // TrackResourceMask (header 266, elements 267-268)
-        if (IsBitSet(266))
+        if (blocks.IsBitSet(266))
         {
             for (int i = 0; i < 2; i++)
-                if (IsBitSet(267 + i))
+                if (blocks.IsBitSet(267 + i))
                     data.WriteUInt32(a.TrackResourceMask[i].Value);
         }
 
@@ -2959,36 +2953,36 @@ public class ObjectUpdateBuilder
         // ModDamageDonePos (header 269, elements 277-283)
         // ModDamageDoneNeg (header 269, elements 284-290)
         // ModDamageDonePercent (header 269, elements 291-297)
-        if (IsBitSet(269))
+        if (blocks.IsBitSet(269))
         {
             for (int i = 0; i < 7; i++)
-                if (IsBitSet(270 + i))
+                if (blocks.IsBitSet(270 + i))
                     data.WriteFloat(a.SpellCritPercentage[i].Value);
             for (int i = 0; i < 7; i++)
-                if (IsBitSet(277 + i))
+                if (blocks.IsBitSet(277 + i))
                     data.WriteInt32(a.ModDamageDonePos[i].Value);
             for (int i = 0; i < 7; i++)
-                if (IsBitSet(284 + i))
+                if (blocks.IsBitSet(284 + i))
                     data.WriteInt32(a.ModDamageDoneNeg[i].Value);
             for (int i = 0; i < 7; i++)
-                if (IsBitSet(291 + i))
+                if (blocks.IsBitSet(291 + i))
                     data.WriteFloat(a.ModDamageDonePercent[i].Value);
         }
 
         // ExploredZones (header 298, elements 299-538)
-        if (IsBitSet(298))
+        if (blocks.IsBitSet(298))
         {
             for (int i = 0; i < 240; i++)
-                if (IsBitSet(299 + i))
+                if (blocks.IsBitSet(299 + i))
                     data.WriteUInt64(a.ExploredZones[i].Value);
         }
 
         // RestInfo (header 539, elements 540-541) — nested struct HasChangesMask<3>
-        if (IsBitSet(539))
+        if (blocks.IsBitSet(539))
         {
             for (int i = 0; i < 2; i++)
             {
-                if (IsBitSet(540 + i))
+                if (blocks.IsBitSet(540 + i))
                 {
                     var ri = a.RestInfo[i];
                     uint restMask = 0;
@@ -3005,95 +2999,95 @@ public class ObjectUpdateBuilder
 
         // WeaponDmgMultipliers (header 542, elements 543-545)
         // WeaponAtkSpeedMultipliers (header 542, elements 546-548)
-        if (IsBitSet(542))
+        if (blocks.IsBitSet(542))
         {
             for (int i = 0; i < 3; i++)
-                if (IsBitSet(543 + i))
+                if (blocks.IsBitSet(543 + i))
                     data.WriteFloat(a.WeaponDmgMultipliers[i].Value);
             for (int i = 0; i < 3; i++)
-                if (IsBitSet(546 + i))
+                if (blocks.IsBitSet(546 + i))
                     data.WriteFloat(a.WeaponAtkSpeedMultipliers[i].Value);
         }
 
         // BuybackPrice (header 549, elements 550-561)
         // BuybackTimestamp (header 549, elements 562-573)
-        if (IsBitSet(549))
+        if (blocks.IsBitSet(549))
         {
             for (int i = 0; i < 12; i++)
-                if (IsBitSet(550 + i))
+                if (blocks.IsBitSet(550 + i))
                     data.WriteUInt32(a.BuybackPrice[i].Value);
             for (int i = 0; i < 12; i++)
-                if (IsBitSet(562 + i))
+                if (blocks.IsBitSet(562 + i))
                     data.WriteInt64((long)a.BuybackTimestamp[i].Value);
         }
 
         // CombatRatings (header 574, elements 575-606)
-        if (IsBitSet(574))
+        if (blocks.IsBitSet(574))
         {
             for (int i = 0; i < 32; i++)
-                if (IsBitSet(575 + i))
+                if (blocks.IsBitSet(575 + i))
                     data.WriteInt32(a.CombatRatings[i].Value);
         }
 
         // NoReagentCostMask (header 615, elements 616-619)
-        if (IsBitSet(615))
+        if (blocks.IsBitSet(615))
         {
             for (int i = 0; i < 4; i++)
-                if (IsBitSet(616 + i))
+                if (blocks.IsBitSet(616 + i))
                     data.WriteUInt32(a.NoReagentCostMask[i].Value);
         }
 
         // ProfessionSkillLine (header 620, elements 621-622)
-        if (IsBitSet(620))
+        if (blocks.IsBitSet(620))
         {
             for (int i = 0; i < 2; i++)
-                if (IsBitSet(621 + i))
+                if (blocks.IsBitSet(621 + i))
                     data.WriteInt32(a.ProfessionSkillLine[i].Value);
         }
 
         // BagSlotFlags (header 623, elements 624-627)
-        if (IsBitSet(623))
+        if (blocks.IsBitSet(623))
         {
             for (int i = 0; i < 4; i++)
-                if (IsBitSet(624 + i))
+                if (blocks.IsBitSet(624 + i))
                     data.WriteUInt32(a.BagSlotFlags[i].Value);
         }
 
         // BankBagSlotFlags (header 628, elements 629-635)
-        if (IsBitSet(628))
+        if (blocks.IsBitSet(628))
         {
             for (int i = 0; i < 7; i++)
-                if (IsBitSet(629 + i))
+                if (blocks.IsBitSet(629 + i))
                     data.WriteUInt32(a.BankBagSlotFlags[i].Value);
         }
 
         // QuestCompleted (header 636, elements 637-1511)
-        if (IsBitSet(636))
+        if (blocks.IsBitSet(636))
         {
             for (int i = 0; i < 875; i++)
-                if (IsBitSet(637 + i))
+                if (blocks.IsBitSet(637 + i))
                     data.WriteUInt64(a.QuestCompleted[i].Value);
         }
 
         // GlyphSlots (header 1512, elements 1513-1518) + Glyphs (elements 1519-1524)
         // Slot IDs sourced from _gameState.ActiveGlyphSlotIds (populated from legacy
         // PLAYER_FIELD_GLYPH_SLOTS_1..6). Was hardcoded {21..26}.
-        if (IsBitSet(1512))
+        if (blocks.IsBitSet(1512))
         {
             for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
-                if (IsBitSet(1513 + i))
+                if (blocks.IsBitSet(1513 + i))
                     data.WriteUInt32(_gameState.ActiveGlyphSlotIds[i]);
             for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
-                if (IsBitSet(1519 + i))
+                if (blocks.IsBitSet(1519 + i))
                     data.WriteUInt32((uint)(this._gameState.ActiveGlyphs[i]));
         }
 
         // PvpInfo (header 607, elements 608-614) — nested struct HasChangesMask<19>
-        if (IsBitSet(607))
+        if (blocks.IsBitSet(607))
         {
             for (int i = 0; i < 7; i++)
             {
-                if (IsBitSet(608 + i))
+                if (blocks.IsBitSet(608 + i))
                 {
                     PVPInfo pi = (a.PvpInfo != null && i < a.PvpInfo.Length) ? a.PvpInfo[i] : null;
                     // Build 19-bit changesMask for this PvpInfo entry
@@ -3170,28 +3164,27 @@ public class ObjectUpdateBuilder
         //  22: DEBUGItemLevel
         //  23: group bit for SpellCharges[5] (bits 24-28)
         //  29: group bit for Enchantment[13] (bits 30-42)
-        uint[] blocks = new uint[2];
-        void SetBit(int bit) { blocks[bit / 32] |= (1u << (bit % 32)); }
-
-        if (item.Owner != null) { SetBit(0); SetBit(3); }
-        if (item.ContainedIn != null) { SetBit(0); SetBit(4); }
-        if (item.Creator != null) { SetBit(0); SetBit(5); }
-        if (item.GiftCreator != null) { SetBit(0); SetBit(6); }
-        if (item.StackCount.HasValue) { SetBit(0); SetBit(7); }
-        if (item.Duration.HasValue) { SetBit(0); SetBit(8); }
-        if (item.Flags.HasValue) { SetBit(0); SetBit(9); }
-        if (item.PropertySeed.HasValue) { SetBit(0); SetBit(10); }
-        if (item.RandomProperty.HasValue) { SetBit(0); SetBit(11); }
-        if (item.Durability.HasValue) { SetBit(0); SetBit(12); }
-        if (item.MaxDurability.HasValue) { SetBit(0); SetBit(13); }
-        if (item.CreatePlayedTime.HasValue) { SetBit(0); SetBit(14); }
-        if (item.Context.HasValue) { SetBit(0); SetBit(15); }
-        if (item.ArtifactXP.HasValue) { SetBit(0); SetBit(17); }
-        if (item.ItemAppearanceModID.HasValue) { SetBit(0); SetBit(18); }
+        Span<uint> blocksBuf = stackalloc uint[2];
+        var blocks = new StackBitMask(blocksBuf);
+        if (item.Owner != null) { blocks.SetBit(0); blocks.SetBit(3); }
+        if (item.ContainedIn != null) { blocks.SetBit(0); blocks.SetBit(4); }
+        if (item.Creator != null) { blocks.SetBit(0); blocks.SetBit(5); }
+        if (item.GiftCreator != null) { blocks.SetBit(0); blocks.SetBit(6); }
+        if (item.StackCount.HasValue) { blocks.SetBit(0); blocks.SetBit(7); }
+        if (item.Duration.HasValue) { blocks.SetBit(0); blocks.SetBit(8); }
+        if (item.Flags.HasValue) { blocks.SetBit(0); blocks.SetBit(9); }
+        if (item.PropertySeed.HasValue) { blocks.SetBit(0); blocks.SetBit(10); }
+        if (item.RandomProperty.HasValue) { blocks.SetBit(0); blocks.SetBit(11); }
+        if (item.Durability.HasValue) { blocks.SetBit(0); blocks.SetBit(12); }
+        if (item.MaxDurability.HasValue) { blocks.SetBit(0); blocks.SetBit(13); }
+        if (item.CreatePlayedTime.HasValue) { blocks.SetBit(0); blocks.SetBit(14); }
+        if (item.Context.HasValue) { blocks.SetBit(0); blocks.SetBit(15); }
+        if (item.ArtifactXP.HasValue) { blocks.SetBit(0); blocks.SetBit(17); }
+        if (item.ItemAppearanceModID.HasValue) { blocks.SetBit(0); blocks.SetBit(18); }
         for (int i = 0; i < 5; i++)
-            if (item.SpellCharges[i].HasValue) { SetBit(23); SetBit(24 + i); }
+            if (item.SpellCharges[i].HasValue) { blocks.SetBit(23); blocks.SetBit(24 + i); }
         for (int i = 0; i < 13; i++)
-            if (item.Enchantment[i] != null) { SetBit(29); SetBit(30 + i); }
+            if (item.Enchantment[i] != null) { blocks.SetBit(29); blocks.SetBit(30 + i); }
 
         // Write blocksMask (2 bits) then each set block (32 bits)
         byte blocksMask = 0;
@@ -3271,12 +3264,11 @@ public class ObjectUpdateBuilder
         // bit 1: NumSlots
         // bit 2: group bit for Slots[36]
         // bits 3..38: Slots[0..35] individual change bits
-        uint[] blocks = new uint[2];
-        void SetBit(int bit) { blocks[bit / 32] |= (1u << (bit % 32)); }
-
-        if (container.NumSlots.HasValue) { SetBit(0); SetBit(1); }
+        Span<uint> blocksBuf = stackalloc uint[2];
+        var blocks = new StackBitMask(blocksBuf);
+        if (container.NumSlots.HasValue) { blocks.SetBit(0); blocks.SetBit(1); }
         for (int i = 0; i < 36; i++)
-            if (container.Slots[i].HasValue) { SetBit(2); SetBit(3 + i); }
+            if (container.Slots[i].HasValue) { blocks.SetBit(2); blocks.SetBit(3 + i); }
 
         byte blocksMask = 0;
         if (blocks[0] != 0) blocksMask |= 1;
@@ -3302,53 +3294,51 @@ public class ObjectUpdateBuilder
     {
         GameObjectData go = _updateData.GameObjectData ?? new GameObjectData();
 
-        uint mask = 0;
-        void SetBit(int bit) { mask |= (1u << bit); }
-        bool IsBitSet(int bit) { return (mask & (1u << bit)) != 0; }
-
+        Span<uint> maskBuf = stackalloc uint[1];
+        var mask = new StackBitMask(maskBuf);
         // Set bits for changed fields
-        if (go.DisplayID.HasValue) { SetBit(0); SetBit(4); }
-        if (go.SpellVisualID.HasValue) { SetBit(0); SetBit(5); }
-        if (go.StateSpellVisualID.HasValue) { SetBit(0); SetBit(6); }
-        if (go.StateAnimID.HasValue) { SetBit(0); SetBit(7); }
-        if (go.StateAnimKitID.HasValue) { SetBit(0); SetBit(8); }
-        if (go.CreatedBy != null) { SetBit(0); SetBit(9); }
-        if (go.GuildGUID != null) { SetBit(0); SetBit(10); }
-        if (go.Flags.HasValue) { SetBit(0); SetBit(11); }
+        if (go.DisplayID.HasValue) { mask.SetBit(0); mask.SetBit(4); }
+        if (go.SpellVisualID.HasValue) { mask.SetBit(0); mask.SetBit(5); }
+        if (go.StateSpellVisualID.HasValue) { mask.SetBit(0); mask.SetBit(6); }
+        if (go.StateAnimID.HasValue) { mask.SetBit(0); mask.SetBit(7); }
+        if (go.StateAnimKitID.HasValue) { mask.SetBit(0); mask.SetBit(8); }
+        if (go.CreatedBy != null) { mask.SetBit(0); mask.SetBit(9); }
+        if (go.GuildGUID != null) { mask.SetBit(0); mask.SetBit(10); }
+        if (go.Flags.HasValue) { mask.SetBit(0); mask.SetBit(11); }
         bool hasRotation = false;
         if (go.ParentRotation != null)
             for (int i = 0; i < 4; i++)
                 if (go.ParentRotation[i].HasValue) hasRotation = true;
-        if (hasRotation) { SetBit(0); SetBit(12); }
-        if (go.FactionTemplate.HasValue) { SetBit(0); SetBit(13); }
-        if (go.Level.HasValue) { SetBit(0); SetBit(14); }
-        if (go.State.HasValue) { SetBit(0); SetBit(15); }
-        if (go.TypeID.HasValue) { SetBit(0); SetBit(16); }
-        if (go.PercentHealth.HasValue) { SetBit(0); SetBit(17); }
-        if (go.ArtKit.HasValue) { SetBit(0); SetBit(18); }
-        if (go.CustomParam.HasValue) { SetBit(0); SetBit(19); }
+        if (hasRotation) { mask.SetBit(0); mask.SetBit(12); }
+        if (go.FactionTemplate.HasValue) { mask.SetBit(0); mask.SetBit(13); }
+        if (go.Level.HasValue) { mask.SetBit(0); mask.SetBit(14); }
+        if (go.State.HasValue) { mask.SetBit(0); mask.SetBit(15); }
+        if (go.TypeID.HasValue) { mask.SetBit(0); mask.SetBit(16); }
+        if (go.PercentHealth.HasValue) { mask.SetBit(0); mask.SetBit(17); }
+        if (go.ArtKit.HasValue) { mask.SetBit(0); mask.SetBit(18); }
+        if (go.CustomParam.HasValue) { mask.SetBit(0); mask.SetBit(19); }
 
-        if (mask != 0)
+        if (mask[0] != 0)
         {
             var fields = new System.Collections.Generic.List<string>(8);
-            if (IsBitSet(4)) fields.Add($"DisplayID={go.DisplayID.Value}");
-            if (IsBitSet(5)) fields.Add($"SpellVisualID={go.SpellVisualID.Value}");
-            if (IsBitSet(6)) fields.Add($"StateSpellVisualID={go.StateSpellVisualID.Value}");
-            if (IsBitSet(7)) fields.Add($"StateAnimID={go.StateAnimID.Value}");
-            if (IsBitSet(8)) fields.Add($"StateAnimKitID={go.StateAnimKitID.Value}");
-            if (IsBitSet(9)) fields.Add($"CreatedBy={go.CreatedBy.Value}");
-            if (IsBitSet(10)) fields.Add($"GuildGUID={go.GuildGUID.Value}");
-            if (IsBitSet(11)) fields.Add($"Flags=0x{go.Flags.Value:X8}");
-            if (IsBitSet(12)) fields.Add($"ParentRotation=({go.ParentRotation[0] ?? 0f},{go.ParentRotation[1] ?? 0f},{go.ParentRotation[2] ?? 0f},{go.ParentRotation[3] ?? 1f})");
-            if (IsBitSet(13)) fields.Add($"FactionTemplate={go.FactionTemplate.Value}");
-            if (IsBitSet(14)) fields.Add($"Level={go.Level.Value}");
-            if (IsBitSet(15)) fields.Add($"State={go.State.Value}");
-            if (IsBitSet(16)) fields.Add($"TypeID={go.TypeID.Value}");
-            if (IsBitSet(17)) fields.Add($"PercentHealth={go.PercentHealth.Value}");
-            if (IsBitSet(18)) fields.Add($"ArtKit={go.ArtKit.Value}");
-            if (IsBitSet(19)) fields.Add($"CustomParam={go.CustomParam.Value}");
+            if (mask.IsBitSet(4)) fields.Add($"DisplayID={go.DisplayID.Value}");
+            if (mask.IsBitSet(5)) fields.Add($"SpellVisualID={go.SpellVisualID.Value}");
+            if (mask.IsBitSet(6)) fields.Add($"StateSpellVisualID={go.StateSpellVisualID.Value}");
+            if (mask.IsBitSet(7)) fields.Add($"StateAnimID={go.StateAnimID.Value}");
+            if (mask.IsBitSet(8)) fields.Add($"StateAnimKitID={go.StateAnimKitID.Value}");
+            if (mask.IsBitSet(9)) fields.Add($"CreatedBy={go.CreatedBy.Value}");
+            if (mask.IsBitSet(10)) fields.Add($"GuildGUID={go.GuildGUID.Value}");
+            if (mask.IsBitSet(11)) fields.Add($"Flags=0x{go.Flags.Value:X8}");
+            if (mask.IsBitSet(12)) fields.Add($"ParentRotation=({go.ParentRotation[0] ?? 0f},{go.ParentRotation[1] ?? 0f},{go.ParentRotation[2] ?? 0f},{go.ParentRotation[3] ?? 1f})");
+            if (mask.IsBitSet(13)) fields.Add($"FactionTemplate={go.FactionTemplate.Value}");
+            if (mask.IsBitSet(14)) fields.Add($"Level={go.Level.Value}");
+            if (mask.IsBitSet(15)) fields.Add($"State={go.State.Value}");
+            if (mask.IsBitSet(16)) fields.Add($"TypeID={go.TypeID.Value}");
+            if (mask.IsBitSet(17)) fields.Add($"PercentHealth={go.PercentHealth.Value}");
+            if (mask.IsBitSet(18)) fields.Add($"ArtKit={go.ArtKit.Value}");
+            if (mask.IsBitSet(19)) fields.Add($"CustomParam={go.CustomParam.Value}");
             Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
-                $"[GO write] guid={_updateData.Guid} mask=0x{mask:X8} fields={{ {string.Join(", ", fields)} }}");
+                $"[GO write] guid={_updateData.Guid} mask=0x{mask[0]:X8} fields={{ {string.Join(", ", fields)} }}");
         }
 
         // V3_4_3 GameObjectData wire format is a flat 20-bit changesMask — no 1-bit
@@ -3359,7 +3349,7 @@ public class ObjectUpdateBuilder
         // GuildGUID/Level/State at bogus offsets, and disconnected with reason=7
         // immediately after the SMSG_UPDATE_OBJECT (signature: chained-initiate
         // unlock cast → cage GO Values update → DC).
-        data.WriteBits(mask, 20);
+        data.WriteBits(mask[0], 20);
 
         // Boundary 1 — TC UpdateFields.cpp:4936. Aligns after the optional bit-1
         // StateWorldEffectIDs sub-section (size + entries). We don't translate
@@ -3376,30 +3366,30 @@ public class ObjectUpdateBuilder
         // BEFORE the field-value block.
 
         // Write field values in TC343 order (bits 4-19)
-        if (IsBitSet(0))
+        if (mask.IsBitSet(0))
         {
-            if (IsBitSet(4)) data.WriteInt32(go.DisplayID.Value);
-            if (IsBitSet(5)) data.WriteUInt32(go.SpellVisualID.Value);
-            if (IsBitSet(6)) data.WriteUInt32(go.StateSpellVisualID.Value);
-            if (IsBitSet(7)) data.WriteUInt32(go.StateAnimID.Value);
-            if (IsBitSet(8)) data.WriteUInt32(go.StateAnimKitID.Value);
-            if (IsBitSet(9)) data.WritePackedGuid128(go.CreatedBy.Value);
-            if (IsBitSet(10)) data.WritePackedGuid128(go.GuildGUID.Value);
-            if (IsBitSet(11)) data.WriteUInt32(go.Flags.Value);
-            if (IsBitSet(12))
+            if (mask.IsBitSet(4)) data.WriteInt32(go.DisplayID.Value);
+            if (mask.IsBitSet(5)) data.WriteUInt32(go.SpellVisualID.Value);
+            if (mask.IsBitSet(6)) data.WriteUInt32(go.StateSpellVisualID.Value);
+            if (mask.IsBitSet(7)) data.WriteUInt32(go.StateAnimID.Value);
+            if (mask.IsBitSet(8)) data.WriteUInt32(go.StateAnimKitID.Value);
+            if (mask.IsBitSet(9)) data.WritePackedGuid128(go.CreatedBy.Value);
+            if (mask.IsBitSet(10)) data.WritePackedGuid128(go.GuildGUID.Value);
+            if (mask.IsBitSet(11)) data.WriteUInt32(go.Flags.Value);
+            if (mask.IsBitSet(12))
             {
                 data.WriteFloat(go.ParentRotation[0] ?? 0f);
                 data.WriteFloat(go.ParentRotation[1] ?? 0f);
                 data.WriteFloat(go.ParentRotation[2] ?? 0f);
                 data.WriteFloat(go.ParentRotation[3] ?? 1f);
             }
-            if (IsBitSet(13)) data.WriteInt32(go.FactionTemplate.Value);
-            if (IsBitSet(14)) data.WriteInt32(go.Level.Value);
-            if (IsBitSet(15)) data.WriteInt8(go.State.Value);
-            if (IsBitSet(16)) data.WriteInt8(go.TypeID.Value);
-            if (IsBitSet(17)) data.WriteUInt8(go.PercentHealth.Value);
-            if (IsBitSet(18)) data.WriteUInt32(go.ArtKit.Value);
-            if (IsBitSet(19)) data.WriteUInt32(go.CustomParam.Value);
+            if (mask.IsBitSet(13)) data.WriteInt32(go.FactionTemplate.Value);
+            if (mask.IsBitSet(14)) data.WriteInt32(go.Level.Value);
+            if (mask.IsBitSet(15)) data.WriteInt8(go.State.Value);
+            if (mask.IsBitSet(16)) data.WriteInt8(go.TypeID.Value);
+            if (mask.IsBitSet(17)) data.WriteUInt8(go.PercentHealth.Value);
+            if (mask.IsBitSet(18)) data.WriteUInt32(go.ArtKit.Value);
+            if (mask.IsBitSet(19)) data.WriteUInt32(go.CustomParam.Value);
         }
     }
 
