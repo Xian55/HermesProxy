@@ -10,7 +10,7 @@ There are 4 major components to the application:
 
 ## Supported Versions
 
-HermesProxy translates between modern WoW Classic clients and legacy private server emulators.
+HermesProxy translates between modern WoW Classic clients and legacy private server emulators. **WotLK Classic (3.4.x → 3.3.5a) support is experimental** — see [wotlk.md](wotlk.md) for the current status and known limitations.
 
 ### Modern Client Versions (What You Play With)
 
@@ -23,6 +23,7 @@ These are the Blizzard WoW Classic client versions you can use:
 | 1.14.2  | Classic Era    | 41858 - 42597     |                          |
 | 2.5.2   | TBC Classic    | 39570 - 41510     |                          |
 | 2.5.3   | TBC Classic    | 41402 - 42598     |                          |
+| 3.4.3   | WotLK Classic  | 51505 - 54261     | Experimental — see [wotlk.md](wotlk.md) |
 
 ### Legacy Server Versions (What Emulators Run)
 
@@ -34,6 +35,7 @@ These are the private server versions HermesProxy can connect to:
 | 1.12.2  | Vanilla   | 6005  | CMaNGOS, VMaNGOS, etc.   |
 | 1.12.3  | Vanilla   | 6141  | CMaNGOS, VMaNGOS, etc.   |
 | 2.4.3   | TBC       | 8606  | CMaNGOS, etc.            |
+| 3.3.5a  | WotLK     | 12340 | [TrinityCore](https://www.ownedcore.com/forums/world-of-warcraft/world-of-warcraft-emulator-servers/wow-emu-general-releases/966706-repack-trinitycore-npcbots-eluna-extras-335a-solo-lan-2022-a.html), AzerothCore, CMaNGOS |
 
 ### Version Mapping
 
@@ -43,6 +45,7 @@ The proxy automatically selects the best legacy version based on your client:
 |---------------|----------------|
 | 1.14.x        | 1.12.x (Vanilla) |
 | 2.5.x         | 2.4.3 (TBC)    |
+| 3.4.x         | 3.3.5a (WotLK) |
 
 ## Download HermesProxy
 
@@ -55,6 +58,7 @@ Stable Downloads: [Releases](https://github.com/Xian55/HermesProxy/releases)
 - Download [Arctium Launcher](https://arctium.io/wow/) into the main game folder
    - Vanilla `--staticseed --version=ClassicEra`
    - TBC `--staticseed --version=Classic`
+   - WotLK `--staticseed --version=Classic` (Arctium reuses the same flag as TBC)
 - Start the proxy app and login through the game with your usual credentials.
 
 ## Ingame Settings
@@ -131,7 +135,7 @@ Primary config is `appsettings.json` (loaded from the working directory, require
 
 | Key                | Default                            | Description                                                                                |
 |--------------------|------------------------------------|--------------------------------------------------------------------------------------------|
-| `ClientBuild`      | `V2_5_2_40892`                     | `ClientVersionBuild` enum value: `V1_14_0_40618`, `V1_14_1_41794`, `V1_14_2_42597`, `V2_5_2_40892`, `V2_5_3_42328`. |
+| `ClientBuild`      | `V2_5_2_40892`                     | `ClientVersionBuild` enum value: `V1_14_0_40618`, `V1_14_1_41794`, `V1_14_2_42597`, `V2_5_2_40892`, `V2_5_3_42328`, `V3_4_3_54261` (experimental). |
 | `SeedHex`          | `179D3DC3235629D07113A9B3867F97A7` | 32-character hex string (16 bytes).                                                        |
 | `ReportedOS`       | `OSX`                              | OS identifier sent to the legacy server (`OSX`, `Win`, etc.).                              |
 | `ReportedPlatform` | `x86`                              | Platform identifier sent to legacy server (`x86`, `x64`).                                  |
@@ -140,7 +144,7 @@ Primary config is `appsettings.json` (loaded from the working directory, require
 
 | Key       | Default     | Description                                                                                       |
 |-----------|-------------|---------------------------------------------------------------------------------------------------|
-| `Build`   | `auto`      | Legacy server build to target. `auto`, `V1_12_1_5875`, `V2_4_3_8606`.                             |
+| `Build`   | `auto`      | Legacy server build to target. `auto`, `V1_12_1_5875`, `V2_4_3_8606`, `V3_3_5a_12340`.            |
 | `Address` | `127.0.0.1` | Address of the legacy realmd (what you'd use in `SET REALMLIST`).                                 |
 | `Port`    | `3724`      | Port of the legacy authentication server.                                                         |
 
@@ -236,3 +240,13 @@ Current coverage: **84.7%** (272 / 321 server packets converted). See [docs/ispa
 ## Acknowledgements
 
 Parts of this project's code are based on [CypherCore](https://github.com/CypherCore/CypherCore) and [BotFarm](https://github.com/jackpoz/BotFarm). I would like to extend my sincere thanks to these projects, as the creation of this app might have never happened without them. And I would also like to expressly thank [Modox](https://github.com/mdx7) for all his work on reverse engineering the classic clients and all the help he has personally given me.
+
+[WowPacketParser](https://github.com/TrinityCore/WowPacketParser) is the protocol source of truth used throughout development — every field layout, opcode definition, and version-gated change in this proxy was verified against WPP's per-build handlers before being implemented.
+
+### WotLK Classic References
+
+The 3.4.3 → 3.3.5a port leans heavily on the following projects:
+
+- [HermesProxy-WOTLK](https://github.com/advocaite/HermesProxy-WOTLK) — upstream WotLK Classic fork; reference for V3_4_3 field descriptors and packet layouts.
+- [lineagedr/3.4.3_Source](https://github.com/lineagedr/3.4.3_Source/) — native 3.4.3 server source, used as a behavioral oracle for V3_4_3 protocol semantics.
+- [RioMcBoo/CypherCoreClassicWOTLK](https://github.com/RioMcBoo/CypherCoreClassicWOTLK) — CypherCore branch targeting 3.4.3, used as a secondary oracle for server-side packet shapes.
