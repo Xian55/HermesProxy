@@ -2,6 +2,8 @@
 
 The **WotLK Classic retail client (build 3.4.3.54261)** connects through HermesProxy to a legacy **WotLK 3.3.5a server emulator** (TrinityCore / CMaNGOS / AzerothCore). Auth, character-select, world-enter, and most gameplay work end-to-end on both backends. Support is still **experimental** — see "Open issues" below for the current rough edges. End-user setup is in the README *"WotLK Classic Quick Start"* section; this document is the dev-facing status + TODO doc.
 
+A **native V3_4_3.23121 server** (Wrathion, TrinityCore-derived) is also available locally for ground-truth packet captures — see ["Reference packet captures"](#reference-packet-captures-v3_4_3-ground-truth-sniff-sources) below. The native server bypasses HermesProxy entirely (client and server both speak V3_4_3, no translation), so it is **not** a proxy backend — it is a wire-format oracle.
+
 ---
 
 ## Backend strategy
@@ -16,6 +18,30 @@ Both backends are supported. `test-loop2.ps1` (the primary in-game smoke harness
 **TC is the primary dev oracle**: the third-party fork at `X:\Programming\HermesProxy-WOTLK` (origin `github.com/advocaite/HermesProxy-WOTLK`) is built and tested against TrinityCore. Cherry-picking V3_4_3-specific fixes from that fork is a known-good baseline for wire-format work.
 
 **cMangos** also works for world-enter and most gameplay as of 2026-05-03. It has a small set of opcode-level translation gaps that TC doesn't exhibit (vendor sell, item use, special-ability targeting, quest-log refresh, raid kick) — see "Open issues". These are isolated translation bugs, not a fundamental backend block.
+
+### Native V3_4_3 reference server (Wrathion, build 23121)
+
+`Wrathion` ([`github.com/Xian55/3.4.3_Source`](https://github.com/Xian55/3.4.3_Source)) is a TrinityCore-derived 3.4.3 server speaking the V3_4_3.54261 client protocol **natively**. It is **not** a HermesProxy backend — HermesProxy translates *modern client ↔ 3.3.5a legacy server*, and Wrathion bypasses the proxy entirely (client speaks V3_4_3 → server speaks V3_4_3, no translation needed).
+
+| Path | Role |
+|---|---|
+| `X:\Programming\refs\3.4.3_Source\` | Sources — 23 distributed `CLAUDE.md` files form a curated lookup trail. See ["Reference repos"](#reference-repos) below. |
+| `X:\Programming\refs\3.4.3_Build\bin\Release\` | Compiled `bnetserver.exe` + `worldserver.exe` (build 23121). `bnetserver.conf` + `worldserver.conf` live here. |
+| `X:\Programming\refs\3.4.3_Database\Databases\` | 4 SQL dumps (~315 MB): auth, characters, world, hotfixes. |
+| `F:\Game\World of Warcraft (3.4.3.54261)\_classic_\Wrath - 343.lnk` | Arctium WoW Launcher with `-config=343-Config.wtf` → connects client direct to Wrathion. |
+
+Wrathion's listen ports (from its `*.conf` files): BNet `1119`, REST `8081`, WorldServer `8085`, InstanceServer `8086`. These **collide** with HermesProxy's default ports (1119/8081/8084/8086) — they cannot run simultaneously on the same box without remapping.
+
+**Use cases**:
+- Canonical V3_4_3 wire captures for diffing HermesProxy's translated output against ground truth.
+- Reading source for correct packet shapes when WPP and CypherCore disagree.
+- Tiebreaker when fork-diff against `HermesProxy-WOTLK` doesn't settle a wire-format question.
+
+**Test-loop entry point**: `./test-loop2.ps1 -LocalTc343` (skips proxy lifecycle, launches client via `Wrath - 343.lnk` direct to Wrathion). Wrathion's `bnetserver.exe` + `worldserver.exe` must already be running.
+
+### NPCBot-augmented backends
+
+TrinityCore 3.3.5a builds running the [`trickerer/Trinity-Bots`](https://github.com/trickerer/Trinity-Bots) NPCBot patch are supported as of 2026-05-17. Hired companions render textured (player-race model), accept group membership, follow + mount alongside the player, and show HP / mana / level / zone / position deltas in the modern raid frames. Two compatibility patches sit in the V3_4_3 emit path (CLONED flag + Race/Class/Sex stripped for bot creatures — `3d93478`) and one in the legacy reader (bounds-checked `SMSG_PARTY_MEMBER_STATS` parser tolerates NPCBot's mask-truncation wire bug — `5f789d3`). Verified against TC + `trickerer/Trinity-Bots@9a7d2921`. AzerothCore + `mod-playerbots` likely benefits from the same patches (same enum and similar wire layout) but is unverified.
 
 ### Fork copy-cat policy
 
@@ -95,6 +121,7 @@ These shipped before any WotLK-specific work; every entry below assumes them.
 | Vehicles — mount + dismount + seat-change + action button | ✅ | ❓ | 2026-05-10 — three-part fix for *Grand Theft Palomino* (quest 12680) on TC: Leave Vehicle button (`d0dd989` rewrites `CMSG_MOVE_DISMISS_VEHICLE` → `CMSG_REQUEST_VEHICLE_EXIT`), missing PREV/NEXT/EXIT seat opcodes (`d0dd989`), and vehicle action-button slot translation (`02e9e51` — TC packs `slot_index_in_UI` in the high byte, not a CharmInfo state). cMangos untested |
 | Trajectory casts (cannons / arc projectiles) | ✅ | ❓ | 2026-05-10 — `3931123` writes the 9-byte trailer (elevation + speed + has-movement-data) when `cast_flags & 0x02` set; verified on TC with Scarlet Cannon (spell 52435). Without it the legacy 3.3.5 `HandleClientCastFlags` silently dropped the cast. cMangos untested |
 | Active-mover handover (vehicle / charm / Eye of Acherus) | ✅ | ❓ | 2026-05-10 — `95aacb6` synthesises `SMSG_MOVE_SET_ACTIVE_MOVER` alongside `SMSG_CONTROL_UPDATE`; without it, mid-session control transfers (Eye of Acherus possess, vehicles, charm) left WASD swallowed on TC. cMangos untested |
+| Flightmaster — discover node + open Taxi window + fly route | ✅ | ❓ | 2026-05-16 — `SMSG_SHOW_TAXI_NODES` V3_4_3 wire-format fix. Talking to a flightmaster (via gossip or NPCs that only offer taxi) opens the Taxi window with all previously discovered nodes; clicking a node activates the flight on TC end-to-end. Pre-fix the window was blank — proxy was writing `count = byte_length` after `CleanupNodes` trim, but the V3_4_3 client expects `count = byte_length / 8` (uint64 blocks) followed by a fixed multiple-of-8 byte payload (56 bytes for V3_4_3's baked TaxiNodes.db2). Trimmed payload caused the client to read garbage from the next packet as taxi-mask bits. Version-gated on `ModernVersion.Build == V3_4_3_54261`; V1_14/V2_5 keep prior behaviour. cMangos retest pending |
 | Zeppelins / elevators (MOTransport) | ❓ | ❓ | untested; filter still in place |
 | Auras / aura ticks | ✅ | ✅ | live ticks animate |
 | Spellbook (incl. trainer learning) | ✅ | ✅ | |
@@ -112,7 +139,7 @@ These shipped before any WotLK-specific work; every entry below assumes them.
 | Chat (`/say`, `/emote`) | ✅ | ✅ | |
 | Party / raid (form, convert) | ✅ | ✅ | bits-first wire format |
 | Party chat / raid chat / raid warning | ✅ | ✅ | |
-| Raid promote-to-assistant | ❓ | ❌ | **HermesProxy crashes** — `CMSG_SET_ASSISTANT_LEADER` parse bug; likely TC too |
+| Raid promote-to-assistant (single + "Everyone is assistant") | ✅ | ❓ | 2026-05-16 — V3_4_3 bits-first parse fix for `SetAssistantLeader` + `SetEveryoneIsAssistant` (`82c8f83`); verified on TC, cMangos retest pending |
 | Raid kick (single member) | ❓ | ❌ | cMangos: disbands whole raid; party uninvite is fine |
 | Trade (between players) | ✅ | ✅ | |
 | Char-list — auto-select newly created character | ✅ | ❓ | `a515bd0` — character pre-selected in char-list after create; QoL |
@@ -146,6 +173,15 @@ These shipped before any WotLK-specific work; every entry below assumes them.
 | 2026-05-10 | Diagnostic surface — `[ActionBarTrace] reason=7` ring buffer in `WorldSocket` expanded from 40 → 512 entries with a 48-byte hex preview per entry. Captures ~4 sec of pre-disconnect history (vs ~0.3 sec before) and surfaces enough of each packet body to byte-diff against expected wire shapes when investigating sudden-event triggers. The hex preview is what pinned the multi-CreateObject OOM trigger above. | feature branch |
 | **2026-05-10 — milestone** | **Death Knight starter chain completed end-to-end on TC.** Whole Acherus → Scarlet Enclave arc playable from class-create through hand-in of the final Light's Hope quest, including the two scripted-event quests that drove most of this session's work (12779 *An End to All Things* — Frostbrood Vanquisher dragon vehicle; 12800 *The Lich King's Command* — Light's Hope mass-mob battle). | feature branch |
 | 2026-05-13 | V3_4_3 loot translation — multi-item drain + coin loss on TC 3.3.5 master. Five layered fixes: (a) mid-drain `SMSG_LOOT_RELEASE` suppression + single closing synth on full drain (TC emits one release per item, V3_4_3 client treats each as "close" and ignores the rest); (b) per-corpse `RemainingLootSlots` list + legacy-slot translation, since TC's auto-loot echoes the *clicked* slot byte in every `SMSG_LOOT_REMOVED` instead of the real one — modern client otherwise erased one icon twice and left the other on screen; (c) outbound `SMSG_LOOT_RELEASE.Owner` rewritten to `state.CurrentPlayerGuid` (V3_4_3 server convention; legacy corpse GUID was silently rejected); (d) coin-path close synth moved from `HandleLootCelarMoney` to `HandleLootMoneyNotify` so the wire order is `COIN_REMOVED → MONEY_NOTIFY → RELEASE` as the modern client expects; (e) pre-claim coins via injected `CMSG_LOOT_MONEY` before forwarding `CMSG_AUTOSTORE_LOOT_ITEM`, and suppress the client's redundant follow-up, to dodge TC's session-close-on-item race that orphaned coins (relog confirmed the gold was permanently lost before this fix). cMangos retest pending. | feature branch |
+| 2026-05-11 | V3_3_5a `ITEM_FIELD_ENCHANTMENT` array-base alias — only per-slot names (`ITEM_FIELD_ENCHANTMENT_1_1 … _12_3`) were declared; `LegacyVersion.GetUpdateField("ITEM_FIELD_ENCHANTMENT")` returned -1 and the entire 36-uint enchantment array was silently dropped from translation. Audit other arrays for the same shape. | `f7635bb` |
+| 2026-05-11 | V3_4_3 glyph slot IDs forwarded — `ObjectUpdateBuilder` was emitting hardcoded `GlyphSlots[] = {21..26}` for every player in both Create and Values paths instead of forwarding the real per-class `GlyphSlot.dbc` record IDs the legacy server pushes via `Player::InitGlyphsForLevel` in `PLAYER_FIELD_GLYPH_SLOTS_1..6`. When the legacy server's slot-ID order differed, dropping a glyph on a visibly-empty Major slot routed to the wrong array index. `GameSessionData.ActiveGlyphSlotIds[6]` now reads those legacy fields; default `{21..26}` keeps untouched sessions byte-identical. Also introduced `PlayerConst.MaxGlyphSlots = 6` to replace magic `6` literals. | `14e743a` + `ffa3fd4` |
+| 2026-05-15 | V3_4_3 `CreateObject` `MovementSpline` `FacingTarget` extra-float — wire layout for `SplineTypeModern.FacingTarget` is just a `PackedGuid128`, **no** leading `FinalOrientation` float. The stray `WriteFloat` shifted `SplinePoints` / `PauseTimesCount` by 4 bytes; client read a garbage `PauseTimesCount ≈ 2.8B`, attempted the array allocation, froze, and disconnected with `reason=7`. Reproduced mid-combat — aggroing then breaking LOS triggered a `CreateObject` with `FacingTarget` (TC AI aiming at the player) and crashed the client. Matches the V2_5_3 / V1_14 writers; per-case branches in the V3_4_3 spline writer must always be diffed against the sibling versions. | `7a50bcf` |
+| 2026-05-15 | V3_4_3 Dark Portal area-trigger drift — synthesise `SMSG_AREA_TRIGGER_NO_CORPSE` for Outland↔BL transitions. Modern client's `AreaTrigger.db2` has *no* BL-side entry and the Outland-side row's ActionSet is dangling, so the client emits nothing on cross-portal trigger. TC's authoritative row is `id 4352` (sniffs report `4524` which doesn't exist in the modern DB2). Proxy now intercepts position to drive the trigger when the player crosses. | `8d9ec15` |
+| 2026-05-16 | V3_4_3 raid promote-to-assistant unblocked — both `CMSG_SET_ASSISTANT_LEADER` (single-target Promote) and `CMSG_SET_EVERYONE_IS_ASSISTANT` ("Everyone is assistant" raid-frame checkbox) crashed the proxy with `IndexOutOfRangeException` in `ByteBuffer.HasBit()`. V3_4_3 client emits these CMSGs bits-first (`hasPartyIndex` + `Apply` bits, optional 1-byte `PartyIndex` last) but `SetAssistantLeader.Read()` / `SetEveryoneIsAssistant.Read()` were still reading byte-first — the leading `ReadUInt8` consumed the bit header and the trailing `HasBit()` overran the buffer. Mirrors CypherCore TC `WorldPackets::Party::SetAssistantLeader::Read` (`refs/TrinityCore-wotlk_classic/.../PartyPackets.cpp:365-372`) and `SetEveryoneIsAssistant::Read` (`:532-538`); same family as `c0a6934` (`PartyInviteResponse`) / `1d1ed8b` (`PartyUpdate`) / `34b63a8` (`PartyUninvite`). Version-gated on `ModernVersion.Build == V3_4_3_54261`; V1_14 / V2_5 paths unchanged. Verified end-to-end on TC: single-target Promote round-trips assistant icon and demote; "Everyone is assistant" checkbox fans out one legacy `CMSG_SET_ASSISTANT_LEADER` (0x28F) per non-self group member. cMangos retest pending. | `82c8f83` |
+| 2026-05-17 | V3_4_3 NPCBot/Playerbot creatures render textured (TrinityCore 3.3.5a + `trickerer/Trinity-Bots@9a7d2921`). Two layered fixes in `ObjectUpdateBuilder.WriteCreateUnitData` + the Values-delta path: (a) strip `UNIT_FLAG2_CLONED (0x10)` unconditionally for Creature-typed objects — NPCBot stamps the flag + `CreatedBy = owner-player` on every bot; V3_4_3 client refuses to self-clone the local player and renders nothing, which is why only the mount mesh was visible while mounted (the mount renderer is independent of CLONED); (b) zero `RaceId / ClassId / SexId` on Creature objects when `CLONED` is set so V3_4_3 stays on the legacy `CreatureDisplayInfoExtra` bake path instead of switching to the modern character-bake path that needs `ChrCustomization` hotfix data we never forward (otherwise bot renders as flat-white untextured silhouette). Real Mage Mirror Image (creature 31216) loses the CLONED flag too but still renders via its own DisplayID. Real NPCs that share player-shape DisplayIDs (Velen etc.) leave `Race = 0` and are unaffected. Permanent `[NpcBotTrace]` reader diagnostic emits for any Creature entry ≥ 70000, gated on `Log.IsTraceEnabled` so it's no-op when Verbose isn't configured. | `3d93478` + `2b24ac8` |
+| 2026-05-17 | V3_4_3 NPCBot `SMSG_PARTY_MEMBER_STATS` parse hardened. `trickerer/Trinity-Bots@9a7d2921 BotMgr::BuildBotPartyMemberStatsChangedPacket` stamps `mask = GROUP_UPDATE_FULL (0x7FFFF)` claiming all 19 group-update flags but only writes the leading `STATUS..POSITION` subset (verified via hex dump: 36-byte packet for a mask that demanded ~74). Trusting the mask used to throw `ArgumentOutOfRangeException` from `ReadUInt32` and kill the world session on hire → mount → "Make a Group". Three fixes shipped together: (a) mask-driven aura iteration that consumes exactly one entry per set bit (replaces the `GetAuraSlotsCount() == 56` cap that missed the server's `MAX_AURAS = 64`); (b) read the WotLK `GROUP_UPDATE_FLAG_VEHICLE_SEAT = 0x00080000` trailing uint32 (mounting a bot used to leave 4 bytes unread); (c) bounds-check every conditional read via new `WorldPacket.CanRead(n)` + `GetRemainingBytes()` helpers and bail through a rate-limited hex-dump warn that returns the partial state populated so far — modern client still gets HP / Power / Position deltas; missing aura / pet / vehicle bits degrade gracefully. Same refactor applied to the `FULL_STATE` variant. Field labels via `nameof(GroupUpdateFlagTBC.X)` so enum renames ripple through the diagnostic. | `5f789d3` + `550bf99` |
+| 2026-05-18 | Adopted local **Wrathion 3.4.3.23121** (TrinityCore fork at `github.com/Xian55/3.4.3_Source`) as canonical V3_4_3 packet-reference oracle alongside the existing `RioMcBoo/CypherCoreClassicWOTLK` source. Wrathion is a *native* V3_4_3 server (no proxy in path) and produces higher-quality V3_4_3 wire captures than the CypherCore branch. New `test-loop2.ps1 -LocalTc343` direct-connect mode (skips HermesProxy entirely) + `HermesProxy/profiles/wotlk-tc-local-343.json` marker profile. See ["Reference packet captures"](#reference-packet-captures-v3_4_3-ground-truth-sniff-sources) for the per-server capture workflow. | feature branch |
+| 2026-05-16 | V3_4_3 flightmaster — `SMSG_SHOW_TAXI_NODES` wire-format fix. Talking to a TC 3.3.5 flightmaster (via the gossip "Show me where I may fly from here" option, or NPCs that only offer taxi) left the Taxi window blank — no discovered nodes, no current-node anchor, no way to fly. Root cause: HermesProxy's `ShowTaxiNodes.Write` / `WriteToSpan` wrote `count = byte_length_after_CleanupNodes_trim` and a variable-length per-byte payload; the V3_4_3 client reads `count` as **uint64 BLOCKS** and unconditionally consumes `count × 8` bytes per list. CypherCore (`Source/Game/Networking/Packets/TaxiPackets.cs:40-59`) writes `WriteInt32(arr.Length / 8)` + the full byte array, with a comment "size is ensured to be divisible by 8 in TaxiMask constructor"; WPP V3_4_4-gated parser confirms (`ReadUInt64` per element). For V3_4_3.54261 the client's baked TaxiNodes.db2 spans 7 uint64 blocks → 56 bytes per list (confirmed by CypherCoreClassicWOTLK sniff captured 2026-05-15 — both empty and Ironforge/Stormwind-discovered states ship 56-byte arrays). Pre-fix the trimmed payload caused the client to read garbage from the next packet as taxi-mask bits, masking every node as undiscovered. Fix is version-gated on `ModernVersion.Build == V3_4_3_54261`: pad/truncate `CanLandNodes` and `CanUseNodes` to 56 bytes (`TaxiMaskBytesV3_4_3 = 56`), write `bytes.Length / 8` as the block count, and write the full 56 bytes (no `CleanupNodes`). V1_14/V2_5 branch unchanged. Verified end-to-end on TC against Stormwind (Dungar Longdrink, entry 352) and Ironforge (Gryth Thurden, entry 1573); cMangos retest pending. | `6872dc9` |
 
 Post-5a opcode-fix flood, grouped by theme:
 
@@ -172,6 +208,7 @@ Post-5a opcode-fix flood, grouped by theme:
 - **Resistances + DisplayPower wire fixes** — Two ObjectUpdate writer/reader bugs that landed in the same evening. `e084fb4`: V3_3_5a's `UnitField` enum doesn't define the parent `UNIT_FIELD_RESISTANCES` / `_RESISTANCEBUFFMODSPOSITIVE` / `_RESISTANCEBUFFMODSNEGATIVE` — only the per-element variants (`_ARMOR / _HOLY / _FIRE / _NATURE / _FROST / _SHADOW / _ARCANE`) at contiguous offsets `0x5D-0x71`. The legacy reader's `GetUpdateField(UNIT_FIELD_RESISTANCES)` returned `-1` silently and the entire Resistances + ResistanceBuffMods arrays stayed null, so the V3_4_3 client read Armor (`Resistances[0]`) as 0 and the Stamina-tooltip Health-bonus calc broke. Added a fallback to `GetUpdateField(_ARMOR)` when the parent name resolves to `-1`; mirrors the pre-existing `GAMEOBJECT_DYN_FLAGS → GAMEOBJECT_DYNAMIC` fallback. `8c6f90c`: `WriteUpdateUnitData` wrote `DisplayPower` as `WriteUInt32` when V3_4_3 expects `WriteUInt8` — the 3-byte over-write cascaded forward, corrupting `ShapeshiftForm` and `Stats[2]` in every Values delta. Trust WPP's `UpdateFieldsHandler343` for V3_4_3 field sizes — the `*Classic` writers are V1_14 / V2_5-shaped.
 - **Char-list auto-select** — `a515bd0` auto-selects the newly created character on the char list. After `CMSG_CREATE_CHARACTER` succeeded, the V3_4_3 client dropped to no-selection instead of highlighting the freshly created row, forcing an extra click. QoL only; no protocol change.
 - **GameObject Values changesMask** — `e34a0a1` drops a stray 1-bit prefix from the `WriteUpdateGameObjectData` `changesMask` write that was shifting all subsequent fields by 1 bit; mirrors the `UnitChannel` no-prefix fix (`fc238f9`).
+- **Flightmaster taxi window — V3_4_3 uint64-block payload** — `SMSG_SHOW_TAXI_NODES` write was using `count = byte_count_after_CleanupNodes_trim` and a variable-length per-byte payload. V3_4_3 client reads `count` as **uint64 BLOCKS** and unconditionally consumes `count × 8` bytes per list. CypherCore writes `WriteInt32(arr.Length / 8)` + full array bytes ("size is ensured to be divisible by 8 in TaxiMask constructor"); WPP V3_4_4-gated parser confirms `ReadUInt64` per element. For V3_4_3.54261 the baked `TaxiNodes.db2` spans 7 blocks → 56 bytes per list (confirmed by CC-WotLK-Classic sniff, both empty and Ironforge/Stormwind-discovered states ship 56-byte arrays). Pre-fix the trimmed payload caused the client to read garbage from the next packet as taxi-mask bits, masking every node as undiscovered. Version-gated on `ModernVersion.Build == V3_4_3_54261`: pad/truncate to `TaxiMaskBytesV3_4_3 = 56`, write `bytes.Length / 8` as the block count, write the full 56 bytes (no `CleanupNodes`). V1_14/V2_5 branch unchanged. Verified end-to-end on TC against Stormwind (Dungar Longdrink, entry 352) and Ironforge (Gryth Thurden, entry 1573). Same `count = bytes/8` + multiple-of-8 payload pattern likely recurs in other CC mask-style packets — when WPP V3_4_0 reports `Packet not fully read! N bytes remaining` against a V3_4_3.54261 sniff, suspect a V3_4_4-gated parser is the truth source.
 - **Mail packet family — V3_4_3 wire format** — `d3004b1` rewrites the mail SMSG/CMSG layouts for V3_4_3. Symptom: opening the mailbox froze the modern client and rendered the inbox as garbage (`Enclosed amount: 1.69e+15`, every attachment "Unknown"). Cause: `MailListEntry` / `MailAttachedItem` / `MailCommandResult` (SMSG writers) and `MailDelete` / `MailMarkAsRead` / `MailReturnToSender` / `MailTakeItem` / `MailTakeMoney` / `MailCreateTextItem` (CMSG readers) all used a pre-V3_4_3 layout — Int32 `MailID`/`AttachID`, UInt8 `SenderType`, and a sender-presence-bit pair that the V3_4_3 client doesn't know about. CypherCore `Source/Game/Networking/Packets/MailPackets.cs:286-450` confirms V3_4_3 wants Int64 ids, UInt32 `SenderType`, and a `switch (SenderType)` unconditional sender write (Normal → `WritePackedGuid128`, Auction/Creature/GameObject → `WriteInt32(AltSenderID)`). The Int32→Int64 + UInt8→UInt32 widening shifted every entry by 7 bytes, cascading into junk down the rest of the list. Fix is version-gated on `ModernVersion.Build == V3_4_3_54261`; storage fields widened to `long`; server-side handler now casts `(uint)mail.MailID` etc. when forwarding to the legacy server. Verified end-to-end on TC: `hermes-20260509_175638.log` shows clean list + 6×take-item + 6×delete; vanilla regression guard in `hermes-20260509_194751.log` shows V1_14 mail send/list/take still works (vanilla split intact).
 
 Individual commits beyond what's listed here are auditable via `git log --grep="(v3_4_3|phase5)"`.
@@ -180,29 +217,24 @@ Individual commits beyond what's listed here are auditable via `git log --grep="
 
 ## Open issues
 
-### Critical (proxy crash — both backends affected)
+### Druid Typhoon — RESOLVED 2026-05-17
 
-- **`CMSG_SET_ASSISTANT_LEADER` bits-first parse bug.** Stack trace: `IndexOutOfRangeException` in `ByteBuffer.HasBit()` at `Framework/IO/ByteBuffer.cs:353`, called from `SetAssistantLeader.Read()` at `HermesProxy/World/Server/Packets/GroupPackets.cs:426`, opcode `CMSG_SET_ASSISTANT_LEADER` (13906). Same family as the bits-first party fixes already shipped (`c0a6934`, `1d1ed8b`, `34b63a8`) — V3_4_3 client emits bits-first, upstream parser reads byte-first, runs off the end. Rewrite `SetAssistantLeader.Read()` bits-first. Repros on cMangos but the bug is in our parser, not the legacy server, so it should reproduce on TC too.
-- **Druid Typhoon crashes HermesProxy** (fork issue #14). Class-ability spell that takes the proxy down. Need a stack-trace capture at next repro to localize. Possibly related to the `SpellCastRequest` parse bug fixed in `557310f` (same opcode family); re-verify against current HEAD before triaging further.
-
-### Critical (client crash — TC backend)
-
-- **`.additem 2512 1000` crashed the V3_4_3 client (TC)** — *root cause was the same `WriteCreateItemData` layout bug fixed 2026-05-03 (see "Hunter ammo + bag render — RESOLVED" below). The mass-stack `.additem` issue was a downstream symptom of the same 7-byte over-write that mangled descriptor offsets; the additem command itself never reached the proxy in the original repro log because the client was already in a corrupt-state from prior Item creates. Re-verify by repeating the `.additem 2512 1000` test on current HEAD; if it still crashes, file a fresh entry with a new repro log.*
+Fork issue #14 listed Druid Typhoon as a proxy-crashing class ability. Re-verified against current HEAD on TC backend — cast succeeds, no crash, no `SMSG_CAST_FAILED`. Likely cleared by the `SpellCastRequest` V3_4_1+ wire-fields + `ResetBitReader` fix in `557310f` (same opcode family). No further action.
 
 ### Class ability gaps (carryover from fork issue [advocaite/HermesProxy-WOTLK#14](https://github.com/advocaite/HermesProxy-WOTLK/issues/14))
 
 The fork received a thorough class-by-class test matrix from `kasperfriend` (2026-04-18, against fork build 2026-04-16, TC backend). The individual symptoms group into a small number of recurring patterns — most are likely single opcode-translation fixes that would unblock dozens of abilities at once. **These results predate our 2026-04-29 → 2026-05-03 work; re-verify against current HEAD before treating each as open.**
 
-**Pattern A — self-cast dispel/cleanse rejects with "can't mount here"** (5+ classes affected). Likely a `CMSG_CAST_SPELL` target-encoding gap for self-targeted dispel/cure spells, or an `SMSG_CAST_FAILED` reason-code translation that maps a generic reject onto `SPELL_FAILED_NOT_MOUNTED`. **May be resolved by `557310f` (`SpellCastRequest` V3_4_1+ wire-fields + `ResetBitReader`) — that fix corrected an `IndexOutOfRange` on every `CMSG_CAST_SPELL` and was confirmed to clear at least the DK runeblade rack "Invalid target" symptom. Re-verify Pattern A against current HEAD before treating it as open.**
+**Pattern A — self-cast dispel/cleanse rejects with "can't mount here"** (5+ classes affected). Likely a `CMSG_CAST_SPELL` target-encoding gap for self-targeted dispel/cure spells, or an `SMSG_CAST_FAILED` reason-code translation that maps a generic reject onto `SPELL_FAILED_NOT_MOUNTED`. **Paladin Purify RESOLVED 2026-05-16** — verified end-to-end on TC at level 20; Purify on self dispelled poison. Likely a same-family fix from `557310f` (`SpellCastRequest` V3_4_1+ wire-fields + `ResetBitReader`), which also cleared the DK runeblade rack "Invalid target" symptom. Re-verify the remaining Pattern A spells (Paladin Cleanse · Priest Dispel Magic / Cure Disease · Shaman Purge / Cleanse Spirit / Cure Toxins · Mage Remove Curse · Druid Cure Poison / Remove Curse) against current HEAD before treating them as open.
   - Paladin: Cleanse, Purify · Priest: Dispel Magic (self), Cure Disease · Shaman: Purge, Cleanse Spirit, Cure Toxins · Mage: Remove Curse · Druid: Cure Poison, Remove Curse
 
-**Pattern B — ground-targeted AOE rejects with "item is not ready yet"** (4+ classes). All `DEST_LOCATION` / ground-click spells. Likely a `CMSG_CAST_SPELL` ground-target position-vector layout gap in V3_4_3. **May also be resolved by `557310f` — the same `SpellCastRequest` / `SpellTargetData` bit-stream desync that produced "Invalid target" likely produced bogus `TargetFlags` reads on ground-target spells too. Re-verify before treating as open.**
+**Pattern B — ground-targeted AOE rejects with "item is not ready yet"** (4+ classes). All `DEST_LOCATION` / ground-click spells. Likely a `CMSG_CAST_SPELL` ground-target position-vector layout gap in V3_4_3. **DK Death and Decay cast/reject RESOLVED 2026-05-16** — verified end-to-end on TC: cast succeeds, debuff lands on targets, no "item is not ready yet" reject. Likely a same-family fix from `557310f` (`SpellCastRequest` V3_4_1+ wire-fields + `ResetBitReader`). **Followup sub-issue:** DnD's ground-swirl visual / persistent-AOE effect does not render on V3_4_3 despite cast + debuff working (raising graphics resolution doesn't help). Almost certainly a separate bug — likely a `DynamicObject` `CreateObject` translation gap for V3_4_3 or `SMSG_PLAY_SPELL_VISUAL_KIT` / persistent-AOE visual-id translation; investigate next session with a hermes log + WPP diff. Re-verify the remaining Pattern B spells (Priest Mass Dispel / Lightwell · Druid Hurricane / Force of Nature · Mage Flamestrike / Blizzard · Warlock Shadowfury) against current HEAD before treating them as open.
   - Priest: Mass Dispel, Lightwell · Druid: Hurricane, Force of Nature · Mage: Flamestrike, Blizzard · Warlock: Shadowfury
 
-**Pattern C — combo-point finishers reject with "requires combo points"**. Likely combo-point descriptor (`PlayerData.ComboPoints`) not propagating to the V3_4_3 client, or modern-client reads it from a different descriptor slot than what we write.
+**Pattern C — combo-point finishers reject with "requires combo points"**. **RESOLVED 2026-05-16** — root cause: V3_4_3 moved the `ComboTarget` descriptor from `ActivePlayerData` (V1_14/V2_5 layout) → `UnitData` (WPP `V3_4_3_51666/UnitData.cs:132`). HermesProxy was sending `UnitData.Power[combo-slot] = N` correctly but `ComboTarget` stayed `0x0` on the wire, so the client — which target-validates finishers in 3.3.5a/3.4.3 Classic style (CPs are target-stuck, not Cata-style player-pooled) — rejected every finisher regardless of CP count. Fix: add `ComboTarget` to shared `UnitData`, mirror the existing `ActivePlayerData.ComboTarget` writes into `UnitData.ComboTarget` in `CharacterHandler.HandleUpdateComboPoints` and `UpdateHandler.PLAYER_FIELD_COMBO_TARGET` translation, and emit it from V3_4_3 `WriteUpdateUnitData` at bit 112 (between `GuildGUID` 107 and `NpcFlags` parent 113). Verified on TC 3.3.5a: Sinister Strike generates CPs, Eviscerate fires; target-switching still drops CPs as expected. cMangos retest pending. Druid Cat (Ferocious Bite / Maim / Rip / Savage Roar) should resolve via the same fix because `ClassPowerTypes` maps Druid CPs to `Power[3]` and uses the same `UnitData.ComboTarget` flow — pending in-game retest.
   - Rogue: ALL combo abilities · Druid (Cat): Ferocious Bite, Maim, Rip, Savage Roar
 
-**Pattern D — bear-form rage abilities reject with "not enough rage"**. Same shape as Pattern C but for power-type swap on shapeshift; rage power isn't propagating in bear form.
+**Pattern D — bear-form rage abilities reject with "not enough rage"**. Same shape as Pattern C but for power-type swap on shapeshift; rage power isn't propagating in bear form. **Druid Bear rage abilities RESOLVED 2026-05-16** — verified on TC: Druid enters Bear Form and casts rage-costing abilities successfully. Likely a same-family fix from `8c6f90c` (V3_4_3 `WriteUpdateUnitData` `DisplayPower` field-size — was `UInt32`, must be `UInt8` for V3_4_3, so the client now reads the correct power slot after shapeshift). Re-verify the individual Pattern D spells (Bash · Demoralizing Roar · Lacerate · Maul · Challenging Roar) against current HEAD if any reject reappears.
   - Druid (Bear): Bash, Demoralizing Roar, Lacerate, Maul, Challenging Roar
 
 **Pattern E — shapeshift / form-cancel broken** (locks character in form). Likely `SMSG_AURA_UPDATE` / aura-removal translation gap for cancelable auras. **Bear Form RESOLVED 2026-05-06 (`7cbc550`)** — root cause was the V3_4_3 client silently dropping pre-CreateObject `SMSG_AURA_UPDATE`, so persistent auras never made it to the buff bar; fix re-emits player auras from a per-session `KnownAuras` tracker after the player's CreateObject. Re-verify the other forms / Stealth / Shadowform / Metamorphosis / Ghost Wolf against current HEAD before treating as open.
@@ -217,7 +249,7 @@ The fork received a thorough class-by-class test matrix from `kasperfriend` (202
   - **Warlock — adding a soulshard to inventory causes DC.** Pet/inventory item type cross-talk; likely a soulshard `Item` create-data write issue.
 
 **Pattern H — misc one-offs**:
-  - Mage Slow Fall: "out of range" on self-cast → target-encoding bug, related to Pattern A.
+  - ~~Mage Slow Fall: "out of range" on self-cast → target-encoding bug, related to Pattern A.~~ **RESOLVED 2026-05-16** — self-cast fires on TC; same-family fix from `557310f` (`SpellCastRequest` V3_4_1+ wire-fields + `ResetBitReader`) that cleared Pattern A. cMangos retest pending.
   - Paladin Greater Blessings of Kings/Sanctuary: "you have already learned that spell" → spell-learn dedup translation.
   - Shaman weapon imbues (Windfury / Rockbiter / Frostbrand / Flametongue / Earthliving): "item is already enchanted" → `CMSG_ENCHANT_ITEM` (or similar) translation gap.
   - Holy Wrath / Holy Shock: animate but no damage / no heal → `SMSG_SPELL_GO` effect translation might be losing damage/heal payload for hybrid school spells.
@@ -327,30 +359,49 @@ Treat regeneration as a debugging loop, not a pre-emptive batch — only regen w
 
 ---
 
-## Reference packet captures (TC 3.4.3 ground truth)
+## Reference packet captures (V3_4_3 ground-truth sniff sources)
 
-For ground-truth V3_4_3 wire-format references (canonical for diffs against HermesProxy output), capture on a working TrinityCore 3.4.3.54261 server — no proxy in the path.
+For ground-truth V3_4_3 wire-format references (canonical for diffs against HermesProxy output), capture on a working V3_4_3.54261-native server with no proxy in the path. Two TrinityCore-derived forks fill this role; either can sniff but they prioritise different things.
 
-1. In TC's `worldserver.conf`, set `PacketLogFile = "World.pkt"` (extension must be `.pkt`; output lands at `LogsDir/World.pkt`, default `Logs/`). Restart `worldserver.exe`.
-2. Play with the V3_4_3 client. Stop with `server shutdown 1` to flush.
-3. Parse with the WPP fork at `X:\Programming\RioMcBoo\WowPacketParser` (already pinned to `LangVersion=12`):
+| Source | Repo | Local clone | Build | Role |
+|---|---|---|---|---|
+| **Wrathion** | [`Xian55/3.4.3_Source`](https://github.com/Xian55/3.4.3_Source) | `X:\Programming\refs\3.4.3_Source\` (sources) + `X:\Programming\refs\3.4.3_Build\bin\Release\` (compiled) | 23121 | **Primary** — higher-quality V3_4_3 wire captures per hands-on use. Native, no translation. ~70% playable. |
+| **CypherCoreClassicWOTLK** | [`RioMcBoo/CypherCoreClassicWOTLK`](https://github.com/RioMcBoo/CypherCoreClassicWOTLK) | (clone path as needed) | — | Secondary — long-standing wire-format reference cited throughout this doc and our source comments (`// matches CypherCore`). Still useful as a tiebreaker. |
+
+Both are TrinityCore forks speaking V3_4_3 wire natively. When their captures disagree, Wrathion's output wins (per user 2026-05-18); CypherCore is retained as a second opinion.
+
+### Capture workflow (Wrathion)
+
+1. In `X:\Programming\refs\3.4.3_Build\bin\Release\worldserver.conf`, set `PacketLogFile = "World.pkt"` (extension must be `.pkt`; output lands at `LogsDir/World.pkt`, default `Logs/`). Restart `worldserver.exe`.
+2. Connect with the V3_4_3 client via `F:\Game\World of Warcraft (3.4.3.54261)\_classic_\Wrath - 343.lnk` (which passes `-config=343-Config.wtf`). Quickest path: `./test-loop2.ps1 -LocalTc343` (no proxy in the loop). Stop with `server shutdown 1` to flush the `.pkt`.
+3. Parse with the WPP fork at `X:\Programming\RioMcBoo\WowPacketParser` (pinned to `LangVersion=12`):
 
    ```powershell
    $wpp = "X:\Programming\RioMcBoo\WowPacketParser\WowPacketParser\bin\Release\WowPacketParser.exe"
-   & $wpp "<TC build dir>\Logs\World.pkt"
+   & $wpp "X:\Programming\refs\3.4.3_Build\bin\Release\Logs\World.pkt"
    ```
 
    Output is `World.txt` next to the input — full field-level decode. `V3_4_3_54261` is auto-detected from the PKT 3.1 header; force-set `<add key="ClientBuild" value="V3_4_3_54261"/>` in WPP's `App.config` if needed. Filter via `<add key="Filters" value="SMSG_UPDATE_OBJECT,..."/>` to narrow opcodes.
 
+### Capture workflow (CypherCoreClassicWOTLK)
+
+Same shape — set `PacketLogFile` in that fork's `WorldServer.conf`, run the client through its launcher config, parse with the same WPP binary. Existing references in this doc and our source comments (`// matches CypherCore`) were diff-verified against captures from this fork.
+
+### Cautions
+
 Captures contain SRP6 session keys + account hashes — **do not commit or share**. Rotate `World.pkt` between sessions to keep diffs clean.
 
-Fallback: HermesProxy's own `SniffFile.cs` writes PKT 2.1 to `PacketsLog/` (gated by `DiagnosticsOptions.PacketsLog`, default on) — useful for debugging proxy output, not for ground-truth TC behavior.
+Fallback: HermesProxy's own `SniffFile.cs` writes PKT 2.1 to `PacketsLog/` (gated by `DiagnosticsOptions.PacketsLog`, default on) — useful for debugging proxy output, not for ground-truth wire behaviour.
 
 The `/parse-pkt` skill wraps the WPP invocation; the `/hermes-logs` skill slices `hermes-*.log` runtime logs.
 
 ---
 
-## Reference fork (`HermesProxy-WOTLK`)
+## Reference repos
+
+Three external repos are pinned for V3_4_3 cross-checking. Cite whichever fits the question.
+
+### `HermesProxy-WOTLK` — proxy fork (translated path)
 
 - **Origin**: `github.com/advocaite/HermesProxy-WOTLK`
 - **Local clone**: `X:\Programming\HermesProxy-WOTLK` (full git history available — 46 commits at last sync, growing)
@@ -359,6 +410,31 @@ The `/parse-pkt` skill wraps the WPP invocation; the `/hermes-logs` skill slices
 - **Future use**: the fork's HEAD `ObjectUpdateBuilder.cs` is the test oracle for any future source-gen byte-equivalence work — generate-and-diff against it per object type.
 
 The fork is actively shipped with nightly GitHub Releases binaries and has a public end-user base (OwnedCore release thread). End-to-end pipeline (3.4.3 modern client → 3.3.5a backend) is validated against TC in production via that fork; our work is tracing a known-working path, not blazing a speculative one.
+
+### `Wrathion` — native V3_4_3 server (ground-truth oracle)
+
+- **Origin**: `github.com/Xian55/3.4.3_Source`
+- **Local layout**: sources at `X:\Programming\refs\3.4.3_Source\`, compiled binaries at `X:\Programming\refs\3.4.3_Build\bin\Release\`, SQL dumps at `X:\Programming\refs\3.4.3_Database\Databases\`.
+- **Build**: 3.4.3.23121, TrinityCore-derived. ~70% playable per upstream README.
+- **Role**: canonical V3_4_3 wire reference. Capture sniffs from a live Wrathion session (per ["Reference packet captures"](#reference-packet-captures-v3_4_3-ground-truth-sniff-sources)) and diff against HermesProxy output to settle wire-format questions.
+- **Tiebreaker policy**: when WPP, fork-diff, and CypherCore disagree, Wrathion's native captures decide.
+
+The source tree carries 23 distributed `CLAUDE.md` files acting as a curated lookup trail. Load-bearing ones:
+
+- `src/server/game/Server/Protocol/CLAUDE.md` — opcode table (`OpcodeClient` / `OpcodeServer`, `OpcodeTable::Initialize`); 16-bit scrambled opcodes; `MAX_OPCODE=0x3FFF`.
+- `src/server/game/Server/Packets/CLAUDE.md` — 125 packet definition files grouped by subsystem. Lookup pattern: grep opcode name → find 3.4.3 hex → grep handler in `Opcodes.cpp` → read `*Packets.h` for wire shape.
+- `src/server/game/Handlers/CLAUDE.md` — handler binding pattern (20+ handler files: auth, character, movement, combat, spells, items, social, world, progression).
+- `src/common/Cryptography/CLAUDE.md` — SRP6 (REST login, v1/v2 + Sha256/Sha512) + WorldPacketCrypt (AES-GCM, 12-byte tags, per-packet counters). Documents the crypto boundary HermesProxy bridges (3.3.5a's ARC4+HMAC-SHA1 → V3_4_3's AES-GCM).
+- `src/shared/Packets/CLAUDE.md` — `ByteBuffer::WriteBits / ReadBits` semantics (bit-level, not byte-aligned). Load-bearing for V3_4_3 packet layout.
+- `src/server/bnetserver/CLAUDE.md` + `src/server/CLAUDE.md` — REST login flow (HTTPS `/bnetserver/login/`) + dual binary architecture (`bnetserver.exe` + `worldserver.exe`).
+- `src/shared/Networking/CLAUDE.md` — Boost.Asio sockets; three frame conventions (WorldSocket binary, BNet RPC protobuf, REST HTTP/1.1).
+- `src/shared/Realm/CLAUDE.md` — `RealmAddress` packs as `region<<24 | site<<16 | realm`; proxy translates to 3.3.5a flat realm id.
+
+### `CypherCoreClassicWOTLK` — secondary native V3_4_3 server
+
+- **Origin**: `github.com/RioMcBoo/CypherCoreClassicWOTLK`
+- **Role**: long-standing wire-format reference. Source comments throughout HermesProxy (e.g. `// matches CypherCore`, `// confirmed against CypherCore native`) were diff-verified against this fork. Now demoted to **secondary** behind Wrathion (see 2026-05-18 row in "Done so far"), but still cited where existing source comments call it out.
+- **Use**: tiebreaker / second-opinion sniff source for V3_4_3 wire-format work.
 
 ---
 
