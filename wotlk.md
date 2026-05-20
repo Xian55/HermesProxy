@@ -144,6 +144,10 @@ These shipped before any WotLK-specific work; every entry below assumes them.
 | Trade (between players) | ✅ | ✅ | |
 | Char-list — auto-select newly created character | ✅ | ❓ | `a515bd0` — character pre-selected in char-list after create; QoL |
 | Mail — open + inbox + take attachments + COD pay + delete | ✅ | ❓ | 2026-05-09 — V3_4_3 wire-format fix (`d3004b1`); 12-attachment + 1-COD mail end-to-end on TC; V1_14/V2_5 regression-clean; cMangos untested |
+| Achievement panel — earned + criteria progress | ❌ | ❓ | 2026-05-21 diff vs native TC 3.4.3: proxy ships an 8-byte `EmptyAllAchievementData` stub (`World/Server/Packets/EmptyInitPackets.cs:33-42`, scheduled from `World/Client/PacketHandlers/CharacterHandler.cs:386`). Legacy 3.3.5a server DOES send `SMSG_ALL_ACHIEVEMENT_DATA` (opcode `0x047D`, ~1.6 KB) but no `[PacketHandler]` exists — data silently discarded. Achievement UI fully silent on V3_4_3 client. See `wotlk.md` § *TODO — Not yet bridged* (F). |
+| Account heirloom panel — collection listing | ❌ | ❓ | 2026-05-21 diff: proxy ships an `EmptyAccountHeirloomUpdate` 13-byte stub (`EmptyInitPackets.cs:155-167`, from `CharacterHandler.cs:404`). Native TC 3.4.3 sends 38 heirloom item IDs unconditionally (CollectionMgr feature with no 3.3.5a equivalent). Modern client's heirloom panel renders empty. Cosmetic only — items themselves don't function as heirlooms on the legacy backend. See *TODO* (G). |
+| Spellbook fresh-login animations (`InitialLogin` flag) | ❌ | ❌ | 2026-05-21 diff: `SMSG_SEND_KNOWN_SPELLS.InitialLogin` blindly forwards the legacy bool (`World/Client/PacketHandlers/SpellHandler.cs:21`), which 3.3.5a always sends `false`. Native TC 3.4.3 sets it to `true` for the player's first SendKnownSpells after world-enter (`Player.cpp` → `InitialLogin = IsLoading();`). V3_4_3 client likely skips new-spell highlight / first-time spellbook animations on enter-world. Cosmetic, 1-line fix. See *TODO* (I). |
+| Flat / Pct spell modifier array shape | ⚠️ | ⚠️ | 2026-05-21 diff: native TC 3.4.3 always emits canonical 40-row spell modifier array (~204 B, mostly empty rows); proxy writes only populated mods (~14 B). Unverified whether V3_4_3 client requires the 40-row form or accepts dynamic count. No symptom reported by user yet — flagged as suspect for later disasm verification. See *TODO* (H). |
 
 ---
 
@@ -521,3 +525,58 @@ Persisted state: per-character `MultiActionBarsMask` (nullable byte) on
 non-zero `CMSG_SET_ACTION_BAR_TOGGLES` mask the user sent, so Phase 7+8
 can replay it on next login (currently inert for bars 2-5 per the open
 issue above).
+
+## TODO — Not yet bridged from TC 3.4.3 (2026-05-21 diff scan)
+
+Big-diff scan between native TC 3.4.3 capture (`refs/3.4.3_Build/.../World_questing_level_1_parsed.txt`) and HermesProxy modern session (`modern_54261_20260520_231838_2_parsed.txt`) surfaced four data-flow gaps where the proxy ships empty / stale data the V3_4_3 client otherwise expects from native. None of these crash the client, but each leaves a UI surface silent / incorrect.
+
+### F. SMSG_ALL_ACHIEVEMENT_DATA — empty stub (8 B) vs native ~606 B
+
+Symptom: V3_4_3 client achievement panel shows zero progress + zero completion.
+
+Root cause: legacy 3.3.5a server **does** ship `SMSG_ALL_ACHIEVEMENT_DATA` (opcode `0x047D`, ~1.6 KB with criteria progress + earned list — verified in `legacy_12340_*` raw capture), but HermesProxy has no `[PacketHandler]` for it. The data is silently discarded. Instead, proxy emits an 8-byte hardcoded stub via `World/Server/Packets/EmptyInitPackets.cs:33-42`, scheduled from `World/Client/PacketHandlers/CharacterHandler.cs:386`.
+
+Fix path (medium effort, ~150 LOC):
+- New `World/Client/PacketHandlers/AchievementHandler.cs` with `[PacketHandler(Opcode.SMSG_ALL_ACHIEVEMENT_DATA)]`. Parse legacy criteria-progress entries + earned-achievement IDs.
+- New `AllAchievementData` packet class in `World/Server/Packets/` matching V3_4_3 shape (per native sniff): `EarnedCount:int32 + ProgressCount:int32 + [Progress]{ CriteriaID:u32, Quantity:i32, PlayerGUID:PackedGuid128, Flags:u8, CurrentTime/ElapsedTime/CreationTime, HasDynamicID:bit }`.
+- Remove the `EmptyAllAchievementData` dispatch from `CharacterHandler.cs:386`.
+- Also wire `SMSG_ACHIEVEMENT_EARNED` + `SMSG_CRITERIA_UPDATE` if not already handled (for runtime progress).
+
+### G. SMSG_ACCOUNT_HEIRLOOM_UPDATE — empty stub (13 B) vs native ~317 B
+
+Symptom: V3_4_3 heirloom collection panel empty even though TC 3.4.3 ships 38 known item IDs unconditionally at login.
+
+Root cause: heirlooms are a `CollectionMgr` feature on modern servers; 3.3.5a has no equivalent (BoA items are inventory-flagged only). Proxy ships an `EmptyAccountHeirloomUpdate` stub via `EmptyInitPackets.cs:155-167` scheduled from `CharacterHandler.cs:404`.
+
+Fix path (small effort, low gameplay impact):
+- **Option α (recommended, ~50 LOC):** hardcode the modern 38-item heirloom ID list as a static array in a new `AccountHeirloomUpdate` packet class. Ship the same list to every player. Loss: not personalized — every account shows all heirlooms unlocked. Acceptable because heirlooms are cosmetic at 3.3.5a-backed gameplay (the items themselves don't function as heirlooms on the legacy backend; the panel UI is purely a collection viewer).
+- **Option β (~200 LOC):** scan the player's inventory for items with `ITEM_FLAG_HEIRLOOM` after world-enter; emit only those item IDs. Requires inventory-iteration timing + ItemTemplate flag lookup; possibly an ID remap if any heirloom item IDs changed between 3.3.5a and 3.4.3 (most should be stable).
+
+### H. SMSG_SET_FLAT_SPELL_MODIFIER — compact (14 B) vs native canonical 40-row (~204 B)
+
+Symptom: speculative. Native always emits the full 40-row spell modifier array (mostly empty rows). Proxy writes only populated mods. Unclear whether V3_4_3 client requires the canonical 40-row form or accepts dynamic count.
+
+Fix path (~10 LOC if confirmed):
+- Modify `World/Server/Packets/SpellPackets.cs` `SetFlatSpellModifier::Write()` to pad the Modifiers array to 40 entries (each empty entry: `modIndex:0, count:0`) before write. Same change for `SetPctSpellModifier` likely.
+- **Verify first** before shipping: read V3_4_3 client's `SMSG_SET_FLAT_SPELL_MODIFIER` handler via IDA/Ghidra to confirm loop iterates `count` from the wire vs hardcoded 40. If dynamic, this is a non-bug; if hardcoded 40, fix is required.
+
+### I. SMSG_SEND_KNOWN_SPELLS `InitialLogin` flag — always False (should be True on fresh world-enter)
+
+Symptom: V3_4_3 client may skip first-time spellbook setup animations / new-spell highlights because `InitialLogin` is false on enter-world; mostly cosmetic but TC 3.4.3 sets it `true` for the player's first `SendKnownSpells` after entering world.
+
+Root cause: `World/Client/PacketHandlers/SpellHandler.cs` (~line 21) reads the legacy `InitialLogin` bool and forwards it unchanged. Legacy 3.3.5a always sends `false`.
+
+Fix path (1-line):
+- Replace pass-through with `spells.InitialLogin = !GetSession().GameState.IsInWorld;` so the flag is `true` only before the in-world transition completes, `false` on subsequent zone changes.
+- TC 3.4.3 reference: `Player.cpp` ~`SendKnownSpells` sets `InitialLogin = IsLoading();`.
+
+### Implementation priority
+
+| # | Fix | Effort | User-visible impact |
+|---|---|---|---|
+| I | InitialLogin flag | XS (1-line) | Tiny — spellbook animations |
+| F | All achievement data | M (~150 LOC) | Achievement UI fully silent until fixed |
+| G | Account heirlooms (Option α) | S (~50 LOC) | Heirloom collection panel empty |
+| H | Flat spell modifier 40-row pad | XS (~10 LOC, after verification) | Unknown — verify client behavior first |
+
+All four scoped V3_4_3-gated; V1_14 / V2_5 paths unaffected.
