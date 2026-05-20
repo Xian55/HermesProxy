@@ -13,14 +13,44 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_PET_ACTION)]
     void HandlePetAction(PetAction act)
     {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_ACTION);
-        packet.WriteGuid(act.PetGUID.To64(GetSession().GameState));
         // V3_4_3 client packs Action in modern slot-shifted layout; legacy 3.3.5a server
         // expects the older state-byte layout. Translate only for V3_4_3 — V1_14 / V2_5
         // modern clients use different/uncertain Action layouts; preserve their behavior.
         uint legacyAction = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
             ? TranslateV343PetActionToLegacy(act.Action)
             : act.Action;
+
+        // Vehicle / pet bar spell-button clicks fail silently on the modern client when
+        // the legacy server returns SMSG_PET_CAST_FAILED — the client-side cast-fail
+        // handler dequeues PendingPetCasts by spell ID, but only CMSG_PET_CAST_SPELL
+        // enqueues there. CMSG_PET_ACTION (used for the vehicle action bar) never did,
+        // so failures were dropped and the action button locked until /reload.
+        // Enqueue here for spell-bearing slots (plain spell / manual / autocast). Skip
+        // command buttons (Attack/Stay/Follow/React) — they have no spell ID.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            uint v343Slot = act.Action >> 23;
+            if (v343Slot == 0 || v343Slot == 0x101 || v343Slot == 0x181)
+            {
+                uint spellId = act.Action & 0x7FFFFF;
+                if (spellId != 0)
+                {
+                    ClientCastRequest castRequest = new ClientCastRequest
+                    {
+                        Timestamp = Environment.TickCount,
+                        SpellId = spellId,
+                        ClientGUID = WowGuid128.Empty,
+                        ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal,
+                            (uint)(GetSession().GameState.CurrentMapId ?? 0), spellId, 20000u + (uint)Environment.TickCount),
+                        HasStarted = true,
+                    };
+                    GetSession().GameState.PendingPetCasts.Enqueue(castRequest);
+                }
+            }
+        }
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_ACTION);
+        packet.WriteGuid(act.PetGUID.To64(GetSession().GameState));
         packet.WriteUInt32(legacyAction);
         packet.WriteGuid(act.TargetGUID.To64());
         SendPacketToServer(packet);
