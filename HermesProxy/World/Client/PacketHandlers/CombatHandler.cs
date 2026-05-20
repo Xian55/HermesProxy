@@ -177,15 +177,68 @@ public partial class WorldClient
         SendPacketToClient(log);
     }
 
-    // SMSG_THREAT_UPDATE / SMSG_HIGHEST_THREAT_UPDATE intentionally NOT handled.
-    // Attempted translation using WPP's V3_4_4_59817+ shape (PackedGuid128 + int32 count
-    // + (PackedGuid128 + int64 threat)*) caused a catastrophic OOM on V3_4_3.54261:
-    // crash file `.?AVWOWGUID@@` requested ~18 GiB of WOWGUID storage (~1.2 billion
-    // entries), classic signature of the client misreading our `count` field. V3_4_3.54261
-    // uses an unknown wire shape — needs a real sniff before re-implementation. Letting
-    // the proxy drop these is annoying (no threat meter data) but won't crash the client.
-    // SMSG_THREAT_REMOVE / SMSG_THREAT_CLEAR are kept because they have no count field —
-    // worst-case malformed-shape is a no-op, not a billion-entry alloc.
+    // SMSG_THREAT_UPDATE / SMSG_HIGHEST_THREAT_UPDATE — re-enabled 2026-05-20 after
+    // native TC 3.4.3 sniffs (`World_questing_level_1_parsed.txt`) confirmed the
+    // V3_4_3.54261 wire shape matches TC 3.4.3 `CombatPackets.cpp:54-79`:
+    //   PackedGuid128 UnitGUID + int32 count + (PackedGuid128 + int64 threat) * count
+    // The earlier ~18 GiB OOM was likely due to a stale guess from WPP V3_4_4+ data,
+    // not the shape itself. ThreatListSanityCap defends against legacy frames where the
+    // count field is garbled (e.g. truncated legacy packet read mid-stream).
+    private const int ThreatListSanityCap = 256;
+
+    [PacketHandler(Opcode.SMSG_THREAT_UPDATE)]
+    void HandleThreatUpdate(WorldPacket packet)
+    {
+        // Wire shape (PackedGuid128 + int32 count + (PackedGuid128 + int64) * count)
+        // verified against V3_4_3.54261 native sniffs only. V1_14 / V2_5 modern clients
+        // may use a different shape — keep them on the pre-fix silent-drop behaviour
+        // until separately verified.
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+            return;
+
+        ThreatUpdate update = new();
+        update.UnitGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
+        uint count = packet.ReadUInt32();
+        if (count > ThreatListSanityCap)
+        {
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Warn,
+                $"SMSG_THREAT_UPDATE: ThreatList count {count} exceeds sanity cap {ThreatListSanityCap}; dropping packet (UnitGUID={update.UnitGUID})");
+            return;
+        }
+        for (uint i = 0; i < count; i++)
+        {
+            update.ThreatList.Add(new ThreatInfo(
+                packet.ReadPackedGuid().To128(GetSession().GameState),
+                packet.ReadUInt32()));
+        }
+        SendPacketToClient(update);
+    }
+
+    [PacketHandler(Opcode.SMSG_HIGHEST_THREAT_UPDATE)]
+    void HandleHighestThreatUpdate(WorldPacket packet)
+    {
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+            return;
+
+        HighestThreatUpdate update = new();
+        update.UnitGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
+        update.HighestThreatGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
+        uint count = packet.ReadUInt32();
+        if (count > ThreatListSanityCap)
+        {
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Warn,
+                $"SMSG_HIGHEST_THREAT_UPDATE: ThreatList count {count} exceeds sanity cap {ThreatListSanityCap}; dropping packet (UnitGUID={update.UnitGUID})");
+            return;
+        }
+        for (uint i = 0; i < count; i++)
+        {
+            update.ThreatList.Add(new ThreatInfo(
+                packet.ReadPackedGuid().To128(GetSession().GameState),
+                packet.ReadUInt32()));
+        }
+        SendPacketToClient(update);
+    }
+
     [PacketHandler(Opcode.SMSG_THREAT_REMOVE)]
     void HandleThreatRemove(WorldPacket packet)
     {
