@@ -17,6 +17,7 @@ public partial class WorldClient
         QuestGiverQuestDetails quest = new();
         quest.QuestGiverGUID = packet.ReadGuid().To128(GetSession().GameState);
         GetSession().GameState.CurrentInteractedWithNPC = quest.QuestGiverGUID;
+        quest.QuestGiverCreatureID = quest.QuestGiverGUID.GetEntry();
 
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             quest.InformUnit = packet.ReadGuid().To128(GetSession().GameState);
@@ -544,26 +545,64 @@ public partial class WorldClient
                 blob.BlobIndex = (int)packet.ReadUInt32();
                 blob.ObjectiveIndex = packet.ReadInt32();
                 blob.MapID = (int)packet.ReadUInt32();
-                // V3_4_3.54261 Classic client keeps LEGACY WorldMapAreaID semantics in the
-                // "UiMapID" wire field — despite the modern field name, it wants the raw
-                // legacy WMA (e.g. 41 for Teldrassil), not the modern UiMap.db2 ID (57).
-                // Diagnostic 2026-05-17: ours-with-lookup emitted 57 → no polygon; fork's
-                // raw-passthrough emits 41 → polygon renders. Match fork.
-                blob.UiMapID = (int)packet.ReadUInt32();
+                int legacyWMA = (int)packet.ReadUInt32();
+                blob.UiMapID = legacyWMA;
                 blob.Flags = (int)packet.ReadUInt32();   // legacy FloorID, repurposed as Flags
                 packet.ReadUInt32(); // Unk3 — discarded
                 packet.ReadUInt32(); // Unk4 — discarded
+
+                bool isV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+
+                if (isV343)
+                {
+                    // V3_4_3 expects modern UiMap.db2 IDs (e.g. 1429 for Elwynn Forest), not
+                    // the legacy WorldMapAreaID. Native TC 3.4.3 sniffs confirm this against
+                    // every Northshire/Elwynn POI. Translation table lives in
+                    // CSV/WorldMapAreaIDToUiMapID.csv; unmapped zones fall back to raw legacy
+                    // WMA passthrough (zero from GetUiMapId == "no override").
+                    int translated = GameData.GetUiMapId(legacyWMA);
+                    if (translated != 0)
+                        blob.UiMapID = translated;
+                }
+
+                // Synthesize modern QuestObjectiveID + QuestObjectID from the cached quest
+                // template. Strict storage-index match first; fall back to the single objective
+                // when legacy DB stored an out-of-range sentinel (e.g. quest 33 has
+                // ObjectiveIndex=4 in mangos-wotlk DB while the template has one objective at
+                // StorageIndex=0). Native V3_4_3 emits the storage_index in this case.
                 if (template != null && blob.ObjectiveIndex >= 0)
                 {
+                    QuestObjective? match = null;
                     foreach (QuestObjective objective in template.Objectives)
                     {
                         if (objective.StorageIndex == blob.ObjectiveIndex)
                         {
-                            blob.QuestObjectiveID = (int)objective.Id;
-                            blob.QuestObjectID = objective.ObjectID;
+                            match = objective;
                             break;
                         }
                     }
+                    if (match == null && template.Objectives.Count == 1)
+                    {
+                        match = template.Objectives[0];
+                        blob.ObjectiveIndex = match.StorageIndex;
+                    }
+                    if (match != null)
+                    {
+                        blob.QuestObjectiveID = (int)match.Id;
+                        blob.QuestObjectID = match.ObjectID;
+                    }
+                }
+
+                // Legacy 3.3.5a stored FloorID in this field (typically 0) which the
+                // V3_4_3 client rejects as a no-render flag. Rewrite with the native
+                // V3_4_3 convention: objective markers get ShowOnMap + ObjectiveNumber,
+                // pure location markers (ObjectiveIndex=-1) get ShowOnMap only.
+                if (isV343)
+                {
+                    QuestPOIFlags flags = QuestPOIFlags.ShowOnMap;
+                    if (blob.ObjectiveIndex >= 0 && blob.QuestObjectiveID != 0)
+                        flags |= QuestPOIFlags.ObjectiveNumber;
+                    blob.Flags = (int)flags;
                 }
                 uint pointsCount = packet.ReadUInt32();
                 for (uint p = 0; p < pointsCount; p++)

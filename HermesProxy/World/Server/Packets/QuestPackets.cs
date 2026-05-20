@@ -151,7 +151,7 @@ public class QuestGiverQuestDetails : ServerPacket
         _worldPacket.WriteUInt32((uint)Objectives.Count);
         _worldPacket.WriteInt32(QuestStartItemID);
         _worldPacket.WriteInt32(QuestSessionBonus);
-        _worldPacket.WriteInt32(0);                 // QuestGiverCreatureID
+        _worldPacket.WriteInt32((int)QuestGiverCreatureID);
         _worldPacket.WriteUInt32(0);                // ConditionalDescriptionText.size
 
         foreach (uint spell in LearnSpells)
@@ -197,6 +197,7 @@ public class QuestGiverQuestDetails : ServerPacket
 
     public WowGuid128 QuestGiverGUID;
     public WowGuid128 InformUnit;
+    public uint QuestGiverCreatureID;
     public uint QuestID;
     public int QuestPackageID;
     public uint[] QuestFlags = new uint[2];
