@@ -1,11 +1,20 @@
 # Generate-WorldMapAreaIDToUiMapID.ps1
 # Builds CSV/WorldMapAreaIDToUiMapID.csv used by HermesProxy to translate
-# legacy 3.3.5a WorldMapAreaID values into V3_4_3 UiMapID values during
+# legacy 3.3.5a WorldMapAreaID values into V3_4_3.54261 UiMap.db2 IDs during
 # SMSG_QUEST_POI_QUERY_RESPONSE translation.
 #
+# The 8.1.5 BfA source produces BfA UiMap IDs (e.g. Elwynn = 37) which the
+# V3_4_3 Classic client does NOT recognize — Classic uses its own UiMap.db2
+# numbering (Elwynn = 1429). This script needs a V3_4_3-built source pair:
+#
 # Source files (download into the same folder as this script):
-#   UIMapIDToWorldMapAreaID.lua  - https://www.townlong-yak.com/framexml/8.1.5/Blizzard_Deprecated/UIMapIDToWorldMapAreaID.lua
-#   UiMap.8.1.0.27826.csv         - https://wago.tools/db2/UiMap?build=8.1.0.27826&page=1   (optional, only used for the Name column)
+#   UIMapIDToWorldMapAreaID.lua  - V3_4_3-era Blizzard deprecated mapping (Classic
+#                                   Era framexml or hand-built WMA->UiMap table)
+#   UiMap.3.4.3.csv               - https://wago.tools/db2/UiMap?build=3.4.3.54261&page=1
+#                                   (filter to Classic Era zone rows; used for Name column)
+#
+# Until a Classic-Era WMA->UiMap source surfaces, the CSV is maintained by hand —
+# add rows as new zones are verified against native TC 3.4.3 sniffs.
 #
 # Output:
 #   ../CSV/WorldMapAreaIDToUiMapID.csv with header `WorldMapAreaID,UiMapID,Name`.
@@ -18,7 +27,7 @@ $csvFile   = Join-Path $scriptDir 'UiMap.8.1.0.27826.csv'
 $outFile   = Join-Path $scriptDir '..\CSV\WorldMapAreaIDToUiMapID.csv'
 
 if (-not (Test-Path $luaFile)) {
-    throw "Source file not found: $luaFile`n  Download from https://www.townlong-yak.com/framexml/8.1.5/Blizzard_Deprecated/UIMapIDToWorldMapAreaID.lua"
+    throw "Source file not found: $luaFile`n  Download from https://www.townlong-yak.com/framexml/30477/Blizzard_Deprecated/UIMapIDToWorldMapAreaID.lua/get"
 }
 
 # Build UiMapID -> Name lookup (optional, used only for the Name column).
