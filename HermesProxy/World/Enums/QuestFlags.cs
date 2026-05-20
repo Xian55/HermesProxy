@@ -43,3 +43,18 @@ public enum QuestFlags : uint
     ItemsGlowWhenDone     = 0x40000000,
     FailOnLogout          = 0x80000000
 }
+
+// Wire flags on SMSG_QUEST_POI_QUERY_RESPONSE blob entries (V3_4_3.54261). Bit
+// semantics derived from native TC 3.4.3 sniffs — TC source treats Flags as a
+// raw int32 with no named enum, so these names reflect observed convention:
+//   1 (ShowOnMap): blob renders on world map (set on every visible blob)
+//   2 (ObjectiveNumber): blob shows a numbered objective icon (objective markers)
+// Native objective marker blobs ship 3 (= ShowOnMap | ObjectiveNumber); pure
+// location markers ship 1.
+[Flags]
+public enum QuestPOIFlags : int
+{
+    None            = 0,
+    ShowOnMap       = 0x1,
+    ObjectiveNumber = 0x2,
+}
