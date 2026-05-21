@@ -1279,7 +1279,7 @@ public partial class ObjectUpdateBuilder
         var dyn = _updateData.DynamicObjectData ?? new DynamicObjectData();
         data.WritePackedGuid128(dyn.Caster ?? WowGuid128.Empty);
         data.WriteUInt8(0);
-        data.WriteInt32(0);
+        data.WriteInt32(dyn.SpellXSpellVisualID.GetValueOrDefault());
         data.WriteInt32(dyn.SpellID.GetValueOrDefault());
         data.WriteFloat(dyn.Radius.GetValueOrDefault());
         data.WriteUInt32(dyn.CastTime.GetValueOrDefault());
