@@ -497,6 +497,14 @@ public class UpdateObject : ServerPacket
             if (ap.Coinage.HasValue || ap.XP.HasValue || ap.NextLevelXP.HasValue) return false;
             if (ap.CharacterPoints.HasValue) return false;
             if (ap.FarsightObject != null) return false;
+            // PLAYER_FIELD_BYTES (legacy) splits into these four bytes on the modern
+            // descriptor. A Values delta for CMSG_SET_ACTION_BAR_TOGGLES lights only
+            // MultiActionBars; without this probe the filter dropped the packet and
+            // bars 2-5 visibility never reached the V3_4_3 client.
+            if (ap.MultiActionBars.HasValue) return false;
+            if (ap.LocalFlags.HasValue) return false;
+            if (ap.GrantableLevels.HasValue) return false;
+            if (ap.LifetimeMaxRank.HasValue) return false;
             if (ap.InvSlots != null)
                 for (int i = 0; i < ap.InvSlots.Length; i++)
                     if (ap.InvSlots[i] != null) return false;
