@@ -805,18 +805,29 @@ public partial class ObjectUpdateBuilder
     // enum members would balloon to ~200 entries with no readability win.
     internal void WriteCreateActivePlayerAll(WorldPacket data, ActivePlayerData src)
     {
+        // V3_4_3 ActivePlayerData wire — written in TC field-declaration order, NOT
+        // descriptor bit order. Many lines below are "zero placeholders": legacy 3.3.5
+        // does not populate the field, but the modern client expects a value at this
+        // wire position so we emit 0 / type-default. Where a property IS available on
+        // ActivePlayerData (Class A — see plan), read it. Otherwise annotate and ship 0.
+        //
+        // Bit numbers refer to ActivePlayerField.cs declarations.
+
         var active = src;
+
+        // InvSlots[141] — modern flat layout fanned from legacy 23/24/28/7/12/32 slots.
         for (int i = 0; i < 141; i++)
             data.WritePackedGuid128(GetModernInvSlot(active, i) ?? WowGuid128.Empty);
 
-        data.WritePackedGuid128(active.FarsightObject ?? WowGuid128.Empty);
-        data.WritePackedGuid128(WowGuid128.Empty);   // SummonedBattlePetGUID
-        data.WriteUInt32(0u);                         // KnownTitles.size()
-        data.WriteUInt64(active.Coinage.GetValueOrDefault());
-        data.WriteInt32(active.XP.GetValueOrDefault());
-        data.WriteInt32(active.NextLevelXP.GetValueOrDefault());
-        data.WriteInt32(0);
+        data.WritePackedGuid128(active.FarsightObject ?? WowGuid128.Empty);       // bit 26: FarsightObject (PackedGuid128)
+        data.WritePackedGuid128(WowGuid128.Empty);                                 // bit 27: SummonedBattlePetGUID (PackedGuid128) — descriptor: not used
+        data.WriteUInt32(0u);                                                      // bit 3 dynamic field: KnownTitles.size — proxy does not track titles
+        data.WriteUInt64(active.Coinage.GetValueOrDefault());                      // bit 28: Coinage (UInt64)
+        data.WriteInt32(active.XP.GetValueOrDefault());                            // bit 29: XP (Int32)
+        data.WriteInt32(active.NextLevelXP.GetValueOrDefault());                   // bit 30: NextLevelXP (Int32)
+        data.WriteInt32(active.TrialXP.GetValueOrDefault());                       // bit 31: TrialXP (Int32) — was hardcoded 0; live property exists
 
+        // bit 32: Skill (nested SkillInfo[256] of 7 ushorts per slot)
         var skill = active.Skill;
         for (int j = 0; j < 256; j++)
         {
@@ -829,13 +840,20 @@ public partial class ObjectUpdateBuilder
             data.WriteUInt16(skill?.SkillPermBonus[j].GetValueOrDefault() ?? 0);
         }
 
-        data.WriteInt32(active.CharacterPoints.GetValueOrDefault());
-        data.WriteInt32(active.MaxTalentTiers.GetValueOrDefault());
-        data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
+        data.WriteInt32(active.CharacterPoints.GetValueOrDefault());               // bit 33: CharacterPoints (Int32)
+        data.WriteInt32(active.MaxTalentTiers.GetValueOrDefault());                // bit 34: MaxTalentTiers (Int32)
+        data.WriteUInt32(active.TrackCreatureMask ?? 0u);                          // bit 35: TrackCreatureMask (UInt32) — was hardcoded 0; live property exists
+        data.WriteUInt32(0u);                                                      // bit 36: MainhandExpertise (Float) — TYPE MISMATCH: wire is UInt32 here but descriptor says Float. Safe while value=0. TODO read live as Float.
+        data.WriteUInt32(0u);                                                      // bit 37: OffhandExpertise (Float) — TYPE MISMATCH. TODO read live as Float.
+
+        // Block 38 percentages (12 fields: RangedExpertise..OffhandCritPercentage + ShieldBlock-area filler).
+        // All zero today; live values available on ActivePlayerData. TODO unpack per-field.
         for (int z = 0; z < 12; z++)
             data.WriteFloat(0f);
+
+        // Multi-school combat arrays — interleaved by school index 0..6.
+        // bits 270/277/284/291 (parent 269): SpellCritPercentage[7], ModDamageDonePos[7], ModDamageDoneNeg[7], ModDamageDonePercent[7].
+        // All zero today; live values available on ActivePlayerData. TODO read per-element.
         for (int k = 0; k < 7; k++)
         {
             data.WriteFloat(0f);
@@ -843,6 +861,9 @@ public partial class ObjectUpdateBuilder
             data.WriteInt32(0);
             data.WriteFloat(0f);
         }
+
+        // Block 38 remainder (bits 51-68: Mastery/Speed/Avoidance/Sturdiness/Versatility*/PvpPower*/ModHealing*/etc.).
+        // All zero today; live values available on ActivePlayerData. TODO unpack per-field.
         data.WriteInt32(0);
         data.WriteFloat(0f);
         data.WriteFloat(0f);
@@ -853,114 +874,160 @@ public partial class ObjectUpdateBuilder
         data.WriteFloat(0f);
         data.WriteFloat(0f);
         data.WriteFloat(0f);
+
+        // bit 299 (parent 298): ExploredZones[240] (UInt64). Live property exists; TODO per-element read.
         for (int l = 0; l < 240; l++)
             data.WriteUInt64(0uL);
 
-        // RestInfo[2]
-        data.WriteUInt32(0u);
-        data.WriteUInt8(1);
-        data.WriteUInt32(0u);
-        data.WriteUInt8(1);
-        data.WriteInt32(0);
-        data.WriteFloat(0f);
-        data.WriteFloat(0f);
-        data.WriteFloat(0f);
+        // bits 540-541 (parent 539): RestInfo[2] nested struct {Threshold:UInt32, StateID:UInt8}.
+        // Defaults: Threshold=0, StateID=1 per element. TODO read active.RestInfo[r].Threshold/StateID.
+        data.WriteUInt32(0u);                                                      // RestInfo[0].Threshold
+        data.WriteUInt8(1);                                                        // RestInfo[0].StateID (default 1)
+        data.WriteUInt32(0u);                                                      // RestInfo[1].Threshold
+        data.WriteUInt8(1);                                                        // RestInfo[1].StateID (default 1)
+
+        data.WriteInt32(0);                                                        // unmapped placeholder
+        data.WriteFloat(0f);                                                       // unmapped placeholder (likely follow-up scalar)
+        data.WriteFloat(0f);                                                       // unmapped placeholder
+        data.WriteFloat(0f);                                                       // unmapped placeholder
+
+        // bits 543/546 (parent 542): WeaponDmgMultipliers[3], WeaponAtkSpeedMultipliers[3] (both Float, default 1f).
+        // TODO read live: active.WeaponDmgMultipliers?[m] ?? 1f / active.WeaponAtkSpeedMultipliers?[m] ?? 1f.
         for (int m = 0; m < 3; m++)
         {
-            data.WriteFloat(1f);
-            data.WriteFloat(1f);
+            data.WriteFloat(1f);                                                   // WeaponDmgMultipliers[m]
+            data.WriteFloat(1f);                                                   // WeaponAtkSpeedMultipliers[m]
         }
-        data.WriteFloat(0f);
-        data.WriteFloat(0f);
-        data.WriteFloat(0f);
-        data.WriteFloat(0f);
-        data.WriteInt32(0);
-        data.WriteInt32(0);
-        data.WriteUInt32(0u);
-        data.WriteUInt8(0);
-        data.WriteUInt8(0);
-        data.WriteUInt8(0);
-        data.WriteUInt8(0);
-        data.WriteInt32((int)active.AmmoID.GetValueOrDefault());
-        data.WriteUInt32(0u);
+        data.WriteFloat(0f);                                                       // unmapped placeholder
+        data.WriteFloat(0f);                                                       // unmapped placeholder
+        data.WriteFloat(0f);                                                       // unmapped placeholder
+        data.WriteFloat(0f);                                                       // unmapped placeholder
+        data.WriteInt32(0);                                                        // unmapped placeholder
+        data.WriteInt32(0);                                                        // unmapped placeholder
+
+        data.WriteUInt32(0u);                                                      // unmapped placeholder (likely block 70 parent slot)
+        // bits 71-74 (parent 70): block-70 byte cluster — fixed 2026-05-21
+        // (was the action-bar 2/3/4/5 persistence bug).
+        data.WriteUInt8(active.GrantableLevels ?? 0);                              // bit 71: GrantableLevels (UInt8)
+        data.WriteUInt8(active.MultiActionBars ?? 0);                              // bit 72: MultiActionBars (UInt8)
+        data.WriteUInt8(active.LifetimeMaxRank ?? 0);                              // bit 73: LifetimeMaxRank (UInt8)
+        data.WriteUInt8(active.NumRespecs ?? 0);                                   // bit 74: NumRespecs (UInt8)
+        data.WriteInt32((int)active.AmmoID.GetValueOrDefault());                   // bit 75: AmmoID (UInt32?→Int32 cast)
+        data.WriteUInt32(active.PvpMedals ?? 0u);                                  // bit 76: PvpMedals (UInt32) — was hardcoded 0; live property exists
+
+        // bits 550/562 (parent 549): BuybackPrice[12] (UInt32), BuybackTimestamp[12] (Int64 cast from uint?).
+        // Interleaved by slot. Live properties exist; TODO per-element read.
         for (int n = 0; n < 12; n++)
         {
-            data.WriteUInt32(0u);
-            data.WriteInt64(0L);
+            data.WriteUInt32(0u);                                                  // BuybackPrice[n] (UInt32)
+            data.WriteInt64(0L);                                                   // BuybackTimestamp[n] ((long)cast)
         }
+
+        // bits 77-84 (block 70): 8 UInt16 honorable/dishonorable kill counters
+        // (Today/Yesterday/LastWeek/ThisWeek × Honorable/Dishonorable).
+        // Live properties exist; TODO per-bit read.
         for (int o = 0; o < 8; o++)
             data.WriteUInt16(0);
+
+        // bits 85-91 (block 70): 7 UInt32 contribution / lifetime kills / yesterday & lastweek contribution / lastweek rank.
+        // Live properties exist; TODO per-bit read.
         for (int p = 0; p < 7; p++)
             data.WriteUInt32(0u);
-        data.WriteInt32(active.WatchedFactionIndex ?? -1);
+
+        data.WriteInt32(active.WatchedFactionIndex ?? -1);                         // bit 92: WatchedFactionIndex (Int32, default -1)
+
+        // bit 575 (parent 574): CombatRatings[32] (Int32).
         for (int c = 0; c < 32; c++)
             data.WriteInt32(active.CombatRatings?[c].GetValueOrDefault() ?? 0);
-        data.WriteInt32(active.MaxLevel ?? LegacyVersion.GetMaxLevel());
-        data.WriteInt32(0);
-        data.WriteInt32(0);
+
+        data.WriteInt32(active.MaxLevel ?? LegacyVersion.GetMaxLevel());           // bit 93: MaxLevel (Int32, default = per-build cap)
+        data.WriteInt32(0);                                                        // bit 94: ScalingPlayerLevelDelta (Int32) — live property exists, TODO
+        data.WriteInt32(0);                                                        // bit 95: MaxCreatureScalingLevel (Int32) — live property exists, TODO
+
+        // bit 616 (parent 615): NoReagentCostMask[4] (UInt32). Live property exists; TODO per-element read.
         for (int q = 0; q < 4; q++)
             data.WriteUInt32(0u);
-        data.WriteInt32(active.PetSpellPower.GetValueOrDefault());
+
+        data.WriteInt32(active.PetSpellPower.GetValueOrDefault());                 // bit 96: PetSpellPower (Int32)
+
+        // bit 621 (parent 620): ProfessionSkillLine[2] (Int32).
         for (int s = 0; s < 2; s++)
             data.WriteInt32(active.ProfessionSkillLine?[s].GetValueOrDefault() ?? 0);
-        data.WriteFloat(0f);
-        data.WriteFloat(0f);
-        data.WriteInt32(0);
-        data.WriteFloat(active.ModPetHaste ?? 1f);
-        data.WriteUInt8(0);
-        data.WriteUInt8(0);
-        data.WriteUInt8(active.NumBackpackSlots ?? 16);
-        data.WriteInt32(0);
-        data.WriteInt32(0);
-        data.WriteUInt16(0);
-        data.WriteUInt32(0u);
+
+        data.WriteFloat(0f);                                                       // bit 97: UiHitModifier (Float) — live property exists, TODO
+        data.WriteFloat(0f);                                                       // bit 98: UiSpellHitModifier (Float) — live property exists, TODO
+        data.WriteInt32(0);                                                        // bit 99: HomeRealmTimeOffset (Int32) — live property exists, TODO
+        data.WriteFloat(active.ModPetHaste ?? 1f);                                 // bit 100: ModPetHaste (Float, default 1f)
+        data.WriteUInt8(0);                                                        // bit 101: LocalRegenFlags (UInt8) — live property exists, TODO
+        data.WriteUInt8(0);                                                        // bit 103: AuraVision (UInt8) — live property exists, TODO
+        data.WriteUInt8(active.NumBackpackSlots ?? 16);                            // bit 104: NumBackpackSlots (UInt8, default 16)
+        data.WriteInt32(0);                                                        // bit 105: OverrideSpellsID (Int32) — live property exists, TODO
+        data.WriteInt32(0);                                                        // bit 106: LfgBonusFactionID (Int32) — live property exists, TODO
+        data.WriteUInt16(0);                                                       // bit 107: LootSpecID (UInt16 from uint? via (ushort) cast) — live property exists, TODO
+        data.WriteUInt32(0u);                                                      // bit 108: OverrideZonePVPType (UInt32) — live property exists, TODO
+
+        // bit 624 (parent 623): BagSlotFlags[4] (UInt32). Live property exists; TODO per-element read.
         for (int b = 0; b < 4; b++)
             data.WriteUInt32(0u);
+
+        // bit 629 (parent 628): BankBagSlotFlags[7] (UInt32). Live property exists; TODO per-element read.
         for (int b = 0; b < 7; b++)
             data.WriteUInt32(0u);
+
+        // bit 637 (parent 636): QuestCompleted[875] (UInt64). Live property exists; TODO per-element read.
         for (int qc = 0; qc < 875; qc++)
             data.WriteUInt64(0uL);
-        data.WriteInt32(active.Honor.GetValueOrDefault());
-        data.WriteInt32(active.HonorNextLevel ?? 5500);
-        data.WriteInt32(0);
-        data.WriteInt32((int?)active.PvPTierMaxFromWins ?? -1);
-        data.WriteInt32((int?)active.PvPLastWeeksTierMaxFromWins ?? -1);
-        data.WriteUInt8(0);
-        data.WriteInt32(0);
+
+        data.WriteInt32(active.Honor.GetValueOrDefault());                         // bit 109: Honor (Int32)
+        data.WriteInt32(active.HonorNextLevel ?? 5500);                            // bit 110: HonorNextLevel (Int32, default 5500)
+        data.WriteInt32(0);                                                        // bit 111: Field_F74 — descriptor: unused
+        data.WriteInt32((int?)active.PvPTierMaxFromWins ?? -1);                    // bit 112: PvPTierMaxFromWins (uint?→Int32 cast, default -1)
+        data.WriteInt32((int?)active.PvPLastWeeksTierMaxFromWins ?? -1);           // bit 113: PvPLastWeeksTierMaxFromWins (uint?→Int32 cast, default -1)
+        data.WriteUInt8(0);                                                        // bit 114: PvPRankProgress (UInt8) — live property exists, TODO
+        data.WriteInt32(0);                                                        // bits 115-119: unused per descriptor
+
+        // 16 UInt32 placeholder block — unmapped against current V3_4_3 descriptor.
+        // Likely V3_4_3-only telemetry array (e.g. SeasonRewardsEarned / Field_F90+).
         for (int u = 0; u < 16; u++)
             data.WriteUInt32(0u);
-        data.WriteInt32(0);
-        data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
 
+        data.WriteInt32(0);                                                        // unmapped placeholder
+        data.WriteUInt32(0u);                                                      // unmapped placeholder
+        data.WriteUInt32(0u);                                                      // unmapped placeholder
+
+        // bit 1512 GlyphsGroup (CustomField, sources from _gameState — not ActivePlayerData).
         for (int g = 0; g < PlayerConst.MaxGlyphSlots; g++)
         {
-            data.WriteUInt32(_gameState.ActiveGlyphSlotIds[g]);
-            data.WriteUInt32(_gameState.ActiveGlyphs[g]);
+            data.WriteUInt32(_gameState.ActiveGlyphSlotIds[g]);                    // GlyphSlots[g]
+            data.WriteUInt32(_gameState.ActiveGlyphs[g]);                          // Glyphs[g]
         }
-        data.WriteUInt8(_gameState.GlyphsEnabled);
-        data.WriteUInt8(0); // LfgRoles
-        data.WriteUInt32(0u);
-        data.WriteUInt32(0u);
-        data.WriteUInt8(0);
+        data.WriteUInt8(_gameState.GlyphsEnabled);                                 // bit 120: GlyphsEnabled (UInt8, from _gameState)
+        data.WriteUInt8(0);                                                        // LfgRoles placeholder
+        data.WriteUInt32(0u);                                                      // unmapped placeholder
+        data.WriteUInt32(0u);                                                      // unmapped placeholder
+        data.WriteUInt8(0);                                                        // unmapped placeholder
+
+        // bits 608-614 (parent 607): PvpInfo[7] nested struct.
+        // Per-element layout per WriteUpdateActivePlayerPvpInfo: Int8 + 16×UInt32 + 1 bit + FlushBits.
+        // Live property is PVPInfo[6] on ActivePlayerData. TODO mirror update writer.
         for (int t = 0; t < 7; t++)
         {
-            data.WriteInt8(0);
+            data.WriteInt8(0);                                                     // PvpInfo[t]: per-element prefix byte
             for (int x = 0; x < 16; x++)
-                data.WriteUInt32(0u);
-            data.WriteBit(false);
+                data.WriteUInt32(0u);                                              // PvpInfo[t]: 16× UInt32 payload (Rating/SeasonPlayed/WeeklyPlayed/etc.)
+            data.WriteBit(false);                                                  // PvpInfo[t]: Disqualified bit
             data.FlushBits();
         }
         data.FlushBits();
-        data.WriteBit(false);
-        data.WriteBit(false);
-        data.WriteBit(false);
+        data.WriteBit(false);                                                      // trailing bit placeholder (PvpInfo group cap?)
+        data.WriteBit(false);                                                      // trailing bit placeholder
+        data.WriteBit(false);                                                      // trailing bit placeholder
         data.FlushBits();
-        data.WriteUInt32(0u);
+        data.WriteUInt32(0u);                                                      // trailing UInt32 placeholder
         for (int e = 0; e < 8; e++)
-            data.WriteInt32(0);
-        data.WriteInt64(0L);
-        data.WriteBit(false);
+            data.WriteInt32(0);                                                    // trailing 8× Int32 placeholder
+        data.WriteInt64(0L);                                                       // trailing Int64 placeholder
+        data.WriteBit(false);                                                      // trailing bit placeholder
         data.FlushBits();
         data.FlushBits();
     }
