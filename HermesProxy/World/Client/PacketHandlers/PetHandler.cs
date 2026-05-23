@@ -1,11 +1,8 @@
-﻿using Framework;
-using Framework.Logging;
+﻿using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
-using System;
-using System.Collections.Generic;
 
 namespace HermesProxy.World.Client;
 
@@ -68,7 +65,16 @@ public partial class WorldClient
 
         byte spellCount = packet.ReadUInt8();
         for (int i = 0; i < spellCount; i++)
-            spells.Actions.Add(packet.ReadUInt32());
+        {
+            uint raw = packet.ReadUInt32();
+            // Actions list uses the same encoding as ActionButtons. Native TC 3.4.3
+            // sniff shows entries packed as (slot:9 | spell:23) — without translation
+            // the V3_4_3 client mis-decodes the spell IDs and refuses to bind the
+            // spellbook pet tab. ActionButtons already get this treatment above.
+            spells.Actions.Add(translateActionEncoding
+                ? TranslateLegacyPetActionButtonToV343(raw)
+                : raw);
+        }
 
         byte cdCount = packet.ReadUInt8();
         for (int i = 0; i < cdCount; i++)
@@ -87,17 +93,11 @@ public partial class WorldClient
             spells.Cooldowns.Add(cooldown);
         }
 
-        // SMSG_PET_LEARNED_SPELLS must arrive BEFORE the pet's CreateObject — the V3_4_3
-        // client's HasPetSpells() (which gates the spellbook pet-tab visibility) registers
-        // spells from LEARNED_SPELLS into a buffer that gets bound at pet-create time.
-        // Once the pet exists, post-create LEARNED_SPELLS go to action-bar bindings only,
-        // not the spellbook. Capture-diff (World_native_pet_parsed.txt Numbers 1916-1924)
-        // shows native order: 4× LEARNED_SPELLS at T=06.880-881 → pet CreateObject at
-        // T=06.885 → PET_SPELLS_MESSAGE at T=06.891. Iter-10: emit LEARNED_SPELLS NOW,
-        // before any cache-or-forward branch, so they reach the client before pet's
-        // CreateObject regardless of which path PetSpells takes.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-            EmitSynthesizedPetLearnedSpells(spells);
+        // Real SMSG_PET_LEARNED_SPELLS from the legacy server (opcode 0x499) is
+        // forwarded by HandlePetLearnedSpells at the bottom of this file — fires
+        // only on actual learn events (tame, level-up). Native TC 3.4.3 sniff
+        // confirms no LEARNED is emitted on re-summon / zone / login when the
+        // pet's spells are already known.
 
         // V3_4_3 + cmangos: SMSG_PET_SPELLS_MESSAGE arrives BEFORE the pet's
         // CreateObject. spells.PetGUID was just translated against an empty pet
@@ -119,78 +119,13 @@ public partial class WorldClient
             return;
         }
 
-        // Specialization=0 matches CypherCore native (`Source/Game/Networking/Packets/PetPackets.cs:79`
-        // writes WriteUInt16((ushort)Specialization) where m_petSpecialization defaults to 0).
-        // Default `-1` here writes 0xFFFF on the wire — the V3_4_3 client may treat that as
-        // an invalid spec and refuse to render the spellbook tab.
-        spells.Specialization = 0;
+        // Specialization stays at its default -1 (0xFFFF on wire). Native TC 3.4.3
+        // sniff (World_hunter_pet_tame_pet_actionbar_pet_spellbook) shows every
+        // SMSG_PET_SPELLS_MESSAGE — tame, re-summon, login, zone — carries -1 for
+        // hunter pets; warlock pets are what use 0..N spec values.
         Log.Print(LogType.Trace,
             $"[PetSpellbookTab] emit summary: PetGUID={spells.PetGUID} family={spells.CreatureFamily} spec={spells.Specialization} → SMSG_PET_SPELLS_MESSAGE");
         SendPacketToClient(spells);
-    }
-
-    private void EmitSynthesizedPetLearnedSpells(PetSpells spells)
-    {
-        var seen = ExtractPetCastableSpellIds(spells);
-        int totalActionButtons = 0;
-        foreach (uint b in spells.ActionButtons) if (b != 0) totalActionButtons++;
-        Log.Print(LogType.Trace,
-            $"[PetSpellbookTab] castable count={seen.Count} ids=[{string.Join(",", seen)}] (filtered from {totalActionButtons} non-zero ActionButtons + {spells.Actions.Count} Actions; slot ∈ {{0x101, 0x181}})");
-        if (seen.Count == 0 && totalActionButtons > 0)
-        {
-            // Diagnostic: dump raw button slot/spell pairs when the filter rejected all
-            // non-zero buttons. Helps identify slot-encoding quirks for vehicles vs. pets.
-            for (int i = 0; i < spells.ActionButtons.Length; i++)
-            {
-                uint b = spells.ActionButtons[i];
-                if (b == 0) continue;
-                Log.Print(LogType.Trace,
-                    $"[PetSpellbookTab][rejected] slot[{i}]=0x{(b >> 23):X3} spellId={b & 0x7FFFFF} raw=0x{b:X8}");
-            }
-        }
-        if (seen.Count == 0) return;
-
-        foreach (uint spellId in seen)
-        {
-            var learned = new PetLearnedSpells();
-            learned.Spells.Add(spellId);
-            SendPacketToClient(learned);
-        }
-    }
-
-    // ActionButton slot encoding (modern V3_4_3 after TranslateLegacyPetActionButtonToV343):
-    //   0x000 = Passive / Show
-    //   0x001 = Hidden
-    //   0x006 = ReactState (command/react byte, not a spell)
-    //   0x007 = CommandState
-    //   0x101 = Manual cast — castable spell, autocast off
-    //   0x181 = AutoCast — castable spell, autocast on
-    //
-    // BOTH 0x101 (manual) and 0x181 (autocast) represent castable pet spells that should
-    // appear in the spellbook tab. Whether autocast is on or off is a per-spell user toggle
-    // (right-click in WoW UI), not a "this isn't a spell" signal. CypherCore native happens
-    // to ship all 4 castables in 0x101 state, but TC pets routinely have autocast enabled
-    // on default abilities (Bite, Claw, etc.) — they ship as 0x181.
-    //
-    // Iter-7 mistakenly restricted to 0x101 only (capture-diff saw native's 4×0x101 and
-    // generalized incorrectly). Iter-9 fixed: include 0x181 too.
-    //
-    // The wider Actions list (passives + family abilities) is intentionally NOT replicated
-    // as LEARNED_SPELLS — those aren't castable spellbook entries.
-    // Public-static so QueryHandler.FlushDeferredUpdatesFor can call it on cached PendingPetSpells.
-    public static HashSet<uint> ExtractPetCastableSpellIds(PetSpells spells)
-    {
-        var seen = new HashSet<uint>();
-        foreach (uint button in spells.ActionButtons)
-        {
-            if (button == 0) continue;
-            uint slot = button >> 23;
-            uint spellId = button & 0x7FFFFF;
-            if (spellId == 0) continue;
-            if (slot != 0x101 && slot != 0x181) continue;  // castable: manual OR autocast
-            seen.Add(spellId);
-        }
-        return seen;
     }
 
     [PacketHandler(Opcode.SMSG_PET_ACTION_SOUND)]
@@ -357,8 +292,8 @@ public partial class WorldClient
         // byte is a UI position (0x08..0x11 for the vehicle bar), not a CharmInfo state.
         // Anything outside the known CharmInfo state values that still carries a non-zero
         // spell ID must be a vehicle/charm castable; map to ManualCast (0x101) so the V3_4_3
-        // client renders it as a clickable bar entry and EmitSynthesizedPetLearnedSpells
-        // adds it to PET_LEARNED_SPELLS. Empty slots (high byte = index, spell = 0) stay 0.
+        // client renders it as a clickable bar entry. Empty slots (high byte = index,
+        // spell = 0) stay 0.
         // EXCEPTION: vehicle slots may also hold passive control auras (e.g. Frostbrood
         // Vanquisher Flight 53112 in DK quest 12779). TC's VehicleSpellInitialize ships
         // every m_spells[] entry — including IsPassive() ones — into the action bar with

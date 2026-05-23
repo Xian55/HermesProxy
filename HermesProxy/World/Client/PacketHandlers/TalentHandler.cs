@@ -134,9 +134,9 @@ public partial class WorldClient
             byte rank = packet.ReadUInt8();
             group.Talents.Add(new TalentEntry { TalentID = talentId, Rank = rank });
         }
-        // Pad to PlayerConst.MaxGlyphSlots with zero glyphs to match CypherCore's wire shape.
-        for (int g = 0; g < PlayerConst.MaxGlyphSlots; ++g)
-            group.Glyphs.Add(0);
+        // Native TC 3.4.3 ships GlyphCount=0 for pet talent groups (sniff
+        // World_hunter_pet_tame_pet_actionbar_pet_spellbook lines 76367-76368);
+        // padding zeros widens the body and the client refuses to bind the pet tab.
 
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
             return;
@@ -149,7 +149,11 @@ public partial class WorldClient
         };
         modern.TalentGroups.Add(new TalentGroupInfo
         {
-            SpecID = 0,
+            // 0xFF = "no spec" sentinel. Native TC 3.4.3 sniff
+            // (World_hunter_pet_tame_pet_actionbar_pet_spellbook) line 76369 shows
+            // pet talent groups carry SpecID=255 every time; using 0 here makes the
+            // V3_4_3 client refuse to bind the spellbook pet tab.
+            SpecID = 255,
             PrimarySpecialization = 0,
             Talents = new List<TalentEntry>(group.Talents),
             Glyphs = new List<ushort>(group.Glyphs),

@@ -731,13 +731,12 @@ public partial class WorldClient
                         var stale = pendingSpells.PetGUID;
                         pendingSpells.PetGUID = corrected;
 
-                        // LEARNED_SPELLS were already emitted at HandlePetSpellsMessage
-                        // entry (iter-10), BEFORE the pet's CreateObject — the V3_4_3
-                        // spellbook pet tab requires that pre-create ordering. Don't
-                        // re-emit here or the client gets duplicates.
-                        pendingSpells.Specialization = 0;
+                        // No LEARNED synthesis here — real LEARNED is forwarded from
+                        // the legacy server only on actual learn events (see
+                        // PetHandler.HandlePetLearnedSpells). Specialization stays at
+                        // its default -1 to match native TC 3.4.3 wire.
                         Log.Print(LogType.Trace,
-                            $"[PetSpellsFlush] (deferred) sending cached SMSG_PET_SPELLS_MESSAGE — stale={stale} corrected={corrected} spec=0");
+                            $"[PetSpellsFlush] (deferred) sending cached SMSG_PET_SPELLS_MESSAGE — stale={stale} corrected={corrected} spec={pendingSpells.Specialization}");
                         SendPacketToClient(pendingSpells);
                         session.GameState.PendingPetSpells = null;
                         session.GameState.PendingPetSpellsLegacyGuid = null;

@@ -642,10 +642,10 @@ public partial class WorldClient
                     var stalePetGuid = pendingSpells.PetGUID;
                     pendingSpells.PetGUID = correctedPetGuid;
 
-                    // Synthesize SMSG_PET_LEARNED_SPELLS BEFORE the spells message so
-                    // the V3_4_3 client registers pet-castable spells (Phase 9).
-                    EmitSynthesizedPetLearnedSpells(pendingSpells);
-
+                    // No LEARNED synthesis: real SMSG_PET_LEARNED_SPELLS is forwarded
+                    // by PetHandler.HandlePetLearnedSpells only on actual server learn
+                    // events. Native TC 3.4.3 sniff shows zero LEARNED on login /
+                    // re-summon, and the pet tab binds from SPELLS_MESSAGE alone.
                     Log.Print(LogType.Trace,
                         $"[PetSpellsFlush] sending cached SMSG_PET_SPELLS_MESSAGE — stale={stalePetGuid} corrected={correctedPetGuid}");
                     SendPacketToClient(pendingSpells);
