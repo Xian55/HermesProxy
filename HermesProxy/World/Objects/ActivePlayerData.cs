@@ -148,6 +148,7 @@ public class ActivePlayerData
     public uint? PvPLastWeeksTierMaxFromWins;
     public bool? InsertItemsLeftToRight;
     public byte? PvPRankProgress;
+    public byte? GlyphsEnabled;
 
     // Dynamic Fields
     public List<uint> SelfResSpells = null!;

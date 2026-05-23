@@ -194,8 +194,14 @@ public class ActivePlayerSectionEquivalenceTests
             gs.ActiveGlyphsDirty = true;
             gs.ActiveGlyphs[0] = 4444;
             gs.ActiveGlyphs[5] = 7777;
+            a.GlyphsEnabled = 0x3F;
             gs.GlyphsEnabled = 0x3F;
-            a.AuraVision = 1; // triggers bit 120 GlyphsEnabled write (Block 102)
+        }) };
+        yield return new object[] { "glyphs-enabled-only", (Action<ActivePlayerData, GameSessionData>)((a, gs) =>
+        {
+            // Level-up scenario: only the unlock bitmask changed; equipped glyphs untouched.
+            a.GlyphsEnabled = 0x03; // L15: slots 0,1 unlocked
+            gs.GlyphsEnabled = 0x03;
         }) };
         yield return new object[] { "skill-rank-up", (Action<ActivePlayerData, GameSessionData>)((a, _) =>
         {
@@ -218,6 +224,7 @@ public class ActivePlayerSectionEquivalenceTests
             a.RestInfo[0] = new RestInfo { Threshold = 50u, StateID = 1u };
             a.PvpInfo[3] = new PVPInfo { Rating = 1800 };
             gs.ActiveGlyphsDirty = true;
+            a.GlyphsEnabled = 0x3F;
             gs.GlyphsEnabled = 0x3F;
         }) };
     }
@@ -273,6 +280,20 @@ public class ActivePlayerSectionEquivalenceTests
         session.ActiveGlyphsDirty = true;
         var guid = WowGuid128.Create(HighGuidType703.Player, 1);
         var builder = MakeBuilder(guid, session, out var update);
+
+        Assert.True(builder.HasAnyActivePlayerFieldSet());
+    }
+
+    [Fact]
+    public void HasAnyActivePlayerFieldSet_GlyphsEnabledSet_ReturnsTrue()
+    {
+        // Level-up scenario: legacy PLAYER_GLYPHS_ENABLED bitmask flipped (slot
+        // unlock at L15/30/50/70/80). Must fan into ActivePlayer Values delta or
+        // unlock UI lags until relog.
+        var session = CreateGameSession();
+        var guid = WowGuid128.Create(HighGuidType703.Player, 1);
+        var builder = MakeBuilder(guid, session, out var update);
+        update.ActivePlayerData!.GlyphsEnabled = 0x03;
 
         Assert.True(builder.HasAnyActivePlayerFieldSet());
     }
@@ -408,6 +429,7 @@ public class ActivePlayerSectionEquivalenceTests
         if (a.PvPTierMaxFromWins.HasValue) { blocks.SetBit(102); blocks.SetBit(112); }
         if (a.PvPLastWeeksTierMaxFromWins.HasValue) { blocks.SetBit(102); blocks.SetBit(113); }
         if (a.PvPRankProgress.HasValue) { blocks.SetBit(102); blocks.SetBit(114); }
+        if (a.GlyphsEnabled.HasValue) { blocks.SetBit(102); blocks.SetBit(120); }
 
         for (int i = 0; i < 141; i++)
         {
@@ -620,9 +642,9 @@ public class ActivePlayerSectionEquivalenceTests
             if (blocks.IsBitSet(112)) data.WriteInt32((int)a.PvPTierMaxFromWins!.Value);
             if (blocks.IsBitSet(113)) data.WriteInt32((int)a.PvPLastWeeksTierMaxFromWins!.Value);
             if (blocks.IsBitSet(114)) data.WriteUInt8(a.PvPRankProgress!.Value);
-            if (blocks.IsBitSet(120)) data.WriteUInt8(gameState.GlyphsEnabled);
-            data.FlushBits();
         }
+        if (blocks.IsBitSet(120)) data.WriteUInt8(a.GlyphsEnabled!.Value);
+        data.FlushBits();
 
         if (blocks.IsBitSet(124))
         {

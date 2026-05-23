@@ -1189,12 +1189,6 @@ public partial class ObjectUpdateBuilder
         }
     }
 
-    // GlyphsEnabled (bit 120) — read from _gameState.
-    internal void WriteUpdateActivePlayerGlyphsEnabled(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
-    {
-        data.WriteUInt8(_gameState.GlyphsEnabled);
-    }
-
     // Glyphs group (bit 1512) — interleaved GlyphSlots[0..5] then Glyphs[0..5],
     // each gated on its element bit (1513+i / 1519+i). Source = _gameState.
     internal void WriteUpdateActivePlayerGlyphsGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)

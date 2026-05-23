@@ -273,10 +273,13 @@ public enum ActivePlayerField
     [DescriptorUpdateField(nameof(ActivePlayerData.PvPRankProgress), DescriptorType.UInt8, bit: 114, ParentBit = 102)]
     ACTIVEPLAYER_PVP_RANK_PROGRESS,
     // bits 115-119: skipped
-    // bit 120: GlyphsEnabled — Custom (read from _gameState, not ActivePlayerData).
-    [DescriptorCustomField("GlyphsEnabled", bit: 120,
-        customWriter: nameof(HermesProxy.World.Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.WriteUpdateActivePlayerGlyphsEnabled),
-        WriteOnly = true)]
+    // bit 120: GlyphsEnabled — nested under parent bit 102 in the V3_4_3 changesMask
+    // (WPP V3_4_0 UpdateFieldsHandler343.cs:3389-3454 — bits 103-123 all live inside
+    // `if (changesMask[102])`). ParentBit=102 makes the generator emit
+    // `if (src.GlyphsEnabled.HasValue) { blocks.SetBit(102); blocks.SetBit(120); }`
+    // automatically. Source-driven from ActivePlayerData.GlyphsEnabled which
+    // UpdateHandler populates alongside the _gameState cache used by the Create path.
+    [DescriptorUpdateField(nameof(ActivePlayerData.GlyphsEnabled), DescriptorType.UInt8, bit: 120, ParentBit = 102)]
     ACTIVEPLAYER_GLYPHS_ENABLED,
     // bits 121-123: skipped
     // PostFlush after bit 120 — hand-port has explicit data.FlushBits() before

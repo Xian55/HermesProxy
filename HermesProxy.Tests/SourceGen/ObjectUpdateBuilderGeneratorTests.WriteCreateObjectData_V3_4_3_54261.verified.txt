@@ -101,6 +101,7 @@ public partial class ObjectUpdateBuilder
         if (src.PvPTierMaxFromWins.HasValue) { blocks.SetBit(102); blocks.SetBit(112); }
         if (src.PvPLastWeeksTierMaxFromWins.HasValue) { blocks.SetBit(102); blocks.SetBit(113); }
         if (src.PvPRankProgress.HasValue) { blocks.SetBit(102); blocks.SetBit(114); }
+        if (src.GlyphsEnabled.HasValue) { blocks.SetBit(102); blocks.SetBit(120); }
         if (src.TrackResourceMask != null && src.TrackResourceMask[0].HasValue) { blocks.SetBit(266); blocks.SetBit(267); }
         if (src.TrackResourceMask != null && src.TrackResourceMask[1].HasValue) { blocks.SetBit(266); blocks.SetBit(268); }
         if (src.SpellCritPercentage != null && src.SpellCritPercentage[0].HasValue) { blocks.SetBit(269); blocks.SetBit(270); }
@@ -1433,7 +1434,7 @@ public partial class ObjectUpdateBuilder
         if (blocks.IsBitSet(112)) data.WriteInt32((int)src.PvPTierMaxFromWins!.Value);
         if (blocks.IsBitSet(113)) data.WriteInt32((int)src.PvPLastWeeksTierMaxFromWins!.Value);
         if (blocks.IsBitSet(114)) data.WriteUInt8(src.PvPRankProgress!.Value);
-        if (blocks.IsBitSet(120)) WriteUpdateActivePlayerGlyphsEnabled(data, ref blocks, src);
+        if (blocks.IsBitSet(120)) data.WriteUInt8(src.GlyphsEnabled!.Value);
         data.FlushBits();
         if (blocks.IsBitSet(124)) WriteUpdateActivePlayerInvSlotsGroup(data, ref blocks, src);
         if (blocks.IsBitSet(267)) data.WriteUInt32(src.TrackResourceMask![0]!.Value);
@@ -2761,6 +2762,7 @@ public partial class ObjectUpdateBuilder
         if (src.PvPTierMaxFromWins.HasValue) return true;
         if (src.PvPLastWeeksTierMaxFromWins.HasValue) return true;
         if (src.PvPRankProgress.HasValue) return true;
+        if (src.GlyphsEnabled.HasValue) return true;
         if (src.TrackResourceMask != null) for (int i = 0; i < 2; i++) if (src.TrackResourceMask[i].HasValue) return true;
         if (src.SpellCritPercentage != null) for (int i = 0; i < 7; i++) if (src.SpellCritPercentage[i].HasValue) return true;
         if (src.ModDamageDonePos != null) for (int i = 0; i < 7; i++) if (src.ModDamageDonePos[i].HasValue) return true;

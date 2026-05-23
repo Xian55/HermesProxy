@@ -3007,6 +3007,7 @@ public partial class WorldClient
             {
                 byte mask = (byte)(updates[PLAYER_GLYPHS_ENABLED].UInt32Value & 0xFF);
                 GetSession().GameState.GlyphsEnabled = mask;
+                updateData.ActivePlayerData.GlyphsEnabled = mask;
                 Log.Print(LogType.Network, $"[Glyphs] PLAYER_GLYPHS_ENABLED bitmask=0x{mask:X2}");
             }
             // PLAYER_FIELD_GLYPHS_1..6 (uint32 each). Legacy server sends these as Values
