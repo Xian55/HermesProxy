@@ -146,7 +146,8 @@ These shipped before any WotLK-specific work; every entry below assumes them.
 | Mail — open + inbox + take attachments + COD pay + delete | ✅ | ❓ | 2026-05-09 — V3_4_3 wire-format fix (`d3004b1`); 12-attachment + 1-COD mail end-to-end on TC; V1_14/V2_5 regression-clean; cMangos untested |
 | Achievement panel — earned + criteria progress | ❌ | ❓ | 2026-05-21 diff vs native TC 3.4.3: proxy ships an 8-byte `EmptyAllAchievementData` stub (`World/Server/Packets/EmptyInitPackets.cs:33-42`, scheduled from `World/Client/PacketHandlers/CharacterHandler.cs:386`). Legacy 3.3.5a server DOES send `SMSG_ALL_ACHIEVEMENT_DATA` (opcode `0x047D`, ~1.6 KB) but no `[PacketHandler]` exists — data silently discarded. Achievement UI fully silent on V3_4_3 client. See `wotlk.md` § *TODO — Not yet bridged* (F). |
 | Account heirloom panel — collection listing | ❌ | ❓ | 2026-05-21 diff: proxy ships an `EmptyAccountHeirloomUpdate` 13-byte stub (`EmptyInitPackets.cs:155-167`, from `CharacterHandler.cs:404`). Native TC 3.4.3 sends 38 heirloom item IDs unconditionally (CollectionMgr feature with no 3.3.5a equivalent). Modern client's heirloom panel renders empty. Cosmetic only — items themselves don't function as heirlooms on the legacy backend. See *TODO* (G). |
-| Spellbook fresh-login animations (`InitialLogin` flag) | ❌ | ❌ | 2026-05-21 diff: `SMSG_SEND_KNOWN_SPELLS.InitialLogin` blindly forwards the legacy bool (`World/Client/PacketHandlers/SpellHandler.cs:21`), which 3.3.5a always sends `false`. Native TC 3.4.3 sets it to `true` for the player's first SendKnownSpells after world-enter (`Player.cpp` → `InitialLogin = IsLoading();`). V3_4_3 client likely skips new-spell highlight / first-time spellbook animations on enter-world. Cosmetic, 1-line fix. See *TODO* (I). |
+| Spellbook fresh-login animations (`InitialLogin` flag) | ✅ | ✅ | 2026-05-23: `SMSG_SEND_KNOWN_SPELLS.InitialLogin` now synthesised from `GameState.IsFirstEnterWorld` for V3_4_3 (`SpellHandler.cs:21-24`); V1_14/V2_5 still forward legacy bool. Matches TC 3.4.3 `IsLoading()` semantics. |
+| Pet spellbook tab + chat spam on login | ✅ | ✅ | 2026-05-23: V3_4_3 pet tab refused to bind. Four diffs vs native sniff `World_hunter_pet_tame_pet_actionbar_pet_spellbook`: (1) `SMSG_PET_SPELLS_MESSAGE.Specialization` forced to `0` instead of native `-1` (removed overrides in `PetHandler.cs:126` + `QueryHandler.cs:738`); (2) `Actions[]` shipped legacy-encoded — added `TranslateLegacyPetActionButtonToV343` mapping in `PetHandler.cs:69-78` to match modern `(slot:9 \| spell:23)`; (3) `SMSG_UPDATE_TALENT_DATA(IsPetTalents=true)` SpecID was 0 / GlyphCount padded to 6 — fixed to 255 / 0 in `TalentHandler.ForwardPetTalents`; (4) synth `SMSG_PET_LEARNED_SPELLS` on every PetSpellsMessage caused "You learned X" spam on login — removed (real LEARNED still forwarded on tame/level-up via `PetHandler.HandlePetLearnedSpells`). |
 | Flat / Pct spell modifier array shape | ⚠️ | ⚠️ | 2026-05-21 diff: native TC 3.4.3 always emits canonical 40-row spell modifier array (~204 B, mostly empty rows); proxy writes only populated mods (~14 B). Unverified whether V3_4_3 client requires the 40-row form or accepts dynamic count. No symptom reported by user yet — flagged as suspect for later disasm verification. See *TODO* (H). |
 | repair | ❌ | ❓ | After pressing the repair button nothing happenin. Received opcode CMSG_REPAIR_ITEM (13548) - Sending opcode CMSG_REPAIR_ITEM (680) |
 
@@ -561,23 +562,24 @@ Fix path (~10 LOC if confirmed):
 - Modify `World/Server/Packets/SpellPackets.cs` `SetFlatSpellModifier::Write()` to pad the Modifiers array to 40 entries (each empty entry: `modIndex:0, count:0`) before write. Same change for `SetPctSpellModifier` likely.
 - **Verify first** before shipping: read V3_4_3 client's `SMSG_SET_FLAT_SPELL_MODIFIER` handler via IDA/Ghidra to confirm loop iterates `count` from the wire vs hardcoded 40. If dynamic, this is a non-bug; if hardcoded 40, fix is required.
 
-### I. SMSG_SEND_KNOWN_SPELLS `InitialLogin` flag — always False (should be True on fresh world-enter)
+### I. ~~SMSG_SEND_KNOWN_SPELLS `InitialLogin` flag~~ — FIXED 2026-05-23
 
-Symptom: V3_4_3 client may skip first-time spellbook setup animations / new-spell highlights because `InitialLogin` is false on enter-world; mostly cosmetic but TC 3.4.3 sets it `true` for the player's first `SendKnownSpells` after entering world.
-
-Root cause: `World/Client/PacketHandlers/SpellHandler.cs` (~line 21) reads the legacy `InitialLogin` bool and forwards it unchanged. Legacy 3.3.5a always sends `false`.
-
-Fix path (1-line):
-- Replace pass-through with `spells.InitialLogin = !GetSession().GameState.IsInWorld;` so the flag is `true` only before the in-world transition completes, `false` on subsequent zone changes.
-- TC 3.4.3 reference: `Player.cpp` ~`SendKnownSpells` sets `InitialLogin = IsLoading();`.
+Resolved. `SpellHandler.cs:21-24` now sets
+`spells.InitialLogin = GameState.IsFirstEnterWorld` for V3_4_3 only
+(other builds forward the legacy bool unchanged). Matches TC 3.4.3
+`IsLoading()` semantics: true during the first SendKnownSpells after
+`CMSG_PLAYER_LOGIN`, false on subsequent zone changes (flipped in
+`MovementHandler.HandleTransferPending` / `HandleNewWorld`). Original
+wotlk.md suggestion `!IsInWorld` was inverted vs packet ordering —
+`IsInWorld` is set true inside `SMSG_LOGIN_VERIFY_WORLD` *before*
+`SMSG_INITIAL_SPELLS` arrives, so the expression would always be false.
 
 ### Implementation priority
 
 | # | Fix | Effort | User-visible impact |
 |---|---|---|---|
-| I | InitialLogin flag | XS (1-line) | Tiny — spellbook animations |
 | F | All achievement data | M (~150 LOC) | Achievement UI fully silent until fixed |
 | G | Account heirlooms (Option α) | S (~50 LOC) | Heirloom collection panel empty |
 | H | Flat spell modifier 40-row pad | XS (~10 LOC, after verification) | Unknown — verify client behavior first |
 
-All four scoped V3_4_3-gated; V1_14 / V2_5 paths unaffected.
+All three scoped V3_4_3-gated; V1_14 / V2_5 paths unaffected.
