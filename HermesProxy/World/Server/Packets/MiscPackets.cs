@@ -271,8 +271,8 @@ class AllAccountCriteria : ServerPacket, ISpanWritable
 
     // Cap for account criteria - reduced from 256 to 32 based on typical usage (0 observed)
     private const int MaxCriteria = 32;
-    // Per criteria: uint(4) + ulong(8) + GUID(18) + PackedTime(4) + 2 uints(8) + bits(1) + optional ulong(8) = 51 bytes max
-    private const int MaxCriteriaSize = 51;
+    // Per criteria: uint(4) + ulong(8) + GUID(18) + Unused(4) + Flags(4) + PackedTime(4) + 2 int64(16) + bit(1) + optional ulong(8) = 67 bytes max
+    private const int MaxCriteriaSize = 67;
     // count(4) + criteria
     public int MaxSize => 4 + MaxCriteria * MaxCriteriaSize;
 
@@ -288,10 +288,11 @@ class AllAccountCriteria : ServerPacket, ISpanWritable
             writer.WriteUInt32(progress.Id);
             writer.WriteUInt64(progress.Quantity);
             writer.WritePackedGuid128(progress.Player.Low, progress.Player.High);
+            writer.WriteUInt32(0u);                                        // Unused_10_1_5
+            writer.WriteUInt32(progress.Flags);
             writer.WriteUInt32(Time.GetPackedTimeFromUnixTime(progress.Date));
-            writer.WriteUInt32(progress.TimeFromStart);
-            writer.WriteUInt32(progress.TimeFromCreate);
-            writer.WriteBits(progress.Flags, 4);
+            writer.WriteInt64(progress.TimeFromStart);
+            writer.WriteInt64(progress.TimeFromCreate);
             writer.WriteBit(progress.RafAcceptanceID.HasValue);
             writer.FlushBits();
 
@@ -304,32 +305,36 @@ class AllAccountCriteria : ServerPacket, ISpanWritable
     public List<CriteriaProgressPkt> Progress = new();
 }
 
+// Wire layout per TC 3.4.3 src/server/game/Server/Packets/AchievementPackets.{h,cpp}
+// + PacketUtilities.h Duration<Seconds>/Timestamp = Int64. Shared by
+// AllAccountCriteria, AllAchievementData, CriteriaUpdate.
 public struct CriteriaProgressPkt
 {
+    public uint Id;
+    public ulong Quantity;
+    public WowGuid128 Player;
+    public uint Flags;
+    public long Date;
+    public long TimeFromStart;
+    public long TimeFromCreate;
+    public ulong? RafAcceptanceID;
+
     public void Write(WorldPacket data)
     {
         data.WriteUInt32(Id);
         data.WriteUInt64(Quantity);
         data.WritePackedGuid128(Player);
+        data.WriteUInt32(0u);          // Unused_10_1_5
+        data.WriteUInt32(Flags);
         data.WritePackedTime(Date);
-        data.WriteUInt32(TimeFromStart);
-        data.WriteUInt32(TimeFromCreate);
-        data.WriteBits(Flags, 4);
+        data.WriteInt64(TimeFromStart);
+        data.WriteInt64(TimeFromCreate);
         data.WriteBit(RafAcceptanceID.HasValue);
         data.FlushBits();
 
         if (RafAcceptanceID.HasValue)
             data.WriteUInt64(RafAcceptanceID.Value);
     }
-
-    public uint Id;
-    public ulong Quantity;
-    public WowGuid128 Player;
-    public uint Flags;
-    public long Date;
-    public uint TimeFromStart;
-    public uint TimeFromCreate;
-    public ulong? RafAcceptanceID;
 }
 
 public class TimeSyncRequest : ServerPacket, ISpanWritable
