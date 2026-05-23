@@ -146,7 +146,7 @@ These shipped before any WotLK-specific work; every entry below assumes them.
 | Char-list — auto-select newly created character | ✅ | ❓ | `a515bd0` — character pre-selected in char-list after create; QoL |
 | Mail — open + inbox + take attachments + COD pay + delete | ✅ | ❓ | 2026-05-09 — V3_4_3 wire-format fix (`d3004b1`); 12-attachment + 1-COD mail end-to-end on TC; V1_14/V2_5 regression-clean; cMangos untested |
 | Achievement panel — earned + criteria progress | ❌ | ❓ | 2026-05-21 diff vs native TC 3.4.3: proxy ships an 8-byte `EmptyAllAchievementData` stub (`World/Server/Packets/EmptyInitPackets.cs:33-42`, scheduled from `World/Client/PacketHandlers/CharacterHandler.cs:386`). Legacy 3.3.5a server DOES send `SMSG_ALL_ACHIEVEMENT_DATA` (opcode `0x047D`, ~1.6 KB) but no `[PacketHandler]` exists — data silently discarded. Achievement UI fully silent on V3_4_3 client. See `wotlk.md` § *TODO — Not yet bridged* (F). |
-| Account heirloom panel — collection listing | ❌ | ❓ | 2026-05-21 diff: proxy ships an `EmptyAccountHeirloomUpdate` 13-byte stub (`EmptyInitPackets.cs:155-167`, from `CharacterHandler.cs:404`). Native TC 3.4.3 sends 38 heirloom item IDs unconditionally (CollectionMgr feature with no 3.3.5a equivalent). Modern client's heirloom panel renders empty. Cosmetic only — items themselves don't function as heirlooms on the legacy backend. See *TODO* (G). |
+| Account heirloom panel — collection listing | ✅ | ❓ | 2026-05-23: §G packet `AccountHeirloomUpdate` (`World/Server/Packets/CollectionPackets.cs`) ships 38 IDs; §G2 `ActivePlayerData::Heirlooms[38]` descriptor field populates the panel as 38/38 owned; §G3 inventory tooltip renders correctly via `ItemFieldFlag.Child` injection + Item/ItemSparse hotfix skip. Right-click "Create from Collection" (spell 160597) is intercepted + silently CastFailed-replied — no item created, no client spam, no `unknown spell id 160597` legacy server log noise. Heirlooms acquired via normal legacy gameplay (vendor/quest), panel is cosmetic-only mirror. Verified on TC; cMangos untested. |
 | Spellbook fresh-login animations (`InitialLogin` flag) | ✅ | ✅ | 2026-05-23: `SMSG_SEND_KNOWN_SPELLS.InitialLogin` now synthesised from `GameState.IsFirstEnterWorld` for V3_4_3 (`SpellHandler.cs:21-24`); V1_14/V2_5 still forward legacy bool. Matches TC 3.4.3 `IsLoading()` semantics. |
 | Pet spellbook tab + chat spam on login | ✅ | ✅ | 2026-05-23: V3_4_3 pet tab refused to bind. Four diffs vs native sniff `World_hunter_pet_tame_pet_actionbar_pet_spellbook`: (1) `SMSG_PET_SPELLS_MESSAGE.Specialization` forced to `0` instead of native `-1` (removed overrides in `PetHandler.cs:126` + `QueryHandler.cs:738`); (2) `Actions[]` shipped legacy-encoded — added `TranslateLegacyPetActionButtonToV343` mapping in `PetHandler.cs:69-78` to match modern `(slot:9 \| spell:23)`; (3) `SMSG_UPDATE_TALENT_DATA(IsPetTalents=true)` SpecID was 0 / GlyphCount padded to 6 — fixed to 255 / 0 in `TalentHandler.ForwardPetTalents`; (4) synth `SMSG_PET_LEARNED_SPELLS` on every PetSpellsMessage caused "You learned X" spam on login — removed (real LEARNED still forwarded on tame/level-up via `PetHandler.HandlePetLearnedSpells`). |
 | Flat / Pct spell modifier array shape | ⚠️ | ⚠️ | 2026-05-21 diff: native TC 3.4.3 always emits canonical 40-row spell modifier array (~204 B, mostly empty rows); proxy writes only populated mods (~14 B). Unverified whether V3_4_3 client requires the 40-row form or accepts dynamic count. No symptom reported by user yet — flagged as suspect for later disasm verification. See *TODO* (H). |
@@ -545,17 +545,134 @@ Fix path (medium effort, ~150 LOC):
 - Remove the `EmptyAllAchievementData` dispatch from `CharacterHandler.cs:386`.
 - Also wire `SMSG_ACHIEVEMENT_EARNED` + `SMSG_CRITERIA_UPDATE` if not already handled (for runtime progress).
 
-### G. SMSG_ACCOUNT_HEIRLOOM_UPDATE — empty stub (13 B) vs native ~317 B
+### G. ~~SMSG_ACCOUNT_HEIRLOOM_UPDATE — empty stub~~ — FIXED 2026-05-23
 
-Symptom: V3_4_3 heirloom collection panel empty even though TC 3.4.3 ships 38 known item IDs unconditionally at login.
+Resolved. `EmptyAccountHeirloomUpdate` removed; replaced by
+`AccountHeirloomUpdate` in new `World/Server/Packets/CollectionPackets.cs`
+shipping 38 IDs sourced from `CSV/Hotfix/Heirloom3.csv` via
+`GameData.LoadHeirlooms`. Packet wire format matches TC
+`MiscPackets.cpp:646-664` exactly (verified against WPP V3_4_0/V4_4_0/V6_0_2
+`HandleAccountHeirloomUpdate`). All `Flags=0` (`HEIRLOOM_FLAG_NONE`).
 
-Root cause: heirlooms are a `CollectionMgr` feature on modern servers; 3.3.5a has no equivalent (BoA items are inventory-flagged only). Proxy ships an `EmptyAccountHeirloomUpdate` stub via `EmptyInitPackets.cs:155-167` scheduled from `CharacterHandler.cs:404`.
+Note: this packet alone is not enough to populate the Collections panel
+header — modern client computes "owned count" from
+`ActivePlayerData::Heirlooms` DynamicUpdateField, not from this packet.
+The packet just triggers a panel refresh against descriptor state. The
+matching descriptor write landed in §G2.
 
-Fix path (small effort, low gameplay impact):
-- **Option α (recommended, ~50 LOC):** hardcode the modern 38-item heirloom ID list as a static array in a new `AccountHeirloomUpdate` packet class. Ship the same list to every player. Loss: not personalized — every account shows all heirlooms unlocked. Acceptable because heirlooms are cosmetic at 3.3.5a-backed gameplay (the items themselves don't function as heirlooms on the legacy backend; the panel UI is purely a collection viewer).
-- **Option β (~200 LOC):** scan the player's inventory for items with `ITEM_FLAG_HEIRLOOM` after world-enter; emit only those item IDs. Requires inventory-iteration timing + ItemTemplate flag lookup; possibly an ID remap if any heirloom item IDs changed between 3.3.5a and 3.4.3 (most should be stable).
+### G2. ~~ActivePlayerData::Heirlooms / HeirloomFlags dynamic fields~~ — FIXED 2026-05-23
 
-### H. SMSG_SET_FLAT_SPELL_MODIFIER — compact (14 B) vs native canonical 40-row (~204 B)
+Symptom (was): heirloom panel showed `0/38` even after §G's packet shipped
+38 IDs. Modern client computed "owned count" from
+`ActivePlayerData::Heirlooms` + `HeirloomFlags` DynamicUpdateFields, not
+from the packet.
+
+Fix (`ObjectUpdateBuilder.cs:WriteCreateActivePlayerAll` lines 989-1004 +
+new payload block after NumStableSlots):
+- Replaced 16-uint32 placeholder loop with 16 explicit per-slot writes
+  matching WPP V3_4_0 wire layout (slots 6 + 7 = Heirlooms.Resize +
+  HeirloomFlags.Resize, set to `(uint)GameData.Heirlooms.Length` = 38).
+- Inserted 38×Int32 ItemIDs + 38×UInt32 Flags payload after NumStableSlots
+  (=304 added wire bytes). Downstream PvpInfo / ResearchHistory etc. shift
+  +304 on wire; client expects them at the same relative offset since it
+  reads the 304 payload bytes per the count prefix → aligned.
+
+Result: Collections → Heirlooms tab now shows `38/38` owned, all icons
+colored. No regressions to bags, tracked rep, or stats panel (PvpInfo
+and trailing fixed-size area land at correctly-aligned offset on both
+sides of the dynamic payload).
+
+Caveat — right-click "Create from Collection" not supported: the modern
+client casts spell 160597 (`Misc[0] = itemID`) to summon a copy of the
+heirloom to the player's bag. Legacy 3.3.5a server has no such spell
+("unknown spell id 160597") and silently drops the cast → client
+re-spams. Proxy intercepts the cast in
+`SpellHandler.HandleCastSpell` (`World/Server/PacketHandlers/SpellHandler.cs:109`)
+and replies with `SendCastRequestFailed` so the client stops; the cast
+is NOT forwarded to the legacy server. Item creation is not bridged
+(no clean legacy path that doesn't require GM `.additem`; account-bound
+collection tracking is a Cataclysm+ feature the legacy server doesn't
+have). Users obtain heirlooms via normal legacy gameplay: heirloom-vendor
+NPC (if present on the 3.3.5a server's DB) or quest reward
+(Champion's Seals / Stone Keeper's Shards). Collection panel is a
+visual-only mirror.
+
+Same dynamic-field-payload pattern applies to other empty-stub init
+packets (`EmptyAccountMountUpdate` for Mounts, `EmptyAccountToyUpdate`
+for Toys, Transmog, etc.) if those panels are ever wired in.
+
+### G3. ~~Heirloom inventory tooltip — broken stats~~ — FIXED 2026-05-23
+
+Symptom: `.additem 42946` (any of the 38 heirlooms) rendered an
+inventory tooltip showing "1 - 0 Damage", no Equip lines, and "Account
+Bound" instead of "Binds to Blizzard account". Collections-tab tooltip
+for the same item rendered correctly (25-48 Damage + 3 green Equip lines).
+
+Root cause (resolved via native TC 3.4.3 sniff
+`X:\Programming\refs\3.4.3_Build\bin\Release\Logs\World.pkt` →
+`World_parsed.txt` line 76250-76369): item descriptor
+`ItemData.DynamicFlags` is `0x00200001` on native (`Soulbound | Child`),
+but legacy 3.3.5a `ITEM_FIELD_FLAGS` ships only `0x01` (Soulbound) —
+3.3.5a has no `Child` bit concept. Bit 21 (`ITEM_FIELD_FLAG_CHILD`) is
+what tells the V3_4_3 client to fire the `ScalingStatDistributionID`-
+driven heirloom scaling formula on inventory render. Other candidates
+(ItemBonusKey, BonusListIDs, ContentTuning, ItemAppearanceModID,
+RandomProperties) were all zero in the native sniff — single bit on a
+single field.
+
+Fix (`UpdateHandler.cs:1940-1953`): when `ModernVersion.ExpansionVersion
+>= 3` AND `updateData.ObjectData.EntryID ∈ GameData.HeirloomItemIds`,
+OR `ItemFieldFlag.Child` (0x00200000) into the forwarded
+`ItemData.Flags`. New `ItemFieldFlag` enum in
+`HermesProxy/World/Enums/ItemDefines.cs` mirrors TC `Item.h`
+`ItemFieldFlags`. Fast-path predicate via new
+`GameData.HeirloomItemIds` (FrozenSet<int>, populated in
+`LoadHeirlooms`). V1_14 / V2_5 paths untouched.
+
+### G4. Character pane stats show 0% on login (Ranged Crit / Dodge / Parry / etc.)
+
+Symptom: after login, character pane Ranged tab (and likely Melee /
+Spell tabs) shows 0% crit chance, 0 Power, Hit Rating 0, etc. Touching
+any equipment slot (equip/unequip cycle) triggers a Values update that
+ships the real percentage and the UI catches up.
+
+Diagnosis (2026-05-23): `WriteCreateActivePlayerAll`
+(`HermesProxy/World/Objects/Version/V3_4_3_54261/ObjectUpdateBuilder.cs:806`)
+writes hardcoded zeros for the entire RangedExpertise..OffhandCritPercentage
++ ShieldBlock block (12 fields × 4 bytes = 48 bytes) instead of reading
+`active.RangedCritPercentage` etc. Live values are populated correctly
+in `_updateData.ActivePlayerData` by `UpdateHandler.cs` (PLAYER_*_CRIT_PERCENTAGE
+reads) but never written to the V3_4_3 wire on Create.
+
+Fix attempt 2026-05-23 (reverted): inserted `TrackResourceMask[2]`
+(8 bytes — required per WPP V3_4_0 wire layout) and converted the
+12-field block + Mainhand/Offhand expertise from hardcoded zeros to
+live `active.*` reads. Stats panel started displaying correctly. **But**
+inventory broke: backpack inaccessible ("available slot count is (0)",
+pressing B did nothing). Tracked-reputation also wrong. Reverted full
+ObjectUpdateBuilder.cs delta.
+
+Suspect: V3_4_3.54261 client wire layout differs from WPP V3_4_3.51666
+module's `ReadCreateActivePlayerData` — possibly the 54261 client does
+NOT expect TrackResourceMask[2] in CreateActivePlayerData. Adding it
+shifted every downstream field +8 bytes on the wire from what the 54261
+client expects, even though the values themselves landed at "correct"
+WPP-stated positions. Symptom was non-fatal because the player session
+ran, but bag descriptors (which depend on NumBackpackSlots and bag-slot
+GUIDs being at correct client-side wire offsets) parsed garbage.
+
+Fix path (deferred, M effort, **wire-position research blocked**):
+1. Capture a HermesProxy session sniff with a 54261-aware parser (need
+   either an updated WPP for build 54261 or a hand-disasm of the client's
+   reader function).
+2. Diff actual client wire layout vs WPP V3_4_3.51666 to identify which
+   fields differ between builds.
+3. Once correct 54261 layout known, do the live-value-read change for
+   the 12-field block at the correct wire positions.
+
+Until then, character pane shows 0% stats on login. Workaround: any
+equipment touch triggers Values update with live values → display catches
+up.
 
 Symptom: speculative. Native always emits the full 40-row spell modifier array (mostly empty rows). Proxy writes only populated mods. Unclear whether V3_4_3 client requires the canonical 40-row form or accepts dynamic count.
 
@@ -580,7 +697,6 @@ wotlk.md suggestion `!IsInWorld` was inverted vs packet ordering —
 | # | Fix | Effort | User-visible impact |
 |---|---|---|---|
 | F | All achievement data | M (~150 LOC) | Achievement UI fully silent until fixed |
-| G | Account heirlooms (Option α) | S (~50 LOC) | Heirloom collection panel empty |
 | H | Flat spell modifier 40-row pad | XS (~10 LOC, after verification) | Unknown — verify client behavior first |
 
-All three scoped V3_4_3-gated; V1_14 / V2_5 paths unaffected.
+Both scoped V3_4_3-gated; V1_14 / V2_5 paths unaffected.
