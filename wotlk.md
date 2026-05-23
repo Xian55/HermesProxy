@@ -145,7 +145,7 @@ These shipped before any WotLK-specific work; every entry below assumes them.
 | Trade (between players) | ✅ | ✅ | |
 | Char-list — auto-select newly created character | ✅ | ❓ | `a515bd0` — character pre-selected in char-list after create; QoL |
 | Mail — open + inbox + take attachments + COD pay + delete | ✅ | ❓ | 2026-05-09 — V3_4_3 wire-format fix (`d3004b1`); 12-attachment + 1-COD mail end-to-end on TC; V1_14/V2_5 regression-clean; cMangos untested |
-| Achievement panel — earned + criteria progress | ❌ | ❓ | 2026-05-21 diff vs native TC 3.4.3: proxy ships an 8-byte `EmptyAllAchievementData` stub (`World/Server/Packets/EmptyInitPackets.cs:33-42`, scheduled from `World/Client/PacketHandlers/CharacterHandler.cs:386`). Legacy 3.3.5a server DOES send `SMSG_ALL_ACHIEVEMENT_DATA` (opcode `0x047D`, ~1.6 KB) but no `[PacketHandler]` exists — data silently discarded. Achievement UI fully silent on V3_4_3 client. See `wotlk.md` § *TODO — Not yet bridged* (F). |
+| Achievement panel — earned + criteria progress | ✅ | ❓ | 2026-05-23: §F bridge — new `AchievementHandler.cs` translates `SMSG_ALL_ACHIEVEMENT_DATA` (init), `SMSG_CRITERIA_UPDATE` (runtime tick), `SMSG_ACHIEVEMENT_EARNED` (toast). New `AchievementPackets.cs` ships modern V3_4_3 wire format per TC 3.4.3 source (`Duration<Seconds>`/`Timestamp<int64>` = 8 B each; fork's `CreationTime` UInt32 bug corrected). Shared `CriteriaProgressPkt` in `MiscPackets.cs` fixed to TC layout (added `Unused_10_1_5`, widened times to Int64, full UInt32 Flags); old wire was dormant (`AllAccountCriteria` always sent empty). `EmptyAllAchievementData` stub + dispatch removed. Version-gated to `V3_0_2+` so V1_14/V2_5 unaffected. cMangos untested. |
 | Account heirloom panel — collection listing | ✅ | ❓ | 2026-05-23: §G packet `AccountHeirloomUpdate` (`World/Server/Packets/CollectionPackets.cs`) ships 38 IDs; §G2 `ActivePlayerData::Heirlooms[38]` descriptor field populates the panel as 38/38 owned; §G3 inventory tooltip renders correctly via `ItemFieldFlag.Child` injection + Item/ItemSparse hotfix skip. Right-click "Create from Collection" (spell 160597) is intercepted + silently CastFailed-replied — no item created, no client spam, no `unknown spell id 160597` legacy server log noise. Heirlooms acquired via normal legacy gameplay (vendor/quest), panel is cosmetic-only mirror. Verified on TC; cMangos untested. |
 | Spellbook fresh-login animations (`InitialLogin` flag) | ✅ | ✅ | 2026-05-23: `SMSG_SEND_KNOWN_SPELLS.InitialLogin` now synthesised from `GameState.IsFirstEnterWorld` for V3_4_3 (`SpellHandler.cs:21-24`); V1_14/V2_5 still forward legacy bool. Matches TC 3.4.3 `IsLoading()` semantics. |
 | Pet spellbook tab + chat spam on login | ✅ | ✅ | 2026-05-23: V3_4_3 pet tab refused to bind. Four diffs vs native sniff `World_hunter_pet_tame_pet_actionbar_pet_spellbook`: (1) `SMSG_PET_SPELLS_MESSAGE.Specialization` forced to `0` instead of native `-1` (removed overrides in `PetHandler.cs:126` + `QueryHandler.cs:738`); (2) `Actions[]` shipped legacy-encoded — added `TranslateLegacyPetActionButtonToV343` mapping in `PetHandler.cs:69-78` to match modern `(slot:9 \| spell:23)`; (3) `SMSG_UPDATE_TALENT_DATA(IsPetTalents=true)` SpecID was 0 / GlyphCount padded to 6 — fixed to 255 / 0 in `TalentHandler.ForwardPetTalents`; (4) synth `SMSG_PET_LEARNED_SPELLS` on every PetSpellsMessage caused "You learned X" spam on login — removed (real LEARNED still forwarded on tame/level-up via `PetHandler.HandlePetLearnedSpells`). |
@@ -300,13 +300,11 @@ The fork received a thorough class-by-class test matrix from `kasperfriend` (202
 
 - **Channel-spell loop animation (TC fixed 2026-05-06; cMangos retest pending).** Root cause was hypothesis (a): the V3_4_3 `ChannelObjects` DynamicUpdateField (bit 4 of UnitData changesMask) was never being written by `ObjectUpdateBuilder.cs`, so the modern client received an empty channel-target list and dropped the loop animation after the start anim. The legacy reader (`UpdateHandler.cs:1918`) was already populating `UnitData.ChannelObject` from `UNIT_FIELD_CHANNEL_OBJECT`; the data was being silently dropped at the V3_4_3 writer. Fix: write `uint32(ChannelObjects.size())` + the GUID body in the create path, and `WriteCompleteDynamicFieldUpdateMask` + GUID body (before Health, per TC ordering) in the values path; also added `ChannelObject` probe to `IsEmptyValuesDelta` so a channel-end clear isn't dropped.
 - **No-handler warnings — silent state drops.** Each gates a UI feature; prioritize by user-visibility:
-  - `SMSG_CRITERIA_UPDATE` — achievement progress
   - `SMSG_THREAT_UPDATE` — threat meter / boss frames
   - `SMSG_LOAD_EQUIPMENT_SET` — equipment manager
   - `SMSG_LEARNED_DANCE_MOVES` — `/dance` variants
   - `SMSG_INSTANCE_DIFFICULTY` — heroic/normal toggle
   - `SMSG_UPDATE_TALENT_DATA` — talent panel
-  - `SMSG_ALL_ACHIEVEMENT_DATA` — achievement window initial population
 
 ### Infrastructure
 
@@ -533,17 +531,36 @@ issue above).
 
 Big-diff scan between native TC 3.4.3 capture (`refs/3.4.3_Build/.../World_questing_level_1_parsed.txt`) and HermesProxy modern session (`modern_54261_20260520_231838_2_parsed.txt`) surfaced four data-flow gaps where the proxy ships empty / stale data the V3_4_3 client otherwise expects from native. None of these crash the client, but each leaves a UI surface silent / incorrect.
 
-### F. SMSG_ALL_ACHIEVEMENT_DATA — empty stub (8 B) vs native ~606 B
+### F. ~~SMSG_ALL_ACHIEVEMENT_DATA — empty stub (8 B) vs native ~606 B~~ — FIXED 2026-05-23
 
-Symptom: V3_4_3 client achievement panel shows zero progress + zero completion.
+Resolved. New `HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs`
+translates three legacy opcodes to modern V3_4_3:
 
-Root cause: legacy 3.3.5a server **does** ship `SMSG_ALL_ACHIEVEMENT_DATA` (opcode `0x047D`, ~1.6 KB with criteria progress + earned list — verified in `legacy_12340_*` raw capture), but HermesProxy has no `[PacketHandler]` for it. The data is silently discarded. Instead, proxy emits an 8-byte hardcoded stub via `World/Server/Packets/EmptyInitPackets.cs:33-42`, scheduled from `World/Client/PacketHandlers/CharacterHandler.cs:386`.
+- `SMSG_ALL_ACHIEVEMENT_DATA` (0x47D, panel init) — reads two `-1`-terminated
+  loops (earned + criteria progress), maps player GUID via
+  `GameState.CurrentPlayerGuid`, packed-time via
+  `Time.GetUnixTimeFromPackedTime`, realm via `RealmId.GetAddress()`.
+- `SMSG_CRITERIA_UPDATE` (0x46A, runtime tick).
+- `SMSG_ACHIEVEMENT_EARNED` (0x468, toast). Legacy carries one GUID
+  (earner); modern wants both `Sender` + `Earner` — mirrored.
 
-Fix path (medium effort, ~150 LOC):
-- New `World/Client/PacketHandlers/AchievementHandler.cs` with `[PacketHandler(Opcode.SMSG_ALL_ACHIEVEMENT_DATA)]`. Parse legacy criteria-progress entries + earned-achievement IDs.
-- New `AllAchievementData` packet class in `World/Server/Packets/` matching V3_4_3 shape (per native sniff): `EarnedCount:int32 + ProgressCount:int32 + [Progress]{ CriteriaID:u32, Quantity:i32, PlayerGUID:PackedGuid128, Flags:u8, CurrentTime/ElapsedTime/CreationTime, HasDynamicID:bit }`.
-- Remove the `EmptyAllAchievementData` dispatch from `CharacterHandler.cs:386`.
-- Also wire `SMSG_ACHIEVEMENT_EARNED` + `SMSG_CRITERIA_UPDATE` if not already handled (for runtime progress).
+New `HermesProxy/World/Server/Packets/AchievementPackets.cs` ships modern
+wire packets (`AllAchievementData`, `CriteriaUpdatePkt`,
+`AchievementEarnedPkt`). Wire layout taken from TC 3.4.3 source
+(`AchievementPackets.{h,cpp}` + `PacketUtilities.h` —
+`Duration<Seconds>` and `Timestamp<int64>` are 8-byte Int64 on wire, not
+4-byte as the HermesProxy-WOTLK fork wrote it).
+
+Shared `CriteriaProgressPkt` in `MiscPackets.cs` corrected to TC layout
+(added `Unused_10_1_5` UInt32, widened `TimeFromStart`/`TimeFromCreate`
+to Int64, expanded `Flags` from 4-bit to UInt32). Old wire was dormant —
+`AllAccountCriteria` is always sent with an empty `Progress` list — so
+the foreach never ran, the bug never manifested.
+
+`EmptyAllAchievementData` class deleted from `EmptyInitPackets.cs` and
+the dispatch removed from `CharacterHandler.cs:386`. Version-gated to
+`ClientVersionBuild.V3_0_2_9056+` so V1_14/V2_5 paths fall through
+unchanged. Verified on TC 3.3.5 backend; cMangos untested.
 
 ### G. ~~SMSG_ACCOUNT_HEIRLOOM_UPDATE — empty stub~~ — FIXED 2026-05-23
 
