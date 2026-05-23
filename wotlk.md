@@ -133,6 +133,7 @@ These shipped before any WotLK-specific work; every entry below assumes them.
 | Talent panel — dual-spec switch | ✅ | ✅ | per-group emit, SpecID encoding matches TC SendTalentsInfoData |
 | Pet talents | ✅ | ❓ | CMSG_PET_LEARN_TALENT (modern 0x3554 → legacy 0x47A) translates with PetGUID modern→legacy; learn UI works on TC |
 | Glyphs — display + slot unlock | ✅ | ❓ | reads PLAYER_GLYPHS_ENABLED bitmask + PLAYER_FIELD_GLYPHS_1..6 from legacy update fields; emits SMSG_ACTIVE_GLYPHS with (SpellID, GlyphID) pairs via GlyphProperties3.csv lookup |
+| Glyphs — slot unlock at L15/30/50/70/80 mid-session | ✅ | ❓ | 2026-05-23 — `GlyphsEnabledDirty` flag + `ApplyActivePlayerGlyphsEnabledMaskMutator` setting bits 102 + 120 (bit 120 is nested under parent 102 in V3_4_3 changesMask); without parent bit, client + WPP silently skip the sub-tree and slots stayed locked until relog |
 | Glyphs — apply (CMSG_USE_ITEM) | ✅ | ❓ | forwards SpellCastRequest.Misc[0] as glyphIndex; was hardcoded 0 → every glyph went to slot 0 |
 | Glyphs — remove (CMSG_REMOVE_GLYPH) | ✅ | ❓ | modern 13056 → legacy 0x48A, identical payload (uint8 GlyphSlot) |
 | Glyphs — dual-spec swap UnitData refresh | ✅ | ❓ | dirty-flag drives ObjectUpdateBuilder to re-emit GlyphSlots in player Values update; without this, "already applied this glyph" check fired against stale (previous-spec) glyphs |
