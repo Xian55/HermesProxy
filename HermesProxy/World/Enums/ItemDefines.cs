@@ -460,3 +460,17 @@ public enum InventoryResult
     CantDoThatRightNow = 100,// You Can'T Do That Right Now.
     BagFull6 = 101,// That Bag Is Full.
 }
+
+[Flags]
+public enum ItemFieldFlag : uint
+{
+    None         = 0x00000000,
+    Soulbound    = 0x00000001,
+    Unlocked     = 0x00000004,
+    Wrapped      = 0x00000008,
+    BopTradeable = 0x00000100,
+    Readable     = 0x00000200,
+    Refundable   = 0x00001000,
+    Child        = 0x00200000,
+    NewItem      = 0x00800000,
+}

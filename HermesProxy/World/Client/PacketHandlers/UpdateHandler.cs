@@ -1942,6 +1942,20 @@ public partial class WorldClient
             {
                 updateData.ItemData.Flags = updates[ITEM_FIELD_FLAGS].UInt32Value;
             }
+
+            if (ModernVersion.ExpansionVersion >= 3)
+            {
+                int entry = updateData.ObjectData.EntryID
+                    ?? (int)GetSession().GameState.GetItemId(guid);
+                if (entry != 0 && GameData.Heirlooms.Contains(entry))
+                {
+                    uint baseFlags = updateData.ItemData.Flags
+                        ?? (ITEM_FIELD_FLAGS >= 0
+                            ? (GetSession().GameState.GetCachedObjectFieldsLegacy(guid)?[ITEM_FIELD_FLAGS].UInt32Value ?? 0u)
+                            : 0u);
+                    updateData.ItemData.Flags = baseFlags | (uint)ItemFieldFlag.Soulbound | (uint)ItemFieldFlag.Child;
+                }
+            }
             int ITEM_FIELD_ENCHANTMENT = LegacyVersion.GetUpdateField(ItemField.ITEM_FIELD_ENCHANTMENT);
             if (ITEM_FIELD_ENCHANTMENT >= 0)
             {
