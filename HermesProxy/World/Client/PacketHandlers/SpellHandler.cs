@@ -18,7 +18,10 @@ public partial class WorldClient
     void HandleSendKnownSpells(WorldPacket packet)
     {
         SendKnownSpells spells = new SendKnownSpells();
-        spells.InitialLogin = packet.ReadBool();
+        bool legacyInitialLogin = packet.ReadBool();
+        spells.InitialLogin = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            ? GetSession().GameState.IsFirstEnterWorld
+            : legacyInitialLogin;
         ushort spellCount = packet.ReadUInt16();
         for (ushort i = 0; i < spellCount; i++)
         {
