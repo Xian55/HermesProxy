@@ -30,17 +30,6 @@ public class EmptyInitWorldStates : ServerPacket
     }
 }
 
-public class EmptyAllAchievementData : ServerPacket
-{
-    public EmptyAllAchievementData() : base(Opcode.SMSG_ALL_ACHIEVEMENT_DATA, ConnectionType.Instance) { }
-
-    public override void Write()
-    {
-        _worldPacket.WriteInt32(0);
-        _worldPacket.WriteInt32(0);
-    }
-}
-
 public class EmptyAllAccountCriteria : ServerPacket
 {
     public EmptyAllAccountCriteria() : base(Opcode.SMSG_ALL_ACCOUNT_CRITERIA, ConnectionType.Instance) { }

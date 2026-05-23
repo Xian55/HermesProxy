@@ -383,7 +383,8 @@ public partial class WorldClient
         // WorldClient.cs:1130-1147 — this is the actual unblock for the loading-screen stall.
         if (isModernWotLK)
         {
-            SendPacketToClient(new EmptyAllAchievementData());
+            // SMSG_ALL_ACHIEVEMENT_DATA arrives async from the legacy 3.3.5a server
+            // and is translated by AchievementHandler.HandleAllAchievementData.
             SendPacketToClient(new EmptyAllAccountCriteria());
             SendPacketToClient(new EmptySetupCurrency());
             SendPacketToClient(new EmptySpellHistory());
