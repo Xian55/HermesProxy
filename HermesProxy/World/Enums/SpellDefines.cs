@@ -1648,3 +1648,11 @@ public enum SpellCastResultV343 : uint
 
     SpellCastOk = Success
 }
+
+public static class KnownSpellIds
+{
+    // V3_4_3 Collections panel right-click "Add to Bag" cast for any heirloom in the
+    // account collection. Misc[0] carries the target heirloom item ID. Not present
+    // on legacy 3.3.5a servers.
+    public const uint CreateHeirloom = 160597;
+}

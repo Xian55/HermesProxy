@@ -109,6 +109,28 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_CAST_SPELL)]
     void HandleCastSpell(CastSpell cast)
     {
+        // Create Heirloom (160597). V3_4_3 Collections panel right-click "Add to Bag"
+        // casts this spell with Misc[0] = heirloom item ID. Legacy 3.3.5a server has
+        // no such spell ("unknown spell id 160597") and silently drops the cast —
+        // client then re-spams every frame. Block at proxy: reply with CastFailed
+        // so the client stops, and do NOT forward to legacy. Item creation is not
+        // bridged (no clean legacy path that doesn't require GM rights).
+        if (cast.Cast.SpellID == KnownSpellIds.CreateHeirloom
+            && ModernVersion.ExpansionVersion == 3
+            && GameData.Heirlooms.Contains((int)cast.Cast.Misc[0]))
+        {
+            WowGuid128 serverCastId = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId!, cast.Cast.SpellID, cast.Cast.SpellID + GetSession().GameState.CurrentPlayerGuid.GetCounter());
+            SendPacket(new SpellPrepare { ClientCastID = cast.Cast.CastID, ServerCastID = serverCastId });
+            SendPacket(new CastFailed
+            {
+                SpellID = cast.Cast.SpellID,
+                SpellXSpellVisualID = cast.Cast.SpellXSpellVisualID,
+                Reason = (uint)SpellCastResultV343.DontReport,
+                CastID = serverCastId,
+            });
+            return;
+        }
+
         bool isNextMelee = GameData.NextMeleeSpells.Contains(cast.Cast.SpellID);
         bool isAutoRepeat = GameData.AutoRepeatSpells.Contains(cast.Cast.SpellID);
 
