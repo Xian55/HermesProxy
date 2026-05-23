@@ -401,7 +401,7 @@ public partial class WorldClient
             SendPacketToClient(new EmptyEquipmentSetList());
             SendPacketToClient(new EmptyAccountMountUpdate());
             SendPacketToClient(new EmptyAccountToyUpdate());
-            SendPacketToClient(new EmptyAccountHeirloomUpdate());
+            SendPacketToClient(new AccountHeirloomUpdate());
             SendPacketToClient(new BattlePetJournalLockAcquired());
 
             PhaseShiftChange phaseShift = new();

@@ -58,6 +58,7 @@ public static partial class GameData
     public static FrozenDictionary<uint, uint> TotemSpells = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<uint, uint> Gems = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<ushort, uint> GlyphSpellById = FrozenDictionary<ushort, uint>.Empty;
+    public static FrozenSet<int> Heirlooms = FrozenSet<int>.Empty;
     public static FrozenDictionary<uint, CreatureDisplayInfo> CreatureDisplayInfos = FrozenDictionary<uint, CreatureDisplayInfo>.Empty;
     public static FrozenDictionary<uint, CreatureModelCollisionHeight> CreatureModelCollisionHeights = FrozenDictionary<uint, CreatureModelCollisionHeight>.Empty;
     public static FrozenDictionary<uint, uint> TransportPeriods = FrozenDictionary<uint, uint>.Empty;
@@ -595,6 +596,7 @@ public static partial class GameData
             LoadTotemSpells,
             LoadGems,
             LoadGlyphProperties,
+            LoadHeirlooms,
             LoadCreatureDisplayInfo,
             LoadCreatureModelCollisionHeights,
             LoadTransports,
@@ -1133,6 +1135,27 @@ public static partial class GameData
             dict[glyphId] = spellId;
         }
         GlyphSpellById = dict.ToFrozenDictionary();
+    }
+
+    // V3_4_3 client expects SMSG_ACCOUNT_HEIRLOOM_UPDATE to ship the full modern
+    // heirloom set so the Collections panel renders. Legacy 3.3.5a has no equivalent;
+    // we ship a hardcoded list (Flags=0, no upgrade levels). Sourced from wago.tools
+    // Heirloom.db2 ?build=3.4.3.54261.
+    public static void LoadHeirlooms()
+    {
+        if (ModernVersion.ExpansionVersion < 3)
+            return;
+
+        var path = Path.Combine("CSV", "Hotfix", $"Heirloom{ModernVersion.ExpansionVersion}.csv");
+        if (!File.Exists(path))
+            return;
+
+        using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+        var ids = new HashSet<int>();
+        foreach (var row in reader)
+            ids.Add(int.Parse(row[1].Span));
+
+        Heirlooms = ids.ToFrozenSet();
     }
 
     public static void LoadCreatureDisplayInfo()
@@ -3203,6 +3226,13 @@ public static partial class GameData
             return null;
         }
 
+        if (ModernVersion.ExpansionVersion >= 3 && Heirlooms.Contains((int)item.Entry))
+        {
+            Log.Print(LogType.Storage,
+                $"[HeirloomHotfixSkip] item={item.Entry} skipping Item hotfix (heirloom — let baked V3_4_3 DB2 render scaling).");
+            return null;
+        }
+
         if (ItemRecordsStore.TryGetValue(item.Entry, out var row))
         {
             int iconFileDataId = (int)GetItemIconFileDataIdByDisplayId(item.DisplayID);
@@ -3314,6 +3344,13 @@ public static partial class GameData
         {
             Log.Print(LogType.Storage,
                 $"Item #{item.Entry}: skipping ItemSparse hotfix (no V3_4_3 DisplayID mapping; client falls back to CMSG_DB_QUERY_BULK).");
+            return null;
+        }
+
+        if (ModernVersion.ExpansionVersion >= 3 && Heirlooms.Contains((int)item.Entry))
+        {
+            Log.Print(LogType.Storage,
+                $"[HeirloomHotfixSkip] item={item.Entry} skipping ItemSparse hotfix (heirloom — let baked V3_4_3 DB2 render scaling).");
             return null;
         }
 

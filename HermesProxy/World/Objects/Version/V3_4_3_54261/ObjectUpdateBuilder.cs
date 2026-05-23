@@ -986,10 +986,27 @@ public partial class ObjectUpdateBuilder
         data.WriteUInt8(0);                                                        // bit 114: PvPRankProgress (UInt8) — live property exists, TODO
         data.WriteInt32(0);                                                        // bits 115-119: unused per descriptor
 
-        // 16 UInt32 placeholder block — unmapped against current V3_4_3 descriptor.
-        // Likely V3_4_3-only telemetry array (e.g. SeasonRewardsEarned / Field_F90+).
-        for (int u = 0; u < 16; u++)
-            data.WriteUInt32(0u);
+        // 16 dynamic-field count prefixes. Per WPP V3_4_0 ReadCreateActivePlayerData
+        // wire order. Slots 6 + 7 = Heirlooms.Resize + HeirloomFlags.Resize; we ship
+        // the full 38-item set so the Collections panel renders X/38 owned. Matching
+        // payload bytes are written below, before the PvpInfo loop.
+        uint heirloomCount = (uint)GameData.Heirlooms.Count;
+        data.WriteUInt32(0u);                                                      // ResearchSites.Resize
+        data.WriteUInt32(0u);                                                      // ResearchSiteProgress.Resize
+        data.WriteUInt32(0u);                                                      // Research.Resize
+        data.WriteUInt32(0u);                                                      // DailyQuestsCompleted.Resize
+        data.WriteUInt32(0u);                                                      // AvailableQuestLineXQuestIDs.Resize
+        data.WriteUInt32(0u);                                                      // Field_1000.Resize
+        data.WriteUInt32(heirloomCount);                                           // Heirlooms.Resize
+        data.WriteUInt32(heirloomCount);                                           // HeirloomFlags.Resize
+        data.WriteUInt32(0u);                                                      // Toys.Resize
+        data.WriteUInt32(0u);                                                      // Transmog.Resize
+        data.WriteUInt32(0u);                                                      // ConditionalTransmog.Resize
+        data.WriteUInt32(0u);                                                      // SelfResSpells.Resize
+        data.WriteUInt32(0u);                                                      // CharacterRestrictions.Resize
+        data.WriteUInt32(0u);                                                      // SpellPctModByLabel.Resize
+        data.WriteUInt32(0u);                                                      // SpellFlatModByLabel.Resize
+        data.WriteUInt32(0u);                                                      // TaskQuests.Resize
 
         data.WriteInt32(0);                                                        // unmapped placeholder
         data.WriteUInt32(0u);                                                      // unmapped placeholder
@@ -1003,9 +1020,19 @@ public partial class ObjectUpdateBuilder
         }
         data.WriteUInt8(_gameState.GlyphsEnabled);                                 // bit 120: GlyphsEnabled (UInt8, from _gameState)
         data.WriteUInt8(0);                                                        // LfgRoles placeholder
-        data.WriteUInt32(0u);                                                      // unmapped placeholder
-        data.WriteUInt32(0u);                                                      // unmapped placeholder
-        data.WriteUInt8(0);                                                        // unmapped placeholder
+        data.WriteUInt32(0u);                                                      // CategoryCooldownMods.Resize
+        data.WriteUInt32(0u);                                                      // WeeklySpellUses.Resize
+        data.WriteUInt8(0);                                                        // NumStableSlots
+
+        // Dynamic-field payloads. WPP wire order: KnownTitles, DailyQuestsCompleted,
+        // AvailableQuestLineXQuestIDs, Field_1000 (all 0-count → 0 bytes),
+        // then Heirlooms[Count], HeirloomFlags[Count], then Toys/Transmog/etc
+        // (all 0-count → 0 bytes), then PvpInfo. Only Heirlooms + HeirloomFlags
+        // carry real payload bytes.
+        foreach (var itemId in GameData.Heirlooms)
+            data.WriteInt32(itemId);
+        for (int i = 0; i < GameData.Heirlooms.Count; i++)
+            data.WriteUInt32(0u);
 
         // bits 608-614 (parent 607): PvpInfo[7] nested struct.
         // Per-element layout per WriteUpdateActivePlayerPvpInfo: Int8 + 16×UInt32 + 1 bit + FlushBits.
