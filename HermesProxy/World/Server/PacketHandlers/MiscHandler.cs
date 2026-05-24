@@ -136,6 +136,32 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_REQUEST_LFG_LIST_BLACKLIST)]
     void HandleRequestLFGListBlacklist(EmptyClientPacket request)
     {
+        // V3_4_3 (WotLK Classic) does NOT implement the Cataclysm+ Premade-Group
+        // LFG List system. Confirmed by Wrathion 3.4.3 reference sniff
+        // (World_solo_dungeon_finder_queue_parsed.txt): client polls
+        // CMSG_REQUEST_LFG_LIST_BLACKLIST at login but server emits ZERO
+        // SMSG_LFG_LIST_UPDATE_BLACKLIST packets. The static Cataclysm+ Activity
+        // blacklist below uses ActivityID values (796-887) that don't exist in
+        // V3_4_3 client DB2 — receiving it appears to route the modern client's
+        // LFG UI toward the Premade-Group code path, hiding the Dungeon Finder
+        // microbar eye icon and disabling the regular Queue button.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            return;
+
+        // Static blacklist for the modern Premade-Group LFG List (Cataclysm+
+        // activity browser, distinct from the WotLK Dungeon Finder queue).
+        // AddBlacklist(activityID, reason):
+        //   activityID — row in modern client's GroupFinderActivity.db2
+        //                (786-934 range covers Cata/MoP/WoD/Legion/BfA dungeons,
+        //                raids, scenarios, RBGs, etc).
+        //   reason     — LfgLockStatus enum value telling client WHY hidden:
+        //                  3    = LFG_LOCKSTATUS_TOO_HIGH_LEVEL
+        //                  1031 = LFG_LOCKSTATUS_NOT_IN_SEASON
+        // Snapshot lifted from a retail BfA-era sniff so the modern Premade
+        // Group browser doesn't show entries the legacy backend can't deliver.
+        // Skipped entirely for V3_4_3 (see early-return above) — Wrathion
+        // 3.4.3 native server never sends this packet.
+        // Gated ExpansionVersion > 1: Vanilla 1.14 client has no LFG List at all.
         LFGListUpdateBlacklist blacklist = new LFGListUpdateBlacklist();
         if (ModernVersion.ExpansionVersion > 1)
         {
