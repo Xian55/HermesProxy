@@ -16,6 +16,7 @@
  */
 
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using System;
 using System.Collections.Generic;
@@ -42,6 +43,27 @@ public class FeatureSystemStatus : ServerPacket
 
     public override void Write()
     {
+        // V3_4_3_54261 (WotLK Classic) wire layout diverges from the unified
+        // modern path. WPP V3_4_3_51505→V3_4_4_59817 parser (in
+        // WowPacketParserModule.V3_4_0_45166/Parsers/MiscellaneousHandler.cs:414)
+        // confirms the V3_4_3 wire DOES NOT carry Scroll-of-Resurrection +
+        // Twitter throttle fields and DOES carry an extra RAFSystem.Unknown1007
+        // u32, a trailing PlayerNameQueryInterval u32, and an extended bit
+        // section ending with IsGroupFinderEnabled / IsLFDEnabled / IsLFREnabled
+        // / IsPremadeGroupEnabled.
+        //
+        // The IsLFDEnabled bit GATES the entire Dungeon Finder UI in the modern
+        // V3_4_3 client — without it set, the LFG microbar eye icon is hidden,
+        // "Find Group" button is inert, and the left sidebar "Dungeon Finder"
+        // category does not populate. Confirmed by Wrathion 3.4.3 reference
+        // sniff (World_dungeon_finder_exists_parsed.txt:36832) which sets it
+        // True alongside IsGroupFinderEnabled True.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            WriteV3_4_3();
+            return;
+        }
+
         _worldPacket.WriteUInt8(ComplaintStatus);
 
         _worldPacket.WriteUInt32(ScrollOfResurrectionRequestsRemaining);
@@ -172,6 +194,132 @@ public class FeatureSystemStatus : ServerPacket
                     _worldPacket.WriteUInt8(RaceClassExpansionLevels[i]);
             }
         }
+
+        _worldPacket.WriteBit(Squelch.IsSquelched);
+        _worldPacket.WritePackedGuid128(Squelch.BnetAccountGuid);
+        _worldPacket.WritePackedGuid128(Squelch.GuildGuid);
+
+        if (EuropaTicketSystemStatus != null)
+            EuropaTicketSystemStatus.Write(_worldPacket);
+    }
+
+    private void WriteV3_4_3()
+    {
+        // Field-by-field per WPP V3_4_3 parser
+        // (WowPacketParserModule.V3_4_0_45166/Parsers/MiscellaneousHandler.cs:414-535).
+        _worldPacket.WriteUInt8(ComplaintStatus);
+        _worldPacket.WriteUInt32(CfgRealmID);
+        _worldPacket.WriteInt32(CfgRealmRecID);
+
+        // RAFSystem header — 5 uint32 (includes Unknown1007 vs 4 on older builds)
+        _worldPacket.WriteUInt32(RAFSystem.MaxRecruits);
+        _worldPacket.WriteUInt32(RAFSystem.MaxRecruitMonths);
+        _worldPacket.WriteUInt32(RAFSystem.MaxRecruitmentUses);
+        _worldPacket.WriteUInt32(RAFSystem.DaysInCycle);
+        _worldPacket.WriteUInt32(0); // Unknown1007
+
+        _worldPacket.WriteUInt32(TokenPollTimeSeconds);
+        _worldPacket.WriteUInt32(KioskSessionMinutes);
+        _worldPacket.WriteInt64(TokenBalanceAmount);
+        _worldPacket.WriteUInt32(BpayStoreProductDeliveryDelay);
+        _worldPacket.WriteUInt32(ClubsPresenceUpdateTimer);
+        _worldPacket.WriteUInt32(HiddenUIClubsPresenceUpdateTimer);
+
+        _worldPacket.WriteInt32(ActiveSeason);
+        _worldPacket.WriteInt32(GameRuleValues.Count);
+
+        _worldPacket.WriteInt16(MaxPlayerNameQueriesPerPacket);
+        _worldPacket.WriteInt16(PlayerNameQueryTelemetryInterval);
+        _worldPacket.WriteUInt32(10); // PlayerNameQueryInterval (Wrathion reference: 10)
+
+        foreach (var rulePair in GameRuleValues)
+            rulePair.Write(_worldPacket);
+
+        // 44 bits in WPP order, broken into 5-6 bytes via FlushBits at end.
+        _worldPacket.WriteBit(VoiceEnabled);
+        _worldPacket.WriteBit(EuropaTicketSystemStatus != null);
+        _worldPacket.WriteBit(BpayStoreEnabled);
+        _worldPacket.WriteBit(BpayStoreAvailable);
+        _worldPacket.WriteBit(BpayStoreDisabledByParentalControls);
+        _worldPacket.WriteBit(ItemRestorationButtonEnabled);
+        _worldPacket.WriteBit(BrowserEnabled);
+        _worldPacket.WriteBit(SessionAlert != null);
+
+        _worldPacket.WriteBit(RAFSystem.Enabled);
+        _worldPacket.WriteBit(RAFSystem.RecruitingEnabled);
+        _worldPacket.WriteBit(CharUndeleteEnabled);
+        _worldPacket.WriteBit(RestrictedAccount);
+        _worldPacket.WriteBit(CommerceSystemEnabled);
+        _worldPacket.WriteBit(TutorialsEnabled);
+        _worldPacket.WriteBit(Unk67);
+        _worldPacket.WriteBit(WillKickFromWorld);
+
+        _worldPacket.WriteBit(KioskModeEnabled);
+        _worldPacket.WriteBit(CompetitiveModeEnabled);
+        _worldPacket.WriteBit(TokenBalanceEnabled);
+        _worldPacket.WriteBit(WarModeFeatureEnabled);
+        _worldPacket.WriteBit(ClubsEnabled);
+        _worldPacket.WriteBit(ClubsBattleNetClubTypeAllowed);
+        _worldPacket.WriteBit(ClubsCharacterClubTypeAllowed);
+        _worldPacket.WriteBit(ClubsPresenceUpdateEnabled);
+
+        _worldPacket.WriteBit(VoiceChatDisabledByParentalControl);
+        _worldPacket.WriteBit(VoiceChatMutedByParentalControl);
+        _worldPacket.WriteBit(QuestSessionEnabled);
+        _worldPacket.WriteBit(IsMuted);
+        _worldPacket.WriteBit(ClubFinderEnabled);
+        _worldPacket.WriteBit(Unknown901CheckoutRelated);
+        _worldPacket.WriteBit(TextToSpeechFeatureEnabled);
+        _worldPacket.WriteBit(ChatDisabledByDefault);
+
+        _worldPacket.WriteBit(ChatDisabledByPlayer);
+        _worldPacket.WriteBit(LFGListCustomRequiresAuthenticator);
+        _worldPacket.WriteBit(false); // AddonsDisabled
+        _worldPacket.WriteBit(true);  // WarGamesEnabled (Wrathion default)
+        _worldPacket.WriteBit(false); // Unk343_1
+        _worldPacket.WriteBit(false); // Unk343_2
+        _worldPacket.WriteBit(false); // ContentTrackingEnabled
+        _worldPacket.WriteBit(true);  // IsSellAllJunkEnabled (Wrathion default)
+
+        _worldPacket.WriteBit(true);  // IsGroupFinderEnabled — required for LFG UI
+        _worldPacket.WriteBit(true);  // IsLFDEnabled — gates the LFG eye microbar icon + Dungeon Finder UI
+        _worldPacket.WriteBit(false); // IsLFREnabled (no LFR in WotLK Classic)
+        _worldPacket.WriteBit(false); // IsPremadeGroupEnabled (no Premade Groups in WotLK Classic)
+        _worldPacket.FlushBits();
+
+        // QuickJoinConfig: ResetBitReader (= FlushBits already done), then 1 bit + 22 floats.
+        _worldPacket.WriteBit(QuickJoinConfig.ToastsDisabled);
+        _worldPacket.WriteFloat(QuickJoinConfig.ToastDuration);
+        _worldPacket.WriteFloat(QuickJoinConfig.DelayDuration);
+        _worldPacket.WriteFloat(QuickJoinConfig.QueueMultiplier);
+        _worldPacket.WriteFloat(QuickJoinConfig.PlayerMultiplier);
+        _worldPacket.WriteFloat(QuickJoinConfig.PlayerFriendValue);
+        _worldPacket.WriteFloat(QuickJoinConfig.PlayerGuildValue);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottleInitialThreshold);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottleDecayTime);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottlePrioritySpike);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottleMinThreshold);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottlePvPPriorityNormal);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottlePvPPriorityLow);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottlePvPHonorThreshold);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottleLfgListPriorityDefault);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottleLfgListPriorityAbove);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottleLfgListPriorityBelow);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottleLfgListIlvlScalingAbove);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottleLfgListIlvlScalingBelow);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottleRfPriorityAbove);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottleRfIlvlScalingAbove);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottleDfMaxItemLevel);
+        _worldPacket.WriteFloat(QuickJoinConfig.ThrottleDfBestPriority);
+
+        if (SessionAlert != null)
+        {
+            _worldPacket.WriteInt32(SessionAlert.Delay);
+            _worldPacket.WriteInt32(SessionAlert.Period);
+            _worldPacket.WriteInt32(SessionAlert.DisplayTime);
+        }
+
+        // VoiceChatManagerSettings is V8.0.1+; absent on V3_4_3 wire.
 
         _worldPacket.WriteBit(Squelch.IsSquelched);
         _worldPacket.WritePackedGuid128(Squelch.BnetAccountGuid);
