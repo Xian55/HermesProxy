@@ -109,6 +109,25 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_CAST_SPELL)]
     void HandleCastSpell(CastSpell cast)
     {
+        // Patched macOS 1.14 client workaround: when the user selected a Creature
+        // (vendor/innkeeper/non-combat NPC) but the client decided the spell can't
+        // target it and silently auto-retargeted the cast to another player or
+        // self, substitute the selection back in. Detected as: cast target is a
+        // Player and differs from the user's last CMSG_SET_SELECTION, and that
+        // selection was a Creature. Windows-client casts won't trigger this
+        // because Windows sends the original creature target through.
+        {
+            var selection = GetSession().GameState.CurrentSelection;
+            if (!selection.IsEmpty()
+                && selection.GetHighType() == HighGuidType.Creature
+                && cast.Cast.Target.Unit.GetHighType() == HighGuidType.Player
+                && cast.Cast.Target.Unit != selection
+                && cast.Cast.Target.Flags.HasAnyFlag(SpellCastTargetFlags.Unit))
+            {
+                cast.Cast.Target.Unit = selection;
+            }
+        }
+
         bool isNextMelee = GameData.NextMeleeSpells.Contains(cast.Cast.SpellID);
         bool isAutoRepeat = GameData.AutoRepeatSpells.Contains(cast.Cast.SpellID);
 

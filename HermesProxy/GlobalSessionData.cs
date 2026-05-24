@@ -99,6 +99,12 @@ public sealed class GameSessionData
     public uint CurrentGuildNumAccounts;
     public WowGuid128 CurrentInteractedWithNPC;
     public WowGuid128 CurrentInteractedWithGO;
+    // Last target the client sent via CMSG_SET_SELECTION. Used to un-do the
+    // patched macOS 1.14 client's tendency to silently retarget friendly-only
+    // spells away from non-attackable NPCs (vendors, innkeepers) onto a nearby
+    // player. When the cast target differs from this selection and the
+    // selection is a Creature, the proxy substitutes the selection back in.
+    public WowGuid128 CurrentSelection;
     public uint LastWhoRequestId;
     public WowGuid128 CurrentPetGuid;
     public WowGuid64 CurrentAttackTarget;        // active CMSG_ATTACK_SWING victim, cleared on ATTACK_STOP/CANCEL_COMBAT

@@ -39,6 +39,7 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_SET_SELECTION)]
     void HandleSetSelection(SetSelection selection)
     {
+        GetSession().GameState.CurrentSelection = selection.TargetGUID;
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_SELECTION);
         packet.WriteGuid(selection.TargetGUID.To64());
         SendPacketToServer(packet);
