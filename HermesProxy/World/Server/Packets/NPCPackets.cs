@@ -627,6 +627,25 @@ class GossipPOI : ServerPacket, ISpanWritable
 
     public override void Write()
     {
+        // V3_4_3 client uses a flat layout: Flags is a full uint32 in field position 2,
+        // not a 14-bit field at the end (retail layout). Mismatch shifts the whole packet
+        // and the client silently drops the POI. Matches TC 3.4.3 GossipPOI::Write.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            _worldPacket.WriteUInt32(Id);
+            _worldPacket.WriteUInt32(Flags);
+            _worldPacket.WriteFloat(Pos.X);
+            _worldPacket.WriteFloat(Pos.Y);
+            _worldPacket.WriteFloat(Pos.Z);
+            _worldPacket.WriteUInt32(Icon);
+            _worldPacket.WriteUInt32(Importance);
+            _worldPacket.WriteUInt32(Unknown905);
+            _worldPacket.WriteBits(Name.GetByteCount(), 6);
+            _worldPacket.FlushBits();
+            _worldPacket.WriteString(Name);
+            return;
+        }
+
         _worldPacket.WriteUInt32(Id);
         _worldPacket.WriteFloat(Pos.X);
         _worldPacket.WriteFloat(Pos.Y);
@@ -642,8 +661,8 @@ class GossipPOI : ServerPacket, ISpanWritable
 
     // Cap for POI name - limited by 6 bits = 64 bytes max
     private const int MaxNameBytes = 64;
-    // 4 uint(16) + 3 floats(12) + 3 bytes for bits + name
-    public int MaxSize => 16 + 12 + 3 + MaxNameBytes;
+    // Worst case (V3_4_3 flat layout): 8 uint(32) + 1 byte for flushed 6-bit name length + name
+    public int MaxSize => 32 + 1 + MaxNameBytes;
 
     public int WriteToSpan(Span<byte> buffer)
     {
@@ -652,6 +671,24 @@ class GossipPOI : ServerPacket, ISpanWritable
             return -1;
 
         var writer = new SpanPacketWriter(buffer);
+
+        // See Write() — V3_4_3 emits Flags as a full uint32 in position 2 (flat layout).
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            writer.WriteUInt32(Id);
+            writer.WriteUInt32(Flags);
+            writer.WriteFloat(Pos.X);
+            writer.WriteFloat(Pos.Y);
+            writer.WriteFloat(Pos.Z);
+            writer.WriteUInt32(Icon);
+            writer.WriteUInt32(Importance);
+            writer.WriteUInt32(Unknown905);
+            writer.WriteBits((uint)nameBytes, 6);
+            writer.FlushBits();
+            writer.WriteString(Name);
+            return writer.Position;
+        }
+
         writer.WriteUInt32(Id);
         writer.WriteFloat(Pos.X);
         writer.WriteFloat(Pos.Y);
