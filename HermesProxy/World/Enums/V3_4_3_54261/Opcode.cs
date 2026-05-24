@@ -543,6 +543,14 @@ public enum Opcode : uint
 	SMSG_SHOW_BANK = 10378u,
 	SMSG_SHOW_RATINGS = 0u,
 	SMSG_SOCKET_GEMS_SUCCESS = 10023u,
+	// Same wire opcode as SMSG_SHOW_BANK (SMSG_NPC_INTERACTION_OPEN_RESULT, 10378).
+	// V3_4_3 dropped the dedicated SMSG_SPIRIT_HEALER_CONFIRM packet; the modern
+	// spirit-healer res dialog is driven by NPC_INTERACTION_OPEN_RESULT with
+	// InteractionType=SpiritHealer. The generated universal->wire table keys on the
+	// universal name, so SHOW_BANK and SPIRIT_HEALER_CONFIRM each map to 10378
+	// independently. The reverse wire->universal slot for 10378 is server-to-client
+	// only (the client never sends it), so the alias on that side is harmless.
+	SMSG_SPIRIT_HEALER_CONFIRM = 10378u,
 	SMSG_SPELL_COOLDOWN = 11285u,
 	SMSG_SPELL_DAMAGE_SHIELD = 11310u,
 	SMSG_SPELL_DELAYED = 11324u,

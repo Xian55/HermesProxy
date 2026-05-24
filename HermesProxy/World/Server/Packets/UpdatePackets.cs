@@ -535,6 +535,27 @@ public class UpdateObject : ServerPacket
                     if (ap.Skill.SkillLineID[i].HasValue) return false;
             }
         }
+        // ItemData carries per-item Values. A repair (CMSG_REPAIR_ITEM) makes the
+        // backend push an item Values delta that populates only Durability — without
+        // this probe the filter classified it as empty and dropped it, so the V3_4_3
+        // client's durability bars never updated and "repair did nothing" (the gold
+        // was still deducted because Coinage lives in ActivePlayerData, probed above).
+        // Same applies to any item-only field change (StackCount, Flags, Enchantment…).
+        var item = u.ItemData;
+        if (item != null)
+        {
+            if (item.Owner != null || item.ContainedIn != null) return false;
+            if (item.Creator != null || item.GiftCreator != null) return false;
+            if (item.StackCount.HasValue || item.Duration.HasValue || item.Flags.HasValue) return false;
+            if (item.PropertySeed.HasValue || item.RandomProperty.HasValue) return false;
+            if (item.Durability.HasValue || item.MaxDurability.HasValue) return false;
+            if (item.SpellCharges != null)
+                for (int i = 0; i < item.SpellCharges.Length; i++)
+                    if (item.SpellCharges[i].HasValue) return false;
+            if (item.Enchantment != null)
+                for (int i = 0; i < item.Enchantment.Length; i++)
+                    if (item.Enchantment[i] != null) return false;
+        }
         return true;
     }
 
