@@ -471,7 +471,7 @@ public enum AuraFlagsWotLK : ushort
     NoCaster     = 0x08,
     Positive     = 0x10,
     Duration     = 0x20,
-    Unk2         = 0x40,
+    Scalable     = 0x40,
     Negative     = 0x80
 };
 

@@ -1390,27 +1390,23 @@ public partial class WorldClient
             SpellXSpellVisualID = GameData.GetSpellVisual(spellId),
         };
 
-        byte legacyFlags = packet.ReadUInt8();
+        var legacyFlags = (AuraFlagsWotLK)packet.ReadUInt8();
         data.CastLevel = packet.ReadUInt8();
         data.Applications = packet.ReadUInt8();
 
         data.Flags = AuraFlagsModern.None;
         data.ActiveFlags = 0u;
 
-        // Legacy 3.3.5a aura flag bits → modern AuraFlagsModern + ActiveFlags mapping.
-        // Bits 0x10 / 0x20 are Positive / has-Duration. Bits 0x01/0x02/0x04 are the three
-        // aura point slots. Bit 0x08 indicates the caster is the affected unit (no GUID).
-        // Bit 0x40 indicates the packet carries explicit point floats.
-        if ((legacyFlags & 0x10) != 0) data.Flags |= AuraFlagsModern.Positive;
-        if ((legacyFlags & 0x20) != 0) data.Flags |= AuraFlagsModern.Duration;
-        if ((legacyFlags & 0x08) != 0) data.Flags |= AuraFlagsModern.NoCaster;
-        if ((legacyFlags & 0x01) != 0) data.ActiveFlags |= 1u;
-        if ((legacyFlags & 0x02) != 0) data.ActiveFlags |= 2u;
-        if ((legacyFlags & 0x04) != 0) data.ActiveFlags |= 4u;
+        if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.Positive)) data.Flags |= AuraFlagsModern.Positive;
+        if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.Duration)) data.Flags |= AuraFlagsModern.Duration;
+        if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.NoCaster)) data.Flags |= AuraFlagsModern.NoCaster;
+        if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.EffectIndex0)) data.ActiveFlags |= 1u;
+        if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.EffectIndex1)) data.ActiveFlags |= 2u;
+        if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.EffectIndex2)) data.ActiveFlags |= 4u;
 
-        data.CastUnit = (legacyFlags & 0x08) == 0
-            ? packet.ReadPackedGuid().To128(GetSession().GameState)
-            : guid;
+        data.CastUnit = legacyFlags.HasAnyFlag(AuraFlagsWotLK.NoCaster)
+            ? guid
+            : packet.ReadPackedGuid().To128(GetSession().GameState);
 
         // Cancelable: V3_4_3 client requires this flag for right-click-buff and the
         // CancelShapeshiftForm() Lua path (i.e. `/cancelform`, stance-bar toggle, and
@@ -1421,23 +1417,23 @@ public partial class WorldClient
         // any positive non-passive buff on themselves regardless of who cast it (PWS from
         // a priest, Mark of the Wild from a druid, etc.). Gate purely on "positive aura
         // landing on the local player" — broader than TC, matches legacy client behavior.
-        bool isPositive = (legacyFlags & 0x10) != 0;
+        bool isPositive = legacyFlags.HasAnyFlag(AuraFlagsWotLK.Positive);
         bool isOnLocalPlayer = guid == GetSession().GameState.CurrentPlayerGuid;
         if (isPositive && isOnLocalPlayer)
             data.Flags |= AuraFlagsModern.Cancelable;
 
-        if ((legacyFlags & 0x20) != 0)
+        if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.Duration))
         {
             data.Duration = packet.ReadInt32();
             data.Remaining = packet.ReadInt32();
         }
 
-        if ((legacyFlags & 0x40) != 0)
+        if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.Scalable))
         {
             var points = ImmutableArray.CreateBuilder<float>(3);
-            if ((legacyFlags & 0x01) != 0) points.Add(packet.ReadFloat());
-            if ((legacyFlags & 0x02) != 0) points.Add(packet.ReadFloat());
-            if ((legacyFlags & 0x04) != 0) points.Add(packet.ReadFloat());
+            if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.EffectIndex0)) points.Add(packet.ReadFloat());
+            if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.EffectIndex1)) points.Add(packet.ReadFloat());
+            if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.EffectIndex2)) points.Add(packet.ReadFloat());
             data.Points = points.ToImmutable();
         }
 
