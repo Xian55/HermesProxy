@@ -1415,13 +1415,15 @@ public partial class WorldClient
         // Cancelable: V3_4_3 client requires this flag for right-click-buff and the
         // CancelShapeshiftForm() Lua path (i.e. `/cancelform`, stance-bar toggle, and
         // direct buff right-click) to emit CMSG_CANCEL_AURA. Legacy 3.3.5a doesn't carry
-        // a Cancelable bit on the wire — the client decides based on aura attributes.
-        // Mirror CypherCore (canonical V3_4_3 reference): self-cast positive auras on the
-        // player are cancelable. Without this, druids stuck in Bear Form had no in-client
-        // way to exit even though Bear Form is a player-cancelable shapeshift aura.
+        // a Cancelable bit on the wire — the client decides locally from spell attributes.
+        // TC wotlk_classic gates AFLAG_CANCELABLE on caster==target (self-cast only), but
+        // that's narrower than legacy 3.3.5a semantics: the player can right-click cancel
+        // any positive non-passive buff on themselves regardless of who cast it (PWS from
+        // a priest, Mark of the Wild from a druid, etc.). Gate purely on "positive aura
+        // landing on the local player" — broader than TC, matches legacy client behavior.
         bool isPositive = (legacyFlags & 0x10) != 0;
-        bool isSelfCast = guid == GetSession().GameState.CurrentPlayerGuid && data.CastUnit == guid;
-        if (isPositive && isSelfCast)
+        bool isOnLocalPlayer = guid == GetSession().GameState.CurrentPlayerGuid;
+        if (isPositive && isOnLocalPlayer)
             data.Flags |= AuraFlagsModern.Cancelable;
 
         if ((legacyFlags & 0x20) != 0)
