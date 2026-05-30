@@ -124,7 +124,9 @@ public partial class WorldClient
         switch (auction.ErrorCode)
         {
             case AuctionHouseError.Ok:
-                if (auction.Command == AuctionHouseAction.Bid)
+                // The trailing outbid uint32 is optional — a buyout-success result omits it on
+                // some legacy cores (TC repack / AzerothCore), leaving a 12-byte packet (#85).
+                if (auction.Command == AuctionHouseAction.Bid && packet.CanRead(4))
                    auction.MinIncrement = packet.ReadUInt32();
                 break;
             case AuctionHouseError.Inventory:
@@ -137,6 +139,18 @@ public partial class WorldClient
                 break;
         }
         SendPacketToClient(auction);
+
+        // V3_4_3 client doesn't auto-refresh the owned tab after a post or cancel; force a
+        // re-list so the change shows without a manual tab-switch (#85). Mirrors the workaround
+        // in HandleAuctionHello above.
+        if (auction.ErrorCode == AuctionHouseError.Ok &&
+            auction.Command is AuctionHouseAction.Sell or AuctionHouseAction.Cancel)
+        {
+            WorldPacket relist = new WorldPacket(Opcode.CMSG_AUCTION_LIST_OWNED_ITEMS);
+            relist.WriteGuid(GetSession().GameState.CurrentInteractedWithNPC.To64());
+            relist.WriteUInt32(0);
+            SendPacketToServer(relist);
+        }
     }
 
     [PacketHandler(Opcode.SMSG_AUCTION_OWNER_NOTIFICATION)]
