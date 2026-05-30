@@ -18,6 +18,7 @@
 
 using System;
 using Framework.Constants;
+using HermesProxy.Enums;
 using Framework.GameMath;
 using Framework.IO;
 using HermesProxy.World.Enums;
@@ -34,17 +35,30 @@ class AuctionHelloResponse : ServerPacket, ISpanWritable
     {
         _worldPacket.WritePackedGuid128(Guid);
         _worldPacket.WriteUInt32(AuctionHouseID);
+        // V3_4_3 added the delivery-delay fields between AuctionHouseID and the
+        // OpenForBusiness bit; omitting them shifts the bit past the payload so
+        // the client reads it as 0 and shows "auction house closed" (#85).
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            _worldPacket.WriteUInt32(PurchasedItemDeliveryDelay);
+            _worldPacket.WriteUInt32(CancelledItemDeliveryDelay);
+        }
         _worldPacket.WriteBit(OpenForBusiness);
         _worldPacket.FlushBits();
     }
 
-    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 5; // GUID + uint + bit
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 5 + 8; // GUID + uint + bit + 2 V3_4_3 uints
 
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
         writer.WritePackedGuid128(Guid.Low, Guid.High);
         writer.WriteUInt32(AuctionHouseID);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            writer.WriteUInt32(PurchasedItemDeliveryDelay);
+            writer.WriteUInt32(CancelledItemDeliveryDelay);
+        }
         writer.WriteBit(OpenForBusiness);
         writer.FlushBits();
         return writer.Position;
@@ -52,6 +66,8 @@ class AuctionHelloResponse : ServerPacket, ISpanWritable
 
     public WowGuid128 Guid;
     public uint AuctionHouseID;
+    public uint PurchasedItemDeliveryDelay;
+    public uint CancelledItemDeliveryDelay;
     public bool OpenForBusiness = true;
 }
 
@@ -96,6 +112,73 @@ class AuctionListItems: ClientPacket
 
     public override void Read()
     {
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // V3_4_3 CMSG_AUCTION_LIST_ITEMS — wire per CypherCore WotLK-Classic
+            // AuctionListItems.Read (the authoritative 54261 layout; TC 3.4.3_Source and WPP's
+            // retail handler both mis-handle it). Auctioneer precedes Offset; the pet bytes,
+            // class-filter bodies and sort bodies ARE sent — earlier revisions discarded the
+            // filter bodies, which silently dropped category filtering (#85).
+            Auctioneer = _worldPacket.ReadPackedGuid128();
+            Offset = _worldPacket.ReadUInt32();
+            MinLevel = _worldPacket.ReadUInt8();
+            MaxLevel = _worldPacket.ReadUInt8();
+            Quality = _worldPacket.ReadInt32();
+            int sortsCount = _worldPacket.ReadUInt8();
+            int knownPetSize = _worldPacket.ReadInt32();
+            MaxPetLevel = (byte)_worldPacket.ReadInt8();
+
+            for (int i = 0; i < knownPetSize; ++i)
+                KnownPets.Add(_worldPacket.ReadUInt8());
+
+            bool tainted = _worldPacket.HasBit();
+            uint nameLen = _worldPacket.ReadBits<uint>(8);
+            Name = _worldPacket.ReadString(nameLen);
+
+            _worldPacket.ResetBitPos();
+            uint itemClassFilterCount = _worldPacket.ReadBits<uint>(3);
+            OnlyUsable = _worldPacket.HasBit();
+            ExactMatch = _worldPacket.HasBit();
+
+            if (tainted)
+            {
+                // Consume the AddOnInfo (TaintedBy) body to stay aligned; not forwarded.
+                _worldPacket.ResetBitPos();
+                uint addonNameLen = _worldPacket.ReadBits<uint>(10);
+                uint addonVerLen = _worldPacket.ReadBits<uint>(10);
+                _worldPacket.HasBit(); // Loaded
+                _worldPacket.HasBit(); // Disabled
+                if (addonNameLen > 1) { _worldPacket.ReadString(addonNameLen - 1); _worldPacket.ReadUInt8(); }
+                if (addonVerLen > 1) { _worldPacket.ReadString(addonVerLen - 1); _worldPacket.ReadUInt8(); }
+            }
+
+            for (uint i = 0; i < itemClassFilterCount; ++i)
+            {
+                ClassFilter classFilter = new ClassFilter();
+                classFilter.ItemClass = _worldPacket.ReadInt32();
+                uint subClassFilterCount = _worldPacket.ReadBits<uint>(5);
+                for (uint j = 0; j < subClassFilterCount; ++j)
+                {
+                    SubClassFilter filter = new SubClassFilter();
+                    filter.InvTypeMask = (uint)_worldPacket.ReadUInt64();
+                    filter.ItemSubclass = _worldPacket.ReadInt32();
+                    classFilter.SubClassFilters.Add(filter);
+                }
+                ClassFilters.Add(classFilter);
+            }
+
+            _worldPacket.ReadInt32(); // sortDataSize
+            for (int i = 0; i < sortsCount; ++i)
+            {
+                AuctionSort sort = new AuctionSort();
+                _worldPacket.ResetBitPos();
+                sort.Type = _worldPacket.ReadUInt8();
+                sort.Direction = _worldPacket.ReadUInt8();
+                Sorts.Add(sort);
+            }
+            return;
+        }
+
         Offset = _worldPacket.ReadUInt32();
         Auctioneer = _worldPacket.ReadPackedGuid128();
 
