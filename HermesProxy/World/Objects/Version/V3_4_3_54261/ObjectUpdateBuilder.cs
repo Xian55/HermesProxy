@@ -877,7 +877,7 @@ public partial class ObjectUpdateBuilder
 
         // bit 299 (parent 298): ExploredZones[240] (UInt64). Live property exists; TODO per-element read.
         for (int l = 0; l < 240; l++)
-            data.WriteUInt64(0uL);
+            data.WriteUInt64(active.ExploredZones[l].GetValueOrDefault());
 
         // bits 540-541 (parent 539): RestInfo[2] nested struct {Threshold:UInt32, StateID:UInt8}.
         // Defaults: Threshold=0, StateID=1 per element. TODO read active.RestInfo[r].Threshold/StateID.
