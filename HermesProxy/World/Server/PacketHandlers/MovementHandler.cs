@@ -56,6 +56,15 @@ public partial class WorldSocket
         movement.MoveInfo.WriteMovementInfoLegacy(packet);
         SendPacketToServer(packet);
 
+        if (movement.MoveInfo.TransportGuid != default)
+        {
+            Log.Print(LogType.Trace,
+                $"[TransportRide] {opcodeName} modernTransport={movement.MoveInfo.TransportGuid} " +
+                $"legacyTransport={movement.MoveInfo.TransportGuid.To64()} " +
+                $"offset=({movement.MoveInfo.TransportOffset.X:F2},{movement.MoveInfo.TransportOffset.Y:F2},{movement.MoveInfo.TransportOffset.Z:F2}) " +
+                $"seat={movement.MoveInfo.TransportSeat} time={movement.MoveInfo.TransportTime}");
+        }
+
         CheckLegacyAreaTriggerProximity(movement.MoveInfo.Position);
     }
 

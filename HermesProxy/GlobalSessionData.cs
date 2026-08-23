@@ -129,6 +129,11 @@ public sealed class GameSessionData
     public uint CurrentTaxiNode;
     public List<byte> UsableTaxiNodes = [];
     public uint PendingTransferMapId;
+
+    // Non-zero while a pending map change is being driven by a transport the player is
+    // standing on. The legacy SMSG_NEW_WORLD that follows carries a transport-relative
+    // offset instead of an absolute position, so the position needs different handling.
+    public uint TransferPendingShipEntry;
     public uint LastEnteredAreaTrigger;
     public uint LastDispellSpellId;
     public string LeftChannelName = "";

@@ -152,6 +152,26 @@ public partial class WorldClient
         TransferPending transfer = new TransferPending();
         transfer.MapID = GetSession().GameState.PendingTransferMapId = packet.ReadUInt32();
         transfer.OldMapPosition = Vector3.Zero;
+
+        // A map change driven by a transport carries the transport's entry and the map it
+        // is leaving (AzerothCore Player.cpp:1609-1613). Without it the modern client
+        // treats this as an ordinary teleport, so it detaches the player from the deck and
+        // they arrive in freefall.
+        if (packet.CanRead(8))
+        {
+            transfer.Ship = new TransferPending.ShipTransferPending
+            {
+                Id = packet.ReadUInt32(),
+                OriginMapID = packet.ReadInt32(),
+            };
+            GetSession().GameState.TransferPendingShipEntry = transfer.Ship.Id;
+            Log.Print(LogType.Trace,
+                $"[TransportRide] SMSG_TRANSFER_PENDING on transport entry={transfer.Ship.Id} " +
+                $"fromMap={transfer.Ship.OriginMapID} toMap={transfer.MapID}");
+        }
+        else
+            GetSession().GameState.TransferPendingShipEntry = 0;
+
         SendPacketToClient(transfer);
         GetSession().GameState.IsFirstEnterWorld = false;
         GetSession().GameState.IsWaitingForNewWorld = true;
