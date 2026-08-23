@@ -166,7 +166,7 @@ public partial class WorldClient
             };
             GetSession().GameState.TransferPendingShipEntry = transfer.Ship.Id;
             Log.Print(LogType.Trace,
-                $"[TransportRide] SMSG_TRANSFER_PENDING on transport entry={transfer.Ship.Id} " +
+                $"[Transport] SMSG_TRANSFER_PENDING on transport entry={transfer.Ship.Id} " +
                 $"fromMap={transfer.Ship.OriginMapID} toMap={transfer.MapID}");
         }
         else

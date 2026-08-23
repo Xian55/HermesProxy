@@ -86,7 +86,7 @@ public partial class WorldClient
         query.WriteUInt32(entry);
         query.WriteGuid(new WowGuid64(HighGuidTypeLegacy.GameObject, entry, 1));
         SendPacketToServer(query);
-        Log.Print(LogType.Trace, $"[TransportTrace] requested gameobject template for transport entry={entry}");
+        Log.Print(LogType.Trace, $"[Transport] requested gameobject template for transport entry={entry}");
     }
 
     [PacketHandler(Opcode.SMSG_UPDATE_OBJECT)]
@@ -821,7 +821,7 @@ public partial class WorldClient
 
             }
             if (guid.IsTransport())
-                Log.Print(LogType.Trace, $"[TransportRide] destroy (out of range) for transport {guid}");
+                Log.Print(LogType.Trace, $"[Transport] destroy (out of range) for transport {guid}");
             updateObject.OutOfRangeGuids.Add(guid);
         }
     }
@@ -1529,12 +1529,14 @@ public partial class WorldClient
                 moveInfo.Rotation = rotation;
         }
 
-        if (updateData != null && moveInfo != null
-            && guid == GetSession().GameState.CurrentPlayerGuid)
+        // Only when the object claims to be riding something — this is the state that
+        // decides whether a passenger ends up on the deck or on the ground.
+        if (updateData != null && moveInfo != null && moveInfo.TransportGuid != default)
         {
             Log.Print(LogType.Trace,
-                $"[TransportRide] own movement block: transport={(moveInfo.TransportGuid == default ? "none" : moveInfo.TransportGuid.ToString())} " +
-                $"pos=({moveInfo.Position.X:F1},{moveInfo.Position.Y:F1},{moveInfo.Position.Z:F1})");
+                $"[Transport] passenger create: guid={guid} transport={moveInfo.TransportGuid} " +
+                $"clientKnowsTransport={GetSession().GameState.ClientKnownGuids.Contains(moveInfo.TransportGuid)} " +
+                $"offset=({moveInfo.TransportOffset.X:F2},{moveInfo.TransportOffset.Y:F2},{moveInfo.TransportOffset.Z:F2}) seat={moveInfo.TransportSeat}");
         }
 
         if (updateData != null && moveInfo != null)

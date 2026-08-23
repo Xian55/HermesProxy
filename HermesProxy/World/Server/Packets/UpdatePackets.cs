@@ -201,7 +201,7 @@ public class ObjectUpdate
                 GameObjectData.Flags = (GameObjectData.Flags ?? 0) | ModernTransportFlag;
 
                 Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
-                    $"[TransportTrace] guid={Guid} entry={ObjectData.EntryID} typeID={GameObjectData.TypeID} " +
+                    $"[Transport] guid={Guid} entry={ObjectData.EntryID} typeID={GameObjectData.TypeID} " +
                     $"pathProgress={transportTimer} period={period} level={GameObjectData.Level} " +
                     $"dynFlags=0x{(ObjectData.DynamicFlags ?? 0):X8} goFlags={GameObjectData.Flags} " +
                     $"pos=({CreateData.MoveInfo!.Position.X:F1},{CreateData.MoveInfo.Position.Y:F1},{CreateData.MoveInfo.Position.Z:F1}) " +

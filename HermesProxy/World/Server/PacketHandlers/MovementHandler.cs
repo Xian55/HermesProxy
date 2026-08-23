@@ -56,14 +56,6 @@ public partial class WorldSocket
         movement.MoveInfo.WriteMovementInfoLegacy(packet);
         SendPacketToServer(packet);
 
-        if (movement.MoveInfo.TransportGuid != default)
-        {
-            Log.Print(LogType.Trace,
-                $"[TransportRide] {opcodeName} modernTransport={movement.MoveInfo.TransportGuid} " +
-                $"legacyTransport={movement.MoveInfo.TransportGuid.To64()} " +
-                $"offset=({movement.MoveInfo.TransportOffset.X:F2},{movement.MoveInfo.TransportOffset.Y:F2},{movement.MoveInfo.TransportOffset.Z:F2}) " +
-                $"seat={movement.MoveInfo.TransportSeat} time={movement.MoveInfo.TransportTime}");
-        }
 
         CheckLegacyAreaTriggerProximity(movement.MoveInfo.Position);
     }
@@ -132,9 +124,6 @@ public partial class WorldSocket
         GetSession().GameState.IsWaitingForWorldPortAck = false;
         WorldPacket packet = new WorldPacket(Opcode.MSG_MOVE_WORLDPORT_ACK);
         SendPacketToServer(packet);
-        Log.Print(LogType.Trace,
-            $"[TransportRide] MSG_MOVE_WORLDPORT_ACK sent, map={GetSession().GameState.CurrentMapId} " +
-            $"shipEntry={GetSession().GameState.TransferPendingShipEntry}");
     }
 
     [PacketHandler(Opcode.CMSG_MOVE_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK)]
