@@ -183,6 +183,13 @@ public class ObjectUpdate
                 }
                 else if (ObjectData.DynamicFlags == null)
                     ObjectData.DynamicFlags = ((transportTimer % System.UInt16.MaxValue) << 16);
+
+                Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                    $"[TransportTrace] guid={Guid} entry={ObjectData.EntryID} typeID={GameObjectData.TypeID} " +
+                    $"pathProgress={transportTimer} csvPeriod={period} level={GameObjectData.Level} " +
+                    $"dynFlags=0x{(ObjectData.DynamicFlags ?? 0):X8} goFlags={GameObjectData.Flags} " +
+                    $"pos=({CreateData.MoveInfo!.Position.X:F1},{CreateData.MoveInfo.Position.Y:F1},{CreateData.MoveInfo.Position.Z:F1}) " +
+                    $"o={CreateData.MoveInfo.Orientation:F3}");
             }
         }
         if (CorpseData != null)
@@ -432,6 +439,24 @@ public class UpdateObject : ServerPacket
             if (obj.DynamicFlags.HasValue) return false;
             if (obj.EntryID.HasValue) return false;
             if (obj.Scale.HasValue) return false;
+        }
+
+        // A moving transport's Values deltas carry GAMEOBJECT_LEVEL (the path period) and
+        // nothing else once GAMEOBJECT_DYNAMIC stops changing, so without this probe the
+        // filter classified them as empty and dropped them. Same for a door or chest whose
+        // only change is GAMEOBJECT_BYTES_1 (State/ArtKit).
+        var go = u.GameObjectData;
+        if (go != null)
+        {
+            if (go.Level.HasValue || go.State.HasValue || go.TypeID.HasValue) return false;
+            if (go.DisplayID.HasValue || go.Flags.HasValue || go.ArtKit.HasValue) return false;
+            if (go.FactionTemplate.HasValue || go.PercentHealth.HasValue) return false;
+            if (go.SpellVisualID.HasValue || go.StateSpellVisualID.HasValue) return false;
+            if (go.StateAnimID.HasValue || go.StateAnimKitID.HasValue || go.CustomParam.HasValue) return false;
+            if (go.CreatedBy != null || go.GuildGUID != null) return false;
+            if (go.ParentRotation != null)
+                for (int i = 0; i < go.ParentRotation.Length; i++)
+                    if (go.ParentRotation[i].HasValue) return false;
         }
 
         var unit = u.UnitData;

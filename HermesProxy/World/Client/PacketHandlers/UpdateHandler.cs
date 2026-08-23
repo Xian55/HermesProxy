@@ -43,20 +43,13 @@ public partial class WorldClient
 
     [PacketHandler(Opcode.SMSG_UPDATE_OBJECT)]
     /// <summary>
-    /// Whether a legacy transport CreateObject may reach a V3_4_3 client.
-    /// Legacy TRANSPORT (gameobject type 11: elevators, subway cars, ICC sleds) keeps its
-    /// entry ID in the 3.4.3 client's TransportAnimation data (verified: all 11 entries seen
-    /// in Undercity, 20649-20657 / 149045 / 149046, are present under their unchanged legacy
-    /// IDs), so those are forwardable behind the opt-in toggle. MO_TRANSPORT (type 15:
-    /// zeppelins, boats) is never forwardable: no type 15 entry appears in TransportAnimation
-    /// in either the 3.3.5a or the 3.4.3 client, because that category is driven by
-    /// gameobject_template.Data0 taxi paths instead. Upstream issue #96.
+    /// Whether a legacy transport CreateObject may reach a V3_4_3 client. Covers both
+    /// legacy TRANSPORT (gameobject type 11: elevators, subway cars, ICC sleds) and
+    /// MO_TRANSPORT (type 15: zeppelins, boats). The V1_14 and V2_5 targets forward both
+    /// unconditionally; this filter exists only on the V3_4_3 path. Upstream issue #96.
     /// </summary>
     private bool MayForwardTransport(HighGuidTypeLegacy legacyHigh, ObjectUpdate updateData)
     {
-        if (legacyHigh == HighGuidTypeLegacy.MOTransport)
-            return false;
-
         if (!GetSession().DiagnosticsOptions.ForwardTransportsV343)
             return false;
 

@@ -224,10 +224,14 @@ public partial class ObjectUpdateBuilder
 
         if (Has(CreateObjectBits.ServerTime))
         {
-            // TC343 writes GameTime::GetGameTimeMS() = server uptime in ms.
-            // Legacy 3.3.5a sends PathProgress (transport-specific counter), NOT game time.
-            // The 3.4.3 client expects server uptime for transport animation sync.
-            data.WriteUInt32((uint)Environment.TickCount);
+            // Legacy UPDATEFLAG_TRANSPORT carries Transport::GetPathProgress() — how far
+            // into its loop the transport is, in ms (AzerothCore Object.cpp:463-469). The
+            // client interpolates its own animation from that offset, so forwarding it is
+            // what keeps every client seeing the boat in the same place. Matches the V1_14
+            // and V2_5 builders. Only fall back to a local clock when the legacy server
+            // sent nothing (non-transport objects that still set the bit).
+            var pathProgress = _updateData.CreateData.MoveInfo.TransportPathTimer;
+            data.WriteUInt32(pathProgress != 0 ? pathProgress : (uint)Environment.TickCount);
         }
 
         if (Has(CreateObjectBits.Vehicle))
