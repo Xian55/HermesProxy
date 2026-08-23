@@ -1,3 +1,4 @@
+using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
@@ -43,6 +44,12 @@ public partial class WorldSocket
         //   uint8  needsCount (always 3)
         //   uint8  Needs[3]
         //   cstr   Comment
+        // 3.3.5a and V3_4_3 do not share LFGDungeons IDs. If the client queues for content
+        // that only exists in 3.4.3 (Titan Rune Protocol, say), the legacy server silently
+        // drops the join with no SMSG_LFG_JOIN_RESULT, so log what we forward.
+        Log.Print(LogType.Debug,
+            $"LFG[diag]: CMSG_DF_JOIN roles=0x{packet.Roles:X8} slots=[{string.Join(", ", packet.Slots)}] forwarding as CMSG_LFG_JOIN");
+
         WorldPacket legacy = new WorldPacket(Opcode.CMSG_LFG_JOIN);
         legacy.WriteUInt32(packet.Roles);
         legacy.WriteUInt8(0); // NoPartialClear

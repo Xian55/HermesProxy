@@ -285,7 +285,8 @@ public partial class WorldClient
         {
             _lfgPlayerInfoLogged = true;
             Log.Print(LogType.Debug,
-                $"LFG[diag]: SMSG_LFG_PLAYER_INFO sent — Dungeons={info.Dungeons.Count} BlackListSlots={info.BlackList.Slots?.Count ?? 0} (one-shot)");
+                $"LFG[diag]: SMSG_LFG_PLAYER_INFO sent, Dungeons={info.Dungeons.Count} BlackListSlots={info.BlackList.Slots?.Count ?? 0} " +
+                $"offeredSlots=[{string.Join(", ", info.Dungeons.ConvertAll(x => x.Slot.ToString()))}] (one-shot)");
         }
     }
 
