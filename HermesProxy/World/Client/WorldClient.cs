@@ -609,12 +609,16 @@ public partial class WorldClient
                         // Dump the whole packet, not a prefix. A parser that over-reads is
                         // usually wrong about a field well past the first few bytes, and this
                         // only fires on an exception so the volume is irrelevant.
+                        // GetSize is the real payload length; GetData can hand back a larger
+                        // ArrayPool rental, and reporting that length makes an over-read look
+                        // like it had spare bytes to read.
                         byte[] raw = packet.GetData();
-                        int hexLen = System.Math.Min(1024, raw.Length);
+                        int size = (int)packet.GetSize();
+                        int hexLen = System.Math.Min(1024, System.Math.Min(size, raw.Length));
                         string body = hexLen > 0 ? System.BitConverter.ToString(raw, 0, hexLen) : "<empty>";
                         Log.Print(LogType.Error,
                             $"C P<S | Unhandled exception in handler for {universalOpcode} ({packet.GetOpcode()}) " +
-                            $"[size={raw.Length} dumped={hexLen}]{System.Environment.NewLine}bytes={body}{System.Environment.NewLine}{handlerException}");
+                            $"[size={size} dumped={hexLen}]{System.Environment.NewLine}bytes={body}{System.Environment.NewLine}{handlerException}");
                     }
                 }
                 else

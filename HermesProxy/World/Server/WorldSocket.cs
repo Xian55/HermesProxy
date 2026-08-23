@@ -446,12 +446,14 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             return;
         }
 
+        // GetSize is the real payload length; GetData can hand back a larger ArrayPool rental.
         byte[] raw = packet.GetData();
-        int hexLen = Math.Min(64, raw.Length);
+        int size = (int)packet.GetSize();
+        int hexLen = Math.Min(64, Math.Min(size, raw.Length));
         string hex = hexLen > 0 ? BitConverter.ToString(raw, 0, hexLen) : "<empty>";
         Log.Print(LogType.Error,
             $"C>P S | Unhandled exception in handler for {universalOpcode} ({packet.GetOpcode()}) " +
-            $"[conn={_connectType} account='{account}' size={raw.Length}]{Environment.NewLine}" +
+            $"[conn={_connectType} account='{account}' size={size}]{Environment.NewLine}" +
             $"head={hex}{Environment.NewLine}{e}");
     }
 
