@@ -382,7 +382,14 @@ public partial class WorldClient
             }
         }
 
+        // Destroys still have to reach the client mid-transfer. A transport that does not
+        // follow the player to the new map is destroyed by a batch carrying nothing but
+        // out-of-range guids (AzerothCore MovementHandler.cpp:132-138, "Client was never
+        // told to destroy its own transport / Destroy it now or it keeps a phantom copy of
+        // the transport on the new map") — swallowing it strands a ghost zeppelin.
         if (updateObject.ObjectUpdates.Count == 0 &&
+            updateObject.OutOfRangeGuids.Count == 0 &&
+            updateObject.DestroyedGuids.Count == 0 &&
             GetSession().GameState.IsWaitingForNewWorld)
             return;
 

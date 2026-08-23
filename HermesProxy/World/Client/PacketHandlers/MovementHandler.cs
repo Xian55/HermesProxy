@@ -231,12 +231,17 @@ public partial class WorldClient
 
                 if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
                     SendPacketToClient(new TimeSyncRequest());
-
-                ResumeToken resume = new();
-                resume.SequenceIndex = 3;
-                resume.Reason = 1;
-                SendPacketToClient(resume);
             }
+
+            // HandleTransferPending sends a SuspendToken for every transfer, so the resume
+            // has to be unconditional or the client stays suspended. It used to be nested
+            // in the MapID > 1 branch, which left the two continents unbalanced: riding a
+            // zeppelin to Northrend (571) arrived fine while the return trip to Tirisfal
+            // (0), and Orgrimmar (1), dropped the player through the deck on arrival.
+            ResumeToken resume = new();
+            resume.SequenceIndex = 3;
+            resume.Reason = 1;
+            SendPacketToClient(resume);
 
             WorldServerInfo info = new();
             if (teleport.MapID > 1)
