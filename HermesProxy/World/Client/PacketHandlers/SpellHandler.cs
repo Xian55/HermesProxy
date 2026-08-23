@@ -539,21 +539,56 @@ public partial class WorldClient
 
         if (isSpellGo)
         {
+            // A short or malformed SMSG_SPELL_GO declares more hit/miss targets than it
+            // actually carries, and the loops then read past the end (issue #105). The
+            // parser's field layout matches AzerothCore, TrinityCore and cMaNGOS exactly,
+            // so the malformed packet comes from the backend, not from us. Bound each entry
+            // on the real payload and keep what parsed, which also names the offending
+            // spell in the log instead of leaving only a raw hex dump.
             var hitCount = packet.ReadUInt8();
             for (var i = 0; i < hitCount; i++)
             {
+                if (!packet.CanRead(8)) // raw guid
+                {
+                    Log.Print(LogType.Warn,
+                        $"[SpellGo] spell {dbdata.SpellID} declared {hitCount} hit targets but only {i} are present, truncating parse.");
+                    return dbdata;
+                }
+
                 WowGuid128 hitTarget = packet.ReadGuid().To128(GetSession().GameState);
                 dbdata.HitTargets.Add(hitTarget);
+            }
+
+            if (!packet.CanRead(1))
+            {
+                Log.Print(LogType.Warn, $"[SpellGo] spell {dbdata.SpellID} ended before the miss-target count, truncating parse.");
+                return dbdata;
             }
 
             var missCount = packet.ReadUInt8();
             for (var i = 0; i < missCount; i++)
             {
+                if (!packet.CanRead(9)) // raw guid + miss reason
+                {
+                    Log.Print(LogType.Warn,
+                        $"[SpellGo] spell {dbdata.SpellID} declared {missCount} miss targets but only {i} are present, truncating parse.");
+                    return dbdata;
+                }
+
                 WowGuid128 missTarget = packet.ReadGuid().To128(GetSession().GameState);
                 SpellMissInfo missType = (SpellMissInfo)packet.ReadUInt8();
                 SpellMissInfo reflectType = SpellMissInfo.None;
                 if (missType == SpellMissInfo.Reflect)
+                {
+                    if (!packet.CanRead(1))
+                    {
+                        Log.Print(LogType.Warn,
+                            $"[SpellGo] spell {dbdata.SpellID} reflect target is missing its status byte, truncating parse.");
+                        return dbdata;
+                    }
+
                     reflectType = (SpellMissInfo)packet.ReadUInt8();
+                }
 
                 dbdata.MissTargets.Add(missTarget);
                 dbdata.MissStatus.Add(new SpellMissStatus(missType, reflectType));
