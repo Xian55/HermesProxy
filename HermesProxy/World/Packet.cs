@@ -208,7 +208,14 @@ public class WorldPacket : ByteBuffer
     public WorldPacket(uint opcode, byte[] data) : base(data)
     {
         this.opcode = opcode;
-        System.Diagnostics.Trace.Assert(this.opcode != 0);
+
+        // Was a Trace.Assert. Both callers are legacy *receive* paths — SMSG_COMPRESSED_MOVES
+        // reads this opcode straight off the wire, and Inflate() copies it from the parent
+        // packet — so a zero here means corrupt or misaligned input, not a programming error.
+        // Aborting the process on malformed server data is the worst possible response; log it
+        // and let the dispatcher drop it as an unknown opcode.
+        if (this.opcode == 0)
+            Log.Print(LogType.Warn, "Constructed a legacy packet with opcode 0 from received data; it will be dropped as unknown.");
     }
 
     public WorldPacket(byte[] data) : base(data)

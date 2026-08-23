@@ -1006,7 +1006,14 @@ public static partial class GameData
                 if (mapId != 0)
                     bg.MapIds.Add(mapId);
             }
-            System.Diagnostics.Trace.Assert(bg.MapIds.Count != 0);
+            // Was a Trace.Assert. A malformed CSV row is a data problem, not a reason to
+            // abort the process during startup — skip the row and say which one it was.
+            if (bg.MapIds.Count == 0)
+            {
+                Log.Print(LogType.Error,
+                    $"LoadBattlegrounds: battleground {bgId} has no map IDs in {path}, skipping row.");
+                continue;
+            }
             dict.Add(bgId, bg);
         }
         Battlegrounds = dict.ToFrozenDictionary();

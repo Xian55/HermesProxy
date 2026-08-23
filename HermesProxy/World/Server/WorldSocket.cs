@@ -1270,7 +1270,15 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
     public void SendAccountDataTimes()
     {
-        System.Diagnostics.Trace.Assert(_connectType == ConnectionType.Realm);
+        // Was a Trace.Assert. Account data belongs on the realm socket; if this ever runs
+        // on the instance socket the packet would go to the wrong connection, but that is
+        // still not worth aborting the process from a socket callback.
+        if (_connectType != ConnectionType.Realm)
+        {
+            Log.Print(LogType.Error,
+                $"SendAccountDataTimes called on a {_connectType} socket, expected {ConnectionType.Realm}. Skipping.");
+            return;
+        }
 
         WowGuid128 guid = GetSession().GameState.CurrentPlayerGuid;
         GetSession().AccountDataMgr.LoadAllData(guid);

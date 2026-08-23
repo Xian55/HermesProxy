@@ -71,9 +71,24 @@
     <TrimmerRootAssembly Include="Serilog" />
   </ItemGroup>
 
+  <!-- _WINDOWS gates the Windows-only console/CTRL-handler blocks in Program.cs.
+       APPEND to $(DefineConstants) — never assign. A plain assignment here silently
+       discarded the SDK-provided TRACE define, so every Trace.Assert compiled away on
+       Windows while staying live (and process-fatal) on macOS/Linux. That divergence
+       hid the opcode-0 abort reported in #111 from every Windows contributor for as
+       long as the line existed. -->
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
-    <DefineConstants>_WINDOWS</DefineConstants>
+    <DefineConstants>$(DefineConstants);_WINDOWS</DefineConstants>
   </PropertyGroup>
+
+  <!-- Regression guard for the above: TRACE must survive into the final DefineConstants on
+       every platform and configuration. If it is missing, someone assigned over it again —
+       fail loudly at build time rather than shipping a binary whose assertions are no-ops
+       on one OS and fatal on another. -->
+  <Target Name="VerifyTraceDefine" BeforeTargets="CoreCompile">
+    <Error Condition="!$(DefineConstants.Contains('TRACE'))"
+           Text="DefineConstants lost TRACE (got '$(DefineConstants)'). Write &lt;DefineConstants&gt;%24(DefineConstants);YOUR_SYMBOL&lt;/DefineConstants&gt; — append, never assign." />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="GitVersion.MsBuild">

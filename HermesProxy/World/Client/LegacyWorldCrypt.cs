@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Security.Cryptography;
 
 namespace HermesProxy.World.Client;
@@ -18,7 +17,11 @@ public class VanillaWorldCrypt : LegacyWorldCrypt
 
     public void Initialize(ReadOnlySpan<byte> sessionKey)
     {
-        Trace.Assert(sessionKey.Length != 0);
+        // Was a Trace.Assert, which aborts the process outright wherever TRACE is defined.
+        // An empty session key means the auth handshake went wrong; throw so the caller's
+        // handler guard can log it and drop the session instead of taking the proxy down.
+        if (sessionKey.Length == 0)
+            throw new ArgumentException("Session key is empty; cannot initialize world crypt.", nameof(sessionKey));
 
         m_key = sessionKey.ToArray();
         m_send_i = m_send_j = m_recv_i = m_recv_j = 0;
