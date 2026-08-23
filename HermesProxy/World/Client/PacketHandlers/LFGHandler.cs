@@ -279,6 +279,13 @@ public partial class WorldClient
         }
         info.BlackList = blackList;
 
+        // Both lists together are the full set of dungeons this backend understands.
+        var known = GetSession().GameState.LfgKnownDungeonIds;
+        foreach (var dungeon in info.Dungeons)
+            known.Add(dungeon.Slot & 0xFFFFFF);
+        foreach (var locked in blackList.Slots)
+            known.Add(locked.Slot & 0xFFFFFF);
+
         SendPacketToClient(info);
 
         if (!_lfgPlayerInfoLogged)

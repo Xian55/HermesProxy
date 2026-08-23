@@ -306,6 +306,13 @@ public sealed class GameSessionData
     // cached copy AFTER the player Create so the V3_4_3 client sees TC's ordering.
     public InitWorldStates? LastInitWorldStates;
 
+    // Dungeon IDs (low 24 bits of an LFG slot) the legacy backend listed in
+    // SMSG_LFG_PLAYER_INFO, available and locked alike. The V3_4_3 client offers
+    // content that shipped after 3.3.5a (Titan Rune Protocol), and queueing for it
+    // makes the legacy server drop CMSG_LFG_JOIN without any reply, leaving the
+    // client waiting forever. Used to answer those joins ourselves.
+    public readonly HashSet<uint> LfgKnownDungeonIds = new();
+
     private GameSessionData()
     {
         

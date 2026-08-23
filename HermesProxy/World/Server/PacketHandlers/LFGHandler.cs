@@ -1,3 +1,4 @@
+using System;
 using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
@@ -44,11 +45,20 @@ public partial class WorldSocket
         //   uint8  needsCount (always 3)
         //   uint8  Needs[3]
         //   cstr   Comment
-        // 3.3.5a and V3_4_3 do not share LFGDungeons IDs. If the client queues for content
-        // that only exists in 3.4.3 (Titan Rune Protocol, say), the legacy server silently
-        // drops the join with no SMSG_LFG_JOIN_RESULT, so log what we forward.
         Log.Print(LogType.Debug,
-            $"LFG[diag]: CMSG_DF_JOIN roles=0x{packet.Roles:X8} slots=[{string.Join(", ", packet.Slots)}] forwarding as CMSG_LFG_JOIN");
+            $"LFG[diag]: CMSG_DF_JOIN roles=0x{packet.Roles:X8} slots=[{string.Join(", ", packet.Slots)}]");
+
+        // The V3_4_3 client offers dungeons that postdate 3.3.5a (Titan Rune Protocol
+        // Alpha/Beta/Gamma, IDs 2447/2470/2485). A legacy backend drops CMSG_LFG_JOIN for
+        // an unknown dungeon without sending SMSG_LFG_JOIN_RESULT, so the client sits on
+        // "Find Group" forever with no error. Answer for the backend instead.
+        if (LfgSlots.TryFindUnknownDungeon(GetSession().GameState.LfgKnownDungeonIds, packet.Slots, out uint unknownDungeonId))
+        {
+            Log.Print(LogType.Debug,
+                $"LFG[diag]: rejecting CMSG_DF_JOIN, dungeon {unknownDungeonId} is unknown to the {LegacyVersion.Build} backend");
+            SendDFJoinFailure(LfgJoinResult.DungeonInvalid);
+            return;
+        }
 
         WorldPacket legacy = new WorldPacket(Opcode.CMSG_LFG_JOIN);
         legacy.WriteUInt32(packet.Roles);
@@ -63,6 +73,31 @@ public partial class WorldSocket
         legacy.WriteUInt8(0);
         legacy.WriteCString(string.Empty);
         SendPacketToServer(legacy);
+    }
+
+    // Legacy 3.3.5a lfg::LfgJoinResult. The proxy forwards the backend's raw result byte
+    // straight through, so a synthesised failure has to use the same numbering.
+    // Source: azerothcore-wotlk src/server/game/DungeonFinding/LFGMgr.h.
+    private enum LfgJoinResult : byte
+    {
+        DungeonInvalid = 11, // "One or more dungeons was not valid"
+    }
+
+    private void SendDFJoinFailure(LfgJoinResult result)
+    {
+        DFJoinResult response = new DFJoinResult
+        {
+            Ticket = new RideTicket
+            {
+                RequesterGuid = GetSession().GameState.CurrentPlayerGuid,
+                Id = 1,
+                Type = RideType.Lfg,
+                Time = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            },
+            Result = (byte)result,
+            ResultDetail = 0,
+        };
+        SendPacket(response);
     }
 
     [PacketHandler(Opcode.CMSG_DF_LEAVE)]
