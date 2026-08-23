@@ -132,6 +132,9 @@ public partial class WorldSocket
         GetSession().GameState.IsWaitingForWorldPortAck = false;
         WorldPacket packet = new WorldPacket(Opcode.MSG_MOVE_WORLDPORT_ACK);
         SendPacketToServer(packet);
+        Log.Print(LogType.Trace,
+            $"[TransportRide] MSG_MOVE_WORLDPORT_ACK sent, map={GetSession().GameState.CurrentMapId} " +
+            $"shipEntry={GetSession().GameState.TransferPendingShipEntry}");
     }
 
     [PacketHandler(Opcode.CMSG_MOVE_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK)]

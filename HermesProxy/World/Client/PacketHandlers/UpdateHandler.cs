@@ -648,6 +648,19 @@ public partial class WorldClient
         // remaining Values reach the client.
         if (createsToSplit != null)
         {
+            // Transports have to be created before anything standing on them. The legacy
+            // batch orders the player ahead of the transport it is riding, which is fine
+            // in one envelope but not once the split turns it into separate packets: the
+            // client got "this player is on transport X" before it had X, dropped the
+            // attachment, and the player fell through the deck on arriving in a new map.
+            // Transports reference nothing themselves, so hoisting them is safe.
+            int transportCreates = TransportCreateOrdering.CountTransports(createsToSplit, u => u.Guid);
+            createsToSplit = TransportCreateOrdering.TransportsFirst(createsToSplit, u => u.Guid);
+
+            if (transportCreates != 0)
+                Log.Print(LogType.Trace,
+                    $"[UpdateObjectTrace] V3_4_3 CreateObject split: hoisted {transportCreates} transport create(s) ahead of {createsToSplit.Count - transportCreates} other create(s)");
+
             foreach (var create in createsToSplit)
             {
                 UpdateObject perCreate = new UpdateObject(GetSession().GameState);
@@ -807,6 +820,8 @@ public partial class WorldClient
                 SendPacketToClient(updateObject2);
 
             }
+            if (guid.IsTransport())
+                Log.Print(LogType.Trace, $"[TransportRide] destroy (out of range) for transport {guid}");
             updateObject.OutOfRangeGuids.Add(guid);
         }
     }
@@ -1512,6 +1527,14 @@ public partial class WorldClient
             var rotation = packet.ReadPackedQuaternion();
             if (moveInfo != null)
                 moveInfo.Rotation = rotation;
+        }
+
+        if (updateData != null && moveInfo != null
+            && guid == GetSession().GameState.CurrentPlayerGuid)
+        {
+            Log.Print(LogType.Trace,
+                $"[TransportRide] own movement block: transport={(moveInfo.TransportGuid == default ? "none" : moveInfo.TransportGuid.ToString())} " +
+                $"pos=({moveInfo.Position.X:F1},{moveInfo.Position.Y:F1},{moveInfo.Position.Z:F1})");
         }
 
         if (updateData != null && moveInfo != null)
