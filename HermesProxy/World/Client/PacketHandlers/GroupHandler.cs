@@ -2,6 +2,7 @@
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
 using System;
 using System.Collections.Generic;
@@ -181,10 +182,14 @@ public partial class WorldClient
         byte ownGroupFlags = packet.ReadUInt8();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
             packet.ReadUInt8(); // own LFG roles
+        byte lfgDungeonStatus = 0;
+        uint lfgDungeonId = 0;
         if (isLfg)
         {
-            packet.ReadUInt8();  // LFG dungeon status
-            packet.ReadUInt32(); // LFG dungeon ID
+            // AC/TC 3.3.5a Group::BuildGroupList: "2 == finished dungeon, else 0", then
+            // GetDungeon(guid, asId: true) — a BARE dungeon ID, not a full LFG slot.
+            lfgDungeonStatus = packet.ReadUInt8();
+            lfgDungeonId = packet.ReadUInt32();
         }
         party.PartyIndex = (byte)(isBattleground ? 1 : 0);
         party.PartyGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -193,14 +198,75 @@ public partial class WorldClient
         if (party.PartyIndex != 0)
             party.PartyFlags |= GroupFlags.FakeRaid;
 
+        if (isLfg)
+        {
+            // Legacy signals "this party is in an LFG dungeon" purely through the group type
+            // flags and this trailing block; the LFG status packets never say it. Dropping it
+            // left the modern client with no idea it was inside a dungeon, so the minimap eye
+            // only ever offered "Leave Queue" and reported the queue as paused — no
+            // "Teleport out of Dungeon" / "Teleport to Dungeon" entry, which is what a native
+            // 3.3.5a client shows. Field semantics mirror TC 3.4.3 Group::SendUpdateToPlayer.
+            // TC 3.4.3 Group::ConvertToLFG sets BOTH flags together and moves the group into
+            // the instance category:
+            //   m_groupFlags   |= GROUP_FLAG_LFG | GROUP_FLAG_LFG_RESTRICTED
+            //   m_groupCategory = GROUP_CATEGORY_INSTANCE
+            // PartyIndex IS that category (HOME = 0, INSTANCE = 1). Announcing an LFG dungeon
+            // group as a home group left the client's "Leave Instance Group" entry with no
+            // instance-category group to act on, so clicking it sent nothing at all. Legacy
+            // only exposes the restricted bit sometimes (AC persists groupType 8, not 12), so
+            // set it unconditionally for LFG groups the way the modern server does.
+            party.PartyFlags |= GroupFlags.Lfg | GroupFlags.LfgRestricted;
+            party.PartyIndex = 1; // GROUP_CATEGORY_INSTANCE
+
+            uint lfgSlot = GetSession().GameState.GetLfgSlotForDungeon(lfgDungeonId);
+            party.LfgInfos = new PartyLFGInfo
+            {
+                Slot = lfgSlot,
+                MyFlags = lfgDungeonStatus, // 2 == dungeon completed, matching TC's own mapping
+                MyRandomSlot = lfgSlot,
+                BootCount = 0,
+                Aborted = false,
+                MyPartialClear = 0,
+                MyGearDiff = 0.0f,
+                MyStrangerCount = 0,
+                MyKickVoteCount = 0,
+                MyFirstReward = false,
+            };
+        }
+
         var uniqueMembers = new HashSet<WowGuid128>();
         uint membersCount = packet.ReadUInt32();
         if (membersCount > 0)
         {
+            // A legacy group can MOVE between party categories mid-life — a premade party sits
+            // in the home category and jumps to the instance category the moment it converts to
+            // LFG. The client tracks the two categories independently, so announcing the group
+            // under its new index while leaving the old one alive left a phantom party behind
+            // that nothing could ever remove: "Leave Party" produced CMSG_GROUP_DISBAND, the
+            // server had no group left to disband and answered nothing, and the client stayed
+            // stuck in a group that no longer existed. Tear the old category down first.
+            byte previousIndex = GetSession().GameState.LastAnnouncedPartyIndex;
+            if (previousIndex != party.PartyIndex && GetSession().GameState.CurrentGroups[previousIndex] != null)
+            {
+                PartyUpdate migrated = new PartyUpdate();
+                migrated.SequenceNum = GetSession().GameState.GroupUpdateCounter++;
+                migrated.PartyIndex = previousIndex;
+                migrated.PartyFlags |= GroupFlags.Destroyed;
+                migrated.PartyGUID = WowGuid128.Empty;
+                migrated.LeaderGUID = WowGuid128.Empty;
+                migrated.MyIndex = -1;
+                GetSession().GameState.CurrentGroups[previousIndex] = null;
+                SendPacketToClient(migrated);
+            }
+
             if (isRaid)
                 party.PartyFlags |= GroupFlags.Raid;
 
-            if (party.PartyIndex != 0)
+            // Only battlegrounds are a PvP group. LFG dungeon groups also sit in the instance
+            // category (PartyIndex 1) but are still GROUP_TYPE_NORMAL — TC 3.4.3 sends
+            // `PartyType = IsCreated() ? GROUP_TYPE_NORMAL : GROUP_TYPE_NONE` irrespective of
+            // category, so this has to key off the BG flag rather than the index.
+            if (isBattleground)
                 party.PartyType = GroupType.PvP;
             else
                 party.PartyType = GroupType.Normal;
@@ -261,10 +327,19 @@ public partial class WorldClient
                 party.DifficultySettings.RaidDifficultyID = DifficultyModern.Raid40;
 
             GetSession().GameState.WeWantToLeaveGroup = false;
+            GetSession().GameState.LastAnnouncedPartyIndex = party.PartyIndex;
             GetSession().GameState.CurrentGroups[party.PartyIndex] = party;
         }
         else
         {
+            // A disbanded group arrives with its type flags already cleared, so the LFG/BG bits
+            // that placed it in the instance category are gone and PartyIndex computes to 0.
+            // Addressing the destroy to the home category would leave the client's instance
+            // group alive forever — the minimap LFG eye stayed up, stuck on "paused", after
+            // "Leave Instance Group" had genuinely removed the group server-side.
+            party.PartyIndex = GetSession().GameState.LastAnnouncedPartyIndex;
+            GetSession().GameState.LastAnnouncedPartyIndex = 0;
+
             party.PartyFlags |= GroupFlags.Destroyed;
             if (party.PartyIndex  == 0)
                 party.PartyGUID = WowGuid128.Empty;
@@ -277,6 +352,40 @@ public partial class WorldClient
         }
 
         SendPacketToClient(party);
+
+        // Legacy never announces the END of an LFG association. Disbanding an LFG group emits
+        // only SMSG_GROUP_LIST, and LFGMgr::LeaveLfg has no LFG_STATE_DUNGEON case at all, so
+        // the client keeps the last LFG status it received — the minimap eye stayed up on
+        // "paused" long after the group was gone server-side. The group dropping its LFG flag
+        // is the only signal available, and it is an honest one: unlike a teleport-out (where
+        // the association legitimately survives and the eye SHOULD stay), here it really has
+        // ended, and a modern server would send REMOVED_FROM_QUEUE of its own accord.
+        bool wasLfg = GetSession().GameState.LastGroupWasLfg;
+        GetSession().GameState.LastGroupWasLfg = isLfg;
+        if (wasLfg && !isLfg)
+            SendLfgAssociationEnded();
+    }
+
+    /// <summary>
+    /// Tells the modern client its LFG association is over, mirroring what TC 3.4.3 emits from
+    /// SendLfgUpdateStatus for LFG_UPDATETYPE_REMOVED_FROM_QUEUE.
+    /// </summary>
+    private void SendLfgAssociationEnded()
+    {
+        bool isV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+
+        DFUpdateStatus status = new DFUpdateStatus();
+        status.Ticket = MakeLfgTicket();
+        status.SubType = isV343 ? LfgUpdateTypes.ModernQueueDungeon : (byte)0;
+        status.Reason = isV343 ? LfgUpdateTypes.ModernRemovedFromQueue : (byte)0;
+        status.NotifyUI = true;
+        status.IsParty = true;
+        status.Joined = false;
+        status.LfgJoined = false;
+        status.Queued = false;
+
+        Log.Print(LogType.Debug, "LFG[diag]: group dropped its LFG flag, synthesising REMOVED_FROM_QUEUE");
+        SendPacketToClient(status);
     }
 
     [PacketHandler(Opcode.SMSG_GROUP_UNINVITE)]

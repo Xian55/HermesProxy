@@ -313,6 +313,50 @@ public sealed class GameSessionData
     // client waiting forever. Used to answer those joins ourselves.
     public readonly HashSet<uint> LfgKnownDungeonIds = new();
 
+    // Dungeon ID -> the full LFG slot (dungeon ID with the type in the high byte) the legacy
+    // backend used for it. SMSG_LFG_PLAYER_INFO / SMSG_LFG_PARTY_INFO carry full slots, but
+    // SMSG_LFG_UPDATE_PLAYER / SMSG_LFG_UPDATE_PARTY carry bare dungeon IDs (AC masks incoming
+    // slots with 0x00FFFFFF and stores the remainder), while the V3_4_3 client expects the full
+    // slot everywhere — TC 3.4.3 sends LFGDungeonData::Entry() == id + (type << 24). The proxy
+    // has no LFGDungeons table of its own, so it learns the type byte from the info packets.
+    // Written on the WorldClient thread, read on the WorldSocket thread.
+    private readonly ConcurrentDictionary<uint, uint> _lfgDungeonSlots = new();
+
+    // Which party category (PartyIndex: 0 = home, 1 = instance) the last non-empty
+    // SMSG_GROUP_LIST was announced under. A disbanded group arrives with its type flags
+    // already cleared, so the LFG/BG bits that put it in the instance category are gone by
+    // then — without remembering it, the destroy notification would be addressed to the home
+    // category and the client would keep showing the instance group (stale minimap LFG eye).
+    public byte LastAnnouncedPartyIndex;
+
+    // Whether the last SMSG_GROUP_LIST described an LFG group. Legacy never announces the end
+    // of an LFG association: AC's LFGMgr::LeaveLfg has no LFG_STATE_DUNGEON case and disbanding
+    // an LFG group emits only SMSG_GROUP_LIST, so the client keeps whatever LFG status it last
+    // received and the minimap eye stays up forever. Watching this flag go true -> false is the
+    // only signal the proxy has that the association is over.
+    public bool LastGroupWasLfg;
+
+    /// <summary>
+    /// Records the type byte carried by a full LFG slot so bare dungeon IDs can be widened later.
+    /// </summary>
+    public void RememberLfgSlot(uint slot)
+    {
+        _lfgDungeonSlots[slot & 0xFFFFFF] = slot;
+    }
+
+    /// <summary>
+    /// Widens a bare legacy dungeon ID back into the full LFG slot the modern client expects.
+    /// Falls back to the value as-given when the backend never mentioned that dungeon, and
+    /// passes through anything that already carries a type byte.
+    /// </summary>
+    public uint GetLfgSlotForDungeon(uint dungeonIdOrSlot)
+    {
+        if ((dungeonIdOrSlot & 0xFF000000) != 0)
+            return dungeonIdOrSlot;
+
+        return _lfgDungeonSlots.TryGetValue(dungeonIdOrSlot, out uint slot) ? slot : dungeonIdOrSlot;
+    }
+
     private GameSessionData()
     {
         

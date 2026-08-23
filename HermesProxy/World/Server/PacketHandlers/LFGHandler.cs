@@ -98,20 +98,33 @@ public partial class WorldSocket
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
             return;
 
+        // Queue leave only. This used to also inject CMSG_LFG_TELEPORT(out=1) on the belief
+        // that V3_4_3 overloads CMSG_DF_LEAVE for "leave dungeon" because CMSG_DF_TELEPORT did
+        // not exist before V3_4_4. That is wrong: CMSG_DF_TELEPORT is 0x3619 in V3_4_3_54261
+        // and the client does send it for the minimap eye's teleport entries (see
+        // HandleDFTeleport). Injecting the teleport here meant clicking "Leave Queue" while
+        // standing inside a dungeon yanked the player out of the instance without them ever
+        // asking for it. Legacy LFGMgr::LeaveLfg has no LFG_STATE_DUNGEON case at all, so
+        // leaving from inside is a server-side no-op — which is what a native client sees too.
         WorldPacket leave = new WorldPacket(Opcode.CMSG_LFG_LEAVE);
         SendPacketToServer(leave);
+    }
 
-        // V3_4_3 client uses a single CMSG_DF_LEAVE for both "leave queue"
-        // (while waiting) and "leave dungeon" (when already inside the
-        // instance). Legacy 3.3.5a splits these into CMSG_LFG_LEAVE (queue) +
-        // CMSG_LFG_TELEPORT(out=1) (instance exit). Without the second packet,
-        // the player is removed from the LFG group but stays inside the
-        // dungeon. Send unconditionally — when not currently in an LFG
-        // instance, legacy server's HandleLfgTeleportOpcode→TeleportPlayer
-        // gracefully no-ops.
-        WorldPacket teleport = new WorldPacket(Opcode.CMSG_LFG_TELEPORT);
-        teleport.WriteUInt8(1); // out = true
-        SendPacketToServer(teleport);
+    [PacketHandler(Opcode.CMSG_DF_TELEPORT)]
+    void HandleDFTeleport(DFTeleportPkt packet)
+    {
+        if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
+            return;
+
+        // The eye's teleport entry, which CMSG_DF_LEAVE does not cover: leaving drops the
+        // queue/group, this just moves the player across the instance boundary and leaves the
+        // LFG association alone. Without this the "Teleport to Dungeon" option was dropped on
+        // the floor, so a player who had teleported out could never get back in.
+        Log.Print(LogType.Debug, $"LFG[diag]: CMSG_DF_TELEPORT out={packet.TeleportOut}");
+
+        WorldPacket legacy = new WorldPacket(Opcode.CMSG_LFG_TELEPORT);
+        legacy.WriteUInt8((byte)(packet.TeleportOut ? 1 : 0));
+        SendPacketToServer(legacy);
     }
 
     [PacketHandler(Opcode.CMSG_DF_SET_ROLES)]

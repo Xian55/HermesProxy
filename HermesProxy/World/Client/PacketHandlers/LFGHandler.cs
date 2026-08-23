@@ -94,23 +94,67 @@ public partial class WorldClient
         DFUpdateStatus status = new DFUpdateStatus();
         status.Ticket = MakeLfgTicket();
         status.IsParty = isParty;
-        byte updateType = packet.ReadUInt8();
-        status.SubType = updateType;
+
+        byte legacyUpdateType = packet.ReadUInt8();
+        bool isV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+
+        // TC 3.4.3 puts a constant queue type in SubType and the update type in Reason
+        // (Handlers/LFGHandler.cpp SendLfgUpdateStatus). Forwarding the legacy update type as
+        // SubType left Reason at 0, so the client saw every update as LFG_UPDATETYPE_DEFAULT.
+        byte modernUpdateType = isV343 ? LfgUpdateTypes.ToModern(legacyUpdateType) : legacyUpdateType;
+        status.SubType = isV343 ? LfgUpdateTypes.ModernQueueDungeon : legacyUpdateType;
+        status.Reason = isV343 ? modernUpdateType : (byte)0;
+
+        // TC sets NotifyUI unconditionally; gating it on the legacy extra-info block meant a
+        // bare REMOVED_FROM_QUEUE (which carries no dungeons) never refreshed the panel.
+        status.NotifyUI = true;
+        status.LfgJoined = !isV343 || LfgUpdateTypes.IsStillLfgJoined(modernUpdateType);
+
         bool hasExtraInfo = packet.ReadUInt8() != 0;
         if (hasExtraInfo)
         {
+            // SMSG_LFG_UPDATE_PARTY is NOT the same shape as SMSG_LFG_UPDATE_PLAYER: it carries
+            // a leading "join" byte and three extra bytes before the dungeon count. Reading the
+            // player layout for both landed dungeonCount on an always-zero filler byte, so party
+            // updates never carried a single slot. Confirmed identical in azerothcore-wotlk
+            // (Handlers/LFGHandler.cpp SendLfgUpdateParty) and cMaNGOS (BuildLfgUpdate).
+            if (isParty)
+                status.Joined = packet.ReadUInt8() != 0; // LFG Join
+
             status.Queued = packet.ReadUInt8() != 0;
-            packet.ReadUInt8(); // unk
-            packet.ReadUInt8(); // unk
+            packet.ReadUInt8(); // NoPartialClear
+            packet.ReadUInt8(); // Achievements
+
+            if (isParty)
+            {
+                packet.ReadUInt8(); // Needs[0]
+                packet.ReadUInt8(); // Needs[1]
+                packet.ReadUInt8(); // Needs[2]
+            }
+
             byte dungeonCount = packet.ReadUInt8();
             for (int i = 0; i < dungeonCount; i++)
-                status.Slots.Add(packet.ReadUInt32());
-            status.Joined = true;
-            status.LfgJoined = true;
-            status.NotifyUI = true;
+                status.Slots.Add(GetSession().GameState.GetLfgSlotForDungeon(packet.ReadUInt32()));
             packet.ReadCString(); // comment — unused in modern
+
+            // The player variant has no "join" byte; extra info at all means the player is
+            // attached to a queue, which is what legacy signals by sending the block.
+            if (!isParty)
+                status.Joined = true;
         }
         SendPacketToClient(status);
+    }
+
+    [PacketHandler(Opcode.SMSG_LFG_TELEPORT_DENIED)]
+    void HandleLFGTeleportDenied(WorldPacket packet)
+    {
+        // Legacy sends the reason as a uint32, V3_4_3 wants it in 4 bits; the enum values line
+        // up, so this is a straight forward. Previously unhandled, which meant a refused
+        // teleport produced no message whatsoever on the client.
+        LFGTeleportDenied denied = new LFGTeleportDenied();
+        denied.Reason = (byte)packet.ReadUInt32();
+        Log.Print(LogType.Debug, $"LFG[diag]: SMSG_LFG_TELEPORT_DENIED reason={denied.Reason}");
+        SendPacketToClient(denied);
     }
 
     [PacketHandler(Opcode.SMSG_LFG_QUEUE_STATUS)]
@@ -202,6 +246,7 @@ public partial class WorldClient
                 li.Slot = packet.ReadUInt32();
                 li.LockStatus = packet.ReadUInt32();
                 entry.Locks.Add(li);
+                GetSession().GameState.RememberLfgSlot(li.Slot);
             }
             info.Players.Add(entry);
         }
@@ -288,10 +333,20 @@ public partial class WorldClient
 
         // Both lists together are the full set of dungeons this backend understands.
         var known = GetSession().GameState.LfgKnownDungeonIds;
+        // These are the only packets that spell out a dungeon's type byte, so remember it:
+        // the UPDATE_PLAYER / UPDATE_PARTY packets carry bare dungeon IDs and the modern
+        // client wants the full slot back.
+        var session = GetSession().GameState;
         foreach (var dungeon in info.Dungeons)
+        {
             known.Add(dungeon.Slot & 0xFFFFFF);
+            session.RememberLfgSlot(dungeon.Slot);
+        }
         foreach (var locked in blackList.Slots)
+        {
             known.Add(locked.Slot & 0xFFFFFF);
+            session.RememberLfgSlot(locked.Slot);
+        }
 
         SendPacketToClient(info);
 
