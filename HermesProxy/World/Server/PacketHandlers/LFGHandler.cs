@@ -56,7 +56,7 @@ public partial class WorldSocket
         {
             Log.Print(LogType.Debug,
                 $"LFG[diag]: rejecting CMSG_DF_JOIN, dungeon {unknownDungeonId} is unknown to the {LegacyVersion.Build} backend");
-            SendDFJoinFailure(LfgJoinResult.DungeonInvalid);
+            SendDFJoinFailure(LfgJoinResults.ModernInvalidSlot);
             return;
         }
 
@@ -75,15 +75,7 @@ public partial class WorldSocket
         SendPacketToServer(legacy);
     }
 
-    // Legacy 3.3.5a lfg::LfgJoinResult. The proxy forwards the backend's raw result byte
-    // straight through, so a synthesised failure has to use the same numbering.
-    // Source: azerothcore-wotlk src/server/game/DungeonFinding/LFGMgr.h.
-    private enum LfgJoinResult : byte
-    {
-        DungeonInvalid = 11, // "One or more dungeons was not valid"
-    }
-
-    private void SendDFJoinFailure(LfgJoinResult result)
+    private void SendDFJoinFailure(byte modernResult)
     {
         DFJoinResult response = new DFJoinResult
         {
@@ -94,7 +86,7 @@ public partial class WorldSocket
                 Type = RideType.Lfg,
                 Time = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             },
-            Result = (byte)result,
+            Result = modernResult,
             ResultDetail = 0,
         };
         SendPacket(response);

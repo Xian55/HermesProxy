@@ -1,5 +1,7 @@
 using Framework.Logging;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
 using System;
 using System.Collections.Generic;
@@ -47,7 +49,12 @@ public partial class WorldClient
     {
         DFJoinResult result = new DFJoinResult();
         result.Ticket = MakeLfgTicket();
-        result.Result = (byte)packet.ReadUInt32();        // joinData.result
+        // The legacy and V3_4_3 LfgJoinResult enums do not share numbering, so forwarding the
+        // raw byte made every rejection invisible in the modern UI.
+        byte legacyResult = (byte)packet.ReadUInt32();    // joinData.result
+        result.Result = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            ? LfgJoinResults.ToModern(legacyResult)
+            : legacyResult;
         result.ResultDetail = (byte)packet.ReadUInt32();  // joinData.state
         if (packet.CanRead())
         {
