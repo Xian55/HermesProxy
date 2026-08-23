@@ -436,6 +436,16 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     private void LogHandlerException(Opcode universalOpcode, WorldPacket packet, Exception e)
     {
         string account = _globalSession != null ? GetSession().Username : "<no session>";
+
+        // An opcode with no per-build mapping is a known translation gap, not a defect in
+        // the handler. Log it as a one-liner so real failures keep their stack traces.
+        if (e is UnmappedOpcodeException unmapped)
+        {
+            Log.Print(LogType.Warn,
+                $"C>P S | Handling {universalOpcode} ({packet.GetOpcode()}) for account '{account}': {unmapped.Message}");
+            return;
+        }
+
         byte[] raw = packet.GetData();
         int hexLen = Math.Min(64, raw.Length);
         string hex = hexLen > 0 ? BitConverter.ToString(raw, 0, hexLen) : "<empty>";

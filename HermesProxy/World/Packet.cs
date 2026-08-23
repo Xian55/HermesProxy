@@ -90,7 +90,8 @@ public abstract class ServerPacket
         connectionType = ConnectionType.Realm;
 
         uint opcode = ModernVersion.GetCurrentOpcode(universalOpcode);
-        System.Diagnostics.Trace.Assert(opcode != 0);
+        if (opcode == 0)
+            throw new UnmappedOpcodeException(universalOpcode, isModern: true);
         _worldPacket = new WorldPacket(opcode);
     }
 
@@ -99,7 +100,8 @@ public abstract class ServerPacket
         connectionType = type;
 
         uint opcode = ModernVersion.GetCurrentOpcode(universalOpcode);
-        System.Diagnostics.Trace.Assert(opcode != 0);
+        if (opcode == 0)
+            throw new UnmappedOpcodeException(universalOpcode, isModern: true);
         _worldPacket = new WorldPacket(opcode);
     }
 
@@ -199,7 +201,8 @@ public class WorldPacket : ByteBuffer
     public WorldPacket(Opcode opcode)
     {
         this.opcode = LegacyVersion.GetCurrentOpcode(opcode);
-        System.Diagnostics.Trace.Assert(this.opcode != 0);
+        if (this.opcode == 0)
+            throw new UnmappedOpcodeException(opcode, isModern: false);
     }
 
     public WorldPacket(uint opcode, byte[] data) : base(data)

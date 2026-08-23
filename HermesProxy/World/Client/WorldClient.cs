@@ -599,6 +599,11 @@ public partial class WorldClient
                     {
                         handler(packet);
                     }
+                    catch (UnmappedOpcodeException unmapped)
+                    {
+                        Log.Print(LogType.Warn,
+                            $"C P<S | Handling {universalOpcode} ({packet.GetOpcode()}): {unmapped.Message}");
+                    }
                     catch (Exception handlerException)
                     {
                         byte[] raw = packet.GetData();
