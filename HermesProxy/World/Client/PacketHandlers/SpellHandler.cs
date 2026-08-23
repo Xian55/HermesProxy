@@ -38,9 +38,26 @@ public partial class WorldClient
         ushort cooldownCount = packet.ReadUInt16();
         if (cooldownCount != 0)
         {
+            // AzerothCore declares this count as m_spellCooldowns.size() up front and then
+            // skips entries whose needSendToClient is false without correcting it, so the
+            // count can exceed what is actually on the wire. (Its spell block just above
+            // back-patches the real count; the cooldown block never does.) Trusting the
+            // declared count read past the end and threw, losing every cooldown including
+            // the ones that had already parsed. Bound each entry on the real payload instead.
+            int entrySize = 2 + 4 + 4; // category + recoveryTime + categoryRecoveryTime
+            entrySize += LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767) ? 4 : 2;  // spellId
+            entrySize += LegacyVersion.AddedInVersion(ClientVersionBuild.V4_2_2_14545) ? 4 : 2; // itemId
+
             SendSpellHistory histories = new SendSpellHistory();
             for (ushort i = 0; i < cooldownCount; i++)
             {
+                if (!packet.CanRead(entrySize))
+                {
+                    Log.Print(LogType.Warn,
+                        $"SMSG_SEND_KNOWN_SPELLS declared {cooldownCount} cooldowns but only {histories.Entries.Count} are present; keeping those.");
+                    break;
+                }
+
                 SpellHistoryEntry history = new SpellHistoryEntry();
 
                 uint spellId;
@@ -63,7 +80,8 @@ public partial class WorldClient
 
                 histories.Entries.Add(history);
             }
-            SendPacketToClient(histories, Opcode.SMSG_SEND_UNLEARN_SPELLS);
+            if (histories.Entries.Count > 0)
+                SendPacketToClient(histories, Opcode.SMSG_SEND_UNLEARN_SPELLS);
         }
 
         // These packets don't exist in Vanilla.
