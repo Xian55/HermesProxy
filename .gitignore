@@ -524,3 +524,6 @@ test-loop2.ps1
 
 # Local deploy scripts
 deploy_local/
+### Local dev environment (not committed)
+.dotnet/
+.env
