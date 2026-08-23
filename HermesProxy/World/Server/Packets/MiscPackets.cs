@@ -22,6 +22,7 @@ using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
 using HermesProxy.World.Enums;
+using Framework.Logging;
 using HermesProxy.World.Objects;
 
 namespace HermesProxy.World.Server.Packets;
@@ -32,7 +33,15 @@ public class EmptyClientPacket : ClientPacket
 
     public override void Read()
     {
-        System.Diagnostics.Trace.Assert(!_worldPacket.CanRead());
+        // Was a Trace.Assert, which is compiled into Release and aborts the process rather
+        // than throwing. This type backs a lot of client-facing handlers, so any client
+        // sending a payload we expect to be empty took the whole proxy down. Unread bytes
+        // mean our layout is wrong, which is worth knowing but never worth aborting for.
+        if (_worldPacket.CanRead())
+        {
+            Log.Print(LogType.Debug,
+                $"Expected an empty payload for opcode {_worldPacket.GetUniversalOpcode(isModern: true)} but {_worldPacket.Remaining()} bytes remain.");
+        }
     }
 }
 
