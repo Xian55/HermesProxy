@@ -42,6 +42,24 @@ public partial class WorldClient
     }
 
     [PacketHandler(Opcode.SMSG_UPDATE_OBJECT)]
+    /// <summary>
+    /// Whether a legacy transport CreateObject may reach a V3_4_3 client.
+    /// Legacy TRANSPORT (gameobject type 11: elevators, subway cars, ICC sleds) keeps its
+    /// entry ID in the 3.4.3 client's TransportAnimation data (verified: all 11 entries seen
+    /// in Undercity, 20649-20657 / 149045 / 149046, are present under their unchanged legacy
+    /// IDs), so those are forwardable behind the opt-in toggle. MO_TRANSPORT (type 15:
+    /// zeppelins, boats) is never forwardable: no type 15 entry appears in TransportAnimation
+    /// in either the 3.3.5a or the 3.4.3 client, because that category is driven by
+    /// gameobject_template.Data0 taxi paths instead. Upstream issue #96.
+    /// </summary>
+    private bool MayForwardTransport(HighGuidTypeLegacy legacyHigh)
+    {
+        if (legacyHigh == HighGuidTypeLegacy.MOTransport)
+            return false;
+
+        return GetSession().DiagnosticsOptions.ForwardTransportsV343;
+    }
+
     void HandleUpdateObject(WorldPacket packet)
     {
         var count = packet.ReadUInt32();
@@ -226,9 +244,9 @@ public partial class WorldClient
                             if (legacyHigh == HighGuidTypeLegacy.Transport ||
                                 legacyHigh == HighGuidTypeLegacy.MOTransport)
                             {
+                                filtered = !MayForwardTransport(legacyHigh);
                                 Log.Print(LogType.Trace,
-                                    $"Skipping {legacyHigh} for V3_4_3 (Position=0 placeholder; pending MOTransport position fix) guid={guid} entryID={updateData.ObjectData.EntryID?.ToString() ?? "null"}.");
-                                filtered = true;
+                                    $"{(filtered ? "Skipping" : "Forwarding")} {legacyHigh} for V3_4_3 guid={guid} entryID={updateData.ObjectData.EntryID?.ToString() ?? "null"}.");
                             }
                             else if (legacyHigh == HighGuidTypeLegacy.GameObject)
                             {
@@ -288,9 +306,9 @@ public partial class WorldClient
                             if (legacyHigh == HighGuidTypeLegacy.Transport ||
                                 legacyHigh == HighGuidTypeLegacy.MOTransport)
                             {
+                                filtered = !MayForwardTransport(legacyHigh);
                                 Log.Print(LogType.Trace,
-                                    $"Skipping CreateObject2 for {legacyHigh} for V3_4_3 (Position=0 placeholder; pending MOTransport position fix) guid={guid} entryID={updateData.ObjectData.EntryID?.ToString() ?? "null"}.");
-                                filtered = true;
+                                    $"{(filtered ? "Skipping" : "Forwarding")} CreateObject2 for {legacyHigh} for V3_4_3 guid={guid} entryID={updateData.ObjectData.EntryID?.ToString() ?? "null"}.");
                             }
                             else if (legacyHigh == HighGuidTypeLegacy.GameObject)
                             {
