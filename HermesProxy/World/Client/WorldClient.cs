@@ -436,11 +436,23 @@ public partial class WorldClient
                 }
             }
 
-            // block these packets until connected to instance
+            // Block these packets until connected to instance. Bounded: an unbounded spin
+            // here deadlocks the legacy read loop for the rest of the session if the client
+            // never completes the instance handshake (or if OnDisconnect clears the socket).
+            const int instanceWaitTimeoutMs = 30000;
+            int waitedMs = 0;
             while (GetSession().InstanceSocket == null)
             {
+                if (waitedMs >= instanceWaitTimeoutMs)
+                {
+                    Log.PrintNet(LogType.Error, LogNetDir.P2C,
+                        $"Gave up waiting {instanceWaitTimeoutMs}ms for the instance connection; dropping {packet.GetUniversalOpcode()} ({packet.GetOpcode()}).");
+                    return;
+                }
+
                 Log.PrintNet(LogType.Network, LogNetDir.P2C, $"Waiting to send {packet.GetUniversalOpcode()} ({packet.GetOpcode()}).");
                 System.Threading.Thread.Sleep(200);
+                waitedMs += 200;
             }
 
             var socket = GetSession().InstanceSocket;
@@ -512,7 +524,11 @@ public partial class WorldClient
     // 1.12 sending SMSG_WARDEN_DATA mid-auth (issue #62).
     private static bool IsIgnorableDuringHandshake(Opcode op)
     {
-        return op == Opcode.SMSG_WARDEN_DATA;
+        // SMSG_CACHE_VERSION is pushed unprompted right after connect by TC-derived cores
+        // (AzerothCore included); if it lands before SMSG_AUTH_RESPONSE it would otherwise
+        // flip _isSuccessful to false and abort an otherwise healthy handshake.
+        return op == Opcode.SMSG_WARDEN_DATA
+            || op == Opcode.SMSG_CACHE_VERSION;
     }
 
     private void HandlePacket(WorldPacket packet)
@@ -575,7 +591,23 @@ public partial class WorldClient
             default:
                 if (_packetHandlers.TryGetValue(universalOpcode, out var handler))
                 {
-                    handler(packet);
+                    // A throwing legacy handler used to escape into the read loop's catch,
+                    // which tears down the world connection (and previously the process).
+                    // The packet is already fully read off the socket, so dropping it here
+                    // cannot desync the stream, so keep the session alive instead.
+                    try
+                    {
+                        handler(packet);
+                    }
+                    catch (Exception handlerException)
+                    {
+                        byte[] raw = packet.GetData();
+                        int hexLen = System.Math.Min(64, raw.Length);
+                        string head = hexLen > 0 ? System.BitConverter.ToString(raw, 0, hexLen) : "<empty>";
+                        Log.Print(LogType.Error,
+                            $"C P<S | Unhandled exception in handler for {universalOpcode} ({packet.GetOpcode()}) " +
+                            $"[size={raw.Length}]{System.Environment.NewLine}head={head}{System.Environment.NewLine}{handlerException}");
+                    }
                 }
                 else
                 {

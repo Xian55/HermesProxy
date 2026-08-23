@@ -257,8 +257,20 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
                     break; // Couldn't receive the whole data this time.
             }
 
-            // just received fresh new payload
-            ReadDataHandlerResult result = ReadData();
+            // just received fresh new payload. ReadData's own switch handles the auth /
+            // connect-to / encrypted-mode cases inline, i.e. outside HandlePacket's guard,
+            // and this runs on a socket completion callback where an escaping exception
+            // takes the whole process down. Contain it here too.
+            ReadDataHandlerResult result;
+            try
+            {
+                result = ReadData();
+            }
+            catch (Exception e)
+            {
+                Log.Print(LogType.Error, $"C>P S | Unhandled exception while reading a client packet [conn={_connectType}]{Environment.NewLine}{e}");
+                result = ReadDataHandlerResult.Error;
+            }
             _headerBuffer.Reset();
             if (result != ReadDataHandlerResult.Ok)
             {
@@ -387,7 +399,17 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     {
         Opcode universalOpcode = packet.GetUniversalOpcode(isModern: true);
         var handler = GetHandler(universalOpcode);
-        if (handler != null)
+        if (handler == null)
+        {
+            WorldSocketLogMessages.NoHandlerForOpcode(_melLog, _sourceFile, _netDirRecv, universalOpcode, packet.GetOpcode());
+            return;
+        }
+
+        // A throwing handler used to escape all the way to AppDomain.UnhandledException and
+        // abort the whole proxy, taking the session with it. The packet is already fully
+        // read out of the socket buffer at this point, so swallowing here cannot desync the
+        // stream. Worst case one client packet is dropped and the session keeps running.
+        try
         {
             if (HermesProxy.Server.MetricsEnabled)
             {
@@ -400,8 +422,27 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
                 handler.Invoke(this, packet);
             }
         }
-        else
-            WorldSocketLogMessages.NoHandlerForOpcode(_melLog, _sourceFile, _netDirRecv, universalOpcode, packet.GetOpcode());
+        catch (Exception e)
+        {
+            LogHandlerException(universalOpcode, packet, e);
+
+            // Without this the client sits on the entering-world screen forever with no
+            // error, which is harder to diagnose than the crash this guard replaced.
+            if (universalOpcode == Opcode.CMSG_PLAYER_LOGIN)
+                AbortLogin(LoginFailureReason.NoWorld);
+        }
+    }
+
+    private void LogHandlerException(Opcode universalOpcode, WorldPacket packet, Exception e)
+    {
+        string account = _globalSession != null ? GetSession().Username : "<no session>";
+        byte[] raw = packet.GetData();
+        int hexLen = Math.Min(64, raw.Length);
+        string hex = hexLen > 0 ? BitConverter.ToString(raw, 0, hexLen) : "<empty>";
+        Log.Print(LogType.Error,
+            $"C>P S | Unhandled exception in handler for {universalOpcode} ({packet.GetOpcode()}) " +
+            $"[conn={_connectType} account='{account}' size={raw.Length}]{Environment.NewLine}" +
+            $"head={hex}{Environment.NewLine}{e}");
     }
 
     private void SendPacketToServer(WorldPacket packet, Opcode delayUntilOpcode = Opcode.MSG_NULL_ACTION)
@@ -574,7 +615,19 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
     void HandleAuthSession(AuthSession authSession)
     {
-        _globalSession = BnetSessionTicketStorage.SessionsByName[authSession.RealmJoinTicket];
+        // A stale or replayed realm-join ticket (client retry after a proxy restart, say)
+        // must not take the process down with a KeyNotFoundException. This runs outside
+        // HandlePacket's guard, straight off the socket completion callback.
+        if (!BnetSessionTicketStorage.SessionsByName.TryGetValue(authSession.RealmJoinTicket, out var session))
+        {
+            Log.Print(LogType.Error,
+                $"WorldSocket.HandleAuthSession: No BNet session for realm join ticket '{authSession.RealmJoinTicket}' from {GetRemoteIpAddress()}. Closing socket.");
+            SendAuthResponseError(BattlenetRpcErrorCode.Denied);
+            CloseSocket();
+            return;
+        }
+
+        _globalSession = session;
         _bnetRpc = new BnetServices.ServiceManager("WorldSocket", this, _globalSession);
         HandleAuthSessionCallback(authSession);
     }
@@ -722,7 +775,17 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         ConnectToKey key = new();
         _key = key.Raw = authSession.Key;
 
-        _globalSession = BnetSessionTicketStorage.SessionsByKey[_key];
+        if (!BnetSessionTicketStorage.SessionsByKey.TryGetValue(_key, out var session))
+        {
+            Log.Print(LogType.Error,
+                $"WorldSocket.HandleAuthContinuedSession: No BNet session for instance connect key 0x{_key:X16} from {GetRemoteIpAddress()}. Closing socket.");
+            SendAuthResponseError(BattlenetRpcErrorCode.Denied);
+            CloseSocket();
+            return;
+        }
+
+        _globalSession = session;
+        Log.Print(LogType.Server, $"[Login] instance socket authenticated for account '{GetSession().Username}', key=0x{_key:X16}");
 
         uint accountId = key.AccountId;
         string login = GetSession().AccountInfo.Login;

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
 
@@ -15,18 +15,25 @@ public class CurrentPlayerStorage
         _globalSession = globalSession;
     }
 
+    // Build fully-loaded instances into locals and only then publish them. The modern
+    // client opens the instance socket on its own network thread while this runs, and
+    // its first packets (CMSG_SET_ACTION_BAR_TOGGLES, guild settings) touch these
+    // objects, and publishing a half-Reloaded instance is a live NullReferenceException.
     public void LoadCurrentPlayer()
     {
-        CompletedQuests = new CompletedQuestTracker(_globalSession);
-        Settings = new PlayerSettings(_globalSession);
-        CompletedQuests.Reload();
-        Settings.Reload();
+        var quests = new CompletedQuestTracker(_globalSession);
+        var settings = new PlayerSettings(_globalSession);
+        quests.Reload();
+        settings.Reload();
+
+        CompletedQuests = quests;
+        Settings = settings;
     }
 }
 
 public class PlayerSettings
 {
-    private InternalStorage _internalStorage = null!;
+    private InternalStorage _internalStorage = new();
     private PlayerFlags _lastCapturedFlags;
 
     public bool NeedToForcePatchFlags { get; private set; }

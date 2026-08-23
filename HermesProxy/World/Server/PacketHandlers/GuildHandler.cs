@@ -1,5 +1,6 @@
 ﻿using System;
 using Framework.Constants;
+using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
@@ -202,11 +203,18 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_DECLINE_GUILD_INVITES)]
     void HandleDeclineGuildInvites(SetAutoDeclineGuildInvites packet)
     {
-        GetSession().GameState.CurrentPlayerStorage.Settings.SetAutoBlockGuildInvites(packet.GuildInvitesShouldGetBlocked);
+        var settings = GetSession().GameState.CurrentPlayerStorage.Settings;
+        if (settings == null)
+        {
+            Log.Print(LogType.Error, "CMSG_DECLINE_GUILD_INVITES received before the player was loaded, ignoring.");
+            return;
+        }
+
+        settings.SetAutoBlockGuildInvites(packet.GuildInvitesShouldGetBlocked);
 
         // Send update to client
         ObjectUpdate updateData = new ObjectUpdate(GetSession().GameState.CurrentPlayerGuid, UpdateTypeModern.Values, GetSession());
-        PlayerFlags flags = GetSession().GameState.CurrentPlayerStorage.Settings.CreateNewFlags();
+        PlayerFlags flags = settings.CreateNewFlags();
         updateData.PlayerData.PlayerFlags = (uint) flags;
         UpdateObject updatePacket = new UpdateObject(GetSession().GameState);
         updatePacket.ObjectUpdates.Add(updateData);

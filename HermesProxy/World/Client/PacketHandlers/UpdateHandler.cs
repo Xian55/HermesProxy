@@ -2737,7 +2737,7 @@ public partial class WorldClient
                     updateData.UnitData.PvpFlags == null)
                     updateData.UnitData.PvpFlags = ReadPvPFlags(updates);
             }
-            else if (updateData.Guid == GetSession().GameState.CurrentPlayerGuid && GetSession().GameState.CurrentPlayerStorage.Settings.NeedToForcePatchFlags)
+            else if (updateData.Guid == GetSession().GameState.CurrentPlayerGuid && (GetSession().GameState.CurrentPlayerStorage.Settings?.NeedToForcePatchFlags ?? false))
             { // If we did not patch the PlayerFlags the first time, we need to force include the field
                 PlayerFlags flags = GetSession().GameState.CurrentPlayerStorage.Settings.CreateNewFlags();
                 updateData.PlayerData.PlayerFlags = (uint) flags;

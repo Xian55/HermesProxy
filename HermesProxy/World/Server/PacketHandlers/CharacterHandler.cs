@@ -137,6 +137,7 @@ public partial class WorldSocket
         if (!GetSession().GameState.CachedPlayers.TryGetValue(playerLogin.Guid, out var selectedChar))
         {
             Log.Print(LogType.Error, $"Player tried to log in with unknown char id: {playerLogin.Guid}");
+            AbortLogin(LoginFailureReason.NoCharacter);
             return;
         }
 
@@ -144,6 +145,7 @@ public partial class WorldSocket
         if (realm == null)
         {
             Log.Print(LogType.Error, $"Player tried to log in to unknown realm id: {GetSession().RealmId}");
+            AbortLogin(LoginFailureReason.NoWorld);
             return;
         }
 
@@ -152,11 +154,22 @@ public partial class WorldSocket
         if (GetSession().AuthClient != null)
             GetSession().AuthClient.Disconnect();
 
-        SendConnectToInstance(ConnectToSerial.WorldAttempt1);
-        GetSession().GameState.IsConnectedToInstance = true;
+        var ownCharacter = GetSession().GameState.OwnCharacters.FirstOrDefault(x => x.CharacterGuid == playerLogin.Guid);
+        if (ownCharacter == null)
+        {
+            Log.Print(LogType.Error, $"Player tried to log in with a char missing from the enumerated list: {playerLogin.Guid}");
+            AbortLogin(LoginFailureReason.NoCharacter);
+            return;
+        }
+
+        // All GameState must be published BEFORE the client is told to open the instance
+        // connection. The instance socket runs on its own network thread and the client
+        // starts pushing packets (CMSG_SET_ACTION_BAR_TOGGLES first) the moment it is up,
+        // so anything set after SendConnectToInstance is a live race. That race crashed
+        // the proxy with a NullReferenceException on every enter-world attempt.
         GetSession().GameState.IsFirstEnterWorld = true;
         GetSession().GameState.CurrentPlayerGuid = playerLogin.Guid;
-        GetSession().GameState.CurrentPlayerInfo = GetSession().GameState.OwnCharacters.Single(x => x.CharacterGuid == playerLogin.Guid);
+        GetSession().GameState.CurrentPlayerInfo = ownCharacter;
         GetSession().GameState.CurrentPlayerStorage.LoadCurrentPlayer();
 
         // V3_4_3-only: DKs need rune state in ActivePlayerData CREATE. Without it
@@ -168,6 +181,12 @@ public partial class WorldSocket
         {
             GetSession().GameState.RuneState = new RuneStateData();
         }
+
+        Log.Print(LogType.Server,
+            $"[Login] entering world as '{ownCharacter.Name}' ({ownCharacter.RaceId} {ownCharacter.ClassId} lvl {ownCharacter.Level}) " +
+            $"guid={playerLogin.Guid} realm='{realm.Name}': state published, opening instance connection");
+        SendConnectToInstance(ConnectToSerial.WorldAttempt1);
+        GetSession().GameState.IsConnectedToInstance = true;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PLAYER_LOGIN);
         packet.WriteGuid(playerLogin.Guid.To64());
@@ -319,7 +338,13 @@ public partial class WorldSocket
         // wiping the legacy DB). Only persist non-zero masks so the next login can
         // re-inject CVars matching the user's last real toggle.
         if (bars.Mask != 0)
-            GetSession().GameState.CurrentPlayerStorage.Settings.SetMultiActionBarsMask(bars.Mask);
+        {
+            var settings = GetSession().GameState.CurrentPlayerStorage.Settings;
+            if (settings != null)
+                settings.SetMultiActionBarsMask(bars.Mask);
+            else
+                Log.Print(LogType.Warn, "[Login] CMSG_SET_ACTION_BAR_TOGGLES arrived before the player was loaded, mask not persisted.");
+        }
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_ACTION_BAR_TOGGLES);
         packet.WriteUInt8(bars.Mask);
