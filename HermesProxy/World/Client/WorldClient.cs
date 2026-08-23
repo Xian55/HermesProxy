@@ -606,12 +606,15 @@ public partial class WorldClient
                     }
                     catch (Exception handlerException)
                     {
+                        // Dump the whole packet, not a prefix. A parser that over-reads is
+                        // usually wrong about a field well past the first few bytes, and this
+                        // only fires on an exception so the volume is irrelevant.
                         byte[] raw = packet.GetData();
-                        int hexLen = System.Math.Min(64, raw.Length);
-                        string head = hexLen > 0 ? System.BitConverter.ToString(raw, 0, hexLen) : "<empty>";
+                        int hexLen = System.Math.Min(1024, raw.Length);
+                        string body = hexLen > 0 ? System.BitConverter.ToString(raw, 0, hexLen) : "<empty>";
                         Log.Print(LogType.Error,
                             $"C P<S | Unhandled exception in handler for {universalOpcode} ({packet.GetOpcode()}) " +
-                            $"[size={raw.Length}]{System.Environment.NewLine}head={head}{System.Environment.NewLine}{handlerException}");
+                            $"[size={raw.Length} dumped={hexLen}]{System.Environment.NewLine}bytes={body}{System.Environment.NewLine}{handlerException}");
                     }
                 }
                 else
