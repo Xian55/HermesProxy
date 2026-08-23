@@ -52,12 +52,26 @@ public partial class WorldClient
     /// in either the 3.3.5a or the 3.4.3 client, because that category is driven by
     /// gameobject_template.Data0 taxi paths instead. Upstream issue #96.
     /// </summary>
-    private bool MayForwardTransport(HighGuidTypeLegacy legacyHigh)
+    private bool MayForwardTransport(HighGuidTypeLegacy legacyHigh, ObjectUpdate updateData)
     {
         if (legacyHigh == HighGuidTypeLegacy.MOTransport)
             return false;
 
-        return GetSession().DiagnosticsOptions.ForwardTransportsV343;
+        if (!GetSession().DiagnosticsOptions.ForwardTransportsV343)
+            return false;
+
+        // Gate on the condition the filter was actually written for. cMangos sends these
+        // creates with Position=(0,0,0) and defers the real position to GAMEOBJECT_POS_*
+        // deltas, and the client rejects a stationary GameObject at the origin with
+        // CMSG_OBJECT_UPDATE_FAILED, retrying forever and never finishing the loading
+        // screen. TrinityCore and AzerothCore use spawn-data position, so their creates
+        // carry a usable one. Testing the position rather than the backend keeps a
+        // placeholder create filtered wherever it comes from.
+        var position = updateData.CreateData?.MoveInfo?.Position;
+        if (position == null || (position.Value.X == 0f && position.Value.Y == 0f && position.Value.Z == 0f))
+            return false;
+
+        return true;
     }
 
     void HandleUpdateObject(WorldPacket packet)
@@ -244,7 +258,7 @@ public partial class WorldClient
                             if (legacyHigh == HighGuidTypeLegacy.Transport ||
                                 legacyHigh == HighGuidTypeLegacy.MOTransport)
                             {
-                                filtered = !MayForwardTransport(legacyHigh);
+                                filtered = !MayForwardTransport(legacyHigh, updateData);
                                 Log.Print(LogType.Trace,
                                     $"{(filtered ? "Skipping" : "Forwarding")} {legacyHigh} for V3_4_3 guid={guid} entryID={updateData.ObjectData.EntryID?.ToString() ?? "null"}.");
                             }
@@ -306,7 +320,7 @@ public partial class WorldClient
                             if (legacyHigh == HighGuidTypeLegacy.Transport ||
                                 legacyHigh == HighGuidTypeLegacy.MOTransport)
                             {
-                                filtered = !MayForwardTransport(legacyHigh);
+                                filtered = !MayForwardTransport(legacyHigh, updateData);
                                 Log.Print(LogType.Trace,
                                     $"{(filtered ? "Skipping" : "Forwarding")} CreateObject2 for {legacyHigh} for V3_4_3 guid={guid} entryID={updateData.ObjectData.EntryID?.ToString() ?? "null"}.");
                             }
