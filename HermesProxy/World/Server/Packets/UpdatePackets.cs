@@ -98,6 +98,11 @@ public class ObjectUpdate
     public DynamicObjectData DynamicObjectData = null!;
     public CorpseData CorpseData = null!;
 
+    // The bit the V3_4_3 client reads as "this gameobject is a transport". Combined with
+    // the legacy GAMEOBJECT_FLAGS value (0x28 for these objects) it reproduces the 1048616
+    // composite the previous code hardcoded.
+    private const uint ModernTransportFlag = 0x100000u;
+
     public void InitializePlaceholders()
     {
         if (CreateData == null)
@@ -172,21 +177,32 @@ public class ObjectUpdate
             if (Guid.GetHighType() == HighGuidType.Transport)
             {
                 var transportTimer = CreateData.MoveInfo!.TransportPathTimer;
-                uint period = GameData.GetTransportPeriod((uint)ObjectData.EntryID!);
-                if (period != 0)
+                // A 3.3.5a backend puts the real loop period in GAMEOBJECT_LEVEL
+                // (AzerothCore Transport.h:81), which is authoritative. The CSV is the
+                // fallback for backends that leave the field unset.
+                uint period = GameObjectData.Level is > 0
+                    ? (uint)GameObjectData.Level.Value
+                    : GameData.GetTransportPeriod((uint)ObjectData.EntryID!);
+                if (period != 0 && GameObjectData.Level == null)
+                    GameObjectData.Level = (int)period;
+
+                // Only synthesize the path-progress fraction when the backend sent none;
+                // the legacy GAMEOBJECT_DYNAMIC high half already carries it otherwise.
+                if (ObjectData.DynamicFlags == null)
                 {
-                    if (GameObjectData.Level == null)
-                        GameObjectData.Level = (int)period;
-                    if (ObjectData.DynamicFlags == null)
-                        ObjectData.DynamicFlags = (((uint)(((float)(transportTimer % period) / (float)period) * System.UInt16.MaxValue)) << 16);
-                    GameObjectData.Flags = 1048616;
+                    ObjectData.DynamicFlags = period != 0
+                        ? (((uint)(((float)(transportTimer % period) / (float)period) * System.UInt16.MaxValue)) << 16)
+                        : ((transportTimer % System.UInt16.MaxValue) << 16);
                 }
-                else if (ObjectData.DynamicFlags == null)
-                    ObjectData.DynamicFlags = ((transportTimer % System.UInt16.MaxValue) << 16);
+
+                // Marks the object as a transport for the modern client. Previously only
+                // applied to entries present in the CSV, which left every transport the
+                // CSV does not list (e.g. 181689, the Undercity zeppelin) unflagged.
+                GameObjectData.Flags = (GameObjectData.Flags ?? 0) | ModernTransportFlag;
 
                 Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
                     $"[TransportTrace] guid={Guid} entry={ObjectData.EntryID} typeID={GameObjectData.TypeID} " +
-                    $"pathProgress={transportTimer} csvPeriod={period} level={GameObjectData.Level} " +
+                    $"pathProgress={transportTimer} period={period} level={GameObjectData.Level} " +
                     $"dynFlags=0x{(ObjectData.DynamicFlags ?? 0):X8} goFlags={GameObjectData.Flags} " +
                     $"pos=({CreateData.MoveInfo!.Position.X:F1},{CreateData.MoveInfo.Position.Y:F1},{CreateData.MoveInfo.Position.Z:F1}) " +
                     $"o={CreateData.MoveInfo.Orientation:F3}");

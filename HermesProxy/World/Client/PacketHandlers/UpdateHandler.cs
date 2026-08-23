@@ -3812,13 +3812,19 @@ public partial class WorldClient
                     oldDynSource = stripHighBits ? "v343NoSeed" : "transport0";
                 }
 
-                GameObjectDynamicFlagsLegacy flags = (GameObjectDynamicFlagsLegacy)effectiveLegacyRaw;
+                // CastFlags remaps by enum name, so anything outside the named low-16
+                // bitmask is dropped. For a transport the high 16 bits are the path
+                // progress fraction the client animates from (AzerothCore
+                // GameObject.cpp:2835-2838 writes uint16 dynFlags then int16 pathProgress),
+                // so carry them across verbatim instead of losing them to the remap.
+                GameObjectDynamicFlagsLegacy flags = (GameObjectDynamicFlagsLegacy)(effectiveLegacyRaw & 0x0000FFFFu);
                 uint newLow = (uint)flags.CastFlags<GameObjectDynamicFlagsModern>();
-                updateData.ObjectData.DynamicFlags = (oldValue | newLow);
+                uint preservedHigh = guid.IsTransport() ? (effectiveLegacyRaw & 0xFFFF0000u) : 0u;
+                updateData.ObjectData.DynamicFlags = (oldValue | preservedHigh | newLow);
                 Log.Print(LogType.Trace,
                     $"[Trace][GO DYN_FLAGS] guid={guid} entry={updateData.ObjectData.EntryID} " +
                     $"legacyRaw=0x{legacyRaw:X8} effective=0x{effectiveLegacyRaw:X8} ({flags}) " +
-                    $"-> modernLow=0x{newLow:X8}, oldDyn=0x{oldValue:X8} oldDynSource={oldDynSource}, finalDyn=0x{updateData.ObjectData.DynamicFlags.Value:X8}");
+                    $"-> modernLow=0x{newLow:X8} high=0x{preservedHigh:X8}, oldDyn=0x{oldValue:X8} oldDynSource={oldDynSource}, finalDyn=0x{updateData.ObjectData.DynamicFlags.Value:X8}");
             }
             int GAMEOBJECT_FACTION = LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_FACTION);
             if (GAMEOBJECT_FACTION >= 0 && updateMaskArray[GAMEOBJECT_FACTION])
