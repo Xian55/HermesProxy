@@ -41,7 +41,6 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_UPDATE_OBJECT)]
     /// <summary>
     /// Whether a legacy transport CreateObject may reach a V3_4_3 client. Covers both
     /// legacy TRANSPORT (gameobject type 11: elevators, subway cars, ICC sleds) and
@@ -90,6 +89,7 @@ public partial class WorldClient
         Log.Print(LogType.Trace, $"[TransportTrace] requested gameobject template for transport entry={entry}");
     }
 
+    [PacketHandler(Opcode.SMSG_UPDATE_OBJECT)]
     void HandleUpdateObject(WorldPacket packet)
     {
         var count = packet.ReadUInt32();
