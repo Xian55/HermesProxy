@@ -98,9 +98,10 @@ public class ObjectUpdate
     public DynamicObjectData DynamicObjectData = null!;
     public CorpseData CorpseData = null!;
 
-    // The bit the V3_4_3 client reads as "this gameobject is a transport". Combined with
-    // the legacy GAMEOBJECT_FLAGS value (0x28 for these objects) it reproduces the 1048616
-    // composite the previous code hardcoded.
+    // GO_FLAG_MAP_OBJECT: the object is a WMO map object, i.e. a MO_TRANSPORT. No
+    // equivalent exists in the 3.3.5a flag set. Combined with the legacy GAMEOBJECT_FLAGS
+    // value (0x28 for these objects) it reproduces the 1048616 composite the previous code
+    // hardcoded for CSV-listed entries.
     private const uint ModernTransportFlag = 0x100000u;
 
     public void InitializePlaceholders()
@@ -195,10 +196,13 @@ public class ObjectUpdate
                         : ((transportTimer % System.UInt16.MaxValue) << 16);
                 }
 
-                // Marks the object as a transport for the modern client. Previously only
-                // applied to entries present in the CSV, which left every transport the
-                // CSV does not list (e.g. 181689, the Undercity zeppelin) unflagged.
-                GameObjectData.Flags = (GameObjectData.Flags ?? 0) | ModernTransportFlag;
+                // MO_TRANSPORT only. GO_FLAG_MAP_OBJECT tells the client the object is a
+                // WMO map object; setting it on a type 11 elevator, which is an M2 doodad,
+                // makes the client load it as a WMO and render an untextured placeholder.
+                // The old code reached the same conclusion by accident, gating on presence
+                // in CSV/Transports*.csv — which only ever lists type 15 entries.
+                if (GameObjectData.TypeID == (sbyte)GameObjectTypeModern.MOTransport)
+                    GameObjectData.Flags = (GameObjectData.Flags ?? 0) | ModernTransportFlag;
 
                 Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
                     $"[Transport] guid={Guid} entry={ObjectData.EntryID} typeID={GameObjectData.TypeID} " +
