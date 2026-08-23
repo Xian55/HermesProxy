@@ -372,6 +372,28 @@ public partial class WorldClient
     /// </summary>
     private void SendLfgAssociationEnded()
     {
+        Log.Print(LogType.Debug, "LFG[diag]: group dropped its LFG flag, synthesising REMOVED_FROM_QUEUE");
+
+        // The client tracks party-scoped and player-scoped LFG state separately, so a removal
+        // has to be announced for BOTH or the half that was not told keeps the minimap eye
+        // alive. Legacy servers do exactly this: on REMOVED_FROM_QUEUE, AC sends
+        // SendLfgUpdateParty followed by SendLfgUpdatePlayer (LFGMgr.cpp 939 / 953) and TC 3.4.3
+        // calls SendLfgUpdateStatus with party=true then party=false (LFGMgr.cpp 676 / 687).
+        //
+        // Sending only the party variant looked like it worked because leaving from INSIDE a
+        // dungeon is followed by a teleport, and the world transfer reloads client state and
+        // clears the eye as a side effect. Leaving from outside produces no teleport, and the
+        // stale player-scoped state was then plainly visible.
+        SendLfgAssociationEnded(isParty: true);
+        SendLfgAssociationEnded(isParty: false);
+
+        // Both removals must carry the ticket the client has been seeing, so only forget it
+        // afterwards — the next queue then mints a fresh one, as TC does per JoinLfg.
+        GetSession().GameState.ResetLfgTicket();
+    }
+
+    private void SendLfgAssociationEnded(bool isParty)
+    {
         bool isV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
 
         DFUpdateStatus status = new DFUpdateStatus();
@@ -379,12 +401,11 @@ public partial class WorldClient
         status.SubType = isV343 ? LfgUpdateTypes.ModernQueueDungeon : (byte)0;
         status.Reason = isV343 ? LfgUpdateTypes.ModernRemovedFromQueue : (byte)0;
         status.NotifyUI = true;
-        status.IsParty = true;
+        status.IsParty = isParty;
         status.Joined = false;
         status.LfgJoined = false;
         status.Queued = false;
 
-        Log.Print(LogType.Debug, "LFG[diag]: group dropped its LFG flag, synthesising REMOVED_FROM_QUEUE");
         SendPacketToClient(status);
     }
 

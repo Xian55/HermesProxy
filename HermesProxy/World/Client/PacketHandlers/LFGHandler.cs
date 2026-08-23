@@ -21,13 +21,11 @@ public partial class WorldClient
 
     private RideTicket MakeLfgTicket()
     {
-        return new RideTicket
-        {
-            RequesterGuid = GetSession().GameState.CurrentPlayerGuid,
-            Id = 1,
-            Type = RideType.Lfg,
-            Time = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-        };
+        // Must stay stable for the lifetime of the queue — see GetOrCreateLfgTicket. Minting a
+        // fresh Time per packet gave every LFG message a different ticket.
+        return GetSession().GameState.GetOrCreateLfgTicket(
+            GetSession().GameState.CurrentPlayerGuid,
+            DateTimeOffset.UtcNow.ToUnixTimeSeconds());
     }
 
     [PacketHandler(Opcode.SMSG_LFG_DISABLED)]

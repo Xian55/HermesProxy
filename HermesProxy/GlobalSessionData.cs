@@ -336,6 +336,31 @@ public sealed class GameSessionData
     // only signal the proxy has that the association is over.
     public bool LastGroupWasLfg;
 
+    // TC creates exactly one RideTicket per queue in LFGMgr::JoinLfg (Id = GetQueueId,
+    // Time = GameTime::GetGameTime()), stores it per player and reuses it for every subsequent
+    // LFG packet via GetTicket(). The proxy used to stamp Time with UtcNow on every call, so
+    // each packet carried a different ticket and nothing the client received could be tied back
+    // to the queue it actually knew about.
+    private RideTicket? _lfgTicket;
+
+    /// <summary>
+    /// The session's stable LFG ride ticket, created on first use and reused until the LFG
+    /// association ends.
+    /// </summary>
+    public RideTicket GetOrCreateLfgTicket(WowGuid128 requesterGuid, long unixTime)
+    {
+        return _lfgTicket ??= new RideTicket
+        {
+            RequesterGuid = requesterGuid,
+            Id = 1,
+            Type = RideType.Lfg,
+            Time = unixTime,
+        };
+    }
+
+    /// <summary>Forgets the ticket so the next queue gets a fresh one.</summary>
+    public void ResetLfgTicket() => _lfgTicket = null;
+
     /// <summary>
     /// Records the type byte carried by a full LFG slot so bare dungeon IDs can be widened later.
     /// </summary>
