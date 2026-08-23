@@ -67,6 +67,29 @@ public partial class WorldClient
         return true;
     }
 
+    // The modern client never sends CMSG_QUERY_GAME_OBJECT for a transport it is merely
+    // looking at, so it never learns gameobject_template.Data0 — the taxi path id a
+    // MO_TRANSPORT flies along. Ask the legacy server ourselves the first time we forward
+    // one; SMSG_QUERY_GAME_OBJECT_RESPONSE is relayed to the client unconditionally.
+    private static readonly HashSet<uint> _queriedTransportTemplates = [];
+
+    private void RequestTransportTemplate(uint entry)
+    {
+        if (entry == 0)
+            return;
+        lock (_queriedTransportTemplates)
+        {
+            if (!_queriedTransportTemplates.Add(entry))
+                return;
+        }
+
+        var query = new WorldPacket(Opcode.CMSG_QUERY_GAME_OBJECT);
+        query.WriteUInt32(entry);
+        query.WriteGuid(new WowGuid64(HighGuidTypeLegacy.GameObject, entry, 1));
+        SendPacketToServer(query);
+        Log.Print(LogType.Trace, $"[TransportTrace] requested gameobject template for transport entry={entry}");
+    }
+
     void HandleUpdateObject(WorldPacket packet)
     {
         var count = packet.ReadUInt32();
@@ -252,6 +275,8 @@ public partial class WorldClient
                                 legacyHigh == HighGuidTypeLegacy.MOTransport)
                             {
                                 filtered = !MayForwardTransport(legacyHigh, updateData);
+                                if (!filtered && legacyHigh == HighGuidTypeLegacy.MOTransport)
+                                    RequestTransportTemplate((uint)(updateData.ObjectData.EntryID ?? 0));
                                 Log.Print(LogType.Trace,
                                     $"{(filtered ? "Skipping" : "Forwarding")} {legacyHigh} for V3_4_3 guid={guid} entryID={updateData.ObjectData.EntryID?.ToString() ?? "null"}.");
                             }
@@ -314,6 +339,8 @@ public partial class WorldClient
                                 legacyHigh == HighGuidTypeLegacy.MOTransport)
                             {
                                 filtered = !MayForwardTransport(legacyHigh, updateData);
+                                if (!filtered && legacyHigh == HighGuidTypeLegacy.MOTransport)
+                                    RequestTransportTemplate((uint)(updateData.ObjectData.EntryID ?? 0));
                                 Log.Print(LogType.Trace,
                                     $"{(filtered ? "Skipping" : "Forwarding")} CreateObject2 for {legacyHigh} for V3_4_3 guid={guid} entryID={updateData.ObjectData.EntryID?.ToString() ?? "null"}.");
                             }
