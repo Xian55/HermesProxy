@@ -217,31 +217,58 @@ public class AccountDataManager
         AccountData? data = null;
         string fileName = GetFullFileName(guid, type);
 
-        if (File.Exists(fileName))
+        if (!File.Exists(fileName))
+            return null;
+
+        // A stale, truncated or mismatched cache file must not be fatal. These were
+        // Trace.Asserts, which are compiled into Release and abort the process outright
+        // rather than throwing, so a single bad file on disk killed the proxy during
+        // login with nothing catchable. Discard the file instead: the client re-sends
+        // that slot and SaveData overwrites it.
+        try
         {
-            using (FileStream file = File.OpenRead(GetFullFileName(guid, type)))
+            using BinaryReader reader = new BinaryReader(File.OpenRead(fileName));
+
+            data = new();
+            ulong guidLow = reader.ReadUInt64();
+            ulong guidHigh = reader.ReadUInt64();
+            data.Guid = new WowGuid128(guidLow, guidHigh);
+
+            if (!IsGlobalDataType(type) && guid != data.Guid)
             {
-                using (BinaryReader reader = new BinaryReader(File.OpenRead(GetFullFileName(guid, type))))
-                {
-                    data = new();
-                    ulong guidLow = reader.ReadUInt64();
-                    ulong guidHigh = reader.ReadUInt64();
-                    data.Guid = new WowGuid128(guidLow, guidHigh);
-
-                    if (!IsGlobalDataType(type))
-                        System.Diagnostics.Trace.Assert(guid == data.Guid);
-
-                    data.Timestamp = reader.ReadInt64();
-                    data.Type = reader.ReadUInt32();
-                    System.Diagnostics.Trace.Assert(type == data.Type);
-                    data.UncompressedSize = reader.ReadUInt32();
-
-                    int compressedSize = reader.ReadInt32();
-                    data.CompressedData = reader.ReadBytes(compressedSize);
-                }
+                Log.Print(LogType.Warn,
+                    $"Account data '{fileName}' belongs to {data.Guid} but was loaded for {guid}, ignoring it.");
+                return null;
             }
+
+            data.Timestamp = reader.ReadInt64();
+            data.Type = reader.ReadUInt32();
+
+            if (type != data.Type)
+            {
+                Log.Print(LogType.Warn,
+                    $"Account data '{fileName}' holds type {data.Type} but type {type} was expected, ignoring it.");
+                return null;
+            }
+
+            data.UncompressedSize = reader.ReadUInt32();
+
+            int compressedSize = reader.ReadInt32();
+            if (compressedSize < 0 || compressedSize > reader.BaseStream.Length - reader.BaseStream.Position)
+            {
+                Log.Print(LogType.Warn,
+                    $"Account data '{fileName}' declares {compressedSize} compressed bytes but the file is shorter, ignoring it.");
+                return null;
+            }
+
+            data.CompressedData = reader.ReadBytes(compressedSize);
         }
-        
+        catch (Exception e)
+        {
+            Log.Print(LogType.Warn, $"Could not read account data '{fileName}', ignoring it: {e.Message}");
+            return null;
+        }
+
         return data;
     }
 
