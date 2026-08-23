@@ -1,4 +1,4 @@
-namespace HermesProxy.World.Enums.V3_4_3_54261;
+﻿namespace HermesProxy.World.Enums.V3_4_3_54261;
 
 public enum Opcode : uint
 {
@@ -771,6 +771,7 @@ public enum Opcode : uint
 	SMSG_PLAYER_SKINNED = 12294u,
 	SMSG_PRINT_NOTIFICATION = 9674u,
 	SMSG_PVP_CREDIT = 10570u,
+	SMSG_PVP_MATCH_STATISTICS = 10548u,
 	SMSG_RAID_INSTANCE_MESSAGE = 11188u,
 	SMSG_READY_CHECK_COMPLETED = 9720u,
 	SMSG_READY_CHECK_RESPONSE = 9719u,

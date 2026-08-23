@@ -507,12 +507,19 @@ public class PVPMatchStatisticsMessage : ServerPacket
 
     public override void Write()
     {
+        // V3_4_3 dropped the arena team name block from this packet, and its opcode slot is
+        // the old SMSG_PVP_LOG_DATA (0x2934) rather than retail's SMSG_PVP_MATCH_STATISTICS
+        // (0x2933, which is what Classic Era and TBC Classic use). Wrathion, a native
+        // 3.4.3.54261 server, hardcodes the HasNames bit to false with the comment
+        // "ArenaTeams no longer in 3.4.3".
+        bool writeArenaTeams = ArenaTeams != null && ModernVersion.Build != ClientVersionBuild.V3_4_3_54261;
+
         _worldPacket.WriteBit(Ratings != null);
-        _worldPacket.WriteBit(ArenaTeams != null);
+        _worldPacket.WriteBit(writeArenaTeams);
         _worldPacket.WriteBit(Winner != null);
 
-        if (ArenaTeams != null)
-            ArenaTeams.Write(_worldPacket);
+        if (writeArenaTeams)
+            ArenaTeams!.Write(_worldPacket);
 
         _worldPacket.WriteInt32(Statistics.Count);
 
@@ -597,7 +604,11 @@ public class PVPMatchStatisticsMessage : ServerPacket
             data.WriteUInt32(HealingDone);
             data.WriteInt32(Stats.Count);
             data.WriteInt32(PrimaryTalentTree);
-            data.WriteUInt32((uint)Sex);
+            // 3.4.3 narrows Sex to a single byte; wider writes shift every following field.
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+                data.WriteInt8((sbyte)Sex);
+            else
+                data.WriteUInt32((uint)Sex);
             data.WriteUInt32((uint)PlayerRace);
             data.WriteUInt32((uint)PlayerClass);
             data.WriteInt32(CreatureID);
