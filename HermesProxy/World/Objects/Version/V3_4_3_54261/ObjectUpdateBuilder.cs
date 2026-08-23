@@ -147,6 +147,10 @@ public partial class ObjectUpdateBuilder
             _createBits |= CreateObjectBits.Vehicle;
         if (hasMoveInfo && _objectType == ObjectTypeBCC.GameObject)
             _createBits |= CreateObjectBits.Rotation;
+        // MO_TRANSPORT only. Ordinary gameobjects still must not set this (see below);
+        // a zeppelin without the block has no period/offset to animate from.
+        if (_updateData.GameObjectData?.TypeID == (sbyte)GameObjectTypeModern.MOTransport)
+            _createBits |= CreateObjectBits.GameObject;
         // CreateObjectBits.GameObject is NOT set unconditionally here — empirical
         // capture vs CypherCore (canonical V3_4_3 server) shows the bit must stay
         // false for typical GameObjects (transports, mailboxes, doodads). It writes
@@ -258,9 +262,42 @@ public partial class ObjectUpdateBuilder
 
         if (Has(CreateObjectBits.GameObject))
         {
-            data.WriteUInt32(0u);
-            data.WriteBit(false);
+            // TC343 Object::BuildMovementUpdate: WorldEffectID, then three bits
+            // (bit8, isTransport, hasPathProgress), then the transport sub-block.
+            // Only MO_TRANSPORT sets isTransport; type 11 rides on hasPathProgress,
+            // which the legacy server gives us no value for.
+            const bool bit8 = false;
+            bool isTransport = _updateData.GameObjectData?.TypeID == (sbyte)GameObjectTypeModern.MOTransport;
+
+            data.WriteUInt32(0u);                                  // WorldEffectID
+            data.WriteBit(bit8);
+            data.WriteBit(isTransport);
+            data.WriteBit(false);                                  // has PathProgress
             data.FlushBits();
+
+            if (isTransport)
+            {
+                uint period = (uint)(_updateData.GameObjectData!.Level ?? 0);
+                uint timeOffset = 0;
+                if (period != 0)
+                {
+                    // The client reconstructs the loop phase as (serverTime + TimeOffset)
+                    // mod period, so TimeOffset has to be expressed against the same clock
+                    // the ServerTime field carries.
+                    long delta = (long)_updateData.CreateData.MoveInfo.TransportPathTimer - (long)(uint)Environment.TickCount;
+                    timeOffset = (uint)(((delta % period) + period) % period);
+                }
+
+                // GO_STATE_READY on a moving transport means it is docked.
+                bool isStopped = _updateData.GameObjectData?.State == 1;
+
+                data.WriteUInt32(timeOffset);
+                data.WriteUInt32(0u);                              // NextStopTimestamp
+                data.WriteBit(false);                              // has NextStopTimestamp
+                data.WriteBit(isStopped);
+                data.WriteBit(false);
+                data.FlushBits();
+            }
         }
 
         if (Has(CreateObjectBits.ActivePlayer))

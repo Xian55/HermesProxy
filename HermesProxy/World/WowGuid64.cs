@@ -26,9 +26,9 @@ public readonly record struct WowGuid64(ulong Low)
         HighGuidType.Uniq => WowGuid128.ConvertUniqGuid(guid),
         HighGuidType.Player => new WowGuid64(HighGuidTypeLegacy.Player, (uint)guid.GetCounter()),
         HighGuidType.Item => new WowGuid64(HighGuidTypeLegacy.Item, (uint)guid.GetCounter()),
-        HighGuidType.Transport => guid.GetEntry() != 0
-                            ? new WowGuid64(HighGuidTypeLegacy.Transport, guid.GetEntry(), (uint)guid.GetCounter())
-                            : new WowGuid64(HighGuidTypeLegacy.MOTransport, (uint)guid.GetCounter()),
+        HighGuidType.Transport => (guid.GetCounter() & WowGuid128.MoTransportCounterFlag) != 0
+                            ? new WowGuid64(HighGuidTypeLegacy.MOTransport, (uint)(guid.GetCounter() & ~WowGuid128.MoTransportCounterFlag))
+                            : new WowGuid64(HighGuidTypeLegacy.Transport, guid.GetEntry(), (uint)guid.GetCounter()),
         HighGuidType.RaidGroup => new WowGuid64(HighGuidTypeLegacy.Group, (uint)guid.GetCounter()),
         HighGuidType.GameObject => new WowGuid64(HighGuidTypeLegacy.GameObject, guid.GetEntry(), (uint)guid.GetCounter()),
         HighGuidType.Creature => new WowGuid64(HighGuidTypeLegacy.Creature, guid.GetEntry(), (uint)guid.GetCounter()),

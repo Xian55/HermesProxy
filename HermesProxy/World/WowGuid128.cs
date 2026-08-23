@@ -20,7 +20,8 @@ public readonly record struct WowGuid128(ulong Low, ulong High)
     {
         HighGuidType.Player => Create(HighGuidType703.Player, guid.GetCounter()),
         HighGuidType.Item => Create(HighGuidType703.Item, guid.GetCounter()),
-        HighGuidType.Transport or HighGuidType.MOTransport => TransportCreate(guid.GetCounter(), guid.GetEntry()),
+        HighGuidType.Transport => TransportCreate(guid.GetCounter(), guid.GetEntry()),
+        HighGuidType.MOTransport => TransportCreate(guid.GetCounter() | MoTransportCounterFlag, guid.GetEntry()),
         HighGuidType.RaidGroup => Create(HighGuidType703.RaidGroup, guid.GetCounter()),
         HighGuidType.GameObject => Create(HighGuidType703.GameObject, gamestate.GetObjectSpawnCounter(guid), guid.GetEntry(), guid.GetCounter()),
         HighGuidType.Creature => Create(HighGuidType703.Creature, gamestate.GetObjectSpawnCounter(guid), guid.GetEntry(), guid.GetCounter()),
@@ -102,6 +103,17 @@ public readonly record struct WowGuid128(ulong Low, ulong High)
     // WorldClient receive loop → client disconnect. cMaNGOS MOTransport guids carry large
     // low values; TC's don't, which is why this only reproduced on cMaNGOS (issue #101).
     const ulong TransportCounterMask = 0xFFFFF; // 20 bits
+
+    // Legacy Transport (gameobject type 11: elevators, trams) and MOTransport (type 15:
+    // zeppelins, boats) are two separate spawn tables on the legacy server, each numbering
+    // its rows from 1, and neither embeds the gameobject entry in its guid — so both arrive
+    // here with entry 0 and a small counter. Collapsing them into one modern Transport guid
+    // made them collide: the Undercity zeppelin (transports row 6) and an Undercity elevator
+    // (spawn counter 6) both produced 0x1800018000000000, and whichever create landed second
+    // replaced the first in the client's world model. Reserving the top counter bit for
+    // MOTransport keeps the two namespaces apart, and gives WowGuid64.Create a reliable way
+    // to tell them apart on the way back (it used to test entry != 0, which is never true).
+    public const ulong MoTransportCounterFlag = 0x80000; // bit 19 of the 20-bit counter
 
     static WowGuid128 TransportCreate(ulong counter, uint entry)
     {
