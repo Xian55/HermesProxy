@@ -142,7 +142,7 @@ AzerothCore column added 2026-08-24. It is marked ❓ rather than assumed-equal-
 | Chat (`/say`, `/emote`) | ✅ | ✅ | ✅ | |
 | Party / raid (form, convert) | ✅ | ✅ | ✅ | bits-first wire format |
 | Party chat / raid chat / raid warning | ✅ | ✅ | ✅ | |
-| Raid promote-to-assistant (single + "Everyone is assistant") | ✅ | ❓ | ❓ | 2026-05-16 — V3_4_3 bits-first parse fix for `SetAssistantLeader` + `SetEveryoneIsAssistant` (`82c8f83`); verified on TC, cMangos retest pending |
+| Raid promote-to-assistant (single + "Everyone is assistant") | ✅ | ❓ | ✅ | 2026-05-16 — V3_4_3 bits-first parse fix for `SetAssistantLeader` + `SetEveryoneIsAssistant` (`82c8f83`); verified on TC, cMangos retest pending. **AzerothCore 2026-08-24:** single promote-to-assistant and Everyone is Assistant both apply. |
 | Raid kick (single member) | ❓ | ❌ | ✅ | cMangos: disbands whole raid; party uninvite is fine. **AzerothCore 2026-08-24:** Remove on a 2-person raid kicks the other player. Raid frames hide because only you remain; the group does not explode the way cMangos does. |
 | Trade (between players) | ✅ | ✅ | ✅ | **AzerothCore 2026-08-24:** copper, items, and mixed trades complete between two real player sessions (RADU ↔ RADU2). |
 | Char-list — auto-select newly created character | ✅ | ❓ | ✅ | `a515bd0` — character pre-selected in char-list after create; QoL |
