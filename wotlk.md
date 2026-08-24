@@ -141,7 +141,7 @@ AzerothCore column added 2026-08-24. It is marked ❓ rather than assumed-equal-
 | Glyphs — dual-spec swap UnitData refresh | ✅ | ❓ | ❓ | dirty-flag drives ObjectUpdateBuilder to re-emit GlyphSlots in player Values update; without this, "already applied this glyph" check fired against stale (previous-spec) glyphs |
 | Chat (`/say`, `/emote`) | ✅ | ✅ | ✅ | |
 | Party / raid (form, convert) | ✅ | ✅ | ✅ | bits-first wire format |
-| Party chat / raid chat / raid warning | ✅ | ✅ | ❓ | |
+| Party chat / raid chat / raid warning | ✅ | ✅ | ✅ | |
 | Raid promote-to-assistant (single + "Everyone is assistant") | ✅ | ❓ | ❓ | 2026-05-16 — V3_4_3 bits-first parse fix for `SetAssistantLeader` + `SetEveryoneIsAssistant` (`82c8f83`); verified on TC, cMangos retest pending |
 | Raid kick (single member) | ❓ | ❌ | ❓ | cMangos: disbands whole raid; party uninvite is fine |
 | Trade (between players) | ✅ | ✅ | ❓ | |
