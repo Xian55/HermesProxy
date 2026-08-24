@@ -87,7 +87,7 @@ AzerothCore column added 2026-08-24. It is marked ❓ rather than assumed-equal-
 |---|---|---|---|---|
 | Auth + char-select | ✅ | ✅ | ✅ | |
 | World-enter + walk + camera | ✅ | ✅ | ✅ | cMangos blocker resolved by recent fixes |
-| New-char first login (post-cinematic movement) | ✅ | ❓ | ❓ | TC: fixed (`21d0e1a` — `CMSG_LOADING_SCREEN_NOTIFY` `0xFFFFFFFF` sentinel was poisoning `CurrentMapId`). Caveat: skipping the cinematic too early can still disconnect (timing-related). cMangos: untested with the TC fix. |
+| New-char first login (post-cinematic movement) | ✅ | ❓ | ✅ | TC: fixed (`21d0e1a` — `CMSG_LOADING_SCREEN_NOTIFY` `0xFFFFFFFF` sentinel was poisoning `CurrentMapId`). Caveat: skipping the cinematic too early can still disconnect (timing-related). cMangos: untested with the TC fix. |
 | Player render (incl. equipped items) | ✅ | ✅ | ✅ | |
 | Combat — auto-attack | ✅ | ✅ | ✅ | packet-split fix (player Values → separate `SMSG_UPDATE_OBJECT`) |
 | Player Armor + magical resistances | ✅ | ❓ | ❓ | `e084fb4` — V3_3_5a `UNIT_FIELD_RESISTANCES` rename fallback; was reading 0 |
