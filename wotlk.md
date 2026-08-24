@@ -92,8 +92,8 @@ AzerothCore column added 2026-08-24. It is marked ❓ rather than assumed-equal-
 | Combat — auto-attack | ✅ | ✅ | ✅ | packet-split fix (player Values → separate `SMSG_UPDATE_OBJECT`) |
 | Player Armor + magical resistances | ✅ | ❓ | ✅ | `e084fb4` — V3_3_5a `UNIT_FIELD_RESISTANCES` rename fallback; was reading 0 |
 | Combat — special abilities | ✅ | ❌ | ✅ | cMangos: "invalid target" on e.g. Heroic Strike |
-| Channel spells (cast bar / kneel anim / ESC unblock) | ✅ | ❓ | ❓ | `fc238f9` — wire-format only; cMangos untested |
-| Channel spells (loop animation) | ✅ | ❓ | ❓ | fixed by writing `ChannelObjects` DynamicUpdateField (bit 4) in V3_4_3 ObjectUpdateBuilder; cMangos retest pending |
+| Channel spells (cast bar / kneel anim / ESC unblock) | ✅ | ❓ | ✅ | `fc238f9` — wire-format only; cMangos untested |
+| Channel spells (loop animation) | ✅ | ❓ | ✅ | fixed by writing `ChannelObjects` DynamicUpdateField (bit 4) in V3_4_3 ObjectUpdateBuilder; cMangos retest pending |
 | Spell-failure error text (e.g. NotShapeshift) | ✅ | ❓ | ✅ | `ed5e470` — per-build `SpellCastResult` dispatch; was reading wrong text like "in flight" |
 | Flying projectiles (arrows / fireball / missiles) | ✅ | ✅ | ✅ | `49ace55` |
 | Death Knight character create | ✅ | ❓ | ✅ | `43957ff` + `39cf991` — DK class offered in create UI on TC; cMangos untested |
@@ -138,7 +138,7 @@ AzerothCore column added 2026-08-24. It is marked ❓ rather than assumed-equal-
 | Glyphs — slot unlock at L15/30/50/70/80 mid-session | ✅ | ❓ | ✅ | 2026-05-23 — `GlyphsEnabledDirty` flag + `ApplyActivePlayerGlyphsEnabledMaskMutator` setting bits 102 + 120 (bit 120 is nested under parent 102 in V3_4_3 changesMask); without parent bit, client + WPP silently skip the sub-tree and slots stayed locked until relog |
 | Glyphs — apply (CMSG_USE_ITEM) | ✅ | ❓ | ✅ | forwards SpellCastRequest.Misc[0] as glyphIndex; was hardcoded 0 → every glyph went to slot 0 |
 | Glyphs — remove (CMSG_REMOVE_GLYPH) | ✅ | ❓ | ✅ | modern 13056 → legacy 0x48A, identical payload (uint8 GlyphSlot) |
-| Glyphs — dual-spec swap UnitData refresh | ✅ | ❓ | ❓ | dirty-flag drives ObjectUpdateBuilder to re-emit GlyphSlots in player Values update; without this, "already applied this glyph" check fired against stale (previous-spec) glyphs |
+| Glyphs — dual-spec swap UnitData refresh | ✅ | ❓ | ✅ | dirty-flag drives ObjectUpdateBuilder to re-emit GlyphSlots in player Values update; without this, "already applied this glyph" check fired against stale (previous-spec) glyphs |
 | Chat (`/say`, `/emote`) | ✅ | ✅ | ✅ | |
 | Party / raid (form, convert) | ✅ | ✅ | ✅ | bits-first wire format |
 | Party chat / raid chat / raid warning | ✅ | ✅ | ✅ | |
