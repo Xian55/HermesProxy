@@ -97,7 +97,7 @@ AzerothCore column added 2026-08-24. It is marked ❓ rather than assumed-equal-
 | Spell-failure error text (e.g. NotShapeshift) | ✅ | ❓ | ❓ | `ed5e470` — per-build `SpellCastResult` dispatch; was reading wrong text like "in flight" |
 | Flying projectiles (arrows / fireball / missiles) | ✅ | ✅ | ❓ | `49ace55` |
 | Death Knight character create | ✅ | ❓ | ✅ | `43957ff` + `39cf991` — DK class offered in create UI on TC; cMangos untested |
-| Death Knight runes + runic power | ✅ | ❓ | ❓ | rune cooldown swirl, RunicPower in power slot 0 (`d2bb304` + `2664a0e` + `cd93bf6` + `c9223a2`) |
+| Death Knight runes + runic power | ✅ | ❓ | ✅ | rune cooldown swirl, RunicPower in power slot 0 (`d2bb304` + `2664a0e` + `cd93bf6` + `c9223a2`) |
 | **Death Knight starter quest chain (full)** | ✅ | ❓ | ❓ | 2026-05-10 — entire Acherus → Scarlet Enclave chain completed end-to-end on TC (incl. quest 12779 Frostbrood Vanquisher / *An End to All Things* and quest 12800 *The Lich King's Command* / Light's Hope battle, the two scripted-event quests that needed the bulk of the May session's fixes). cMangos retest pending |
 | Battle Shout / self-aura | ✅ | ✅ | ❓ | |
 | Shapeshift / form cancel (Bear Form verified) | ✅ | ❓ | ❓ | `7cbc550` — re-emit player auras after CreateObject; other Druid forms / Rogue Stealth not exhaustively tested |
