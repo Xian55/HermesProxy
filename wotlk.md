@@ -139,7 +139,7 @@ AzerothCore column added 2026-08-24. It is marked ❓ rather than assumed-equal-
 | Glyphs — apply (CMSG_USE_ITEM) | ✅ | ❓ | ❓ | forwards SpellCastRequest.Misc[0] as glyphIndex; was hardcoded 0 → every glyph went to slot 0 |
 | Glyphs — remove (CMSG_REMOVE_GLYPH) | ✅ | ❓ | ❓ | modern 13056 → legacy 0x48A, identical payload (uint8 GlyphSlot) |
 | Glyphs — dual-spec swap UnitData refresh | ✅ | ❓ | ❓ | dirty-flag drives ObjectUpdateBuilder to re-emit GlyphSlots in player Values update; without this, "already applied this glyph" check fired against stale (previous-spec) glyphs |
-| Chat (`/say`, `/emote`) | ✅ | ✅ | ❓ | |
+| Chat (`/say`, `/emote`) | ✅ | ✅ | ✅ | |
 | Party / raid (form, convert) | ✅ | ✅ | ✅ | bits-first wire format |
 | Party chat / raid chat / raid warning | ✅ | ✅ | ❓ | |
 | Raid promote-to-assistant (single + "Everyone is assistant") | ✅ | ❓ | ❓ | 2026-05-16 — V3_4_3 bits-first parse fix for `SetAssistantLeader` + `SetEveryoneIsAssistant` (`82c8f83`); verified on TC, cMangos retest pending |
