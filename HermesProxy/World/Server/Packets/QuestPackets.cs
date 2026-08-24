@@ -142,9 +142,7 @@ public class QuestGiverQuestDetails : ServerPacket
         _worldPacket.WriteInt32((int)PortraitGiverMount);
         _worldPacket.WriteInt32((int)PortraitGiverModelSceneID);
         _worldPacket.WriteInt32((int)PortraitTurnIn);
-        // Strip AUTO_ACCEPT only for details we synthesized from a title click.
-        // A server-pushed AutoLaunched quest (start item, area trigger) must keep it.
-        _worldPacket.WriteUInt32(AutoLaunched ? QuestFlags[0] : QuestFlagUtil.StripAutoAccept(QuestFlags[0]));
+        _worldPacket.WriteUInt32(QuestFlags[0]);    // Flags
         _worldPacket.WriteUInt32(QuestFlags[1]);    // FlagsEx
         _worldPacket.WriteUInt32(0);                // FlagsEx2 (V3_4_3 only)
         _worldPacket.WriteInt32((int)SuggestedPartyMembers);

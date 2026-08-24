@@ -248,7 +248,6 @@ public partial class WorldClient
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_3_11685))
             quest.Repeatable = packet.ReadBool();
 
-        GetSession().GameState.GossipQuestFlagsById[quest.QuestID] = quest.QuestFlags;
         GetSession().GameState.GossipQuestTypesById[quest.QuestID] = quest.QuestType;
 
         quest.QuestTitle = packet.ReadCString();
@@ -270,7 +269,7 @@ public partial class WorldClient
         quest.AutoLaunched = packet.ReadUInt32() != 0;
 
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_3_11685))
-            quest.QuestFlags[0] = QuestFlagUtil.StripAutoAccept(packet.ReadUInt32());
+            quest.QuestFlags[0] = packet.ReadUInt32();
 
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             quest.SuggestPartyMembers = packet.ReadUInt32();

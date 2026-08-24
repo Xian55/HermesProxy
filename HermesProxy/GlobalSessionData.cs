@@ -160,12 +160,7 @@ public sealed class GameSessionData
     public uint CurrentGuildCreateTime;
     public uint CurrentGuildNumAccounts;
     public WowGuid128 CurrentInteractedWithNPC;
-    public readonly Dictionary<uint, uint> GossipQuestFlagsById = new();
     public readonly Dictionary<uint, int> GossipQuestTypesById = new();
-    // Quest titles clicked on V3_4_3 whose template was not cached yet, keyed by
-    // quest id. A single slot loses the first click when two titles are opened
-    // before the first CMSG_QUERY_QUEST_INFO round-trip returns.
-    public readonly Dictionary<uint, WowGuid128> PendingQuestDetails = new();
     public uint AwaitingQuestRewardId;
     public WowGuid128 AwaitingQuestGiver = WowGuid128.Empty;
     public bool JustSentOfferReward;
@@ -191,8 +186,6 @@ public sealed class GameSessionData
             return;
 
         RequestedQuestTemplateIds.Remove(questId);
-        PendingQuestDetails.Remove(questId);
-        GossipQuestFlagsById.Remove(questId);
         GossipQuestTypesById.Remove(questId);
         if (SentItemQuestCredits.Count == 0)
             return;

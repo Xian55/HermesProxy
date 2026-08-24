@@ -228,7 +228,7 @@ public class ClientGossipQuest
         data.WriteInt32(QuestType);
         data.WriteInt32(QuestLevel);
         data.WriteInt32(QuestMaxLevel);     // QuestMaxScalingLevel
-        data.WriteInt32((int)QuestFlagUtil.StripAutoAccept(QuestFlags));
+        data.WriteInt32((int)QuestFlags);
         data.WriteInt32((int)QuestFlagsEx);
         data.WriteBit(Repeatable);
         data.WriteBit(false);               // Important

@@ -44,18 +44,6 @@ public enum QuestFlags : uint
     FailOnLogout          = 0x80000000
 }
 
-public static class QuestFlagUtil
-{
-    // 3.4.3 treats AUTO_ACCEPT as "take the quest on title click".
-    // AzerothCore also auto-takes on QUEST_GIVER_QUERY when this bit is set.
-    // Strip it so the client shows Accept, and we only forward ACCEPT.
-    public const uint AutoAcceptMask = (uint)QuestFlags.AutoAccept;
-
-    public static uint StripAutoAccept(uint flags) => flags & ~AutoAcceptMask;
-
-    public static bool HasAutoAccept(uint flags) => (flags & AutoAcceptMask) != 0;
-}
-
 // Wire flags on SMSG_QUEST_POI_QUERY_RESPONSE blob entries (V3_4_3.54261). Bit
 // semantics derived from native TC 3.4.3 sniffs — TC source treats Flags as a
 // raw int32 with no named enum, so these names reflect observed convention:

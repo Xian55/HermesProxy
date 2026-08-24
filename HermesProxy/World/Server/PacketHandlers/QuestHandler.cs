@@ -16,36 +16,6 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_QUEST_GIVER_QUERY_QUEST)]
     void HandleQuestGiverQueryQuest(QuestGiverQueryQuest quest)
     {
-        if (ModernVersion.Build == HermesProxy.Enums.ClientVersionBuild.V3_4_3_54261)
-        {
-            // Gossip icon 4 = completable. Title click must open RequestItems /
-            // OfferReward, not Accept details. Forward COMPLETE so AC sends that.
-            if (GetSession().GameState.GossipQuestTypesById.TryGetValue(quest.QuestID, out int gossipType)
-                && gossipType == 4)
-            {
-                WorldPacket complete = new WorldPacket(Opcode.CMSG_QUEST_GIVER_COMPLETE_QUEST);
-                complete.WriteGuid(quest.QuestGiverGUID.To64());
-                complete.WriteUInt32(quest.QuestID);
-                SendPacketToServer(complete);
-                return;
-            }
-
-            // Never forward QUERY on 3.4.3. AC IsAutoAccept() is SpecialFlags
-            // (often not on the wire Flags). QUERY always takes those quests.
-            QuestTemplate? template = GameData.GetQuestTemplate(quest.QuestID);
-            if (template != null)
-            {
-                SendPacket(QuestDetailsBuilder.FromTemplate(quest.QuestGiverGUID, template));
-                return;
-            }
-
-            GetSession().GameState.PendingQuestDetails[quest.QuestID] = quest.QuestGiverGUID;
-            WorldPacket info = new WorldPacket(Opcode.CMSG_QUERY_QUEST_INFO);
-            info.WriteUInt32(quest.QuestID);
-            SendPacketToServer(info);
-            return;
-        }
-
         WorldPacket packet = new WorldPacket(Opcode.CMSG_QUEST_GIVER_QUERY_QUEST);
         packet.WriteGuid(quest.QuestGiverGUID.To64());
         packet.WriteUInt32(quest.QuestID);

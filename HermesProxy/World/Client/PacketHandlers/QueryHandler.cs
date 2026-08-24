@@ -275,10 +275,6 @@ public partial class WorldClient
 
         GameData.StoreQuestTemplate(response.QuestID, quest);
 
-        var pendingQuestDetails = GetSession().GameState.PendingQuestDetails;
-        if (pendingQuestDetails.Remove(response.QuestID, out WowGuid128 pendingGiver))
-            SendPacketToClient(QuestDetailsBuilder.FromTemplate(pendingGiver, quest));
-
         SendPacketToClient(response);
 
         bool inLog = false;
