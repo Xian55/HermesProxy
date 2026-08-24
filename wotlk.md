@@ -144,7 +144,7 @@ AzerothCore column added 2026-08-24. It is marked ❓ rather than assumed-equal-
 | Party chat / raid chat / raid warning | ✅ | ✅ | ✅ | |
 | Raid promote-to-assistant (single + "Everyone is assistant") | ✅ | ❓ | ❓ | 2026-05-16 — V3_4_3 bits-first parse fix for `SetAssistantLeader` + `SetEveryoneIsAssistant` (`82c8f83`); verified on TC, cMangos retest pending |
 | Raid kick (single member) | ❓ | ❌ | ❓ | cMangos: disbands whole raid; party uninvite is fine |
-| Trade (between players) | ✅ | ✅ | ❓ | |
+| Trade (between players) | ✅ | ✅ | ✅ | **AzerothCore 2026-08-24:** copper, items, and mixed trades complete between two real player sessions (RADU ↔ RADU2). |
 | Char-list — auto-select newly created character | ✅ | ❓ | ✅ | `a515bd0` — character pre-selected in char-list after create; QoL |
 | Mail — open + inbox + take attachments + COD pay + delete | ✅ | ❓ | ✅ | 2026-05-09 — V3_4_3 wire-format fix (`d3004b1`); 12-attachment + 1-COD mail end-to-end on TC; V1_14/V2_5 regression-clean; cMangos untested |
 | Achievement panel — earned + criteria progress | ✅ | ❓ | ✅ | 2026-05-23: §F bridge — new `AchievementHandler.cs` translates `SMSG_ALL_ACHIEVEMENT_DATA` (init), `SMSG_CRITERIA_UPDATE` (runtime tick), `SMSG_ACHIEVEMENT_EARNED` (toast). New `AchievementPackets.cs` ships modern V3_4_3 wire format per TC 3.4.3 source (`Duration<Seconds>`/`Timestamp<int64>` = 8 B each; fork's `CreationTime` UInt32 bug corrected). Shared `CriteriaProgressPkt` in `MiscPackets.cs` fixed to TC layout (added `Unused_10_1_5`, widened times to Int64, full UInt32 Flags); old wire was dormant (`AllAccountCriteria` always sent empty). `EmptyAllAchievementData` stub + dispatch removed. Version-gated to `V3_0_2+` so V1_14/V2_5 unaffected. cMangos untested. |
