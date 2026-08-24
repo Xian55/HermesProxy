@@ -90,7 +90,7 @@ AzerothCore column added 2026-08-24. It is marked ❓ rather than assumed-equal-
 | New-char first login (post-cinematic movement) | ✅ | ❓ | ✅ | TC: fixed (`21d0e1a` — `CMSG_LOADING_SCREEN_NOTIFY` `0xFFFFFFFF` sentinel was poisoning `CurrentMapId`). Caveat: skipping the cinematic too early can still disconnect (timing-related). cMangos: untested with the TC fix. |
 | Player render (incl. equipped items) | ✅ | ✅ | ✅ | |
 | Combat — auto-attack | ✅ | ✅ | ✅ | packet-split fix (player Values → separate `SMSG_UPDATE_OBJECT`) |
-| Player Armor + magical resistances | ✅ | ❓ | ❓ | `e084fb4` — V3_3_5a `UNIT_FIELD_RESISTANCES` rename fallback; was reading 0 |
+| Player Armor + magical resistances | ✅ | ❓ | ✅ | `e084fb4` — V3_3_5a `UNIT_FIELD_RESISTANCES` rename fallback; was reading 0 |
 | Combat — special abilities | ✅ | ❌ | ✅ | cMangos: "invalid target" on e.g. Heroic Strike |
 | Channel spells (cast bar / kneel anim / ESC unblock) | ✅ | ❓ | ❓ | `fc238f9` — wire-format only; cMangos untested |
 | Channel spells (loop animation) | ✅ | ❓ | ❓ | fixed by writing `ChannelObjects` DynamicUpdateField (bit 4) in V3_4_3 ObjectUpdateBuilder; cMangos retest pending |
