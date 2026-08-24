@@ -132,7 +132,7 @@ AzerothCore column added 2026-08-24. It is marked ❓ rather than assumed-equal-
 | Pet — character-sheet stats | ✅ | ❓ | ❓ | follow-up Values UpdateObject (PetStatsValuesSynth) re-emits IsOwner-gated stats (Stats[5] / AP / MinDamage / Resistances). cMangos retest pending |
 | Pet — spellbook "Pet" tab in player UI | ❌ | ❓ | ❓ | 6 iterations of capture-diff against CypherCore native didn't crack it (count, Specialization, slot encoding, ordering all matched native). Parked — see "Open issues" |
 | Talent panel — unspent talent point counter + tree population | ✅ | ✅ | ✅ | translates legacy SMSG_UPDATE_TALENT_DATA → modern (V3_4_3 Rank=u8, no PrimarySpecialization) with cache for relog re-emit |
-| Talent panel — dual-spec switch | ✅ | ✅ | ❓ | per-group emit, SpecID encoding matches TC SendTalentsInfoData |
+| Talent panel — dual-spec switch | ✅ | ✅ | ✅ | per-group emit, SpecID encoding matches TC SendTalentsInfoData |
 | Pet talents | ✅ | ❓ | ❓ | CMSG_PET_LEARN_TALENT (modern 0x3554 → legacy 0x47A) translates with PetGUID modern→legacy; learn UI works on TC |
 | Glyphs — display + slot unlock | ✅ | ❓ | ✅ | reads PLAYER_GLYPHS_ENABLED bitmask + PLAYER_FIELD_GLYPHS_1..6 from legacy update fields; emits SMSG_ACTIVE_GLYPHS with (SpellID, GlyphID) pairs via GlyphProperties3.csv lookup |
 | Glyphs — slot unlock at L15/30/50/70/80 mid-session | ✅ | ❓ | ❓ | 2026-05-23 — `GlyphsEnabledDirty` flag + `ApplyActivePlayerGlyphsEnabledMaskMutator` setting bits 102 + 120 (bit 120 is nested under parent 102 in V3_4_3 changesMask); without parent bit, client + WPP silently skip the sub-tree and slots stayed locked until relog |
