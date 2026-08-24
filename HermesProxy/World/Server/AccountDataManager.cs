@@ -17,6 +17,7 @@ public class AccountMetaDataManager
     private const string COMPLETED_QUESTS_FILE = "completed_quests.csv";
     private const string SETTINGS_FILE = "settings.json";
     private const string CHAR_LIST_ORDER_FILE = "char_list_order.txt";
+    private static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
     private readonly string _accountName;
 
@@ -106,10 +107,20 @@ public class AccountMetaDataManager
                 continue;
             var parts = line.Split(',');
             if (!ulong.TryParse(parts[0], out ulong guidLow))
+            {
+                Log.Print(LogType.Warn, $"Ignoring unparseable character-list order line in '{path}': '{line}'");
                 continue;
+            }
             byte pos = fallback;
-            if (parts.Length >= 2 && byte.TryParse(parts[1], out byte parsed))
+            if (parts.Length >= 2)
+            {
+                if (!byte.TryParse(parts[1], out byte parsed))
+                {
+                    Log.Print(LogType.Warn, $"Ignoring unparseable character-list position in '{path}': '{line}'");
+                    continue;
+                }
                 pos = parsed;
+            }
             order.Add(new CharacterListSlot(guidLow, pos));
             fallback = (byte)(pos + 1);
         }
@@ -119,7 +130,7 @@ public class AccountMetaDataManager
     public void SaveCharacterListOrder(string realmName, IReadOnlyList<CharacterListSlot> slots)
     {
         var path = Path.Combine(GetAccountRealmDirectory(realmName), CHAR_LIST_ORDER_FILE);
-        File.WriteAllLines(path, slots.Select(s => $"{s.GuidLow},{s.ListPosition}"), Encoding.UTF8);
+        File.WriteAllLines(path, slots.Select(s => $"{s.GuidLow},{s.ListPosition}"), Utf8NoBom);
         Log.Print(LogType.Debug, $"Saved character list order ({slots.Count}) in '{path}'");
     }
 

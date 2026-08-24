@@ -215,7 +215,12 @@ public partial class WorldClient
         if (!string.IsNullOrEmpty(realmName))
         {
             var saved = GetSession().AccountMetaDataMgr.LoadCharacterListOrder(realmName);
-            CharacterListOrder.Apply(charEnum.Characters, saved);
+            var pruned = CharacterListOrder.Apply(charEnum.Characters, saved);
+            if (pruned.Count != saved.Count)
+            {
+                GetSession().AccountMetaDataMgr.SaveCharacterListOrder(realmName, CharacterListOrder.Normalize(pruned));
+                Log.Print(LogType.Debug, $"[CharEnum] pruned {saved.Count - pruned.Count} missing character(s) from list order");
+            }
             Log.Print(LogType.Debug,
                 $"[CharEnum] applied order=[{string.Join(", ", charEnum.Characters.ConvertAll(c => $"{c.Name}:{c.ListPosition}"))}]");
         }

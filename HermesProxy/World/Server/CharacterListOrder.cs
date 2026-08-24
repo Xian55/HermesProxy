@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Framework.Logging;
 using HermesProxy.World.Server.Packets;
 
 namespace HermesProxy.World.Server;
@@ -14,7 +15,7 @@ public readonly record struct CharacterListSlot(ulong GuidLow, byte ListPosition
 /// </summary>
 public static class CharacterListOrder
 {
-        public const byte PositionStep = 10;
+    public const byte PositionStep = 10;
 
     public static List<CharacterListSlot> Normalize(IReadOnlyList<CharacterListSlot> slots)
     {
@@ -26,17 +27,47 @@ public static class CharacterListOrder
         });
         var normalized = new List<CharacterListSlot>(ordered.Count);
         for (int i = 0; i < ordered.Count; i++)
-            normalized.Add(new CharacterListSlot(ordered[i].GuidLow, (byte)((i + 1) * PositionStep)));
+            normalized.Add(new CharacterListSlot(ordered[i].GuidLow, PositionAt(i)));
         return normalized;
     }
 
-    public static void Apply(List<EnumCharactersResult.CharacterInfo> characters, IReadOnlyList<CharacterListSlot> saved)
+    /// <summary>
+    /// Drops saved slots whose GUID is not in the live enum. Keeps the file
+    /// bounded by the realm character cap and stops a reused GUID from
+    /// inheriting a deleted character's slot
+    /// </summary>
+    public static List<CharacterListSlot> Prune(IReadOnlyList<CharacterListSlot> saved, IReadOnlyList<EnumCharactersResult.CharacterInfo> characters)
     {
-        if (characters.Count == 0 || saved.Count == 0)
-            return;
+        if (saved.Count == 0)
+            return new List<CharacterListSlot>();
+        if (characters.Count == 0)
+            return new List<CharacterListSlot>(saved);
+
+        var live = new HashSet<ulong>(characters.Count);
+        foreach (var character in characters)
+            live.Add(character.Guid.Low);
+
+        var pruned = new List<CharacterListSlot>(saved.Count);
+        foreach (var slot in saved)
+        {
+            if (live.Contains(slot.GuidLow))
+                pruned.Add(slot);
+        }
+        return pruned;
+    }
+
+    /// <summary>
+    /// Stamps the live enum with the saved order. Returns the pruned save so
+    /// the caller can persist it when deleted characters were dropped
+    /// </summary>
+    public static List<CharacterListSlot> Apply(List<EnumCharactersResult.CharacterInfo> characters, IReadOnlyList<CharacterListSlot> saved)
+    {
+        var pruned = Prune(saved, characters);
+        if (characters.Count == 0 || pruned.Count == 0)
+            return pruned;
 
         byte nextFallback = 0;
-        foreach (var slot in saved)
+        foreach (var slot in pruned)
         {
             if (slot.ListPosition >= nextFallback)
                 nextFallback = (byte)(slot.ListPosition + 1);
@@ -45,7 +76,7 @@ public static class CharacterListOrder
         foreach (var character in characters)
         {
             bool found = false;
-            foreach (var slot in saved)
+            foreach (var slot in pruned)
             {
                 if (slot.GuidLow != character.Guid.Low)
                     continue;
@@ -59,7 +90,20 @@ public static class CharacterListOrder
 
         characters.Sort((a, b) => a.ListPosition.CompareTo(b.ListPosition));
         for (int i = 0; i < characters.Count; i++)
-            characters[i].ListPosition = (byte)((i + 1) * PositionStep);
+            characters[i].ListPosition = PositionAt(i);
+        return pruned;
+    }
+
+    // ListPosition is a byte; 26+ rows would wrap (260 -> 4) and scramble the list
+    public static byte PositionAt(int index)
+    {
+        int raw = (index + 1) * PositionStep;
+        if (raw > byte.MaxValue)
+        {
+            Log.Print(LogType.Warn, $"character list position {raw} exceeds {byte.MaxValue}, clamping");
+            return byte.MaxValue;
+        }
+        return (byte)raw;
     }
 
     /// <summary>
