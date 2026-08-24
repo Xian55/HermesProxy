@@ -129,8 +129,20 @@ public partial class WorldClient
         moveInfo.ReadMovementInfoLegacy(packet, GetSession().GameState);
         moveInfo.Flags = (uint)(((MovementFlagWotLK)moveInfo.Flags).CastFlags<MovementFlagModern>());
         moveInfo.ValidateMovementInfo();
-        teleport.Position = moveInfo.Position;
-        teleport.Orientation = moveInfo.Orientation;
+        // A mover riding something expects deck-relative Pos/Facing, not world coords:
+        // Unit::SendTeleportPacket runs the position through CalculatePassengerOffset
+        // before filling MoveTeleport. Sending world coords makes the client add them
+        // to the transport's own position and strands the player off the map.
+        if (moveInfo.TransportGuid != default)
+        {
+            teleport.Position = moveInfo.TransportOffset;
+            teleport.Orientation = moveInfo.TransportOrientation;
+        }
+        else
+        {
+            teleport.Position = moveInfo.Position;
+            teleport.Orientation = moveInfo.Orientation;
+        }
         teleport.TransportGUID = moveInfo.TransportGuid;
         if (moveInfo.TransportSeat > 0)
         {
