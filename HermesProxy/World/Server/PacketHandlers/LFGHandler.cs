@@ -48,11 +48,11 @@ public partial class WorldSocket
         Log.Print(LogType.Debug,
             $"LFG[diag]: CMSG_DF_JOIN roles=0x{packet.Roles:X8} slots=[{string.Join(", ", packet.Slots)}]");
 
-        // The V3_4_3 client offers dungeons that postdate 3.3.5a (Titan Rune Protocol
-        // Alpha/Beta/Gamma, IDs 2447/2470/2485). A legacy backend drops CMSG_LFG_JOIN for
-        // an unknown dungeon without sending SMSG_LFG_JOIN_RESULT, so the client sits on
-        // "Find Group" forever with no error. Answer for the backend instead.
-        if (LfgSlots.TryFindUnknownDungeon(GetSession().GameState.LfgKnownDungeonIds, packet.Slots, out uint unknownDungeonId))
+        // Titan Rune / other post-3.3.5 LFGDungeons IDs. A legacy backend drops
+        // CMSG_LFG_JOIN for those with no SMSG_LFG_JOIN_RESULT, so the client sits
+        // on Find Group forever. Answer for the backend instead. Real 3.3.5
+        // specifics are forwarded even if they were never listed in PLAYER_INFO.
+        if (LfgSlots.TryFindUnknownDungeon(packet.Slots, out uint unknownDungeonId))
         {
             Log.Print(LogType.Debug,
                 $"LFG[diag]: rejecting CMSG_DF_JOIN, dungeon {unknownDungeonId} is unknown to the {LegacyVersion.Build} backend");

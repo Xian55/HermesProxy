@@ -327,6 +327,23 @@ public partial class WorldClient
             });
             blackList.Slots.Add(slot);
         }
+
+        // Titan Rune Alpha/Beta/Gamma live only in the 3.4.3 LFGDungeons.db2.
+        // SoftLock=Unk2 hides a row; without these the three categories stay
+        // visible and every click on them is InvalidSlot.
+        var alreadyListed = new HashSet<uint>(blackList.Slots.Count);
+        foreach (var existing in blackList.Slots)
+            alreadyListed.Add(LfgSlots.GetDungeonId(existing.Slot));
+        foreach (uint packed in LfgSlots.GetTitanRuneHideSlots(alreadyListed))
+        {
+            blackList.Slots.Add(new LFGBlackListSlot
+            {
+                Slot = packed,
+                Reason = (uint)LFGLockStatus.NotInSeason,
+                SoftLock = (uint)LFGSoftLock.Unk2,
+            });
+        }
+
         info.BlackList = blackList;
 
         // Both lists together are the full set of dungeons this backend understands.
