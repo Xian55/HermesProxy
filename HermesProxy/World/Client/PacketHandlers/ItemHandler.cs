@@ -84,6 +84,8 @@ public partial class WorldClient
             item.ItemGUID = WowGuid128.Empty;
         
         SendPacketToClient(item);
+        if (item.Item.ItemID != 0)
+            SendItemQuestCredit(item.Item.ItemID);
     }
     [PacketHandler(Opcode.SMSG_READ_ITEM_RESULT_OK)]
     void HandleReadItemResultOk(WorldPacket packet)

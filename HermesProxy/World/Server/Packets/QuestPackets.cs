@@ -142,7 +142,9 @@ public class QuestGiverQuestDetails : ServerPacket
         _worldPacket.WriteInt32((int)PortraitGiverMount);
         _worldPacket.WriteInt32((int)PortraitGiverModelSceneID);
         _worldPacket.WriteInt32((int)PortraitTurnIn);
-        _worldPacket.WriteUInt32(QuestFlags[0]);    // Flags
+        // Strip AUTO_ACCEPT only for details we synthesized from a title click.
+        // A server-pushed AutoLaunched quest (start item, area trigger) must keep it.
+        _worldPacket.WriteUInt32(AutoLaunched ? QuestFlags[0] : QuestFlagUtil.StripAutoAccept(QuestFlags[0]));
         _worldPacket.WriteUInt32(QuestFlags[1]);    // FlagsEx
         _worldPacket.WriteUInt32(0);                // FlagsEx2 (V3_4_3 only)
         _worldPacket.WriteInt32((int)SuggestedPartyMembers);
@@ -381,6 +383,18 @@ public class QuestGiverCloseQuest : ClientPacket
     }
 
     public int QuestID;
+}
+
+public class CloseInteraction : ClientPacket
+{
+    public CloseInteraction(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        Guid = _worldPacket.ReadPackedGuid128();
+    }
+
+    public WowGuid128 Guid;
 }
 
 public class QuestPOIQuery : ClientPacket

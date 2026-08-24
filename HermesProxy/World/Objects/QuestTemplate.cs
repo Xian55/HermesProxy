@@ -112,6 +112,10 @@ public class QuestObjective
     public uint QuestID;
     public QuestObjectiveType Type;
     public sbyte StorageIndex;
+    // Raw column this objective occupied in the legacy quest template: 0-3 for
+    // creature/GO, 4+N for required items. SMSG_QUEST_POI_QUERY_RESPONSE addresses
+    // blobs by that column, which is not the same as the compacted StorageIndex.
+    public sbyte LegacyPoiIndex = -1;
     public int ObjectID;
     public int Amount;
     public QuestObjectiveFlags Flags;

@@ -248,6 +248,9 @@ public partial class WorldClient
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_3_11685))
             quest.Repeatable = packet.ReadBool();
 
+        GetSession().GameState.GossipQuestFlagsById[quest.QuestID] = quest.QuestFlags;
+        GetSession().GameState.GossipQuestTypesById[quest.QuestID] = quest.QuestType;
+
         quest.QuestTitle = packet.ReadCString();
         return quest;
     }
@@ -267,7 +270,7 @@ public partial class WorldClient
         quest.AutoLaunched = packet.ReadUInt32() != 0;
 
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_3_11685))
-            quest.QuestFlags[0] = packet.ReadUInt32();
+            quest.QuestFlags[0] = QuestFlagUtil.StripAutoAccept(packet.ReadUInt32());
 
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             quest.SuggestPartyMembers = packet.ReadUInt32();
@@ -289,14 +292,21 @@ public partial class WorldClient
 
         // flags
         uint statusFlags = packet.ReadUInt32();
-        if ((statusFlags & 3) != 0)
-            quest.StatusFlags = 223;
-        else
-            quest.StatusFlags = 219;
         packet.ReadUInt32(); // Unk flags 2
         packet.ReadUInt32(); // Unk flags 3
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             packet.ReadUInt32(); // Unk flags 4
+
+        // 3.4.3.54261: 223 makes Continue send CMSG (0xFF leaves the button dead).
+        bool canComplete = (statusFlags & 3) != 0
+            || (GetSession().GameState.GossipQuestTypesById.TryGetValue(quest.QuestID, out int gtype) && gtype == 4);
+        quest.StatusFlags = canComplete ? 223u : 219u;
+
+        GetSession().GameState.AwaitingQuestRewardId = quest.QuestID;
+        GetSession().GameState.AwaitingQuestGiver = quest.QuestGiverGUID;
+        GetSession().GameState.LastRequestItems = quest;
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Server,
+            $"[RequestItems] quest={quest.QuestID} status=0x{quest.StatusFlags:X} flags=0x{quest.QuestFlags[0]:X} collect={quest.Collect.Count} auto={quest.AutoLaunched}");
         SendPacketToClient(quest);
     }
 
@@ -344,6 +354,9 @@ public partial class WorldClient
             SendPacketToServer(queryQuest);
         }
 
+        GetSession().GameState.JustSentOfferReward = true;
+        GetSession().GameState.LastRequestItems = null;
+        GetSession().GameState.AwaitingQuestRewardId = 0;
         SendPacketToClient(quest);
     }
 
@@ -388,21 +401,30 @@ public partial class WorldClient
         }
 
         quest.ItemReward.ItemID = itemId;
-
         QuestTemplate? questTemplate = GameData.GetQuestTemplate((uint)quest.QuestID);
-        if (questTemplate != null && questTemplate.RewardNextQuest == 0)
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            // 3.4.3 keeps the completion window up when LaunchQuest is set with no
+            // follow-up quest. Other builds relied on the default-true field.
+            quest.LaunchQuest = questTemplate != null && questTemplate.RewardNextQuest != 0;
+        }
+        else if (questTemplate != null && questTemplate.RewardNextQuest == 0)
         {
             quest.LaunchQuest = false;
-
-            if (GetSession().GameState.CurrentInteractedWithNPC != default)
-            {
-                uint npcFlags = GetSession().GameState.GetLegacyFieldValueUInt32(GetSession().GameState.CurrentInteractedWithNPC, UnitField.UNIT_NPC_FLAGS);
-                if (npcFlags.HasAnyFlag(NPCFlags.Gossip))
-                    quest.LaunchGossip = true;
-            }
         }
-        
+
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261
+            && !quest.LaunchQuest
+            && GetSession().GameState.CurrentInteractedWithNPC != default)
+        {
+            uint npcFlags = GetSession().GameState.GetLegacyFieldValueUInt32(GetSession().GameState.CurrentInteractedWithNPC, UnitField.UNIT_NPC_FLAGS);
+            if (npcFlags.HasAnyFlag(NPCFlags.Gossip))
+                quest.LaunchGossip = true;
+        }
+
         SendPacketToClient(quest);
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            SendPacketToClient(new GossipComplete());
 
         DisplayToast toast = new();
         toast.QuestID = quest.QuestID;
@@ -452,27 +474,117 @@ public partial class WorldClient
     [PacketHandler(Opcode.SMSG_QUEST_UPDATE_ADD_ITEM)]
     void HandleQuestUpdateAddItem(WorldPacket packet)
     {
-        uint itemId = packet.ReadUInt32();
-        uint count = packet.ReadUInt32();
-
-        QuestObjective? objective = GameData.GetQuestObjectiveForItem(itemId);
-        if (objective == null)
+        // 3.3.5a client counts quest items from bags. AzerothCore even sends this
+        // packet empty. 3.4.3 needs SMSG_QUEST_UPDATE_ADD_CREDIT (type Item).
+        if (packet.CanRead())
         {
-            var updateFields = GetSession().GameState.GetCachedObjectFieldsLegacy(GetSession().GameState.CurrentPlayerGuid);
-            int questsCount = LegacyVersion.GetQuestLogSize();
-            for (int i = 0; i < questsCount; i++)
-            {
-                QuestLog? logEntry = ReadQuestLogEntry(i, null, updateFields!);
-                if (logEntry == null || logEntry.QuestID == null)
-                    continue;
+            uint itemId = packet.ReadUInt32();
+            if (packet.CanRead())
+                packet.ReadUInt32(); // count; inventory total is authoritative
+            SendItemQuestCredit(itemId);
+            return;
+        }
 
-                if (GameData.GetQuestTemplate((uint)logEntry.QuestID) == null)
-                {
-                    WorldPacket packet2 = new WorldPacket(Opcode.CMSG_QUERY_QUEST_INFO);
-                    packet2.WriteUInt32((uint)logEntry.QuestID);
-                    SendPacketToServer(packet2);
-                }
+        ResyncItemQuestCredits();
+    }
+
+    // Credits a single looted item across every in-log quest that wants it. The
+    // count always comes from the bags, so this is also correct when the same item
+    // id satisfies two quests at once.
+    void SendItemQuestCredit(uint itemId)
+    {
+        if (itemId == 0)
+            return;
+
+        uint have = GetSession().GameState.GetItemCountInInventory(itemId);
+        bool sent = false;
+
+        foreach (int questId in GetSession().GameState.QuestLogQuestIDs)
+        {
+            if (questId == 0)
+                continue;
+            QuestTemplate? template = GameData.GetQuestTemplate((uint)questId);
+            if (template == null)
+                continue;
+            foreach (QuestObjective obj in template.Objectives)
+            {
+                if (obj.Type != QuestObjectiveType.Item || obj.ObjectID != (int)itemId)
+                    continue;
+                SendItemCredit((uint)questId, itemId, have, (ushort)Math.Max(obj.Amount, 1));
+                sent = true;
             }
+        }
+
+        if (!sent)
+            RequestMissingQuestTemplates();
+    }
+
+    void SendItemCredit(uint questId, uint itemId, uint have, ushort required)
+    {
+        ushort count = (ushort)Math.Min(have, required);
+        var key = (questId, itemId);
+        var sentCredits = GetSession().GameState.SentItemQuestCredits;
+        if (sentCredits.TryGetValue(key, out ushort last) && last == count)
+            return;
+        sentCredits[key] = count;
+
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Server,
+            $"[QuestItemCredit] quest={questId} item={itemId} have={have}/{required}");
+        SendPacketToClient(new QuestUpdateAddCredit
+        {
+            QuestID = questId,
+            ObjectID = (int)itemId,
+            Count = count,
+            Required = required,
+            ObjectiveType = QuestObjectiveType.Item,
+            VictimGUID = WowGuid128.Empty,
+        });
+    }
+
+    // Drives every item objective of every in-log quest off one bag snapshot, so a
+    // count that dropped (sold, destroyed, traded) is pushed down as well as up.
+    // SendItemCredit swallows unchanged values, so calling this often is cheap.
+    void ResyncItemQuestCredits()
+    {
+        Dictionary<uint, uint>? counts = null;
+        foreach (int questId in GetSession().GameState.QuestLogQuestIDs)
+        {
+            if (questId == 0)
+                continue;
+            QuestTemplate? template = GameData.GetQuestTemplate((uint)questId);
+            if (template == null)
+                continue;
+            foreach (QuestObjective obj in template.Objectives)
+            {
+                if (obj.Type != QuestObjectiveType.Item)
+                    continue;
+                counts ??= GetSession().GameState.GetInventoryItemCounts();
+                counts.TryGetValue((uint)obj.ObjectID, out uint have);
+                SendItemCredit((uint)questId, (uint)obj.ObjectID, have, (ushort)Math.Max(obj.Amount, 1));
+            }
+        }
+    }
+
+    void RequestMissingQuestTemplates()
+    {
+        var updateFields = GetSession().GameState.GetCachedObjectFieldsLegacy(GetSession().GameState.CurrentPlayerGuid);
+        if (updateFields == null)
+            return;
+        int questsCount = LegacyVersion.GetQuestLogSize();
+        for (int i = 0; i < questsCount; i++)
+        {
+            QuestLog? logEntry = ReadQuestLogEntry(i, null, updateFields);
+            if (logEntry?.QuestID == null)
+                continue;
+            if (GameData.GetQuestTemplate((uint)logEntry.QuestID) != null)
+                continue;
+            // One query per quest id. Without this, every looted trash item replays
+            // the whole log's missing-template queries.
+            if (!GetSession().GameState.RequestedQuestTemplateIds.Add((uint)logEntry.QuestID))
+                continue;
+            WorldPacket query = new WorldPacket(Opcode.CMSG_QUERY_QUEST_INFO);
+            query.WriteUInt32((uint)logEntry.QuestID);
+            SendPacketToServer(query);
         }
     }
 
@@ -547,51 +659,17 @@ public partial class WorldClient
                 blob.MapID = (int)packet.ReadUInt32();
                 int legacyWMA = (int)packet.ReadUInt32();
                 blob.UiMapID = legacyWMA;
-                blob.Flags = (int)packet.ReadUInt32();   // legacy FloorID, repurposed as Flags
-                packet.ReadUInt32(); // Unk3 — discarded
-                packet.ReadUInt32(); // Unk4 — discarded
+                packet.ReadUInt32(); // FloorID
+                packet.ReadUInt32(); // Unk3 / Priority
+                packet.ReadUInt32(); // Unk4 / Flags
 
                 bool isV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
 
-                if (isV343)
-                {
-                    // V3_4_3 expects modern UiMap.db2 IDs (e.g. 1429 for Elwynn Forest), not
-                    // the legacy WorldMapAreaID. Native TC 3.4.3 sniffs confirm this against
-                    // every Northshire/Elwynn POI. Translation table lives in
-                    // CSV/WorldMapAreaIDToUiMapID.csv; unmapped zones fall back to raw legacy
-                    // WMA passthrough (zero from GetUiMapId == "no override").
-                    int translated = GameData.GetUiMapId(legacyWMA);
-                    if (translated != 0)
-                        blob.UiMapID = translated;
-                }
+                // V3_4_3 Classic keeps WorldMapArea IDs in this slot (Teldrassil 41
+                // renders; Cata UiMap 57 / Classic 1438 do not). Do not GetUiMapId.
 
-                // Synthesize modern QuestObjectiveID + QuestObjectID from the cached quest
-                // template. Strict storage-index match first; fall back to the single objective
-                // when legacy DB stored an out-of-range sentinel (e.g. quest 33 has
-                // ObjectiveIndex=4 in mangos-wotlk DB while the template has one objective at
-                // StorageIndex=0). Native V3_4_3 emits the storage_index in this case.
                 if (template != null && blob.ObjectiveIndex >= 0)
-                {
-                    QuestObjective? match = null;
-                    foreach (QuestObjective objective in template.Objectives)
-                    {
-                        if (objective.StorageIndex == blob.ObjectiveIndex)
-                        {
-                            match = objective;
-                            break;
-                        }
-                    }
-                    if (match == null && template.Objectives.Count == 1)
-                    {
-                        match = template.Objectives[0];
-                        blob.ObjectiveIndex = match.StorageIndex;
-                    }
-                    if (match != null)
-                    {
-                        blob.QuestObjectiveID = (int)match.Id;
-                        blob.QuestObjectID = match.ObjectID;
-                    }
-                }
+                    BindLegacyPoiObjective(blob, template);
 
                 // Legacy 3.3.5a stored FloorID in this field (typically 0) which the
                 // V3_4_3 client rejects as a no-render flag. Rewrite with the native
@@ -615,10 +693,53 @@ public partial class WorldClient
                     };
                     blob.Points.Add(point);
                 }
+                Framework.Logging.Log.Print(Framework.Logging.LogType.Debug,
+                    $"[QuestPOI] quest={data.QuestID} blob={blob.BlobIndex} objIdx={blob.ObjectiveIndex} " +
+                    $"map={blob.MapID} wma={legacyWMA} uiMap={blob.UiMapID} flags={blob.Flags} " +
+                    $"objId={blob.QuestObjectiveID} points={pointsCount}");
                 data.Blobs.Add(blob);
             }
             response.QuestPOIDataStats.Add(data);
         }
         SendPacketToClient(response);
+        ResyncItemQuestCredits();
+    }
+
+    static void BindLegacyPoiObjective(QuestPOIBlobData blob, QuestTemplate template)
+    {
+        QuestObjective? match = null;
+
+        // Legacy blobs address the raw template column (0-3 creature/GO, 4+N items).
+        // Quest 179 stores its meat at column 4 while StorageIndex is 0.
+        foreach (QuestObjective objective in template.Objectives)
+        {
+            if (objective.LegacyPoiIndex >= 0 && objective.LegacyPoiIndex == blob.ObjectiveIndex)
+            {
+                match = objective;
+                break;
+            }
+        }
+
+        if (match == null)
+        {
+            foreach (QuestObjective objective in template.Objectives)
+            {
+                if (objective.StorageIndex == blob.ObjectiveIndex)
+                {
+                    match = objective;
+                    break;
+                }
+            }
+        }
+
+        if (match == null && template.Objectives.Count == 1)
+            match = template.Objectives[0];
+
+        if (match == null)
+            return;
+
+        blob.ObjectiveIndex = match.StorageIndex;
+        blob.QuestObjectiveID = (int)match.Id;
+        blob.QuestObjectID = match.ObjectID;
     }
 }

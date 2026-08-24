@@ -78,9 +78,9 @@ public partial class WorldSocket
         if (targetFlags.HasAnyFlag(SpellCastTargetFlags.String))
             packet.WriteCString(target.Name);
     }
-    public void SendCastRequestFailed(ClientCastRequest castRequest, bool isPet)
+    public void SendCastRequestFailed(ClientCastRequest castRequest, bool isPet, bool sendPrepare = true)
     {
-        if (!castRequest.HasStarted)
+        if (sendPrepare && !castRequest.HasStarted)
         {
             SpellPrepare prepare2 = new SpellPrepare();
             prepare2.ClientCastID = castRequest.ClientGUID;
@@ -88,11 +88,15 @@ public partial class WorldSocket
             SendPacket(prepare2);
         }
 
+        uint reason = ModernVersion.Build == HermesProxy.Enums.ClientVersionBuild.V3_4_3_54261
+            ? (uint)SpellCastResultV343.SpellInProgress
+            : (uint)SpellCastResultClassic.SpellInProgress;
+
         if (isPet)
         {
             PetCastFailed failed = new();
             failed.SpellID = castRequest.SpellId;
-            failed.Reason = (uint)SpellCastResultClassic.SpellInProgress;
+            failed.Reason = reason;
             failed.CastID = castRequest.ServerGUID;
             SendPacket(failed);
         }
@@ -101,10 +105,10 @@ public partial class WorldSocket
             CastFailed failed = new();
             failed.SpellID = castRequest.SpellId;
             failed.SpellXSpellVisualID = castRequest.SpellXSpellVisualId;
-            failed.Reason = (uint)SpellCastResultClassic.SpellInProgress;
+            failed.Reason = reason;
             failed.CastID = castRequest.ServerGUID;
             SendPacket(failed);
-        }    
+        }
     }
     [PacketHandler(Opcode.CMSG_CAST_SPELL)]
     void HandleCastSpell(CastSpell cast)
@@ -182,7 +186,7 @@ public partial class WorldSocket
             // This prevents interrupting the current cast (player gets "Another action is in progress")
             if (GetSession().GameState.HasStartedNormalCast())
             {
-                SendCastRequestFailed(castRequest, false);
+                SendCastRequestFailed(castRequest, false, sendPrepare: false);
                 return;
             }
 

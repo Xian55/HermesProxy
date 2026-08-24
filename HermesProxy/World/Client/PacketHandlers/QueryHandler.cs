@@ -29,6 +29,9 @@ public partial class WorldClient
         QueryQuestInfoResponse response = new QueryQuestInfoResponse();
         var id = packet.ReadEntry();
         response.QuestID = (uint)id.Key;
+        // The query is answered either way. Dropping it here keeps a masked or
+        // rejected reply from blocking every later retry for that quest.
+        GetSession().GameState.RequestedQuestTemplateIds.Remove(response.QuestID);
         if (id.Value) // entry is masked
         {
             response.Allow = false;
@@ -203,6 +206,7 @@ public partial class WorldClient
                 // Modern client reads ObjectiveProgress[StorageIndex], so a compacted index
                 // mis-points whenever the quest has a gap (e.g. Ferocitas 2459 — Mystic at column 1).
                 objective.StorageIndex = (sbyte)i;
+                objective.LegacyPoiIndex = (sbyte)i;
                 if (objectiveCounter <= i)
                     objectiveCounter = (sbyte)(i + 1);
                 objective.Type = isGo ? QuestObjectiveType.GameObject : QuestObjectiveType.Monster;
@@ -241,6 +245,9 @@ public partial class WorldClient
                 objective.QuestID = response.QuestID;
                 objective.Id = QuestObjective.QuestObjectiveCounter++;
                 objective.StorageIndex = objectiveCounter++;
+                // Legacy POI blobs address required items as column 4+N, never the
+                // compacted StorageIndex, so keep the raw column for the POI binder.
+                objective.LegacyPoiIndex = (sbyte)(4 + i);
                 objective.Type = QuestObjectiveType.Item;
                 objective.ObjectID = requiredItemID[i];
                 objective.Amount = requiredItemCount[i];
@@ -267,7 +274,33 @@ public partial class WorldClient
         quest.CompleteSoundKitID = 878;
 
         GameData.StoreQuestTemplate(response.QuestID, quest);
+
+        var pendingQuestDetails = GetSession().GameState.PendingQuestDetails;
+        if (pendingQuestDetails.Remove(response.QuestID, out WowGuid128 pendingGiver))
+            SendPacketToClient(QuestDetailsBuilder.FromTemplate(pendingGiver, quest));
+
         SendPacketToClient(response);
+
+        bool inLog = false;
+        foreach (int logId in GetSession().GameState.QuestLogQuestIDs)
+        {
+            if (logId == (int)response.QuestID)
+            {
+                inLog = true;
+                break;
+            }
+        }
+        if (inLog)
+        {
+            WorldPacket poi = new WorldPacket(Opcode.CMSG_QUEST_POI_QUERY);
+            poi.WriteInt32(1);
+            poi.WriteInt32((int)response.QuestID);
+            SendPacketToServer(poi);
+        }
+
+        // A newly cached template can resolve item objectives that earlier loot could
+        // not match. The resync only emits credits whose count actually changed.
+        ResyncItemQuestCredits();
     }
 
     [PacketHandler(Opcode.SMSG_QUERY_CREATURE_RESPONSE)]

@@ -128,6 +128,11 @@ public partial class WorldClient
                     // - which modern descriptor sections have ANY concrete field set (a
                     //   non-empty delta is what would actually transmit data)
                     bool isPlayer = guid == GetSession().GameState.CurrentPlayerGuid;
+                    // Bag contents and stack counts arrive as Item/Container Values
+                    // updates, which is how a sold or destroyed quest item shows up.
+                    if (guid.GetObjectType() == ObjectType.Item ||
+                        guid.GetObjectType() == ObjectType.Container)
+                        GetSession().GameState.InventoryChangedSinceQuestResync = true;
                     var valuesLegacyHigh = oldGuid.GetHighGuidTypeLegacy();
                     uint legacyEntry = oldGuid.GetEntry();
                     ulong legacyCounter = oldGuid.GetCounter();
@@ -392,6 +397,12 @@ public partial class WorldClient
             updateObject.DestroyedGuids.Count == 0 &&
             GetSession().GameState.IsWaitingForNewWorld)
             return;
+
+        if (GetSession().GameState.InventoryChangedSinceQuestResync)
+        {
+            GetSession().GameState.InventoryChangedSinceQuestResync = false;
+            ResyncItemQuestCredits();
+        }
 
         foreach (uint itemId in missingItemTemplates)
         {
@@ -1642,7 +1653,10 @@ public partial class WorldClient
             questLog.QuestID = updates[index].Int32Value;
             // Cache the QuestID for this slot so partial state-only updates can
             // recover it. Mirrors the fork's behavior at WorldClient.cs:10857.
+            int previousId = GetSession().GameState.QuestLogQuestIDs[i];
             GetSession().GameState.QuestLogQuestIDs[i] = questLog.QuestID.Value;
+            if (previousId != questLog.QuestID.Value)
+                GetSession().GameState.ForgetQuestState((uint)previousId);
         }
         if ((updateMaskArray != null && updateMaskArray[index + stateOffset]) ||
             (updateMaskArray == null && updates.ContainsKey(index + stateOffset)))
@@ -1722,7 +1736,10 @@ public partial class WorldClient
 
         // QuestID explicitly cleared (quest abandoned/completed) → clear cache.
         if (questLog != null && questLog.QuestID.HasValue && questLog.QuestID.Value == 0)
+        {
+            GetSession().GameState.ForgetQuestState((uint)GetSession().GameState.QuestLogQuestIDs[i]);
             GetSession().GameState.QuestLogQuestIDs[i] = 0;
+        }
 
         bool anyFieldPresent =
             updates.ContainsKey(index) ||
@@ -1730,6 +1747,26 @@ public partial class WorldClient
             (progressOffset != -1 && updates.ContainsKey(index + progressOffset)) ||
             (progressOffsetHi != -1 && updates.ContainsKey(index + progressOffsetHi)) ||
             updates.ContainsKey(index + timerOffset);
+        if (questLog?.QuestID != null && questLog.QuestID.Value != 0)
+        {
+            QuestTemplate? template = GameData.GetQuestTemplate((uint)questLog.QuestID.Value);
+            if (template != null)
+            {
+                foreach (QuestObjective objective in template.Objectives)
+                {
+                    if (objective.Type != QuestObjectiveType.Item)
+                        continue;
+                    if (objective.StorageIndex < 0 || objective.StorageIndex >= questLog.ObjectiveProgress.Length)
+                        continue;
+                    // Legacy 3.3.5a keeps no item progress in the quest-log fields, so the
+                    // bag count is authoritative in both directions — 0 included, or a
+                    // sold stack would leave the tracker stuck at its old value.
+                    uint have = GetSession().GameState.GetItemCountInInventory((uint)objective.ObjectID);
+                    questLog.ObjectiveProgress[objective.StorageIndex] = (short)Math.Min(have, (uint)Math.Max(objective.Amount, 1));
+                }
+            }
+        }
+
         if (anyFieldPresent || (questLog != null && questLog.QuestID.HasValue && questLog.QuestID.Value != 0))
         {
             Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
@@ -2922,6 +2959,7 @@ public partial class WorldClient
                     {
                         var slotGuid = GetSlotGuidValue(updates, PLAYER_FIELD_INV_SLOT_HEAD + i * 2);
                         updateData.ActivePlayerData.InvSlots[i] = slotGuid;
+                        GetSession().GameState.InventoryChangedSinceQuestResync = true;
                         if (tracePlayer)
                             Log.Print(LogType.Debug,
                                 $"[V343Trace][InvSlot] player slot={i} guid={slotGuid}");
@@ -2934,7 +2972,10 @@ public partial class WorldClient
                 for (int i = 0; i < 16; i++)
                 {
                     if (updateMaskArray[PLAYER_FIELD_PACK_SLOT_1 + i * 2])
+                    {
                         updateData.ActivePlayerData.PackSlots[i] = GetSlotGuidValue(updates, PLAYER_FIELD_PACK_SLOT_1 + i * 2);
+                        GetSession().GameState.InventoryChangedSinceQuestResync = true;
+                    }
                 }
             }
             int PLAYER_FIELD_BANK_SLOT_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_BANK_SLOT_1);

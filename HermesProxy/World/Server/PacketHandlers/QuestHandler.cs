@@ -16,6 +16,36 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_QUEST_GIVER_QUERY_QUEST)]
     void HandleQuestGiverQueryQuest(QuestGiverQueryQuest quest)
     {
+        if (ModernVersion.Build == HermesProxy.Enums.ClientVersionBuild.V3_4_3_54261)
+        {
+            // Gossip icon 4 = completable. Title click must open RequestItems /
+            // OfferReward, not Accept details. Forward COMPLETE so AC sends that.
+            if (GetSession().GameState.GossipQuestTypesById.TryGetValue(quest.QuestID, out int gossipType)
+                && gossipType == 4)
+            {
+                WorldPacket complete = new WorldPacket(Opcode.CMSG_QUEST_GIVER_COMPLETE_QUEST);
+                complete.WriteGuid(quest.QuestGiverGUID.To64());
+                complete.WriteUInt32(quest.QuestID);
+                SendPacketToServer(complete);
+                return;
+            }
+
+            // Never forward QUERY on 3.4.3. AC IsAutoAccept() is SpecialFlags
+            // (often not on the wire Flags). QUERY always takes those quests.
+            QuestTemplate? template = GameData.GetQuestTemplate(quest.QuestID);
+            if (template != null)
+            {
+                SendPacket(QuestDetailsBuilder.FromTemplate(quest.QuestGiverGUID, template));
+                return;
+            }
+
+            GetSession().GameState.PendingQuestDetails[quest.QuestID] = quest.QuestGiverGUID;
+            WorldPacket info = new WorldPacket(Opcode.CMSG_QUERY_QUEST_INFO);
+            info.WriteUInt32(quest.QuestID);
+            SendPacketToServer(info);
+            return;
+        }
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_QUEST_GIVER_QUERY_QUEST);
         packet.WriteGuid(quest.QuestGiverGUID.To64());
         packet.WriteUInt32(quest.QuestID);
@@ -87,15 +117,38 @@ public partial class WorldSocket
         packet.WriteGuid(hello.QuestGiverGUID.To64());
         SendPacketToServer(packet);
     }
-    // [PacketHandler(Opcode.CMSG_QUEST_GIVER_CLOSE_QUEST)]
-    // void HandleQuestGiverCloseQuest(QuestGiverCloseQuest close)
-    // {
-    //     // Modern client carries QuestID; legacy CMSG_QUEST_GIVER_CANCEL is empty —
-    //     // 3.3.5a just closes whatever NPC interaction the session is currently in.
-    //     _ = close;
-    //     WorldPacket packet = new WorldPacket(Opcode.CMSG_QUEST_GIVER_CANCEL);
-    //     SendPacketToServer(packet);
-    // }
+    [PacketHandler(Opcode.CMSG_QUEST_GIVER_CLOSE_QUEST)]
+    void HandleQuestGiverCloseQuest(QuestGiverCloseQuest close)
+    {
+        _ = close;
+        // 3.4.3 only. On every other build this opcode stayed unhandled, and legacy
+        // servers do not expect an unsolicited SMSG_GOSSIP_COMPLETE here.
+        if (ModernVersion.Build != HermesProxy.Enums.ClientVersionBuild.V3_4_3_54261)
+            return;
+
+        // The first CLOSE_QUEST after OfferReward is the client leaving the item
+        // list, not Cancel. The next one is the real Cancel.
+        if (GetSession().GameState.JustSentOfferReward)
+        {
+            GetSession().GameState.JustSentOfferReward = false;
+            return;
+        }
+
+        GetSession().GameState.ClearQuestRewardWait();
+        SendPacket(new GossipComplete());
+    }
+
+    [PacketHandler(Opcode.CMSG_CLOSE_INTERACTION)]
+    void HandleCloseInteraction(CloseInteraction close)
+    {
+        // Leaving gossip after RequestItems. Continue is REQUEST_REWARD, not this.
+        // The reward wait is deliberately kept: the client re-talks to the same NPC
+        // straight after, and NPCHandler replays the item list to rebind the frame.
+        // Any interaction with a different NPC clears it there.
+        _ = close;
+    }
+
+
 
     [PacketHandler(Opcode.CMSG_QUEST_POI_QUERY)]
     void HandleQuestPOIQuery(QuestPOIQuery query)
@@ -106,6 +159,15 @@ public partial class WorldSocket
         // SMSG_QUEST_POI_QUERY_RESPONSE handler — there it's emitted right after
         // the POI translation, matching CypherCore's order and using
         // SendPacketToClient (auto-routes by ConnectionType.Instance).
+        foreach (int questId in query.MissingQuestPOIs)
+        {
+            if (GameData.GetQuestTemplate((uint)questId) != null)
+                continue;
+            WorldPacket info = new WorldPacket(Opcode.CMSG_QUERY_QUEST_INFO);
+            info.WriteUInt32((uint)questId);
+            SendPacketToServer(info);
+        }
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_QUEST_POI_QUERY);
         packet.WriteInt32(query.MissingQuestPOIs.Length);
         foreach (int questId in query.MissingQuestPOIs)
@@ -160,7 +222,15 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_QUEST_GIVER_COMPLETE_QUEST)]
     void HandleQuestGiverCompleteQuest(QuestGiverCompleteQuest quest)
     {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_QUEST_GIVER_COMPLETE_QUEST);
+        Opcode opcode = Opcode.CMSG_QUEST_GIVER_COMPLETE_QUEST;
+        if (ModernVersion.Build == HermesProxy.Enums.ClientVersionBuild.V3_4_3_54261
+            && GetSession().GameState.AwaitingQuestRewardId == quest.QuestID)
+        {
+            opcode = Opcode.CMSG_QUEST_GIVER_REQUEST_REWARD;
+            GetSession().GameState.AwaitingQuestRewardId = 0;
+        }
+
+        WorldPacket packet = new WorldPacket(opcode);
         packet.WriteGuid(quest.QuestGiverGUID.To64());
         packet.WriteUInt32(quest.QuestID);
         SendPacketToServer(packet);

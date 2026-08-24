@@ -160,6 +160,21 @@ public sealed class GameSessionData
     public uint CurrentGuildCreateTime;
     public uint CurrentGuildNumAccounts;
     public WowGuid128 CurrentInteractedWithNPC;
+    public readonly Dictionary<uint, uint> GossipQuestFlagsById = new();
+    public readonly Dictionary<uint, int> GossipQuestTypesById = new();
+    // Quest titles clicked on V3_4_3 whose template was not cached yet, keyed by
+    // quest id. A single slot loses the first click when two titles are opened
+    // before the first CMSG_QUERY_QUEST_INFO round-trip returns.
+    public readonly Dictionary<uint, WowGuid128> PendingQuestDetails = new();
+    public uint AwaitingQuestRewardId;
+    public WowGuid128 AwaitingQuestGiver = WowGuid128.Empty;
+    public bool JustSentOfferReward;
+    public HermesProxy.World.Server.Packets.QuestGiverRequestItems? LastRequestItems;
+    // Last (quest, item) count pushed to the client as SMSG_QUEST_UPDATE_ADD_CREDIT.
+    // Resends are skipped so an unrelated pickup does not replay every objective toast.
+    public readonly Dictionary<(uint QuestId, uint ItemId), ushort> SentItemQuestCredits = new();
+    public readonly HashSet<uint> RequestedQuestTemplateIds = new();
+    public bool InventoryChangedSinceQuestResync;
     public WowGuid128 CurrentInteractedWithGO;
     // Per-slot QuestID cache used by ReadQuestLogEntry. Legacy 3.3.5a often sends
     // partial Values updates where StateFlags / Progress changes but the QuestID
@@ -167,6 +182,34 @@ public sealed class GameSessionData
     // produce QuestLog entries with QuestID=null which our writer treats as
     // empty slots — making active quests "disappear" from the V3_4_3 client log.
     public readonly int[] QuestLogQuestIDs = new int[QuestConst.MaxQuestLogSize];
+
+    // Drops every per-quest cache keyed on a quest that just left the log, so
+    // re-accepting it later starts from a clean slate instead of a stale count.
+    public void ForgetQuestState(uint questId)
+    {
+        if (questId == 0)
+            return;
+
+        RequestedQuestTemplateIds.Remove(questId);
+        PendingQuestDetails.Remove(questId);
+        GossipQuestFlagsById.Remove(questId);
+        GossipQuestTypesById.Remove(questId);
+        if (SentItemQuestCredits.Count == 0)
+            return;
+        foreach (var key in SentItemQuestCredits.Keys.ToList())
+        {
+            if (key.QuestId == questId)
+                SentItemQuestCredits.Remove(key);
+        }
+    }
+
+    public void ClearQuestRewardWait()
+    {
+        AwaitingQuestRewardId = 0;
+        AwaitingQuestGiver = WowGuid128.Empty;
+        LastRequestItems = null;
+        JustSentOfferReward = false;
+    }
     public uint LastWhoRequestId;
     public WowGuid128 CurrentPetGuid;
     public WowGuid64 CurrentAttackTarget;        // active CMSG_ATTACK_SWING victim, cleared on ATTACK_STOP/CANCEL_COMBAT
@@ -614,6 +657,50 @@ public sealed class GameSessionData
         }
 
         return total;
+    }
+    // One pass over equipped slots and bags. Callers that need counts for several
+    // item ids at once must use this instead of GetItemCountInInventory per id.
+    public Dictionary<uint, uint> GetInventoryItemCounts()
+    {
+        Dictionary<uint, uint> counts = new();
+        void Add(WowGuid64 guid64)
+        {
+            if (guid64 == WowGuid64.Empty)
+                return;
+            var guid128 = guid64.To128(this);
+            uint id = GetItemId(guid128);
+            if (id == 0)
+                return;
+            counts.TryGetValue(id, out uint have);
+            counts[id] = have + GetItemStackCount(guid128);
+        }
+
+        for (int i = World.Enums.Vanilla.InventorySlots.ItemStart; i < World.Enums.Vanilla.InventorySlots.ItemEnd; i++)
+            Add(GetInventorySlotItem(i));
+
+        int containerSlotField = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_FIELD_SLOT_1);
+        int numSlotsField = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_FIELD_NUM_SLOTS);
+        if (containerSlotField < 0 || numSlotsField < 0)
+            return counts;
+
+        for (int bagIdx = World.Enums.Vanilla.InventorySlots.BagStart; bagIdx < World.Enums.Vanilla.InventorySlots.BagEnd; bagIdx++)
+        {
+            var bagGuid64 = GetInventorySlotItem(bagIdx);
+            if (bagGuid64 == WowGuid64.Empty)
+                continue;
+
+            var bagFields = GetCachedObjectFieldsLegacy(bagGuid64.To128(this));
+            if (bagFields == null)
+                continue;
+            if (!bagFields.TryGetValue(numSlotsField, out var numSlotsValue))
+                continue;
+
+            int numSlots = (int)numSlotsValue.UInt32Value;
+            for (int slot = 0; slot < numSlots; slot++)
+                Add(bagFields.GetGuidValue(containerSlotField + slot * 2));
+        }
+
+        return counts;
     }
     public (byte containerSlot, byte slot)? FindItemInInventory(WowGuid64 itemGuid64)
     {

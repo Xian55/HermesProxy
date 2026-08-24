@@ -17,14 +17,41 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_LIST_INVENTORY)]
     [PacketHandler(Opcode.CMSG_SPELL_CLICK)]
     [PacketHandler(Opcode.CMSG_SPIRIT_HEALER_ACTIVATE)]
-    [PacketHandler(Opcode.CMSG_TALK_TO_GOSSIP)]
     [PacketHandler(Opcode.CMSG_TRAINER_LIST)]
     [PacketHandler(Opcode.CMSG_BATTLEMASTER_HELLO)]
     [PacketHandler(Opcode.CMSG_AREA_SPIRIT_HEALER_QUERY)]
     [PacketHandler(Opcode.CMSG_AREA_SPIRIT_HEALER_QUEUE)]
     void HandleInteractWithNPC(InteractWithNPC interact)
     {
+        if (GetSession().GameState.AwaitingQuestRewardId != 0
+            && interact.CreatureGUID != GetSession().GameState.AwaitingQuestGiver)
+            GetSession().GameState.ClearQuestRewardWait();
+
         WorldPacket packet = new WorldPacket(interact.GetUniversalOpcode());
+        packet.WriteGuid(interact.CreatureGUID.To64());
+        SendPacketToServer(packet);
+    }
+
+    [PacketHandler(Opcode.CMSG_TALK_TO_GOSSIP)]
+    void HandleTalkToGossip(InteractWithNPC interact)
+    {
+        // V3_4_3 re-talks to the same NPC right after RequestItems. Replaying the
+        // item list keeps that frame bound; opening a fresh gossip list kills it.
+        // Any other NPC means the turn-in was abandoned, so drop the wait first.
+        if (ModernVersion.Build == HermesProxy.Enums.ClientVersionBuild.V3_4_3_54261
+            && GetSession().GameState.AwaitingQuestRewardId != 0)
+        {
+            var last = GetSession().GameState.LastRequestItems;
+            if (last != null && interact.CreatureGUID == GetSession().GameState.AwaitingQuestGiver)
+            {
+                SendPacket(last);
+                return;
+            }
+
+            GetSession().GameState.ClearQuestRewardWait();
+        }
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_TALK_TO_GOSSIP);
         packet.WriteGuid(interact.CreatureGUID.To64());
         SendPacketToServer(packet);
     }
