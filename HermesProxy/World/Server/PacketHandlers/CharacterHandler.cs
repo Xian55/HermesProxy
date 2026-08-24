@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Framework.Constants;
 using Framework.Logging;
@@ -19,6 +20,23 @@ public partial class WorldSocket
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_ENUM_CHARACTERS);
         SendPacketToServer(packet);
+    }
+
+    [PacketHandler(Opcode.CMSG_REORDER_CHARACTERS)]
+    void HandleReorderCharacters(ReorderCharacters reorder)
+    {
+        var realm = GetSession().Realm;
+        if (realm == null || reorder.Entries.Length == 0)
+            return;
+
+        var incoming = new List<CharacterListSlot>(reorder.Entries.Length);
+        foreach (var entry in reorder.Entries)
+            incoming.Add(new CharacterListSlot(entry.PlayerGuid.Low, entry.NewPosition));
+        var merged = CharacterListOrder.Merge(
+            GetSession().AccountMetaDataMgr.LoadCharacterListOrder(realm.Name),
+            incoming);
+        GetSession().AccountMetaDataMgr.SaveCharacterListOrder(realm.Name, merged);
+        Log.Print(LogType.Debug, $"[CharEnum] saved list order count={merged.Count} incoming={incoming.Count} pos=[{string.Join(",", merged.ConvertAll(s => s.ListPosition.ToString()))}]");
     }
 
     [PacketHandler(Opcode.CMSG_GET_ACCOUNT_CHARACTER_LIST)]

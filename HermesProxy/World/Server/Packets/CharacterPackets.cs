@@ -23,6 +23,7 @@ using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
 using Framework.Logging;
+using HermesProxy.World;
 using HermesProxy.World.Enums;
 
 namespace HermesProxy.World.Server.Packets;
@@ -32,6 +33,30 @@ public sealed class EnumCharacters : ClientPacket
     public EnumCharacters(WorldPacket packet) : base(packet) { }
 
     public override void Read() { }
+}
+
+public sealed class ReorderCharacters : ClientPacket
+{
+    public ReorderCharacters(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        uint count = _worldPacket.ReadBits<uint>(9);
+        Entries = new ReorderInfo[count];
+        for (uint i = 0; i < count; i++)
+        {
+            Entries[i].PlayerGuid = _worldPacket.ReadPackedGuid128();
+            Entries[i].NewPosition = _worldPacket.ReadUInt8();
+        }
+    }
+
+    public ReorderInfo[] Entries = System.Array.Empty<ReorderInfo>();
+
+    public struct ReorderInfo
+    {
+        public WowGuid128 PlayerGuid;
+        public byte NewPosition;
+    }
 }
 
 public sealed class EnumCharactersResult : ServerPacket

@@ -16,6 +16,7 @@ public class AccountMetaDataManager
     private const string LAST_CHARACTER_FILE = "last_character.txt";
     private const string COMPLETED_QUESTS_FILE = "completed_quests.csv";
     private const string SETTINGS_FILE = "settings.json";
+    private const string CHAR_LIST_ORDER_FILE = "char_list_order.txt";
 
     private readonly string _accountName;
 
@@ -80,6 +81,46 @@ public class AccountMetaDataManager
 
         File.WriteAllText(path, "");
         Log.Print(LogType.Debug, $"Invalidated last selected character entry in '{path}'");
+    }
+
+    private string GetAccountRealmDirectory(string realmName)
+    {
+        string path = Path.GetFullPath(Path.Combine("AccountData", _accountName, realmName.Trim()));
+        if (!Directory.Exists(path))
+            Directory.CreateDirectory(path);
+        return path;
+    }
+
+    public List<CharacterListSlot> LoadCharacterListOrder(string realmName)
+    {
+        var path = Path.Combine(GetAccountRealmDirectory(realmName), CHAR_LIST_ORDER_FILE);
+        if (!File.Exists(path))
+            return new List<CharacterListSlot>();
+
+        var order = new List<CharacterListSlot>();
+        byte fallback = 0;
+        foreach (var raw in File.ReadAllLines(path, Encoding.UTF8))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0)
+                continue;
+            var parts = line.Split(',');
+            if (!ulong.TryParse(parts[0], out ulong guidLow))
+                continue;
+            byte pos = fallback;
+            if (parts.Length >= 2 && byte.TryParse(parts[1], out byte parsed))
+                pos = parsed;
+            order.Add(new CharacterListSlot(guidLow, pos));
+            fallback = (byte)(pos + 1);
+        }
+        return order;
+    }
+
+    public void SaveCharacterListOrder(string realmName, IReadOnlyList<CharacterListSlot> slots)
+    {
+        var path = Path.Combine(GetAccountRealmDirectory(realmName), CHAR_LIST_ORDER_FILE);
+        File.WriteAllLines(path, slots.Select(s => $"{s.GuidLow},{s.ListPosition}"), Encoding.UTF8);
+        Log.Print(LogType.Debug, $"Saved character list order ({slots.Count}) in '{path}'");
     }
 
     public List<uint> GetAllCompletedQuests(string realmName, string charName)
