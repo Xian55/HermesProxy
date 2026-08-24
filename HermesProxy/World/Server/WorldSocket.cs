@@ -1292,25 +1292,15 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         for (int i = 0; i < count; i++)
             accountData.AccountTimes[i] = GetSession().AccountDataMgr.Data[i] != null ? GetSession().AccountDataMgr.Data[i].Timestamp : 0;
 
-        // V3_4_3 client only sends CMSG_REQUEST_ACCOUNT_DATA when the advertised
-        // timestamp is newer than its local cache. Once it has received a type-0
-        // blob (without action-bar CVars) it caches it locally and never asks
-        // again on subsequent logins — leaving Phase 7's response augmentation
-        // dead. Bumping the type-0 timestamp to "now" each login forces the
-        // client to re-fetch, which gives ClientConfigHandler.HandleRequestAccountData
-        // the chance to inject the saved bottomLeftActionBar / etc. CVars.
-        // Only do this when we actually have something to inject (saved mask).
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            byte? mask = GetSession().GameState.CurrentPlayerStorage?.Settings?.MultiActionBarsMask;
-            if (mask.HasValue && (uint)AccountDataType.GlobalConfigCache < count)
-            {
-                long bumped = Time.UnixTime;
-                Log.Print(LogType.Trace,
-                    $"[ActionBarTrace] bumping type-0 timestamp {accountData.AccountTimes[(int)AccountDataType.GlobalConfigCache]} → {bumped} to force re-request (mask=0x{mask.Value:X2})");
-                accountData.AccountTimes[(int)AccountDataType.GlobalConfigCache] = bumped;
-            }
-        }
+        // Do NOT bump the type-0 timestamp to force a re-request. That was added to
+        // deliver synthesised bottomLeftActionBar / rightActionBar CVars, but this
+        // client never uses them — the type-0 blob it uploads contains
+        // alwaysShowActionBars and lockActionBars and none of those four. Forcing a
+        // re-fetch makes the client drop its local cache and apply the config blob
+        // late, after the action bars have already been built, which leaves
+        // "Always Show Action Bars" ticked but not applied until it is re-toggled.
+        // The setting round-trips on its own: the blob carries it, and the login
+        // CreateObject already carries MultiActionBars (bit 0x10 = alwaysShow).
 
         // [ActionBarTrace] Show which slots have a non-zero timestamp — those tell
         // the client "I have data for this AccountDataType, ask me for it".
