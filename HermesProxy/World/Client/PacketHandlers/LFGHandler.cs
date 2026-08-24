@@ -92,6 +92,7 @@ public partial class WorldClient
         DFUpdateStatus status = new DFUpdateStatus();
         status.Ticket = MakeLfgTicket();
         status.IsParty = isParty;
+        status.RequestedRoles = GetSession().GameState.LfgRequestedRoles;
 
         byte legacyUpdateType = packet.ReadUInt8();
         bool isV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
@@ -140,6 +141,12 @@ public partial class WorldClient
             if (!isParty)
                 status.Joined = true;
         }
+
+        Log.Print(LogType.Debug,
+            $"LFG[diag]: DFUpdateStatus(player/party) subType={status.SubType} reason={status.Reason} " +
+            $"requestedRoles=0x{status.RequestedRoles:X2} slots=[{string.Join(", ", status.Slots)}] " +
+            $"isParty={status.IsParty} joined={status.Joined} lfgJoined={status.LfgJoined} queued={status.Queued}");
+
         SendPacketToClient(status);
     }
 

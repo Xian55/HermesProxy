@@ -48,6 +48,8 @@ public partial class WorldSocket
         Log.Print(LogType.Debug,
             $"LFG[diag]: CMSG_DF_JOIN roles=0x{packet.Roles:X8} slots=[{string.Join(", ", packet.Slots)}]");
 
+        GetSession().GameState.LfgRequestedRoles = (byte)(packet.Roles & 0xFF);
+
         // Titan Rune / other post-3.3.5 LFGDungeons IDs. A legacy backend drops
         // CMSG_LFG_JOIN for those with no SMSG_LFG_JOIN_RESULT, so the client sits
         // on Find Group forever. Answer for the backend instead. Real 3.3.5
@@ -134,6 +136,9 @@ public partial class WorldSocket
             return;
 
         WorldPacket legacy = new WorldPacket(Opcode.CMSG_LFG_SET_ROLES);
+        Log.Print(LogType.Debug, $"LFG[diag]: CMSG_DF_SET_ROLES roles=0x{packet.Roles:X2}");
+
+        GetSession().GameState.LfgRequestedRoles = packet.Roles;
         legacy.WriteUInt8(packet.Roles);
         SendPacketToServer(legacy);
     }

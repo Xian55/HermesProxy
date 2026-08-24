@@ -352,6 +352,12 @@ public sealed class GameSessionData
     // content that shipped after 3.3.5a (Titan Rune Protocol), and queueing for it
     // makes the legacy server drop CMSG_LFG_JOIN without any reply, leaving the
     // client waiting forever. Used to answer those joins ourselves.
+    // Roles the client asked for in CMSG_DF_JOIN / CMSG_DF_SET_ROLES. Legacy
+    // SMSG_LFG_UPDATE_PLAYER carries no roles, but the modern DF frame checks
+    // RequestedRoles against the queued dungeons: at 0 it greys out Leave Queue
+    // with "Role unavailable for some dungeons". Native 3.4.3 echoes the stored
+    // roles back (LFGHandler.cpp: sLFGMgr->GetRoles).
+    public byte LfgRequestedRoles;
     public readonly HashSet<uint> LfgKnownDungeonIds = new();
 
     // Dungeon ID -> the full LFG slot (dungeon ID with the type in the high byte) the legacy

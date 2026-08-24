@@ -398,6 +398,7 @@ public partial class WorldClient
 
         DFUpdateStatus status = new DFUpdateStatus();
         status.Ticket = MakeLfgTicket();
+        status.RequestedRoles = GetSession().GameState.LfgRequestedRoles;
         status.SubType = isV343 ? LfgUpdateTypes.ModernQueueDungeon : (byte)0;
         status.Reason = isV343 ? LfgUpdateTypes.ModernRemovedFromQueue : (byte)0;
         status.NotifyUI = true;
@@ -405,6 +406,10 @@ public partial class WorldClient
         status.Joined = false;
         status.LfgJoined = false;
         status.Queued = false;
+
+        Log.Print(LogType.Debug,
+            $"LFG[diag]: DFUpdateStatus(removed) subType={status.SubType} reason={status.Reason} " +
+            $"requestedRoles=0x{status.RequestedRoles:X2} isParty={status.IsParty}");
 
         SendPacketToClient(status);
     }
