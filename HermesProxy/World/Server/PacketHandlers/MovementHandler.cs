@@ -63,7 +63,7 @@ public partial class WorldSocket
     // V3_4_3 client's AreaTrigger.db2 is missing legacy walk-through triggers
     // (notably the Blasted Lands Dark Portal). When the player walks into a
     // known legacy trigger volume, synthesize CMSG_AREA_TRIGGER to the legacy
-    // server. One-shot per entry into the sphere; cleared on map change.
+    // server. Re-fired while inside the volume; cleared on leaving it.
     void CheckLegacyAreaTriggerProximity(Vector3 pos)
     {
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
@@ -81,16 +81,13 @@ public partial class WorldSocket
 
         foreach (var e in entries)
         {
-            float distSq = Vector3.DistanceSquared(pos, e.Center);
-            bool inside = distSq <= e.Radius * e.Radius;
-
-            if (!inside)
+            if (!e.Contains(pos))
             {
                 lastSent.Remove(e.LegacyId);
                 continue;
             }
 
-            // While inside our generous proxy-side sphere, re-fire CMSG_AREA_TRIGGER
+            // While inside our generous proxy-side volume, re-fire CMSG_AREA_TRIGGER
             // every ~250ms so that whichever heartbeat first sees the player cross
             // the server's stricter DBC volume actually gets accepted and teleports.
             if (lastSent.TryGetValue(e.LegacyId, out var last) &&
