@@ -16,6 +16,7 @@
  */
 
 using System;
+using System.Buffers;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -619,13 +620,23 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             header.Size = packetSize;
             _worldCrypt.Encrypt(data, header.Tag);
 
-            // One exact-sized frame. Routing this through a ByteBuffer meant a rented
-            // buffer plus a full GetData() copy on top of the frame itself.
-            byte[] framed = new byte[PacketHeader.StructSize + data.Length];
-            header.Write(framed);
-            data.CopyTo(framed, PacketHeader.StructSize);
+            // Frame header + body into one pooled buffer. AsyncWrite is a blocking
+            // Socket.Send, so the rental is safe to return the moment it comes back.
+            // The old path built this through a ByteBuffer: a rented buffer plus a full
+            // GetData() copy on top of the frame itself.
+            int framedSize = PacketHeader.StructSize + data.Length;
+            byte[] framed = ArrayPool<byte>.Shared.Rent(framedSize);
+            try
+            {
+                header.Write(framed);
+                data.CopyTo(framed, PacketHeader.StructSize);
 
-            AsyncWrite(framed);
+                AsyncWrite(framed.AsSpan(0, framedSize));
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(framed);
+            }
         }
     }
 
