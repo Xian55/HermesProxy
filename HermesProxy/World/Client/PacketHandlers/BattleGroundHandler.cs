@@ -78,7 +78,8 @@ public partial class WorldClient
             int instanceId = packet.ReadInt32();
             bglist.BattlefieldInstances.Add(instanceId);
         }
-        Log.Print(LogType.Debug, $"[BG] SMSG_BATTLEFIELD_LIST (WotLK): BattlemasterListID={bglist.BattlemasterListID} guid={bglist.BattlemasterGuid} MinLevel={bglist.MinLevel} MaxLevel={bglist.MaxLevel} PvpAnywhere={bglist.PvpAnywhere} HasRandomWinToday={bglist.HasRandomWinToday} instances={bglist.BattlefieldInstances.Count} [{string.Join(",", bglist.BattlefieldInstances)}].");
+        if (Log.IsDebugEnabled)
+            Log.Print(LogType.Debug, $"[BG] SMSG_BATTLEFIELD_LIST (WotLK): BattlemasterListID={bglist.BattlemasterListID} guid={bglist.BattlemasterGuid} MinLevel={bglist.MinLevel} MaxLevel={bglist.MaxLevel} PvpAnywhere={bglist.PvpAnywhere} HasRandomWinToday={bglist.HasRandomWinToday} instances={bglist.BattlefieldInstances.Count} [{string.Join(",", bglist.BattlefieldInstances)}].");
         SendPacketToClient(bglist);
     }
 

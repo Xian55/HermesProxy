@@ -1556,13 +1556,13 @@ public partial class WorldClient
                 slotMap[aura.Slot] = aura;
         }
 
-        Log.Print(LogType.Trace,
-            $"[AuraUpdateTrace] guid={guid} isAll={isAll} isPlayer={isPlayer} " +
-            $"incomingBytes={incomingBytes} aurasShipped={update.Auras.Count} trackedTotal={slotMap.Count} dedupHit={dedupHit}");
+        World.Logging.SpellLogMessages.AuraUpdate(
+            _melSpellLog, guid.Low, guid.High, isAll, isPlayer,
+            incomingBytes, update.Auras.Count, slotMap.Count, dedupHit);
 
         if (dedupHit)
         {
-            Log.Print(LogType.Trace, $"[AuraDedup] skipped no-op resync guid={guid} slots={update.Auras.Count}");
+            World.Logging.SpellLogMessages.AuraDedupSkipped(_melSpellLog, guid.Low, update.Auras.Count);
             return;
         }
 
@@ -1682,7 +1682,7 @@ public partial class WorldClient
             Health = health,
         };
         SendPacketToClient(update);
-        Log.Print(LogType.Trace, $"[HealthUpdateTrace] guid={guid} health={health}");
+        World.Logging.SpellLogMessages.HealthUpdate(_melSpellLog, guid.Low, health);
     }
 
     // Legacy 3.3.5a SMSG_POWER_UPDATE wire format: PackedGuid + uint8 powerType + uint32 power.
@@ -1700,7 +1700,7 @@ public partial class WorldClient
         PowerUpdate update = new PowerUpdate(guid);
         update.Powers.Add(new PowerUpdatePower(power, powerType));
         SendPacketToClient(update);
-        Log.Print(LogType.Trace, $"[PowerUpdateTrace] guid={guid} type={(PowerType)powerType} power={power}");
+        World.Logging.SpellLogMessages.PowerUpdate(_melSpellLog, guid.Low, (PowerType)powerType, power);
 
         // Cache RunicPower for the local player so SpellGo can embed a RemainingPower
         // entry with the post-cast value (V3_4_3 wire shape — see CastFlag.RuneInfo branch).

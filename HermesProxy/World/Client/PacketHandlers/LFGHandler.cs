@@ -142,7 +142,8 @@ public partial class WorldClient
                 status.Joined = true;
         }
 
-        Log.Print(LogType.Debug,
+        if (Log.IsDebugEnabled)
+            Log.Print(LogType.Debug,
             $"LFG[diag]: DFUpdateStatus(player/party) subType={status.SubType} reason={status.Reason} " +
             $"requestedRoles=0x{status.RequestedRoles:X2} slots=[{string.Join(", ", status.Slots)}] " +
             $"isParty={status.IsParty} joined={status.Joined} lfgJoined={status.LfgJoined} queued={status.Queued}");
@@ -392,7 +393,8 @@ public partial class WorldClient
         if (!_lfgPlayerInfoLogged)
         {
             _lfgPlayerInfoLogged = true;
-            Log.Print(LogType.Debug,
+            if (Log.IsDebugEnabled)
+                Log.Print(LogType.Debug,
                 $"LFG[diag]: SMSG_LFG_PLAYER_INFO sent, Dungeons={info.Dungeons.Count} BlackListSlots={info.BlackList.Slots?.Count ?? 0} " +
                 $"offeredSlots=[{string.Join(", ", info.Dungeons.ConvertAll(x => x.Slot.ToString()))}] (one-shot)");
         }

@@ -750,7 +750,8 @@ public partial class WorldClient
                     if (any)
                     {
                         statsUpdateObject.ObjectUpdates.Add(petValuesOu);
-                        Log.Print(LogType.Trace,
+                        if (Log.IsTraceEnabled)
+                            Log.Print(LogType.Trace,
                             $"[PetStatsValuesSynth] sending follow-up Values for pet {mergedPetGuid} with Stats={(srcUnit.Stats != null ? "[" + string.Join(",", new[] { srcUnit.Stats[0], srcUnit.Stats[1], srcUnit.Stats[2], srcUnit.Stats[3], srcUnit.Stats[4] }) + "]" : "n")} AP={srcUnit.AttackPower} minDmg={srcUnit.MinDamage} maxDmg={srcUnit.MaxDamage} armor={srcUnit.Resistances?[0]} baseHP={srcUnit.BaseHealth}");
                         SendPacketToClient(statsUpdateObject);
                     }
@@ -812,10 +813,11 @@ public partial class WorldClient
                     }
                 }
 
-                Log.Print(LogType.Trace,
-                    $"[PlayerEnterTrace] deferred-flush: objects={entry.UpdateObject.ObjectUpdates.Count} " +
-                    $"playerCreateMatched={playerCreateInBatch} playerGuid={currentPlayerGuid} " +
-                    $"types=[{string.Join(",", entry.UpdateObject.ObjectUpdates.Select(o => $"{o.Guid.Low}:{o.Type}"))}]");
+                if (Log.IsTraceEnabled)
+                    Log.Print(LogType.Trace,
+                        $"[PlayerEnterTrace] deferred-flush: objects={entry.UpdateObject.ObjectUpdates.Count} " +
+                        $"playerCreateMatched={playerCreateInBatch} playerGuid={currentPlayerGuid} " +
+                        $"types=[{string.Join(",", entry.UpdateObject.ObjectUpdates.Select(o => $"{o.Guid.Low}:{o.Type}"))}]");
 
                 if (playerCreateInBatch)
                 {

@@ -223,6 +223,10 @@ public partial class WorldClient
     // one; SMSG_QUERY_GAME_OBJECT_RESPONSE is relayed to the client unconditionally.
     private static readonly HashSet<uint> _queriedTransportTemplates = [];
 
+    // Enum.GetValues is reflection and allocates a new array on every call. The GameObject
+    // ingest trace walks this list per object per update batch, so it is materialised once.
+    private static readonly GameObjectField[] _goFieldsForTrace = Enum.GetValues<GameObjectField>();
+
     private void RequestTransportTemplate(uint entry)
     {
         if (entry == 0)
@@ -1770,10 +1774,16 @@ public partial class WorldClient
         // decides whether a passenger ends up on the deck or on the ground.
         if (updateData != null && moveInfo != null && moveInfo.TransportGuid != default)
         {
-            Log.Print(LogType.Trace,
-                $"[Transport] passenger create: guid={guid} transport={moveInfo.TransportGuid} " +
-                $"clientKnowsTransport={GetSession().GameState.ClientKnownGuids.Contains(moveInfo.TransportGuid)} " +
-                $"offset=({moveInfo.TransportOffset.X:F2},{moveInfo.TransportOffset.Y:F2},{moveInfo.TransportOffset.Z:F2}) seat={moveInfo.TransportSeat}");
+            // Gated: clientKnowsTransport is a set probe passed as an argument.
+            if (_melGoFields.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Trace))
+            {
+                TransportLogMessages.PassengerCreate(
+                    _melGoFields, guid.Low,
+                    moveInfo.TransportGuid.Low, moveInfo.TransportGuid.High,
+                    GetSession().GameState.ClientKnownGuids.Contains(moveInfo.TransportGuid),
+                    moveInfo.TransportOffset.X, moveInfo.TransportOffset.Y, moveInfo.TransportOffset.Z,
+                    moveInfo.TransportSeat);
+            }
         }
 
         if (updateData != null && moveInfo != null)
@@ -4093,24 +4103,35 @@ public partial class WorldClient
         // GameObject Fields
         if (objectType == ObjectType.GameObject)
         {
-            Log.Print(LogType.Trace,
-                $"[Trace][GO ingest ENTER] guid={guid} entry={updateData.ObjectData.EntryID} " +
-                $"dynFlagsBefore={(updateData.ObjectData.DynamicFlags.HasValue ? "0x" + updateData.ObjectData.DynamicFlags.Value.ToString("X8") : "null")} " +
-                $"isTransport={guid.IsTransport()}");
-
             // Diagnostic: dump every GAMEOBJECT_* field actually set in this incoming
             // values-update mask, so we don't silently miss fields the current handler
-            // doesn't read. GO updates are infrequent vs Unit/Player so volume is fine.
-            foreach (GameObjectField goField in Enum.GetValues(typeof(GameObjectField)))
+            // doesn't read.
+            //
+            // The whole block is gated. The previous version reasoned about log *volume*
+            // ("GO updates are infrequent vs Unit/Player") and left the work ungated, which
+            // is the wrong question: Log.Print tests IsEnabled inside itself, so every
+            // argument was still evaluated with Trace off. That meant a reflective
+            // Enum.GetValues -- a fresh Array allocation, plus a box per element because the
+            // non-generic overload enumerates as object -- and a GetUpdateField probe per
+            // field, on every GameObject of every SMSG_UPDATE_OBJECT, forever.
+            if (_melGoFields.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Trace))
             {
-                if (goField == GameObjectField.GAMEOBJECT_END) continue;
-                int idx = LegacyVersion.GetUpdateField(goField);
-                if (idx < 0 || idx >= updateMaskArray.Length) continue;
-                if (!updateMaskArray[idx]) continue;
-                Log.Print(LogType.Trace,
-                    $"[Trace][GO field in] guid={guid} {goField}@{idx} " +
-                    $"u32=0x{updates[idx].UInt32Value:X8} ({updates[idx].UInt32Value}) " +
-                    $"i32={updates[idx].Int32Value} f32={updates[idx].FloatValue}");
+                GameObjectFieldLogMessages.GameObjectIngestEnter(
+                    _melGoFields, guid.Low, guid.High,
+                    updateData.ObjectData.EntryID ?? -1,
+                    updateData.ObjectData.DynamicFlags.HasValue ? updateData.ObjectData.DynamicFlags.Value : -1L,
+                    guid.IsTransport());
+
+                foreach (GameObjectField goField in _goFieldsForTrace)
+                {
+                    if (goField == GameObjectField.GAMEOBJECT_END) continue;
+                    int idx = LegacyVersion.GetUpdateField(goField);
+                    if (idx < 0 || idx >= updateMaskArray.Length) continue;
+                    if (!updateMaskArray[idx]) continue;
+                    GameObjectFieldLogMessages.GameObjectFieldIngested(
+                        _melGoFields, guid.Low, goField, idx,
+                        updates[idx].UInt32Value, updates[idx].Int32Value, updates[idx].FloatValue);
+                }
             }
 
             // V3_4_3 ObjectData::DynamicFlags for non-transport GameObjects is a pure

@@ -61,4 +61,16 @@ internal static partial class TransportLogMessages
                   "({X},{Y},{Z},{W})")]
     public static partial void ParentRotationForwarded(
         ILogger logger, ulong guidLow, uint entry, float x, float y, float z, float w);
+
+    // clientKnowsTransport is a ClientKnownGuids set probe at the call site, so this one has to
+    // stay inside an IsEnabled block -- the lookup runs per create otherwise.
+    [LoggerMessage(
+        EventId = 1115,
+        Level = LogLevel.Trace,
+        Message = "[TransportRider] passenger create guidLow={GuidLow} " +
+                  "transport={TransportLow}/{TransportHigh} clientKnowsTransport={ClientKnowsTransport} " +
+                  "offset=({X},{Y},{Z}) seat={Seat}")]
+    public static partial void PassengerCreate(
+        ILogger logger, ulong guidLow, ulong transportLow, ulong transportHigh,
+        bool clientKnowsTransport, float x, float y, float z, sbyte seat);
 }

@@ -1,3 +1,5 @@
+using HermesProxy.World.Enums;
+
 using Microsoft.Extensions.Logging;
 
 namespace HermesProxy.World.Logging;
@@ -53,4 +55,24 @@ internal static partial class GameObjectFieldLogMessages
         float parentRotW,
         int factionTemplate,
         int level);
+
+    // The two below bracket the *incoming* legacy values-update for a GameObject, before any
+    // translation. GameObjectFieldsPublished above records what we ended up sending; these
+    // record what arrived, so a field that the handler never reads shows up as a gap between
+    // the two rather than as silence. Both fire per GameObject per SMSG_UPDATE_OBJECT, so the
+    // caller must keep them inside an IsEnabled block -- see the note in UpdateHandler.
+    [LoggerMessage(
+        EventId = 1101,
+        Level = LogLevel.Trace,
+        Message = "[GoIngest] enter guidLow={GuidLow} guidHigh={GuidHigh} entry={Entry} " +
+                  "dynFlagsBefore={DynamicFlagsBefore} isTransport={IsTransport}")]
+    public static partial void GameObjectIngestEnter(
+        ILogger logger, ulong guidLow, ulong guidHigh, int entry, long dynamicFlagsBefore, bool isTransport);
+
+    [LoggerMessage(
+        EventId = 1102,
+        Level = LogLevel.Trace,
+        Message = "[GoIngest] field guidLow={GuidLow} {Field}@{Index} u32=0x{Raw:X8} i32={Signed} f32={Value}")]
+    public static partial void GameObjectFieldIngested(
+        ILogger logger, ulong guidLow, GameObjectField field, int index, uint raw, int signed, float value);
 }
