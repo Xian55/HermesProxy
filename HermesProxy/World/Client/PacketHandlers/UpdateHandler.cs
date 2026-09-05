@@ -3854,10 +3854,6 @@ public partial class WorldClient
                 
                 updateData.EnsureActivePlayerData().MultiActionBars = (byte)((updates[PLAYER_FIELD_BYTES].UInt32Value >> 16) & 0xFF);
                 updateData.EnsureActivePlayerData().LifetimeMaxRank = (byte)((updates[PLAYER_FIELD_BYTES].UInt32Value >> 24) & 0xFF);
-                UpdateHandlerLogMessages.ActionBarBytes(
-                    _melUpdateValues,
-                    (byte)((updates[PLAYER_FIELD_BYTES].UInt32Value >> 16) & 0xFF),
-                    updates[PLAYER_FIELD_BYTES].UInt32Value, guid.Low, guid.High);
             }
             int PLAYER_AMMO_ID = LegacyVersion.GetUpdateField(PlayerField.PLAYER_AMMO_ID);
             if (PLAYER_AMMO_ID >= 0 && updateMaskArray[PLAYER_AMMO_ID])

@@ -310,11 +310,6 @@ public partial class WorldSocket
             $"wire(action=0x{actionLow16:X4} type=0x{typeHi16:X4}) build={ModernVersion.Build} → " +
             $"actionReal={actionReal} typeReal=0x{typeReal:X2} ({DescribeActionButtonType(typeReal)}) " +
             $"packedLE=0x{packed:X8}");
-
-        // Mark a 10-second watch window so SendPacket dumps every SMSG that
-        // follows. The client crashes ~6s after a problematic CMSG_SET_ACTION_BUTTON
-        // and we want to know exactly which SMSG it choked on.
-        GetSession().RealmSocket?.MarkActionButtonWatchWindow();
     }
 
     // 3.3.5a action-button slot mapping (idx → "which bar"). Helps spot
@@ -349,9 +344,6 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_SET_ACTION_BAR_TOGGLES)]
     void HandleSetActionBarToggles(SetActionBarToggles bars)
     {
-        Log.Print(LogType.Trace,
-            $"[ActionBarTrace] CMSG_SET_ACTION_BAR_TOGGLES mask=0x{bars.Mask:X2} ({Convert.ToString(bars.Mask, 2).PadLeft(8, '0')}b) → forwarding to legacy server");
-
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_ACTION_BAR_TOGGLES);
         packet.WriteUInt8(bars.Mask);
         SendPacketToServer(packet);
