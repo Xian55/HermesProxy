@@ -1989,12 +1989,6 @@ public partial class WorldClient
             GetSession().GameState.QuestLogQuestIDs[i] = 0;
         }
 
-        bool anyFieldPresent =
-            updates.ContainsKey(index) ||
-            updates.ContainsKey(index + stateOffset) ||
-            (progressOffset != -1 && updates.ContainsKey(index + progressOffset)) ||
-            (progressOffsetHi != -1 && updates.ContainsKey(index + progressOffsetHi)) ||
-            updates.ContainsKey(index + timerOffset);
         if (questLog?.QuestID != null && questLog.QuestID.Value != 0)
         {
             var state = GetSession().GameState;
@@ -2034,13 +2028,16 @@ public partial class WorldClient
             state.RememberQuestLogProgress(i, questLog);
         }
 
-        if (anyFieldPresent || (questLog != null && questLog.QuestID.HasValue && questLog.QuestID.Value != 0))
-        {
-            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
-                $"[QuestLogRead] slot={i} questId={(questLog?.QuestID.GetValueOrDefault() ?? 0)} state={(questLog?.StateFlags ?? 0)} " +
-                $"baseFieldIndex={index} sizePerEntry={sizePerEntry} hasQID={updates.ContainsKey(index)} " +
-                $"hasState={updates.ContainsKey(index + stateOffset)} hasTimer={updates.ContainsKey(index + timerOffset)}");
-        }
+        // The per-slot [QuestLogRead] trace was removed here. It fired for every populated
+        // slot of every player values-update -- 13,318 lines in a four-minute session -- and
+        // could not answer the question it looked like it answered: `updates` is the merged
+        // field cache (GetCachedObjectFieldsLegacy at the ReadValuesUpdateBlock call site),
+        // so its hasQID / hasState / hasTimer probes reported "this field is known for this
+        // object", not "this update changed it", and were true on every line. The stride bug
+        // it was written for is settled (vanilla 3 / BC 4 / WotLK 5, decoded above) and the
+        // counter wipe it also watched was fixed in #204. If quest-log decoding needs
+        // instrumenting again, gate it on ReadValuesUpdateBlock's actuallyChangedValuesMaskArray
+        // rather than on key presence, or it will be this noisy and this uninformative again.
         return questLog;
     }
 
@@ -3279,21 +3276,18 @@ public partial class WorldClient
             int PLAYER_QUEST_LOG_1_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_QUEST_LOG_1_1);
             if (PLAYER_QUEST_LOG_1_1 >= 0)
             {
+                // The [QuestLogReadLoop] summary trace was removed here along with the
+                // per-slot [QuestLogRead] in ReadQuestLogEntry. Its StringBuilder was
+                // allocated on every player values-update and appended an interpolated
+                // string per populated slot, with no level check anywhere -- 1,248 builders
+                // and 13,318 strings in a four-minute session, all of it discarded when
+                // Trace was off.
                 int questsCount = LegacyVersion.GetQuestLogSize();
-                int populatedSlots = 0;
-                System.Text.StringBuilder slotSummary = new();
                 for (int i = 0; i < questsCount; i++)
                 {
                     QuestLog? entry = ReadQuestLogEntry(i, updateMaskArray, updates);
                     updateData.PlayerData.QuestLog[i] = entry!;
-                    if (entry != null && entry.QuestID.HasValue && entry.QuestID.Value != 0)
-                    {
-                        populatedSlots++;
-                        slotSummary.Append($" [{i}]={entry.QuestID.Value}");
-                    }
                 }
-                Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
-                    $"[QuestLogReadLoop] questsCount={questsCount} populated={populatedSlots} slots:{slotSummary}");
             }
             int PLAYER_CHOSEN_TITLE = LegacyVersion.GetUpdateField(PlayerField.PLAYER_CHOSEN_TITLE);
             if (PLAYER_CHOSEN_TITLE >= 0 && updateMaskArray[PLAYER_CHOSEN_TITLE])

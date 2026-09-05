@@ -28,6 +28,12 @@ internal static class NoisyOpcodes
         // visual timer locally and we don't forward these, so the Debug log line
         // is pure noise during DK combat.
         Opcode.SMSG_RESYNC_RUNES,
+        // The highest-volume opcode the proxy sees. A four-minute AzerothCore
+        // playerbots session logged 14,906 inbound (~62/sec) and a bot battleground
+        // has been measured at 1,608/sec; see ThrottlingOptions, which exists solely
+        // to rate-limit the forwarded side (936 of those 14,906 went out). The Debug
+        // line was 19% of the whole log on its own.
+        Opcode.SMSG_PARTY_MEMBER_PARTIAL_STATE,
     }.ToFrozenSet();
 
     public static bool IsNoisy(Opcode opcode) => s_noisy.Contains(opcode);
