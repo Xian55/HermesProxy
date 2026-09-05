@@ -102,10 +102,10 @@ public class SendPipelineBenchmarks
         header.Size = packetSize;
         _crypt.Encrypt(data, header.Tag);
 
-        using ByteBuffer framed = new();
+        byte[] framed = new byte[PacketHeader.StructSize + data.Length];
         header.Write(framed);
-        framed.WriteBytes(data);
-        return framed.GetData().Length;
+        data.CopyTo(framed, PacketHeader.StructSize);
+        return framed.Length;
     }
 
     // ---- PowerUpdate: ISpanWritable, ~30 bytes, fires on every power change ----

@@ -16,6 +16,7 @@
  */
 
 using System;
+using System.Buffers;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -63,7 +64,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     static readonly byte[] ContinuedSessionSeed = { 0x16, 0xAD, 0x0C, 0xD4, 0x46, 0xF9, 0x4F, 0xB2, 0xEF, 0x7D, 0xEA, 0x2A, 0x17, 0x66, 0x4D, 0x2F };
     static readonly byte[] EncryptionKeySeed = { 0xE9, 0x75, 0x3C, 0x50, 0x90, 0x93, 0x61, 0xDA, 0x3B, 0x07, 0xEE, 0xFA, 0xFF, 0x9D, 0x41, 0xB8 };
 
-    static readonly int HeaderSize = 16;
+    static readonly int HeaderSize = PacketHeader.StructSize;
 
     SocketBuffer _headerBuffer;
     SocketBuffer _packetBuffer;
@@ -91,14 +92,13 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     private readonly string _externalAddress;
     private readonly int _instancePort;
 
-    // [ActionBarTrace] Ring-buffered SMSG history for diagnosing client
+    // [SendHistory] Ring-buffered SMSG history for diagnosing client
     // disconnect-with-reason-7 events (the V3_4_3 client emits this when it
     // rejects a server packet but doesn't tell us which one). On every
     // SendPacket we append a one-line summary; on CMSG_LOG_DISCONNECT we
-    // dump the buffer. The ring is also gated by an "active watch window"
-    // set by paths suspected of triggering crashes (e.g. CMSG_SET_ACTION_BUTTON)
-    // — when the window is open we additionally Trace-log every send so the
-    // raw flow is in the file.
+    // dump the buffer. Reason 7 is still open (see wotlk.md) — this ring is
+    // the only forensic trail when it fires. Logs written before 2026-09-06
+    // carry the older [ActionBarTrace] tag for the same entries.
     // 512 captures ~4 seconds of history at the observed peak burst rate (~125 SMSG/sec
     // in dense scripted events like DK quest 12800). Needed because the user-reported
     // sudden RAM jump → freeze → reason=7 disconnect path puts several seconds between
@@ -124,7 +124,6 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     private readonly byte[] _recentSentPreview = new byte[RecentSentCap * RecentSentHexPreviewBytes];
     private int _recentSentHead;   // next slot to write
     private int _recentSentCount;  // filled slots, capped at RecentSentCap
-    private long _actionButtonWatchUntilTicks;
 
     /// Renders one ring slot in the same shape the old string entries used.
     private string FormatRecentSent(int index)
@@ -140,12 +139,6 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         return record.Size > record.PreviewLength
             ? $"{timestamp} {record.UniversalOpcode}({record.RawOpcode}) sz={record.Size} hex[{record.PreviewLength}/{record.Size}]={hex}…"
             : $"{timestamp} {record.UniversalOpcode}({record.RawOpcode}) sz={record.Size} hex={hex}";
-    }
-
-    public void MarkActionButtonWatchWindow()
-    {
-        // Open / extend a 10-second watch window starting now.
-        _actionButtonWatchUntilTicks = DateTime.UtcNow.AddSeconds(10).Ticks;
     }
 
     public WorldSocket(Socket socket, IOptions<ProxyNetworkOptions> networkOptions) : base(socket)
@@ -380,17 +373,17 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
                 uint reason = packet.ReadUInt32();
                 Log.Print(LogType.Server, $"Client disconnected with reason {reason}.");
 
-                // [ActionBarTrace] Dump the recent SMSG history. Reason 7 is
+                // [SendHistory] Dump the recent SMSG history. Reason 7 is
                 // "client rejected a server packet"; the offending packet is
                 // almost always within the last ~30 sends. The dump only fires
                 // on the disconnect path, so it doesn't add per-packet cost.
                 if (reason == 7 && _recentSentCount > 0)
                 {
                     Log.Print(LogType.Trace,
-                        $"[ActionBarTrace] reason=7 — last {_recentSentCount} SMSG packets sent to this client (oldest first):");
+                        $"[SendHistory] reason=7 — last {_recentSentCount} SMSG packets sent to this client (oldest first):");
                     int oldest = (_recentSentHead - _recentSentCount + RecentSentCap) % RecentSentCap;
                     for (int n = 0; n < _recentSentCount; n++)
-                        Log.Print(LogType.Trace, $"[ActionBarTrace]   #{n + 1,2} {FormatRecentSent((oldest + n) % RecentSentCap)}");
+                        Log.Print(LogType.Trace, $"[SendHistory]   #{n + 1,2} {FormatRecentSent((oldest + n) % RecentSentCap)}");
                 }
                 if (_connectType == ConnectionType.Realm)
                 {
@@ -552,9 +545,8 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             else
                 WorldSocketLogMessages.PacketSent(_melLog, _sourceFile, _netDirSend, universalOpcode, (uint)opcode);
 
-            // [ActionBarTrace] Append to ring buffer + verbose Trace inside the
-            // active watch window. Ring buffer is capped — drop the oldest entry
-            // when full so the dump on CMSG_LOG_DISCONNECT shows just the most
+            // [SendHistory] Append to the ring buffer. Capped — drop the oldest
+            // entry when full so the dump on CMSG_LOG_DISCONNECT shows just the most
             // recent activity. Hex preview captures the leading bytes of each
             // packet body so reason=7 dumps reveal *what* (not just which opcode)
             // was sent — needed when we don't have a known-good wire-format
@@ -574,9 +566,6 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             _recentSentHead = (_recentSentHead + 1) % RecentSentCap;
             if (_recentSentCount < RecentSentCap)
                 _recentSentCount++;
-
-            if (nowTicksUtc < _actionButtonWatchUntilTicks)
-                Log.Print(LogType.Trace, $"[ActionBarTrace] inWatchWindow → {FormatRecentSent(slot)}");
 
             // Trace-level enrichment for the modern V3_4_3 SMSG_UPDATE_OBJECT envelope.
             // Layout: u32 NumObjUpdates, u16 MapID, then per-update body. Read the first
@@ -631,11 +620,23 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             header.Size = packetSize;
             _worldCrypt.Encrypt(data, header.Tag);
 
-            using ByteBuffer framed = new();
-            header.Write(framed);
-            framed.WriteBytes(data);
+            // Frame header + body into one pooled buffer. AsyncWrite is a blocking
+            // Socket.Send, so the rental is safe to return the moment it comes back.
+            // The old path built this through a ByteBuffer: a rented buffer plus a full
+            // GetData() copy on top of the frame itself.
+            int framedSize = PacketHeader.StructSize + data.Length;
+            byte[] framed = ArrayPool<byte>.Shared.Rent(framedSize);
+            try
+            {
+                header.Write(framed);
+                data.CopyTo(framed, PacketHeader.StructSize);
 
-            AsyncWrite(framed.GetData());
+                AsyncWrite(framed.AsSpan(0, framedSize));
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(framed);
+            }
         }
     }
 
@@ -1370,20 +1371,6 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         // "Always Show Action Bars" ticked but not applied until it is re-toggled.
         // The setting round-trips on its own: the blob carries it, and the login
         // CreateObject already carries MultiActionBars (bit 0x10 = alwaysShow).
-
-        // [ActionBarTrace] Show which slots have a non-zero timestamp — those tell
-        // the client "I have data for this AccountDataType, ask me for it".
-        var nonZero = new System.Text.StringBuilder();
-        for (int i = 0; i < count; i++)
-        {
-            if (accountData.AccountTimes[i] != 0)
-            {
-                if (nonZero.Length > 0) nonZero.Append(", ");
-                nonZero.Append($"{i}({(AccountDataType)i})={accountData.AccountTimes[i]}");
-            }
-        }
-        Log.Print(LogType.Trace,
-            $"[ActionBarTrace] SendAccountDataTimes guid={guid} count={count} nonZeroSlots=[{(nonZero.Length == 0 ? "<all zero>" : nonZero.ToString())}]");
 
         SendPacket(accountData);
 

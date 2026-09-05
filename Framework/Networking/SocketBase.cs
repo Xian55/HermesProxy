@@ -133,7 +133,13 @@ public abstract class SocketBase : ISocket, IDisposable
 
     public abstract void ReadHandler(SocketAsyncEventArgs args);
 
-    public void AsyncWrite(byte[] data)
+    public void AsyncWrite(byte[] data) => AsyncWrite(data.AsSpan());
+
+    /// <summary>
+    /// Despite the name this is a blocking send: the caller's buffer is free to reuse or
+    /// return to a pool as soon as this returns.
+    /// </summary>
+    public void AsyncWrite(ReadOnlySpan<byte> data)
     {
         if (!IsOpen())
             return;

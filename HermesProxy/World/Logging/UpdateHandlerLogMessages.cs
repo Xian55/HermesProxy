@@ -43,12 +43,4 @@ internal static partial class UpdateHandlerLogMessages
         Message = "[V343Trace][InvSlot] player slot={Slot} guidLow={GuidLow} guidHigh={GuidHigh}")]
     public static partial void OwnerInvSlot(
         ILogger logger, int slot, ulong guidLow, ulong guidHigh);
-
-    [LoggerMessage(
-        EventId = 1202,
-        Level = LogLevel.Trace,
-        Message = "[ActionBarTrace] PLAYER_FIELD_BYTES extracted: MultiActionBars=0x{MultiActionBars:X2} " +
-                  "raw32=0x{Raw:X8} guidLow={GuidLow} guidHigh={GuidHigh}")]
-    public static partial void ActionBarBytes(
-        ILogger logger, byte multiActionBars, uint raw, ulong guidLow, ulong guidHigh);
 }
