@@ -63,7 +63,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     static readonly byte[] ContinuedSessionSeed = { 0x16, 0xAD, 0x0C, 0xD4, 0x46, 0xF9, 0x4F, 0xB2, 0xEF, 0x7D, 0xEA, 0x2A, 0x17, 0x66, 0x4D, 0x2F };
     static readonly byte[] EncryptionKeySeed = { 0xE9, 0x75, 0x3C, 0x50, 0x90, 0x93, 0x61, 0xDA, 0x3B, 0x07, 0xEE, 0xFA, 0xFF, 0x9D, 0x41, 0xB8 };
 
-    static readonly int HeaderSize = 16;
+    static readonly int HeaderSize = PacketHeader.StructSize;
 
     SocketBuffer _headerBuffer;
     SocketBuffer _packetBuffer;
@@ -619,11 +619,13 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             header.Size = packetSize;
             _worldCrypt.Encrypt(data, header.Tag);
 
-            using ByteBuffer framed = new();
+            // One exact-sized frame. Routing this through a ByteBuffer meant a rented
+            // buffer plus a full GetData() copy on top of the frame itself.
+            byte[] framed = new byte[PacketHeader.StructSize + data.Length];
             header.Write(framed);
-            framed.WriteBytes(data);
+            data.CopyTo(framed, PacketHeader.StructSize);
 
-            AsyncWrite(framed.GetData());
+            AsyncWrite(framed);
         }
     }
 

@@ -26,6 +26,7 @@ using HermesProxy.World.Enums;
 using HermesProxy.World.Client;
 using HermesProxy.World.Logging;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace HermesProxy.World;
 
@@ -364,24 +365,39 @@ public class WorldPacket : ByteBuffer
     long m_receivedTime;
 }
 
-public class PacketHeader
+/// <summary>
+/// Storage for <see cref="PacketHeader.Tag"/>. An inline array so the 12 AES-GCM tag bytes
+/// live inside the header itself; the implicit <see cref="Span{T}"/> conversion lets
+/// <see cref="Framework.Cryptography.PacketCrypt"/> write the tag straight into that storage.
+/// </summary>
+[InlineArray(PacketHeader.TagSize)]
+public struct PacketTag
 {
-    public int Size;
-    public byte[] Tag = new byte[12];
+    private byte _element0;
+}
 
-    public void Read(byte[] buffer)
+public struct PacketHeader
+{
+    public const int TagSize = 12;
+    public const int StructSize = sizeof(int) + TagSize;
+
+    public int Size;
+    public PacketTag Tag;
+
+    public void Read(ReadOnlySpan<byte> buffer)
     {
         Size = BinaryPrimitives.ReadInt32LittleEndian(buffer);
-        Buffer.BlockCopy(buffer, 4, Tag, 0, 12);
+        buffer.Slice(sizeof(int), TagSize).CopyTo(Tag);
     }
 
-    public void Write(ByteBuffer byteBuffer)
+    /// <summary>Writes the 16-byte header into the front of <paramref name="destination"/>.</summary>
+    public readonly void Write(Span<byte> destination)
     {
-        byteBuffer.WriteInt32(Size);
-        byteBuffer.WriteBytes(Tag, 12);
+        BinaryPrimitives.WriteInt32LittleEndian(destination, Size);
+        ((ReadOnlySpan<byte>)Tag).CopyTo(destination[sizeof(int)..]);
     }
 
-    public bool IsValidSize() { return Size < 0x40000; }
+    public readonly bool IsValidSize() { return (uint)Size < 0x40000; }
 }
 
 public class LegacyServerPacketHeader
