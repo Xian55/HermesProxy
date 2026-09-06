@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2012-2020 CypherCore <http://github.com/CypherCore>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -910,6 +910,25 @@ public class ByteBuffer : IDisposable
         return _length;
     }
 
+    /// <summary>
+    /// The bytes actually written or received, with no pooled slack on the end. Prefer this over
+    /// <see cref="GetData"/> anywhere the length is meaningful — a capture, a hash, a hex dump —
+    /// because in read mode <c>GetData</c> hands back the whole rental, which is rounded up to an
+    /// <see cref="System.Buffers.ArrayPool{T}"/> bucket and so is routinely larger than the packet.
+    /// </summary>
+    public ReadOnlySpan<byte> GetDataSpan()
+    {
+        if (_isWriteMode)
+            FlushBits();
+
+        return _buffer.AsSpan(0, _length);
+    }
+
+    /// <remarks>
+    /// In read mode this returns the backing buffer itself, which for a pooled receive is longer
+    /// than the packet — <c>GetData().Length</c> is not the packet length. Use
+    /// <see cref="GetDataSpan"/> when the length matters.
+    /// </remarks>
     public byte[] GetData()
     {
         if (_isWriteMode)
@@ -922,7 +941,6 @@ public class ByteBuffer : IDisposable
         }
         else
         {
-            // For read mode, return the original buffer (which IS the right size)
             return _buffer;
         }
     }

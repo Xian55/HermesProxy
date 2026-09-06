@@ -55,6 +55,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     private static readonly string _sourceFile = nameof(WorldSocket).PadRight(15);
     private static readonly string _netDirRecv = Log.FormatDir(LogNetDir.C2P);
     private static readonly string _netDirSend = Log.FormatDir(LogNetDir.P2C);
+    private const string _netDirNone = "";
 
     static readonly string ClientConnectionInitialize = "WORLD OF WARCRAFT CONNECTION - CLIENT TO SERVER - V2";
     static readonly string ServerConnectionInitialize = "WORLD OF WARCRAFT CONNECTION - SERVER TO CLIENT - V2";
@@ -797,7 +798,13 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         if (!GetSession().WorldClient!.ConnectToWorldServer(GetSession().RealmManager.GetRealm(_realmId)!, GetSession()))
         {
             SendAuthResponseError(BattlenetRpcErrorCode.BadServer);
-            Log.Print(LogType.Error, "The WorldClient failed to connect to the selected world server!");
+            // Only reached once, on a dead session, so the interpolation here is not on any path
+            // that runs twice. Without the code this line said nothing about *why* the backend
+            // refused us and the answer could only be recovered by decoding the .pkt (issue #248).
+            var legacyResult = GetSession().WorldClient!.LastAuthResult;
+            WorldSocketLogMessages.WorldClientConnectFailed(
+                _melLog, _sourceFile, _netDirNone,
+                legacyResult is { } r ? $"{r} ({(byte)r})" : "none received");
             Session.AccountMetaDataMgr.InvalidateLastSelectedCharacter();
             CloseSocket();
             GetSession().OnDisconnect();

@@ -68,6 +68,14 @@ public partial class WorldClient
     Dictionary<Opcode, List<WorldPacket>> _delayedPacketsToServer = null!;
     Dictionary<Opcode, List<ServerPacket>> _delayedPacketsToClient = null!;
 
+    /// <summary>
+    /// Last <c>SMSG_AUTH_RESPONSE</c> code the legacy world server sent, or <c>null</c> if the
+    /// handshake died before one arrived (socket refused, unknown opcode during the handshake).
+    /// Read by <see cref="Server.WorldSocket"/> so the client-facing failure line can name the
+    /// backend's verdict instead of only reporting that the connect failed.
+    /// </summary>
+    public AuthResult? LastAuthResult { get; private set; }
+
     public WorldClient()
     {
         InitializePacketHandlers();
@@ -93,7 +101,10 @@ public partial class WorldClient
 
         var sniff = SniffFile.EnsureOpen(ref session.LegacySniff, "legacy", (ushort)LegacyVersion.Build);
 
-        ReadOnlySpan<byte> body = packet.GetData();
+        // GetDataSpan, not GetData: received packets sit in an ArrayPool rental rounded up to a
+        // bucket, so GetData would staple that slack onto every captured server packet and make
+        // the .pkt claim payloads longer than the wire ever carried (issue #248).
+        ReadOnlySpan<byte> body = packet.GetDataSpan();
         uint opcode = packet.GetOpcode();
 
         if (isFromClient)
@@ -115,6 +126,7 @@ public partial class WorldClient
         _globalSession = globalSession;
         _username = globalSession.Username;
         _isSuccessful = null;
+        LastAuthResult = null;
         _delayedPacketsToServer = new Dictionary<Opcode, List<WorldPacket>>();
         _delayedPacketsToClient = new Dictionary<Opcode, List<ServerPacket>>();
 
@@ -771,6 +783,7 @@ public partial class WorldClient
     private void HandleAuthResponse(WorldPacket packet)
     {
         AuthResult result = (AuthResult)packet.ReadUInt8();
+        LastAuthResult = result;
 
         if (_isSuccessful == null)
         {
@@ -798,14 +811,14 @@ public partial class WorldClient
         else if (result == AuthResult.AUTH_WAIT_QUEUE)
         {
             _queuePosition = packet.ReadUInt32();
-            Log.Print(LogType.Network, $"Position in queue is {_queuePosition}.");
+            WorldClientLogMessages.QueuePosition(_melNet, _sourceFile, _netDirNone, _queuePosition);
             if (_isSuccessful != null && GetSession().RealmSocket != null)
                 GetSession().RealmSocket.SendAuthWaitQue(_queuePosition);
             _isSuccessful = true;
         }
         else
         {
-            Log.Print(LogType.Network, "Authentication failed!");
+            WorldClientLogMessages.AuthenticationFailed(_melNet, _sourceFile, _netDirNone, result, (byte)result);
             _isSuccessful = false;
         }
     }

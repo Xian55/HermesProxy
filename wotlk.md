@@ -22,6 +22,7 @@ Note that `test-loop2.ps1` invoked bare still selects cMangos — the parameter 
 | ChromieCraft (public, AC-derived, read-only) | `logon.chromiecraft.com:3724` | `-ChromieCraft` | — |
 | tavernwlk.top (public, AC-derived, read-only) | `login.tavernwlk.top:3724` | `-Tavern` | `wotlk-tavernwlk` |
 | Warmane (public, custom core + Warden) | `logon.warmane.com:3724` | — | `wotlk-warmane` |
+| WoW Circle (public, Warden — needs `ReportedOS=Win`, [#248](https://github.com/Xian55/HermesProxy/issues/248)) | `logon.wowcircle.com:3724` | `-WowCircle` | `wotlk-wowcircle` |
 | Wrathion native V3_4_3.23121 — **not a backend** | `127.0.0.1` | `-LocalTc343` | `wotlk-tc-local-343` |
 
 **Which one to reach for.** TrinityCore is local, fast to restart, and has a GM account, so it is the default for anything needing repeated iteration or `.additem` / `.gm` setup. AzerothCore is the tie-breaker: its playerbots are real `Player` objects, so unlike TC's NPCBots they appear as scoreboard rows, fill a Dungeon Finder queue, and can be partied, duelled and traded with — most of the group, battleground, arena and loot work landed there for exactly that reason. A behaviour present on one core and absent on the other is server policy far more often than it is a translation bug, so check both before opening an issue.

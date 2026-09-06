@@ -66,7 +66,9 @@ public abstract class ClientPacket : IDisposable
             return;
 
         var sniff = SniffFile.EnsureOpen(ref sniffFile, "modern", (ushort)context.ClientBuild);
-        sniff.WritePacket(GetOpcode(), true, _worldPacket.GetData());
+        // GetDataSpan: this packet was received into a pooled rental, and GetData would hand back
+        // the whole bucket-rounded buffer rather than the payload (issue #248).
+        sniff.WritePacket(GetOpcode(), true, _worldPacket.GetDataSpan());
     }
 
     protected WorldPacket _worldPacket;

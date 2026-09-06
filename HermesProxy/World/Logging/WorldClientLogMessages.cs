@@ -227,4 +227,34 @@ internal static partial class WorldClientLogMessages
         string SourceFile,
         string NetDir,
         int Records);
+
+    /// <summary>
+    /// The legacy world server refused the session. <paramref name="ResultId"/> carries the raw
+    /// byte alongside the enum name because a customised core can send a code this build's
+    /// <see cref="AuthResult"/> has no name for, and the number is what the core's source is
+    /// grepped for. The distinction matters for triage: AUTH_FAILED (13) is a digest or
+    /// session-key mismatch, while AUTH_REJECT (14) means the credentials were accepted and a
+    /// policy check refused us anyway -- an OS whitelist, an IP ban, or a closed realm
+    /// (issue #248).
+    /// </summary>
+    [LoggerMessage(
+        EventId = 220,
+        Level = LogLevel.Warning,
+        Message = "Authentication failed! Server answered SMSG_AUTH_RESPONSE {Result} ({ResultId}).")]
+    public static partial void AuthenticationFailed(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        AuthResult Result,
+        byte ResultId);
+
+    [LoggerMessage(
+        EventId = 221,
+        Level = LogLevel.Information,
+        Message = "Position in queue is {Position}.")]
+    public static partial void QueuePosition(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        uint Position);
 }
