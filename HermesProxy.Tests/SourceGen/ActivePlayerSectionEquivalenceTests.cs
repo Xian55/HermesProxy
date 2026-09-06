@@ -675,16 +675,19 @@ public class ActivePlayerSectionEquivalenceTests
                 if (blocks.IsBitSet(267 + i))
                     data.WriteUInt32(a.TrackResourceMask![i]!.Value);
         }
+        // Index outer, arrays inner — TrinityCore UpdateFields.cpp:3972-3993 nests the four
+        // arrays inside one loop over i. This oracle previously used four separate loops,
+        // which put crit values into ModDamageDonePos on the wire and gave the character
+        // sheet garbage spell power and a 0.00% crit (#254). Do not "simplify" it back.
         if (blocks.IsBitSet(269))
         {
             for (int i = 0; i < 7; i++)
+            {
                 if (blocks.IsBitSet(270 + i)) data.WriteFloat(a.SpellCritPercentage![i]!.Value);
-            for (int i = 0; i < 7; i++)
                 if (blocks.IsBitSet(277 + i)) data.WriteInt32(a.ModDamageDonePos![i]!.Value);
-            for (int i = 0; i < 7; i++)
                 if (blocks.IsBitSet(284 + i)) data.WriteInt32(a.ModDamageDoneNeg![i]!.Value);
-            for (int i = 0; i < 7; i++)
                 if (blocks.IsBitSet(291 + i)) data.WriteFloat(a.ModDamageDonePercent![i]!.Value);
+            }
         }
         if (blocks.IsBitSet(298))
         {
@@ -712,16 +715,18 @@ public class ActivePlayerSectionEquivalenceTests
         if (blocks.IsBitSet(542))
         {
             for (int i = 0; i < 3; i++)
+            {
                 if (blocks.IsBitSet(543 + i)) data.WriteFloat(a.WeaponDmgMultipliers![i]!.Value);
-            for (int i = 0; i < 3; i++)
                 if (blocks.IsBitSet(546 + i)) data.WriteFloat(a.WeaponAtkSpeedMultipliers![i]!.Value);
+            }
         }
         if (blocks.IsBitSet(549))
         {
             for (int i = 0; i < 12; i++)
+            {
                 if (blocks.IsBitSet(550 + i)) data.WriteUInt32(a.BuybackPrice![i]!.Value);
-            for (int i = 0; i < 12; i++)
                 if (blocks.IsBitSet(562 + i)) data.WriteInt64((long)a.BuybackTimestamp![i]!.Value);
+            }
         }
         if (blocks.IsBitSet(574))
         {

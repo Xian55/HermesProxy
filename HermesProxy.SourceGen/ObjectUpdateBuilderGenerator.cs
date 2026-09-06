@@ -1095,6 +1095,19 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
             .OrderBy(x => x.SortKey)
             .ToList();
         var postFlushAfterBit = new HashSet<int>(section.UpdatePostFlushes.Select(pf => pf.AfterBit));
+
+        // PerElement arrays that share a change-mask parent are read index-outer by the
+        // client, so they cannot be emitted in plain bit order like everything else. Group
+        // them here and write the whole group at the position of its lowest bit; see
+        // EmitSharedParentArrayWrites for the layout and why it matters (#254).
+        var sharedParentGroups = section.UpdateFields
+            .Where(f => !f.MaskOnly && f.ArrayCount > 0 && f.ArrayMode == ArrayMode.PerElement && f.ParentBit > 0)
+            .GroupBy(f => f.ParentBit)
+            .Where(g => g.Count() > 1)
+            .ToDictionary(g => g.Key, g => g.OrderBy(f => f.Bit).ToList());
+        var groupedFieldBits = new HashSet<int>(sharedParentGroups.Values.SelectMany(g => g).Select(f => f.Bit));
+        var emittedGroupParents = new HashSet<int>();
+
         foreach (var op in writeOps)
         {
             if (op.IsCustom)
@@ -1107,6 +1120,16 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
             {
                 var f = (UpdateFieldEntry)op.FieldEntry;
                 if (f.MaskOnly) continue;   // sibling CustomGroupWriter handles the write
+
+                if (groupedFieldBits.Contains(f.Bit))
+                {
+                    // The lowest-bit member stands in for the whole group; the rest are
+                    // already written by it, so they emit nothing of their own.
+                    if (emittedGroupParents.Add(f.ParentBit))
+                        EmitSharedParentArrayWrites(sb, sharedParentGroups[f.ParentBit]);
+                    continue;
+                }
+
                 EmitBlocksUpdateWrite(sb, f);
             }
 
@@ -1156,32 +1179,70 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
           .Append("blocks.SetBit(").Append(f.Bit).AppendLine("); }");
     }
 
+    /// <summary>
+    /// One element of a <see cref="ArrayMode.PerElement"/> array, gated on its own bit.
+    /// Split out of <see cref="EmitBlocksUpdateWrite"/> so a group of arrays sharing a
+    /// parent bit can be emitted index-outer rather than array-outer.
+    /// </summary>
+    private static void EmitPerElementWrite(StringBuilder sb, UpdateFieldEntry f, int i)
+    {
+        if (!string.IsNullOrEmpty(f.CustomWriter))
+        {
+            sb.Append("        if (blocks.IsBitSet(").Append(f.Bit + i)
+              .Append(")) ").Append(f.CustomWriter).Append("(data, src.").Append(f.SourceProperty)
+              .Append("!, ").Append(i).AppendLine(");");
+        }
+        else if (f.Type == DescriptorType.PackedGuid128)
+        {
+            sb.Append("        if (blocks.IsBitSet(").Append(f.Bit + i)
+              .Append(")) data.WritePackedGuid128(src.").Append(f.SourceProperty)
+              .Append("![").Append(i).AppendLine("]!.Value);");
+        }
+        else
+        {
+            sb.Append("        if (blocks.IsBitSet(").Append(f.Bit + i)
+              .Append(")) data.").Append(WriteMethodNameFor(f.Type))
+              .Append("(").Append(f.Cast ?? "").Append("src.").Append(f.SourceProperty)
+              .Append("![").Append(i).AppendLine("]!.Value);");
+        }
+    }
+
+    /// <summary>
+    /// Writes a set of <see cref="ArrayMode.PerElement"/> arrays that share a change-mask
+    /// parent, in the order the client reads them: index outer, arrays inner.
+    ///
+    /// TrinityCore 3.4.3 <c>UpdateFields.cpp</c> and WowPacketParser both nest the arrays
+    /// inside the index — one loop over i, one guarded write per array:
+    ///
+    ///     if (changesMask[269])
+    ///         for (i = 0..6)
+    ///         {
+    ///             if (changesMask[270 + i]) data &lt;&lt; float(SpellCritPercentage[i]);
+    ///             if (changesMask[277 + i]) data &lt;&lt; int32(ModDamageDonePos[i]);
+    ///             ...
+    ///         }
+    ///
+    /// Emitting these in plain ascending bit order instead — all of one array, then all of
+    /// the next — puts the right values in the wrong fields as soon as more than one array
+    /// in the group has a changed element. That produced garbage spell power and a 0.00%
+    /// crit on the character sheet (issue #254), and the same shape applies to
+    /// Power/MaxPower/ModPowerRegen and the other UnitData groups.
+    /// </summary>
+    private static void EmitSharedParentArrayWrites(StringBuilder sb, List<UpdateFieldEntry> group)
+    {
+        int elementCount = group.Max(f => f.ArrayCount);
+        for (int i = 0; i < elementCount; i++)
+            foreach (var f in group)
+                if (i < f.ArrayCount)
+                    EmitPerElementWrite(sb, f, i);
+    }
+
     private static void EmitBlocksUpdateWrite(StringBuilder sb, UpdateFieldEntry f)
     {
         if (f.ArrayCount > 0 && f.ArrayMode == ArrayMode.PerElement)
         {
-            string castPrefix = f.Cast ?? "";
             for (int i = 0; i < f.ArrayCount; i++)
-            {
-                if (!string.IsNullOrEmpty(f.CustomWriter))
-                {
-                    sb.Append("        if (blocks.IsBitSet(").Append(f.Bit + i)
-                      .Append(")) ").Append(f.CustomWriter).Append("(data, src.").Append(f.SourceProperty)
-                      .Append("!, ").Append(i).AppendLine(");");
-                }
-                else if (f.Type == DescriptorType.PackedGuid128)
-                {
-                    sb.Append("        if (blocks.IsBitSet(").Append(f.Bit + i)
-                      .Append(")) data.WritePackedGuid128(src.").Append(f.SourceProperty)
-                      .Append("![").Append(i).AppendLine("]!.Value);");
-                }
-                else
-                {
-                    sb.Append("        if (blocks.IsBitSet(").Append(f.Bit + i)
-                      .Append(")) data.").Append(WriteMethodNameFor(f.Type))
-                      .Append("(").Append(castPrefix).Append("src.").Append(f.SourceProperty).Append("![").Append(i).AppendLine("]!.Value);");
-                }
-            }
+                EmitPerElementWrite(sb, f, i);
             return;
         }
 
