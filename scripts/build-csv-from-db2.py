@@ -120,9 +120,12 @@ LOADER_TYPES: dict[str, dict[str, str]] = {
         "StatType8": "sbyte", "StatType9": "sbyte", "StatType10": "sbyte",
         "ContainerSlots": "byte", "RequiredReputationRank": "byte", "RequiredCityRank": "byte",
         "RequiredHonorRank": "byte", "InventoryType": "byte", "OverallQualityId": "byte",
-        "AmmoType": "byte", "StatValue1": "sbyte", "StatValue2": "sbyte", "StatValue3": "sbyte",
-        "StatValue4": "sbyte", "StatValue5": "sbyte", "StatValue6": "sbyte", "StatValue7": "sbyte",
-        "StatValue8": "sbyte", "StatValue9": "sbyte", "StatValue10": "sbyte",
+        "AmmoType": "byte",
+        # short, not sbyte: WotLK raid gear exceeds a signed byte (item 51219 is
+        # +162 Str / +219 Sta) and both the store and the V3_4_3 wire field are 16-bit.
+        "StatValue1": "short", "StatValue2": "short", "StatValue3": "short",
+        "StatValue4": "short", "StatValue5": "short", "StatValue6": "short", "StatValue7": "short",
+        "StatValue8": "short", "StatValue9": "short", "StatValue10": "short",
         "RequiredLevel": "sbyte",
     },
     "ItemEffect3.csv": {
@@ -144,6 +147,9 @@ LOADER_TYPES: dict[str, dict[str, str]] = {
     },
     "ItemAppearance3.csv": {"DisplayType": "byte"},
 }
+
+# The TBC file uses the same loader field types as the WotLK one.
+LOADER_TYPES["ItemSparse2.csv"] = LOADER_TYPES["ItemSparse3.csv"]
 
 INT_WIDTHS = {"sbyte": (8, True), "byte": (8, False), "short": (16, True), "ushort": (16, False),
               "uint": (32, False), "ulong": (64, False)}
@@ -417,6 +423,9 @@ def build_taxi_path(build: str) -> tuple[list[str], list[list[str]]]:
 RECIPES: dict[str, Recipe] = {
     "Item3.csv": Recipe(source="Item", columns=ITEM_COLUMNS),
     "ItemSparse3.csv": Recipe(source="ItemSparse", columns=ITEM_SPARSE_COLUMNS, quote_all=True),
+    # Same table and projection, built with --build 2.5.3.41750. Present so the TBC
+    # file can be regenerated too: it also carried sbyte-wrapped stat values.
+    "ItemSparse2.csv": Recipe(source="ItemSparse", columns=ITEM_SPARSE_COLUMNS, quote_all=True),
     "ItemAppearance3.csv": Recipe(
         source="ItemAppearance",
         columns=["ID", "DisplayType", "ItemDisplayInfoID", "DefaultIconFileDataID", "UiOrder"],

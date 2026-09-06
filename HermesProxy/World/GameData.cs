@@ -24,6 +24,7 @@ namespace HermesProxy.World;
 public static partial class GameData
 {
     private static readonly Microsoft.Extensions.Logging.ILogger _melStorage = Log.CreateMelLogger(Log.CategoryStorage);
+    private static readonly Microsoft.Extensions.Logging.ILogger _melServer = Log.CreateMelLogger(Log.CategoryServer);
     private static readonly string _sourceFile = nameof(GameData).PadRight(15);
     private const string _netDirNone = "";
 
@@ -1026,16 +1027,16 @@ public static partial class GameData
             item.InventoryType = byte.Parse(row[113].Span);
             item.OverallQualityId = byte.Parse(row[114].Span);
             item.AmmoType = byte.Parse(row[115].Span);
-            item.StatValue[0] = sbyte.Parse(row[116].Span);
-            item.StatValue[1] = sbyte.Parse(row[117].Span);
-            item.StatValue[2] = sbyte.Parse(row[118].Span);
-            item.StatValue[3] = sbyte.Parse(row[119].Span);
-            item.StatValue[4] = sbyte.Parse(row[120].Span);
-            item.StatValue[5] = sbyte.Parse(row[121].Span);
-            item.StatValue[6] = sbyte.Parse(row[122].Span);
-            item.StatValue[7] = sbyte.Parse(row[123].Span);
-            item.StatValue[8] = sbyte.Parse(row[124].Span);
-            item.StatValue[9] = sbyte.Parse(row[125].Span);
+            item.StatValue[0] = short.Parse(row[116].Span);
+            item.StatValue[1] = short.Parse(row[117].Span);
+            item.StatValue[2] = short.Parse(row[118].Span);
+            item.StatValue[3] = short.Parse(row[119].Span);
+            item.StatValue[4] = short.Parse(row[120].Span);
+            item.StatValue[5] = short.Parse(row[121].Span);
+            item.StatValue[6] = short.Parse(row[122].Span);
+            item.StatValue[7] = short.Parse(row[123].Span);
+            item.StatValue[8] = short.Parse(row[124].Span);
+            item.StatValue[9] = short.Parse(row[125].Span);
             item.RequiredLevel = sbyte.Parse(row[126].Span);
             ItemSparseRecordsStore.Add((uint)item.Id, item);
         }
@@ -3268,7 +3269,7 @@ public static partial class GameData
         // V3_4_3 values too, so a +520 spell power weapon was advertised as +127
         // whenever we actually pushed an ItemSparse override for it.
         int[] StatValues = new int[10];
-        for (int i = 0; i < item.StatsCount; i++)
+        for (int i = 0; i < Math.Min(item.StatsCount, 10); i++)
             StatValues[i] = item.StatValues[i];
 
         buffer.WriteInt64(item.AllowedRaces);
@@ -3457,8 +3458,8 @@ public static partial class GameData
     {
         var startSize = buffer.GetSize();
         // Only the pre-3.4.3 layout below consumes this; the V3_4_3 branch writes
-        // row.StatValue directly as Int16. row.StatValue is already sbyte-ranged by
-        // its own type, so the clamp is defensive rather than load-bearing here.
+        // row.StatValue directly as Int16. Now that the store is short[], the clamp is
+        // load-bearing: a WotLK-era stat genuinely does not fit the older Int8 field.
         Span<int> StatValues = stackalloc int[10];
         for (int i = 0; i < 10; i++)
             StatValues[i] = Math.Clamp(row.StatValue[i], sbyte.MinValue, sbyte.MaxValue);
@@ -3580,10 +3581,11 @@ public static partial class GameData
         buffer.WriteInt16(row.Resistances[5]);
         buffer.WriteInt16(row.Resistances[6]);
         buffer.WriteUInt16(row.ScalingStatDistributionId);
-        Log.Print(LogType.Trace, $"[ItemSparseHotfix] item={row.Id} preScalingSize={buffer.GetSize() - startSize} build={ModernVersion.Build}");
+        GameDataLogMessages.ItemSparseHotfixPreScaling(_melServer, _sourceFile, _netDirNone,
+            row.Id, buffer.GetSize() - startSize, ModernVersion.Build);
         if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
         {
-            Log.Print(LogType.Trace, $"[ItemSparseHotfix] item={row.Id} taking V3_4_3 path");
+            GameDataLogMessages.ItemSparseHotfixV343Path(_melServer, _sourceFile, _netDirNone, row.Id);
             // V3_4_3 ItemSparse format. Reference: WPP V3_4_0_45166 HotfixHandler.cs:4087-4113.
             for (int i = 0; i < 10; i++)
                 buffer.WriteInt16((short)row.StatValue[i]);  // StatModifierBonusAmount[10]
@@ -3657,7 +3659,8 @@ public static partial class GameData
             buffer.WriteInt8((sbyte)StatValues[9]);
             buffer.WriteInt8(row.RequiredLevel);
         }
-        Log.Print(LogType.Trace, $"[ItemSparseHotfixSize] item={row.Id} buildTotal={buffer.GetSize() - startSize}");
+        GameDataLogMessages.ItemSparseHotfixSize(_melServer, _sourceFile, _netDirNone,
+            row.Id, buffer.GetSize() - startSize);
     }
     public static void LoadItemHotfixes()
     {
@@ -3979,81 +3982,43 @@ public static partial class GameData
         if (ItemRecordsStore.TryGetValue(item.Entry, out var row))
         {
             int iconFileDataId = (int)GetItemIconFileDataIdByDisplayId(item.DisplayID);
-            if (row.ClassId != (byte)item.Class ||
-                row.SubclassId != (byte)item.SubClass ||
-                row.Material != (byte)item.Material ||
-                row.InventoryType != (sbyte)item.InventoryType ||
-                row.RequiredLevel != (int)item.RequiredLevel ||
-                row.SheatheType != (byte)item.SheathType ||
-                row.RandomProperty != (ushort)item.RandomProperty ||
-                row.ItemRandomSuffixGroupId != (ushort)item.RandomSuffix ||
-                row.IconFileDataId != iconFileDataId && iconFileDataId != 0 ||
-                row.MaxDurability != item.MaxDurability ||
-                row.AmmoType != (byte)item.AmmoType ||
-                row.DamageType[0] != (byte)item.DamageTypes[0] ||
-                row.DamageType[1] != (byte)item.DamageTypes[1] ||
-                row.DamageType[2] != (byte)item.DamageTypes[2] ||
-                row.DamageType[3] != (byte)item.DamageTypes[3] ||
-                row.DamageType[4] != (byte)item.DamageTypes[4] ||
-                //row.MinDamage[0] != (ushort)item.DamageMins[0] ||
-                //row.MinDamage[1] != (ushort)item.DamageMins[1] ||
-                //row.MinDamage[2] != (ushort)item.DamageMins[2] ||
-                //row.MinDamage[3] != (ushort)item.DamageMins[3] ||
-                //row.MinDamage[4] != (ushort)item.DamageMins[4] ||
-                //row.MaxDamage[0] != (ushort)item.DamageMaxs[0] ||
-                //row.MaxDamage[1] != (ushort)item.DamageMaxs[1] ||
-                //row.MaxDamage[2] != (ushort)item.DamageMaxs[2] ||
-                //row.MaxDamage[3] != (ushort)item.DamageMaxs[3] ||
-                //row.MaxDamage[4] != (ushort)item.DamageMaxs[4] ||
-                //row.Resistances[0] != (short)item.Armor ||
-                row.Resistances[1] != (short)item.HolyResistance ||
-                row.Resistances[2] != (short)item.FireResistance ||
-                row.Resistances[3] != (short)item.NatureResistance ||
-                row.Resistances[4] != (short)item.FrostResistance ||
-                row.Resistances[5] != (short)item.ShadowResistance ||
-                row.Resistances[6] != (short)item.ArcaneResistance)
+            var r = row;
+
+            // Excluded on purpose, same reasoning as GenerateItemSparseUpdateIfNeeded:
+            // MinDamage / MaxDamage truncate a float through a (ushort) cast, and Resistances[0]
+            // (Armor) was disabled by the original port for a reason that was never recorded.
+            bool Diff(bool log)
+            {
+                bool d = false;
+                d |= Cmp(log, "ClassId", r.ClassId, (byte)item.Class);
+                d |= Cmp(log, "SubclassId", r.SubclassId, (byte)item.SubClass);
+                d |= Cmp(log, "Material", r.Material, (byte)item.Material);
+                d |= Cmp(log, "InventoryType", r.InventoryType, (sbyte)item.InventoryType);
+                d |= Cmp(log, "RequiredLevel", r.RequiredLevel, (int)item.RequiredLevel);
+                d |= Cmp(log, "SheatheType", r.SheatheType, (byte)item.SheathType);
+                d |= Cmp(log, "RandomProperty", r.RandomProperty, (ushort)item.RandomProperty);
+                d |= Cmp(log, "ItemRandomSuffixGroupId", r.ItemRandomSuffixGroupId, (ushort)item.RandomSuffix);
+                // A zero lookup would overwrite the client's baked-in icon with 0; the guard is
+                // belt-and-braces since the method already returned early on that case.
+                d |= CmpGuarded(log, "IconFileDataId", r.IconFileDataId, iconFileDataId, iconFileDataId != 0);
+                d |= Cmp(log, "MaxDurability", r.MaxDurability, item.MaxDurability);
+                d |= Cmp(log, "AmmoType", r.AmmoType, (byte)item.AmmoType);
+                for (int i = 0; i < 5; i++)
+                    d |= Cmp(log, "DamageType", i, r.DamageType[i], (byte)item.DamageTypes[i]);
+                d |= Cmp(log, "Resistances", 1, r.Resistances[1], (short)item.HolyResistance);
+                d |= Cmp(log, "Resistances", 2, r.Resistances[2], (short)item.FireResistance);
+                d |= Cmp(log, "Resistances", 3, r.Resistances[3], (short)item.NatureResistance);
+                d |= Cmp(log, "Resistances", 4, r.Resistances[4], (short)item.FrostResistance);
+                d |= Cmp(log, "Resistances", 5, r.Resistances[5], (short)item.ShadowResistance);
+                d |= Cmp(log, "Resistances", 6, r.Resistances[6], (short)item.ArcaneResistance);
+                return d;
+            }
+
+            if (Diff(false))
             {
                 Log.Print(LogType.Storage, $"Item #{item.Entry} needs to be updated.");
-
-                if (row.ClassId != (byte)item.Class)
-                    Log.Print(LogType.Storage, $"ClassId {row.ClassId} vs {item.Class}");
-                if (row.SubclassId != (byte)item.SubClass)
-                    Log.Print(LogType.Storage, $"SubclassId {row.SubclassId} vs {item.SubClass}");
-                if (row.Material != (byte)item.Material)
-                    Log.Print(LogType.Storage, $"Material {row.Material} vs {item.Material}");
-                if (row.InventoryType != (sbyte)item.InventoryType)
-                    Log.Print(LogType.Storage, $"InventoryType {row.InventoryType} vs {item.InventoryType}");
-                if (row.RequiredLevel != (int)item.RequiredLevel)
-                    Log.Print(LogType.Storage, $"RequiredLevel {row.RequiredLevel} vs {item.RequiredLevel}");
-                if (row.SheatheType != (byte)item.SheathType)
-                    Log.Print(LogType.Storage, $"SheatheType {row.SheatheType} vs {item.SheathType}");
-                if (row.RandomProperty != (ushort)item.RandomProperty)
-                    Log.Print(LogType.Storage, $"RandomProperty {row.RandomProperty} vs {item.RandomProperty}");
-                if (row.ItemRandomSuffixGroupId != (ushort)item.RandomSuffix)
-                    Log.Print(LogType.Storage, $"ItemRandomSuffixGroupId {row.ItemRandomSuffixGroupId} vs {item.RandomSuffix}");
-                if (row.IconFileDataId != iconFileDataId)
-                    Log.Print(LogType.Storage, $"IconFileDataId {row.IconFileDataId} vs {iconFileDataId}");
-                if (row.MaxDurability != item.MaxDurability)
-                    Log.Print(LogType.Storage, $"MaxDurability {row.MaxDurability} vs {item.MaxDurability}");
-                if (row.AmmoType != (byte)item.AmmoType)
-                    Log.Print(LogType.Storage, $"AmmoType {row.AmmoType} vs {item.AmmoType}");
-                for (int i = 0; i < 5; i++)
-                {
-                    if (row.DamageType[i] != (byte)item.DamageTypes[i])
-                        Log.Print(LogType.Storage, $"DamageType[{i}] {row.DamageType[i]} vs {item.DamageTypes[i]}");
-                }
-                if (row.Resistances[1] != (short)item.HolyResistance)
-                    Log.Print(LogType.Storage, $"Resistances[1] {row.Resistances[1]} vs {item.HolyResistance}");
-                if (row.Resistances[2] != (short)item.FireResistance)
-                    Log.Print(LogType.Storage, $"Resistances[2] {row.Resistances[2]} vs {item.FireResistance}");
-                if (row.Resistances[3] != (short)item.NatureResistance)
-                    Log.Print(LogType.Storage, $"Resistances[3] {row.Resistances[3]} vs {item.NatureResistance}");
-                if (row.Resistances[4] != (short)item.FrostResistance)
-                    Log.Print(LogType.Storage, $"Resistances[4] {row.Resistances[4]} vs {item.FrostResistance}");
-                if (row.Resistances[5] != (short)item.ShadowResistance)
-                    Log.Print(LogType.Storage, $"Resistances[5] {row.Resistances[5]} vs {item.ShadowResistance}");
-                if (row.Resistances[6] != (short)item.ArcaneResistance)
-                    Log.Print(LogType.Storage, $"Resistances[6] {row.Resistances[6]} vs {item.ArcaneResistance}");
+                if (Log.IsEnabled(LogType.Storage))
+                    Diff(true);
 
                 // something is different so update current data
                 UpdateItemRecord(row, item);
@@ -4073,6 +4038,65 @@ public static partial class GameData
             return GenerateHotFixMessage(row);
         }
         return null;
+    }
+
+    // Field comparators shared by the Generate*UpdateIfNeeded hotfix paths.
+    //
+    // The equal path — which is the overwhelming majority, one call per field per item — must not
+    // allocate. The IEquatable<T> constraint makes Equals a constrained callvirt the JIT resolves
+    // to the struct's own implementation, so nothing boxes; the field name is a literal, and the
+    // interpolated message is only built once the values are known to differ.
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool Cmp<T>(bool log, string field, T mine, T theirs) where T : IEquatable<T>
+    {
+        if (mine.Equals(theirs))
+            return false;
+
+        if (log)
+            Log.Print(LogType.Storage, $"{field} {mine} vs {theirs}");
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool Cmp<T>(bool log, string field, int index, T mine, T theirs) where T : IEquatable<T>
+    {
+        if (mine.Equals(theirs))
+            return false;
+
+        if (log)
+            Log.Print(LogType.Storage, $"{field}[{index}] {mine} vs {theirs}");
+        return true;
+    }
+
+    /// <summary>
+    /// Indexed compare that only counts when <paramref name="guard"/> holds — for paired arrays
+    /// where a difference in one is meaningless unless the other carries a value.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool CmpGuarded<T>(bool log, string field, int index, T mine, T theirs, bool guard)
+        where T : IEquatable<T>
+        => guard && Cmp(log, field, index, mine, theirs);
+
+    /// <summary>
+    /// Compare that only counts when <paramref name="guard"/> holds — for fields whose difference
+    /// is only meaningful under a side condition.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool CmpGuarded<T>(bool log, string field, T mine, T theirs, bool guard)
+        where T : IEquatable<T>
+        => guard && Cmp(log, field, mine, theirs);
+
+    /// <summary>Ordinal string compare; quotes both sides so a trailing-space diff is visible.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool CmpStr(bool log, string field, string mine, string theirs)
+    {
+        if (string.Equals(mine, theirs, StringComparison.Ordinal))
+            return false;
+
+        if (log)
+            Log.Print(LogType.Storage, $"{field} \"{mine}\" vs \"{theirs}\"");
+        return true;
     }
 
     public static Server.Packets.HotFixMessage? GenerateItemSparseUpdateIfNeeded(ItemTemplate item)
@@ -4100,217 +4124,91 @@ public static partial class GameData
         ItemSparseRecordsStore.TryGetValue(item.Entry, out var row);
         if (row != null)
         {
-            if (//row.AllowableRace != item.AllowedRaces ||
-                !row.Description.Equals(item.Description) ||
-                !row.Name4.Equals(item.Name[3]) ||
-                !row.Name3.Equals(item.Name[2]) ||
-                !row.Name2.Equals(item.Name[1]) ||
-                !row.Name1.Equals(item.Name[0]) ||
-                row.DurationInInventory != item.Duration ||
-                row.BagFamily != item.BagFamily ||
-                row.RangeMod != item.RangedMod ||
-                //row.Stackable != item.MaxStackSize ||
-                //row.MaxCount != item.MaxCount ||
-                row.RequiredAbility != item.RequiredSpell ||
-                row.SellPrice != item.SellPrice ||
-                row.BuyPrice != item.BuyPrice ||
-                //row.Flags[0] != item.Flags ||
-                //row.Flags[1] != item.FlagsExtra ||
-                row.MaxDurability != item.MaxDurability ||
-                row.RequiredHoliday != (ushort)item.HolidayID ||
-                row.LimitCategory != (ushort)item.ItemLimitCategory ||
-                row.GemProperties != (ushort)item.GemProperties ||
-                row.SocketMatchEnchantmentId != (ushort)item.SocketBonus ||
-                row.TotemCategoryId != (ushort)item.TotemCategory ||
-                row.InstanceBound != (ushort)item.MapID ||
-                row.ZoneBound[0] != (ushort)item.AreaID ||
-                row.ItemSet != (ushort)item.ItemSet ||
-                row.LockId != (ushort)item.LockId ||
-                row.StartQuestId != (ushort)item.StartQuestId ||
-                row.PageText != (ushort)item.PageText ||
-                row.Delay != (ushort)item.Delay ||
-                row.RequiredReputationId != (ushort)item.RequiredRepFaction ||
-                row.RequiredSkillRank != (ushort)item.RequiredSkillLevel ||
-                row.RequiredSkill != (ushort)item.RequiredSkillId ||
-                row.ItemLevel != (ushort)item.ItemLevel ||
-                //row.AllowableClass != (short)item.AllowedClasses ||
-                row.ItemRandomSuffixGroupId != (ushort)item.RandomSuffix ||
-                row.RandomProperty != (ushort)item.RandomProperty ||
-                //row.MinDamage[0] != (ushort)item.DamageMins[0] ||
-                //row.MinDamage[1] != (ushort)item.DamageMins[1] ||
-                //row.MinDamage[2] != (ushort)item.DamageMins[2] ||
-                //row.MinDamage[3] != (ushort)item.DamageMins[3] ||
-                //row.MinDamage[4] != (ushort)item.DamageMins[4] ||
-                //row.MaxDamage[0] != (ushort)item.DamageMaxs[0] ||
-                //row.MaxDamage[1] != (ushort)item.DamageMaxs[1] ||
-                //row.MaxDamage[2] != (ushort)item.DamageMaxs[2] ||
-                //row.MaxDamage[3] != (ushort)item.DamageMaxs[3] ||
-                //row.MaxDamage[4] != (ushort)item.DamageMaxs[4] ||
-                //row.Resistances[0] != (short)item.Armor ||
-                row.Resistances[1] != (short)item.HolyResistance ||
-                row.Resistances[2] != (short)item.FireResistance ||
-                row.Resistances[3] != (short)item.NatureResistance ||
-                row.Resistances[4] != (short)item.FrostResistance ||
-                row.Resistances[5] != (short)item.ShadowResistance ||
-                row.Resistances[6] != (short)item.ArcaneResistance ||
-                row.ScalingStatDistributionId != (ushort)item.ScalingStatDistribution ||
-                row.SocketType[0] != ModernVersion.ConvertSocketColor((byte)item.ItemSocketColors[0]) ||
-                row.SocketType[1] != ModernVersion.ConvertSocketColor((byte)item.ItemSocketColors[1]) ||
-                row.SocketType[2] != ModernVersion.ConvertSocketColor((byte)item.ItemSocketColors[2]) ||
-                row.SheatheType != (byte)item.SheathType ||
-                row.Material != (byte)item.Material ||
-                row.PageMaterial != (byte)item.PageMaterial ||
-                row.PageLanguage != (byte)item.Language ||
-                row.Bonding != (byte)item.Bonding ||
-                row.DamageType != (byte)item.DamageTypes[0] ||
-                row.StatType[0] != (sbyte)item.StatTypes[0] && (row.StatValue[0] != 0 || item.StatValues[0] != 0) ||
-                row.StatType[1] != (sbyte)item.StatTypes[1] && (row.StatValue[1] != 0 || item.StatValues[1] != 0) ||
-                row.StatType[2] != (sbyte)item.StatTypes[2] && (row.StatValue[2] != 0 || item.StatValues[2] != 0) ||
-                row.StatType[3] != (sbyte)item.StatTypes[3] && (row.StatValue[3] != 0 || item.StatValues[3] != 0) ||
-                row.StatType[4] != (sbyte)item.StatTypes[4] && (row.StatValue[4] != 0 || item.StatValues[4] != 0) ||
-                row.StatType[5] != (sbyte)item.StatTypes[5] && (row.StatValue[5] != 0 || item.StatValues[5] != 0) ||
-                row.StatType[6] != (sbyte)item.StatTypes[6] && (row.StatValue[6] != 0 || item.StatValues[6] != 0) ||
-                row.StatType[7] != (sbyte)item.StatTypes[7] && (row.StatValue[7] != 0 || item.StatValues[7] != 0) ||
-                row.StatType[8] != (sbyte)item.StatTypes[8] && (row.StatValue[8] != 0 || item.StatValues[8] != 0) ||
-                row.StatType[9] != (sbyte)item.StatTypes[9] && (row.StatValue[9] != 0 || item.StatValues[9] != 0) ||
-                row.ContainerSlots != (byte)item.ContainerSlots ||
-                row.RequiredReputationRank != (byte)item.RequiredRepValue ||
-                row.RequiredCityRank != (byte)item.RequiredCityRank ||
-                row.RequiredHonorRank != (byte)item.RequiredHonorRank ||
-                row.InventoryType != (byte)item.InventoryType ||
-                row.OverallQualityId != (byte)item.Quality ||
-                row.AmmoType != (byte)item.AmmoType ||
-                row.StatValue[0] != (sbyte)item.StatValues[0] ||
-                row.StatValue[1] != (sbyte)item.StatValues[1] ||
-                row.StatValue[2] != (sbyte)item.StatValues[2] ||
-                row.StatValue[3] != (sbyte)item.StatValues[3] ||
-                row.StatValue[4] != (sbyte)item.StatValues[4] ||
-                row.StatValue[5] != (sbyte)item.StatValues[5] ||
-                row.StatValue[6] != (sbyte)item.StatValues[6] ||
-                row.StatValue[7] != (sbyte)item.StatValues[7] ||
-                row.StatValue[8] != (sbyte)item.StatValues[8] ||
-                row.StatValue[9] != (sbyte)item.StatValues[9] ||
-                row.RequiredLevel != (sbyte)item.RequiredLevel)
+            var r = row;
+
+            // Fields deliberately left out of the comparison. Re-enabling one means every item
+            // that trips it gets a hotfix on every login, so each needs verifying first:
+            //   AllowableRace / AllowableClass — legacy sends a 32-bit mask while the V3_4_3
+            //       columns are Int64 / Int16, so -1 ("all races/classes") never compares equal.
+            //   MinDamage / MaxDamage — ItemTemplate holds floats; the (ushort) cast truncates,
+            //       so any item with fractional damage would differ permanently.
+            //   Stackable / MaxCount / Flags[0] / Flags[1] / Resistances[0] (Armor) — excluded by
+            //       the original port; the reason was never recorded and is not established here.
+            //
+            // Diff() runs twice on a mismatch: once silently to decide, once to print. The second
+            // pass only happens when the Storage sink is on, and the closure is a stack-allocated
+            // ref struct because the local function is never converted to a delegate.
+            bool Diff(bool log)
+            {
+                bool d = false;
+                d |= CmpStr(log, "Description", r.Description, item.Description);
+                d |= CmpStr(log, "Name4", r.Name4, item.Name[3]);
+                d |= CmpStr(log, "Name3", r.Name3, item.Name[2]);
+                d |= CmpStr(log, "Name2", r.Name2, item.Name[1]);
+                d |= CmpStr(log, "Name1", r.Name1, item.Name[0]);
+                d |= Cmp(log, "DurationInInventory", r.DurationInInventory, item.Duration);
+                d |= Cmp(log, "BagFamily", r.BagFamily, item.BagFamily);
+                d |= Cmp(log, "RangeMod", r.RangeMod, item.RangedMod);
+                d |= Cmp(log, "RequiredAbility", r.RequiredAbility, item.RequiredSpell);
+                d |= Cmp(log, "SellPrice", r.SellPrice, item.SellPrice);
+                d |= Cmp(log, "BuyPrice", r.BuyPrice, item.BuyPrice);
+                d |= Cmp(log, "MaxDurability", r.MaxDurability, item.MaxDurability);
+                d |= Cmp(log, "RequiredHoliday", r.RequiredHoliday, (ushort)item.HolidayID);
+                d |= Cmp(log, "LimitCategory", r.LimitCategory, (ushort)item.ItemLimitCategory);
+                d |= Cmp(log, "GemProperties", r.GemProperties, (ushort)item.GemProperties);
+                d |= Cmp(log, "SocketMatchEnchantmentId", r.SocketMatchEnchantmentId, (ushort)item.SocketBonus);
+                d |= Cmp(log, "TotemCategoryId", r.TotemCategoryId, (ushort)item.TotemCategory);
+                d |= Cmp(log, "InstanceBound", r.InstanceBound, (ushort)item.MapID);
+                d |= Cmp(log, "ZoneBound", 0, r.ZoneBound[0], (ushort)item.AreaID);
+                d |= Cmp(log, "ItemSet", r.ItemSet, (ushort)item.ItemSet);
+                d |= Cmp(log, "LockId", r.LockId, (ushort)item.LockId);
+                d |= Cmp(log, "StartQuestId", r.StartQuestId, (ushort)item.StartQuestId);
+                d |= Cmp(log, "PageText", r.PageText, (ushort)item.PageText);
+                d |= Cmp(log, "Delay", r.Delay, (ushort)item.Delay);
+                d |= Cmp(log, "RequiredReputationId", r.RequiredReputationId, (ushort)item.RequiredRepFaction);
+                d |= Cmp(log, "RequiredSkillRank", r.RequiredSkillRank, (ushort)item.RequiredSkillLevel);
+                d |= Cmp(log, "RequiredSkill", r.RequiredSkill, (ushort)item.RequiredSkillId);
+                d |= Cmp(log, "ItemLevel", r.ItemLevel, (ushort)item.ItemLevel);
+                d |= Cmp(log, "ItemRandomSuffixGroupId", r.ItemRandomSuffixGroupId, (ushort)item.RandomSuffix);
+                d |= Cmp(log, "RandomProperty", r.RandomProperty, (ushort)item.RandomProperty);
+                d |= Cmp(log, "Resistances", 1, r.Resistances[1], (short)item.HolyResistance);
+                d |= Cmp(log, "Resistances", 2, r.Resistances[2], (short)item.FireResistance);
+                d |= Cmp(log, "Resistances", 3, r.Resistances[3], (short)item.NatureResistance);
+                d |= Cmp(log, "Resistances", 4, r.Resistances[4], (short)item.FrostResistance);
+                d |= Cmp(log, "Resistances", 5, r.Resistances[5], (short)item.ShadowResistance);
+                d |= Cmp(log, "Resistances", 6, r.Resistances[6], (short)item.ArcaneResistance);
+                d |= Cmp(log, "ScalingStatDistributionId", r.ScalingStatDistributionId, (ushort)item.ScalingStatDistribution);
+                for (int i = 0; i < 3; i++)
+                    d |= Cmp(log, "SocketType", i, r.SocketType[i], ModernVersion.ConvertSocketColor((byte)item.ItemSocketColors[i]));
+                d |= Cmp(log, "SheatheType", r.SheatheType, (byte)item.SheathType);
+                d |= Cmp(log, "Material", r.Material, (byte)item.Material);
+                d |= Cmp(log, "PageMaterial", r.PageMaterial, (byte)item.PageMaterial);
+                d |= Cmp(log, "PageLanguage", r.PageLanguage, (byte)item.Language);
+                d |= Cmp(log, "Bonding", r.Bonding, (byte)item.Bonding);
+                d |= Cmp(log, "DamageType", r.DamageType, (byte)item.DamageTypes[0]);
+                // A StatType mismatch only counts while at least one side carries a value; a type
+                // change on a zero-valued slot is invisible to the client.
+                for (int i = 0; i < 10; i++)
+                    d |= CmpGuarded(log, "StatType", i, r.StatType[i], (sbyte)item.StatTypes[i],
+                                    r.StatValue[i] != 0 || item.StatValues[i] != 0);
+                d |= Cmp(log, "ContainerSlots", r.ContainerSlots, (byte)item.ContainerSlots);
+                d |= Cmp(log, "RequiredReputationRank", r.RequiredReputationRank, (byte)item.RequiredRepValue);
+                d |= Cmp(log, "RequiredCityRank", r.RequiredCityRank, (byte)item.RequiredCityRank);
+                d |= Cmp(log, "RequiredHonorRank", r.RequiredHonorRank, (byte)item.RequiredHonorRank);
+                d |= Cmp(log, "InventoryType", r.InventoryType, (byte)item.InventoryType);
+                d |= Cmp(log, "OverallQualityId", r.OverallQualityId, (byte)item.Quality);
+                d |= Cmp(log, "AmmoType", r.AmmoType, (byte)item.AmmoType);
+                for (int i = 0; i < 10; i++)
+                    d |= Cmp(log, "StatValue", i, r.StatValue[i], (short)item.StatValues[i]);
+                d |= Cmp(log, "RequiredLevel", r.RequiredLevel, (sbyte)item.RequiredLevel);
+                return d;
+            }
+
+            if (Diff(false))
             {
                 Log.Print(LogType.Storage, $"ItemSparse #{item.Entry} needs to be updated.");
-
-                if (!row.Description.Equals(item.Description))
-                    Log.Print(LogType.Storage, $"Description \"{row.Description}\" vs \"{item.Description}\"");
-                if (!row.Name4.Equals(item.Name[3]))
-                    Log.Print(LogType.Storage, $"Name4 \"{row.Name4}\" vs \"{item.Name[3]}\"");
-                if (!row.Name3.Equals(item.Name[2]))
-                    Log.Print(LogType.Storage, $"Name3 \"{row.Name3}\" vs \"{item.Name[2]}\"");
-                if (!row.Name2.Equals(item.Name[1]))
-                    Log.Print(LogType.Storage, $"Name2 \"{row.Name2}\" vs \"{item.Name[1]}\"");
-                if (!row.Name1.Equals(item.Name[0]))
-                    Log.Print(LogType.Storage, $"Name1 \"{row.Name1}\" vs \"{item.Name[0]}\"");
-                if (row.DurationInInventory != item.Duration)
-                    Log.Print(LogType.Storage, $"DurationInInventory {row.DurationInInventory} vs {item.Duration}");
-                if (row.BagFamily != item.BagFamily)
-                    Log.Print(LogType.Storage, $"BagFamily {row.BagFamily} vs {item.BagFamily}");
-                if (row.RangeMod != item.RangedMod)
-                    Log.Print(LogType.Storage, $"RangeMod {row.RangeMod} vs {item.RangedMod}");
-                if (row.RequiredAbility != item.RequiredSpell)
-                    Log.Print(LogType.Storage, $"RequiredAbility {row.RequiredAbility} vs {item.RequiredSpell}");
-                if (row.SellPrice != item.SellPrice)
-                    Log.Print(LogType.Storage, $"SellPrice {row.SellPrice} vs {item.SellPrice}");
-                if (row.BuyPrice != item.BuyPrice)
-                    Log.Print(LogType.Storage, $"BuyPrice {row.BuyPrice} vs {item.BuyPrice}");
-                if (row.MaxDurability != item.MaxDurability)
-                    Log.Print(LogType.Storage, $"MaxDurability {row.MaxDurability} vs {item.MaxDurability}");
-                if (row.RequiredHoliday != (ushort)item.HolidayID)
-                    Log.Print(LogType.Storage, $"RequiredHoliday {row.RequiredHoliday} vs {item.HolidayID}");
-                if (row.LimitCategory != (ushort)item.ItemLimitCategory)
-                    Log.Print(LogType.Storage, $"LimitCategory {row.LimitCategory} vs {item.ItemLimitCategory}");
-                if (row.GemProperties != (ushort)item.GemProperties)
-                    Log.Print(LogType.Storage, $"GemProperties {row.GemProperties} vs {item.GemProperties}");
-                if (row.SocketMatchEnchantmentId != (ushort)item.SocketBonus)
-                    Log.Print(LogType.Storage, $"SocketMatchEnchantmentId {row.SocketMatchEnchantmentId} vs {item.SocketBonus}");
-                if (row.TotemCategoryId != (ushort)item.TotemCategory)
-                    Log.Print(LogType.Storage, $"TotemCategoryId {row.TotemCategoryId} vs {item.TotemCategory}");
-                if (row.InstanceBound != (ushort)item.MapID)
-                    Log.Print(LogType.Storage, $"InstanceBound {row.InstanceBound} vs {item.MapID}");
-                if (row.ZoneBound[0] != (ushort)item.AreaID)
-                    Log.Print(LogType.Storage, $"ZoneBound[0] {row.ZoneBound[0]} vs {item.AreaID}");
-                if (row.ItemSet != (ushort)item.ItemSet)
-                    Log.Print(LogType.Storage, $"ItemSet {row.ItemSet} vs {item.ItemSet}");
-                if (row.LockId != (ushort)item.LockId)
-                    Log.Print(LogType.Storage, $"LockId {row.LockId} vs {item.LockId}");
-                if (row.StartQuestId != (ushort)item.StartQuestId)
-                    Log.Print(LogType.Storage, $"StartQuestId {row.StartQuestId} vs {item.StartQuestId}");
-                if (row.PageText != (ushort)item.PageText)
-                    Log.Print(LogType.Storage, $"PageText {row.PageText} vs {item.PageText}");
-                if (row.Delay != (ushort)item.Delay)
-                    Log.Print(LogType.Storage, $"Delay {row.Delay} vs {item.Delay}");
-                if (row.RequiredReputationId != (ushort)item.RequiredRepFaction)
-                    Log.Print(LogType.Storage, $"RequiredReputationId {row.RequiredReputationId} vs {item.RequiredRepFaction}");
-                if (row.RequiredSkillRank != (ushort)item.RequiredSkillLevel)
-                    Log.Print(LogType.Storage, $"RequiredSkillRank {row.RequiredSkillRank} vs {item.RequiredSkillLevel}");
-                if (row.RequiredSkill != (ushort)item.RequiredSkillId)
-                    Log.Print(LogType.Storage, $"RequiredSkill {row.RequiredSkill} vs {item.RequiredSkillId}");
-                if (row.ItemLevel != (ushort)item.ItemLevel)
-                    Log.Print(LogType.Storage, $"ItemLevel {row.ItemLevel} vs {item.ItemLevel}");
-                if (row.ItemRandomSuffixGroupId != (ushort)item.RandomSuffix)
-                    Log.Print(LogType.Storage, $"ItemRandomSuffixGroupId {row.ItemRandomSuffixGroupId} vs {item.RandomSuffix}");
-                if (row.RandomProperty != (ushort)item.RandomProperty)
-                    Log.Print(LogType.Storage, $"RandomProperty {row.RandomProperty} vs {item.RandomProperty}");
-                if (row.Resistances[1] != (short)item.HolyResistance)
-                    Log.Print(LogType.Storage, $"Resistances[1] {row.Resistances[1]} vs {item.HolyResistance}");
-                if (row.Resistances[2] != (short)item.FireResistance)
-                    Log.Print(LogType.Storage, $"Resistances[2] {row.Resistances[2]} vs {item.FireResistance}");
-                if (row.Resistances[3] != (short)item.NatureResistance)
-                    Log.Print(LogType.Storage, $"Resistances[3]  {row.Resistances[3]} vs {item.NatureResistance}");
-                if (row.Resistances[4] != (short)item.FrostResistance)
-                    Log.Print(LogType.Storage, $"Resistances[4] {row.Resistances[4]} vs {item.FrostResistance}");
-                if (row.Resistances[5] != (short)item.ShadowResistance)
-                    Log.Print(LogType.Storage, $"Resistances[5] {row.Resistances[5]} vs {item.ShadowResistance}");
-                if (row.Resistances[6] != (short)item.ArcaneResistance)
-                    Log.Print(LogType.Storage, $"Resistances[6] {row.Resistances[6]} vs {item.ArcaneResistance}");
-                if (row.ScalingStatDistributionId != (ushort)item.ScalingStatDistribution)
-                    Log.Print(LogType.Storage, $"ScalingStatDistributionId {row.ScalingStatDistributionId} vs {item.ScalingStatDistribution}");
-                for (int i = 0; i < 3; i++)
-                {
-                    if (row.SocketType[i] != ModernVersion.ConvertSocketColor((byte)item.ItemSocketColors[i]))
-                        Log.Print(LogType.Storage, $"SocketType[{i}] {row.SocketType[i]} vs {ModernVersion.ConvertSocketColor((byte)item.ItemSocketColors[i])}");
-                }
-                if (row.SheatheType != (byte)item.SheathType)
-                    Log.Print(LogType.Storage, $"SheatheType {row.SheatheType} vs {item.SheathType}");
-                if (row.Material != (byte)item.Material)
-                    Log.Print(LogType.Storage, $"Material {row.Material} vs {item.Material}");
-                if (row.PageMaterial != (byte)item.PageMaterial)
-                    Log.Print(LogType.Storage, $"PageMaterial {row.PageMaterial} vs {item.PageMaterial}");
-                if (row.PageLanguage != (byte)item.Language)
-                    Log.Print(LogType.Storage, $"PageLanguage {row.PageLanguage} vs {item.Language}");
-                if (row.Bonding != (byte)item.Bonding)
-                    Log.Print(LogType.Storage, $"Bonding {row.Bonding} vs {item.Bonding}");
-                if (row.DamageType != (byte)item.DamageTypes[0])
-                    Log.Print(LogType.Storage, $"DamageType {row.DamageType} vs {item.DamageTypes[0]}");
-                for (int i = 0; i < 10; i++)
-                {
-                    if (row.StatType[i] != (sbyte)item.StatTypes[i] && (row.StatValue[i] != 0 || item.StatValues[i] != 0))
-                        Log.Print(LogType.Storage, $"StatType[{i}] {row.StatType[i]} vs {item.StatTypes[i]}");
-                }
-                if (row.ContainerSlots != (byte)item.ContainerSlots)
-                    Log.Print(LogType.Storage, $"ContainerSlots {row.ContainerSlots} vs {item.ContainerSlots}");
-                if (row.RequiredReputationRank != (byte)item.RequiredRepValue)
-                    Log.Print(LogType.Storage, $"RequiredReputationRank {row.RequiredReputationRank} vs {item.RequiredRepValue}");
-                if (row.RequiredCityRank != (byte)item.RequiredCityRank)
-                    Log.Print(LogType.Storage, $"RequiredCityRank {row.RequiredCityRank} vs {item.RequiredCityRank}");
-                if (row.RequiredHonorRank != (byte)item.RequiredHonorRank)
-                    Log.Print(LogType.Storage, $"RequiredHonorRank {row.RequiredHonorRank} vs {item.RequiredHonorRank}");
-                if (row.InventoryType != (byte)item.InventoryType)
-                    Log.Print(LogType.Storage, $"InventoryType {row.InventoryType} vs {item.InventoryType}");
-                if (row.OverallQualityId != (byte)item.Quality)
-                    Log.Print(LogType.Storage, $"OverallQualityId {row.OverallQualityId} vs {item.Quality}");
-                if (row.AmmoType != (byte)item.AmmoType)
-                    Log.Print(LogType.Storage, $"AmmoType {row.AmmoType} vs {item.AmmoType}");
-                for (int i = 0; i < 10; i++)
-                {
-                    if (row.StatValue[0] != (sbyte)item.StatValues[0])
-                        Log.Print(LogType.Storage, $"StatValue[{i}] {row.StatValue[i]} vs {item.StatValues[i]}");
-                }
-                if (row.RequiredLevel != (sbyte)item.RequiredLevel)
-                    Log.Print(LogType.Storage, $"RequiredLevel {row.RequiredLevel} vs {item.RequiredLevel}");
+                if (Log.IsEnabled(LogType.Storage))
+                    Diff(true);
 
                 // something is different so update current data
                 UpdateItemSparseRecord(row, item);
@@ -4599,12 +4497,6 @@ public static partial class GameData
         row.MaxDamage[2] = (ushort)item.DamageMaxs[2];
         row.MaxDamage[3] = (ushort)item.DamageMaxs[3];
         row.MaxDamage[4] = (ushort)item.DamageMaxs[4];
-
-        if (ItemRecordsStore.ContainsKey(item.Entry))
-        {
-            ItemRecordsStore[item.Entry] = row;
-            //Log.Print(LogType.Storage, $"Item #{row.Id} updated.");
-        }
     }
 
     public static ItemSparseRecord AddItemSparseRecord(ItemTemplate item)
@@ -4621,14 +4513,11 @@ public static partial class GameData
 
     public static void UpdateItemSparseRecord(ItemSparseRecord row, ItemTemplate item)
     {
-        // The destination row.StatValue is sbyte[], so values wider than a signed byte
-        // have to be clamped rather than wrapped. This narrowing is why the store cannot
-        // represent a WotLK-era stat like +520 spell power; the comparison in
-        // GenerateItemSparseUpdateIfNeeded casts the legacy side to sbyte as well, so the
-        // two agree, but the stored row is not the real value.
+        // row.StatValue is short[], which spans every stat the game actually ships, so
+        // the clamp only guards against a malformed legacy item_template.
         Span<int> StatValues = stackalloc int[10];
-        for (int i = 0; i < item.StatsCount; i++)
-            StatValues[i] = Math.Clamp(item.StatValues[i], sbyte.MinValue, sbyte.MaxValue);
+        for (int i = 0; i < Math.Min(item.StatsCount, 10); i++)
+            StatValues[i] = Math.Clamp(item.StatValues[i], short.MinValue, short.MaxValue);
 
         row.AllowableRace = item.AllowedRaces;
         row.Description = item.Description;
@@ -4710,23 +4599,17 @@ public static partial class GameData
         row.InventoryType = (byte)item.InventoryType;
         row.OverallQualityId = (byte)item.Quality;
         row.AmmoType = (byte)item.AmmoType;
-        row.StatValue[0] = (sbyte)StatValues[0];
-        row.StatValue[1] = (sbyte)StatValues[1];
-        row.StatValue[2] = (sbyte)StatValues[2];
-        row.StatValue[3] = (sbyte)StatValues[3];
-        row.StatValue[4] = (sbyte)StatValues[4];
-        row.StatValue[5] = (sbyte)StatValues[5];
-        row.StatValue[6] = (sbyte)StatValues[6];
-        row.StatValue[7] = (sbyte)StatValues[7];
-        row.StatValue[8] = (sbyte)StatValues[8];
-        row.StatValue[9] = (sbyte)StatValues[9];
+        row.StatValue[0] = (short)StatValues[0];
+        row.StatValue[1] = (short)StatValues[1];
+        row.StatValue[2] = (short)StatValues[2];
+        row.StatValue[3] = (short)StatValues[3];
+        row.StatValue[4] = (short)StatValues[4];
+        row.StatValue[5] = (short)StatValues[5];
+        row.StatValue[6] = (short)StatValues[6];
+        row.StatValue[7] = (short)StatValues[7];
+        row.StatValue[8] = (short)StatValues[8];
+        row.StatValue[9] = (short)StatValues[9];
         row.RequiredLevel = (sbyte)item.RequiredLevel;
-
-        if (ItemSparseRecordsStore.ContainsKey(item.Entry))
-        {
-            ItemSparseRecordsStore[item.Entry] = row;
-            //Log.Print(LogType.Storage, $"ItemSparse #{row.Id} updated.");
-        }
     }
 
     public static ItemEffect AddItemEffectRecord(ItemTemplate item, byte slot)
@@ -4807,12 +4690,6 @@ public static partial class GameData
         appearance.ItemDisplayInfoID = (int)item.DisplayID;
         appearance.DefaultIconFileDataID = fileDataId;
         appearance.UiOrder = 0;
-
-        if (ItemAppearanceStore.ContainsKey((uint)appearance.Id))
-        {
-            ItemAppearanceStore[(uint)appearance.Id] = appearance;
-            //Log.Print(LogType.Storage, $"ItemAppearance #{appearance.Id} updated for DisplayID #{item.DisplayID}.");
-        }
     }
 
     public static ItemModifiedAppearance? AddItemModifiedAppearanceRecord(ItemTemplate item)
@@ -4845,12 +4722,6 @@ public static partial class GameData
         modAppearance.ItemAppearanceID = appearance.Id;
         modAppearance.OrderIndex = 0;
         modAppearance.TransmogSourceTypeEnum = 0;
-
-        if (ItemModifiedAppearanceStore.ContainsKey((uint)modAppearance.Id))
-        {
-            ItemModifiedAppearanceStore[(uint)modAppearance.Id] = modAppearance;
-            //Log.Print(LogType.Storage, $"ItemModifiedAppearance #{modAppearance.Id} updated for item #{item.Entry}.");
-        }
     }
 
     public static bool ItemCanHaveModel(ItemTemplate item)
@@ -5419,7 +5290,10 @@ public static partial class GameData
         public byte InventoryType;
         public byte OverallQualityId;
         public byte AmmoType;
-        public sbyte[] StatValue = new sbyte[10];
+        // short, not sbyte: WotLK raid gear exceeds a signed byte (item 51219
+        // Sanctified Ymirjar Lord's Breastplate is +162 Str / +219 Sta) and the
+        // V3_4_3 wire field is Int16. Older layouts still narrow on write.
+        public short[] StatValue = new short[10];
         public sbyte RequiredLevel;
     }
 
