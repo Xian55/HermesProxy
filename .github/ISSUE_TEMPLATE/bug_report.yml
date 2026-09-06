@@ -9,6 +9,8 @@ body:
 
       **Log files are required.** Issues without both an application log and a packet capture will be closed unactioned, because they cannot be triaged. See the README section "Reporting bugs" if you need help locating these files.
 
+      **Clear the client cache first.** Delete the whole `Cache` folder in your WoW directory, then restart the client and try again. The client caches item tooltips and DB2 data in `Cache\WDB\<locale>\`; once it has stored a broken entry it keeps using it and never asks again, so a bug that was already fixed can look like it is still there. Your settings live in `WTF`, not `Cache`, so nothing is lost.
+
       **Reproduce with verbose logging.** For the highest-quality triage, please reproduce the issue with verbose logs enabled:
 
       ```
@@ -106,8 +108,10 @@ body:
 - type: checkboxes
   attributes:
     label: Confirmation
-    description: Both attachments are required for the issue to be triaged.
+    description: All three are required for the issue to be triaged.
     options:
+      - label: I have deleted the `Cache` folder in my WoW directory and the problem still happens.
+        required: true
       - label: I have attached the application log from `Logs/`.
         required: true
       - label: I have attached the packet capture from `PacketsLog/` (zipped, or renamed to `.pkt.txt`).
