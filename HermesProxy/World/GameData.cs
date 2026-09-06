@@ -100,7 +100,11 @@ public static partial class GameData
     public static FrozenSet<uint> PassiveSpells = FrozenSet<uint>.Empty;
     public static FrozenDictionary<uint, int> AuraDurations = FrozenDictionary<uint, int>.Empty;
     public static FrozenDictionary<uint, TaxiPath> TaxiPaths = FrozenDictionary<uint, TaxiPath>.Empty;
-    public static int[,] TaxiNodesGraph = new int[250, 250];
+    // Adjacency matrix indexed by taxi node id, so it must span the highest id in
+    // TaxiNodes{N}.csv -- 87 on vanilla, 220 on TBC, 440 on WotLK. Sized from the
+    // data by LoadTaxiPathNodesGraph rather than a literal; the old fixed 250 was
+    // short of WotLK and turned correct data into a startup crash.
+    public static int[,] TaxiNodesGraph = new int[1, 1];
     public static FrozenDictionary<uint /*questId*/, uint /*questBit*/> QuestBits = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<int /*worldMapAreaId (legacy 3.3.5a)*/, int /*uiMapId (modern build)*/> WorldMapAreaIDToUiMapID = FrozenDictionary<int, int>.Empty;
 
@@ -2015,6 +2019,16 @@ public static partial class GameData
                 TaxiPathNodes.Add(taxiPathNode.Id, taxiPathNode);
             }
         }
+        // Span every node id the data actually uses. Node ids are sparse and reach
+        // 440 on WotLK, so the matrix is sized here instead of at the declaration.
+        uint highestNodeId = 0;
+        foreach (var node in TaxiNodes.Keys)
+        {
+            if (node > highestNodeId)
+                highestNodeId = node;
+        }
+        TaxiNodesGraph = new int[highestNodeId + 1, highestNodeId + 1];
+
         // calculate distances between nodes
         for (uint i = 0; i < TaxiPaths.Count; i++)
         {
@@ -2024,8 +2038,16 @@ public static partial class GameData
             }
 
             float dist = 0.0f;
-            TaxiNode nodeFrom = TaxiNodes[taxiPath.From];
-            TaxiNode nodeTo = TaxiNodes[taxiPath.To];
+            // A path whose endpoint is missing from TaxiNodes is unroutable, and
+            // TaxiPath.db2 does ship such rows. Degrade instead of taking the host
+            // down: this runs inside Parallel.Invoke, so a KeyNotFoundException here
+            // surfaces as an AggregateException and the proxy never finishes startup.
+            if (!TaxiNodes.TryGetValue(taxiPath.From, out TaxiNode? nodeFrom) ||
+                !TaxiNodes.TryGetValue(taxiPath.To, out TaxiNode? nodeTo) ||
+                nodeFrom == null || nodeTo == null)
+            {
+                continue;
+            }
 
             if (nodeFrom.x == 0 && nodeFrom.x == 0 && nodeFrom.z == 0)
                 continue;

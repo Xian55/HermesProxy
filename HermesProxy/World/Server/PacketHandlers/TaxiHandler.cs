@@ -24,7 +24,24 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_ENABLE_TAXI_NODE)]
     void HandleEnableTaxiNode(InteractWithNPC interact)
     {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_TALK_TO_GOSSIP);
+        // The modern client sends this for a flight master whose node it has not
+        // discovered yet, meaning "open the taxi map". Forwarding it as
+        // CMSG_TALK_TO_GOSSIP (gossip-hello) makes TrinityCore run the creature's
+        // gossip menu instead, which never answers with SMSG_SHOW_TAXI_NODES -- so
+        // the node stayed undiscovered, the client re-sent this opcode forever, and
+        // CurrentTaxiNode / UsableTaxiNodes never populated, leaving CMSG_ACTIVATE_TAXI
+        // and the multi-hop express route dead too. See issue #252.
+        //
+        // CMSG_TAXI_QUERY_AVAILABLE_NODES is the handler that discovers the node and
+        // sends the map, and takes the same payload -- one non-packed creature GUID.
+        //
+        // Ungated: the opcode is defined at 0x1AC on V1_12_1, V2_4_3 and V3_3_5a with
+        // the same payload, and VMaNGOS's vanilla HandleTaxiQueryAvailableNodes is
+        // functionally the same as the WotLK one -- SendLearnNewTaxiNode for the
+        // unknown-node case, SendTaxiMenu for the known one. Verified on TC 3.3.5a
+        // (first click discovers, second opens the map); vanilla and TBC to be
+        // confirmed against a live backend with an undiscovered flight master.
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_TAXI_QUERY_AVAILABLE_NODES);
         packet.WriteGuid(interact.CreatureGUID.To64());
         SendPacketToServer(packet);
     }
@@ -49,7 +66,19 @@ public partial class WorldSocket
 
             WorldPacket packet = new WorldPacket(Opcode.CMSG_ACTIVATE_TAXI_EXPRESS);
             packet.WriteGuid(taxi.FlightMaster.To64());
-            packet.WriteUInt32(0);                // total cost, not used
+
+            // The cost field was removed in 3.2.0.10192 (WPP reads it under
+            // RemovedInVersion(V3_2_0_10192); VMaNGOS 1.12 still parses
+            // guid > totalcost > node_count, while AzerothCore, cMaNGOS-wotlk and
+            // TrinityCore 3.3.5a all parse guid > node_count).
+            //
+            // Writing it unconditionally made every WotLK server read node_count
+            // from our cost field, i.e. 0, then return on `if (nodes.empty())`
+            // without a reply of any kind -- so multi-hop flights silently did
+            // nothing while direct ones worked. Vanilla and TBC still need it.
+            if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V3_2_0_10192))
+                packet.WriteUInt32(0); // total cost, not used
+
             packet.WriteUInt32((uint)path.Count); // node count
             foreach (uint itr in path)
                 packet.WriteUInt32(itr);
@@ -69,14 +98,31 @@ public partial class WorldSocket
     }
     bool IsTaxiNodeKnown(uint node, List<byte> usableNodes)
     {
-        byte field = (byte)((node - 1) / 8);
-        uint submask = (uint)1 << (byte)((node - 1) % 8);
-        return (usableNodes[field] & submask) == submask;
+        if (node == 0)
+            return false;
+
+        uint field = (node - 1) / 8;
+        // The mask is only as wide as the legacy server sent, and is empty until
+        // SMSG_SHOW_TAXI_NODES arrives, while the graph spans every node id in
+        // TaxiNodes{N}.csv (440 on WotLK). Past the end simply means "not known".
+        if (field >= (uint)usableNodes.Count)
+            return false;
+
+        uint submask = 1u << (int)((node - 1) % 8);
+        return (usableNodes[(int)field] & submask) == submask;
     }
     HashSet<uint> GetTaxiPath(uint from, uint to, List<byte> usableNodes)
     {
         // shortest path node list
         HashSet<uint> nodes = new HashSet<uint> { from };
+
+        // Both ends index dist[] / parent[] inside Dijkstra. `to` comes straight
+        // from the modern client's CMSG_ACTIVATE_TAXI and `from` from the legacy
+        // stream, so neither is trustworthy enough to index an array with.
+        int width = GameData.TaxiNodesGraph.GetLength(0);
+        if (from >= (uint)width || to >= (uint)width)
+            return nodes;
+
         // copy taxi nodes graph and disable unknown nodes
         int[,] graphCopy = new int[GameData.TaxiNodesGraph.GetLength(0), GameData.TaxiNodesGraph.GetLength(1)];
         Buffer.BlockCopy(GameData.TaxiNodesGraph, 0, graphCopy, 0, GameData.TaxiNodesGraph.Length * sizeof(uint));
