@@ -1059,6 +1059,17 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
             sb.AppendLine("            if ((blocksMask & (1 << __i)) != 0) data.WriteBits(blocks[__i], 32);");
         }
 
+        // Unconditional Update-side bit preambles. Used for fixed marker bits between the
+        // blocks-mask write and FlushBits (e.g. Player's IsQuestLogChangesMaskSkipped).
+        // These precede the mask preambles: PlayerData::WriteUpdate writes the
+        // IsQuestLogChangesMaskSkipped bit straight after the blocks and only then the
+        // DynamicUpdateField masks, so emitting them the other way round shifts every
+        // following bit by one. Player is the only section carrying both today.
+        foreach (var ubp in section.UpdateBitsPreambles)
+        {
+            sb.Append("        data.WriteBits(").Append(ubp.Value).Append("u, ").Append(ubp.BitCount).AppendLine(");");
+        }
+
         // Mask-preamble emit: synthetic custom-field calls between per-block writes and
         // FlushBits. Used for DynamicUpdateField preambles (ChannelObjects: size + bitmask)
         // that must be bit-aligned with the blocks-mask prefix, not byte-aligned with
@@ -1067,13 +1078,6 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
         {
             sb.Append("        if (blocks.IsBitSet(").Append(mp.Bit)
               .Append(")) ").Append(mp.CustomWriter).AppendLine("(data, ref blocks, src);");
-        }
-
-        // Unconditional Update-side bit preambles. Used for fixed marker bits between the
-        // blocks-mask write and FlushBits (e.g. Player's IsQuestLogChangesMaskSkipped).
-        foreach (var ubp in section.UpdateBitsPreambles)
-        {
-            sb.Append("        data.WriteBits(").Append(ubp.Value).Append("u, ").Append(ubp.BitCount).AppendLine(");");
         }
 
         sb.AppendLine("        data.FlushBits();");

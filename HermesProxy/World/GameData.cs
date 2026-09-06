@@ -74,6 +74,10 @@ public static partial class GameData
     public static FrozenDictionary<uint, uint> LearnSpells = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<uint, uint> TotemSpells = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<uint, uint> Gems = FrozenDictionary<uint, uint>.Empty;
+    // BarberShopStyle.dbc, keyed by PackBarberShopStyleKey(type, race, sex, data). The legacy
+    // barber validates the row ids the client sends against its own DBC, so the proxy has to
+    // turn the modern choice values back into row ids. See CSV/BarberShopStyle3.csv.
+    public static FrozenDictionary<uint, uint> BarberShopStyles = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<ushort, uint> GlyphSpellById = FrozenDictionary<ushort, uint>.Empty;
     public static FrozenSet<int> Heirlooms = FrozenSet<int>.Empty;
     public static FrozenSet<uint> Toys = FrozenSet<uint>.Empty;
@@ -408,6 +412,25 @@ public static partial class GameData
         return 0;
     }
 
+    /// <summary>
+    /// Packs a BarberShopStyle lookup key. The four parts are all byte-ranged in 3.3.5a.
+    /// </summary>
+    private static uint PackBarberShopStyleKey(byte type, byte race, byte sex, byte data)
+        => (uint)type << 24 | (uint)race << 16 | (uint)sex << 8 | data;
+
+    /// <summary>
+    /// Reverse BarberShopStyle lookup: turns a legacy appearance byte back into the DBC row id
+    /// the legacy server expects in CMSG_ALTER_APPEARANCE. Types are 0 hair style, 2 facial hair,
+    /// 3 skin colour. Returns 0 when the combination has no row, which the legacy server accepts
+    /// for skin colour and rejects for the other two.
+    /// </summary>
+    public static uint GetBarberShopStyleId(byte type, Race race, Gender sex, byte data)
+    {
+        if (BarberShopStyles.TryGetValue(PackBarberShopStyleKey(type, (byte)race, (byte)sex, data), out uint id))
+            return id;
+        return 0;
+    }
+
     public static uint GetEnchantIdFromGem(uint itemId)
     {
         foreach (var itr in Gems)
@@ -656,6 +679,7 @@ public static partial class GameData
             LoadLearnSpells,
             LoadTotemSpells,
             LoadGems,
+            LoadBarberShopStyles,
             LoadGlyphProperties,
             LoadHeirlooms,
             LoadToys,
@@ -1367,6 +1391,34 @@ public static partial class GameData
             dict.Add(spellId, totemSlot);
         }
         TotemSpells = dict.ToFrozenDictionary();
+    }
+
+    // BarberShopStyle.dbc (3.3.5a). Extracted from the WotLK client data the legacy backend
+    // itself loads, so the row ids match what the server validates against. Barber shops only
+    // exist from 3.0.2 on, so the table ships for the WotLK build alone.
+    public static void LoadBarberShopStyles()
+    {
+        if (ModernVersion.ExpansionVersion != 3)
+            return;
+
+        var path = Path.Combine("CSV", "BarberShopStyle3.csv");
+
+        if (!File.Exists(path))
+            return;
+
+        using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+        var dict = new Dictionary<uint, uint>(EstimateRowCount(path, 16));
+
+        foreach (var row in reader)
+        {
+            uint id = uint.Parse(row[0].Span);
+            byte type = byte.Parse(row[1].Span);
+            byte race = byte.Parse(row[2].Span);
+            byte sex = byte.Parse(row[3].Span);
+            byte data = byte.Parse(row[4].Span);
+            dict[PackBarberShopStyleKey(type, race, sex, data)] = id;
+        }
+        BarberShopStyles = dict.ToFrozenDictionary();
     }
 
     public static void LoadGems()

@@ -7,6 +7,7 @@ using HermesProxy.Auth;
 using HermesProxy.Enums;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 
@@ -241,6 +242,51 @@ public partial class WorldSocket
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_TITLE);
         packet.WriteInt32(title.TitleID);
+        SendPacketToServer(packet);
+    }
+
+    [PacketHandler(Opcode.CMSG_ALTER_APPEARANCE)]
+    void HandleAlterAppearance(AlterAppearance appearance)
+    {
+        // Barber shops arrived in 3.0.2; older backends have no opcode to forward to.
+        if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
+            return;
+
+        var gameState = GetSession().GameState;
+        if (!gameState.TryGetCachedPlayerAppearance(gameState.CurrentPlayerGuid, out Race race, out _, out Gender sex))
+            return;
+
+        // The legacy barber cannot change gender, and the modern client has already switched to
+        // the target gender's customization options by the time it sends this. Mapping those
+        // against the character's real gender would pick unrelated styles, and the legacy server
+        // would answer a mismatched BarberShopStyle row with silence, so refuse it here instead.
+        if (appearance.NewSexId != sex)
+        {
+            SendPacket(new BarberShopResult { Result = 1 });
+            return;
+        }
+
+        CharacterCustomizations.ConvertModernCustomizationsToLegacy(appearance.Customizations,
+            out byte skin, out _, out byte hairStyle, out byte hairColor, out byte facialHair);
+
+        uint hairStyleId = GameData.GetBarberShopStyleId(0, race, sex, hairStyle);
+        uint facialHairId = GameData.GetBarberShopStyleId(2, race, sex, facialHair);
+        uint skinId = GameData.GetBarberShopStyleId(3, race, sex, skin);
+
+        // Types 0 and 2 are mandatory on the legacy side; a row it cannot resolve makes it drop
+        // the request without replying, which the client shows as a barber that does nothing.
+        if (hairStyleId == 0 || facialHairId == 0)
+        {
+            WorldSocketLogMessages.BarberShopStyleUnresolved(_melLog, _sourceFile, _netDirRecv, (byte)race, (byte)sex, hairStyle, facialHair, hairStyleId, facialHairId);
+            SendPacket(new BarberShopResult { Result = 1 });
+            return;
+        }
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_ALTER_APPEARANCE);
+        packet.WriteUInt32(hairStyleId);
+        packet.WriteUInt32(hairColor);
+        packet.WriteUInt32(facialHairId);
+        packet.WriteUInt32(skinId);
         SendPacketToServer(packet);
     }
 

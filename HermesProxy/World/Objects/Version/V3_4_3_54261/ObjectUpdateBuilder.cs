@@ -831,6 +831,49 @@ public partial class ObjectUpdateBuilder
     // Player Create + Update custom writers — referenced by V3_4_3_54261.PlayerField.
     // -----------------------------------------------------------------------------------
 
+    private static uint GetPlayerCustomizationsSize(PlayerData src)
+    {
+        if (src.Customizations == null)
+            return 0;
+
+        uint size = 0;
+        for (int i = 0; i < src.Customizations.Length; i++)
+            if (src.Customizations[i] != null)
+                size++;
+        return size;
+    }
+
+    internal void WriteUpdatePlayerCustomizationsMaskPreamble(WorldPacket data, ref Framework.Util.StackBitMask blocks, PlayerData src)
+    {
+        if (!src.HasCustomizationsUpdate)
+            return;
+
+        // DynamicUpdateField preamble: 32-bit size then one changed-bit per element. Emitted
+        // with the blocks-mask prefix, so it is bit-aligned rather than byte-aligned.
+        uint size = GetPlayerCustomizationsSize(src);
+        data.WriteBits(size, 32);
+        if (size != 0)
+            data.WriteBits(0xFFFFFFFFu, (int)size);
+    }
+
+    internal void WriteUpdatePlayerCustomizationsBody(WorldPacket data, PlayerData src)
+    {
+        if (src.Customizations == null)
+            return;
+
+        // ChrCustomizationChoice::WriteUpdate (UpdateFields.cpp:1626) is two bare uint32s —
+        // the struct carries no changesMask of its own, unlike SocketedGem.
+        for (int i = 0; i < src.Customizations.Length; i++)
+        {
+            var choice = src.Customizations[i];
+            if (choice == null)
+                continue;
+
+            data.WriteUInt32(choice.ChrCustomizationOptionID);
+            data.WriteUInt32(choice.ChrCustomizationChoiceID);
+        }
+    }
+
     internal void WriteCreatePlayerCustomizationsCount(WorldPacket data, PlayerData src)
     {
         int customizationCount = 0;
