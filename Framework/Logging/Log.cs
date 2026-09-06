@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -373,27 +373,36 @@ public static class Log
     }
 
     /// <summary>
-    /// Inlinable fast-path gate for verbose Trace sites. Equivalent to
-    /// <c>IsEnabled(LogType.Trace)</c> but avoids the <c>[CallerFilePath]</c>
-    /// allocation and the <c>Route()</c> switch — collapses to two
-    /// <see cref="LoggingLevelSwitch.MinimumLevel"/> field reads + two int compares,
-    /// so the JIT can fully inline the gate at call sites. Reads both the global
-    /// and Server switches because Serilog enforces both filters; auto-tracks any
-    /// runtime level change via <see cref="Configure"/>.
+    /// Inlinable fast-path gate for verbose Trace sites. Avoids the <c>[CallerFilePath]</c>
+    /// argument and the <c>Route()</c> switch that <see cref="IsEnabled"/> pays, collapsing to
+    /// one <see cref="LoggingLevelSwitch.MinimumLevel"/> read and one int compare.
+    /// <para>
+    /// It must agree with <c>Route(LogType.Trace, …)</c>, which resolves to
+    /// (<see cref="Server"/>, Verbose) — hence the Server switch alone.
+    /// <see cref="BuildPipeline"/> wires each category with <c>MinimumLevel.Override</c>, and a
+    /// Serilog override <em>replaces</em> the global minimum for that source context rather than
+    /// being combined with it. ANDing the global here made the gate stricter than the sink it
+    /// guards: with <c>Log.MinimumLevel=Information</c> and <c>Log.Server.MinimumLevel=Verbose</c>
+    /// — what test-loop2 configures — <c>Log.Print(LogType.Trace, …)</c> wrote the line while every
+    /// gated site went silent, so the cheapest diagnostics were the ones that disappeared.
+    /// </para>
+    /// Auto-tracks runtime level changes via <see cref="Configure"/> because the switch is read
+    /// on each call rather than captured.
     /// </summary>
     public static bool IsTraceEnabled
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => _globalSwitch.MinimumLevel <= LogEventLevel.Verbose
-            && _serverSwitch.MinimumLevel <= LogEventLevel.Verbose;
+        get => _serverSwitch.MinimumLevel <= LogEventLevel.Verbose;
     }
 
-    /// <summary>Same shape as <see cref="IsTraceEnabled"/> for Debug-level sites.</summary>
+    /// <summary>
+    /// Same shape as <see cref="IsTraceEnabled"/> for Debug-level sites — <c>LogType.Debug</c>
+    /// routes to <see cref="Server"/> as well, just at a different level.
+    /// </summary>
     public static bool IsDebugEnabled
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => _globalSwitch.MinimumLevel <= LogEventLevel.Debug
-            && _serverSwitch.MinimumLevel <= LogEventLevel.Debug;
+        get => _serverSwitch.MinimumLevel <= LogEventLevel.Debug;
     }
 
     private static (ILogger logger, LogEventLevel level) Route(LogType type, string path)
