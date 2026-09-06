@@ -19,6 +19,18 @@ This is not a gap waiting to be filled. A modern Classic client runs a Warden mo
 
 **Consequence:** the remote server must have Warden disabled. Every backend used to develop and test HermesProxy runs with it off — that is the default for `vmangos-deploy`, and TrinityCore, AzerothCore and CMaNGOS all ship it disabled or trivially disableable in config.
 
+### Rejected at login: check `ReportedOS` first
+
+Some Warden-enabled cores gate the session on the OS string the account logged in with, *before* any Warden check runs. TrinityCore refuses anything but `Win`/`OSX` with `AUTH_REJECT` (`WorldSocket.cpp`, `wardenActive && !ClientBuild::Platform::IsValid(account.OS)`). HermesProxy sends that string from `ClientOptions.ReportedOS`, which **defaults to `OSX`**.
+
+The symptom is specific: logon succeeds, the realm list arrives, and the world server closes at realm join. `AUTH_REJECT` (14) means the session key was accepted and a policy check refused it — unlike `AUTH_FAILED` (13), which is a digest or key mismatch. Try:
+
+```
+HermesProxy.exe --set ReportedOS=Win
+```
+
+Confirmed on WoW Circle ([#248](https://github.com/Xian55/HermesProxy/issues/248)). This is a config default, not a structural limit — but it does not make a Warden server playable, it only moves the failure to "logged in, then kicked".
+
 ### Warmane
 
 **Warmane does not work and is not supported.** It is the most common server people ask about, so it is called out by name.
@@ -29,5 +41,11 @@ Two independent blockers:
 2. **Warmane runs a heavily customised core.** Its protocol has diverged from stock 3.3.5a in ways the translation layer does not model, so even with Warden off the session would not be trustworthy.
 
 > **Do not attempt this with an account you care about.** Connecting through a proxy is indistinguishable from client tampering as far as Warden is concerned, and public servers ban for it. If you experiment anyway, use a throwaway account and accept that losing it is the expected outcome.
+
+### WoW Circle
+
+**Not supported.** Fails in two stages ([#248](https://github.com/Xian55/HermesProxy/issues/248)): with the default `ReportedOS=OSX` every realm answers `AUTH_REJECT` at realm join (see above, `ReportedOS=Win` clears it); with that fixed, Warden takes over — one measured session reached the world, played 116 s with the proxy translating cleanly, then was closed by the server. Throwaway account only.
+
+> In captures taken before the `GetDataSpan` fix, `SMSG_AUTH_CHALLENGE` looks like a 62-byte body against stock 3.3.5a's 40. It is not evidence of anything: received packets were sniffed with `ByteBuffer.GetData()`, which returns the whole pooled receive buffer, so every server packet carried slack — a stock TrinityCore capture shows the identical 62. It was briefly read here as proof of a customised core; it was not.
 
 The same reasoning applies to any other public server that runs Warden or a custom core. Public servers known to work are listed in [wotlk.md](../wotlk.md); they work because they are close to stock AzerothCore and do not enforce Warden.

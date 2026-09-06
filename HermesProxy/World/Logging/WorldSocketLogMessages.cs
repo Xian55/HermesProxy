@@ -145,4 +145,20 @@ internal static partial class WorldSocketLogMessages
         string NetDir,
         byte TeamSize,
         bool AsGroup);
+
+    /// <summary>
+    /// The modern client is told BadServer and dropped here, so this line is the only place the
+    /// legacy world server's own verdict reaches the log on the client-facing side. Carrying
+    /// <paramref name="LegacyAuthResult"/> across saves a .pkt decode to answer "why" -- see
+    /// <see cref="WorldClientLogMessages.AuthenticationFailed"/> for what the codes mean.
+    /// </summary>
+    [LoggerMessage(
+        EventId = 116,
+        Level = LogLevel.Error,
+        Message = "The WorldClient failed to connect to the selected world server! (legacy SMSG_AUTH_RESPONSE: {LegacyAuthResult})")]
+    public static partial void WorldClientConnectFailed(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        string LegacyAuthResult);
 }
