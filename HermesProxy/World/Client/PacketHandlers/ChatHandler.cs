@@ -459,6 +459,7 @@ public partial class WorldClient
                 return true;
             }
             GetSession().GameState.CurrentPlayerStorage.CompletedQuests.MarkQuestAsCompleted(questId);
+            GetSession().SendHermesTextMessage(DescribeQuestBitResult(questId, completed: true));
             return true;
         }
 
@@ -473,10 +474,27 @@ public partial class WorldClient
                 return true;
             }
             GetSession().GameState.CurrentPlayerStorage.CompletedQuests.MarkQuestAsNotCompleted(questId);
+            GetSession().SendHermesTextMessage(DescribeQuestBitResult(questId, completed: false));
             return true;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Confirmation text for the quest chat commands. These swallow the message, so without
+    /// a reply the player cannot tell a successful run from a typo or from the command not
+    /// existing at all. Reports the quest bit too: a quest with no row in QuestV2_{N}.csv is
+    /// recorded locally but sends nothing to the client, so the flag will not change and the
+    /// missing bit is the explanation worth surfacing.
+    /// </summary>
+    private static string DescribeQuestBitResult(uint questId, bool completed)
+    {
+        var action = completed ? "completed" : "not completed";
+        var questBit = GameData.GetUniqueQuestBit(questId);
+        return questBit.HasValue
+            ? $"Quest {questId} marked {action} (quest bit {questBit.Value})."
+            : $"Quest {questId} marked {action} locally, but it has no quest bit in QuestV2_{ModernVersion.ExpansionVersion}.csv — the client was not told, so IsQuestFlaggedCompleted will not change.";
     }
 
     public void SendMessageChatWotLK(ChatMessageTypeWotLK type, uint lang, string msg, string channel, string to)

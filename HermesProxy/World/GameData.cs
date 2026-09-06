@@ -3262,15 +3262,14 @@ public static partial class GameData
 
     public static void WriteItemSparseHotfix(ItemTemplate item, Framework.IO.ByteBuffer buffer)
     {
+        // Kept at full width here. The two layouts below need different ranges:
+        // pre-3.4.3 writes each value as a signed byte and has to clamp, while V3_4_3
+        // writes StatModifierBonusAmount as Int16. Clamping up front truncated the
+        // V3_4_3 values too, so a +520 spell power weapon was advertised as +127
+        // whenever we actually pushed an ItemSparse override for it.
         int[] StatValues = new int[10];
         for (int i = 0; i < item.StatsCount; i++)
-        {
             StatValues[i] = item.StatValues[i];
-            if (StatValues[i] > 127)
-                StatValues[i] = 127;
-            if (StatValues[i] < -127)
-                StatValues[i] = -127;
-        }
 
         buffer.WriteInt64(item.AllowedRaces);
         buffer.WriteCString(item.Description);
@@ -3446,16 +3445,10 @@ public static partial class GameData
             buffer.WriteUInt8((byte)item.InventoryType);
             buffer.WriteUInt8((byte)item.Quality);
             buffer.WriteUInt8((byte)item.AmmoType);
-            buffer.WriteInt8((sbyte)StatValues[0]);
-            buffer.WriteInt8((sbyte)StatValues[1]);
-            buffer.WriteInt8((sbyte)StatValues[2]);
-            buffer.WriteInt8((sbyte)StatValues[3]);
-            buffer.WriteInt8((sbyte)StatValues[4]);
-            buffer.WriteInt8((sbyte)StatValues[5]);
-            buffer.WriteInt8((sbyte)StatValues[6]);
-            buffer.WriteInt8((sbyte)StatValues[7]);
-            buffer.WriteInt8((sbyte)StatValues[8]);
-            buffer.WriteInt8((sbyte)StatValues[9]);
+            // This layout stores each value in a signed byte, so anything wider has to
+            // be clamped rather than wrapped -- a raw cast would turn +520 into +8.
+            for (int i = 0; i < 10; i++)
+                buffer.WriteInt8((sbyte)Math.Clamp(StatValues[i], sbyte.MinValue, sbyte.MaxValue));
             buffer.WriteInt8((sbyte)item.RequiredLevel);
         }
     }
@@ -3463,15 +3456,12 @@ public static partial class GameData
     public static void WriteItemSparseHotfix(ItemSparseRecord row, Framework.IO.ByteBuffer buffer)
     {
         var startSize = buffer.GetSize();
+        // Only the pre-3.4.3 layout below consumes this; the V3_4_3 branch writes
+        // row.StatValue directly as Int16. row.StatValue is already sbyte-ranged by
+        // its own type, so the clamp is defensive rather than load-bearing here.
         Span<int> StatValues = stackalloc int[10];
         for (int i = 0; i < 10; i++)
-        {
-            StatValues[i] = row.StatValue[i];
-            if (StatValues[i] > 127)
-                StatValues[i] = 127;
-            if (StatValues[i] < -127)
-                StatValues[i] = -127;
-        }
+            StatValues[i] = Math.Clamp(row.StatValue[i], sbyte.MinValue, sbyte.MaxValue);
 
         buffer.WriteInt64(row.AllowableRace);
         buffer.WriteCString(row.Description);
@@ -4631,15 +4621,14 @@ public static partial class GameData
 
     public static void UpdateItemSparseRecord(ItemSparseRecord row, ItemTemplate item)
     {
+        // The destination row.StatValue is sbyte[], so values wider than a signed byte
+        // have to be clamped rather than wrapped. This narrowing is why the store cannot
+        // represent a WotLK-era stat like +520 spell power; the comparison in
+        // GenerateItemSparseUpdateIfNeeded casts the legacy side to sbyte as well, so the
+        // two agree, but the stored row is not the real value.
         Span<int> StatValues = stackalloc int[10];
         for (int i = 0; i < item.StatsCount; i++)
-        {
-            StatValues[i] = item.StatValues[i];
-            if (StatValues[i] > 127)
-                StatValues[i] = 127;
-            if (StatValues[i] < -127)
-                StatValues[i] = -127;
-        }
+            StatValues[i] = Math.Clamp(item.StatValues[i], sbyte.MinValue, sbyte.MaxValue);
 
         row.AllowableRace = item.AllowedRaces;
         row.Description = item.Description;
