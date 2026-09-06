@@ -1,4 +1,4 @@
-using HermesProxy.World.Enums;
+﻿using HermesProxy.World.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace HermesProxy.World.Logging;
@@ -161,4 +161,23 @@ internal static partial class WorldSocketLogMessages
         string SourceFile,
         string NetDir,
         string LegacyAuthResult);
+
+    /// <summary>
+    /// A barber change could not be expressed as legacy BarberShopStyle rows, so it was refused
+    /// instead of being forwarded into a silent drop on the legacy server.
+    /// </summary>
+    [LoggerMessage(
+        EventId = 117,
+        Level = LogLevel.Warning,
+        Message = "Barber shop change refused: no BarberShopStyle row for race {Race} sex {Sex} (hairStyle {HairStyle} -> {HairStyleId}, facialHair {FacialHair} -> {FacialHairId}).")]
+    public static partial void BarberShopStyleUnresolved(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        byte Race,
+        byte Sex,
+        byte HairStyle,
+        byte FacialHair,
+        uint HairStyleId,
+        uint FacialHairId);
 }

@@ -55,6 +55,20 @@ public enum PlayerField
     [DescriptorCreatePlaceholder(DescriptorType.UInt32, CustomWriter = nameof(HermesProxy.World.Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.WriteCreatePlayerCustomizationsCount))]
     PLAYER_CUSTOMIZATION_COUNT_CUSTOM,
 
+    // Customizations as a DynamicUpdateField on the Values path — UpdateFields.h:380 declares
+    // DynamicUpdateField<ChrCustomizationChoice, 0, 1>, so bit 1 under the group gate. The
+    // preamble writes size + per-element changed mask alongside the blocks prefix; the body
+    // writes ChrCustomizationChoice::WriteUpdate, which is two bare uint32s per element with
+    // no inner changesMask. Gated on HasCustomizationsUpdate so ordinary player deltas that
+    // never touched the appearance do not re-send it.
+    [DescriptorMaskPreamble(bit: 1, customWriter: nameof(HermesProxy.World.Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.WriteUpdatePlayerCustomizationsMaskPreamble))]
+    PLAYER_CUSTOMIZATIONS_PREAMBLE_UPDATE,
+
+    [DescriptorUpdateField(nameof(PlayerData.HasCustomizationsUpdate), DescriptorType.Int32, bit: 1, ParentBit = 0,
+                           CustomPredicate = "src.HasCustomizationsUpdate",
+                           CustomWriter = nameof(HermesProxy.World.Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.WriteUpdatePlayerCustomizationsBody))]
+    PLAYER_CUSTOMIZATIONS_BODY_UPDATE,
+
     [DescriptorCreateField(nameof(PlayerData.PartyType), DescriptorType.UInt8)]
     PLAYER_PARTY_TYPE,
 

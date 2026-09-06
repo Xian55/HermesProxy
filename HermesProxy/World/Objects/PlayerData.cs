@@ -46,4 +46,8 @@ public class PlayerData
     public uint? CurrentBattlePetBreedQuality;
     public int? HonorLevel;
     public ChrCustomizationChoice[] Customizations = new ChrCustomizationChoice[36];
+
+    // Set when a legacy appearance change (barber shop) rewrote Customizations, so the
+    // Values path emits the dynamic field. Create always writes them, Values only on change.
+    public bool HasCustomizationsUpdate;
 }

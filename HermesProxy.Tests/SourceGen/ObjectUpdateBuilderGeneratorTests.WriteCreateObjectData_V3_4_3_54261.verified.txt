@@ -3581,6 +3581,7 @@ public partial class ObjectUpdateBuilder
         if (src.GuildRankID.HasValue) { blocks.SetBit(0); blocks.SetBit(9); }
         if (src.GuildDeleteDate.HasValue) { blocks.SetBit(0); blocks.SetBit(10); }
         if (src.GuildLevel.HasValue) { blocks.SetBit(0); blocks.SetBit(11); }
+        if (src.HasCustomizationsUpdate) { blocks.SetBit(0); blocks.SetBit(1); }
         if (src.NumBankSlots.HasValue) { blocks.SetBit(0); blocks.SetBit(12); }
         if (src.NativeSex.HasValue) { blocks.SetBit(0); blocks.SetBit(13); }
         if (src.Inebriation.HasValue) { blocks.SetBit(0); blocks.SetBit(14); }
@@ -3645,8 +3646,10 @@ public partial class ObjectUpdateBuilder
         for (int __i = 0; __i < 3; __i++)
             if ((blocksMask & (1 << __i)) != 0) data.WriteBits(blocks[__i], 32);
         data.WriteBits(1u, 1);
+        if (blocks.IsBitSet(1)) WriteUpdatePlayerCustomizationsMaskPreamble(data, ref blocks, src);
         data.FlushBits();
         if (blocksMask == 0) return;
+        if (blocks.IsBitSet(1)) WriteUpdatePlayerCustomizationsBody(data, src);
         if (blocks.IsBitSet(4)) data.WritePackedGuid128(src.DuelArbiter!.Value);
         if (blocks.IsBitSet(5)) data.WritePackedGuid128(src.WowAccount!.Value);
         if (blocks.IsBitSet(6)) data.WritePackedGuid128(src.LootTargetGUID!.Value);
@@ -3726,6 +3729,7 @@ public partial class ObjectUpdateBuilder
         if (src.GuildRankID.HasValue) return true;
         if (src.GuildDeleteDate.HasValue) return true;
         if (src.GuildLevel.HasValue) return true;
+        if (src.HasCustomizationsUpdate) return true;
         if (src.NumBankSlots.HasValue) return true;
         if (src.NativeSex.HasValue) return true;
         if (src.Inebriation.HasValue) return true;

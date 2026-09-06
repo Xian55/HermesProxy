@@ -771,6 +771,73 @@ public class DeleteChar : ServerPacket, ISpanWritable
     public byte Code;
 }
 
+public class AlterAppearance : ClientPacket
+{
+    public AlterAppearance(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        var customizationCount = _worldPacket.ReadUInt32();
+        NewSexId = (Gender)_worldPacket.ReadUInt8();
+        CustomizedRace = (Race)_worldPacket.ReadUInt32();
+        CustomizedChrModelId = _worldPacket.ReadUInt32();
+
+        for (var i = 0; i < customizationCount; ++i)
+            Customizations.Add(new ChrCustomizationChoice(_worldPacket.ReadUInt32(), _worldPacket.ReadUInt32()));
+
+        Customizations.Sort();
+    }
+
+    public Gender NewSexId;
+    public Race CustomizedRace;
+    public uint CustomizedChrModelId;
+    public List<ChrCustomizationChoice> Customizations = new(8);
+}
+
+public class EnableBarberShop : ServerPacket, ISpanWritable
+{
+    public EnableBarberShop() : base(Opcode.SMSG_ENABLE_BARBER_SHOP) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteUInt8(CustomizationScope);
+    }
+
+    public int MaxSize => 1; // byte
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteUInt8(CustomizationScope);
+        return writer.Position;
+    }
+
+    // Legacy has no equivalent field and native 3.4.3 sends 0 for a barber chair.
+    public byte CustomizationScope;
+}
+
+public class BarberShopResult : ServerPacket, ISpanWritable
+{
+    public BarberShopResult() : base(Opcode.SMSG_BARBER_SHOP_RESULT) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt32(Result);
+    }
+
+    public int MaxSize => 4; // int32
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteInt32(Result);
+        return writer.Position;
+    }
+
+    // 0 success, 1 and 3 not enough money, 2 not sitting in the chair. Same values both eras.
+    public int Result;
+}
+
 public class LoadingScreenNotify : ClientPacket
 {
     public LoadingScreenNotify(WorldPacket packet) : base(packet) { }

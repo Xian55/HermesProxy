@@ -3452,6 +3452,29 @@ public partial class WorldClient
                     restInfo.StateID = (byte)((updates[PLAYER_BYTES_2].UInt32Value >> 24) & 0xFF);
             }
 
+            // A barber change dirties PLAYER_BYTES and PLAYER_BYTES_2 independently — the legacy
+            // server only marks the one whose bytes actually moved. Both halves are needed to
+            // rebuild the modern choice list, so fill whichever is absent from the cached fields.
+            if ((skin != null) != (facialHair != null))
+            {
+                var cached = GetSession().GameState.GetCachedObjectFieldsLegacy(guid.To128(GetSession().GameState));
+                if (cached != null)
+                {
+                    if (skin == null && PLAYER_BYTES >= 0)
+                    {
+                        uint bytes = cached[PLAYER_BYTES].UInt32Value;
+                        skin = (byte)(bytes & 0xFF);
+                        face = (byte)((bytes >> 8) & 0xFF);
+                        hairStyle = (byte)((bytes >> 16) & 0xFF);
+                        hairColor = (byte)((bytes >> 24) & 0xFF);
+                    }
+                    else if (facialHair == null && PLAYER_BYTES_2 >= 0)
+                    {
+                        facialHair = (byte)(cached[PLAYER_BYTES_2].UInt32Value & 0xFF);
+                    }
+                }
+            }
+
             if (skin != null && face != null && hairStyle != null && hairColor != null && facialHair != null)
             {
                 Race raceId = Race.None;
@@ -3479,6 +3502,11 @@ public partial class WorldClient
                     {
                         updateData.PlayerData.Customizations[i] = customizations[i];
                     }
+
+                    // Create writes customizations unconditionally; a Values delta only carries
+                    // them when they changed, so flag it here for the dynamic-field writer.
+                    if (!isCreate)
+                        updateData.PlayerData.HasCustomizationsUpdate = true;
                 }
             }
 

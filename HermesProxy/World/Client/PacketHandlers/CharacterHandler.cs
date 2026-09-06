@@ -536,6 +536,21 @@ public partial class WorldClient
         }
     }
 
+    [PacketHandler(Opcode.SMSG_ENABLE_BARBER_SHOP)]
+    void HandleEnableBarberShop(WorldPacket packet)
+    {
+        // Legacy carries no payload. Native 3.4.3 sends CustomizationScope 0 for a barber chair,
+        // which is the only scope a WotLK backend can produce.
+        SendPacketToClient(new EnableBarberShop { CustomizationScope = 0 });
+    }
+
+    [PacketHandler(Opcode.SMSG_BARBER_SHOP_RESULT)]
+    void HandleBarberShopResult(WorldPacket packet)
+    {
+        // Legacy writes uint32, modern reads int32, and the result values did not change.
+        SendPacketToClient(new BarberShopResult { Result = packet.ReadInt32() });
+    }
+
     [PacketHandler(Opcode.SMSG_LOGOUT_RESPONSE)]
     void HandleLogoutResponse(WorldPacket packet)
     {
