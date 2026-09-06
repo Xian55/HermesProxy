@@ -464,20 +464,48 @@ Three patterns coexist under `HermesProxy/CSV/`:
 | `{Name}{LegacyVersion.ExpansionVersion}.csv` | `BroadcastTexts2.csv` | Legacy-server expansion (same numbering) |
 | `{Name}.csv` | `AreaNames.csv`, `LearnSpells.csv`, `RaceFaction.csv` | version-agnostic |
 
-WotLK activates `*3.csv` lookups on both sides. Phase 1 bootstrapped the `ModernVersion`-keyed `*3.csv` set (~15 tables) from the fork as a placeholder — most were byte-identical TBC duplicates.
+WotLK activates `*3.csv` lookups on both sides. Phase 1 bootstrapped the `ModernVersion`-keyed `*3.csv` set (~15 tables) from the fork as a placeholder — most were byte-identical TBC duplicates. Those have since been regenerated from the 3.4.3.54261 client DB2s; see "Regenerating static `*N.csv`" below.
 
 ### Hotfix data (`HermesProxy/CSV/Hotfix/`)
 
 Phase 5a-7b regenerated the 18 V3_4_3 hotfix CSVs from wago.tools at `?build=3.4.3.54261` (~700K records). Per-loader column projections were tightened during that regen — 5 of 18 tables (`SpellMisc`, `ItemSparse`, `Item`, `ItemDisplayInfo`, `CreatureDisplayInfo`) need explicit reorder + drop of wago-only columns; the other 13 match wago's column order verbatim.
 
-For future regenerations of static `*3.csv` data:
+### Regenerating static `*N.csv`
 
-1. `ItemSparse3.csv`, `Item3.csv`, `ItemEffect3.csv`, `ItemSpellsData3.csv` — tooltips, stats, names (most user-visible).
-2. `ItemAppearance3.csv`, `ItemModifiedAppearance3.csv`, `ItemDisplayIdToFileDataId3.csv` — rendering.
-3. `QuestV2_3.csv`, `SpellVisuals3.csv`, `BroadcastTexts3.csv` — quest text, spell anims, NPC dialogue.
-4. `TaxiPath3.csv`, `TaxiNodes3.csv`, `TaxiPathNode3.csv` — flight paths.
+`scripts/build-csv-from-db2.py` builds them from the client's own DB2s. It is the generator
+counterpart to the two audit scripts, and shares their wago cache under `.cache/db2/<build>/`.
 
-Treat regeneration as a debugging loop, not a pre-emptive batch — only regen when a specific gameplay bug demands it.
+```
+python scripts/build-csv-from-db2.py --all 3 --build 3.4.3.54261   # regenerate
+python scripts/build-csv-from-db2.py Item3.csv --build 3.4.3.54261 # one file
+python scripts/build-csv-from-db2.py --audit --all 3               # report drift, write nothing
+```
+
+The per-file recipe (source table, column projection, header rename, row filter) lives in the
+`RECIPES` table at the bottom of that script. Two things it encodes that are easy to get wrong
+by hand:
+
+- **Column order is load-bearing.** Every `Load*` in `World/GameData.cs` parses by index
+  (`row[0].Span`, `row[1].Span`, …), so a renamed or dropped upstream column silently shifts every
+  later field. The recipes pin an explicit ordered list and raise instead.
+- **Signedness and width.** wago prints each DB2 column in its own representation, which is not
+  always the one the loader parses with — `ItemSparse.Flags_0` arrives as `-2147483648` for a
+  `uint.Parse` column, `ItemEffect.TriggerType` as `255` for an `sbyte`. Either is an
+  `OverflowException` inside GameData's `Parallel.Invoke`, which takes the host down at startup.
+  `LOADER_TYPES` re-encodes every narrow column; regenerate that table when a loader's field types
+  change.
+
+Known-stale, deliberately not regenerated:
+
+- `BroadcastTexts3.csv` — comes from a 3.3.5a world `broadcast_text` table, not a DB2.
+  `GetBroadcastTextId` allocates a new entry on a miss (`GameData.cs:603`), so a gap degrades
+  rather than breaks.
+- `MeleeSpells3.csv`, `AutoRepeatSpells3.csv`, `SpellEffectPoints3.csv` — hand-curated behaviour
+  lists with no DB2 equivalent.
+
+`CSV/MountSpells{N}.csv` is read by no loader at all — `LoadMountSpells` reads
+`CSV/Hotfix/Mount{N}.csv`. `StackableAuras3.csv` was deleted: `LoadStackableAuras` returns early
+when `LegacyVersion.ExpansionVersion > 2`, so on WotLK the file could never be opened.
 
 ### Regeneration verification (per `dbc-lookup` skill)
 

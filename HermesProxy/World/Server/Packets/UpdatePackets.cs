@@ -844,6 +844,13 @@ public class UpdateObject : ServerPacket
                 for (int i = 0; i < ap.KeyringSlots.Length; i++)
                     if (ap.KeyringSlots[i] != null) return false;
             if (ap.Toys != null && ap.Toys.Count > 0) return false;
+            // A quest completion sets exactly one QuestCompleted word and nothing else
+            // (CompletedQuestTracker.SendSingleUpdateToClient), so without this probe the
+            // filter called the delta empty and dropped it -- the client's completed-quest
+            // bitmask never updated and IsQuestFlaggedCompleted stayed false forever.
+            if (ap.QuestCompleted != null)
+                for (int i = 0; i < ap.QuestCompleted.Length; i++)
+                    if (ap.QuestCompleted[i].HasValue) return false;
             if (ap.Skill != null)
             {
                 for (int i = 0; i < 256; i++)
