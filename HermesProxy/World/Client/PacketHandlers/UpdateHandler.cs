@@ -4349,6 +4349,24 @@ public partial class WorldClient
 
                 switch (updateData.ObjectData.EntryID)
                 {
+                    case tramSouthEastmost:
+                    case tramNorthWestmost:
+                    {
+                        // Keep the legacy parent quaternion separate from the packed live
+                        // rotation. Missing create fields are zero, not components of the
+                        // live quaternion. Preserve the server's pivot so these cars keep
+                        // the same travel direction as the rest of their train.
+                        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+                        {
+                            var parent = updateData.GameObjectData.ParentRotation;
+                            for (int i = 0; i < 4; i++)
+                                parent[i] = updateMaskArray[GAMEOBJECT_ROTATION + i]
+                                    ? updates[GAMEOBJECT_ROTATION + i].FloatValue : 0f;
+                            if (parent[0] == 0f && parent[1] == 0f && parent[2] == 0f && parent[3] == 0f)
+                                parent[3] = 1f;
+                        }
+                        break;
+                    }
                     case tramNorthMiddle:
                     case tramSouthMiddle:
                     case tramSouthWestmost:
