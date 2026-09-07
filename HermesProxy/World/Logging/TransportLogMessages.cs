@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 
 namespace HermesProxy.World.Logging;
 
@@ -73,4 +73,21 @@ internal static partial class TransportLogMessages
     public static partial void PassengerCreate(
         ILogger logger, ulong guidLow, ulong transportLow, ulong transportHigh,
         bool clientKnowsTransport, float x, float y, float z, sbyte seat);
+
+    // The create block only carries the rotation components the legacy update mask marks as
+    // set, so a component the backend left at zero is absent and whatever the live movement
+    // quaternion held in that slot survives into ParentRotation. Logging the mask next to both
+    // quaternions is what separates "the backend sent a bad pivot" from "we kept a live
+    // component". Mask is four bits, x=1 y=2 z=4 w=8.
+    [LoggerMessage(
+        EventId = 1116,
+        Level = LogLevel.Trace,
+        Message = "[TransportSail] guidLow={GuidLow} entry={Entry} create rotation mask={Mask} " +
+                  "legacy=({LegacyX},{LegacyY},{LegacyZ},{LegacyW}) live=({LiveX},{LiveY},{LiveZ},{LiveW}) " +
+                  "parentRotation=({X},{Y},{Z},{W})")]
+    public static partial void ParentRotationOnCreate(
+        ILogger logger, ulong guidLow, uint entry, int mask,
+        float legacyX, float legacyY, float legacyZ, float legacyW,
+        float liveX, float liveY, float liveZ, float liveW,
+        float x, float y, float z, float w);
 }
