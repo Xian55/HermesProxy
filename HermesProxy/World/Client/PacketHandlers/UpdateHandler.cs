@@ -4210,7 +4210,17 @@ public partial class WorldClient
             // pre-Identity default), which the V3_4_3 client treats as an invalid
             // quaternion and rejects with CMSG_OBJECT_UPDATE_FAILED for the whole
             // SMSG_UPDATE_OBJECT (collateral Player rejection from byte misalignment).
-            if (GAMEOBJECT_ROTATION < 0)
+            // Which of the two the backend actually sent decides what the four floats mean.
+            // V1_12 / V2_4_3 send GAMEOBJECT_ROTATION -- the object's own local quaternion.
+            // The Classic re-releases (V1_14, V2_5, V3_3_5a) send GAMEOBJECT_PARENTROTATION,
+            // which is the transport *path* rotation: the pivot the client rotates a
+            // transport's animation path by. cMaNGOS SetTransportPathRotation writes it from
+            // `gameobject.path_rotation` and TrinityCore / AzerothCore from
+            // `gameobject_addon.parentRotation`, both defaulting to identity, while the local
+            // quaternion rides packed in the movement block instead. The two are unrelated
+            // values and must not be mixed.
+            bool legacyRotationIsPathRotation = GAMEOBJECT_ROTATION < 0;
+            if (legacyRotationIsPathRotation)
                 GAMEOBJECT_ROTATION = LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_PARENTROTATION);
             // GameObjectData.TypeID is not populated until the GAMEOBJECT_BYTES_1 unpack
             // much further down, so anything above that point reads null off it and any
@@ -4274,10 +4284,15 @@ public partial class WorldClient
 
             if (GAMEOBJECT_ROTATION >= 0 && updateData.CreateData != null && updateData.CreateData.MoveInfo != null)
             {
+                var liveRotation = updateData.CreateData.MoveInfo.Rotation;
+                int rotationMask = 0;
                 for (int i = 0; i < 4; i++)
                 {
                     if (updateMaskArray[GAMEOBJECT_ROTATION + i])
+                    {
                         updateData.CreateData.MoveInfo.Rotation[i] = updates[GAMEOBJECT_ROTATION + i].FloatValue;
+                        rotationMask |= 1 << i;
+                    }
                 }
                 // Sanitize: if the server sent all-zero rotation, snap to identity
                 // so the client doesn't reject a non-unit quaternion.
@@ -4312,6 +4327,38 @@ public partial class WorldClient
                         SetDestructibleParentRotation(parentRotation,
                             (uint)(updateData.ObjectData.EntryID ?? 0), updateData.GameObjectData.DisplayID);
                     }
+                    else if (legacyRotationIsPathRotation)
+                    {
+                        // Read the path rotation straight out of the update fields rather than
+                        // off `rot`. A legacy create block only carries the components the
+                        // update mask marks as set, and a component the backend left at zero is
+                        // never marked -- so every zero in the path rotation would otherwise
+                        // keep whatever the live movement quaternion held in that slot. The
+                        // Deeprun Tram cars ship parentRotation (0,0,1,0): only z is masked, and
+                        // the unmasked w inherited the live 0.707106, which tilts the pivot and
+                        // sends the car through the wall (issue seen on AzerothCore, PR #261).
+                        // Same failure the Values path above already guards against for the
+                        // Strand of the Ancients gunships.
+                        var cached = GetSession().GameState.GetCachedObjectFieldsLegacy(guid);
+                        bool allZero = true;
+                        for (int i = 0; i < 4; i++)
+                        {
+                            int index = GAMEOBJECT_ROTATION + i;
+                            float value;
+                            if (updateMaskArray[index])
+                                value = updates[index].FloatValue;
+                            else if (cached != null && cached.TryGetValue(index, out var field))
+                                value = field.FloatValue;
+                            else
+                                value = 0f;
+                            parentRotation[i] = value;
+                            allZero &= value == 0f;
+                        }
+                        // An all-zero quaternion is not a rotation; both backends default the
+                        // path rotation to identity, so that is what an empty field means.
+                        if (allZero)
+                            parentRotation[3] = 1f;
+                    }
                     else
                     {
                         parentRotation[0] = rot.X;
@@ -4320,11 +4367,35 @@ public partial class WorldClient
                         parentRotation[3] = rot.W;
                     }
 
+                    if (_melGoFields.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Trace))
+                        TransportLogMessages.ParentRotationOnCreate(_melGoFields, guid.Low, guid.GetEntry(), rotationMask,
+                            (rotationMask & 1) != 0 ? updates[GAMEOBJECT_ROTATION].FloatValue : 0f,
+                            (rotationMask & 2) != 0 ? updates[GAMEOBJECT_ROTATION + 1].FloatValue : 0f,
+                            (rotationMask & 4) != 0 ? updates[GAMEOBJECT_ROTATION + 2].FloatValue : 0f,
+                            (rotationMask & 8) != 0 ? updates[GAMEOBJECT_ROTATION + 3].FloatValue : 0f,
+                            liveRotation.X, liveRotation.Y, liveRotation.Z, liveRotation.W,
+                            parentRotation[0] ?? 0f, parentRotation[1] ?? 0f,
+                            parentRotation[2] ?? 0f, parentRotation[3] ?? 0f);
+
                     float ori = updateData.CreateData.MoveInfo.Orientation;
                     updateData.CreateData.MoveInfo.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, ori);
                 }
 
                 // Fix for invalid movement of Deeprun Tram, some carts were going through the wall (in the opposite direction)
+                //
+                // Both switches below are hardcoded corrections reverse-engineered in 2022 from
+                // what a cMaNGOS backend sends to a V1_14 client, and they are keyed on entry id
+                // -- which makes them wrong wherever a backend's spawn data differs. It does:
+                // cMaNGOS spawns 176085 with the reversed orientation, TrinityCore / AzerothCore
+                // spawn 176084 that way instead, so the flip list corrects the wrong car there.
+                //
+                // V3_4_3 does not need either of them. It reads ParentRotation straight off the
+                // backend's own path rotation above, and all three 3.3.5a backends ship the same
+                // (0, 0, 1, ~0) pivot for all six cars -- the value a native 3.4.3 server sends
+                // from its own gameobject_addon, verified against Wrathion. Applying a 180 degree
+                // yaw on top of a correct pivot double-corrects, and overwriting the pivot with a
+                // literal throws away exactly the data that just arrived. Skip both and the wire
+                // matches native; V1_14 / V2_5 keep the behaviour that makes trams work for them.
                 // Entry IDs of Trams:
                 const int tramSouthEastmost = 176080;
                 const int tramNorthMiddle = 176081;
@@ -4334,35 +4405,38 @@ public partial class WorldClient
                 const int tramNorthEastmost = 176085;
                 const int zangarmarshElevator = 183177;
 
-                switch (updateData.ObjectData.EntryID)
+                if (ModernVersion.ExpansionVersion < 3)
                 {
-                    case tramSouthEastmost:
-                    case tramNorthWestmost:
-                    case tramNorthEastmost:
+                    switch (updateData.ObjectData.EntryID)
                     {
-                        var rot = updateData.CreateData.MoveInfo.Rotation.AsEulerAngles();
-                        rot.Yaw *= -1; // Rotate the cart content by 180°, so players who stand on the left side of the cart are actually on the left side
-                        updateData.CreateData.MoveInfo.Rotation = rot.AsQuaternion();
-                        break;
+                        case tramSouthEastmost:
+                        case tramNorthWestmost:
+                        case tramNorthEastmost:
+                        {
+                            var rot = updateData.CreateData.MoveInfo.Rotation.AsEulerAngles();
+                            rot.Yaw *= -1; // Rotate the cart content by 180°, so players who stand on the left side of the cart are actually on the left side
+                            updateData.CreateData.MoveInfo.Rotation = rot.AsQuaternion();
+                            break;
+                        }
                     }
-                }
 
-                switch (updateData.ObjectData.EntryID)
-                {
-                    case tramNorthMiddle:
-                    case tramSouthMiddle:
-                    case tramSouthWestmost:
-                    case tramNorthEastmost:
+                    switch (updateData.ObjectData.EntryID)
                     {
-                        // Quaternion to rotate the pivot point of the transport movement by 180°
-                        SetParentRotation(updateData.GameObjectData.ParentRotation, -4.371139E-08f, 0f, 1f, 0f);
-                        break;
-                    }
-                    case zangarmarshElevator:
-                    {
-                        // Super weird angle -88°
-                        SetParentRotation(updateData.GameObjectData.ParentRotation, 0f, 0f, -0.69465846f, 0.7193397f);
-                        break;
+                        case tramNorthMiddle:
+                        case tramSouthMiddle:
+                        case tramSouthWestmost:
+                        case tramNorthEastmost:
+                        {
+                            // Quaternion to rotate the pivot point of the transport movement by 180°
+                            SetParentRotation(updateData.GameObjectData.ParentRotation, -4.371139E-08f, 0f, 1f, 0f);
+                            break;
+                        }
+                        case zangarmarshElevator:
+                        {
+                            // Super weird angle -88°
+                            SetParentRotation(updateData.GameObjectData.ParentRotation, 0f, 0f, -0.69465846f, 0.7193397f);
+                            break;
+                        }
                     }
                 }
             }
