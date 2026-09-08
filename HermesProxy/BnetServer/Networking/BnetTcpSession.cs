@@ -385,9 +385,23 @@ public class BnetTcpSession : SSLSocket, BnetServices.INetwork
         if (!IsOpen())
             return;
 
-        _pooledBuffer.Append(data, receivedLength);
+        try
+        {
+            _pooledBuffer.Append(data, receivedLength);
 
-        await ProcessCurrentBuffer();
+            await ProcessCurrentBuffer();
+        }
+        catch (Exception ex)
+        {
+            // SSLSocket.AsyncRead cannot await this method, so anything escaping here would both
+            // go unlogged and skip the AsyncRead below, leaving the session open but permanently
+            // unreadable. Only buffer-level failures reach this far — the frame loop handles its
+            // own — so the stream state is unknown and the connection has to go.
+            BnetTcpSessionLogMessages.BufferProcessingFailed(_melServer, ex, _sourceFile, _netDirNone,
+                DescribeEndpoint(), ex.Message);
+            CloseSocket();
+            return;
+        }
 
         await AsyncRead();
     }
@@ -396,7 +410,21 @@ public class BnetTcpSession : SSLSocket, BnetServices.INetwork
     {
         while (_pooledBuffer.Length > 2)
         {
-            var result = BnetPacketParser.ParseFromSpan(_pooledBuffer.Span);
+            BnetPacketParseResultPooled result;
+            try
+            {
+                result = BnetPacketParser.ParseFromSpan(_pooledBuffer.Span);
+            }
+            catch (Exception ex)
+            {
+                // A header that will not decode leaves no way to find the next frame boundary, so
+                // every following byte is unusable. Drop the connection rather than spin.
+                BnetTcpSessionLogMessages.FrameParseFailed(_melServer, ex, _sourceFile, _netDirNone,
+                    DescribeEndpoint(), ex.Message);
+                _pooledBuffer.Clear();
+                CloseSocket();
+                return Task.CompletedTask;
+            }
 
             if (!result.Success)
             {
@@ -416,6 +444,14 @@ public class BnetTcpSession : SSLSocket, BnetServices.INetwork
                     _handlerManager.Invoke(result.Header.ServiceId, (OriginalHash)result.Header.ServiceHash, result.Header.MethodId, result.Header.Token, stream);
                 }
             }
+            catch (Exception ex)
+            {
+                // Framing was already advanced past this frame, so the stream stays in sync and the
+                // rest of the buffer is still readable. Skipping one bad frame beats killing the
+                // session — an unhandled handler fault used to stop all further reads silently.
+                BnetTcpSessionLogMessages.FrameDispatchFailed(_melServer, ex, _sourceFile, _netDirNone,
+                    result.Header!.ServiceHash, result.Header.MethodId, result.Header.Token, ex.Message);
+            }
             finally
             {
                 result.ReturnPayload();
@@ -424,6 +460,8 @@ public class BnetTcpSession : SSLSocket, BnetServices.INetwork
 
         return Task.CompletedTask;
     }
+
+    private string DescribeEndpoint() => GetRemoteIpEndPoint()?.ToString() ?? "<unknown>";
 
     public void SendRpcMessage(uint serviceId, OriginalHash service, uint methodId, uint token, BattlenetRpcErrorCode status, IMessage? message)
     {

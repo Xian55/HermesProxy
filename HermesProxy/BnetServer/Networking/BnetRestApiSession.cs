@@ -21,6 +21,10 @@ namespace BNetServer.Networking;
 
 public sealed class BnetRestApiSession : SSLSocket
 {
+    private static readonly Microsoft.Extensions.Logging.ILogger _melServer = Framework.Logging.Log.CreateMelLogger(Framework.Logging.Log.CategoryServer);
+    private static readonly string _sourceFile = nameof(BnetRestApiSession).PadRight(15);
+    private const string _netDirNone = "";
+
     private const string BNET_SERVER_BASE_PATH = "/bnetserver/";
     private const string TICKET_PREFIX = "HP-"; // Hermes Proxy
 
@@ -53,9 +57,21 @@ public sealed class BnetRestApiSession : SSLSocket
 
     public override async Task ReadHandler(byte[] data, int receivedLength)
     {
-        var httpRequest = HttpHelper.ParseRequest(data, receivedLength);
-        if (httpRequest == null || !RequestRouter(httpRequest))
+        try
         {
+            var httpRequest = HttpHelper.ParseRequest(data, receivedLength);
+            if (httpRequest == null || !RequestRouter(httpRequest))
+            {
+                CloseSocket();
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            // SSLSocket.AsyncRead cannot await this method, so an escaping exception would go
+            // unlogged and skip the AsyncRead below, leaving the session silently unreadable.
+            BnetRestApiSessionLogMessages.RequestHandlingFailed(_melServer, ex, _sourceFile, _netDirNone,
+                GetRemoteIpEndPoint()?.ToString() ?? "<unknown>", ex.Message);
             CloseSocket();
             return;
         }
