@@ -3,6 +3,7 @@ using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
+using System;
 using System.Collections.Generic;
 
 namespace HermesProxy.World.Client;
@@ -52,10 +53,41 @@ public partial class WorldClient
 
         const int maxCreatureSpells = 10;
         bool translateActionEncoding = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+
+        Span<uint> rawButtons = stackalloc uint[maxCreatureSpells];
+        bool isVehicleBar = false;
         for (int i = 0; i < maxCreatureSpells; i++) // Read pet/vehicle spell ids
         {
             uint raw = packet.ReadUInt32();
-            // ActionButton encoding differs: 3.3.5a uses (state:8 | reserved:8 | spell:16),
+            rawButtons[i] = raw;
+            isVehicleBar |= IsLegacyVehicleBarSlot((byte)(raw >> 24));
+        }
+        isVehicleBar &= translateActionEncoding;
+
+        for (int i = 0; i < maxCreatureSpells; i++)
+        {
+            uint raw = rawButtons[i];
+
+            // A legacy vehicle bar carries the UI position (i + 8) in the high byte rather
+            // than a CharmInfo state. Native V3_4_3 keeps that position — every slot ships
+            // as MAKE_UNIT_ACTION_BUTTON_VEHICLE(spellId, i + 8), including the empty ones
+            // (Player.cpp:21560/21582), so the whole bar is rebuilt index-first here instead
+            // of per-button. See the reference capture wrathion_343_toc_vehicle_actionbar.
+            if (isVehicleBar)
+            {
+                uint vehicleSpellId = raw & LegacyActionButtonSpellMask;
+
+                // Passive control auras (e.g. Frostbrood Vanquisher Flight 53112) are cast on
+                // the vehicle server-side; the retail bar shows an empty slot for them. Keep
+                // the slot so the position still lines up with native.
+                if (vehicleSpellId != 0 && GameData.PassiveSpells.Contains(vehicleSpellId))
+                    vehicleSpellId = 0;
+
+                spells.ActionButtons[i] = ((uint)(i + VehicleActionBarFirstSlot) << 23) | vehicleSpellId;
+                continue;
+            }
+
+            // ActionButton encoding differs: 3.3.5a uses (state:8 | spell:24),
             // V3_4_3 modern uses (slot:9 | spell:23). Translate only for V3_4_3 — V1_14
             // and V2_5 modern clients haven't been verified to use the same modern format,
             // so preserve the verbatim forward there.
@@ -63,6 +95,11 @@ public partial class WorldClient
                 ? TranslateLegacyPetActionButtonToV343(raw)
                 : raw;
         }
+
+        // Native V3_4_3 ships Specialization = 0 for vehicles (Player::VehicleSpellInitialize)
+        // and -1 for hunter pets (see the emit comment below).
+        if (isVehicleBar)
+            spells.Specialization = 0;
 
         byte spellCount = packet.ReadUInt8();
         for (int i = 0; i < spellCount; i++)
@@ -339,7 +376,24 @@ public partial class WorldClient
     // hit the legacy switch's `_ => 0` fallback — the slot becomes 0 ("Passive"), which the
     // pet spellbook tab logic ignores. Spell IDs survive (low 16 bits) so the action bar
     // still displays icons, but the spellbook tab never renders.
-    private static uint TranslateLegacyPetActionButtonToV343(uint legacy)
+    // 3.3.5a packs the action button as (state:8 | spell:24) — AzerothCore, mangos-wotlk and
+    // VMaNGOS all define UNIT_ACTION_BUTTON_ACTION(X) as X & 0x00FFFFFF. Masking to 16 bits
+    // silently drops the high byte of every spell id above 65535, which is most of the 3.2+
+    // vehicle content (issue #264: Argent Warhorse 68505 arrived as 2969).
+    private const uint LegacyActionButtonSpellMask = 0x00FFFFFF;
+
+    // Modern V3_4_3 packs (slot:9 | spell:23).
+    private const uint V343ActionButtonSpellMask = 0x007FFFFF;
+
+    // TC/AC vehicle bars use the UI position (index + 8) as the high byte, which cannot
+    // collide with the CharmInfo ActiveStates values (0x00, 0x01, 0x06, 0x07, 0x81, 0xC0, 0xC1).
+    private const int VehicleActionBarFirstSlot = 8;
+    private const byte VehicleActionBarLastSlot = VehicleActionBarFirstSlot + 9;
+
+    private static bool IsLegacyVehicleBarSlot(byte legacyState)
+        => legacyState >= VehicleActionBarFirstSlot && legacyState <= VehicleActionBarLastSlot;
+
+    internal static uint TranslateLegacyPetActionButtonToV343(uint legacy)
     {
         if (legacy == 0)
             return 0;
@@ -357,7 +411,7 @@ public partial class WorldClient
             // get their abilities (52264 Charge, 52268 Buck) shown as clickable bar entries.
             // True passive auras live in the Actions list, not ActionButtons, so this won't
             // misclassify pet passives.
-            uint modernSpellId = legacy & 0x7FFFFF;
+            uint modernSpellId = legacy & V343ActionButtonSpellMask;
             if (maybeModernSlot == 0x000 && modernSpellId != 0)
                 return (0x101u << 23) | modernSpellId;
             return legacy;
@@ -365,14 +419,15 @@ public partial class WorldClient
 
         // Otherwise treat as CMaNGOS legacy state-byte format.
         byte legacyState = (byte)((legacy >> 24) & 0xFF);
-        ushort spellId = (ushort)(legacy & 0xFFFF);
+        uint spellId = legacy & LegacyActionButtonSpellMask;
 
-        // TC packs vehicle action buttons as (slot_index:8 | 0:8 | spellId:16) — the high
-        // byte is a UI position (0x08..0x11 for the vehicle bar), not a CharmInfo state.
-        // Anything outside the known CharmInfo state values that still carries a non-zero
-        // spell ID must be a vehicle/charm castable; map to ManualCast (0x101) so the V3_4_3
-        // client renders it as a clickable bar entry. Empty slots (high byte = index,
-        // spell = 0) stay 0.
+        // TC packs vehicle action buttons as (slot_index:8 | spellId:24) — the high byte is
+        // a UI position (0x08..0x11 for the vehicle bar), not a CharmInfo state. The
+        // ActionButtons array is rebuilt index-first by the caller; this path only sees such
+        // entries via the Actions list, where the position is preserved as the modern slot.
+        // Anything else outside the known CharmInfo state values that still carries a
+        // non-zero spell ID is treated as a charm castable and mapped to ManualCast (0x101)
+        // so the V3_4_3 client renders it as a clickable bar entry.
         // EXCEPTION: vehicle slots may also hold passive control auras (e.g. Frostbrood
         // Vanquisher Flight 53112 in DK quest 12779). TC's VehicleSpellInitialize ships
         // every m_spells[] entry — including IsPassive() ones — into the action bar with
@@ -395,9 +450,10 @@ public partial class WorldClient
             0xC1 => 0x181,  // AutoCastSpell (enabled with autocast)
             0xC0 => 0x101,  // ManualSpell (active, no autocast)
             0x81 => 0x101,  // Disabled — keep spell visible, autocast off
-            _    => spellId != 0 ? 0x101u : 0u,  // TC vehicle button (e.g. Havenshire Mare 28606 → 52264 Charge)
+            _ when IsLegacyVehicleBarSlot(legacyState) => legacyState, // vehicle bar: keep the UI position
+            _    => spellId != 0 ? 0x101u : 0u,  // unknown state carrying a spell — render as castable
         };
 
-        return (v343Slot << 23) | spellId;
+        return (v343Slot << 23) | (spellId & V343ActionButtonSpellMask);
     }
 }
