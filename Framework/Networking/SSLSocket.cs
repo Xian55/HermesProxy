@@ -22,12 +22,17 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Framework.Networking;
 
 public abstract class SSLSocket : ISocket, IDisposable
 {
+    private static readonly Microsoft.Extensions.Logging.ILogger _melNet = Log.CreateMelLogger(Log.CategoryNetwork);
+    private static readonly string _sourceFile = nameof(SSLSocket).PadRight(15);
+    private const string _netDirNone = "";
+
     Socket _socket;
     internal SslStream _stream;
     IPEndPoint? _remoteEndPoint;
@@ -75,12 +80,33 @@ public abstract class SSLSocket : ISocket, IDisposable
                 return;
             }
 
-            _ = ReadHandler(receiveBuffer, result);
+            // ReadHandler re-arms the loop itself by awaiting AsyncRead again, so awaiting it here
+            // would chain every read into the previous one and never unwind. It has to stay fire
+            // and forget — but the task must still be observed: a fault that goes unwatched also
+            // skips ReadHandler's own AsyncRead, leaving the connection open and never reading.
+            var handlerTask = ReadHandler(receiveBuffer, result);
+            if (!handlerTask.IsCompletedSuccessfully)
+                ObserveFault(handlerTask, GetRemoteIpEndPoint());
         }
         catch (Exception ex)
         {
             Log.outException(ex);
         }
+    }
+
+    private static void ObserveFault(Task handlerTask, IPEndPoint? endPoint)
+    {
+        handlerTask.ContinueWith(
+            static (task, state) =>
+            {
+                var ex = task.Exception!.GetBaseException();
+                SslSocketLogMessages.ReadHandlerFaulted(_melNet, ex, _sourceFile, _netDirNone,
+                    state?.ToString() ?? "<unknown>", ex.Message);
+            },
+            endPoint,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     public async Task AsyncHandshake(X509Certificate2 certificate)
