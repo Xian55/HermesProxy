@@ -80,14 +80,14 @@ public partial class WorldSocket
 
     // Inverse of WorldClient.PetHandler.TranslateLegacyPetActionButtonToV343 — repack
     // the V3_4_3 client's Action field (slot:9 in bits 23-31, spell:23 in bits 0-22)
-    // into the 3.3.5a legacy server's expected layout (state:8 in bits 24-31, spell:16
-    // in bits 0-15). Without this, an Attack click ships as Action=(7<<23)|2 = 0x03800002,
+    // into the 3.3.5a legacy server's expected layout (state:8 in bits 24-31, spell:24
+    // in bits 0-23). Without this, an Attack click ships as Action=(7<<23)|2 = 0x03800002,
     // which the legacy server reads as state_byte=0x03 (unknown) and ignores.
     //
     // Slot mapping mirrors the legacy ActiveStates enum (cmangos `ActiveStates`):
     //   0x07=ACT_COMMAND, 0x06=ACT_REACTION, 0x01=ACT_PASSIVE,
     //   0x81=ACT_DISABLED, 0xC1=ACT_ENABLED (autocast on)
-    private static uint TranslateV343PetActionToLegacy(uint v343Action)
+    internal static uint TranslateV343PetActionToLegacy(uint v343Action)
     {
         if (v343Action == 0)
             return 0;
@@ -103,11 +103,17 @@ public partial class WorldSocket
             0x181  => 0xC1, // AutoCastSpell (enabled with autocast)
             0x101  => 0x81, // ManualSpell (active, no autocast)
             0      => 0xC0, // plain SpellID — enabled active spell
+            // Vehicle bar positions (8..17). The V3_4_3 client casts these through
+            // CMSG_PET_CAST_SPELL rather than CMSG_PET_ACTION (confirmed in the native
+            // capture), so this is a fallback only — echoing the position back would land
+            // in the legacy handler's "unknown PET flag" default and be dropped, so ship a
+            // castable state instead.
+            >= 8 and <= 17 => 0x81,
             _      => 0x00,
         };
 
-        // Legacy stores spell_id in low 16 bits; clamp.
-        ushort legacySpell = (ushort)(spellId & 0xFFFF);
+        // Legacy stores spell_id in the low 24 bits (UNIT_ACTION_BUTTON_ACTION).
+        uint legacySpell = spellId & 0x00FFFFFF;
         return ((uint)legacyState << 24) | legacySpell;
     }
 
