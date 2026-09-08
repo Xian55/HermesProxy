@@ -408,9 +408,11 @@ public class BnetTcpSession : SSLSocket, BnetServices.INetwork
 
             try
             {
-                var stream = new CodedInputStream(result.PayloadArray, 0, result.PayloadLength);
                 if (result.Header!.ServiceId != 0xFE && result.Header.ServiceHash != 0)
                 {
+                    // ParseFromSpan leaves PayloadArray null for zero-length payloads (e.g. the
+                    // NoData keepalive), and CodedInputStream rejects a null buffer.
+                    using var stream = new CodedInputStream(result.PayloadArray ?? Array.Empty<byte>(), 0, result.PayloadLength);
                     _handlerManager.Invoke(result.Header.ServiceId, (OriginalHash)result.Header.ServiceHash, result.Header.MethodId, result.Header.Token, stream);
                 }
             }
