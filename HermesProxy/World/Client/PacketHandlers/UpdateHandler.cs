@@ -244,6 +244,49 @@ public partial class WorldClient
         Log.Print(LogType.Trace, $"[Transport] requested gameobject template for transport entry={entry}");
     }
 
+    // The modern client only sends CMSG_QUERY_GAME_OBJECT when its own Cache/WDB has no
+    // entry for the template, so the lock id the cast rewrite depends on cannot be harvested
+    // from a query the client may never make. Ask for it ourselves the first time a
+    // lock-bearing GameObject is forwarded; the response is relayed to the client
+    // unconditionally, exactly as for transports above. See GameObjectLockRemap, issue #269.
+    private void RequestGameObjectLockTemplate(uint entry, sbyte? typeId)
+    {
+        if (entry == 0 || typeId is not { } type)
+            return;
+
+        // Only the types that carry a Lock.dbc id are worth a round-trip. A zone holds a few
+        // dozen distinct lock-bearing entries and each is asked about once per session.
+        if (!IsLockBearingGameObjectType(type))
+            return;
+
+        var gameState = GetSession().GameState;
+        if (gameState.GoLockIdByEntry.ContainsKey(entry))
+            return;
+        if (!gameState.GoLockTemplateRequested.TryAdd(entry, 0))
+            return;
+
+        var query = new WorldPacket(Opcode.CMSG_QUERY_GAME_OBJECT);
+        query.WriteUInt32(entry);
+        query.WriteGuid(new WowGuid64(HighGuidTypeLegacy.GameObject, entry, 1));
+        SendPacketToServer(query);
+    }
+
+    private static bool IsLockBearingGameObjectType(sbyte typeId) => (GameObjectTypeLegacy)typeId switch
+    {
+        GameObjectTypeLegacy.Door or
+        GameObjectTypeLegacy.Button or
+        GameObjectTypeLegacy.QuestGiver or
+        GameObjectTypeLegacy.Chest or
+        GameObjectTypeLegacy.Trap or
+        GameObjectTypeLegacy.Goober or
+        GameObjectTypeLegacy.AreaDamage or
+        GameObjectTypeLegacy.Camera or
+        GameObjectTypeLegacy.FlagStand or
+        GameObjectTypeLegacy.FishingHole or
+        GameObjectTypeLegacy.FlagDrop => true,
+        _ => false,
+    };
+
     [PacketHandler(Opcode.SMSG_UPDATE_OBJECT)]
     void HandleUpdateObject(WorldPacket packet)
     {
@@ -458,6 +501,9 @@ public partial class WorldClient
                             }
                             else if (legacyHigh == HighGuidTypeLegacy.GameObject)
                             {
+                                RequestGameObjectLockTemplate(
+                                    (uint)(updateData.ObjectData.EntryID ?? 0),
+                                    updateData.GameObjectData?.TypeID);
                                 var rot = updateData.CreateData?.MoveInfo?.Rotation;
                                 Log.Print(LogType.Trace,
                                     $"Forwarding CreateObject1 for {legacyHigh} guid={guid} entryID={updateData.ObjectData.EntryID?.ToString() ?? "null"} typeID={updateData.GameObjectData?.TypeID?.ToString() ?? "null"} state={updateData.GameObjectData?.State?.ToString() ?? "null"} rot=({rot?.X.ToString("F3") ?? "?"},{rot?.Y.ToString("F3") ?? "?"},{rot?.Z.ToString("F3") ?? "?"},{rot?.W.ToString("F3") ?? "?"}).");
@@ -532,6 +578,9 @@ public partial class WorldClient
                             }
                             else if (legacyHigh == HighGuidTypeLegacy.GameObject)
                             {
+                                RequestGameObjectLockTemplate(
+                                    (uint)(updateData.ObjectData.EntryID ?? 0),
+                                    updateData.GameObjectData?.TypeID);
                                 var rot = updateData.CreateData?.MoveInfo?.Rotation;
                                 Log.Print(LogType.Trace,
                                     $"Forwarding CreateObject2 for {legacyHigh} guid={guid} entryID={updateData.ObjectData.EntryID?.ToString() ?? "null"} typeID={updateData.GameObjectData?.TypeID?.ToString() ?? "null"} state={updateData.GameObjectData?.State?.ToString() ?? "null"} rot=({rot?.X.ToString("F3") ?? "?"},{rot?.Y.ToString("F3") ?? "?"},{rot?.Z.ToString("F3") ?? "?"},{rot?.W.ToString("F3") ?? "?"}).");

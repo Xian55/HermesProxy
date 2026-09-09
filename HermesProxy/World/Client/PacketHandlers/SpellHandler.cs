@@ -226,6 +226,10 @@ public partial class WorldClient
         if (packet.CanRead())
             arg2 = packet.ReadInt32();
 
+        // Every argument is a local the handler has already read, so this needs no IsEnabled
+        // guard of its own.
+        World.Logging.SpellLogMessages.LegacyCastFailed(_melSpellLog, spellId, reason, arg1, arg2);
+
         // Check special casts first - try next melee, then auto repeat
         ClientCastRequest? specialCast = null;
         bool isAutoRepeat = false;

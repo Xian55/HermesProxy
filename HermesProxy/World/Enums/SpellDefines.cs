@@ -1655,4 +1655,13 @@ public static class KnownSpellIds
     // account collection. Misc[0] carries the target heirloom item ID. Not present
     // on legacy 3.3.5a servers.
     public const uint CreateHeirloom = 160597;
+
+    // SPELL_EFFECT_OPEN_LOCK with EffectMiscValue = 5 (LOCKTYPE_OPEN). What a client casts
+    // at a GameObject whose Lock row asks for a plain "open".
+    public const uint Opening = 3365;
+
+    // SPELL_EFFECT_OPEN_LOCK with EffectMiscValue = 14 (LOCKTYPE_OPEN_ATTACKING). The 3.3.5a
+    // counterpart for lock rows the V3_4_3 client believes are plain "open" — see
+    // GameObjectLockRemap and issue #269.
+    public const uint OpeningAttacking = 8386;
 }

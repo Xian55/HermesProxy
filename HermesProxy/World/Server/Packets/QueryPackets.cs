@@ -716,6 +716,32 @@ public class GameObjectStats
     /// issue #184. Meaningless for any other GameObject type.
     /// </summary>
     public int DestructibleModelRec => Data[DestructibleModelRecIndex];
+
+    /// <summary>
+    /// Lock.dbc id for the types that carry one, mirroring the legacy server's own
+    /// GameObjectTemplate::GetLockId. The slot is not the same for every type: DOOR and
+    /// BUTTON keep it in data[1] and FISHINGHOLE in data[4], everything else in data[0].
+    /// 0 when the type has no lock. Issue #269.
+    /// </summary>
+    public uint LegacyLockId => (GameObjectTypeLegacy)Type switch
+    {
+        GameObjectTypeLegacy.Door or
+        GameObjectTypeLegacy.Button => (uint)Data[1],
+
+        GameObjectTypeLegacy.QuestGiver or
+        GameObjectTypeLegacy.Chest or
+        GameObjectTypeLegacy.Trap or
+        GameObjectTypeLegacy.Goober or
+        GameObjectTypeLegacy.AreaDamage or
+        GameObjectTypeLegacy.Camera or
+        GameObjectTypeLegacy.FlagStand or
+        GameObjectTypeLegacy.FlagDrop => (uint)Data[0],
+
+        GameObjectTypeLegacy.FishingHole => (uint)Data[4],
+
+        _ => 0u,
+    };
+
     public float Size = 1;
     public List<uint> QuestItems = new();
     public uint ContentTuningId;
