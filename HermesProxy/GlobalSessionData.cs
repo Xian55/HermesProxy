@@ -463,6 +463,17 @@ public sealed class GameSessionData
     // A V3_4_3 client resolves a type-33 object's model through this id and will draw nothing
     // without a valid one. See the ParentRotation handling in UpdateHandler. Issue #184.
     public Dictionary<uint, int> DestructibleModelIdByEntry = [];
+
+    // gameobject_template lock id keyed by GameObject entry, harvested from the same
+    // SMSG_QUERY_GAME_OBJECT_RESPONSE. Concurrent where DestructibleModelIdByEntry is not:
+    // this one is written on the WorldClient thread and read on the WorldSocket thread when
+    // a GO-targeted lock-open cast is rewritten. See GameObjectLockRemap, issue #269.
+    public readonly ConcurrentDictionary<uint, uint> GoLockIdByEntry = new();
+
+    // Entries the proxy has already asked the legacy server about itself. The modern client
+    // only sends CMSG_QUERY_GAME_OBJECT on a cold Cache/WDB, so the lock ids above cannot
+    // depend on it having asked. Issue #269.
+    public readonly ConcurrentDictionary<uint, byte> GoLockTemplateRequested = new();
     public HashSet<WowGuid64> DespawnedGameObjects = [];
     public HashSet<WowGuid128> HunterPetGuids = [];
 

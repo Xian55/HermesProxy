@@ -442,6 +442,18 @@ public partial class WorldClient
                 gameObject.DestructibleModelRec;
         }
 
+        // The V3_4_3 client picks its "Opening" spell from its own Lock.db2, which disagrees
+        // with the legacy server's Lock.dbc on row 99. Rewriting the cast needs the legacy
+        // lock id, and this response is the only place gameobject_template.data crosses the
+        // wire. Same V3_4_3 gate as above: no other build's client and server disagree.
+        // See GameObjectLockRemap, issue #269.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            uint lockId = gameObject.LegacyLockId;
+            if (lockId != 0)
+                GetSession().GameState.GoLockIdByEntry[response.GameObjectID] = lockId;
+        }
+
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             gameObject.Size = packet.ReadFloat();
 

@@ -136,6 +136,13 @@ public partial class WorldSocket
             return;
         }
 
+        // Lock.dbc row 99 asks for a different lock type on 3.3.5a than the V3_4_3 client's
+        // Lock.db2 does, so the client casts an "Opening" the legacy server rejects with
+        // SPELL_FAILED_BAD_TARGETS. Substitute the spell the legacy lock actually wants and
+        // remember both ids so the SMSG responses still match the queued cast.
+        // See GameObjectLockRemap, issue #269.
+        uint legacyOpenLockSpellId = ResolveLegacyOpenLockSpell(cast.Cast);
+
         bool isNextMelee = GameData.NextMeleeSpells.Contains(cast.Cast.SpellID);
         bool isAutoRepeat = GameData.AutoRepeatSpells.Contains(cast.Cast.SpellID);
 
@@ -191,6 +198,9 @@ public partial class WorldSocket
                 return;
             }
 
+            if (legacyOpenLockSpellId != 0)
+                castRequest.LegacySpellId = legacyOpenLockSpellId;
+
             // Enqueue the cast - responses will be matched by SpellId in FIFO order
             GetSession().GameState.PendingNormalCasts.Enqueue(castRequest);
 
@@ -205,8 +215,31 @@ public partial class WorldSocket
             castRequest.PrepareSent = true;
         }
 
-        SendLegacyCastSpell(cast.Cast, cast.Cast.SpellID);
+        SendLegacyCastSpell(cast.Cast, legacyOpenLockSpellId != 0 ? legacyOpenLockSpellId : cast.Cast.SpellID);
     }
+
+    /// <summary>
+    /// The legacy spell id to send in place of a GameObject-targeted lock-open cast, or 0 to
+    /// forward the client's own spell id unchanged. Issue #269.
+    /// </summary>
+    uint ResolveLegacyOpenLockSpell(SpellCastRequest cast)
+    {
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+            return 0;
+        if (!cast.Target.Flags.HasFlag(SpellCastTargetFlags.GameObject))
+            return 0;
+        if (cast.Target.Unit.GetHighType() != HighGuidType.GameObject)
+            return 0;
+
+        // 0 when the template has not gone past yet, which resolves to "forward unchanged".
+        // UpdateHandler.RequestGameObjectLockTemplate asks for it as the object is created,
+        // well before the object can be clicked.
+        if (!GetSession().GameState.GoLockIdByEntry.TryGetValue(cast.Target.Unit.GetEntry(), out uint lockId))
+            return 0;
+
+        return GameObjectLockRemap.ResolveLegacyOpenLockSpell(cast.SpellID, lockId);
+    }
+
     // CMSG_CAST_SPELL for a spell the 3.3.5a character already knows. Use Toy
     // takes this path when the bag item is on another character.
     void ForwardKnownSpellCast(SpellCastRequest cast, uint serverSpellId)
@@ -235,9 +268,21 @@ public partial class WorldSocket
         castRequest.PrepareSent = true;
         SendLegacyCastSpell(cast, serverSpellId != 0 ? serverSpellId : cast.SpellID);
     }
+    private static readonly Microsoft.Extensions.Logging.ILogger _melSpellServerLog =
+        Log.CreateMelLogger(Log.CategoryServer);
+
     void SendLegacyCastSpell(SpellCastRequest cast, uint spellId)
     {
         SpellCastTargetFlags targetFlags = ConvertSpellTargetFlags(cast.Target);
+
+        // To64() repeats the conversion WriteSpellTargets performs a few lines down, so keep
+        // the call behind IsEnabled rather than paying for it on every forwarded cast.
+        if (_melSpellServerLog.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Trace))
+        {
+            World.Logging.SpellLogMessages.LegacyCastForwarded(
+                _melSpellServerLog, cast.SpellID, spellId,
+                (uint)cast.Target.Flags, (uint)targetFlags, cast.Target.Unit.To64().GetLowValue());
+        }
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CAST_SPELL);
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
