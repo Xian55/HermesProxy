@@ -424,7 +424,9 @@ public partial class WorldClient
     {
         var uncompressedSize = packet.ReadInt32();
 
-        WorldPacket pkt = packet.Inflate(uncompressedSize);
+        // Inflate hands back a pooled buffer; without the dispose the rental only comes back
+        // via the finalizer.
+        using WorldPacket pkt = packet.Inflate(uncompressedSize);
 
         while (pkt.CanRead())
         {

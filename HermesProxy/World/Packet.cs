@@ -221,6 +221,17 @@ public class WorldPacket : ByteBuffer
         opcode = ReadUInt16();
     }
 
+    /// Read-mode ctor for a pooled, possibly-oversized buffer whose opcode is already known
+    /// (Inflate carries it over from the parent packet rather than reading it from the payload).
+    /// Pass isPooled=true when `data` came from ArrayPool<byte>.Shared so Dispose returns it.
+    public WorldPacket(uint opcode, byte[] data, int length, bool isPooled) : base(data, length, isPooled)
+    {
+        this.opcode = opcode;
+
+        if (this.opcode == 0)
+            Log.Print(LogType.Warn, "Constructed a legacy packet with opcode 0 from received data; it will be dropped as unknown.");
+    }
+
     public KeyValuePair<int, bool> ReadEntry()
     {
         // Entries masked with 0x80000000 are invalid entries OR used to tell apart NPCs and GOs
@@ -273,13 +284,21 @@ public class WorldPacket : ByteBuffer
         return field;
     }
 
+    /// <summary>
+    /// Inflates the rest of this packet into a new one. The caller owns the result and must
+    /// dispose it — the payload buffer is pooled.
+    /// </summary>
+    /// <remarks>
+    /// SMSG_COMPRESSED_UPDATE_OBJECT is the single largest allocator on the receive path, so
+    /// neither copy this used to make is affordable: the compressed bytes are inflated straight
+    /// out of this packet's buffer, and the destination is rented rather than allocated.
+    /// </remarks>
     public WorldPacket Inflate(int inflatedSize)
     {
-        var arr = ReadToEnd();
-        var newarr = ZLib.Decompress(arr, (uint)inflatedSize);
+        byte[] rented = ArrayPool<byte>.Shared.Rent(inflatedSize);
+        InflateRemainingInto(rented.AsSpan(0, inflatedSize));
 
-        // Cannot use "using" here
-        var pkt = new WorldPacket(GetOpcode(), newarr);
+        var pkt = new WorldPacket(GetOpcode(), rented, inflatedSize, isPooled: true);
         pkt.SetReceiveTime(GetReceivedTime());
         return pkt;
     }

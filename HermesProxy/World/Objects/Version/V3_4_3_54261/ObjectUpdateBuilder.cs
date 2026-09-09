@@ -1061,7 +1061,7 @@ public partial class ObjectUpdateBuilder
     // written earlier by the resize prefixes, so payload length has to agree with them.
     internal void WriteCreateActivePlayerDynamicPayloads(WorldPacket data, ActivePlayerData src)
     {
-        ulong[] foldedTitles = new ulong[6];
+        Span<ulong> foldedTitles = stackalloc ulong[6];
         int knownTitlesCount = FoldKnownTitles(src.KnownTitles, foldedTitles);
         for (int i = 0; i < knownTitlesCount; i++)
             data.WriteUInt64(foldedTitles[i]);
@@ -1120,7 +1120,7 @@ public partial class ObjectUpdateBuilder
     // both writers self-contained instead of threading a local across the whole block.
     internal void WriteCreateActivePlayerKnownTitlesCount(WorldPacket data, ActivePlayerData src)
     {
-        ulong[] folded = new ulong[6];
+        Span<ulong> folded = stackalloc ulong[6];
         data.WriteUInt32((uint)FoldKnownTitles(src.KnownTitles, folded));
     }
 
@@ -1215,7 +1215,7 @@ public partial class ObjectUpdateBuilder
 
     // Folds KnownTitles uint?[12] → ulong[6] (lo + hi<<32 per pair). Used by both
     // preamble (count) and body (data).
-    internal static int FoldKnownTitles(uint?[] knownTitles, ulong[] dest)
+    internal static int FoldKnownTitles(uint?[] knownTitles, Span<ulong> dest)
     {
         if (knownTitles == null)
             return 0;
@@ -1249,7 +1249,7 @@ public partial class ObjectUpdateBuilder
     // Emits: WriteBits(count, 32) + count× WriteBit(true).
     internal void WriteUpdateActivePlayerKnownTitlesPreamble(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
     {
-        ulong[] folded = new ulong[6];
+        Span<ulong> folded = stackalloc ulong[6];
         int count = FoldKnownTitles(src.KnownTitles, folded);
         data.WriteBits((uint)count, 32);
         for (int i = 0; i < count; i++)
@@ -1259,7 +1259,7 @@ public partial class ObjectUpdateBuilder
     // KnownTitles body — count× WriteUInt64(folded[i]).
     internal void WriteUpdateActivePlayerKnownTitlesBody(WorldPacket data, ActivePlayerData src)
     {
-        ulong[] folded = new ulong[6];
+        Span<ulong> folded = stackalloc ulong[6];
         int count = FoldKnownTitles(src.KnownTitles, folded);
         for (int i = 0; i < count; i++)
             data.WriteUInt64(folded[i]);
@@ -1535,46 +1535,46 @@ public partial class ObjectUpdateBuilder
     private void WriteValuesCreate(WorldPacket data)
     {
         var effectiveMask = _objectTypeMask;
-        bool trace = _objectType == ObjectTypeBCC.ActivePlayer;
+        bool trace = _objectType == ObjectTypeBCC.ActivePlayer && Framework.Logging.Log.IsTraceEnabled;
 
         byte updateFieldFlags = (byte)FieldVisibilityFlags;
         data.WriteUInt8(updateFieldFlags);
 
-        int p0 = data.GetData().Length;
+        int p0 = data.GetWrittenLength();
         WriteCreateObjectData(data);
-        int p1 = data.GetData().Length;
+        int p1 = data.GetWrittenLength();
 
         if (effectiveMask.HasAnyFlag(ObjectTypeMask.Item))
             WriteCreateItemData(data);
-        int p2 = data.GetData().Length;
+        int p2 = data.GetWrittenLength();
 
         if (effectiveMask.HasAnyFlag(ObjectTypeMask.Container))
             WriteCreateContainerData(data);
-        int p3 = data.GetData().Length;
+        int p3 = data.GetWrittenLength();
 
         if (effectiveMask.HasAnyFlag(ObjectTypeMask.Unit))
             WriteCreateUnitData(data);
-        int p4 = data.GetData().Length;
+        int p4 = data.GetWrittenLength();
 
         if (effectiveMask.HasAnyFlag(ObjectTypeMask.Player))
             WriteCreatePlayerData(data);
-        int p5 = data.GetData().Length;
+        int p5 = data.GetWrittenLength();
 
         if (effectiveMask.HasAnyFlag(ObjectTypeMask.ActivePlayer))
             WriteCreateActivePlayerData(data);
-        int p6 = data.GetData().Length;
+        int p6 = data.GetWrittenLength();
 
         if (_objectTypeMask.HasAnyFlag(ObjectTypeMask.GameObject))
             WriteCreateGameObjectData(data);
-        int p7 = data.GetData().Length;
+        int p7 = data.GetWrittenLength();
 
         if (_objectTypeMask.HasAnyFlag(ObjectTypeMask.DynamicObject))
             WriteCreateDynamicObjectData(data);
-        int p8 = data.GetData().Length;
+        int p8 = data.GetWrittenLength();
 
         if (_objectTypeMask.HasAnyFlag(ObjectTypeMask.Corpse))
             WriteCreateCorpseData(data);
-        int p9 = data.GetData().Length;
+        int p9 = data.GetWrittenLength();
 
         // Phase 5a diagnostic — per-section byte sizes for the ActivePlayer create
         // packet. Used to bisect which descriptor section diverges from the V3_4_3
@@ -1583,7 +1583,7 @@ public partial class ObjectUpdateBuilder
         // ends with unflushed bits — acceptable for first-pass bisection.
         if (trace)
         {
-            byte[] buf = data.GetData();
+            ReadOnlySpan<byte> buf = data.GetDataSpan();
             Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
                 $"[Phase5aTrace] sections flags=1 obj={p1 - p0} item={p2 - p1} container={p3 - p2} " +
                 $"unit={p4 - p3} player={p5 - p4} active={p6 - p5} " +
@@ -1596,12 +1596,14 @@ public partial class ObjectUpdateBuilder
         }
     }
 
-    private static void DumpSectionHead(byte[] buf, int start, int end, string label)
+    private static void DumpSectionHead(ReadOnlySpan<byte> buf, int start, int end, string label)
     {
         int len = end - start;
         if (len <= 0) return;
         int dumpLen = Math.Min(64, len);
-        string hex = BitConverter.ToString(buf, start, dumpLen);
+        // Copy only the window being dumped -- BitConverter.ToString needs an array, but the
+        // whole packet does not have to become one to hex 64 bytes of it.
+        string hex = BitConverter.ToString(buf.Slice(start, dumpLen).ToArray());
         Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
             $"[Phase5aTrace]   {label} ({len} bytes) head={hex}");
     }
@@ -1665,13 +1667,15 @@ public partial class ObjectUpdateBuilder
 
     private void WriteValuesModern(WorldPacket packet)
     {
-        var valuesBuffer = new WorldPacket();
+        // ByteBuffer rents from ArrayPool and has a finalizer, so an undisposed scratch packet
+        // both leaks the rental and puts one finalizable object per update on the queue.
+        using var valuesBuffer = new WorldPacket();
         if (_updateData.Type == UpdateTypeModern.Values)
             WriteValuesUpdate(valuesBuffer);
         else
             WriteValuesCreate(valuesBuffer);
 
-        var valuesData = valuesBuffer.GetData();
+        ReadOnlySpan<byte> valuesData = valuesBuffer.GetDataSpan();
 
         // Debug: dump the bytes we produce for Values updates so we can compare against
         // TC's accepted format. CMSG_OBJECT_UPDATE_FAILED or `CMSG_LOG_DISCONNECT(reason=7)`
@@ -1687,7 +1691,7 @@ public partial class ObjectUpdateBuilder
             && Framework.Logging.Log.IsEnabled(Framework.Logging.LogType.Debug))
         {
             int dumpLen = System.Math.Min(96, valuesData.Length);
-            string hex = System.BitConverter.ToString(valuesData, 0, dumpLen);
+            string hex = System.BitConverter.ToString(valuesData[..dumpLen].ToArray());
             Framework.Logging.Log.Print(Framework.Logging.LogType.Debug,
                 $"[ValuesUpdateHex] guid={_updateData.Guid} type={_objectType} size={valuesData.Length} hasUnit={_updateData.UnitData != null} hasPlayer={_updateData.PlayerData != null} hasActive={_updateData.ActivePlayerData != null} hasGO={_updateData.GameObjectData != null} hex={hex}");
         }
@@ -1698,7 +1702,7 @@ public partial class ObjectUpdateBuilder
 
     public void WriteToPacket(WorldPacket packet)
     {
-        int startPos = packet.GetData().Length;
+        int startPos = packet.GetWrittenLength();
         bool traceOn = Framework.Logging.Log.IsTraceEnabled;
 
         // Phase 5a diagnostic — log the player's UnitData fields most likely to cause
@@ -1740,10 +1744,12 @@ public partial class ObjectUpdateBuilder
         // is enough to identify which object type was being written.
         if (traceOn && _objectType == ObjectTypeBCC.ActivePlayer)
         {
-            byte[] all = packet.GetData();
+            // Slice the dump window off a span over the live buffer; GetData would copy the
+            // entire packet just to hex its first 80 bytes.
+            ReadOnlySpan<byte> all = packet.GetDataSpan();
             int len = all.Length - startPos;
             int dumpLen = Math.Min(80, len);
-            string hex = BitConverter.ToString(all, startPos, dumpLen);
+            string hex = BitConverter.ToString(all.Slice(startPos, dumpLen).ToArray());
             Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
                 $"[Phase5aTrace] ActivePlayer packet bytes={len} first80={hex}");
         }
@@ -1755,10 +1761,12 @@ public partial class ObjectUpdateBuilder
             && _updateData.Type != UpdateTypeModern.Values
             && _objectType == ObjectTypeBCC.GameObject)
         {
-            byte[] all = packet.GetData();
+            // Slice the dump window off a span over the live buffer; GetData would copy the
+            // entire packet just to hex its first 200 bytes.
+            ReadOnlySpan<byte> all = packet.GetDataSpan();
             int len = all.Length - startPos;
             int dumpLen = Math.Min(200, len);
-            string hex = BitConverter.ToString(all, startPos, dumpLen);
+            string hex = BitConverter.ToString(all.Slice(startPos, dumpLen).ToArray());
             var moveInfo = _updateData.CreateData?.MoveInfo;
             var go = _updateData.GameObjectData;
             Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
@@ -1778,10 +1786,12 @@ public partial class ObjectUpdateBuilder
             && _updateData.Type != UpdateTypeModern.Values
             && _updateData.Guid.GetHighType() == HighGuidType.Creature)
         {
-            byte[] all = packet.GetData();
+            // Slice the dump window off a span over the live buffer; GetData would copy the
+            // entire packet just to hex its first 256 bytes.
+            ReadOnlySpan<byte> all = packet.GetDataSpan();
             int len = all.Length - startPos;
             int dumpLen = Math.Min(256, len);
-            string hex = BitConverter.ToString(all, startPos, dumpLen);
+            string hex = BitConverter.ToString(all.Slice(startPos, dumpLen).ToArray());
             Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
                 $"[CreateObjectHex] guid={_updateData.Guid} entry={_updateData.ObjectData?.EntryID?.ToString() ?? "null"} " +
                 $"type={_objectType} bytes={len} first256={hex}");

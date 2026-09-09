@@ -51,16 +51,34 @@ public static partial class ZLib
     public static byte[] Decompress(byte[] data, uint unpackedSize)
     {
         byte[] decompressData = new byte[unpackedSize];
-        using (var deflateStream = new DeflateStream(new MemoryStream(data, 2, data.Length - 6), CompressionMode.Decompress))
-        {
-            var decompressed = new MemoryStream();
-            deflateStream.CopyTo(decompressed);
-
-            decompressed.Seek(0, SeekOrigin.Begin);
-            for (int i = 0; i < unpackedSize; i++)
-                decompressData[i] = (byte)decompressed.ReadByte();
-        }
-
+        Decompress(data, 0, data.Length, decompressData.AsSpan(0, (int)unpackedSize));
         return decompressData;
+    }
+
+    /// <summary>
+    /// Inflates a zlib blob straight into <paramref name="destination"/>.
+    /// </summary>
+    /// <remarks>
+    /// The previous shape decompressed into a growing <see cref="MemoryStream"/> and then copied
+    /// it out one <c>ReadByte()</c> at a time, so a 1.3 MB update object cost ~5.4 MB of garbage
+    /// and a virtual call per byte. Reading into the caller's buffer removes both, and lets the
+    /// caller rent that buffer.
+    ///
+    /// The offset/count pair lets the caller point at the compressed bytes already sitting in a
+    /// received packet instead of copying them out first.
+    /// </remarks>
+    public static void Decompress(byte[] data, int offset, int count, Span<byte> destination)
+    {
+        // 2-byte zlib header up front, 4-byte adler32 checksum on the end; DeflateStream wants
+        // neither.
+        using var deflateStream = new DeflateStream(
+            new MemoryStream(data, offset + 2, count - 6), CompressionMode.Decompress);
+
+        // A stream shorter than unpackedSize used to leave the tail at whatever the freshly
+        // allocated array held, i.e. zeroes. A pooled destination holds the previous packet
+        // instead, so clear the remainder rather than let stale bytes be parsed as payload.
+        int read = deflateStream.ReadAtLeast(destination, destination.Length, throwOnEndOfStream: false);
+        if (read < destination.Length)
+            destination[read..].Clear();
     }
 }
