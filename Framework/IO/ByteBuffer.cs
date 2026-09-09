@@ -603,7 +603,14 @@ public class ByteBuffer : IDisposable
         AdvanceWrite(data.Length);
     }
 
-    public void WriteBytes(Span<byte> data)
+    public void WriteBytes(Span<byte> data) => WriteBytes((ReadOnlySpan<byte>)data);
+
+    /// <summary>
+    /// Appends the bytes without requiring the caller to own an array. Pairs with
+    /// <see cref="GetDataSpan"/> so one buffer can be spliced into another with a single copy
+    /// instead of the two <see cref="GetData"/> would cost.
+    /// </summary>
+    public void WriteBytes(ReadOnlySpan<byte> data)
     {
         FlushBits();
         EnsureCapacity(data.Length);
@@ -892,6 +899,14 @@ public class ByteBuffer : IDisposable
         var remaining = (uint)(_length - _position);
         return ReadBytes(remaining);
     }
+
+    /// <summary>
+    /// Inflates the unread bytes into <paramref name="destination"/>, treating them as a zlib
+    /// blob. Unlike <see cref="ReadToEnd"/> + <c>ZLib.Decompress</c> this copies the compressed
+    /// payload nowhere first. Leaves the read position untouched.
+    /// </summary>
+    public void InflateRemainingInto(Span<byte> destination)
+        => ZLib.Decompress(_buffer, _position, _length - _position, destination);
 
     /// <summary>
     /// Bytes written so far, flushing any pending bit pack first — the same side effect
