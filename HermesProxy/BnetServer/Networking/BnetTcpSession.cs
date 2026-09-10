@@ -441,15 +441,19 @@ public class BnetTcpSession : SSLSocket, BnetServices.INetwork
         header.ServiceHash = (uint)service;
         header.MethodId = methodId;
 
-        AsyncWrite(BuildRpcFrame(header, message));
+        var frame = RentRpcFrame(header, message, out int length);
+        _ = AsyncWrite(frame, length, returnToPool: true);
     }
 
+    // RequestDisconnect sends a DisconnectNotification and then closes; closing on the spot could
+    // cut that frame off mid-write. Error paths call SSLSocket.CloseSocket directly and stay immediate.
+    void BnetServices.INetwork.CloseSocket() => _ = CloseSocketAfterWrites(TimeSpan.FromSeconds(5));
+
     /// <summary>
-    /// Frame layout: big-endian u16 header length, header, payload. Sets <c>header.Size</c>.
+    /// Rents a buffer from <see cref="ArrayPool{T}.Shared"/> and writes the frame into it: big-endian
+    /// u16 header length, header, payload. Sets <c>header.Size</c>. The caller owns the rental.
     /// </summary>
-    // A fresh exact-size array rather than a pooled rental: SSLSocket.AsyncWrite does not await
-    // the stream write, so the buffer would go back to the pool while still being sent.
-    internal static byte[] BuildRpcFrame(Header header, IMessage? message)
+    internal static byte[] RentRpcFrame(Header header, IMessage? message, out int length)
     {
         int payloadSize = 0;
         if (message != null)
@@ -459,10 +463,11 @@ public class BnetTcpSession : SSLSocket, BnetServices.INetwork
         }
 
         int headerSize = header.CalculateSize();
-        var frame = new byte[2 + headerSize + payloadSize];
+        length = 2 + headerSize + payloadSize;
+        var frame = ArrayPool<byte>.Shared.Rent(length);
         BinaryPrimitives.WriteUInt16BigEndian(frame, (ushort)headerSize);
         header.WriteTo(frame.AsSpan(2, headerSize));
-        message?.WriteTo(frame.AsSpan(2 + headerSize));
+        message?.WriteTo(frame.AsSpan(2 + headerSize, payloadSize));
         return frame;
     }
 }

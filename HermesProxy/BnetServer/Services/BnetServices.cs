@@ -128,6 +128,8 @@ public partial class BnetServices
     public interface INetwork
     {
         public void SendRpcMessage(uint serviceId, OriginalHash service, uint methodId, uint token, BattlenetRpcErrorCode status, IMessage? message);
+
+        /// <summary>Closes the connection once the messages already sent have gone out.</summary>
         public void CloseSocket();
 
         IPEndPoint? GetRemoteIpEndPoint();

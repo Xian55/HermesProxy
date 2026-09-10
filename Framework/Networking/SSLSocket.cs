@@ -17,6 +17,7 @@
 
 using Framework.Logging;
 using System;
+using System.Buffers;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -37,6 +38,11 @@ public abstract class SSLSocket : ISocket, IDisposable
     internal SslStream _stream;
     IPEndPoint? _remoteEndPoint;
     byte[]? _receiveBuffer;
+
+    // SslStream throws NotSupportedException for a WriteAsync that starts while another is pending,
+    // and callers send without awaiting, so writes queue here. SemaphoreSlim releases async waiters
+    // in arrival order, which keeps frames in the order they were sent.
+    readonly SemaphoreSlim _writeLock = new(1, 1);
 
     protected SSLSocket(Socket socket)
     {
@@ -136,18 +142,49 @@ public abstract class SSLSocket : ISocket, IDisposable
 
     public abstract Task ReadHandler(byte[] data, int receivedLength);
 
-    public async Task AsyncWrite(byte[] data)
-    {
-        if (!IsOpen())
-            return;
+    public Task AsyncWrite(byte[] data) => AsyncWrite(data, data.Length, returnToPool: false);
 
+    /// <summary>
+    /// Writes the first <paramref name="length"/> bytes of <paramref name="buffer"/> once any write
+    /// already in flight has finished. With <paramref name="returnToPool"/> this call owns the
+    /// buffer and hands it back to <see cref="ArrayPool{T}.Shared"/> after the write completes or fails.
+    /// </summary>
+    public async Task AsyncWrite(byte[] buffer, int length, bool returnToPool)
+    {
+        await _writeLock.WaitAsync();
         try
         {
-            await _stream.WriteAsync(data, 0, data.Length);
+            if (IsOpen())
+                await _stream.WriteAsync(buffer.AsMemory(0, length));
         }
         catch (Exception ex)
         {
             Log.outException(ex);
+        }
+        finally
+        {
+            _writeLock.Release();
+            if (returnToPool)
+                ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    /// <summary>
+    /// Closes once the writes queued before this call are on the wire, so a final notification is
+    /// not cut off. Closes anyway after <paramref name="timeout"/>: a peer that stopped reading must
+    /// not be able to hold the connection open.
+    /// </summary>
+    public async Task CloseSocketAfterWrites(TimeSpan timeout)
+    {
+        bool acquired = await _writeLock.WaitAsync(timeout);
+        try
+        {
+            CloseSocket();
+        }
+        finally
+        {
+            if (acquired)
+                _writeLock.Release();
         }
     }
 
