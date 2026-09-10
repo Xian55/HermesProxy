@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Linq;
 using Bgs.Protocol;
@@ -33,7 +34,7 @@ public class BnetRpcFrameTests
     }
 
     [Fact]
-    public void BuildRpcFrame_WithMessage_MatchesLengthPrefixedHeaderThenPayload()
+    public void RentRpcFrame_WithMessage_MatchesLengthPrefixedHeaderThenPayload()
     {
         var message = NewLogonResult();
         var expectedHeader = NewHeader();
@@ -41,26 +42,32 @@ public class BnetRpcFrameTests
         var headerBytes = expectedHeader.ToByteArray();
         var payloadBytes = message.ToByteArray();
 
-        var frame = BnetTcpSession.BuildRpcFrame(NewHeader(), message);
-
-        Assert.Equal(2 + headerBytes.Length + payloadBytes.Length, frame.Length);
-        Assert.Equal(headerBytes.Length, BinaryPrimitives.ReadUInt16BigEndian(frame));
-        Assert.Equal(headerBytes, frame.AsSpan(2, headerBytes.Length).ToArray());
-        Assert.Equal(payloadBytes, frame.AsSpan(2 + headerBytes.Length).ToArray());
+        var frame = BnetTcpSession.RentRpcFrame(NewHeader(), message, out int length);
+        try
+        {
+            Assert.Equal(2 + headerBytes.Length + payloadBytes.Length, length);
+            Assert.Equal(headerBytes.Length, BinaryPrimitives.ReadUInt16BigEndian(frame));
+            Assert.Equal(headerBytes, frame.AsSpan(2, headerBytes.Length).ToArray());
+            Assert.Equal(payloadBytes, frame.AsSpan(2 + headerBytes.Length, payloadBytes.Length).ToArray());
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(frame);
+        }
     }
 
     [Fact]
-    public void BuildRpcFrame_WithMessage_RoundTripsThroughParseFromSpan()
+    public void RentRpcFrame_WithMessage_RoundTripsThroughParseFromSpan()
     {
         var message = NewLogonResult();
 
-        var frame = BnetTcpSession.BuildRpcFrame(NewHeader(), message);
-        var result = BnetPacketParser.ParseFromSpan(frame);
+        var frame = BnetTcpSession.RentRpcFrame(NewHeader(), message, out int length);
+        var result = BnetPacketParser.ParseFromSpan(frame.AsSpan(0, length));
 
         try
         {
             Assert.True(result.Success);
-            Assert.Equal(frame.Length, result.TotalLength);
+            Assert.Equal(length, result.TotalLength);
             Assert.Equal(42u, result.Header!.Token);
             Assert.Equal(0x71240E35u, result.Header.ServiceHash);
             Assert.Equal(5u, result.Header.MethodId);
@@ -69,21 +76,29 @@ public class BnetRpcFrameTests
         finally
         {
             result.ReturnPayload();
+            ArrayPool<byte>.Shared.Return(frame);
         }
     }
 
     [Fact]
-    public void BuildRpcFrame_WithoutMessage_LeavesSizeUnsetAndCarriesNoPayload()
+    public void RentRpcFrame_WithoutMessage_LeavesSizeUnsetAndCarriesNoPayload()
     {
         var header = NewHeader();
 
-        var frame = BnetTcpSession.BuildRpcFrame(header, null);
-        var result = BnetPacketParser.ParseFromSpan(frame);
+        var frame = BnetTcpSession.RentRpcFrame(header, null, out int length);
+        try
+        {
+            var result = BnetPacketParser.ParseFromSpan(frame.AsSpan(0, length));
 
-        Assert.False(header.HasSize);
-        Assert.Equal(2 + header.CalculateSize(), frame.Length);
-        Assert.True(result.Success);
-        Assert.Equal(0, result.PayloadLength);
-        Assert.Null(result.PayloadArray);
+            Assert.False(header.HasSize);
+            Assert.Equal(2 + header.CalculateSize(), length);
+            Assert.True(result.Success);
+            Assert.Equal(0, result.PayloadLength);
+            Assert.Null(result.PayloadArray);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(frame);
+        }
     }
 }

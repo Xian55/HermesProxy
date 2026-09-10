@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using Bgs.Protocol;
 using Bgs.Protocol.Authentication.V1;
 using Bgs.Protocol.GameUtilities.V1;
@@ -100,8 +101,16 @@ public class BnetRpcCodecBenchmarks
     }
 
     [Benchmark]
-    public byte[] FrameRealmListResponse() => BnetTcpSession.BuildRpcFrame(NewHeader(), _realmListResponse);
+    public int FrameRealmListResponse() => FrameAndReturn(_realmListResponse);
 
     [Benchmark]
-    public byte[] FrameLogonResult() => BnetTcpSession.BuildRpcFrame(NewHeader(), _logonResult);
+    public int FrameLogonResult() => FrameAndReturn(_logonResult);
+
+    // Rent then return, as SendRpcMessage does once SSLSocket.AsyncWrite has sent the frame.
+    private static int FrameAndReturn(IMessage message)
+    {
+        var frame = BnetTcpSession.RentRpcFrame(NewHeader(), message, out int length);
+        ArrayPool<byte>.Shared.Return(frame);
+        return length;
+    }
 }

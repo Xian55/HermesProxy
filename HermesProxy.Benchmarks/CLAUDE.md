@@ -28,7 +28,7 @@ dotnet run --project HermesProxy.Benchmarks -c Release -- --list flat
 | `ByteBufferBenchmarks.cs` | `ByteBuffer` read/write performance |
 | `SpanPacketBenchmarks.cs` | `SpanPacketReader`/`SpanPacketWriter` vs `ByteBuffer` |
 | `BnetPacketParserBenchmarks.cs` | BNet packet parsing performance |
-| `BnetRpcCodecBenchmarks.cs` | BNet RPC request parse (span `MergeFrom`) and response framing (`BuildRpcFrame`) on login-shaped messages |
+| `BnetRpcCodecBenchmarks.cs` | BNet RPC request parse (span `MergeFrom`) and response framing (`RentRpcFrame`) on login-shaped messages |
 | `ExtensionsBenchmarks.cs` | Extension method performance |
 | `PacketDispatchBenchmarks.cs` | Inbound dispatch on real `ClientPacket`s: Activator path vs direct vs `SpanPacketReader` floor |
 | `SendPipelineBenchmarks.cs` | `ServerPacket` construct → `WritePacketData` → framed + encrypted wire bytes, per stage |
