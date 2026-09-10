@@ -79,8 +79,9 @@ class AvailableHotfixes : ServerPacket
         // a ~5 MB packet the client never even logs ("ClientAvailableHotfixes" line missing),
         // suggesting a parse-abort. A single pass over the (large) store — the previous code
         // walked all of GameData.Hotfixes twice, once to count and once to write.
+        // Enumerated directly: .Values would first copy the whole store under every lock.
         var advertised = new System.Collections.Generic.List<HotfixRecord>();
-        foreach (var hotfix in GameData.Hotfixes.Values)
+        foreach (var (_, hotfix) in GameData.Hotfixes)
         {
             if (TableFilter != null && !TableFilter.Contains(hotfix.TableHash))
                 continue;

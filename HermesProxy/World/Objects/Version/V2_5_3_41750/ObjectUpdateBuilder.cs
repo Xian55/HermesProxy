@@ -752,7 +752,7 @@ public class ObjectUpdateBuilder
             }
         }
 
-        ContainerData containerData = m_updateData.ContainerData;
+        ContainerData? containerData = m_updateData.ContainerData;
         if (containerData != null)
         {
             for (int i = 0; i < 36; i++)

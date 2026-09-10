@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using HermesProxy;
 using HermesProxy.Enums;
 using HermesProxy.World;
@@ -83,8 +83,8 @@ public class UnitSectionEquivalenceTests
         unit.Health = 1000L;
         unit.MaxHealth = 1500L;
         unit.DisplayID = 49;
-        unit.NpcFlags[0] = 1u;
-        unit.NpcFlags[1] = 0u;
+        unit.EnsureNpcFlags()[0] = 1u;
+        unit.EnsureNpcFlags()[1] = 0u;
         unit.ChannelData = new UnitChannel(51769, 0);
         unit.ChannelObject = WowGuid128.Create(HighGuidType703.Creature, 0, 7777, 42);
         unit.RaceId = 7;
@@ -94,16 +94,16 @@ public class UnitSectionEquivalenceTests
         unit.DisplayPower = 1u; // Rage — the bug-history regression vector for DisplayPower UInt8 width.
         unit.Level = 60;
         unit.EffectiveLevel = 70;
-        unit.Power[0] = 100;
-        unit.MaxPower[0] = 100;
-        unit.Power[1] = 50;   // Rage
-        unit.MaxPower[1] = 100;
+        unit.EnsurePower()[0] = 100;
+        unit.EnsureMaxPower()[0] = 100;
+        unit.EnsurePower()[1] = 50;   // Rage
+        unit.EnsureMaxPower()[1] = 100;
         unit.FactionTemplate = 35;
         unit.Flags = 0x40u;
         unit.Flags2 = 0u;
         unit.AuraState = 0x100u;
-        unit.AttackRoundBaseTime[0] = 2000u;
-        unit.AttackRoundBaseTime[1] = 2000u;
+        unit.EnsureAttackRoundBaseTime()[0] = 2000u;
+        unit.EnsureAttackRoundBaseTime()[1] = 2000u;
         unit.BoundingRadius = 0.5f;
         unit.CombatReach = 2f;
         unit.NativeDisplayID = 49;
@@ -127,9 +127,8 @@ public class UnitSectionEquivalenceTests
         unit.GuildGUID = WowGuid128.Create(HighGuidType703.Guild, 99);
 
         // Populate PlayerData VisibleItems for VirtualItems fallback (mainhand at slot 15).
-        update.PlayerData!.VisibleItems = new VisibleItem?[19];
-        update.PlayerData.VisibleItems[15] = new VisibleItem(12345, 0, 0); // mainhand
-        update.PlayerData.VisibleItems[17] = new VisibleItem(2508, 0, 0);  // ranged → triggers 2300ms fallback for RangedAttackRoundBaseTime
+        update.PlayerData.EnsureVisibleItems()[15] = new VisibleItem(12345, 0, 0); // mainhand
+        update.PlayerData.EnsureVisibleItems()[17] = new VisibleItem(2508, 0, 0);  // ranged → triggers 2300ms fallback for RangedAttackRoundBaseTime
 
         var actual = new WorldPacket();
         builder.WriteCreateUnitData(actual);
@@ -189,7 +188,7 @@ public class UnitSectionEquivalenceTests
         data.WriteInt64(unit.MaxHealth.GetValueOrDefault());
         data.WriteInt32(unit.DisplayID.GetValueOrDefault());
         for (int i = 0; i < 2; i++)
-            data.WriteUInt32(unit.NpcFlags?[i].GetValueOrDefault() ?? 0);
+            data.WriteUInt32(unit.NpcFlags[i].GetValueOrDefault());
         data.WriteUInt32(0u);
         data.WriteUInt32(0u);
         data.WriteUInt32(0u);
@@ -238,7 +237,7 @@ public class UnitSectionEquivalenceTests
         for (int l = 0; l < 3; l++)
         {
             int vItemId = unit.VirtualItems != null && unit.VirtualItems[l] is VisibleItem vi ? vi.ItemID : 0;
-            if (vItemId == 0 && isOwner && playerData?.VisibleItems != null)
+            if (vItemId == 0 && isOwner && playerData != null)
             {
                 int playerSlot = 15 + l;
                 if (playerSlot < playerData.VisibleItems.Length
@@ -259,11 +258,11 @@ public class UnitSectionEquivalenceTests
         data.WriteUInt32(0u);
         data.WriteUInt32(unit.AuraState.GetValueOrDefault());
         for (int m = 0; m < 2; m++)
-            data.WriteUInt32(unit.AttackRoundBaseTime?[m].GetValueOrDefault() ?? 0);
+            data.WriteUInt32(unit.AttackRoundBaseTime[m].GetValueOrDefault());
         if (isOwner)
         {
             uint rangedTime = unit.RangedAttackRoundBaseTime.GetValueOrDefault();
-            if (rangedTime == 0 && playerData?.VisibleItems != null
+            if (rangedTime == 0 && playerData != null
                 && playerData.VisibleItems.Length > 17
                 && playerData.VisibleItems[17] is VisibleItem ranged && ranged.ItemID != 0)
             {
@@ -306,28 +305,28 @@ public class UnitSectionEquivalenceTests
         {
             for (int n = 0; n < 5; n++)
             {
-                data.WriteInt32(unit.Stats?[n].GetValueOrDefault() ?? 0);
-                data.WriteInt32(unit.StatPosBuff?[n].GetValueOrDefault() ?? 0);
-                data.WriteInt32(unit.StatNegBuff?[n].GetValueOrDefault() ?? 0);
+                data.WriteInt32(unit.Stats[n].GetValueOrDefault());
+                data.WriteInt32(unit.StatPosBuff[n].GetValueOrDefault());
+                data.WriteInt32(unit.StatNegBuff[n].GetValueOrDefault());
             }
         }
         if (isOwner)
         {
             for (int r = 0; r < 7; r++)
-                data.WriteInt32(unit.Resistances?[r].GetValueOrDefault() ?? 0);
+                data.WriteInt32(unit.Resistances[r].GetValueOrDefault());
         }
         if (isOwner)
         {
             for (int p = 0; p < 7; p++)
             {
-                data.WriteInt32(unit.PowerCostModifier?[p].GetValueOrDefault() ?? 0);
-                data.WriteFloat(unit.PowerCostMultiplier?[p].GetValueOrDefault() ?? 0f);
+                data.WriteInt32(unit.PowerCostModifier[p].GetValueOrDefault());
+                data.WriteFloat(unit.PowerCostMultiplier[p].GetValueOrDefault());
             }
         }
         for (int b = 0; b < 7; b++)
         {
-            data.WriteInt32(unit.ResistanceBuffModsPositive?[b].GetValueOrDefault() ?? 0);
-            data.WriteInt32(unit.ResistanceBuffModsNegative?[b].GetValueOrDefault() ?? 0);
+            data.WriteInt32(unit.ResistanceBuffModsPositive[b].GetValueOrDefault());
+            data.WriteInt32(unit.ResistanceBuffModsNegative[b].GetValueOrDefault());
         }
         data.WriteInt32(unit.BaseMana.GetValueOrDefault());
         if (isOwner)
@@ -547,7 +546,7 @@ public class UnitSectionEquivalenceTests
         var guid = WowGuid128.Create(HighGuidType703.Creature, 0, 1234, 1);
         var builder = MakeBuilder(guid, session, out var update);
 
-        update.UnitData!.NpcFlags[0] = 0u;   // HasValue = true, value = 0
+        update.UnitData!.EnsureNpcFlags()[0] = 0u;   // HasValue = true, value = 0
 
         Assert.False(builder.HasAnyUnitFieldSet());
     }

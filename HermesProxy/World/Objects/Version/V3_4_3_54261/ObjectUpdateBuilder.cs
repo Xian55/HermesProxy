@@ -598,7 +598,7 @@ public partial class ObjectUpdateBuilder
             // Players don't populate VirtualItems server-side (use PLAYER_VISIBLE_ITEM
             // descriptors instead). For the local player, fall back to PlayerData.VisibleItems:
             // slot 0=mainhand(15), 1=offhand(16), 2=ranged(17).
-            if (vItemId == 0 && IsOwner && _updateData.PlayerData?.VisibleItems != null)
+            if (vItemId == 0 && IsOwner && _updateData.PlayerData != null)
             {
                 int playerSlot = 15 + l;
                 if (playerSlot < _updateData.PlayerData.VisibleItems.Length
@@ -622,7 +622,7 @@ public partial class ObjectUpdateBuilder
     {
         // IF IsOwner: bow-default fallback. Generator wraps in if (IsOwner) already.
         uint rangedTime = src.RangedAttackRoundBaseTime.GetValueOrDefault();
-        if (rangedTime == 0 && _updateData.PlayerData?.VisibleItems != null
+        if (rangedTime == 0 && _updateData.PlayerData != null
             && _updateData.PlayerData.VisibleItems.Length > 17
             && _updateData.PlayerData.VisibleItems[17] is VisibleItem ranged && ranged.ItemID != 0)
         {
@@ -636,9 +636,9 @@ public partial class ObjectUpdateBuilder
         // IF IsOwner: 5 slots × (Stats[n], StatPosBuff[n], StatNegBuff[n]).
         for (int n = 0; n < 5; n++)
         {
-            data.WriteInt32(src.Stats?[n].GetValueOrDefault() ?? 0);
-            data.WriteInt32(src.StatPosBuff?[n].GetValueOrDefault() ?? 0);
-            data.WriteInt32(src.StatNegBuff?[n].GetValueOrDefault() ?? 0);
+            data.WriteInt32(src.Stats[n].GetValueOrDefault());
+            data.WriteInt32(src.StatPosBuff[n].GetValueOrDefault());
+            data.WriteInt32(src.StatNegBuff[n].GetValueOrDefault());
         }
     }
 
@@ -646,7 +646,7 @@ public partial class ObjectUpdateBuilder
     {
         // IF IsOwner: 7× Resistances Int32.
         for (int r = 0; r < 7; r++)
-            data.WriteInt32(src.Resistances?[r].GetValueOrDefault() ?? 0);
+            data.WriteInt32(src.Resistances[r].GetValueOrDefault());
     }
 
     internal void WriteCreateUnitPowerCostInterleaved(WorldPacket data, UnitData src)
@@ -654,8 +654,8 @@ public partial class ObjectUpdateBuilder
         // IF IsOwner: 7 slots × (PowerCostModifier[p] Int32, PowerCostMultiplier[p] Float).
         for (int p = 0; p < 7; p++)
         {
-            data.WriteInt32(src.PowerCostModifier?[p].GetValueOrDefault() ?? 0);
-            data.WriteFloat(src.PowerCostMultiplier?[p].GetValueOrDefault() ?? 0f);
+            data.WriteInt32(src.PowerCostModifier[p].GetValueOrDefault());
+            data.WriteFloat(src.PowerCostMultiplier[p].GetValueOrDefault());
         }
     }
 
@@ -664,8 +664,8 @@ public partial class ObjectUpdateBuilder
         // 7 slots × (ResistanceBuffModsPositive[b] Int32, ResistanceBuffModsNegative[b] Int32).
         for (int b = 0; b < 7; b++)
         {
-            data.WriteInt32(src.ResistanceBuffModsPositive?[b].GetValueOrDefault() ?? 0);
-            data.WriteInt32(src.ResistanceBuffModsNegative?[b].GetValueOrDefault() ?? 0);
+            data.WriteInt32(src.ResistanceBuffModsPositive[b].GetValueOrDefault());
+            data.WriteInt32(src.ResistanceBuffModsNegative[b].GetValueOrDefault());
         }
     }
 
@@ -719,7 +719,7 @@ public partial class ObjectUpdateBuilder
         data.WritePackedGuid128(src.ChannelObject.Value);
     }
 
-    internal void WriteUpdateUnitVirtualItem(WorldPacket data, System.Nullable<VisibleItem>[] arr, int i)
+    internal void WriteUpdateUnitVirtualItem(WorldPacket data, ReadOnlySpan<VisibleItem?> arr, int i)
     {
         // VirtualItem inner mask: 4-bit (bit 0 = group, 1 = ItemID present). Hand-port
         // (file:2308-2316 pre-delete) emits mask 0x03 then Int32 ItemID.
@@ -974,7 +974,7 @@ public partial class ObjectUpdateBuilder
             : WowGuid128.Empty);
     }
 
-    internal void WriteUpdatePlayerQuestLogEntry(WorldPacket data, QuestLog[] arr, int i)
+    internal void WriteUpdatePlayerQuestLogEntry(WorldPacket data, ReadOnlySpan<QuestLog> arr, int i)
     {
         // Per-element write at bit 36+i. Same shape as hand-port file:1576-1583 — uses
         // WriteCreate format (no inner mask, raw fields) per IsQuestLogChangesMaskSkipped = 1.
@@ -986,7 +986,7 @@ public partial class ObjectUpdateBuilder
             data.WriteUInt16((ushort)(quest?.ObjectiveProgress[obj] ?? 0));
     }
 
-    internal void WriteUpdatePlayerVisibleItem(WorldPacket data, System.Nullable<VisibleItem>[] arr, int i)
+    internal void WriteUpdatePlayerVisibleItem(WorldPacket data, ReadOnlySpan<VisibleItem?> arr, int i)
     {
         // Per-element write at bit 62+i. Inner 4-bit mask (0x0F = all 4 bits set) +
         // FlushBits + Int32 ItemID + UInt16 ItemAppearanceModID + UInt16 ItemVisual.
