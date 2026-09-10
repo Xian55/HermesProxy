@@ -13,6 +13,16 @@
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Moq" />
     <PackageReference Include="Verify.XunitV3" />
+    <!-- Syntax-only parse of the vendored WowPacketParser handler in UpdateFieldWppConformanceTests. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Kept as .txt so it is never compiled; the conformance test reads it as source text.
+         WithCulture=false: MSBuild otherwise reads the ".cs." in the name as the Czech culture and
+         moves the file into a cs/ satellite assembly. -->
+    <EmbeddedResource Include="SourceGen\Reference\WowPacketParser\UpdateFieldsHandler343.cs.txt"
+                      LogicalName="WowPacketParser.UpdateFieldsHandler343.cs" WithCulture="false" />
   </ItemGroup>
 
   <ItemGroup>
