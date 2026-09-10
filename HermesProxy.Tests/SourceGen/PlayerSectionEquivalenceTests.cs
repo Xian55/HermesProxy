@@ -215,6 +215,9 @@ public class PlayerSectionEquivalenceTests
         Assert.Equal(HasAnyPlayerFieldSet_HandPort(update.PlayerData!), builder.HasAnyPlayerFieldSet());
     }
 
+    // CA2265: the oracle below still null-checks fields that are now spans. It is frozen
+    // (HermesProxy.SourceGen/CLAUDE.md), so the warning is silenced rather than fixed.
+#pragma warning disable CA2265
     // ---------------------------------------------------------------------
     // Inlined pre-Phase-5b hand-port — frozen oracle. Identical to bodies
     // removed from V3_4_3_54261/ObjectUpdateBuilder.cs (lines 749-856 Create /
@@ -426,4 +429,5 @@ public class PlayerSectionEquivalenceTests
                 if (p.VisibleItems[i] != null) return true;
         return false;
     }
+#pragma warning restore CA2265
 }

@@ -992,6 +992,12 @@ public enum Opcode : uint
 	CMSG_REPORT_ENABLED_ADDONS = 14086u,
 	CMSG_REPORT_KEYBINDING_EXECUTION_COUNTS = 14088u,
 	CMSG_DISCARDED_TIME_SYNC_ACKS = 14913u,
+	// Sent by the client but had no entry here, so they logged as MSG_NULL_ACTION.
+	// Values from WowPacketParser's V3_4_3_51666 table, which it also uses for 54261.
+	// Still unhandled: naming them only fixes the log.
+	CMSG_GET_ITEM_PURCHASE_DATA = 13615u,
+	CMSG_REQUEST_PARTY_JOIN_UPDATES = 13816u,
+	CMSG_SUSPEND_TOKEN_RESPONSE = 14186u,
 	SMSG_ENABLE_BARBER_SHOP = 9916u, // 0x26BC
 	SMSG_BARBER_SHOP_RESULT = 9918u // 0x26BE
 }
