@@ -9,7 +9,6 @@ using Framework.Logging;
 using Framework.Serialization;
 using Framework.Util;
 using Framework.Web;
-using Google.Protobuf;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
 
@@ -53,7 +52,7 @@ public partial class WorldSocket
             (OriginalHash)request.Method.GetServiceHash(),
             request.Method.GetMethodId(),
             request.Method.Token,
-            new CodedInputStream(request.Data)
+            request.Data
         );
     }
 }

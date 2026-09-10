@@ -1,0 +1,22 @@
+syntax = "proto2";
+
+package bgs.protocol.user_manager.v1;
+
+import public "bgs/low/pb/client/global_extensions/field_options.proto";
+import "bgs/low/pb/client/entity_types.proto";
+import "bgs/low/pb/client/attribute_types.proto";
+
+message RecentPlayer {
+  required .bgs.protocol.EntityId entity_id = 1;
+  optional string program = 2;
+  optional fixed64 timestamp_played = 3;
+  repeated .bgs.protocol.Attribute attributes = 4;
+  optional fixed32 counter = 6 [default = 0];
+}
+
+message BlockedPlayer {
+  required .bgs.protocol.EntityId account_id = 1;
+  optional string battle_tag = 2 [(bgs.protocol.field_options).log = HIDDEN];
+  repeated uint32 role = 3 [deprecated = true];
+  optional uint64 privileges = 4 [deprecated = true];
+}

@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+package bgs.protocol.channel.v1;
+
+import "bgs/low/pb/client/rpc_types.proto";
+import "bgs/low/pb/client/global_extensions/message_options.proto";
+
+message ChannelId {
+  option (bgs.protocol.message_options).custom_select_shard = true;
+  optional uint32 type = 1;
+  optional .bgs.protocol.ProcessId host = 2;
+  optional fixed32 id = 3;
+}

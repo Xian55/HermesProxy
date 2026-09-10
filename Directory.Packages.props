@@ -10,7 +10,11 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Framework project packages -->
-    <PackageVersion Include="Google.Protobuf" Version="3.33.4" />
+    <PackageVersion Include="Google.Protobuf" Version="3.36.1" />
+    <!-- Build-time only: bundles protoc (35.1). Generated code must not be newer than the runtime above.
+         Prerelease for its universal macOS protoc: 2.83.0 ships x86_64 only, which cannot run on Apple
+         Silicon without Rosetta (MSB6003). Move to 2.84.0 once it is stable. -->
+    <PackageVersion Include="Grpc.Tools" Version="2.84.0-pre1" />
     <PackageVersion Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageVersion Include="Sep" Version="0.12.2" />
     <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />

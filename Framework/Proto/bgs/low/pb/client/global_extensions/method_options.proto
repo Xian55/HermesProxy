@@ -1,0 +1,23 @@
+syntax = "proto2";
+
+package bgs.protocol;
+
+import "google/protobuf/descriptor.proto";
+import "bgs/low/pb/client/global_extensions/routing.proto";
+
+option java_package = "bnet.protocol";
+option java_outer_classname = "MethodOptionsProto";
+
+message BGSMethodOptions {
+  optional uint32 id = 1;
+  optional .bgs.protocol.ClientIdentityRoutingType client_identity_routing = 2 [default = CLIENT_IDENTITY_ROUTING_DISABLED];
+  optional bool enable_fanout = 3;
+  optional string legacy_fanout_replacement = 4;
+  optional string forward_key = 5;
+  optional bool idempotent = 6;
+  optional bool handle_destination_unreachable = 7;
+}
+
+extend .google.protobuf.MethodOptions {
+  optional .bgs.protocol.BGSMethodOptions method_options = 90000;
+}
