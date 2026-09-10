@@ -18,6 +18,7 @@
 using System;
 using System.Buffers;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Sockets;
@@ -1416,6 +1417,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         return GetRemoteIpAddress()!;
     }
 
+    [UnconditionalSuppressMessage("Trimming", "IL2072", Justification = Trimming.RootedAssembly)]
     public void InitializePacketHandlers()
     {
         foreach (var methodInfo in typeof(WorldSocket).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic))
@@ -1454,9 +1456,9 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
     public class PacketHandler
     {
-        public PacketHandler(MethodInfo info, Type type)
+        public PacketHandler(MethodInfo info, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type type)
         {
-            methodCaller = (Action<WorldSocket, ClientPacket>)GetType().GetMethod("CreateDelegate", BindingFlags.Static | BindingFlags.NonPublic)!.MakeGenericMethod(type).Invoke(null, new object[] { info })!;
+            methodCaller = (Action<WorldSocket, ClientPacket>)typeof(PacketHandler).GetMethod(nameof(CreateDelegate), BindingFlags.Static | BindingFlags.NonPublic)!.MakeGenericMethod(type).Invoke(null, new object[] { info })!;
             packetType = type;
         }
 
@@ -1482,6 +1484,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         }
 
         Action<WorldSocket, ClientPacket> methodCaller = null!;
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
         Type packetType;
     }
 }

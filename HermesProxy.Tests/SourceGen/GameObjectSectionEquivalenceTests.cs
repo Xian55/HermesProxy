@@ -80,7 +80,7 @@ public class GameObjectSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(CreateScenarios))]
-    public void WriteCreateGameObjectData_GeneratedMatchesHandPort(string _label, System.Action<GameObjectData> populate)
+    public void WriteCreateGameObjectData_GeneratedMatchesHandPort(string _, System.Action<GameObjectData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.GameObject, 0, 5678, 1);
@@ -141,7 +141,7 @@ public class GameObjectSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(UpdateScenarios))]
-    public void WriteUpdateGameObjectData_GeneratedMatchesHandPort(string _label, System.Action<GameObjectData> populate)
+    public void WriteUpdateGameObjectData_GeneratedMatchesHandPort(string _, System.Action<GameObjectData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.GameObject, 0, 5678, 1);
@@ -163,7 +163,7 @@ public class GameObjectSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(CreateScenarios))]
-    public void HasAnyGameObjectFieldSet_GeneratedMatchesHandPort(string _label, System.Action<GameObjectData> populate)
+    public void HasAnyGameObjectFieldSet_GeneratedMatchesHandPort(string _, System.Action<GameObjectData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.GameObject, 0, 5678, 1);

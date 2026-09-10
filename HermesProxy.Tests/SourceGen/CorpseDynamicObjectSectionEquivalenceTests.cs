@@ -116,7 +116,7 @@ public class CorpseDynamicObjectSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(CorpseScenarios))]
-    public void WriteCreateCorpseData_GeneratedMatchesHandPort(string _label, System.Action<CorpseData> populate)
+    public void WriteCreateCorpseData_GeneratedMatchesHandPort(string _, System.Action<CorpseData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.Corpse, 0, 1234, 1);
@@ -135,7 +135,7 @@ public class CorpseDynamicObjectSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(CorpseScenarios))]
-    public void WriteUpdateCorpseData_GeneratedMatchesTrinityLayout(string _label, System.Action<CorpseData> populate)
+    public void WriteUpdateCorpseData_GeneratedMatchesTrinityLayout(string _, System.Action<CorpseData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.Corpse, 0, 1234, 1);
@@ -268,7 +268,7 @@ public class CorpseDynamicObjectSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(DynamicObjectScenarios))]
-    public void WriteCreateDynamicObjectData_GeneratedMatchesHandPort(string _label, System.Action<DynamicObjectData> populate)
+    public void WriteCreateDynamicObjectData_GeneratedMatchesHandPort(string _, System.Action<DynamicObjectData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.DynamicObject, 0, 1234, 1);
@@ -287,7 +287,7 @@ public class CorpseDynamicObjectSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(DynamicObjectScenarios))]
-    public void WriteUpdateDynamicObjectData_GeneratedMatchesTrinityLayout(string _label, System.Action<DynamicObjectData> populate)
+    public void WriteUpdateDynamicObjectData_GeneratedMatchesTrinityLayout(string _, System.Action<DynamicObjectData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.DynamicObject, 0, 1234, 1);

@@ -595,7 +595,7 @@ public partial class WorldClient
             WowGuid128 partyGuid = gameState.GetCurrentGroupGuid();
 
             // The group broke up while the check was running; there is nothing to complete.
-            if (partyGuid == null || partyGuid.IsEmpty())
+            if (partyGuid.IsEmpty())
                 return;
 
             WorldClientLogMessages.ReadyCheckDeadlineLapsed(_melLog, _sourceFile, _netDirNone, (long)state!, responses, expected);

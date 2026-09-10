@@ -734,15 +734,12 @@ public partial class WorldClient
                     var dstUnit = petValuesOu.UnitData;
 
                     bool any = false;
-                    if (srcUnit.Stats != null)
-                    {
-                        for (int i = 0; i < 5; i++)
-                            if (srcUnit.Stats[i].HasValue)
-                            {
-                                dstUnit.EnsureStats()[i] = srcUnit.Stats[i];
-                                any = true;
-                            }
-                    }
+                    for (int i = 0; i < 5; i++)
+                        if (srcUnit.Stats[i].HasValue)
+                        {
+                            dstUnit.EnsureStats()[i] = srcUnit.Stats[i];
+                            any = true;
+                        }
                     if (srcUnit.AttackPower.HasValue) { dstUnit.AttackPower = srcUnit.AttackPower; any = true; }
                     if (srcUnit.AttackPowerModPos.HasValue) { dstUnit.AttackPowerModPos = srcUnit.AttackPowerModPos; any = true; }
                     if (srcUnit.AttackPowerModNeg.HasValue) { dstUnit.AttackPowerModNeg = srcUnit.AttackPowerModNeg; any = true; }
@@ -750,21 +747,18 @@ public partial class WorldClient
                     if (srcUnit.MinDamage.HasValue) { dstUnit.MinDamage = srcUnit.MinDamage; any = true; }
                     if (srcUnit.MaxDamage.HasValue) { dstUnit.MaxDamage = srcUnit.MaxDamage; any = true; }
                     if (srcUnit.BaseHealth.HasValue) { dstUnit.BaseHealth = srcUnit.BaseHealth; any = true; }
-                    if (srcUnit.Resistances != null)
-                    {
-                        for (int i = 0; i < 7; i++)
-                            if (srcUnit.Resistances[i].HasValue)
-                            {
-                                dstUnit.EnsureResistances()[i] = srcUnit.Resistances[i];
-                                any = true;
-                            }
-                    }
+                    for (int i = 0; i < 7; i++)
+                        if (srcUnit.Resistances[i].HasValue)
+                        {
+                            dstUnit.EnsureResistances()[i] = srcUnit.Resistances[i];
+                            any = true;
+                        }
                     if (any)
                     {
                         statsUpdateObject.ObjectUpdates.Add(petValuesOu);
                         if (Log.IsTraceEnabled)
                             Log.Print(LogType.Trace,
-                            $"[PetStatsValuesSynth] sending follow-up Values for pet {mergedPetGuid} with Stats={(srcUnit.Stats != null ? "[" + string.Join(",", new[] { srcUnit.Stats[0], srcUnit.Stats[1], srcUnit.Stats[2], srcUnit.Stats[3], srcUnit.Stats[4] }) + "]" : "n")} AP={srcUnit.AttackPower} minDmg={srcUnit.MinDamage} maxDmg={srcUnit.MaxDamage} armor={srcUnit.Resistances[0]} baseHP={srcUnit.BaseHealth}");
+                            $"[PetStatsValuesSynth] sending follow-up Values for pet {mergedPetGuid} with Stats=[{srcUnit.Stats[0]},{srcUnit.Stats[1]},{srcUnit.Stats[2]},{srcUnit.Stats[3]},{srcUnit.Stats[4]}] AP={srcUnit.AttackPower} minDmg={srcUnit.MinDamage} maxDmg={srcUnit.MaxDamage} armor={srcUnit.Resistances[0]} baseHP={srcUnit.BaseHealth}");
                         SendPacketToClient(statsUpdateObject);
                     }
                 }
