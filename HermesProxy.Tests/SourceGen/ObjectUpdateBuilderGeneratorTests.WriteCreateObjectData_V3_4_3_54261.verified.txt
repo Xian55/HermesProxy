@@ -4049,7 +4049,7 @@ public partial class ObjectUpdateBuilder
         if (src.GuildGUID != null) { blocks.SetBit(107); }
         if (src.ChannelObject.HasValue && !src.ChannelObject.Value.IsEmpty()) { blocks.SetBit(4); }
         if (src.Flags3.HasValue) { blocks.SetBit(43); }
-        if (src.OverrideDisplayPowerID.HasValue) { blocks.SetBit(45); }
+        if (src.OverrideDisplayPowerID.HasValue) { blocks.SetBit(29); }
         if (src.DisplayScale.HasValue) { blocks.SetBit(48); }
         if (src.NativeXDisplayScale.HasValue) { blocks.SetBit(50); }
         if (src.ModHaste.HasValue) { blocks.SetBit(67); }
@@ -4162,6 +4162,7 @@ public partial class ObjectUpdateBuilder
         if (blocks.IsBitSet(25)) data.WriteUInt8(src.ClassId!.Value);
         if (blocks.IsBitSet(27)) data.WriteUInt8(src.SexId!.Value);
         if (blocks.IsBitSet(28)) data.WriteUInt8((byte)src.DisplayPower!.Value);
+        if (blocks.IsBitSet(29)) data.WriteUInt32(src.OverrideDisplayPowerID!.Value);
         if (blocks.IsBitSet(30)) data.WriteInt32(src.Level!.Value);
         if (blocks.IsBitSet(31)) data.WriteInt32(src.EffectiveLevel!.Value);
         if (blocks.IsBitSet(40)) data.WriteInt32(src.FactionTemplate!.Value);
@@ -4169,7 +4170,6 @@ public partial class ObjectUpdateBuilder
         if (blocks.IsBitSet(42)) WriteUpdateUnitFlags2(data, src);
         if (blocks.IsBitSet(43)) data.WriteUInt32(src.Flags3!.Value);
         if (blocks.IsBitSet(44)) data.WriteUInt32(src.AuraState!.Value);
-        if (blocks.IsBitSet(45)) data.WriteUInt32(src.OverrideDisplayPowerID!.Value);
         if (blocks.IsBitSet(46)) data.WriteFloat(src.BoundingRadius!.Value);
         if (blocks.IsBitSet(47)) data.WriteFloat(src.CombatReach!.Value);
         if (blocks.IsBitSet(48)) data.WriteFloat(src.DisplayScale!.Value);

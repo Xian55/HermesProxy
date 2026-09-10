@@ -476,7 +476,7 @@ public enum UnitField
     [DescriptorUpdateField(nameof(UnitData.Flags3), DescriptorType.UInt32, bit: 43)]
     UNIT_FLAGS3_UPDATE,
 
-    [DescriptorUpdateField(nameof(UnitData.OverrideDisplayPowerID), DescriptorType.UInt32, bit: 45)]
+    [DescriptorUpdateField(nameof(UnitData.OverrideDisplayPowerID), DescriptorType.UInt32, bit: 29)]
     UNIT_OVERRIDE_DISPLAY_POWER_ID_UPDATE,
 
     [DescriptorUpdateField(nameof(UnitData.DisplayScale), DescriptorType.Float, bit: 48)]
