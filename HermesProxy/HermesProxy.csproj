@@ -13,16 +13,14 @@
     <Authors>WowLegacyCore</Authors>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 
-    <!-- Keep System.Text.Json reflection-based serialization on under
-         PublishTrimmed=true. Without this, JsonSerializer.Deserialize<T>(string)
-         throws InvalidOperationException "Reflection-based serialization has
-         been disabled for this application" the first time AccountDataManager
-         reads a character settings file (hit after PlayerLogin). The SDK
-         auto-disables reflection serialization with trimming as a safety,
-         but our HermesProxy assembly is rooted via TrimmerRootAssembly so
-         the deserialized types remain intact — reflection is safe. A proper
-         fix would use JsonSerializerContext source generation on every
-         serialized type; that's a bigger refactor. -->
+    <!-- Safety net only. HermesProxy's own JSON goes through the source-generated
+         HermesJsonContext, so none of it needs reflection-based System.Text.Json.
+         PublishTrimmed=true would otherwise switch reflection off, and any
+         serializer call that bypasses the context would throw
+         InvalidOperationException "Reflection-based serialization has been
+         disabled for this application" at runtime (it used to, after PlayerLogin,
+         when AccountDataManager read a character settings file). Drop this once a
+         trimmed publish has been playtested without it. -->
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
 
     <!-- Enable the .NET 8+ source generator for Microsoft.Extensions.Configuration.Binder so

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Framework.Constants;
 using Google.Protobuf;
@@ -11,6 +12,8 @@ public partial class BnetServices
 {
     public class ServiceManager
     {
+        [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = Trimming.RootedAssembly)]
+        [UnconditionalSuppressMessage("Trimming", "IL2075", Justification = Trimming.RootedAssembly)]
         static ServiceManager()
         {
             // TODO: Replace with compile time generator

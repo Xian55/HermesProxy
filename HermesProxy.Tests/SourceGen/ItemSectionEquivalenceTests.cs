@@ -88,7 +88,7 @@ public class ItemSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(CreateScenarios))]
-    public void WriteCreateItemData_GeneratedMatchesHandPort(string _label, bool ownerGuid, System.Action<ItemData> populate)
+    public void WriteCreateItemData_GeneratedMatchesHandPort(string _, bool ownerGuid, System.Action<ItemData> populate)
     {
         var session = CreateGameSession();
         var guid = ownerGuid
@@ -177,7 +177,7 @@ public class ItemSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(UpdateScenarios))]
-    public void WriteUpdateItemData_GeneratedMatchesHandPort(string _label, System.Action<ItemData> populate)
+    public void WriteUpdateItemData_GeneratedMatchesHandPort(string _, System.Action<ItemData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.Item, 1);
@@ -195,7 +195,7 @@ public class ItemSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(UpdateScenarios))]
-    public void HasAnyItemFieldSet_GeneratedMatchesHandPort(string _label, System.Action<ItemData> populate)
+    public void HasAnyItemFieldSet_GeneratedMatchesHandPort(string _, System.Action<ItemData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.Item, 1);

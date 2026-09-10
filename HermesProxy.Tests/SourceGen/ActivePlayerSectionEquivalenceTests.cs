@@ -234,7 +234,7 @@ public class ActivePlayerSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(UpdateScenarios))]
-    public void WriteUpdateActivePlayerData_GeneratedMatchesHandPort(string _label, Action<ActivePlayerData, GameSessionData> populate)
+    public void WriteUpdateActivePlayerData_GeneratedMatchesHandPort(string _, Action<ActivePlayerData, GameSessionData> populate)
     {
         // Generator-emitted path.
         var sessionActual = CreateGameSession();
@@ -1196,7 +1196,7 @@ public class ActivePlayerSectionEquivalenceTests
     // that replaces a slice of WriteCreateActivePlayerAll must keep this green.
     [Theory]
     [MemberData(nameof(CreateScenarios))]
-    public void WriteCreateActivePlayerData_GeneratedMatchesHandPort(string _label, Action<ActivePlayerData, GameSessionData> populate)
+    public void WriteCreateActivePlayerData_GeneratedMatchesHandPort(string _, Action<ActivePlayerData, GameSessionData> populate)
     {
         var sessionActual = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.Player, 1);

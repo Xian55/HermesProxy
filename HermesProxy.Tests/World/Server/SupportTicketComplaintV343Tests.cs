@@ -110,7 +110,7 @@ public class SupportTicketComplaintV343Tests
         var complaint = Parse(Bytes(StolenName));
 
         // Packed as lowMask 0x01 / highMask 0xA0 -> low byte 0x62, high bytes 5 and 7.
-        Assert.NotNull(complaint.TargetCharacterGuid);
+        Assert.False(complaint.TargetCharacterGuid.IsEmpty());
         Assert.Equal(98u, complaint.TargetCharacterGuid.GetCounter());
     }
 

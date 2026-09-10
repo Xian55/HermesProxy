@@ -118,24 +118,22 @@ public sealed class OpcodeTableGenerator : IIncrementalGenerator
                 if (!field.IsConst || !field.HasConstantValue)
                     continue;
 
+                // Zero is the "not found" sentinel slot, so zero-valued members never reach the
+                // tables. Per-version enums keep names the build doesn't have at 0 as placeholders;
+                // such a name has nothing to drop, so it needn't exist in the universal enum.
                 uint versionValue = Convert.ToUInt32(field.ConstantValue);
-                if (!universalByName.TryGetValue(field.Name, out uint universalValue))
-                {
-                    // MSG_NULL_ACTION is expected in every version but value 0 and is excluded from
-                    // the translation tables (the zero slot is used as the "not found" sentinel).
-                    if (field.Name != "MSG_NULL_ACTION")
-                    {
-                        diagnostics.Add(Diagnostic.Create(
-                            MissingUniversalMember,
-                            field.Locations.FirstOrDefault(),
-                            field.Name,
-                            childNs.Name));
-                    }
-                    continue;
-                }
-
                 if (versionValue == 0)
                     continue;
+
+                if (!universalByName.TryGetValue(field.Name, out uint universalValue))
+                {
+                    diagnostics.Add(Diagnostic.Create(
+                        MissingUniversalMember,
+                        field.Locations.FirstOrDefault(),
+                        field.Name,
+                        childNs.Name));
+                    continue;
+                }
 
                 entries.Add(new OpcodeEntry(versionValue, universalValue, field.Name));
             }

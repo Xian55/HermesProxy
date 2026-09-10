@@ -89,7 +89,7 @@ partial class Server
             response.EnsureSuccessStatusCode();
 
             string rawJson = await response.Content.ReadAsStringAsync();
-            var parsedJson = JsonSerializer.Deserialize<Dictionary<string, object>>(rawJson);
+            var parsedJson = JsonSerializer.Deserialize(rawJson, HermesJsonContext.Default.DictionaryStringObject);
 
             string? commitDateStr = parsedJson!["created_at"].ToString();
             DateTime commitDate = DateTime.Parse(commitDateStr!, CultureInfo.InvariantCulture).ToUniversalTime();

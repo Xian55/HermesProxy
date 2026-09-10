@@ -13,6 +13,7 @@ using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -637,7 +638,11 @@ public static partial class GameData
         return 10;
     }
 
-    private static int EstimateAvgBytesPerRow<T>()
+    // Tells the trimmer to keep the public fields/properties the row-size estimate reflects over.
+    private const DynamicallyAccessedMemberTypes RowMembers =
+        DynamicallyAccessedMemberTypes.PublicFields | DynamicallyAccessedMemberTypes.PublicProperties;
+
+    private static int EstimateAvgBytesPerRow<[DynamicallyAccessedMembers(RowMembers)] T>()
     {
         int bytes = 0;
         foreach (var field in typeof(T).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
@@ -657,7 +662,7 @@ public static partial class GameData
         return (int)(fileSize / avgBytesPerRow);
     }
 
-    private static int EstimateRowCount<T>(string path) => EstimateRowCount(path, EstimateAvgBytesPerRow<T>());
+    private static int EstimateRowCount<[DynamicallyAccessedMembers(RowMembers)] T>(string path) => EstimateRowCount(path, EstimateAvgBytesPerRow<T>());
 
     public static void LoadEverything()
     {

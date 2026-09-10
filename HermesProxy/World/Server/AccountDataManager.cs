@@ -198,8 +198,7 @@ public class AccountMetaDataManager
         var dir = GetAccountCharacterMetaDataDirectory(realmName, charName);
         var path = Path.Combine(dir, SETTINGS_FILE);
 
-        var options = new JsonSerializerOptions { WriteIndented = true };
-        var jsonString = JsonSerializer.Serialize(settings, options);
+        var jsonString = JsonSerializer.Serialize(settings, HermesJsonContext.Default.InternalStorage);
         File.WriteAllText(path, jsonString, Encoding.UTF8);
     }
 
@@ -216,7 +215,7 @@ public class AccountMetaDataManager
         }
 
         var jsonString = File.ReadAllText(path, Encoding.UTF8);
-        var loadedJson = JsonSerializer.Deserialize<PlayerSettings.InternalStorage>(jsonString);
+        var loadedJson = JsonSerializer.Deserialize(jsonString, HermesJsonContext.Default.InternalStorage);
 
         return loadedJson!;
     }
@@ -227,7 +226,7 @@ public class AccountMetaDataManager
         if (!File.Exists(path))
             return new CollectionFavorites();
 
-        var loaded = JsonSerializer.Deserialize<CollectionFavorites>(File.ReadAllText(path, Encoding.UTF8));
+        var loaded = JsonSerializer.Deserialize(File.ReadAllText(path, Encoding.UTF8), HermesJsonContext.Default.CollectionFavorites);
         if (loaded == null)
             return new CollectionFavorites();
         loaded.FavoritePetSpecies ??= [];
@@ -240,8 +239,7 @@ public class AccountMetaDataManager
     public void SaveCollectionFavorites(CollectionFavorites favorites)
     {
         var path = Path.Combine(GetAccountMetaDataDirectory(), COLLECTION_FAVORITES_FILE);
-        var options = new JsonSerializerOptions { WriteIndented = true };
-        File.WriteAllText(path, JsonSerializer.Serialize(favorites, options), Encoding.UTF8);
+        File.WriteAllText(path, JsonSerializer.Serialize(favorites, HermesJsonContext.Default.CollectionFavorites), Encoding.UTF8);
     }
 }
 

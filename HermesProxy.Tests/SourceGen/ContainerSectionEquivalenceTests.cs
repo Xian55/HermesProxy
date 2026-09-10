@@ -65,7 +65,7 @@ public class ContainerSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(CreateScenarios))]
-    public void WriteCreateContainerData_GeneratedMatchesHandPort(string _label, System.Action<ContainerData> populate)
+    public void WriteCreateContainerData_GeneratedMatchesHandPort(string _, System.Action<ContainerData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.Item, 1);
@@ -105,7 +105,7 @@ public class ContainerSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(UpdateScenarios))]
-    public void WriteUpdateContainerData_GeneratedMatchesHandPort(string _label, System.Action<ContainerData> populate)
+    public void WriteUpdateContainerData_GeneratedMatchesHandPort(string _, System.Action<ContainerData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.Item, 1);
@@ -127,7 +127,7 @@ public class ContainerSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(UpdateScenarios))]
-    public void HasAnyContainerFieldSet_GeneratedMatchesHandPort(string _label, System.Action<ContainerData> populate)
+    public void HasAnyContainerFieldSet_GeneratedMatchesHandPort(string _, System.Action<ContainerData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.Item, 1);

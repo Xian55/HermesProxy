@@ -594,7 +594,7 @@ public partial class ObjectUpdateBuilder
     {
         for (int l = 0; l < 3; l++)
         {
-            int vItemId = src.VirtualItems != null && src.VirtualItems[l] is VisibleItem vi ? vi.ItemID : 0;
+            int vItemId = src.VirtualItems[l] is VisibleItem vi ? vi.ItemID : 0;
             // Players don't populate VirtualItems server-side (use PLAYER_VISIBLE_ITEM
             // descriptors instead). For the local player, fall back to PlayerData.VisibleItems:
             // slot 0=mainhand(15), 1=offhand(16), 2=ranged(17).
@@ -732,15 +732,15 @@ public partial class ObjectUpdateBuilder
     internal void WriteUpdateUnitPowerGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, UnitData src)
     {
         int maxLen = 7;
-        if (src.Power != null && src.Power.Length > maxLen) maxLen = src.Power.Length;
-        if (src.MaxPower != null && src.MaxPower.Length > maxLen) maxLen = src.MaxPower.Length;
+        if (src.Power.Length > maxLen) maxLen = src.Power.Length;
+        if (src.MaxPower.Length > maxLen) maxLen = src.MaxPower.Length;
         for (int pi = 0; pi < maxLen; pi++)
         {
-            if (src.Power != null && pi < src.Power.Length && src.Power[pi].HasValue)
+            if (pi < src.Power.Length && src.Power[pi].HasValue)
                 data.WriteInt32(src.Power[pi].Value);
-            if (src.MaxPower != null && pi < src.MaxPower.Length && src.MaxPower[pi].HasValue)
+            if (pi < src.MaxPower.Length && src.MaxPower[pi].HasValue)
                 data.WriteInt32(src.MaxPower[pi].Value);
-            if (src.ModPowerRegen != null && pi < src.ModPowerRegen.Length && src.ModPowerRegen[pi].HasValue)
+            if (pi < src.ModPowerRegen.Length && src.ModPowerRegen[pi].HasValue)
                 data.WriteFloat(src.ModPowerRegen[pi].Value);
         }
     }
@@ -749,9 +749,9 @@ public partial class ObjectUpdateBuilder
     {
         for (int i = 0; i < 5; i++)
         {
-            if (src.Stats != null && src.Stats[i].HasValue) data.WriteInt32(src.Stats[i].Value);
-            if (src.StatPosBuff != null && src.StatPosBuff[i].HasValue) data.WriteInt32(src.StatPosBuff[i].Value);
-            if (src.StatNegBuff != null && src.StatNegBuff[i].HasValue) data.WriteInt32(src.StatNegBuff[i].Value);
+            if (src.Stats[i].HasValue) data.WriteInt32(src.Stats[i].Value);
+            if (src.StatPosBuff[i].HasValue) data.WriteInt32(src.StatPosBuff[i].Value);
+            if (src.StatNegBuff[i].HasValue) data.WriteInt32(src.StatNegBuff[i].Value);
         }
     }
 
@@ -759,9 +759,9 @@ public partial class ObjectUpdateBuilder
     {
         for (int i = 0; i < 7; i++)
         {
-            if (src.Resistances != null && src.Resistances[i].HasValue) data.WriteInt32(src.Resistances[i].Value);
-            if (src.PowerCostModifier != null && src.PowerCostModifier[i].HasValue) data.WriteInt32(src.PowerCostModifier[i].Value);
-            if (src.PowerCostMultiplier != null && src.PowerCostMultiplier[i].HasValue) data.WriteFloat(src.PowerCostMultiplier[i].Value);
+            if (src.Resistances[i].HasValue) data.WriteInt32(src.Resistances[i].Value);
+            if (src.PowerCostModifier[i].HasValue) data.WriteInt32(src.PowerCostModifier[i].Value);
+            if (src.PowerCostMultiplier[i].HasValue) data.WriteFloat(src.PowerCostMultiplier[i].Value);
         }
     }
 
@@ -769,8 +769,8 @@ public partial class ObjectUpdateBuilder
     {
         for (int i = 0; i < 7; i++)
         {
-            if (src.ResistanceBuffModsPositive != null && src.ResistanceBuffModsPositive[i].HasValue) data.WriteInt32(src.ResistanceBuffModsPositive[i].Value);
-            if (src.ResistanceBuffModsNegative != null && src.ResistanceBuffModsNegative[i].HasValue) data.WriteInt32(src.ResistanceBuffModsNegative[i].Value);
+            if (src.ResistanceBuffModsPositive[i].HasValue) data.WriteInt32(src.ResistanceBuffModsPositive[i].Value);
+            if (src.ResistanceBuffModsNegative[i].HasValue) data.WriteInt32(src.ResistanceBuffModsNegative[i].Value);
         }
     }
 
@@ -833,9 +833,6 @@ public partial class ObjectUpdateBuilder
 
     private static uint GetPlayerCustomizationsSize(PlayerData src)
     {
-        if (src.Customizations == null)
-            return 0;
-
         uint size = 0;
         for (int i = 0; i < src.Customizations.Length; i++)
             if (src.Customizations[i] != null)
@@ -858,9 +855,6 @@ public partial class ObjectUpdateBuilder
 
     internal void WriteUpdatePlayerCustomizationsBody(WorldPacket data, PlayerData src)
     {
-        if (src.Customizations == null)
-            return;
-
         // ChrCustomizationChoice::WriteUpdate (UpdateFields.cpp:1626) is two bare uint32s —
         // the struct carries no changesMask of its own, unlike SocketedGem.
         for (int i = 0; i < src.Customizations.Length; i++)
@@ -877,17 +871,13 @@ public partial class ObjectUpdateBuilder
     internal void WriteCreatePlayerCustomizationsCount(WorldPacket data, PlayerData src)
     {
         int customizationCount = 0;
-        if (src.Customizations != null)
-        {
-            for (int i = 0; i < src.Customizations.Length; i++)
-                if (src.Customizations[i] != null) customizationCount++;
-        }
+        for (int i = 0; i < src.Customizations.Length; i++)
+            if (src.Customizations[i] != null) customizationCount++;
         data.WriteUInt32((uint)customizationCount);
     }
 
     internal void WriteCreatePlayerCustomizationsData(WorldPacket data, PlayerData src)
     {
-        if (src.Customizations == null) return;
         for (int m = 0; m < src.Customizations.Length; m++)
         {
             var choice = src.Customizations[m];
@@ -930,7 +920,7 @@ public partial class ObjectUpdateBuilder
         // 25 quest slots, writing each entry's 4 fields. Null entries write zeros.
         for (int q = 0; q < QuestConst.MaxQuestLogSize; q++)
         {
-            var quest = src.QuestLog != null && q < src.QuestLog.Length ? src.QuestLog[q] : null;
+            var quest = q < src.QuestLog.Length ? src.QuestLog[q] : null;
             data.WriteInt64(quest?.EndTime ?? 0);
             data.WriteInt32(quest?.QuestID ?? 0);
             data.WriteUInt32(quest?.StateFlags ?? 0);
@@ -944,8 +934,7 @@ public partial class ObjectUpdateBuilder
         // 19× always-write. Null entry → zero placeholder (Int32 ItemID + 2× UInt16 0).
         for (int j = 0; j < 19; j++)
         {
-            if (src.VisibleItems != null && j < src.VisibleItems.Length
-                && src.VisibleItems[j] is VisibleItem pv)
+            if (j < src.VisibleItems.Length && src.VisibleItems[j] is VisibleItem pv)
             {
                 data.WriteInt32(pv.ItemID);
                 data.WriteUInt16(pv.ItemAppearanceModID);

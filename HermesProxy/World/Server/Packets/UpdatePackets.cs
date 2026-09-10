@@ -772,21 +772,16 @@ public class UpdateObject : ServerPacket
             if (unit.StandState.HasValue || unit.AnimTier.HasValue) return false;
             if (unit.AttackPower.HasValue || unit.RangedAttackPower.HasValue) return false;
             if (unit.BaseMana.HasValue || unit.BaseHealth.HasValue) return false;
-            if (unit.NpcFlags != null)
-                for (int i = 0; i < unit.NpcFlags.Length; i++)
-                    if (unit.NpcFlags[i].HasValue && unit.NpcFlags[i] != 0) return false;
-            if (unit.Power != null)
-                for (int i = 0; i < unit.Power.Length; i++)
-                    if (unit.Power[i].HasValue) return false;
-            if (unit.MaxPower != null)
-                for (int i = 0; i < unit.MaxPower.Length; i++)
-                    if (unit.MaxPower[i].HasValue) return false;
-            if (unit.Stats != null)
-                for (int i = 0; i < unit.Stats.Length; i++)
-                    if (unit.Stats[i].HasValue) return false;
-            if (unit.Resistances != null)
-                for (int i = 0; i < 7; i++)
-                    if (unit.Resistances[i].HasValue) return false;
+            for (int i = 0; i < unit.NpcFlags.Length; i++)
+                if (unit.NpcFlags[i].HasValue && unit.NpcFlags[i] != 0) return false;
+            for (int i = 0; i < unit.Power.Length; i++)
+                if (unit.Power[i].HasValue) return false;
+            for (int i = 0; i < unit.MaxPower.Length; i++)
+                if (unit.MaxPower[i].HasValue) return false;
+            for (int i = 0; i < unit.Stats.Length; i++)
+                if (unit.Stats[i].HasValue) return false;
+            for (int i = 0; i < 7; i++)
+                if (unit.Resistances[i].HasValue) return false;
         }
         var player = u.PlayerData;
         if (player != null)

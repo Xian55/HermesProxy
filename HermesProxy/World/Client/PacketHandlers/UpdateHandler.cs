@@ -344,7 +344,7 @@ public partial class WorldClient
                             u.Health.HasValue || u.MaxHealth.HasValue || u.DisplayID.HasValue ||
                             u.Level.HasValue || u.Flags.HasValue || u.AuraState.HasValue ||
                             u.Charm != null || u.Summon != null || u.Target != null ||
-                            u.Power != null || u.MaxPower != null || u.Stats != null);
+                            AnyHasValue(u.Power) || AnyHasValue(u.MaxPower) || AnyHasValue(u.Stats));
                         bool playerHasAnyField = pd != null && (
                             pd.PlayerFlags.HasValue || pd.NativeSex.HasValue ||
                             pd.GuildRankID.HasValue || pd.HonorLevel.HasValue ||
@@ -362,6 +362,15 @@ public partial class WorldClient
                             pd != null, playerHasAnyField,
                             a != null, activeHasAnyField,
                             auraUpdate.Auras.Count, powerUpdate.Powers.Count);
+                    }
+
+                    // The span getters fall back to a shared all-null sentinel, so a span is never
+                    // null — "was this array sent" means "does any slot hold a value".
+                    static bool AnyHasValue<T>(ReadOnlySpan<T?> span) where T : struct
+                    {
+                        foreach (var v in span)
+                            if (v.HasValue) return true;
+                        return false;
                     }
 
                     static bool ActivePlayerHasAnySlot(ActivePlayerData a)

@@ -100,7 +100,7 @@ public class PlayerSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(CreateScenarios))]
-    public void WriteCreatePlayerData_GeneratedMatchesHandPort(string _label, System.Action<PlayerData> populate)
+    public void WriteCreatePlayerData_GeneratedMatchesHandPort(string _, System.Action<PlayerData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.Player, 1);
@@ -183,7 +183,7 @@ public class PlayerSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(UpdateScenarios))]
-    public void WriteUpdatePlayerData_GeneratedMatchesHandPort(string _label, System.Action<PlayerData> populate)
+    public void WriteUpdatePlayerData_GeneratedMatchesHandPort(string _, System.Action<PlayerData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.Player, 1);
@@ -205,7 +205,7 @@ public class PlayerSectionEquivalenceTests
 
     [Theory]
     [MemberData(nameof(UpdateScenarios))]
-    public void HasAnyPlayerFieldSet_GeneratedMatchesHandPort(string _label, System.Action<PlayerData> populate)
+    public void HasAnyPlayerFieldSet_GeneratedMatchesHandPort(string _, System.Action<PlayerData> populate)
     {
         var session = CreateGameSession();
         var guid = WowGuid128.Create(HighGuidType703.Player, 1);
