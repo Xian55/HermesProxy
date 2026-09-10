@@ -1,0 +1,40 @@
+syntax = "proto2";
+
+package bgs.protocol.notification.v1;
+
+import "bgs/low/pb/client/account_types.proto";
+import "bgs/low/pb/client/attribute_types.proto";
+import "bgs/low/pb/client/entity_types.proto";
+import "bgs/low/pb/client/rpc_types.proto";
+import "bgs/low/pb/client/global_extensions/message_options.proto";
+import "bgs/low/pb/client/global_extensions/field_options.proto";
+
+message Target {
+  option (bgs.protocol.message_options).custom_validator = true;
+  optional .bgs.protocol.notification.v1.TargetIdentity identity = 1;
+  optional string type = 2;
+}
+
+message TargetIdentity {
+  optional .bgs.protocol.account.v1.AccountId account = 1;
+  optional .bgs.protocol.account.v1.GameAccountHandle game_account = 2;
+}
+
+message Subscription {
+  repeated .bgs.protocol.notification.v1.Target target = 1;
+  optional .bgs.protocol.account.v1.Identity subscriber = 2;
+  optional bool delivery_required = 3 [deprecated = true];
+}
+
+message Notification {
+  option (bgs.protocol.message_options).custom_select_shard = true;
+  optional .bgs.protocol.EntityId sender_id = 1;
+  required .bgs.protocol.EntityId target_id = 2;
+  required string type = 3;
+  repeated .bgs.protocol.Attribute attribute = 4;
+  optional .bgs.protocol.EntityId sender_account_id = 5;
+  optional .bgs.protocol.EntityId target_account_id = 6;
+  optional string sender_battle_tag = 7 [(bgs.protocol.field_options).log = HIDDEN];
+  optional string target_battle_tag = 8 [(bgs.protocol.field_options).log = HIDDEN];
+  optional .bgs.protocol.account.v1.Identity forwarding_identity = 10;
+}

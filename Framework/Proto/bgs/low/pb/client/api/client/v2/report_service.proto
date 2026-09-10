@@ -1,0 +1,30 @@
+syntax = "proto2";
+
+package bgs.protocol.report.v2;
+
+import "bgs/low/pb/client/account_types.proto";
+import "bgs/low/pb/client/api/client/v2/report_types.proto";
+import "bgs/low/pb/client/rpc_types.proto";
+import "bgs/low/pb/client/global_extensions/method_options.proto";
+import "bgs/low/pb/client/global_extensions/service_options.proto";
+
+option cc_generic_services = false;
+
+message SubmitReportRequest {
+  optional .bgs.protocol.account.v1.AccountId agent_id = 1;
+  optional string user_description = 2;
+  oneof type {
+    .bgs.protocol.report.v2.UserOptions user_options = 10;
+    .bgs.protocol.report.v2.ClubOptions club_options = 11;
+    .bgs.protocol.report.v2.EntityOptions entity_options = 20;
+  }
+}
+
+service ReportService {
+  option (bgs.protocol.service_options).descriptor_name = "bnet.protocol.report.v2.ReportService";
+  option (bgs.protocol.service_options).shard_name = "report";
+  option (bgs.protocol.sdk_service_options).outbound = true;
+  rpc SubmitReport (.bgs.protocol.report.v2.SubmitReportRequest) returns (.bgs.protocol.NoData) {
+    option (bgs.protocol.method_options).id = 1;
+  }
+}

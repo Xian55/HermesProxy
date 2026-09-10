@@ -1,0 +1,63 @@
+syntax = "proto2";
+
+package bgs.protocol.report.v2;
+
+import "bgs/low/pb/client/api/client/v2/attribute_types.proto";
+import "bgs/low/pb/client/account_types.proto";
+import "bgs/low/pb/client/rpc_types.proto";
+import "bgs/low/pb/client/message_types.proto";
+import "bgs/low/pb/client/global_extensions/field_options.proto";
+
+option cc_generic_services = false;
+
+enum IssueType {
+  ISSUE_TYPE_SPAM = 0;
+  ISSUE_TYPE_HARASSMENT = 1;
+  ISSUE_TYPE_OFFENSIVE_CONTENT = 3;
+  ISSUE_TYPE_HACKING = 4;
+  ISSUE_TYPE_BOTTING = 5;
+}
+
+enum UserSource {
+  USER_SOURCE_OTHER = 0;
+  USER_SOURCE_WHISPER = 1;
+  USER_SOURCE_PROFILE = 2;
+  USER_SOURCE_BATTLE_TAG = 3;
+  USER_SOURCE_CHAT = 4;
+  USER_SOURCE_FRIEND_INVITATION = 5;
+  USER_SOURCE_VOICE = 6;
+}
+
+enum ClubSource {
+  CLUB_SOURCE_OTHER = 0;
+  CLUB_SOURCE_MESSAGE = 1;
+  CLUB_SOURCE_CLUB_NAME = 2;
+  CLUB_SOURCE_STREAM_NAME = 3;
+}
+
+message ReportItem {
+  oneof type {
+    .bgs.protocol.MessageId message_id = 1;
+  }
+}
+
+message UserOptions {
+  optional .bgs.protocol.account.v1.AccountId target_id = 1;
+  optional .bgs.protocol.report.v2.IssueType type = 2 [default = ISSUE_TYPE_SPAM];
+  optional .bgs.protocol.report.v2.UserSource source = 3 [default = USER_SOURCE_OTHER];
+  optional .bgs.protocol.report.v2.ReportItem item = 4;
+}
+
+message ClubOptions {
+  optional uint64 club_id = 1;
+  optional uint64 stream_id = 2;
+  optional .bgs.protocol.report.v2.IssueType type = 3 [default = ISSUE_TYPE_SPAM];
+  optional .bgs.protocol.report.v2.ClubSource source = 4 [default = CLUB_SOURCE_OTHER];
+  optional .bgs.protocol.report.v2.ReportItem item = 5;
+}
+
+message EntityOptions {
+  optional string entity_id = 1 [(bgs.protocol.valid).string.size.min = 1, (bgs.protocol.valid).string.size.max = 200];
+  optional string entity_type = 2 [(bgs.protocol.valid).string.size.min = 1, (bgs.protocol.valid).string.size.max = 100];
+  repeated .bgs.protocol.v2.Attribute attribute = 5;
+}

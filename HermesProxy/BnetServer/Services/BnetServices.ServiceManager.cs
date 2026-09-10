@@ -68,7 +68,7 @@ public partial class BnetServices
             }
         }
 
-        public void Invoke(uint serviceId, OriginalHash serviceHash, uint methodId, uint requestToken, CodedInputStream stream)
+        public void Invoke(uint serviceId, OriginalHash serviceHash, uint methodId, uint requestToken, ReadOnlySpan<byte> payload)
         {
             void SendRpcMessage(BattlenetRpcErrorCode status, IMessage? message)
             {
@@ -118,7 +118,7 @@ public partial class BnetServices
                 _serviceHolder.BuildSessionPrefix(), serviceHash, methodId);
 
             var request = (IMessage)Activator.CreateInstance(handler.RequestType)!;
-            request.MergeFrom(stream);
+            request.MergeFrom(payload);
 
             BattlenetRpcErrorCode status;
             if (handler.ResponseType != null)

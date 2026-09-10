@@ -1,0 +1,27 @@
+syntax = "proto2";
+
+package bgs.protocol.resources.v1;
+
+import "bgs/low/pb/client/content_handle_types.proto";
+import "bgs/low/pb/client/rpc_types.proto";
+import "bgs/low/pb/client/global_extensions/message_options.proto";
+import "bgs/low/pb/client/global_extensions/method_options.proto";
+import "bgs/low/pb/client/global_extensions/service_options.proto";
+
+option cc_generic_services = false;
+
+message ContentHandleRequest {
+  option (bgs.protocol.message_options).custom_validator = true;
+  required fixed32 program = 1;
+  required fixed32 stream = 2;
+  optional fixed32 version = 3 [default = 1701729619];
+}
+
+service ResourcesService {
+  option (bgs.protocol.service_options).descriptor_name = "bnet.protocol.resources.Resources";
+  option (bgs.protocol.service_options).shard_name = "resources";
+  option (bgs.protocol.sdk_service_options).outbound = true;
+  rpc GetContentHandle (.bgs.protocol.resources.v1.ContentHandleRequest) returns (.bgs.protocol.ContentHandle) {
+    option (bgs.protocol.method_options).id = 1;
+  }
+}

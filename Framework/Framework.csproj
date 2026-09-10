@@ -21,6 +21,17 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="BouncyCastle.Cryptography" />
+    <PackageReference Include="Grpc.Tools">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Battle.net RPC schema. Recovered from the descriptors embedded in the old checked-in C#,
+         so wire behaviour is unchanged; protoc regenerates the C# into obj/ on every build.
+         Messages only: service dispatch is hand-written in HermesProxy/BnetServer/Services. -->
+    <Protobuf Include="Proto\**\*.proto" ProtoRoot="Proto" GrpcServices="None" />
   </ItemGroup>
 
 </Project>

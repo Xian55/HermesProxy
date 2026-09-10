@@ -1,0 +1,21 @@
+syntax = "proto2";
+
+package bgs.protocol.game_utilities.v1;
+
+import "bgs/low/pb/client/attribute_types.proto";
+import "bgs/low/pb/client/entity_types.proto";
+import "bgs/low/pb/client/rpc_types.proto";
+
+option java_package = "bnet.protocol.game_utilities.v1";
+option java_outer_classname = "GameUtilitiesTypesProto";
+
+message PlayerVariables {
+  required .bgs.protocol.Identity identity = 1;
+  optional double rating = 2;
+  repeated .bgs.protocol.Attribute attribute = 3;
+}
+
+message ClientInfo {
+  optional string client_address = 1;
+  optional bool privileged_network = 2;
+}

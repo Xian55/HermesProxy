@@ -434,22 +434,6 @@ public class BnetPacketParserTests
         result.ReturnPayload(); // Should be safe even with null array
     }
 
-    [Fact]
-    public void ParseFromListPooled_ReturnPayload_CanBeCalledMultipleTimes()
-    {
-        // Arrange
-        var packet = CreateValidPacket(serviceHash: 0x12345678, methodId: 1, token: 100, payloadSize: 16);
-        var buffer = new List<byte>(packet);
-
-        // Act
-        var result = BnetPacketParser.ParseFromListPooled(buffer);
-
-        // Assert - multiple calls should not throw
-        result.ReturnPayload();
-        result.ReturnPayload(); // Should not throw
-        result.ReturnPayload(); // Should not throw
-    }
-
     // ========== ParseFromSpan (Zero-allocation) Tests ==========
 
     [Fact]

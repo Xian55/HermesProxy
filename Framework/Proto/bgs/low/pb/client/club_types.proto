@@ -1,0 +1,21 @@
+syntax = "proto2";
+
+package bgs.protocol.club.v1;
+
+import public "bgs/low/pb/client/club_membership_types.proto";
+import public "bgs/low/pb/client/club_enum.proto";
+import public "bgs/low/pb/client/club_role.proto";
+import public "bgs/low/pb/client/club_range_set.proto";
+import public "bgs/low/pb/client/club_core.proto";
+import public "bgs/low/pb/client/club_member.proto";
+import public "bgs/low/pb/client/club_invitation.proto";
+import public "bgs/low/pb/client/club_ban.proto";
+import public "bgs/low/pb/client/club_stream.proto";
+import public "bgs/low/pb/client/api/client/v2/attribute_types.proto";
+import public "bgs/low/pb/client/account_types.proto";
+import public "bgs/low/pb/client/event_view_types.proto";
+import public "bgs/low/pb/client/invitation_types.proto";
+import public "bgs/low/pb/client/message_types.proto";
+import public "bgs/low/pb/client/ets_types.proto";
+import public "bgs/low/pb/client/voice_types.proto";
+import public "bgs/low/pb/client/rpc_types.proto";

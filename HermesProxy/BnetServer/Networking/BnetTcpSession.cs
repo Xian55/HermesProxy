@@ -3,7 +3,6 @@
 
 using Bgs.Protocol;
 using Framework.Constants;
-using Framework.IO;
 using Framework.Logging;
 using Framework.Networking;
 using Google.Protobuf;
@@ -193,11 +192,8 @@ internal static class BnetPacketParser
         if (buffer.Count < 2 + headerLength)
             return BnetPacketParseResult.Incomplete;
 
-        // Note: MergeFrom with Span requires protobuf to be regenerated with ParseContext support.
-        // For now, we still need to allocate for the header buffer, but we avoid LINQ overhead.
-        var headerBuffer = span.Slice(2, headerLength).ToArray();
         var header = new Header();
-        header.MergeFrom(headerBuffer);
+        header.MergeFrom(span.Slice(2, headerLength));
 
         int payloadLength = (int)header.Size;
 
@@ -226,9 +222,8 @@ internal static class BnetPacketParser
         if (buffer.Count < 2 + headerLength)
             return BnetPacketParseResultPooled.Incomplete;
 
-        var headerBuffer = span.Slice(2, headerLength).ToArray();
         var header = new Header();
-        header.MergeFrom(headerBuffer);
+        header.MergeFrom(span.Slice(2, headerLength));
 
         int payloadLength = (int)header.Size;
 
@@ -249,8 +244,8 @@ internal static class BnetPacketParser
     }
 
     /// <summary>
-    /// Zero-allocation parser using ReadOnlySpan and stackalloc for headers.
-    /// Works with PooledByteBuffer for minimal allocations.
+    /// Parses the header straight out of the receive buffer; only the payload is copied, into a
+    /// pooled array, because handlers can close the session and release that buffer mid-dispatch.
     /// </summary>
     public static BnetPacketParseResultPooled ParseFromSpan(ReadOnlySpan<byte> buffer)
     {
@@ -262,30 +257,8 @@ internal static class BnetPacketParser
         if (buffer.Length < 2 + headerLength)
             return BnetPacketParseResultPooled.Incomplete;
 
-        // Parse header - unfortunately protobuf requires byte[] for MergeFrom
-        // Use stackalloc for small headers (typical headers are < 50 bytes)
         var header = new Header();
-        if (headerLength <= 128)
-        {
-            Span<byte> headerStack = stackalloc byte[headerLength];
-            buffer.Slice(2, headerLength).CopyTo(headerStack);
-            // Note: We still need to call ToArray() because protobuf doesn't support Span
-            // But we avoid the intermediate List<byte> overhead
-            header.MergeFrom(headerStack.ToArray());
-        }
-        else
-        {
-            var headerBuffer = ArrayPool<byte>.Shared.Rent(headerLength);
-            try
-            {
-                buffer.Slice(2, headerLength).CopyTo(headerBuffer);
-                header.MergeFrom(new ReadOnlySpan<byte>(headerBuffer, 0, headerLength).ToArray());
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(headerBuffer);
-            }
-        }
+        header.MergeFrom(buffer.Slice(2, headerLength));
 
         int payloadLength = (int)header.Size;
 
@@ -333,7 +306,8 @@ internal readonly struct BnetPacketParseResultPooled
     public ReadOnlySpan<byte> PayloadSpan => PayloadArray.AsSpan(0, PayloadLength);
 
     /// <summary>
-    /// Returns the rented payload array to the pool. Must be called after processing.
+    /// Returns the rented payload array to the pool. Call exactly once per result: ArrayPool does
+    /// not detect a double return, and the same array is then handed to two renters at once.
     /// </summary>
     public void ReturnPayload()
     {
@@ -437,12 +411,7 @@ public class BnetTcpSession : SSLSocket, BnetServices.INetwork
             try
             {
                 if (result.Header!.ServiceId != 0xFE && result.Header.ServiceHash != 0)
-                {
-                    // ParseFromSpan leaves PayloadArray null for zero-length payloads (e.g. the
-                    // NoData keepalive), and CodedInputStream rejects a null buffer.
-                    using var stream = new CodedInputStream(result.PayloadArray ?? Array.Empty<byte>(), 0, result.PayloadLength);
-                    _handlerManager.Invoke(result.Header.ServiceId, (OriginalHash)result.Header.ServiceHash, result.Header.MethodId, result.Header.Token, stream);
-                }
+                    _handlerManager.Invoke(result.Header.ServiceId, (OriginalHash)result.Header.ServiceHash, result.Header.MethodId, result.Header.Token, result.PayloadSpan);
             }
             catch (Exception ex)
             {
@@ -471,29 +440,30 @@ public class BnetTcpSession : SSLSocket, BnetServices.INetwork
         header.ServiceId = serviceId;
         header.ServiceHash = (uint)service;
         header.MethodId = methodId;
-        if (message != null)
-            header.Size = (uint)message.CalculateSize();
 
-        ByteBuffer buffer = new();
-        buffer.WriteBytes(GetHeaderSize(header), 2);
-        buffer.WriteBytes(header.ToByteArray());
-        if (message != null)
-            buffer.WriteBytes(message.ToByteArray());
-
-        AsyncWrite(buffer.GetData());
+        AsyncWrite(BuildRpcFrame(header, message));
     }
 
-    public byte[] GetHeaderSize(Header header)
+    /// <summary>
+    /// Frame layout: big-endian u16 header length, header, payload. Sets <c>header.Size</c>.
+    /// </summary>
+    // A fresh exact-size array rather than a pooled rental: SSLSocket.AsyncWrite does not await
+    // the stream write, so the buffer would go back to the pool while still being sent.
+    internal static byte[] BuildRpcFrame(Header header, IMessage? message)
     {
-        var size = (ushort)header.CalculateSize();
-        byte[] bytes = new byte[2];
-        bytes[0] = (byte)((size >> 8) & 0xff);
-        bytes[1] = (byte)(size & 0xff);
+        int payloadSize = 0;
+        if (message != null)
+        {
+            payloadSize = message.CalculateSize();
+            header.Size = (uint)payloadSize;
+        }
 
-        var headerSizeBytes = BitConverter.GetBytes((ushort)header.CalculateSize());
-        Array.Reverse(headerSizeBytes);
-
-        return bytes;
+        int headerSize = header.CalculateSize();
+        var frame = new byte[2 + headerSize + payloadSize];
+        BinaryPrimitives.WriteUInt16BigEndian(frame, (ushort)headerSize);
+        header.WriteTo(frame.AsSpan(2, headerSize));
+        message?.WriteTo(frame.AsSpan(2 + headerSize));
+        return frame;
     }
 }
 

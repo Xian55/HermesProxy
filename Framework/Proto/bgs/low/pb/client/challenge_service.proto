@@ -1,0 +1,31 @@
+syntax = "proto2";
+
+package bgs.protocol.challenge.v1;
+
+import "bgs/low/pb/client/rpc_types.proto";
+import "bgs/low/pb/client/global_extensions/method_options.proto";
+import "bgs/low/pb/client/global_extensions/service_options.proto";
+
+option cc_generic_services = false;
+
+message ChallengeExternalRequest {
+  optional string request_token = 1;
+  optional string payload_type = 2;
+  optional bytes payload = 3;
+}
+
+message ChallengeExternalResult {
+  optional string request_token = 1;
+  optional bool passed = 2 [default = true];
+}
+
+service ChallengeListener {
+  option (bgs.protocol.service_options).descriptor_name = "bnet.protocol.challenge.ChallengeNotify";
+  option (bgs.protocol.sdk_service_options).inbound = true;
+  rpc OnExternalChallenge (.bgs.protocol.challenge.v1.ChallengeExternalRequest) returns (.bgs.protocol.NO_RESPONSE) {
+    option (bgs.protocol.method_options).id = 3;
+  }
+  rpc OnExternalChallengeResult (.bgs.protocol.challenge.v1.ChallengeExternalResult) returns (.bgs.protocol.NO_RESPONSE) {
+    option (bgs.protocol.method_options).id = 4;
+  }
+}

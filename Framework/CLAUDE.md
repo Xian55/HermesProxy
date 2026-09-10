@@ -20,7 +20,7 @@ Shared library providing core networking, cryptography, packet I/O, protocol buf
 | `Logging/` | Logging infrastructure |
 | `Metrics/` | Performance metrics collection |
 | `Networking/` | `SocketBase`, async socket I/O |
-| `Proto/` | Protobuf-generated classes (Battle.net protocol) |
+| `Proto/` | Battle.net protocol `.proto` schema; Grpc.Tools runs protoc on build, C# lands in `obj/` (messages only, `GrpcServices="None"`) |
 | `Serialization/` | Serialization helpers |
 | `Singleton/` | Singleton pattern base |
 | `Util/` | Extension methods, helpers |
@@ -30,7 +30,7 @@ Shared library providing core networking, cryptography, packet I/O, protocol buf
 
 - **Unsafe code allowed** (`AllowUnsafeBlocks: true`) for performance-critical paths
 - **InternalsVisibleTo**: `HermesProxy.Tests`, `HermesProxy.Benchmarks`
-- **Dependencies**: Google.Protobuf, System.Configuration.ConfigurationManager
+- **Dependencies**: Google.Protobuf, System.Configuration.ConfigurationManager; Grpc.Tools (build-time only — bundled protoc must not be newer than the Google.Protobuf runtime)
 
 ## Conventions
 
