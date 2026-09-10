@@ -9,6 +9,7 @@ using HermesProxy.World.Objects;
 using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
 using System;
+using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -1174,6 +1175,31 @@ public partial class WorldClient
 #endif
     }
 
+    /// Renders a packed uint as its four bytes, low byte first, for DEBUG_UPDATES output.
+    /// Called only from a [Conditional] PrintValue argument, so it disappears with the call.
+    private static string FormatByteQuad(uint packed)
+        => $"{packed & 0xFF}/{(packed >> 8) & 0xFF}/{(packed >> 16) & 0xFF}/{packed >> 24}";
+
+    /// <summary>
+    /// Builds a legacy update mask of <paramref name="length"/> bits from its 32-bit words, bit 0
+    /// of word 0 first (the layout BitArray(int[]) uses), without an intermediate array. Never
+    /// shorter than the words themselves, matching BitArray(int[]) widened through Length.
+    /// </summary>
+    internal static BitArray BuildUpdateMask(ReadOnlySpan<int> words, int length)
+    {
+        var mask = new BitArray(Math.Max(length, words.Length * 32));
+        for (int w = 0; w < words.Length; w++)
+        {
+            uint word = (uint)words[w];
+            while (word != 0)
+            {
+                mask[(w << 5) + BitOperations.TrailingZeroCount(word)] = true;
+                word &= word - 1;
+            }
+        }
+        return mask;
+    }
+
     [System.Diagnostics.Conditional("DEBUG_UPDATES")]
     private void PrintValue<T>(string name, T obj, params object[] indexes)
     {
@@ -1187,14 +1213,16 @@ public partial class WorldClient
         bool missingCreateObject = !isCreating && oldValues == null;
         var maskSize = packet.ReadUInt8();
 
-        var updateMask = new int[maskSize];
+        // Staged on the stack (maskSize is a byte, so at most 1 KB), counting set bits on the way;
+        // the count sizes the field cache below.
+        Span<int> maskWords = stackalloc int[maskSize];
+        int setBits = 0;
         for (var i = 0; i < maskSize; i++)
-            updateMask[i] = packet.ReadInt32();
-
-        var mask = new BitArray(updateMask);
-        outUpdateMaskArray = mask;
-        outActuallyChangedValuesMaskArray = new BitArray(new int[maskSize]);
-        var dict = oldValues ?? new Dictionary<int, UpdateField>();
+        {
+            maskWords[i] = packet.ReadInt32();
+            setBits += BitOperations.PopCount((uint)maskWords[i]);
+        }
+        int maskBits = maskSize * 32;
 
         if (missingCreateObject)
         {
@@ -1202,7 +1230,7 @@ public partial class WorldClient
             {
                 case ObjectType.Item:
                 {
-                    if (mask.Count >= LegacyVersion.GetUpdateField(ItemField.ITEM_END))
+                    if (maskBits >= LegacyVersion.GetUpdateField(ItemField.ITEM_END))
                     {
                         // Container MaskSize = 8 (6.1.0 - 8.0.1) 5 (2.4.3 - 6.0.3)
                         if (maskSize == Convert.ToInt32((LegacyVersion.GetUpdateField(ContainerField.CONTAINER_END) + 32) / 32))
@@ -1212,7 +1240,7 @@ public partial class WorldClient
                 }
                 case ObjectType.Player:
                 {
-                    if (mask.Count >= LegacyVersion.GetUpdateField(PlayerField.PLAYER_END))
+                    if (maskBits >= LegacyVersion.GetUpdateField(PlayerField.PLAYER_END))
                     {
                         // ActivePlayer MaskSize = 184 (8.0.1)
                         if (maskSize == Convert.ToInt32((LegacyVersion.GetUpdateField(ActivePlayerField.ACTIVE_PLAYER_END) + 32) / 32))
@@ -1224,63 +1252,41 @@ public partial class WorldClient
                     break;
             }
         }
-        else
+        // A delta's mask stops at the highest word that changed. For a known object, widen it to
+        // the object's whole field range so every index the loop below reads is in bounds; a
+        // missing-create block keeps its own length, as before.
+        int maskLength = maskBits;
+        if (!missingCreateObject)
         {
-            switch (type)
+            int objectFieldEnd = type switch
             {
-                case ObjectType.Item:
-                {
-                    int ITEM_END = LegacyVersion.GetUpdateField(ItemField.ITEM_END);
-                    if (mask.Length < ITEM_END)
-                        mask.Length = ITEM_END;
-                    break;
-                }
-                case ObjectType.Container:
-                {
-                    int CONTAINER_END = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_END);
-                    if (mask.Length < CONTAINER_END)
-                        mask.Length = CONTAINER_END;
-                    break;
-                }
-                case ObjectType.Unit:
-                {
-                    int UNIT_END = LegacyVersion.GetUpdateField(UnitField.UNIT_END);
-                    if (mask.Length < UNIT_END)
-                        mask.Length = UNIT_END;
-                    break;
-                }
-                case ObjectType.Player:
-                {
-                    int PLAYER_END = LegacyVersion.GetUpdateField(PlayerField.PLAYER_END);
-                    if (mask.Length < PLAYER_END)
-                        mask.Length = PLAYER_END;
-                    break;
-                }
-                case ObjectType.GameObject:
-                {
-                    int GAMEOBJECT_END = LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_END);
-                    if (mask.Length < GAMEOBJECT_END)
-                        mask.Length = GAMEOBJECT_END;
-                    break;
-                }
-                case ObjectType.DynamicObject:
-                {
-                    int DYNAMICOBJECT_END = LegacyVersion.GetUpdateField(DynamicObjectField.DYNAMICOBJECT_END);
-                    if (mask.Length < DYNAMICOBJECT_END)
-                        mask.Length = DYNAMICOBJECT_END;
-                    break;
-                }
-                case ObjectType.Corpse:
-                {
-                    int CORPSE_END = LegacyVersion.GetUpdateField(CorpseField.CORPSE_END);
-                    if (mask.Length < CORPSE_END)
-                        mask.Length = CORPSE_END;
-                    break;
-                }
-            }
+                ObjectType.Item => LegacyVersion.GetUpdateField(ItemField.ITEM_END),
+                ObjectType.Container => LegacyVersion.GetUpdateField(ContainerField.CONTAINER_END),
+                ObjectType.Unit => LegacyVersion.GetUpdateField(UnitField.UNIT_END),
+                ObjectType.Player => LegacyVersion.GetUpdateField(PlayerField.PLAYER_END),
+                ObjectType.GameObject => LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_END),
+                ObjectType.DynamicObject => LegacyVersion.GetUpdateField(DynamicObjectField.DYNAMICOBJECT_END),
+                ObjectType.Corpse => LegacyVersion.GetUpdateField(CorpseField.CORPSE_END),
+                _ => 0,
+            };
+            maskLength = Math.Max(maskBits, objectFieldEnd);
         }
 
+        // Built once at its final length. BitArray(int[]) copied a throwaway int[], and widening it
+        // afterwards through mask.Length reallocated it a second time.
+        var mask = BuildUpdateMask(maskWords, maskLength);
+        outUpdateMaskArray = mask;
+        // All-false at maskSize * 32 bits, which is what BitArray(new int[maskSize]) produced. The
+        // in-range check in the write-back relies on that length, so it is deliberately not widened.
+        outActuallyChangedValuesMaskArray = new BitArray(maskBits);
+        // A create starts this object's field cache from empty; sizing it for the fields the mask
+        // carries avoids growing it through every intermediate capacity on the way there.
+        var dict = oldValues ?? new Dictionary<int, UpdateField>(setBits);
+
         int objectEnd = LegacyVersion.GetUpdateField(ObjectField.OBJECT_END);
+        // Every field group's values go through this one buffer instead of a List each. If parsing
+        // throws, the rental is simply not returned, which ArrayPool tolerates.
+        UpdateField[] fieldScratch = ArrayPool<UpdateField>.Shared.Rent(16);
         for (var i = 0; i < mask.Count; ++i)
         {
             if (!mask[i])
@@ -1288,8 +1294,6 @@ public partial class WorldClient
 
             UpdateField blockVal = packet.ReadUpdateField();
 
-            string key = "Block Value " + i;
-            string value = blockVal.UInt32Value + "/" + blockVal.FloatValue;
             UpdateFieldInfo? fieldInfo = null;
 
             if (i < objectEnd)
@@ -1384,6 +1388,7 @@ public partial class WorldClient
             }
             int start = i;
             int size = 1;
+            string key;
             UpdateFieldType updateFieldType = UpdateFieldType.Default;
             if (fieldInfo != null)
             {
@@ -1392,17 +1397,31 @@ public partial class WorldClient
                 start = fieldInfo.Value;
                 updateFieldType = fieldInfo.Format;
             }
+            else
+            {
+                key = "Block Value " + i;
+            }
 
-            List<UpdateField> fieldData = new List<UpdateField>();
+            // Usually exactly `size` values: the slots before i, i itself, and the slots after it.
+            // But GetUpdateFieldInfo answers an index in a gap with the nearest preceding field,
+            // so i can sit past start + size, and then the group runs from start to i instead.
+            int groupLength = Math.Max(size, i - start + 1);
+            if (fieldScratch.Length < groupLength)
+            {
+                ArrayPool<UpdateField>.Shared.Return(fieldScratch);
+                fieldScratch = ArrayPool<UpdateField>.Shared.Rent(groupLength);
+            }
+            Span<UpdateField> fieldData = fieldScratch.AsSpan(0, groupLength);
+            int filled = 0;
             for (int k = start; k < i; ++k)
             {
                 UpdateField updateField;
                 if (oldValues == null || !oldValues.TryGetValue(k, out updateField))
                     updateField = new UpdateField(0);
 
-                fieldData.Add(updateField);
+                fieldData[filled++] = updateField;
             }
-            fieldData.Add(blockVal);
+            fieldData[filled++] = blockVal;
             for (int k = i - start + 1; k < size; ++k)
             {
                 int currentPosition = ++i;
@@ -1412,8 +1431,9 @@ public partial class WorldClient
                 else if (oldValues == null || !oldValues.TryGetValue(currentPosition, out updateField))
                     updateField = new UpdateField(0);
 
-                fieldData.Add(updateField);
+                fieldData[filled++] = updateField;
             }
+            fieldData = fieldData[..filled];
 
             switch (updateFieldType)
             {
@@ -1497,40 +1517,37 @@ public partial class WorldClient
                 }
                 case UpdateFieldType.Uint:
                 {
-                    for (int k = 0; k < fieldData.Count; ++k)
+                    for (int k = 0; k < fieldData.Length; ++k)
                         if (mask[start + k] && (!isCreating || fieldData[k].UInt32Value != 0))
                             PrintValue(k > 0 ? key + " + " + k : key, fieldData[k].UInt32Value, index);
                     break;
                 }
                 case UpdateFieldType.Int:
                 {
-                    for (int k = 0; k < fieldData.Count; ++k)
+                    for (int k = 0; k < fieldData.Length; ++k)
                         if (mask[start + k] && (!isCreating || fieldData[k].UInt32Value != 0))
                             PrintValue(k > 0 ? key + " + " + k : key, fieldData[k].Int32Value, index);
                     break;
                 }
                 case UpdateFieldType.Float:
                 {
-                    for (int k = 0; k < fieldData.Count; ++k)
+                    for (int k = 0; k < fieldData.Length; ++k)
                         if (mask[start + k] && (!isCreating || fieldData[k].UInt32Value != 0))
                             PrintValue(k > 0 ? key + " + " + k : key, fieldData[k].FloatValue, index);
                     break;
                 }
                 case UpdateFieldType.Bytes:
                 {
-                    for (int k = 0; k < fieldData.Count; ++k)
+                    for (int k = 0; k < fieldData.Length; ++k)
                     {
                         if (mask[start + k] && (!isCreating || fieldData[k].UInt32Value != 0))
-                        {
-                            byte[] intBytes = BitConverter.GetBytes(fieldData[k].UInt32Value);
-                            PrintValue(k > 0 ? key + " + " + k : key, intBytes[0] + "/" + intBytes[1] + "/" + intBytes[2] + "/" + intBytes[3], index);
-                        }
+                            PrintValue(k > 0 ? key + " + " + k : key, FormatByteQuad(fieldData[k].UInt32Value), index);
                     }
                     break;
                 }
                 case UpdateFieldType.Short:
                 {
-                    for (int k = 0; k < fieldData.Count; ++k)
+                    for (int k = 0; k < fieldData.Length; ++k)
                     {
                         if (mask[start + k] && (!isCreating || fieldData[k].UInt32Value != 0))
                             PrintValue(k > 0 ? key + " + " + k : key, ((short)(fieldData[k].UInt32Value & 0xffff)) + "/" + ((short)(fieldData[k].UInt32Value >> 16)), index);
@@ -1539,13 +1556,13 @@ public partial class WorldClient
                 }
                 case UpdateFieldType.Custom:
                 default:
-                    for (int k = 0; k < fieldData.Count; ++k)
+                    for (int k = 0; k < fieldData.Length; ++k)
                         if (mask[start + k] && (!isCreating || fieldData[k].UInt32Value != 0))
                             PrintValue(k > 0 ? key + " + " + k : key, fieldData[k].UInt32Value + "/" + fieldData[k].FloatValue, index);
                     break;
             }
 
-            for (int k = 0; k < fieldData.Count; ++k)
+            for (int k = 0; k < fieldData.Length; ++k)
             {
                 int absoluteIndex = start + k;
                 // V3_4_3 field-table iterates past the legacy mask's bit count when
@@ -1569,6 +1586,7 @@ public partial class WorldClient
             }
         }
 
+        ArrayPool<UpdateField>.Shared.Return(fieldScratch);
         return dict;
     }
 
@@ -2604,7 +2622,7 @@ public partial class WorldClient
             int CONTAINER_FIELD_NUM_SLOTS = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_FIELD_NUM_SLOTS);
             if (CONTAINER_FIELD_NUM_SLOTS >= 0 && updateMaskArray[CONTAINER_FIELD_NUM_SLOTS])
             {
-                updateData.ContainerData.NumSlots = updates[CONTAINER_FIELD_NUM_SLOTS].UInt32Value;
+                updateData.EnsureContainerData().NumSlots = updates[CONTAINER_FIELD_NUM_SLOTS].UInt32Value;
             }
             int CONTAINER_FIELD_SLOT_1 = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_FIELD_SLOT_1);
             if (CONTAINER_FIELD_SLOT_1 >= 0)
@@ -2613,7 +2631,7 @@ public partial class WorldClient
                 {
                     if (updateMaskArray[CONTAINER_FIELD_SLOT_1 + i * 2])
                     {
-                        updateData.ContainerData.Slots[i] = GetGuidValue(updates, CONTAINER_FIELD_SLOT_1 + i * 2).To128(GetSession().GameState);
+                        updateData.EnsureContainerData().Slots[i] = GetGuidValue(updates, CONTAINER_FIELD_SLOT_1 + i * 2).To128(GetSession().GameState);
                     }
                 }
             }
@@ -2760,7 +2778,7 @@ public partial class WorldClient
                         }
                             
                         if (powerSlot >= 0)
-                            updateData.UnitData.Power[powerSlot] = updates[UNIT_FIELD_POWER1 + i].Int32Value;
+                            updateData.UnitData.EnsurePower()[powerSlot] = updates[UNIT_FIELD_POWER1 + i].Int32Value;
                     }
                 }
             }
@@ -2784,13 +2802,13 @@ public partial class WorldClient
                             powerSlot = ClassPowerTypes.GetPowerSlotForClass(classId, (PowerType)i);
 
                         if (powerSlot >= 0)
-                            updateData.UnitData.MaxPower[powerSlot] = updates[UNIT_FIELD_MAXPOWER1 + i].Int32Value;
+                            updateData.UnitData.EnsureMaxPower()[powerSlot] = updates[UNIT_FIELD_MAXPOWER1 + i].Int32Value;
 
                         if (i == (byte)PowerType.Energy)
                         {
                             powerSlot = ClassPowerTypes.GetPowerSlotForClass(classId, PowerType.ComboPoints);
                             if (powerSlot >= 0)
-                                updateData.UnitData.MaxPower[powerSlot] = 5;
+                                updateData.UnitData.EnsureMaxPower()[powerSlot] = 5;
                         }
                     }
                 }
@@ -2806,7 +2824,7 @@ public partial class WorldClient
                         uint itemId = GameData.GetItemIdWithDisplayId(itemDisplayId);
                         if (itemId != 0)
                         {
-                            updateData.UnitData.VirtualItems[i] = new VisibleItem((int)itemId, 0, 0);
+                            updateData.UnitData.EnsureVirtualItems()[i] = new VisibleItem((int)itemId, 0, 0);
                         }
                     }
                 }
@@ -2818,7 +2836,7 @@ public partial class WorldClient
                 {
                     if (updateMaskArray[UNIT_VIRTUAL_ITEM_SLOT_ID + i])
                     {
-                        updateData.UnitData.VirtualItems[i] = new VisibleItem(updates[UNIT_VIRTUAL_ITEM_SLOT_ID + i].Int32Value, 0, 0);
+                        updateData.UnitData.EnsureVirtualItems()[i] = new VisibleItem(updates[UNIT_VIRTUAL_ITEM_SLOT_ID + i].Int32Value, 0, 0);
                     }
                 }
             }
@@ -2897,7 +2915,7 @@ public partial class WorldClient
                 for (int i = 0; i < 2; i++)
                 {
                     if (updateMaskArray[UNIT_FIELD_BASEATTACKTIME + i])
-                        updateData.UnitData.AttackRoundBaseTime[i] = updates[UNIT_FIELD_BASEATTACKTIME + i].UInt32Value;
+                        updateData.UnitData.EnsureAttackRoundBaseTime()[i] = updates[UNIT_FIELD_BASEATTACKTIME + i].UInt32Value;
                 }
             }
             int UNIT_FIELD_RANGEDATTACKTIME = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RANGEDATTACKTIME);
@@ -3050,11 +3068,11 @@ public partial class WorldClient
                 if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
                 {
                     NPCFlagsVanilla vanillaFlags = (NPCFlagsVanilla)updates[UNIT_NPC_FLAGS].UInt32Value;
-                    updateData.UnitData.NpcFlags[0] = (uint)(vanillaFlags.CastFlags<NPCFlags>());
+                    updateData.UnitData.EnsureNpcFlags()[0] = (uint)(vanillaFlags.CastFlags<NPCFlags>());
                 }
                 else
                 {
-                    updateData.UnitData.NpcFlags[0] = updates[UNIT_NPC_FLAGS].UInt32Value;
+                    updateData.UnitData.EnsureNpcFlags()[0] = updates[UNIT_NPC_FLAGS].UInt32Value;
                 }
             }
             int UNIT_NPC_EMOTESTATE = LegacyVersion.GetUpdateField(UnitField.UNIT_NPC_EMOTESTATE);
@@ -3074,7 +3092,7 @@ public partial class WorldClient
                 for (int i = 0; i < 5; i++)
                 {
                     if (updateMaskArray[UNIT_FIELD_STAT0 + i])
-                        updateData.UnitData.Stats[i] = updates[UNIT_FIELD_STAT0 + i].Int32Value;
+                        updateData.UnitData.EnsureStats()[i] = updates[UNIT_FIELD_STAT0 + i].Int32Value;
                 }
             }
             int UNIT_FIELD_POSSTAT0 = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_POSSTAT0);
@@ -3083,7 +3101,7 @@ public partial class WorldClient
                 for (int i = 0; i < 5; i++)
                 {
                     if (updateMaskArray[UNIT_FIELD_POSSTAT0 + i])
-                        updateData.UnitData.StatPosBuff[i] = updates[UNIT_FIELD_POSSTAT0 + i].Int32Value;
+                        updateData.UnitData.EnsureStatPosBuff()[i] = updates[UNIT_FIELD_POSSTAT0 + i].Int32Value;
                 }
             }
             int UNIT_FIELD_NEGSTAT0 = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_NEGSTAT0);
@@ -3092,7 +3110,7 @@ public partial class WorldClient
                 for (int i = 0; i < 5; i++)
                 {
                     if (updateMaskArray[UNIT_FIELD_NEGSTAT0 + i])
-                        updateData.UnitData.StatNegBuff[i] = updates[UNIT_FIELD_NEGSTAT0 + i].Int32Value;
+                        updateData.UnitData.EnsureStatNegBuff()[i] = updates[UNIT_FIELD_NEGSTAT0 + i].Int32Value;
                 }
             }
             // V3_3_5a (cMangos / TrinityCore wotlk_classic) emits the resistance arrays
@@ -3110,7 +3128,7 @@ public partial class WorldClient
                 for (int i = 0; i < 7; i++)
                 {
                     if (updateMaskArray[UNIT_FIELD_RESISTANCES + i])
-                        updateData.UnitData.Resistances[i] = updates[UNIT_FIELD_RESISTANCES + i].Int32Value;
+                        updateData.UnitData.EnsureResistances()[i] = updates[UNIT_FIELD_RESISTANCES + i].Int32Value;
                 }
             }
             int UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE);
@@ -3121,7 +3139,7 @@ public partial class WorldClient
                 for (int i = 0; i < 7; i++)
                 {
                     if (updateMaskArray[UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE + i])
-                        updateData.UnitData.ResistanceBuffModsPositive[i] = updates[UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE + i].Int32Value;
+                        updateData.UnitData.EnsureResistanceBuffModsPositive()[i] = updates[UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE + i].Int32Value;
                 }
             }
             int UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE);
@@ -3132,7 +3150,7 @@ public partial class WorldClient
                 for (int i = 0; i < 7; i++)
                 {
                     if (updateMaskArray[UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE + i])
-                        updateData.UnitData.ResistanceBuffModsNegative[i] = updates[UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE + i].Int32Value;
+                        updateData.UnitData.EnsureResistanceBuffModsNegative()[i] = updates[UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE + i].Int32Value;
                 }
             }
             int UNIT_FIELD_BASE_MANA = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_BASE_MANA);
@@ -3209,7 +3227,7 @@ public partial class WorldClient
                 for (int i = 0; i < 7; i++)
                 {
                     if (updateMaskArray[UNIT_FIELD_POWER_COST_MODIFIER + i])
-                        updateData.UnitData.PowerCostModifier[i] = updates[UNIT_FIELD_POWER_COST_MODIFIER + i].Int32Value;
+                        updateData.UnitData.EnsurePowerCostModifier()[i] = updates[UNIT_FIELD_POWER_COST_MODIFIER + i].Int32Value;
                 }
             }
             int UNIT_FIELD_POWER_COST_MULTIPLIER = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_POWER_COST_MULTIPLIER);
@@ -3218,7 +3236,7 @@ public partial class WorldClient
                 for (int i = 0; i < 7; i++)
                 {
                     if (updateMaskArray[UNIT_FIELD_POWER_COST_MULTIPLIER + i])
-                        updateData.UnitData.PowerCostMultiplier[i] = updates[UNIT_FIELD_POWER_COST_MULTIPLIER + i].FloatValue;
+                        updateData.UnitData.EnsurePowerCostMultiplier()[i] = updates[UNIT_FIELD_POWER_COST_MULTIPLIER + i].FloatValue;
                 }
             }
             int UNIT_FIELD_MAXHEALTHMODIFIER = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_MAXHEALTHMODIFIER);
@@ -3335,7 +3353,7 @@ public partial class WorldClient
                 for (int i = 0; i < questsCount; i++)
                 {
                     QuestLog? entry = ReadQuestLogEntry(i, updateMaskArray, updates);
-                    updateData.PlayerData.QuestLog[i] = entry!;
+                    updateData.PlayerData.EnsureQuestLog()[i] = entry!;
                 }
             }
             int PLAYER_CHOSEN_TITLE = LegacyVersion.GetUpdateField(PlayerField.PLAYER_CHOSEN_TITLE);
@@ -3361,7 +3379,7 @@ public partial class WorldClient
                             itemVisual = (ushort)GameData.GetItemEnchantVisual(updates[tempEnchantIndex].UInt32Value);
                         if (itemVisual == 0 && updates.ContainsKey(permEnchantIndex))
                             itemVisual = (ushort)GameData.GetItemEnchantVisual(updates[permEnchantIndex].UInt32Value);
-                        updateData.PlayerData.VisibleItems[i] = new VisibleItem(itemId, 0, itemVisual);
+                        updateData.PlayerData.EnsureVisibleItems()[i] = new VisibleItem(itemId, 0, itemVisual);
                     }
                 }
             }
@@ -3382,7 +3400,7 @@ public partial class WorldClient
                         ushort itemVisual = updates.ContainsKey(enchantIndex)
                             ? (ushort)GameData.GetItemEnchantVisual(updates[enchantIndex].UInt32Value)
                             : (ushort)0;
-                        updateData.PlayerData.VisibleItems[i] = new VisibleItem(itemId, 0, itemVisual);
+                        updateData.PlayerData.EnsureVisibleItems()[i] = new VisibleItem(itemId, 0, itemVisual);
                     }
                 }
             }
@@ -3549,7 +3567,7 @@ public partial class WorldClient
                     var customizations = CharacterCustomizations.ConvertLegacyCustomizationsToModern(raceId, sexId, (byte)skin, (byte)face, (byte)hairStyle, (byte)hairColor, (byte)facialHair);
                     for (int i = 0; i < 5; i++)
                     {
-                        updateData.PlayerData.Customizations[i] = customizations[i];
+                        updateData.PlayerData.EnsureCustomizations()[i] = customizations[i];
                     }
 
                     // Create writes customizations unconditionally; a Values delta only carries
@@ -3603,7 +3621,10 @@ public partial class WorldClient
             if (PLAYER_FIELD_COMBO_TARGET >= 0 && updateMaskArray[PLAYER_FIELD_COMBO_TARGET])
             {
                 var comboTarget = GetGuidValue(updates, PlayerField.PLAYER_FIELD_COMBO_TARGET).To128(GetSession().GameState);
-                updateData.EnsureActivePlayerData().ComboTarget = comboTarget;
+                // Only the V1_14/V2_5 builders read ComboTarget from ActivePlayerData; V3_4_3
+                // writes it from UnitData, so don't materialise ActivePlayerData just for it.
+                if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+                    updateData.EnsureActivePlayerData().ComboTarget = comboTarget;
                 updateData.UnitData.ComboTarget = comboTarget;
             }
             int PLAYER_FIELD_KNOWN_TITLES = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_KNOWN_TITLES);
@@ -3820,7 +3841,7 @@ public partial class WorldClient
                 {
                     if (updateMaskArray[PLAYER_FIELD_POSSTAT0 + i])
                     {
-                        updateData.UnitData.StatPosBuff[i] = updates[PLAYER_FIELD_POSSTAT0 + i].Int32Value;
+                        updateData.UnitData.EnsureStatPosBuff()[i] = updates[PLAYER_FIELD_POSSTAT0 + i].Int32Value;
                     }
                 }
             }
@@ -3831,7 +3852,7 @@ public partial class WorldClient
                 {
                     if (updateMaskArray[PLAYER_FIELD_NEGSTAT0 + i])
                     {
-                        updateData.UnitData.StatNegBuff[i] = updates[PLAYER_FIELD_NEGSTAT0 + i].Int32Value;
+                        updateData.UnitData.EnsureStatNegBuff()[i] = updates[PLAYER_FIELD_NEGSTAT0 + i].Int32Value;
                     }
                 }
             }
@@ -3842,7 +3863,7 @@ public partial class WorldClient
                 {
                     if (updateMaskArray[PLAYER_FIELD_RESISTANCEBUFFMODSPOSITIVE + i])
                     {
-                        updateData.UnitData.ResistanceBuffModsPositive[i] = updates[PLAYER_FIELD_RESISTANCEBUFFMODSPOSITIVE + i].Int32Value;
+                        updateData.UnitData.EnsureResistanceBuffModsPositive()[i] = updates[PLAYER_FIELD_RESISTANCEBUFFMODSPOSITIVE + i].Int32Value;
                     }
                 }
             }
@@ -3853,7 +3874,7 @@ public partial class WorldClient
                 {
                     if (updateMaskArray[PLAYER_FIELD_RESISTANCEBUFFMODSNEGATIVE + i])
                     {
-                        updateData.UnitData.ResistanceBuffModsNegative[i] = updates[PLAYER_FIELD_RESISTANCEBUFFMODSNEGATIVE + i].Int32Value;
+                        updateData.UnitData.EnsureResistanceBuffModsNegative()[i] = updates[PLAYER_FIELD_RESISTANCEBUFFMODSNEGATIVE + i].Int32Value;
                     }
                 }
             }
@@ -3923,7 +3944,7 @@ public partial class WorldClient
                     {
                         if (powerUpdate != null && guid == GetSession().GameState.CurrentPlayerGuid)
                             powerUpdate.Powers.Add(new PowerUpdatePower(comboPoints, (byte)PowerType.ComboPoints));
-                        updateData.UnitData.Power[powerSlot] = comboPoints;
+                        updateData.UnitData.EnsurePower()[powerSlot] = comboPoints;
                     }
                 }
                 else
@@ -4146,7 +4167,7 @@ public partial class WorldClient
             int PLAYER_FIELD_MOD_MANA_REGEN = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_MOD_MANA_REGEN);
             if (PLAYER_FIELD_MOD_MANA_REGEN >= 0 && updateMaskArray[PLAYER_FIELD_MOD_MANA_REGEN])
             {
-                updateData.UnitData.ModPowerRegen[0] = updates[PLAYER_FIELD_MOD_MANA_REGEN].FloatValue;
+                updateData.UnitData.EnsureModPowerRegen()[0] = updates[PLAYER_FIELD_MOD_MANA_REGEN].FloatValue;
             }
             int PLAYER_FIELD_MAX_LEVEL = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_MAX_LEVEL);
             if (PLAYER_FIELD_MAX_LEVEL >= 0 && updateMaskArray[PLAYER_FIELD_MAX_LEVEL])

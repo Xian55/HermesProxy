@@ -149,7 +149,7 @@ public class ObjectUpdateConstructorTests
     }
 
     [Fact]
-    public void Constructor_ItemGuid_InitializesItemAndContainerData()
+    public void Constructor_ItemGuid_InitializesItemData_ContainerDataOnDemand()
     {
         var guid = WowGuid128.Create(HighGuidType703.Item, 1);
         var session = CreateGlobalSession();
@@ -157,8 +157,14 @@ public class ObjectUpdateConstructorTests
         var update = new ObjectUpdate(guid, UpdateTypeModern.Values, session);
 
         Assert.NotNull(update.ItemData);
-        Assert.NotNull(update.ContainerData);
         Assert.NotNull(update.ObjectData);
+        // A bag and a plain item share a guid type, so the 36-slot container block is only
+        // materialised once a container field is written.
+        Assert.Null(update.ContainerData);
+
+        var container = update.EnsureContainerData();
+        Assert.Same(container, update.ContainerData);
+        Assert.Same(container, update.EnsureContainerData());
     }
 
     [Fact]

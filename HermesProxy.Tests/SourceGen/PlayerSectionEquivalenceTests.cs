@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using HermesProxy;
 using HermesProxy.Enums;
 using HermesProxy.World;
@@ -81,20 +81,20 @@ public class PlayerSectionEquivalenceTests
         }) };
         yield return new object[] { "visible-items-partial", (System.Action<PlayerData>)(p =>
         {
-            p.VisibleItems[0] = new VisibleItem { ItemID = 12345, ItemAppearanceModID = 1, ItemVisual = 0 };
-            p.VisibleItems[5] = new VisibleItem { ItemID = 67890, ItemAppearanceModID = 2, ItemVisual = 100 };
-            p.VisibleItems[18] = new VisibleItem { ItemID = 99999, ItemAppearanceModID = 0, ItemVisual = 0 };
+            p.EnsureVisibleItems()[0] = new VisibleItem { ItemID = 12345, ItemAppearanceModID = 1, ItemVisual = 0 };
+            p.EnsureVisibleItems()[5] = new VisibleItem { ItemID = 67890, ItemAppearanceModID = 2, ItemVisual = 100 };
+            p.EnsureVisibleItems()[18] = new VisibleItem { ItemID = 99999, ItemAppearanceModID = 0, ItemVisual = 0 };
         }) };
         yield return new object[] { "customizations-some", (System.Action<PlayerData>)(p =>
         {
-            p.Customizations[0] = new ChrCustomizationChoice(1u, 11u);
-            p.Customizations[3] = new ChrCustomizationChoice(4u, 44u);
-            p.Customizations[35] = new ChrCustomizationChoice(36u, 360u);
+            p.EnsureCustomizations()[0] = new ChrCustomizationChoice(1u, 11u);
+            p.EnsureCustomizations()[3] = new ChrCustomizationChoice(4u, 44u);
+            p.EnsureCustomizations()[35] = new ChrCustomizationChoice(36u, 360u);
         }) };
         yield return new object[] { "customizations-all", (System.Action<PlayerData>)(p =>
         {
             for (int i = 0; i < 36; i++)
-                p.Customizations[i] = new ChrCustomizationChoice((uint)(i + 1), (uint)((i + 1) * 10));
+                p.EnsureCustomizations()[i] = new ChrCustomizationChoice((uint)(i + 1), (uint)((i + 1) * 10));
         }) };
     }
 
@@ -143,22 +143,22 @@ public class PlayerSectionEquivalenceTests
         }) };
         yield return new object[] { "questlog-single", (System.Action<PlayerData>)(p =>
         {
-            p.QuestLog[0] = new QuestLog { QuestID = 1234, EndTime = 1700000000u, StateFlags = 0u };
+            p.EnsureQuestLog()[0] = new QuestLog { QuestID = 1234, EndTime = 1700000000u, StateFlags = 0u };
             p.QuestLog[0].ObjectiveProgress[0] = 5;
         }) };
         yield return new object[] { "questlog-multi", (System.Action<PlayerData>)(p =>
         {
             for (int i = 0; i < 5; i++)
             {
-                p.QuestLog[i] = new QuestLog { QuestID = 1000 + i, EndTime = (uint)i, StateFlags = 1u };
+                p.EnsureQuestLog()[i] = new QuestLog { QuestID = 1000 + i, EndTime = (uint)i, StateFlags = 1u };
                 for (int o = 0; o < 24; o++) p.QuestLog[i].ObjectiveProgress[o] = (short)(o + i);
             }
         }) };
         yield return new object[] { "visible-items-update", (System.Action<PlayerData>)(p =>
         {
-            p.VisibleItems[0] = new VisibleItem { ItemID = 100, ItemAppearanceModID = 1, ItemVisual = 0 };
-            p.VisibleItems[16] = new VisibleItem { ItemID = 200, ItemAppearanceModID = 2, ItemVisual = 50 };
-            p.VisibleItems[18] = new VisibleItem { ItemID = 300, ItemAppearanceModID = 0, ItemVisual = 0 };
+            p.EnsureVisibleItems()[0] = new VisibleItem { ItemID = 100, ItemAppearanceModID = 1, ItemVisual = 0 };
+            p.EnsureVisibleItems()[16] = new VisibleItem { ItemID = 200, ItemAppearanceModID = 2, ItemVisual = 50 };
+            p.EnsureVisibleItems()[18] = new VisibleItem { ItemID = 300, ItemAppearanceModID = 0, ItemVisual = 0 };
         }) };
         yield return new object[] { "all-block0-plus-quest-plus-items", (System.Action<PlayerData>)(p =>
         {
@@ -176,8 +176,8 @@ public class PlayerSectionEquivalenceTests
             p.CurrentSpecID = 10u;
             p.GuildTimeStamp = 11;
             p.DuelTeam = 12u;
-            p.QuestLog[2] = new QuestLog { QuestID = 200, EndTime = 0u, StateFlags = 0u };
-            p.VisibleItems[7] = new VisibleItem { ItemID = 77, ItemAppearanceModID = 0, ItemVisual = 0 };
+            p.EnsureQuestLog()[2] = new QuestLog { QuestID = 200, EndTime = 0u, StateFlags = 0u };
+            p.EnsureVisibleItems()[7] = new VisibleItem { ItemID = 77, ItemAppearanceModID = 0, ItemVisual = 0 };
         }) };
     }
 

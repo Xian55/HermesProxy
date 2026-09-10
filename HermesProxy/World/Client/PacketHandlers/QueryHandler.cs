@@ -739,7 +739,7 @@ public partial class WorldClient
                         for (int i = 0; i < 5; i++)
                             if (srcUnit.Stats[i].HasValue)
                             {
-                                dstUnit.Stats[i] = srcUnit.Stats[i];
+                                dstUnit.EnsureStats()[i] = srcUnit.Stats[i];
                                 any = true;
                             }
                     }
@@ -755,7 +755,7 @@ public partial class WorldClient
                         for (int i = 0; i < 7; i++)
                             if (srcUnit.Resistances[i].HasValue)
                             {
-                                dstUnit.Resistances[i] = srcUnit.Resistances[i];
+                                dstUnit.EnsureResistances()[i] = srcUnit.Resistances[i];
                                 any = true;
                             }
                     }
@@ -764,7 +764,7 @@ public partial class WorldClient
                         statsUpdateObject.ObjectUpdates.Add(petValuesOu);
                         if (Log.IsTraceEnabled)
                             Log.Print(LogType.Trace,
-                            $"[PetStatsValuesSynth] sending follow-up Values for pet {mergedPetGuid} with Stats={(srcUnit.Stats != null ? "[" + string.Join(",", new[] { srcUnit.Stats[0], srcUnit.Stats[1], srcUnit.Stats[2], srcUnit.Stats[3], srcUnit.Stats[4] }) + "]" : "n")} AP={srcUnit.AttackPower} minDmg={srcUnit.MinDamage} maxDmg={srcUnit.MaxDamage} armor={srcUnit.Resistances?[0]} baseHP={srcUnit.BaseHealth}");
+                            $"[PetStatsValuesSynth] sending follow-up Values for pet {mergedPetGuid} with Stats={(srcUnit.Stats != null ? "[" + string.Join(",", new[] { srcUnit.Stats[0], srcUnit.Stats[1], srcUnit.Stats[2], srcUnit.Stats[3], srcUnit.Stats[4] }) + "]" : "n")} AP={srcUnit.AttackPower} minDmg={srcUnit.MinDamage} maxDmg={srcUnit.MaxDamage} armor={srcUnit.Resistances[0]} baseHP={srcUnit.BaseHealth}");
                         SendPacketToClient(statsUpdateObject);
                     }
                 }

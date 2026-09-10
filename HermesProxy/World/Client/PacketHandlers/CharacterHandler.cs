@@ -629,12 +629,16 @@ public partial class WorldClient
     {
         ObjectUpdate updateData = new ObjectUpdate(GetSession().GameState.CurrentPlayerGuid, UpdateTypeModern.Values, GetSession());
         var comboTarget = packet.ReadPackedGuid().To128(GetSession().GameState);
-        updateData.EnsureActivePlayerData().ComboTarget = comboTarget;
+        // Only the V1_14/V2_5 builders read ComboTarget from ActivePlayerData; V3_4_3 writes it
+        // from UnitData. Materialising ActivePlayerData for this one field was nearly all of the
+        // ~35 KB each combo-point update allocated on V3_4_3.
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+            updateData.EnsureActivePlayerData().ComboTarget = comboTarget;
         updateData.UnitData.ComboTarget = comboTarget;
         byte comboPoints = packet.ReadUInt8();
         sbyte powerSlot = ClassPowerTypes.GetPowerSlotForClass(GetSession().GameState.GetUnitClass(GetSession().GameState.CurrentPlayerGuid), PowerType.ComboPoints);
         if (powerSlot >= 0)
-            updateData.UnitData.Power[powerSlot] = comboPoints;
+            updateData.UnitData.EnsurePower()[powerSlot] = comboPoints;
 
         UpdateObject updatePacket = new UpdateObject(GetSession().GameState);
         updatePacket.ObjectUpdates.Add(updateData);

@@ -3893,7 +3893,18 @@ public static partial class GameData
 
     public static List<HotfixRecord> FindHotfixesByRecordIdAndTable(uint id, DB2Hash table, uint startId = 0)
     {
-        return Hotfixes.Values.Where(hotfix => hotfix.HotfixId >= startId && hotfix.TableHash == table && hotfix.RecordId == id).ToList();
+        // Enumerate the dictionary itself. ConcurrentDictionary.Values takes every lock and copies
+        // the whole store (tens of thousands of records) into a new list before anything is
+        // filtered, and the item-query path runs this twice per hotfix. The enumerator walks the
+        // same buckets in the same order without locking or copying; UpdateHotfix depends on that
+        // order, since it keeps the last match and invalidates the rest.
+        var found = new List<HotfixRecord>();
+        foreach (var (_, hotfix) in Hotfixes)
+        {
+            if (hotfix.HotfixId >= startId && hotfix.TableHash == table && hotfix.RecordId == id)
+                found.Add(hotfix);
+        }
+        return found;
     }
 
     public static void UpdateHotfix(object obj, bool remove = false)
