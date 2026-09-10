@@ -173,6 +173,9 @@ public class UnitSectionEquivalenceTests
         Assert.Equal(expected.GetData(), actual.GetData());
     }
 
+    // CA2265: the oracle below still null-checks fields that are now spans. It is frozen
+    // (HermesProxy.SourceGen/CLAUDE.md), so the warning is silenced rather than fixed.
+#pragma warning disable CA2265
     // ---------------------------------------------------------------------
     // Inlined pre-Phase-5b WriteCreateUnitData hand-port — frozen byte oracle.
     // Reproduces V3_4_3_54261/ObjectUpdateBuilder.cs (lines 527-747 pre-delete).
@@ -377,6 +380,7 @@ public class UnitSectionEquivalenceTests
         if (hasChannelObject)
             data.WritePackedGuid128(unit.ChannelObject!.Value);
     }
+#pragma warning restore CA2265
 
     // =====================================================================
     // Update path tests — exercise bug-history regression vectors.
