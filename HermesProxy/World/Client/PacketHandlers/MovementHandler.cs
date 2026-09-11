@@ -283,7 +283,6 @@ public partial class WorldClient
     [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_SWIM_BACK_SPEED)]
     [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_SWIM_SPEED)]
     [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_TURN_RATE)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_WALK_BACK_SPEED)]
     [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_WALK_SPEED)]
     void HandleMoveSplineSetSpeed(WorldPacket packet)
     {
