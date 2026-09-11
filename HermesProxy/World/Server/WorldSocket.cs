@@ -673,6 +673,9 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
     public override void OnClose()
     {
+        // A rank edit still inside its coalescing window goes out now rather than being lost.
+        System.Threading.Interlocked.Exchange(ref _rankPermissionsTimer, null)?.Dispose();
+        FlushRankPermissions();
         base.OnClose();
     }
 

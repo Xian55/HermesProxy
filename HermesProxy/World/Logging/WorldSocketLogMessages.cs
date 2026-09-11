@@ -200,4 +200,25 @@ internal static partial class WorldSocketLogMessages
         string SourceFile,
         string NetDir,
         Opcode Opcode);
+
+    [LoggerMessage(
+        EventId = 120,
+        Level = LogLevel.Debug,
+        Message = "Forwarded {Sent} CMSG_GUILD_RANK for {Received} CMSG_GUILD_SET_RANK_PERMISSIONS from one burst")]
+    public static partial void GuildRankPermissionsCoalesced(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        int Received,
+        int Sent);
+
+    [LoggerMessage(
+        EventId = 121,
+        Level = LogLevel.Error,
+        Message = "Forwarding coalesced guild rank permissions failed")]
+    public static partial void GuildRankPermissionsFlushFailed(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        System.Exception exception);
 }
