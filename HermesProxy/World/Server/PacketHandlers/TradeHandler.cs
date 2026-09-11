@@ -1,8 +1,8 @@
 ﻿using Framework.Constants;
-using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 
@@ -25,7 +25,7 @@ public partial class WorldSocket
         var tradeSession = GetSession().GameState.CurrentTrade;
         if (tradeSession == null)
         {
-            Log.Print(LogType.Error, $"Got {trade.GetUniversalOpcode()} without trade session");
+            LogTradeActionWithoutSession(trade.GetUniversalOpcode());
             return;
         }
         tradeSession.ClientStateIndex++;
@@ -60,7 +60,7 @@ public partial class WorldSocket
         var tradeSession = GetSession().GameState.CurrentTrade;
         if (tradeSession == null)
         {
-            Log.Print(LogType.Error, $"Got {trade.GetUniversalOpcode()} without trade session");
+            LogTradeActionWithoutSession(trade.GetUniversalOpcode());
             return;
         }
         tradeSession.ClientStateIndex++;
@@ -76,7 +76,7 @@ public partial class WorldSocket
         var tradeSession = GetSession().GameState.CurrentTrade;
         if (tradeSession == null)
         {
-            Log.Print(LogType.Error, $"Got {trade.GetUniversalOpcode()} without trade session");
+            LogTradeActionWithoutSession(trade.GetUniversalOpcode());
             return;
         }
         tradeSession.ClientStateIndex++;
@@ -88,5 +88,13 @@ public partial class WorldSocket
         packet.WriteUInt8(containerSlot);
         packet.WriteUInt8(slot);
         SendPacketToServer(packet);
+    }
+
+    void LogTradeActionWithoutSession(Opcode opcode)
+    {
+        if (GetSession().GameState.TradeJustCompleted)
+            WorldSocketLogMessages.TradeActionAfterComplete(_melLog, _sourceFile, _netDirRecv, opcode);
+        else
+            WorldSocketLogMessages.TradeActionWithoutSession(_melLog, _sourceFile, _netDirRecv, opcode);
     }
 }

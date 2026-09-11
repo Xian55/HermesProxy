@@ -2,6 +2,7 @@
 using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 using System;
@@ -18,34 +19,32 @@ public partial class WorldClient
         TradeStatusPkt trade = new();
         trade.Status = (TradeStatus)packet.ReadUInt32();
 
-        TradeSession? tradeSession = GetSession().GameState.CurrentTrade;
-        if (tradeSession == null)
+        var gameState = GetSession().GameState;
+        TradeSession? tradeSession = gameState.CurrentTrade;
+        gameState.TradeJustCompleted = trade.Status == TradeStatus.Complete;
+        WorldClientLogMessages.TradeStatusReceived(_melLog, _sourceFile, _netDirNone, trade.Status, gameState.CurrentPlayerInfo?.Name, tradeSession != null);
+
+        // Only the target of CMSG_INITIATE_TRADE is sent Proposed, so the initiator has no
+        // session until Initiated, and every refusal of its request (target busy, too far away,
+        // dead, ...) arrives without one. Those must reach the client with their own status,
+        // not a substituted Cancelled (#228). Verified on V3_4_3 only.
+        if (tradeSession == null && trade.Status is not (TradeStatus.Proposed or TradeStatus.Initiated)
+            && ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
         {
-            switch (trade.Status)
-            {
-                case TradeStatus.Initiated:
-                case TradeStatus.Proposed:
-                {
-                    tradeSession = new TradeSession();
-                    GetSession().GameState.CurrentTrade = tradeSession;
-                    break;
-                }
-                default:
-                {
-                    Log.Print(LogType.Error, $"Got SMSG_TRADE_STATUS without trade session (status: {trade.Status})");
-                    SendPacketToClient(new TradeStatusPkt { Status = TradeStatus.Cancelled });
-                    return;
-                }
-            }
-        } 
+            Log.Print(LogType.Error, $"Got SMSG_TRADE_STATUS without trade session (status: {trade.Status})");
+            SendPacketToClient(new TradeStatusPkt { Status = TradeStatus.Cancelled });
+            return;
+        }
 
         switch (trade.Status)
         {
             case TradeStatus.Proposed:
-                trade.Partner = tradeSession.Partner = packet.ReadGuid().To128(GetSession().GameState);
+                tradeSession ??= gameState.CurrentTrade = new TradeSession();
+                trade.Partner = tradeSession.Partner = packet.ReadGuid().To128(gameState);
                 trade.PartnerAccount = tradeSession.PartnerAccount = GetSession().GetGameAccountGuidForPlayer(trade.Partner);
                 break;
             case TradeStatus.Initiated:
+                tradeSession ??= gameState.CurrentTrade = new TradeSession();
                 if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
                     trade.Id = packet.ReadUInt32();
                 else

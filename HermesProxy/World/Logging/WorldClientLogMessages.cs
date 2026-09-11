@@ -257,4 +257,20 @@ internal static partial class WorldClientLogMessages
         string SourceFile,
         string NetDir,
         uint Position);
+
+    /// <summary>
+    /// Names the receiving character because the two traders' SMSG_TRADE_STATUS lines otherwise
+    /// interleave in one log with nothing to tell the sessions apart.
+    /// </summary>
+    [LoggerMessage(
+        EventId = 222,
+        Level = LogLevel.Debug,
+        Message = "Trade status {Status} for {Player} (had trade session: {HadSession})")]
+    public static partial void TradeStatusReceived(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        TradeStatus Status,
+        string? Player,
+        bool HadSession);
 }

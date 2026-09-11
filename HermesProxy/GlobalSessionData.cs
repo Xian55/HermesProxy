@@ -517,6 +517,9 @@ public sealed class GameSessionData
     // CreateObject's UnitData), so a separate authoritative tracker is required.
     public Dictionary<WowGuid128, Dictionary<byte, AuraInfo>> KnownAuras = [];
     public TradeSession? CurrentTrade = null;
+    // The client clears the trade slots it filled after the legacy server has already closed a
+    // completed trade, so a trade action with no session is expected only while this is set.
+    public bool TradeJustCompleted;
     public HashSet<uint> RequestedItemHotfixes = [];
     public HashSet<uint> RequestedItemSparseHotfixes = [];
 
