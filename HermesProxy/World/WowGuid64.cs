@@ -25,7 +25,9 @@ public readonly record struct WowGuid64(ulong Low)
     {
         HighGuidType.Uniq => WowGuid128.ConvertUniqGuid(guid),
         HighGuidType.Player => new WowGuid64(HighGuidTypeLegacy.Player, (uint)guid.GetCounter()),
-        HighGuidType.Item => new WowGuid64(HighGuidTypeLegacy.Item, (uint)guid.GetCounter()),
+        // Not hard-coded to 0x4000: cMaNGOS WotLK uses 0x4700 for items, and an item guid sent
+        // back under the wrong high finds nothing on that backend (#278). See LegacyItemGuidHigh.
+        HighGuidType.Item => new WowGuid64(LegacyItemGuidHigh.Current, (uint)guid.GetCounter()),
         HighGuidType.Transport => (guid.GetCounter() & WowGuid128.MoTransportCounterFlag) != 0
                             ? new WowGuid64(HighGuidTypeLegacy.MOTransport, (uint)(guid.GetCounter() & ~WowGuid128.MoTransportCounterFlag))
                             : new WowGuid64(HighGuidTypeLegacy.Transport, guid.GetEntry(), (uint)guid.GetCounter()),
