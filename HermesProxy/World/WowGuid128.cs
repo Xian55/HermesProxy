@@ -99,7 +99,7 @@ public readonly record struct WowGuid128(ulong Low, ulong High)
     // legacy MOTransport guid's GetCounter() returns the full low 32 bits
     // (WowGuid64Extensions, HasEntry=false), and an unmasked `counter << 38` lets counter
     // bits 20-25 spill into the type field (bits 58-63), corrupting Transport(6) into an
-    // undefined HighGuidType703 (e.g. 0x36). HighGuid703's ctor then threw and killed the
+    // undefined HighGuidType703 (e.g. 0x36). The high-guid lookup then threw and killed the
     // WorldClient receive loop → client disconnect. cMaNGOS MOTransport guids carry large
     // low values; TC's don't, which is why this only reproduced on cMaNGOS (issue #101).
     const ulong TransportCounterMask = 0xFFFFF; // 20 bits

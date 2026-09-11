@@ -403,7 +403,7 @@ public partial class WorldClient
                     // container items) Values updates flow through unchanged. The matching
                     // CreateObject for these guids is already forwarded (see CreateObject1/2
                     // branches below), so the V3_4_3 client has the item object to bind to.
-                    // The HighGuid mapping (ItemContainer → Item, HighGuid.cs:30) ensures
+                    // The HighGuid mapping (ItemContainer → Item, HighGuid.FromLegacy) ensures
                     // To128() produces a normal Item-typed guid.
 
                     updateObject.ObjectUpdates.Add(updateData);
@@ -1917,7 +1917,7 @@ public partial class WorldClient
     //
     // cMangos packs equipped/container items under a non-standard 0x4700
     // ItemContainer high-guid (TC/AC use the standard 0x4000 Item). The
-    // HighGuid table (HighGuid.cs:30) maps ItemContainer → Item, and the
+    // HighGuid mapping (HighGuid.FromLegacy) maps ItemContainer → Item, and the
     // matching CreateObject blocks for these items are forwarded to the
     // V3_4_3 client (see UpdateHandler:232+ / :292+), so a normal To128()
     // conversion produces an Item-typed modern guid the client can resolve.

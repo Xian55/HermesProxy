@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using HermesProxy.World.Enums;
 
 namespace HermesProxy.World;
@@ -14,9 +15,8 @@ public static class WowGuid128Extensions
         public ulong GetLowValue() => guid.Low;
         public ulong GetHighValue() => guid.High;
 
-        public HighGuid GetHighGuid() => new HighGuid703((byte)((guid.High >> 58) & 0x3F));
-
-        public HighGuidType GetHighType() => guid.GetHighGuid().GetHighGuidType();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public HighGuidType GetHighType() => HighGuid.From703((byte)((guid.High >> 58) & 0x3F));
 
         public byte GetSubType() => (byte)(guid.High & 0x3F);
 
