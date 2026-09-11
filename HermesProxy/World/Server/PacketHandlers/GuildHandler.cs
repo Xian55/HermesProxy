@@ -118,8 +118,62 @@ public partial class WorldSocket
         }
     }
 
+    // One Apply in the 3.4.3 guild control panel sends a CMSG_GUILD_SET_RANK_PERMISSIONS per
+    // changed setting, all in the same millisecond and each carrying the rank's complete state:
+    // a native Wrathion capture shows five for one Apply. A 3.3.5a client sends one
+    // CMSG_GUILD_RANK, and AzerothCore kicks after three in one second (antidos_opcode_policies,
+    // opcode 561). Only the last of a burst matters, so hold them briefly and forward the newest
+    // per rank. Issue #283.
+    private const int RankPermissionsCoalesceMs = 100;
+    private readonly LatestPerKeyCoalescer<uint, GuildSetRankPermissions> _pendingRankPermissions = new();
+    // Armed on the packet thread and disposed from it, the timer callback or OnClose, so every
+    // swap goes through Interlocked.
+    private System.Threading.Timer? _rankPermissionsTimer;
+
     [PacketHandler(Opcode.CMSG_GUILD_SET_RANK_PERMISSIONS)]
     void HandleGuildSetRankPermissions(GuildSetRankPermissions rank)
+    {
+        // The burst was only observed, and the fix only tested, on the 3.4.3 client.
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        {
+            SendPacketToServer(BuildLegacyGuildRank(rank));
+            return;
+        }
+
+        if (_pendingRankPermissions.Offer(rank.RankID, rank))
+        {
+            var timer = new System.Threading.Timer(OnRankPermissionsDue, null, RankPermissionsCoalesceMs, System.Threading.Timeout.Infinite);
+            System.Threading.Interlocked.Exchange(ref _rankPermissionsTimer, timer)?.Dispose();
+        }
+    }
+
+    private void OnRankPermissionsDue(object? state)
+    {
+        System.Threading.Interlocked.Exchange(ref _rankPermissionsTimer, null)?.Dispose();
+        FlushRankPermissions();
+    }
+
+    private void FlushRankPermissions()
+    {
+        // Runs on a timer thread or from OnClose. An exception escaping a timer callback has no
+        // handler above it and would take the whole proxy down.
+        try
+        {
+            var ranks = _pendingRankPermissions.Drain(out int received);
+            if (ranks.Count == 0)
+                return;
+
+            WorldSocketLogMessages.GuildRankPermissionsCoalesced(_melLog, _sourceFile, _netDirRecv, received, ranks.Count);
+            foreach (var rank in ranks)
+                SendPacketToServer(BuildLegacyGuildRank(rank));
+        }
+        catch (Exception ex)
+        {
+            WorldSocketLogMessages.GuildRankPermissionsFlushFailed(_melLog, _sourceFile, _netDirRecv, ex);
+        }
+    }
+
+    internal static WorldPacket BuildLegacyGuildRank(GuildSetRankPermissions rank)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_GUILD_SET_RANK_PERMISSIONS);
         packet.WriteUInt32(rank.RankID);
@@ -134,7 +188,7 @@ public partial class WorldSocket
                 packet.WriteUInt32(rank.TabWithdrawItemLimit[i]);
             }
         }
-        SendPacketToServer(packet);
+        return packet;
     }
 
     [PacketHandler(Opcode.CMSG_GUILD_ADD_RANK)]
