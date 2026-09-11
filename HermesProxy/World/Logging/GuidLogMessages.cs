@@ -29,4 +29,13 @@ internal static partial class GuidLogMessages
         Message = "[HighGuid703] Unknown 703 high-guid 0x{High:X2} ({High}) — treating as Null. " +
                   "Object will be skipped on the modern side.")]
     public static partial void Unknown703HighGuid(ILogger logger, byte high);
+
+    // Fires at most once per session, on the first item guid a 0x4700 backend sends. Information
+    // rather than Debug because it changes what every later item-guid packet puts on the wire, so
+    // it is worth having in a user's log when an item action misbehaves.
+    [LoggerMessage(
+        EventId = 1302,
+        Level = LogLevel.Information,
+        Message = "[ItemGuid] Backend uses high-guid 0x{High:X4} for items; rebuilding item guids with it.")]
+    public static partial void LearnedLegacyItemHigh(ILogger logger, uint high);
 }

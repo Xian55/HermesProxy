@@ -19,7 +19,7 @@ public readonly record struct WowGuid128(ulong Low, ulong High)
     public static WowGuid128 Create(WowGuid64 guid, GameSessionData gamestate) => guid.GetHighType() switch
     {
         HighGuidType.Player => Create(HighGuidType703.Player, guid.GetCounter()),
-        HighGuidType.Item => Create(HighGuidType703.Item, guid.GetCounter()),
+        HighGuidType.Item => CreateItem(guid),
         HighGuidType.Transport => TransportCreate(guid.GetCounter(), guid.GetEntry()),
         HighGuidType.MOTransport => TransportCreate(guid.GetCounter() | MoTransportCounterFlag, guid.GetEntry()),
         HighGuidType.RaidGroup => Create(HighGuidType703.RaidGroup, guid.GetCounter()),
@@ -31,6 +31,15 @@ public readonly record struct WowGuid128(ulong Low, ulong High)
         HighGuidType.Corpse => Create(HighGuidType703.Corpse, 0, guid.GetEntry(), guid.GetCounter()),
         _ => WowGuid128.Empty,
     };
+    // Every legacy item guid the backend sends reaches the modern side through here, which makes
+    // it the one place that sees which high the server uses for items before the guid is
+    // normalised to a modern Item guid. WowGuid64.Create reads it back when rebuilding (#278).
+    static WowGuid128 CreateItem(WowGuid64 guid)
+    {
+        LegacyItemGuidHigh.Observe(guid.GetHighGuidTypeLegacy());
+        return Create(HighGuidType703.Item, guid.GetCounter());
+    }
+
     public static WowGuid128 Create(HighGuidType703 type, ulong counter)
     {
         switch (type)
