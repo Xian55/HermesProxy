@@ -312,8 +312,6 @@ class LootRemoved : ServerPacket, ISpanWritable
         writer.WritePackedGuid128(Owner.Low, Owner.High);
         writer.WritePackedGuid128(LootObj.Low, LootObj.High);
         writer.WriteUInt8(LootListID);
-        if (LootRollWire.WritesDungeonEncounterId)
-            writer.WriteInt32(0);                    // DungeonEncounterID
         return writer.Position;
     }
 
@@ -449,12 +447,16 @@ class LootRoll : ClientPacket
 /// SMSG_LOOT_ROLL and SMSG_LOOT_ROLL_WON carry it at offset 17 (after RollType), and
 /// SMSG_LOOT_ROLLS_COMPLETE at offset 8 (after LootListID). 3.3.5a has no dungeon-encounter
 /// concept on this wire and it is zero in every native packet, so it is always written as 0.
-/// SMSG_LOOT_START_ROLL does NOT have this field. Issue #162.
+/// SMSG_LOOT_START_ROLL and SMSG_LOOT_REMOVED do NOT have this field. Issue #162.
 /// </summary>
 internal static class LootRollWire
 {
+    // ModernVersion.Build is readonly and the test process runs as one fixed build, so the
+    // span/Write parity test needs this to reach the V3_4_3 branch. Production never sets it.
+    internal static bool? ForceDungeonEncounterIdForTests;
+
     public static bool WritesDungeonEncounterId =>
-        ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        ForceDungeonEncounterIdForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
 
     public static int DungeonEncounterIdBytes => WritesDungeonEncounterId ? 4 : 0;
 }
@@ -639,6 +641,8 @@ class LootRollsComplete : ServerPacket, ISpanWritable
         var writer = new SpanPacketWriter(buffer);
         writer.WritePackedGuid128(LootObj.Low, LootObj.High);
         writer.WriteUInt8(LootListID);
+        if (LootRollWire.WritesDungeonEncounterId)
+            writer.WriteInt32(0);                    // DungeonEncounterID
         return writer.Position;
     }
 

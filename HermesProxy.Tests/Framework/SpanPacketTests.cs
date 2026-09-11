@@ -283,6 +283,34 @@ public class SpanPacketWriterTests
         writer.WriteUInt8(3);
         Assert.Equal(13, writer.Position);
     }
+
+    [Fact]
+    public void Position_CountsPendingBits()
+    {
+        Span<byte> span = stackalloc byte[4];
+        var writer = new SpanPacketWriter(span);
+
+        // An 11-bit length followed by an empty string, as GuildEventMotd writes it (#156).
+        // WriteString("") does not flush, so the last 3 bits must still be counted.
+        writer.WriteBits(0x5FFu, 11);
+        writer.WriteString("");
+
+        Assert.Equal(2, writer.Position);
+        Assert.Equal(new byte[] { 0xBF, 0xE0 }, span[..writer.Position].ToArray());
+    }
+
+    [Fact]
+    public void Position_CountsTrailingSingleBit()
+    {
+        Span<byte> span = stackalloc byte[4];
+        var writer = new SpanPacketWriter(span);
+
+        writer.WriteUInt8(0x11);
+        writer.WriteBit(true);
+
+        Assert.Equal(2, writer.Position);
+        Assert.Equal(new byte[] { 0x11, 0x80 }, span[..writer.Position].ToArray());
+    }
 }
 
 public class SpanPacketReaderTests
