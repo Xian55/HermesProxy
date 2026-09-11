@@ -1,91 +1,81 @@
-﻿using Framework.IO;
-using HermesProxy.World.Enums;
+using Framework.IO;
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace HermesProxy.World.Objects;
 
-public class UpdateMask
+// Dirty-field mask for the V1_14/V2_5 flat update-field path. Same block math as
+// Framework.Util.StackBitMask, but heap-backed: it accumulates across SetUpdateField calls and is
+// cached with its UpdateFieldsArray in ObjectCacheModern, which a ref struct cannot be.
+// Block j bit k written little-endian lands at byte 4j + k/8, bit k%8 — the layout the previous
+// BitArray.CopyTo(byte[]) implementation produced.
+public sealed class UpdateMask
 {
-    public UpdateMask(uint valuesCount = 0)
+    private readonly uint[] _blocks;
+    private readonly uint _fieldCount;
+
+    public UpdateMask(uint valuesCount)
     {
         _fieldCount = valuesCount;
-        _blockCount = (valuesCount + 32 - 1) / 32;
-
-        _mask = new BitArray((int)valuesCount, false);
-    }
-
-    public void SetCount(int valuesCount)
-    {
-        _fieldCount = (uint)valuesCount;
-        _blockCount = (uint)(valuesCount + 32 - 1) / 32;
-
-        _mask = new BitArray(valuesCount, false);
+        _blocks = new uint[BlockCount((int)valuesCount)];
     }
 
     public uint GetCount() { return _fieldCount; }
 
-    public virtual void AppendToPacket(ByteBuffer data)
-    {
-        data.WriteUInt8((byte)_blockCount);
-        var maskArray = new byte[_blockCount << 2];
+    public ReadOnlySpan<uint> Blocks => _blocks;
 
-        _mask.CopyTo(maskArray, 0);
-        data.WriteBytes(maskArray);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int BlockCount(int fieldCount) => (fieldCount + 31) >> 5;
+
+    public void AppendToPacket(ByteBuffer data)
+    {
+        data.WriteUInt8((byte)_blocks.Length);
+        WriteUInt32s(data, _blocks);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool GetBit(int index)
     {
-        return _mask.Get(index);
+        CheckIndex(index);
+        return (_blocks[index >> 5] & (1u << (index & 31))) != 0;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetBit(int index)
     {
-        _mask.Set(index, true);
+        CheckIndex(index);
+        _blocks[index >> 5] |= 1u << (index & 31);
     }
 
-    void UnsetBit(int index)
+    public void Clear() => Array.Clear(_blocks);
+
+    // The wire wants little-endian uint32s, which on a little-endian host are the span's own bytes.
+    internal static void WriteUInt32s(ByteBuffer data, ReadOnlySpan<uint> values)
     {
-        _mask.Set(index, false);
+        if (BitConverter.IsLittleEndian)
+        {
+            data.WriteBytes(MemoryMarshal.AsBytes(values));
+            return;
+        }
+
+        foreach (var value in values)
+            data.WriteUInt32(value);
     }
 
-    public void Clear()
+    // BitArray bounded indices by its length; the last block's spare bits must stay unreachable
+    // or a stray SetBit would put a field on the wire that has no value behind it.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void CheckIndex(int index)
     {
-        _mask.SetAll(false);
+        if ((uint)index >= _fieldCount)
+            ThrowIndexOutOfRange(index);
     }
 
-    uint _fieldCount;
-    protected uint _blockCount;
-    protected BitArray _mask;
-}
-
-public class DynamicUpdateMask : UpdateMask
-{
-    public DynamicUpdateMask(uint valuesCount) : base(valuesCount) { }
-
-    public void EncodeDynamicFieldChangeType(DynamicFieldChangeType changeType, UpdateTypeModern updateType)
-    {
-        DynamicFieldChangeType = (uint)(_blockCount | ((uint)(changeType & HermesProxy.World.Objects.DynamicFieldChangeType.ValueAndSizeChanged) * ((3 - (int)updateType /*this part evaluates to 0 if update type is not VALUES*/) / 3)));
-    }
-
-    public override void AppendToPacket(ByteBuffer data)
-    {
-        data.WriteUInt16((ushort)DynamicFieldChangeType);
-        if (ValueCount != null)
-            data.WriteInt32((int)ValueCount);
-
-        var maskArray = new byte[_blockCount << 2];
-
-        _mask.CopyTo(maskArray, 0);
-        data.WriteBytes(maskArray);
-    }
-
-    public uint DynamicFieldChangeType;
-    public int? ValueCount;
+    [DoesNotReturn]
+    private static void ThrowIndexOutOfRange(int index) =>
+        throw new ArgumentOutOfRangeException(nameof(index), index, null);
 }
 
 public enum DynamicFieldChangeType
