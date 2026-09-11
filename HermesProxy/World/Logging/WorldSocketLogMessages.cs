@@ -180,4 +180,24 @@ internal static partial class WorldSocketLogMessages
         byte FacialHair,
         uint HairStyleId,
         uint FacialHairId);
+
+    [LoggerMessage(
+        EventId = 118,
+        Level = LogLevel.Debug,
+        Message = "Dropped {Opcode}: the client is clearing the window of a trade that already completed.")]
+    public static partial void TradeActionAfterComplete(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        Opcode Opcode);
+
+    [LoggerMessage(
+        EventId = 119,
+        Level = LogLevel.Error,
+        Message = "Got {Opcode} without trade session")]
+    public static partial void TradeActionWithoutSession(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        Opcode Opcode);
 }
