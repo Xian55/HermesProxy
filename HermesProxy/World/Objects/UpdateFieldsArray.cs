@@ -37,16 +37,16 @@ public class UpdateFieldsArray
 
     public void WriteToPacket(ByteBuffer buffer)
     {
-        var fieldBuffer = new ByteBuffer();
-        for (var index = 0; index < ValuesCount; ++index)
-        {
-            if (m_updateMask.GetBit(index))
-            {
-                fieldBuffer.WriteUInt32(m_updateValues[index].UnsignedValue);
-            }
-        }
         m_updateMask.AppendToPacket(buffer);
-        buffer.WriteBytes(fieldBuffer);
+
+        // Values follow the mask in ascending field order; walking set bits skips clean blocks,
+        // which is most of a 4674-field ActivePlayer array on a typical Values update.
+        var blocks = m_updateMask.Blocks;
+        for (var block = 0; block < blocks.Length; ++block)
+        {
+            for (var bits = blocks[block]; bits != 0; bits &= bits - 1)
+                buffer.WriteUInt32(m_updateValues[(block << 5) + BitOperations.TrailingZeroCount(bits)].UnsignedValue);
+        }
     }
 
     public void SetUpdateField<T>(object index, T value, byte offset = 0) where T : new()
@@ -293,86 +293,78 @@ public class DynamicUpdateFieldsArray
 {
     public DynamicUpdateFieldsArray(uint size, UpdateTypeModern updateType)
     {
-        ValuesCount = size;
         m_updateType = updateType;
         m_updateMask = new UpdateMask(size);
-        m_fieldBuffer = new();
     }
-    uint ValuesCount;
     UpdateTypeModern m_updateType;
     UpdateMask m_updateMask;
-    ByteBuffer m_fieldBuffer;
+    // Every builder constructs one of these, but most updates set no dynamic field — only rent
+    // the pooled buffer once one does.
+    ByteBuffer? m_fieldBuffer;
 
     public void WriteToPacket(ByteBuffer buffer)
     {
         m_updateMask.AppendToPacket(buffer);
-        buffer.WriteBytes(m_fieldBuffer);
+        if (m_fieldBuffer != null)
+            buffer.WriteBytes(m_fieldBuffer.GetDataSpan());
     }
 
-    public void SetUpdateField(int index, uint[] values, DynamicFieldChangeType changeType)
+    public void SetUpdateField(int index, ReadOnlySpan<uint> values, DynamicFieldChangeType changeType)
     {
-        var valueBuffer = new ByteBuffer();
         m_updateMask.SetBit(index);
+        var data = m_fieldBuffer ??= new ByteBuffer();
 
-        var arrayMask = new DynamicUpdateMask((uint)values.Length);
-        arrayMask.EncodeDynamicFieldChangeType(changeType, m_updateType);
-        if (m_updateType == UpdateTypeModern.Values && changeType == DynamicFieldChangeType.ValueAndSizeChanged)
-        {
-            arrayMask.ValueCount = values.Length;
-            arrayMask.SetCount(values.Length);
-        } 
+        // The size-changed flag and explicit count only exist on Values updates; creates always
+        // carry the full array.
+        var blockCount = UpdateMask.BlockCount(values.Length);
+        var sizeChanged = m_updateType == UpdateTypeModern.Values && changeType == DynamicFieldChangeType.ValueAndSizeChanged;
+        data.WriteUInt16((ushort)(sizeChanged ? blockCount | (int)DynamicFieldChangeType.ValueAndSizeChanged : blockCount));
+        if (sizeChanged)
+            data.WriteInt32(values.Length);
 
-        for (var v = 0; v < values.Length; ++v)
-        {
-            arrayMask.SetBit(v);
-            valueBuffer.WriteUInt32(values[v]);
-        }
+        // Every element is sent, so the element mask is all ones up to values.Length.
+        for (var remaining = values.Length; remaining > 0; remaining -= 32)
+            data.WriteUInt32(remaining >= 32 ? uint.MaxValue : (1u << remaining) - 1);
 
-        arrayMask.AppendToPacket(m_fieldBuffer);
-        m_fieldBuffer.WriteBytes(valueBuffer);
+        UpdateMask.WriteUInt32s(data, values);
     }
 
     public void SetUpdateField<T>(object index, T value, DynamicFieldChangeType changeType) where T : new()
     {
+        Span<uint> values = stackalloc uint[4];
+        int count;
         if (value is int intValue)
         {
-            uint[] values = new uint[1];
-            UpdateValues union = new();
-            union.SignedValue = intValue;
-            values[0] = union.UnsignedValue;
-            SetUpdateField((int)index, values, changeType);
+            values[0] = new UpdateValues { SignedValue = intValue }.UnsignedValue;
+            count = 1;
         }
         else if (value is uint uintValue)
         {
-            uint[] values = new uint[1];
             values[0] = uintValue;
-            SetUpdateField((int)index, values, changeType);
+            count = 1;
         }
         else if (value is float floatValue)
         {
-            uint[] values = new uint[1];
-            UpdateValues union = new();
-            union.FloatValue = floatValue;
-            values[0] = union.UnsignedValue;
-            SetUpdateField((int)index, values, changeType);
+            values[0] = new UpdateValues { FloatValue = floatValue }.UnsignedValue;
+            count = 1;
         }
         else if (value is ulong ulongValue)
         {
-            uint[] values = new uint[2];
             values[0] = MathFunctions.Pair64_LoPart(ulongValue);
             values[1] = MathFunctions.Pair64_HiPart(ulongValue);
-            SetUpdateField((int)index, values, changeType);
+            count = 2;
         }
         else if (value is WowGuid128 guid)
         {
-            uint[] values = new uint[4];
             values[0] = MathFunctions.Pair64_LoPart(guid.GetLowValue());
             values[1] = MathFunctions.Pair64_HiPart(guid.GetLowValue());
             values[2] = MathFunctions.Pair64_LoPart(guid.GetHighValue());
             values[3] = MathFunctions.Pair64_HiPart(guid.GetHighValue());
-            SetUpdateField((int)index, values, changeType);
+            count = 4;
         }
         else
             throw new Exception($"Unhandled type {typeof(T).Name} in SetUpdateField!");
+
+        SetUpdateField((int)index, values[..count], changeType);
     }
 }

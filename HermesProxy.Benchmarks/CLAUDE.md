@@ -34,6 +34,7 @@ dotnet run --project HermesProxy.Benchmarks -c Release -- --list flat
 | `SendPipelineBenchmarks.cs` | `ServerPacket` construct → `WritePacketData` → framed + encrypted wire bytes, per stage |
 | `PackedGuidBenchmarks.cs` | `WorldPacket` vs `PackedGuidHelper` packed-GUID encode/decode |
 | `MovementHandlerPrologueBenchmarks.cs` | `HandlePlayerMove` opcode translation: string/reflection round trip vs the prebuilt map |
+| `UpdateMaskBenchmarks.cs` | V1_14/V2_5 `UpdateFieldsArray` / `DynamicUpdateFieldsArray` write path vs the previous `BitArray`-backed mask (verbatim `Legacy*` copies) |
 
 ## Conventions
 
