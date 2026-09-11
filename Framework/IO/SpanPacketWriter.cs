@@ -44,8 +44,11 @@ public ref struct SpanPacketWriter
         _bitPosition = 8;
     }
 
-    public readonly int Position => _position;
-    public readonly int Remaining => _buffer.Length - _position;
+    // Counts a partially filled bit byte. WriteToSpan implementations return Position, and a
+    // packet that ends in bits — or in bits followed by an empty WriteString, which does not
+    // flush — would otherwise lose its last byte. ByteBuffer.GetData flushes for the same reason.
+    public readonly int Position => _bitPosition == 8 ? _position : _position + 1;
+    public readonly int Remaining => _buffer.Length - Position;
 
     #region Integer Write Methods
 
@@ -253,9 +256,12 @@ public ref struct SpanPacketWriter
         if (value)
             _bitValue |= (byte)(1 << _bitPosition);
 
+        // Stored on every bit, not just a full byte, so Position can count a partial one unflushed.
+        _buffer[_position] = _bitValue;
+
         if (_bitPosition == 0)
         {
-            _buffer[_position++] = _bitValue;
+            ++_position;
             _bitPosition = 8;
             _bitValue = 0;
         }
@@ -284,6 +290,10 @@ public ref struct SpanPacketWriter
                 _bitValue = 0;
             }
         }
+
+        // Store the partial byte too, so Position can count it unflushed.
+        if (_bitPosition != 8)
+            _buffer[_position] = _bitValue;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
