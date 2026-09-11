@@ -6,9 +6,11 @@ Bugs and quirks that have workarounds. For things HermesProxy structurally canno
 
 # Classic Era (1.14.x)
 
-## Priest wand `Shoot` cancels in melee range (1.14.x client)
+## Wand `Shoot` stops in melee range (1.14.x client)
 
-On modern 1.14.x Classic clients the `autoRangedCombat` CVar (default ON) treats wands as ranged weapons and auto-cancels `Shoot` the moment a mob enters melee range, then switches you into auto-attack. Vanilla 1.12 emulators (VMaNGOS, Kronos, CMaNGOS) never expected this — the wand simply dies, you can't finish the mob with it, and you get stuck swinging.
+Modern 1.14.x Classic clients have an `autoRangedCombat` setting, on by default, that swaps ranged attacks for melee once the target is in melee range. When a mob reaches you while you wand it, the client stops `Shoot` and starts auto-attack on its own. Pressing `Shoot` again restarts the wand, but the client switches back to melee a second or two later. The 1.12 client has no such setting, so on vanilla servers (VMaNGOS, Kronos, CMaNGOS) you can't finish a mob with your wand once it closes in.
+
+This is the client's choice, not a proxy or server bug: the client sends the melee attack and the wand cancel itself, and the proxy forwards them unchanged.
 
 **Workaround — run once in chat:**
 ```
@@ -19,7 +21,9 @@ Or make it persistent by adding this line to `WTF/Config.wtf` before launch:
 SET autoRangedCombat "0"
 ```
 
-Priest characters logging in on 1.14+ Classic Era clients receive a one-time chat reminder from the proxy on world-enter. Other classes that occasionally use a wand are affected the same way — apply the same CVar fix if you notice it. Tracked in [#80](https://github.com/Xian55/HermesProxy/issues/80).
+With the setting off, the wand keeps firing in melee range. This affects any wand user. Priests on 1.14+ clients also get a chat reminder from the proxy each time they log in.
+
+Moving still interrupts a wand, as it always has on vanilla servers — walk, strafe or jump and you need to press `Shoot` again. That is unrelated to this setting. Background in [#80](https://github.com/Xian55/HermesProxy/issues/80).
 
 ---
 

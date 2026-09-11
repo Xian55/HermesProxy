@@ -466,6 +466,12 @@ public partial class WorldSocket
     [PacketHandler(Opcode.CMSG_CANCEL_AUTO_REPEAT_SPELL)]
     void HandleCancelAutoRepeatSpell(CancelAutoRepeatSpell spell)
     {
+        // The client has already dropped auto-repeat, so its next Auto Shot is a new cast.
+        // Don't wait for SMSG_CANCEL_AUTO_REPEAT: cMaNGOS WotLK never sends it for a client
+        // cancel, and the stale entry made HandleCastSpell reject every later Auto Shot as
+        // SpellInProgress (#277).
+        GetSession().GameState.CurrentClientAutoRepeatCast = null;
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CANCEL_AUTO_REPEAT_SPELL);
         SendPacketToServer(packet);
     }
