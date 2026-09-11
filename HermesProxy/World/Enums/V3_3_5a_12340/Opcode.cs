@@ -1075,7 +1075,7 @@ public enum Opcode : uint
     SMSG_MOVE_SPLINE_SET_SWIM_BACK_SPEED                  = 0x302,
     SMSG_MOVE_SPLINE_SET_SWIM_SPEED                       = 0x300,
     SMSG_MOVE_SPLINE_SET_TURN_RATE                        = 0x303,
-    SMSG_MOVE_SPLINE_SET_WALK_BACK_SPEED                  = 0x301,
+    SMSG_MOVE_SPLINE_SET_WALK_SPEED                       = 0x301,
     SMSG_MOVE_SPLINE_SET_WALK_MODE                        = 0x30E,
     SMSG_MOVE_SPLINE_SET_WATER_WALK                       = 0x309,
     SMSG_MOVE_SPLINE_START_SWIM                           = 0x30B,
