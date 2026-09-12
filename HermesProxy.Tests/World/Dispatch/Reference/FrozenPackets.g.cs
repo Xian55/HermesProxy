@@ -2966,4 +2966,183 @@ internal static class FrozenPackets
         public uint BorderStyle;
         public uint BorderColor;
     }
+
+/// Frozen verbatim from <c>SocialPackets.cs</c>.
+    internal sealed class ContactListRequest
+    {
+        public void Read(WorldPacket p)
+        {
+            Flags = (SocialFlag)p.ReadUInt32();
+        }
+
+        public SocialFlag Flags;
+    }
+
+    /// Frozen verbatim from <c>SocialPackets.cs</c>.
+    internal sealed class AddFriend
+    {
+        public void Read(WorldPacket p)
+        {
+            uint nameLength = p.ReadBits<uint>(9);
+            uint noteslength = p.ReadBits<uint>(10);
+            Name = p.ReadString(nameLength);
+            Note = p.ReadString(noteslength);
+        }
+
+        public string Note = string.Empty;
+        public string Name = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>SocialPackets.cs</c>.
+    internal sealed class AddIgnore
+    {
+        public void Read(WorldPacket p)
+        {
+            uint nameLength = p.ReadBits<uint>(9);
+            if (ModernVersion.AddedInVersion(9, 1, 5, 1, 14, 1, 2, 5, 3))
+                AccountGuid = p.ReadPackedGuid128();
+            Name = p.ReadString(nameLength);
+        }
+
+        WowGuid128 AccountGuid;
+        public string Name = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>SocialPackets.cs</c>.
+    internal sealed class DelFriend
+    {
+        public void Read(WorldPacket p)
+        {
+            VirtualRealmAddress = p.ReadUInt32();
+            Guid = p.ReadPackedGuid128();
+        }
+
+        public uint VirtualRealmAddress;
+        public WowGuid128 Guid;
+    }
+
+    /// Frozen verbatim from <c>SocialPackets.cs</c>.
+    internal sealed class SetContactNotes
+    {
+        public void Read(WorldPacket p)
+        {
+            VirtualRealmAddress = p.ReadUInt32();
+            Guid = p.ReadPackedGuid128();
+            Notes = p.ReadString(p.ReadBits<uint>(10));
+        }
+
+        public uint VirtualRealmAddress;
+        public WowGuid128 Guid;
+        public string Notes = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>ReputationPackets.cs</c>.
+    internal sealed class SetFactionAtWar
+    {
+        public void Read(WorldPacket p)
+        {
+            FactionIndex = p.ReadUInt8();
+        }
+
+        public byte FactionIndex;
+    }
+
+    /// Frozen verbatim from <c>ReputationPackets.cs</c>.
+    internal sealed class SetFactionNotAtWar
+    {
+        public void Read(WorldPacket p)
+        {
+            FactionIndex = p.ReadUInt8();
+        }
+
+        public byte FactionIndex;
+    }
+
+    /// Frozen verbatim from <c>ReputationPackets.cs</c>.
+    internal sealed class SetFactionInactive
+    {
+        public void Read(WorldPacket p)
+        {
+            FactionIndex = p.ReadUInt32();
+            State = p.HasBit();
+        }
+
+        public uint FactionIndex;
+        public bool State;
+    }
+
+    /// Frozen verbatim from <c>ReputationPackets.cs</c>.
+    internal sealed class SetWatchedFaction
+    {
+        public void Read(WorldPacket p)
+        {
+            FactionIndex = p.ReadUInt32();
+        }
+
+        public uint FactionIndex;
+    }
+
+    /// Frozen verbatim from <c>DuelPackets.cs</c>.
+    internal sealed class CanDuel
+    {
+        public void Read(WorldPacket p)
+        {
+            TargetGUID = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 TargetGUID;
+    }
+
+    /// Frozen verbatim from <c>DuelPackets.cs</c>.
+    internal sealed class DuelResponse
+    {
+        public void Read(WorldPacket p)
+        {
+            ArbiterGUID = p.ReadPackedGuid128();
+            Accepted = p.HasBit();
+            Forfeited = p.HasBit();
+        }
+
+        public WowGuid128 ArbiterGUID;
+        public bool Accepted;
+        public bool Forfeited;
+    }
+
+    /// Frozen verbatim from <c>CollectionPackets.cs</c>.
+    internal sealed class ToyClearFanfare
+    {
+        public void Read(WorldPacket p)
+        {
+            ItemID = p.ReadUInt32();
+        }
+
+        public uint ItemID;
+    }
+
+    /// Frozen verbatim from <c>CollectionPackets.cs</c>.
+    internal sealed class AddToy
+    {
+        public void Read(WorldPacket p)
+        {
+            Guid = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Guid = WowGuid128.Empty;
+    }
+
+    /// Frozen verbatim from <c>CollectionPackets.cs</c>.
+    internal sealed class CollectionItemSetFavorite
+    {
+        public void Read(WorldPacket p)
+        {
+            // Wrathion CollectionPackets.cpp: CollectionType is int32, not uint8
+            Type = (ItemCollectionType)p.ReadInt32();
+            ID = p.ReadUInt32();
+            IsFavorite = p.ReadBit();
+        }
+
+        public ItemCollectionType Type;
+        public uint ID;
+        public bool IsFavorite;
+    }
 }

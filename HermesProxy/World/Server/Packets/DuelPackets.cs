@@ -27,17 +27,7 @@ using System.Text;
 
 namespace HermesProxy.World.Server.Packets;
 
-public class CanDuel : ClientPacket
-{
-    public CanDuel(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        TargetGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 TargetGUID;
-}
+public readonly record struct CanDuel(WowGuid128 TargetGUID);
 
 public class CanDuelResult : ServerPacket, ISpanWritable
 {
@@ -92,21 +82,7 @@ public class DuelRequested : ServerPacket, ISpanWritable
     public WowGuid128 RequestedByWowAccount;
 }
 
-public class DuelResponse : ClientPacket
-{
-    public DuelResponse(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        ArbiterGUID = _worldPacket.ReadPackedGuid128();
-        Accepted = _worldPacket.HasBit();
-        Forfeited = _worldPacket.HasBit();
-    }
-
-    public WowGuid128 ArbiterGUID;
-    public bool Accepted;
-    public bool Forfeited;
-}
+public readonly record struct DuelResponse(WowGuid128 ArbiterGUID, bool Accepted, bool Forfeited);
 
 public class DuelCountdown : ServerPacket, ISpanWritable
 {

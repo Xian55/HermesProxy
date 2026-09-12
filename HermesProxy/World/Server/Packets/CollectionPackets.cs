@@ -1,4 +1,4 @@
-using Framework.Constants;
+﻿using Framework.Constants;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
@@ -140,44 +140,16 @@ public class AccountToyUpdate : ServerPacket
     }
 }
 
-public class ToyClearFanfare : ClientPacket
+public readonly record struct ToyClearFanfare(uint ItemID);
+
+public readonly record struct AddToy(WowGuid128 Guid);
+
+/// <remarks>
+/// Holds <see cref="SpellCastRequest"/> by reference for the same reason CastSpell does: it carries
+/// a mutable MovementInfo the outbound path fills in field by field.
+/// </remarks>
+public readonly record struct UseToy(SpellCastRequest Cast)
 {
-    public ToyClearFanfare(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        ItemID = _worldPacket.ReadUInt32();
-    }
-
-    public uint ItemID;
-}
-
-public class AddToy : ClientPacket
-{
-    public AddToy(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Guid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Guid = WowGuid128.Empty;
-}
-
-public class UseToy : ClientPacket
-{
-    public UseToy(WorldPacket packet) : base(packet)
-    {
-        Cast = new SpellCastRequest();
-    }
-
-    public override void Read()
-    {
-        Cast.Read(_worldPacket);
-    }
-
-    public SpellCastRequest Cast;
-
     public uint ItemId => Cast.Misc[0];
 }
 
@@ -190,19 +162,4 @@ public enum ItemCollectionType : byte
     TransmogSetFavorite = 4,
 }
 
-public class CollectionItemSetFavorite : ClientPacket
-{
-    public CollectionItemSetFavorite(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        // Wrathion CollectionPackets.cpp: CollectionType is int32, not uint8
-        Type = (ItemCollectionType)_worldPacket.ReadInt32();
-        ID = _worldPacket.ReadUInt32();
-        IsFavorite = _worldPacket.ReadBit();
-    }
-
-    public ItemCollectionType Type;
-    public uint ID;
-    public bool IsFavorite;
-}
+public readonly record struct CollectionItemSetFavorite(ItemCollectionType Type, uint ID, bool IsFavorite);

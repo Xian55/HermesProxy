@@ -27,17 +27,7 @@ using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets;
 
-public class ContactListRequest : ClientPacket
-{
-    public ContactListRequest(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Flags = (SocialFlag)_worldPacket.ReadUInt32();
-    }
-
-    public SocialFlag Flags;
-}
+public readonly record struct ContactListRequest(SocialFlag Flags);
 
 public class ContactList : ServerPacket, ISpanWritable
 {
@@ -197,64 +187,15 @@ public class FriendStatusPkt : ServerPacket, ISpanWritable
     public bool Mobile;
 }
 
-public class AddFriend : ClientPacket
-{
-    public AddFriend(WorldPacket packet) : base(packet) { }
+public readonly record struct AddFriend(string Name, string Note);
 
-    public override void Read()
-    {
-        uint nameLength = _worldPacket.ReadBits<uint>(9);
-        uint noteslength = _worldPacket.ReadBits<uint>(10);
-        Name = _worldPacket.ReadString(nameLength);
-        Note = _worldPacket.ReadString(noteslength);
-    }
+/// <remarks>
+/// <c>AccountGuid</c> was a private field on the old class: read to advance the reader, then
+/// unreachable. It is a real field here, so the equivalence test can assert it was parsed rather
+/// than only that the reader ended in the right place.
+/// </remarks>
+public readonly record struct AddIgnore(string Name, WowGuid128 AccountGuid);
 
-    public string Note = string.Empty;
-    public string Name = string.Empty;
-}
+public readonly record struct DelFriend(uint VirtualRealmAddress, WowGuid128 Guid);
 
-public class AddIgnore : ClientPacket
-{
-    public AddIgnore(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        uint nameLength = _worldPacket.ReadBits<uint>(9);
-        if (ModernVersion.AddedInVersion(9, 1, 5, 1, 14, 1, 2, 5, 3))
-            AccountGuid = _worldPacket.ReadPackedGuid128();
-        Name = _worldPacket.ReadString(nameLength);
-    }
-
-    WowGuid128 AccountGuid;
-    public string Name = string.Empty;
-}
-
-public class DelFriend : ClientPacket
-{
-    public DelFriend(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        VirtualRealmAddress = _worldPacket.ReadUInt32();
-        Guid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public uint VirtualRealmAddress;
-    public WowGuid128 Guid;
-}
-
-public class SetContactNotes : ClientPacket
-{
-    public SetContactNotes(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        VirtualRealmAddress = _worldPacket.ReadUInt32();
-        Guid = _worldPacket.ReadPackedGuid128();
-        Notes = _worldPacket.ReadString(_worldPacket.ReadBits<uint>(10));
-    }
-
-    public uint VirtualRealmAddress;
-    public WowGuid128 Guid;
-    public string Notes = string.Empty;
-}
+public readonly record struct SetContactNotes(uint VirtualRealmAddress, WowGuid128 Guid, string Notes);

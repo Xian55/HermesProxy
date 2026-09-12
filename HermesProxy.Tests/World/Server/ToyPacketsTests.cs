@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.IO;
+using Framework.IO;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -71,9 +72,11 @@ public class ToyPacketsTests
         var payload = new WorldPacket(1u);
         payload.WritePackedGuid128(guid);
 
-        using var packet = new AddToy(new WorldPacket(Frame(payload.GetData())));
-        packet.Read();
+        var r = new SpanPacketReader(
+            new WorldPacket(Frame(payload.GetData())).GetRemainingSpan());
+        AddToyCodec.Read(ref r, out var packet);
         Assert.Equal(guid, packet.Guid);
+        Assert.Equal(0, r.Remaining);
     }
 
     [Fact]
@@ -85,8 +88,9 @@ public class ToyPacketsTests
         payload.WriteBit(true);
         payload.FlushBits();
 
-        using var packet = new CollectionItemSetFavorite(new WorldPacket(Frame(payload.GetData())));
-        packet.Read();
+        var r = new SpanPacketReader(
+            new WorldPacket(Frame(payload.GetData())).GetRemainingSpan());
+        CollectionItemSetFavoriteCodec.Read(ref r, out var packet);
         Assert.Equal(ItemCollectionType.Toy, packet.Type);
         Assert.Equal(1973u, packet.ID);
         Assert.True(packet.IsFavorite);

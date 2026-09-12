@@ -159,55 +159,13 @@ struct FactionStandingData
     public int Standing;
 }
 
-class SetFactionAtWar : ClientPacket
-{
-    public SetFactionAtWar(WorldPacket packet) : base(packet) { }
+public readonly record struct SetFactionAtWar(byte FactionIndex);
 
-    public override void Read()
-    {
-        FactionIndex = _worldPacket.ReadUInt8();
-    }
+public readonly record struct SetFactionNotAtWar(byte FactionIndex);
 
-    public byte FactionIndex;
-}
+public readonly record struct SetFactionInactive(uint FactionIndex, bool State);
 
-class SetFactionNotAtWar : ClientPacket
-{
-    public SetFactionNotAtWar(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        FactionIndex = _worldPacket.ReadUInt8();
-    }
-
-    public byte FactionIndex;
-}
-
-class SetFactionInactive : ClientPacket
-{
-    public SetFactionInactive(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        FactionIndex = _worldPacket.ReadUInt32();
-        State = _worldPacket.HasBit();
-    }
-
-    public uint FactionIndex;
-    public bool State;
-}
-
-class SetWatchedFaction : ClientPacket
-{
-    public SetWatchedFaction(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        FactionIndex = _worldPacket.ReadUInt32();
-    }
-
-    public uint FactionIndex;
-}
+public readonly record struct SetWatchedFaction(uint FactionIndex);
 
 class SetForcedReactions : ServerPacket, ISpanWritable
 {

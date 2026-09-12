@@ -65,6 +65,11 @@ def normalise(body: str) -> list[str]:
     # argument now. Same class of required rewrite as the `ctx.` prefixes above.
     body = body.replace('(in ctx, ', '(')
 
+    # The same argument, spelled the way the pre-conversion handler spelled it: a handler still
+    # on WorldSocket passes the socket's own `_sessionContext` field where a system passes its
+    # `ctx` parameter. Both name the same struct, so neither should count as a difference.
+    body = body.replace('(in _sessionContext, ', '(')
+
     # Shape B: the opcode is a parameter now rather than a call on the packet, and a data-only
     # packet has no GetOpcode() either. Collapse all three spellings to one token — specific
     # patterns first, or the general one corrupts the replacements the others just made.
