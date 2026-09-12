@@ -437,6 +437,27 @@ has to emit union-aware access or the generated file will not compile. That cuts
 is a new dependency for the union branch, but one emit-template change covers the generated sites
 rather than hand-editing each.
 
+> **Correction (2026-09-12).** Both claims above are out of date, and the conclusion was wrong.
+> The branch was rebased on **2026-09-09** onto `30f78fed` (PR #270) and is now `85f0c536`, only
+> 30 commits behind `master` — not stale since April. More importantly it **did not need the
+> generator to change at all**: public accessor properties (`UnitData`, `PlayerData`, …) pattern-match
+> the union internally, so all 280+ call sites including every generated one compile unchanged. The
+> final diff is three files — `World/Server/Packets/UpdatePackets.cs` plus `ObjectSpecificDataTests.cs`
+> and an edit to `ItemSectionEquivalenceTests.cs`. The counts in the table above are still right;
+> what they cost is not.
+>
+> One property the accessors carry forward: they return `null!` for the wrong variant, matching the
+> prior `null!`-suppressed fields. So the union currently makes invalid *construction*
+> unrepresentable, not invalid *access*.
+>
+> All four live branches share the base commit
+> `7cbc9dd6 Build: Bump target framework to .NET 11 with C# 15 preview language`:
+> `perf/union-object-update`, `perf/union-trade-status`, `perf/union-inventory-failure`,
+> `perf/union-socket-address`. Each uses `sealed record` (reference-type) variants — correct for the
+> outbound and event-rate packets they convert, but a reason to measure before reaching for unions on
+> the inbound per-packet path. `perf/union-prep` (`6386462b`, 2026-04-15) is 561 commits behind with
+> nothing ahead; it is dead.
+
 ## Direction: discriminated unions
 
 Same argument as `perf/union-object-update`, which replaces `ObjectUpdate`'s eight nullable data
@@ -459,8 +480,17 @@ construction.
 
 ## Suggested sequencing
 
-1. **Name the branch on `ModernVersion`.** A `ClientBranch` enum plus branch-scoped
-   `AddedInVersion` / `RemovedInVersion` / `InVersion`, replacing the nine-`byte` positional form.
+1. **Name the branch on `ModernVersion`.** ✅ **Done 2026-09-12.** `ClientBranch`
+   (`Framework/Constants/ClientBranch.cs`) plus `VersionChecker.GetBranch(expansion, major)` and a
+   `Branch` field on both `LegacyVersion` and `ModernVersion`. The `ExpansionVersion == 1 / 2 || 3 /
+   else` chain inside `AddedInVersion(9 bytes)`, `AddedInClassicVersion(6 bytes)` and
+   `IsClassicVersionBuild()` now switches on it — that chain had **no arm for expansion 4**, so a
+   Cataclysm Classic client silently took the *retail* triple at all 53 ranged sites. Equivalence over
+   every supported build is pinned by `HermesProxy.Tests/World/ClientBranchTests.cs`.
+   Rather than `[Obsolete]`-ing the raw-build overloads (step 2 below assumed one caller; there are
+   five, and four are branch-guarded and sound), they now call a `[Conditional("DEBUG")]`
+   `VersionChecker.AssertComparableBranch`, which turns a cross-branch comparison into a loud test
+   failure at zero Release cost.
    This is a *rename of an existing behaviour*, not new logic — the `ExpansionVersion == 1 / 2||3 /
    else` chain already implements it. 53 call sites become readable; the trap becomes
    inexpressible. Small, mechanical, independently verifiable against the current predicate.

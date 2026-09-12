@@ -117,11 +117,65 @@ public static class VersionChecker
         };
     }
 
-    private static byte GetExpansionVersion(ClientVersionBuild version)
+    internal static byte GetExpansionVersion(ClientVersionBuild version)
     {
         ReadOnlySpan<char> span = version.ToString().AsSpan(1); // Skip 'V'
         int underscoreIndex = span.IndexOf('_');
         return byte.Parse(span[..underscoreIndex]);
+    }
+
+    /// <summary>
+    /// Which release line an expansion/major pair belongs to. Every re-released expansion picked a
+    /// major number above anything the original line ever shipped, so the split is a per-expansion
+    /// threshold rather than one rule; a new Classic expansion adds one arm here and nowhere else.
+    /// </summary>
+    /// <remarks>
+    /// This replaces the <c>ExpansionVersion == 1 / 2 || 3 / else</c> chain the ranged predicates
+    /// used to inline. That chain had no arm for expansion 4, so a Cataclysm Classic client would
+    /// have silently taken the *retail* version triple at all 53 ranged call sites (issue #202).
+    /// </remarks>
+    public static ClientBranch GetBranch(byte expansion, byte major) => expansion switch
+    {
+        0 => ClientBranch.Unknown,
+        1 => major >= 13 ? ClientBranch.ClassicEra : ClientBranch.Retail,   // 1.13+ Classic Era vs 1.12 vanilla
+        2 => major >= 5  ? ClientBranch.Classic    : ClientBranch.Retail,   // 2.5 TBC Classic vs 2.4.3
+        3 => major >= 4  ? ClientBranch.Classic    : ClientBranch.Retail,   // 3.4 Wrath Classic vs 3.3.5a
+        4 => major >= 4  ? ClientBranch.Classic    : ClientBranch.Retail,   // 4.4 Cata Classic vs 4.3.4
+        _ => ClientBranch.Retail,
+    };
+
+    /// <summary>
+    /// Guards a raw-build comparison against crossing release lines.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ClientVersionBuild"/> is valued by raw build number, so ordered comparisons are
+    /// only meaningful inside one <see cref="ClientBranch"/>: <c>V3_4_3_54261</c> is numerically
+    /// above every original-line Cataclysm, Mists, Legion and Shadowlands build. A mismatch answers
+    /// silently and wrongly, which is why this is an assert and not a returned error — every call
+    /// site that trips it is a bug in the caller, not a condition to handle. DEBUG-only, so the
+    /// Release comparison stays a single integer compare.
+    /// </remarks>
+    [System.Diagnostics.Conditional("DEBUG")]
+    internal static void AssertComparableBranch(ClientBranch self, ClientVersionBuild other, string caller)
+    {
+        // Zero is the "unbounded" sentinel the ranged PacketHandler attributes pass for an open
+        // lower bound. It has no expansion to parse and is comparable against anything.
+        if (other == ClientVersionBuild.Zero)
+            return;
+
+        ClientBranch otherBranch = GetBranch(GetExpansionVersion(other), GetMajorPatchVersion(other));
+        System.Diagnostics.Debug.Assert(self == otherBranch,
+            $"{caller}({other}) compares a {self} build against a {otherBranch} build. " +
+            "Raw build numbers are only ordered within one branch — use the expansion/major/minor overload.");
+    }
+
+    internal static byte GetMajorPatchVersion(ClientVersionBuild version)
+    {
+        ReadOnlySpan<char> span = version.ToString().AsSpan();
+        int firstUnderscore = span.IndexOf('_');
+        span = span[(firstUnderscore + 1)..];
+        int secondUnderscore = span.IndexOf('_');
+        return byte.Parse(span[..secondUnderscore]);
     }
 }
 public class UpdateFieldInfo
@@ -139,6 +193,7 @@ public static class LegacyVersion
     public static readonly byte ExpansionVersion = GetExpansionVersion();
     public static readonly byte MajorVersion = GetMajorPatchVersion();
     public static readonly byte MinorVersion = GetMinorPatchVersion();
+    public static readonly ClientBranch Branch = VersionChecker.GetBranch(ExpansionVersion, MajorVersion);
 
     public static int BuildInt => (int)Build;
     public static string VersionString => Build.ToString();
@@ -347,11 +402,13 @@ public static class LegacyVersion
 
     public static bool AddedInVersion(ClientVersionBuild build)
     {
+        VersionChecker.AssertComparableBranch(Branch, build, nameof(AddedInVersion));
         return Build >= build;
     }
 
     public static bool RemovedInVersion(ClientVersionBuild build)
     {
+        VersionChecker.AssertComparableBranch(Branch, build, nameof(RemovedInVersion));
         return Build < build;
     }
 
@@ -450,6 +507,7 @@ public static class ModernVersion
     public static readonly byte ExpansionVersion = GetExpansionVersion();
     public static readonly byte MajorVersion = GetMajorPatchVersion();
     public static readonly byte MinorVersion = GetMinorPatchVersion();
+    public static readonly ClientBranch Branch = VersionChecker.GetBranch(ExpansionVersion, MajorVersion);
 
     public static int BuildInt => (int)Build;
     public static string VersionString => Build.ToString();
@@ -699,12 +757,14 @@ public static class ModernVersion
 
     public static bool AddedInVersion(byte retailExpansion, byte retailMajor, byte retailMinor, byte classicEraExpansion, byte classicEraMajor, byte classicEraMinor, byte classicExpansion, byte classicMajor, byte classicMinor)
     {
-        if (ExpansionVersion == 1)
-            return AddedInVersion(classicEraExpansion, classicEraMajor, classicEraMinor);
-        else if (ExpansionVersion == 2 || ExpansionVersion == 3)
-            return AddedInVersion(classicExpansion, classicMajor, classicMinor);
-
-        return AddedInVersion(retailExpansion, retailMajor, retailMinor);
+        // Was `ExpansionVersion == 1 / 2 || 3 / else`, which had no arm for expansion 4: a
+        // Cataclysm Classic client fell through to the retail triple at every call site.
+        return Branch switch
+        {
+            ClientBranch.ClassicEra => AddedInVersion(classicEraExpansion, classicEraMajor, classicEraMinor),
+            ClientBranch.Classic    => AddedInVersion(classicExpansion, classicMajor, classicMinor),
+            _                       => AddedInVersion(retailExpansion, retailMajor, retailMinor),
+        };
     }
 
     public static bool RemovedInVersion(byte retailExpansion, byte retailMajor, byte retailMinor, byte classicEraExpansion, byte classicEraMajor, byte classicEraMinor, byte classicExpansion, byte classicMajor, byte classicMinor)
@@ -714,12 +774,12 @@ public static class ModernVersion
 
     public static bool AddedInClassicVersion(byte classicEraExpansion, byte classicEraMajor, byte classicEraMinor, byte classicExpansion, byte classicMajor, byte classicMinor)
     {
-        if (ExpansionVersion == 1)
-            return AddedInVersion(classicEraExpansion, classicEraMajor, classicEraMinor);
-        else if (ExpansionVersion == 2 || ExpansionVersion == 3)
-            return AddedInVersion(classicExpansion, classicMajor, classicMinor);
-
-        return false;
+        return Branch switch
+        {
+            ClientBranch.ClassicEra => AddedInVersion(classicEraExpansion, classicEraMajor, classicEraMinor),
+            ClientBranch.Classic    => AddedInVersion(classicExpansion, classicMajor, classicMinor),
+            _                       => false,
+        };
     }
 
     public static bool RemovedInClassicVersion(byte classicEraExpansion, byte classicEraMajor, byte classicEraMinor, byte classicExpansion, byte classicMajor, byte classicMinor)
@@ -739,19 +799,19 @@ public static class ModernVersion
 
     public static bool AddedInVersion(ClientVersionBuild build)
     {
+        VersionChecker.AssertComparableBranch(Branch, build, nameof(AddedInVersion));
         return Build >= build;
     }
 
     public static bool RemovedInVersion(ClientVersionBuild build)
     {
+        VersionChecker.AssertComparableBranch(Branch, build, nameof(RemovedInVersion));
         return Build < build;
     }
 
     public static bool IsClassicVersionBuild()
     {
-        return ExpansionVersion == 1 && MajorVersion >= 13 ||
-               ExpansionVersion == 2 && MajorVersion >= 5 ||
-               ExpansionVersion == 3 && MajorVersion >= 4;
+        return Branch is ClientBranch.ClassicEra or ClientBranch.Classic;
     }
 
     public static int GetAccountDataCount()
