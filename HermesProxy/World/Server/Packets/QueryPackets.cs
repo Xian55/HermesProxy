@@ -115,31 +115,9 @@ class QueryPetNameResponse : ServerPacket, ISpanWritable
     public string Name = "";
 }
 
-public class QueryPlayerName : ClientPacket
-{
-    public QueryPlayerName(WorldPacket packet) : base(packet) { }
+public readonly record struct QueryPlayerName(WowGuid128 Player);
 
-    public override void Read()
-    {
-        Player = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Player;
-}
-
-public class QueryPlayerNames : ClientPacket
-{
-    public QueryPlayerNames(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        uint count = _worldPacket.ReadUInt32();
-        for (uint i = 0; i < count; i++)
-            Players.Add(_worldPacket.ReadPackedGuid128());
-    }
-
-    public List<WowGuid128> Players = new List<WowGuid128>();
-}
+public readonly record struct QueryPlayerNames(List<WowGuid128> Players);
 
 public class QueryPlayerNameResponse : ServerPacket, ISpanWritable
 {

@@ -1,32 +1,58 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Framework.Constants;
 using Framework.Logging;
 using HermesProxy.Auth;
 using HermesProxy.Enums;
-using HermesProxy.World;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 
-namespace HermesProxy.World.Server;
+namespace HermesProxy.World.Server.Systems;
 
-public partial class WorldSocket
+/// <summary>
+/// Translation for the modern client's character CMSGs: the character list, creation and deletion,
+/// login and logout, appearance, action bars and inspection.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Bodies were moved from <c>World/Server/PacketHandlers/CharacterHandler.cs</c>, not retyped;
+/// <c>verify-handler-port.py</c> diffs each one against the original.
+/// </para>
+/// <para>
+/// Two methods were renamed, and only renamed. Three overloads shared the name
+/// <c>HandleTogglePvP</c> and only one of them toggles PvP; the other two set a title and set the
+/// PvP flag explicitly. verify-handler-port maps old name to new.
+/// </para>
+/// <para>
+/// <see cref="HandlePlayerLogin"/> is the one handler here that reaches back into the socket.
+/// <c>AbortLogin</c> and <c>SendConnectToInstance</c> are connection lifecycle rather than packet
+/// translation — they open the instance socket and tear the login down — so they stay on
+/// <c>WorldSocket</c> and are called through <c>ctx.Socket</c>. Its ordering comment is load-bearing:
+/// everything it publishes to GameState must happen before the instance connection opens, because
+/// the client starts pushing packets on that socket from another thread the moment it is up.
+/// </para>
+/// </remarks>
+public static class CharacterSystem
 {
-    // Handlers for CMSG opcodes coming from the modern client
-    [PacketHandler(Opcode.CMSG_ENUM_CHARACTERS)]
-    void HandleEnumCharacters(EnumCharacters charEnum)
+    private static readonly Microsoft.Extensions.Logging.ILogger _melLog = Log.CreateMelLogger(Log.CategoryPacket);
+    private static readonly string _sourceFile = nameof(WorldSocket).PadRight(15);
+    private static readonly string _netDirRecv = Log.FormatDir(LogNetDir.C2P);
+
+    [HandlesCmsg(Opcode.CMSG_ENUM_CHARACTERS)]
+    public static void HandleEnumCharacters(in EmptyClientPacket charEnum, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_ENUM_CHARACTERS);
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_REORDER_CHARACTERS)]
-    void HandleReorderCharacters(ReorderCharacters reorder)
+    [HandlesCmsg(Opcode.CMSG_REORDER_CHARACTERS)]
+    public static void HandleReorderCharacters(in ReorderCharacters reorder, in SessionContext ctx)
     {
-        var realm = GetSession().Realm;
+        var realm = ctx.GetSession().Realm;
         if (realm == null || reorder.Entries.Length == 0)
             return;
 
@@ -34,25 +60,25 @@ public partial class WorldSocket
         foreach (var entry in reorder.Entries)
             incoming.Add(new CharacterListSlot(entry.PlayerGuid.Low, entry.NewPosition));
         var merged = CharacterListOrder.Merge(
-            GetSession().AccountMetaDataMgr.LoadCharacterListOrder(realm.Name),
+            ctx.GetSession().AccountMetaDataMgr.LoadCharacterListOrder(realm.Name),
             incoming);
-        GetSession().AccountMetaDataMgr.SaveCharacterListOrder(realm.Name, merged);
+        ctx.GetSession().AccountMetaDataMgr.SaveCharacterListOrder(realm.Name, merged);
         Log.Print(LogType.Debug, $"[CharEnum] saved list order count={merged.Count} incoming={incoming.Count} pos=[{string.Join(",", merged.ConvertAll(s => s.ListPosition.ToString()))}]");
     }
 
-    [PacketHandler(Opcode.CMSG_GET_ACCOUNT_CHARACTER_LIST)]
-    void HandleGetAccountCharacterList(GetAccountCharacterListRequest request)
+    [HandlesCmsg(Opcode.CMSG_GET_ACCOUNT_CHARACTER_LIST)]
+    public static void HandleGetAccountCharacterList(in GetAccountCharacterListRequest request, in SessionContext ctx)
     {
         GetAccountCharacterListResult response = new();
         response.Token = request.Token;
 
-        foreach (var ownCharacter in GetSession().GameState.OwnCharacters)
+        foreach (var ownCharacter in ctx.GetSession().GameState.OwnCharacters)
         {
             response.CharacterList.Add(new AccountCharacterListEntry
             {
-                AccountId = WowGuid128.Create(HighGuidType703.WowAccount, GetSession().GameAccountInfo.Id),
+                AccountId = WowGuid128.Create(HighGuidType703.WowAccount, ctx.GetSession().GameAccountInfo.Id),
                 CharacterGuid = ownCharacter.CharacterGuid,
-                RealmVirtualAddress = GetSession().RealmId.GetAddress(),
+                RealmVirtualAddress = ctx.GetSession().RealmId.GetAddress(),
                 RealmName = "", // If empty the realm name will not be displayed
                 LastLoginUnixSec = ownCharacter.LastLoginUnixSec,
 
@@ -64,27 +90,27 @@ public partial class WorldSocket
             });
         }
 
-        SendPacket(response);
+        ctx.SendPacket(response);
     }
 
-    [PacketHandler(Opcode.CMSG_GENERATE_RANDOM_CHARACTER_NAME)]
-    void HandleGenerateRandomCharacterNameRequest(GenerateRandomCharacterNameRequest randomCharacterName)
+    [HandlesCmsg(Opcode.CMSG_GENERATE_RANDOM_CHARACTER_NAME)]
+    public static void HandleGenerateRandomCharacterNameRequest(in GenerateRandomCharacterNameRequest randomCharacterName, in SessionContext ctx)
     {
         GenerateRandomCharacterNameResult result = new();
 
         // The client can generate the name itself
         result.Success = false;
 
-        SendPacket(result);
+        ctx.SendPacket(result);
     }
 
-    [PacketHandler(Opcode.CMSG_CREATE_CHARACTER)]
-    void HandleCreateCharacter(CreateCharacter charCreate)
+    [HandlesCmsg(Opcode.CMSG_CREATE_CHARACTER)]
+    public static void HandleCreateCharacter(in CreateCharacter charCreate, in SessionContext ctx)
     {
         // Cache the requested name so HandleCreateChar can resolve the new char's
         // GUID via an internal CMSG_CHAR_ENUM and stamp it into SMSG_CREATE_CHAR
         // (V3_4_3 client uses that GUID for auto-select on the next char list).
-        GetSession().GameState.PendingCreateCharName = charCreate.CreateInfo.Name;
+        ctx.GetSession().GameState.PendingCreateCharName = charCreate.CreateInfo.Name;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CREATE_CHARACTER);
         packet.WriteCString(charCreate.CreateInfo.Name);
@@ -99,19 +125,19 @@ public partial class WorldSocket
         packet.WriteUInt8(hairColor);
         packet.WriteUInt8(facialhair);
         packet.WriteUInt8(0); // outfit
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_CHAR_DELETE)]
-    void HandleCharDelete(CharDelete charDelete)
+    [HandlesCmsg(Opcode.CMSG_CHAR_DELETE)]
+    public static void HandleCharDelete(in CharDelete charDelete, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CHAR_DELETE);
         packet.WriteGuid(charDelete.Guid.To64());
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_LOADING_SCREEN_NOTIFY)]
-    void HandleLoadScreen(LoadingScreenNotify loadingScreenNotify)
+    [HandlesCmsg(Opcode.CMSG_LOADING_SCREEN_NOTIFY)]
+    public static void HandleLoadScreen(in LoadingScreenNotify loadingScreenNotify, in SessionContext ctx)
     {
         // Authoritative map comes from SMSG_LOGIN_VERIFY_WORLD / SMSG_NEW_WORLD.
         // The 3.4.3 client also sends this CMSG when the loading screen hides:
@@ -121,64 +147,66 @@ public partial class WorldSocket
         if (loadingScreenNotify.Showing
             && loadingScreenNotify.MapID != 0
             && loadingScreenNotify.MapID != 0xFFFFFFFFu)
-            GetSession().GameState.CurrentMapId = loadingScreenNotify.MapID;
+            ctx.GetSession().GameState.CurrentMapId = loadingScreenNotify.MapID;
     }
 
-    [PacketHandler(Opcode.CMSG_QUERY_PLAYER_NAME)]
-    void HandleNameQueryRequest(QueryPlayerName queryPlayerName)
+    [HandlesCmsg(Opcode.CMSG_QUERY_PLAYER_NAME)]
+    public static void HandleNameQueryRequest(in QueryPlayerName queryPlayerName, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_NAME_QUERY);
         packet.WriteGuid(queryPlayerName.Player.To64());
-        SendPacketToServer(packet, GetSession().GameState.IsInWorld ? Opcode.MSG_NULL_ACTION : Opcode.SMSG_LOGIN_VERIFY_WORLD);
+        ctx.SendPacketToServer(packet, ctx.GetSession().GameState.IsInWorld ? Opcode.MSG_NULL_ACTION : Opcode.SMSG_LOGIN_VERIFY_WORLD);
     }
 
-    [PacketHandler(Opcode.CMSG_QUERY_PLAYER_NAMES)]
-    void HandleNamesQueryRequest(QueryPlayerNames queryPlayerNames)
+    [HandlesCmsg(Opcode.CMSG_QUERY_PLAYER_NAMES)]
+    public static void HandleNamesQueryRequest(in QueryPlayerNames queryPlayerNames, in SessionContext ctx)
     {
         foreach (var guid in queryPlayerNames.Players)
         {
             WorldPacket packet = new WorldPacket(Opcode.CMSG_NAME_QUERY);
             packet.WriteGuid(guid.To64());
-            SendPacketToServer(packet, GetSession().GameState.IsInWorld ? Opcode.MSG_NULL_ACTION : Opcode.SMSG_LOGIN_VERIFY_WORLD);
+            ctx.SendPacketToServer(packet, ctx.GetSession().GameState.IsInWorld ? Opcode.MSG_NULL_ACTION : Opcode.SMSG_LOGIN_VERIFY_WORLD);
         }
     }
 
-    [PacketHandler(Opcode.CMSG_PLAYER_LOGIN)]
-    void HandlePlayerLogin(PlayerLogin playerLogin)
+    [HandlesCmsg(Opcode.CMSG_PLAYER_LOGIN)]
+    public static void HandlePlayerLogin(in PlayerLogin playerLogin, in SessionContext ctx)
     {
-        if (GetSession().WorldClient == null || !GetSession().WorldClient!.IsConnected())
+        if (ctx.GetSession().WorldClient == null || !ctx.GetSession().WorldClient!.IsConnected())
         {
             Log.Print(LogType.Error, "WorldClient is disconnected, cannot enter world.");
-            AbortLogin(LoginFailureReason.NoWorld);
+            ctx.Socket!.AbortLogin(LoginFailureReason.NoWorld);
             return;
         }
 
-        if (!GetSession().GameState.CachedPlayers.TryGetValue(playerLogin.Guid, out var selectedChar))
+        if (!ctx.GetSession().GameState.CachedPlayers.TryGetValue(playerLogin.Guid, out var selectedChar))
         {
             Log.Print(LogType.Error, $"Player tried to log in with unknown char id: {playerLogin.Guid}");
-            AbortLogin(LoginFailureReason.NoCharacter);
+            ctx.Socket!.AbortLogin(LoginFailureReason.NoCharacter);
             return;
         }
 
-        var realm = GetSession().RealmManager.GetRealm(GetSession().RealmId);
+        var realm = ctx.GetSession().RealmManager.GetRealm(ctx.GetSession().RealmId);
         if (realm == null)
         {
-            Log.Print(LogType.Error, $"Player tried to log in to unknown realm id: {GetSession().RealmId}");
-            AbortLogin(LoginFailureReason.NoWorld);
+            Log.Print(LogType.Error, $"Player tried to log in to unknown realm id: {ctx.GetSession().RealmId}");
+            ctx.Socket!.AbortLogin(LoginFailureReason.NoWorld);
             return;
         }
 
-        GetSession().AccountMetaDataMgr.SaveLastSelectedCharacter(realm.Name, selectedChar.Name!, playerLogin.Guid.Low, Time.UnixTime);
-        GetSession().GameState.CollectionFavorites ??= GetSession().AccountMetaDataMgr.LoadCollectionFavorites();
+        ctx.GetSession().AccountMetaDataMgr.SaveLastSelectedCharacter(realm.Name, selectedChar.Name!, playerLogin.Guid.Low, Time.UnixTime);
+        ctx.GetSession().GameState.CollectionFavorites ??= ctx.GetSession().AccountMetaDataMgr.LoadCollectionFavorites();
 
-        if (GetSession().AuthClient != null)
-            GetSession().AuthClient.Disconnect();
+        if (ctx.GetSession().AuthClient != null)
+            ctx.GetSession().AuthClient.Disconnect();
 
-        var ownCharacter = GetSession().GameState.OwnCharacters.FirstOrDefault(x => x.CharacterGuid == playerLogin.Guid);
+        // C# forbids capturing an `in` parameter in a lambda, so the guid is hoisted first.
+        var loginGuid = playerLogin.Guid;
+        var ownCharacter = ctx.GetSession().GameState.OwnCharacters.FirstOrDefault(x => x.CharacterGuid == loginGuid);
         if (ownCharacter == null)
         {
             Log.Print(LogType.Error, $"Player tried to log in with a char missing from the enumerated list: {playerLogin.Guid}");
-            AbortLogin(LoginFailureReason.NoCharacter);
+            ctx.Socket!.AbortLogin(LoginFailureReason.NoCharacter);
             return;
         }
 
@@ -187,72 +215,72 @@ public partial class WorldSocket
         // starts pushing packets (CMSG_SET_ACTION_BAR_TOGGLES first) the moment it is up,
         // so anything set after SendConnectToInstance is a live race. That race crashed
         // the proxy with a NullReferenceException on every enter-world attempt.
-        GetSession().GameState.IsFirstEnterWorld = true;
-        GetSession().GameState.CurrentPlayerGuid = playerLogin.Guid;
-        GetSession().GameState.CurrentPlayerInfo = ownCharacter;
-        GetSession().GameState.CurrentPlayerStorage.LoadCurrentPlayer();
+        ctx.GetSession().GameState.IsFirstEnterWorld = true;
+        ctx.GetSession().GameState.CurrentPlayerGuid = playerLogin.Guid;
+        ctx.GetSession().GameState.CurrentPlayerInfo = ownCharacter;
+        ctx.GetSession().GameState.CurrentPlayerStorage.LoadCurrentPlayer();
 
         // V3_4_3-only: DKs need rune state in ActivePlayerData CREATE. Without it
         // the client starts up believing all 6 runes are on cooldown and refuses to
         // send rune-cost CMSG_CAST_SPELL until a SpellGo proves otherwise. SMSG_RESYNC_RUNES
         // from the legacy server later overwrites this default with authoritative values.
         if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
-            GetSession().GameState.CurrentPlayerInfo!.ClassId == Class.Deathknight)
+            ctx.GetSession().GameState.CurrentPlayerInfo!.ClassId == Class.Deathknight)
         {
-            GetSession().GameState.RuneState = new RuneStateData();
+            ctx.GetSession().GameState.RuneState = new RuneStateData();
         }
 
         Log.Print(LogType.Server,
             $"[Login] entering world as '{ownCharacter.Name}' ({ownCharacter.RaceId} {ownCharacter.ClassId} lvl {ownCharacter.Level}) " +
             $"guid={playerLogin.Guid} realm='{realm.Name}': state published, opening instance connection");
-        SendConnectToInstance(ConnectToSerial.WorldAttempt1);
-        GetSession().GameState.IsConnectedToInstance = true;
+        ctx.Socket!.SendConnectToInstance(ConnectToSerial.WorldAttempt1);
+        ctx.GetSession().GameState.IsConnectedToInstance = true;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PLAYER_LOGIN);
         packet.WriteGuid(playerLogin.Guid.To64());
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_LOGOUT_REQUEST)]
-    void HandleLogoutRequest(LogoutRequest logoutRequest)
+    [HandlesCmsg(Opcode.CMSG_LOGOUT_REQUEST)]
+    public static void HandleLogoutRequest(in LogoutRequest logoutRequest, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_LOGOUT_REQUEST);
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_LOGOUT_CANCEL)]
-    void HandleLogoutCancel(LogoutCancel logoutCancel)
+    [HandlesCmsg(Opcode.CMSG_LOGOUT_CANCEL)]
+    public static void HandleLogoutCancel(in EmptyClientPacket logoutCancel, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_LOGOUT_CANCEL);
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_REQUEST_PLAYED_TIME)]
-    void HandleRequestPlayedTime(RequestPlayedTime played)
+    [HandlesCmsg(Opcode.CMSG_REQUEST_PLAYED_TIME)]
+    public static void HandleRequestPlayedTime(in RequestPlayedTime played, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_REQUEST_PLAYED_TIME);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             packet.WriteBool(played.TriggerScriptEvent);
-        SendPacketToServer(packet);
-        GetSession().GameState.ShowPlayedTime = played.TriggerScriptEvent;
+        ctx.SendPacketToServer(packet);
+        ctx.GetSession().GameState.ShowPlayedTime = played.TriggerScriptEvent;
     }
 
-    [PacketHandler(Opcode.CMSG_SET_TITLE)]
-    void HandleTogglePvP(SetTitle title)
+    [HandlesCmsg(Opcode.CMSG_SET_TITLE)]
+    public static void HandleSetTitle(in SetTitle title, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_TITLE);
         packet.WriteInt32(title.TitleID);
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_ALTER_APPEARANCE)]
-    void HandleAlterAppearance(AlterAppearance appearance)
+    [HandlesCmsg(Opcode.CMSG_ALTER_APPEARANCE)]
+    public static void HandleAlterAppearance(in AlterAppearance appearance, in SessionContext ctx)
     {
         // Barber shops arrived in 3.0.2; older backends have no opcode to forward to.
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             return;
 
-        var gameState = GetSession().GameState;
+        var gameState = ctx.GetSession().GameState;
         if (!gameState.TryGetCachedPlayerAppearance(gameState.CurrentPlayerGuid, out Race race, out _, out Gender sex))
             return;
 
@@ -262,7 +290,7 @@ public partial class WorldSocket
         // would answer a mismatched BarberShopStyle row with silence, so refuse it here instead.
         if (appearance.NewSexId != sex)
         {
-            SendPacket(new BarberShopResult { Result = 1 });
+            ctx.SendPacket(new BarberShopResult { Result = 1 });
             return;
         }
 
@@ -278,7 +306,7 @@ public partial class WorldSocket
         if (hairStyleId == 0 || facialHairId == 0)
         {
             WorldSocketLogMessages.BarberShopStyleUnresolved(_melLog, _sourceFile, _netDirRecv, (byte)race, (byte)sex, hairStyle, facialHair, hairStyleId, facialHairId);
-            SendPacket(new BarberShopResult { Result = 1 });
+            ctx.SendPacket(new BarberShopResult { Result = 1 });
             return;
         }
 
@@ -287,26 +315,26 @@ public partial class WorldSocket
         packet.WriteUInt32(hairColor);
         packet.WriteUInt32(facialHairId);
         packet.WriteUInt32(skinId);
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_TOGGLE_PVP)]
-    void HandleTogglePvP(TogglePvP pvp)
+    [HandlesCmsg(Opcode.CMSG_TOGGLE_PVP)]
+    public static void HandleTogglePvP(in EmptyClientPacket pvp, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_TOGGLE_PVP);
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_SET_PVP)]
-    void HandleTogglePvP(SetPvP pvp)
+    [HandlesCmsg(Opcode.CMSG_SET_PVP)]
+    public static void HandleSetPvP(in SetPvP pvp, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_TOGGLE_PVP);
         packet.WriteBool(pvp.Enable);
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_SET_ACTION_BUTTON)]
-    void HandleSetActionButton(SetActionButton button)
+    [HandlesCmsg(Opcode.CMSG_SET_ACTION_BUTTON)]
+    public static void HandleSetActionButton(in SetActionButton button, in SessionContext ctx)
     {
         // Legacy 3.3.5a CMSG_SET_ACTION_BUTTON wire format (per mangos-wotlk
         // Player.cpp + WPP V3_4_0_45166 ActionBarHandler.cs:12-19):
@@ -349,7 +377,7 @@ public partial class WorldSocket
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_ACTION_BUTTON);
         packet.WriteUInt8(button.Index);
         packet.WriteUInt32(packed);
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
 
         Log.Print(LogType.Debug,
             $"[V343Trace][SaveButton] modern→legacy idx={button.Index} ({DescribeActionButtonSlot(button.Index)}) " +
@@ -358,8 +386,76 @@ public partial class WorldSocket
             $"packedLE=0x{packed:X8}");
     }
 
-    // 3.3.5a action-button slot mapping (idx → "which bar"). Helps spot
-    // off-by-bar issues and matches the labels the user sees in Options.
+    [HandlesCmsg(Opcode.CMSG_SET_ACTION_BAR_TOGGLES)]
+    public static void HandleSetActionBarToggles(in SetActionBarToggles bars, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_ACTION_BAR_TOGGLES);
+        packet.WriteUInt8(bars.Mask);
+        ctx.SendPacketToServer(packet);
+    }
+
+    [HandlesCmsg(Opcode.CMSG_UNLEARN_SKILL)]
+    public static void HandleUnlearnSkill(in UnlearnSkill skill, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_UNLEARN_SKILL);
+        packet.WriteUInt32(skill.SkillLine);
+        ctx.SendPacketToServer(packet);
+    }
+
+    [HandlesCmsg(Opcode.CMSG_PLAYER_SHOWING_CLOAK)]
+    [HandlesCmsg(Opcode.CMSG_PLAYER_SHOWING_HELM)]
+    public static void HandleShowHelmOrCloak(Opcode opcode, in PlayerShowingHelmOrCloak show, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(opcode);
+        packet.WriteBool(show.Showing);
+        ctx.SendPacketToServer(packet);
+    }
+
+    [HandlesCmsg(Opcode.CMSG_INSPECT)]
+    public static void HandleInspect(in Inspect inspect, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_INSPECT);
+        packet.WriteGuid(inspect.Target.To64());
+        ctx.SendPacketToServer(packet);
+    }
+
+    [HandlesCmsg(Opcode.CMSG_INSPECT_HONOR_STATS)]
+    public static void HandleInspectHonorStats(in Inspect inspect, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.MSG_INSPECT_HONOR_STATS);
+        packet.WriteGuid(inspect.Target.To64());
+        ctx.SendPacketToServer(packet);
+    }
+
+    [HandlesCmsg(Opcode.CMSG_INSPECT_PVP)]
+    public static void HandleInspectArenaTeams(in Inspect inspect, in SessionContext ctx)
+    {
+        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
+        {
+            WorldPacket packet = new WorldPacket(Opcode.MSG_INSPECT_ARENA_TEAMS);
+            packet.WriteGuid(inspect.Target.To64());
+            ctx.SendPacketToServer(packet);
+        }
+        else
+        {
+            InspectPvP pvp = new InspectPvP();
+            pvp.PlayerGUID = inspect.Target;
+            pvp.ArenaTeams.Add(new ArenaTeamInspectData());
+            pvp.ArenaTeams.Add(new ArenaTeamInspectData());
+            pvp.ArenaTeams.Add(new ArenaTeamInspectData());
+            ctx.SendPacket(pvp);
+        }
+    }
+
+    [HandlesCmsg(Opcode.CMSG_CHARACTER_RENAME_REQUEST)]
+    public static void HandleCharacterRenameRequest(in CharacterRenameRequest rename, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_CHARACTER_RENAME_REQUEST);
+        packet.WriteGuid(rename.Guid.To64());
+        packet.WriteCString(rename.NewName);
+        ctx.SendPacketToServer(packet);
+    }
+
     private static string DescribeActionButtonSlot(byte idx) => idx switch
     {
         < 12  => $"MainBar btn{idx + 1}",
@@ -386,74 +482,4 @@ public partial class WorldSocket
         0x90 => "COMPANION",
         _    => $"unknown 0x{t:X2}"
     };
-
-    [PacketHandler(Opcode.CMSG_SET_ACTION_BAR_TOGGLES)]
-    void HandleSetActionBarToggles(SetActionBarToggles bars)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_ACTION_BAR_TOGGLES);
-        packet.WriteUInt8(bars.Mask);
-        SendPacketToServer(packet);
-    }
-
-    [PacketHandler(Opcode.CMSG_UNLEARN_SKILL)]
-    void HandleUnlearnSkill(UnlearnSkill skill)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_UNLEARN_SKILL);
-        packet.WriteUInt32(skill.SkillLine);
-        SendPacketToServer(packet);
-    }
-
-    [PacketHandler(Opcode.CMSG_PLAYER_SHOWING_CLOAK)]
-    [PacketHandler(Opcode.CMSG_PLAYER_SHOWING_HELM)]
-    void HandleShowHelmOrCloak(PlayerShowingHelmOrCloak show)
-    {
-        WorldPacket packet = new WorldPacket(show.GetUniversalOpcode());
-        packet.WriteBool(show.Showing);
-        SendPacketToServer(packet);
-    }
-
-    [PacketHandler(Opcode.CMSG_INSPECT)]
-    void HandleInspect(Inspect inspect)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_INSPECT);
-        packet.WriteGuid(inspect.Target.To64());
-        SendPacketToServer(packet);
-    }
-
-    [PacketHandler(Opcode.CMSG_INSPECT_HONOR_STATS)]
-    void HandleInspectHonorStats(Inspect inspect)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.MSG_INSPECT_HONOR_STATS);
-        packet.WriteGuid(inspect.Target.To64());
-        SendPacketToServer(packet);
-    }
-
-    [PacketHandler(Opcode.CMSG_INSPECT_PVP)]
-    void HandleInspectArenaTeams(Inspect inspect)
-    {
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-        {
-            WorldPacket packet = new WorldPacket(Opcode.MSG_INSPECT_ARENA_TEAMS);
-            packet.WriteGuid(inspect.Target.To64());
-            SendPacketToServer(packet);
-        }
-        else
-        {
-            InspectPvP pvp = new InspectPvP();
-            pvp.PlayerGUID = inspect.Target;
-            pvp.ArenaTeams.Add(new ArenaTeamInspectData());
-            pvp.ArenaTeams.Add(new ArenaTeamInspectData());
-            pvp.ArenaTeams.Add(new ArenaTeamInspectData());
-            SendPacket(pvp);
-        }
-    }
-
-    [PacketHandler(Opcode.CMSG_CHARACTER_RENAME_REQUEST)]
-    void HandleCharacterRenameRequest(CharacterRenameRequest rename)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_CHARACTER_RENAME_REQUEST);
-        packet.WriteGuid(rename.Guid.To64());
-        packet.WriteCString(rename.NewName);
-        SendPacketToServer(packet);
-    }
 }

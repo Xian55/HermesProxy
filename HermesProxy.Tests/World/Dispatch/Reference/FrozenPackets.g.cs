@@ -1974,4 +1974,287 @@ internal static class FrozenPackets
         public WowGuid128 ChangedUnit;
         public byte Role;
     }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class ReorderCharacters
+    {
+        public void Read(WorldPacket p)
+        {
+            uint count = p.ReadBits<uint>(9);
+            Entries = new ReorderInfo[count];
+            for (uint i = 0; i < count; i++)
+            {
+                Entries[i].PlayerGuid = p.ReadPackedGuid128();
+                Entries[i].NewPosition = p.ReadUInt8();
+            }
+        }
+
+        public ReorderInfo[] Entries = System.Array.Empty<ReorderInfo>();
+
+        public struct ReorderInfo
+        {
+            public WowGuid128 PlayerGuid;
+            public byte NewPosition;
+        }
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class GetAccountCharacterListRequest
+    {
+        public void Read(WorldPacket p)
+        {
+            Token = p.ReadUInt32();
+        }
+
+        public uint Token = 0;
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class GenerateRandomCharacterNameRequest
+    {
+        public void Read(WorldPacket p)
+        {
+            Race = (Race)p.ReadUInt8();
+            Sex = (Gender)p.ReadUInt8();
+        }
+
+        public Race Race;
+        public Gender Sex;
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class CreateCharacter
+    {
+        public void Read(WorldPacket p)
+        {
+            CreateInfo = new CharacterCreateInfo();
+            uint nameLength = p.ReadBits<uint>(6);
+            bool hasTemplateSet = p.HasBit();
+            CreateInfo.IsTrialBoost = p.HasBit();
+            CreateInfo.UseNPE = p.HasBit();
+
+            CreateInfo.RaceId = (Race)p.ReadUInt8();
+            CreateInfo.ClassId = (Class)p.ReadUInt8();
+            CreateInfo.Sex = (Gender)p.ReadUInt8();
+            var customizationCount = p.ReadUInt32();
+
+            CreateInfo.Name = p.ReadString(nameLength);
+            if (hasTemplateSet)
+                CreateInfo.TemplateSet = p.ReadUInt32();
+
+            for (var i = 0; i < customizationCount; ++i)
+            {
+                CreateInfo.Customizations.Add(new ChrCustomizationChoice(p.ReadUInt32(), p.ReadUInt32()));
+            }
+
+            CreateInfo.Customizations.Sort();
+        }
+
+        public CharacterCreateInfo CreateInfo = null!;
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class CharDelete
+    {
+        public void Read(WorldPacket p)
+        {
+            Guid = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Guid; // Guid of the character to delete
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class LoadingScreenNotify
+    {
+        public void Read(WorldPacket p)
+        {
+            MapID = p.ReadUInt32();
+            Showing = p.HasBit();
+        }
+
+        public uint MapID;
+        public bool Showing;
+    }
+
+    /// Frozen verbatim from <c>QueryPackets.cs</c>.
+    internal sealed class QueryPlayerName
+    {
+        public void Read(WorldPacket p)
+        {
+            Player = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Player;
+    }
+
+    /// Frozen verbatim from <c>QueryPackets.cs</c>.
+    internal sealed class QueryPlayerNames
+    {
+        public void Read(WorldPacket p)
+        {
+            uint count = p.ReadUInt32();
+            for (uint i = 0; i < count; i++)
+                Players.Add(p.ReadPackedGuid128());
+        }
+
+        public List<WowGuid128> Players = new List<WowGuid128>();
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class PlayerLogin
+    {
+        public void Read(WorldPacket p)
+        {
+            Guid = p.ReadPackedGuid128();
+            FarClip = p.ReadFloat();
+            // 3.4.3 client doesn't send the trailing bit — packet is exactly Guid+FarClip.
+            // Per WPP V3_4_0_45166 SessionHandler.cs:143, gated on V3_4_3_51505+.
+            if (ModernVersion.ExpansionVersion < 3)
+                UnkBit = p.HasBit();
+        }
+
+        public WowGuid128 Guid;      // Guid of the player that is logging in
+        public float FarClip;        // Visibility distance (for terrain)
+        public bool UnkBit;
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class LogoutRequest
+    {
+        public void Read(WorldPacket p)
+        {
+            IdleLogout = p.HasBit();
+        }
+
+        public bool IdleLogout;
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class RequestPlayedTime
+    {
+        public void Read(WorldPacket p)
+        {
+            TriggerScriptEvent = p.HasBit();
+        }
+
+        public bool TriggerScriptEvent;
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class SetTitle
+    {
+        public int TitleID;
+
+        public void Read(WorldPacket p)
+        {
+            TitleID = p.ReadInt32();
+        }
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class AlterAppearance
+    {
+        public void Read(WorldPacket p)
+        {
+            var customizationCount = p.ReadUInt32();
+            NewSexId = (Gender)p.ReadUInt8();
+            CustomizedRace = (Race)p.ReadUInt32();
+            CustomizedChrModelId = p.ReadUInt32();
+
+            for (var i = 0; i < customizationCount; ++i)
+                Customizations.Add(new ChrCustomizationChoice(p.ReadUInt32(), p.ReadUInt32()));
+
+            Customizations.Sort();
+        }
+
+        public Gender NewSexId;
+        public Race CustomizedRace;
+        public uint CustomizedChrModelId;
+        public List<ChrCustomizationChoice> Customizations = new(8);
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class SetPvP
+    {
+        public void Read(WorldPacket p)
+        {
+            Enable = p.HasBit();
+        }
+
+        public bool Enable;
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class SetActionButton
+    {
+        public void Read(WorldPacket p)
+        {
+            Action = p.ReadUInt16();
+            Type = p.ReadUInt16();
+            Index = p.ReadUInt8();
+        }
+
+        public ushort Action;
+        public ushort Type;
+        public byte Index;
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class SetActionBarToggles
+    {
+        public void Read(WorldPacket p)
+        {
+            Mask = p.ReadUInt8();
+        }
+
+        public byte Mask;
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class UnlearnSkill
+    {
+        public void Read(WorldPacket p)
+        {
+            SkillLine = p.ReadUInt32();
+        }
+
+        public uint SkillLine;
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class PlayerShowingHelmOrCloak
+    {
+        public void Read(WorldPacket p)
+        {
+            p.ResetBitPos();
+            Showing = p.HasBit();
+        }
+
+        public bool Showing;
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class Inspect
+    {
+        public void Read(WorldPacket p)
+        {
+            Target = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Target;
+    }
+
+    /// Frozen verbatim from <c>CharacterPackets.cs</c>.
+    internal sealed class CharacterRenameRequest
+    {
+        public void Read(WorldPacket p)
+        {
+            Guid = p.ReadPackedGuid128();
+            NewName = p.ReadString(p.ReadBits<uint>(6));
+        }
+
+        public string NewName = string.Empty;
+        public WowGuid128 Guid;
+    }
 }

@@ -31,36 +31,9 @@ using HermesProxy.World.Logging;
 
 namespace HermesProxy.World.Server.Packets;
 
-public sealed class EnumCharacters : ClientPacket
-{
-    public EnumCharacters(WorldPacket packet) : base(packet) { }
+public readonly record struct ReorderCharacters(ReorderInfo[] Entries);
 
-    public override void Read() { }
-}
-
-public sealed class ReorderCharacters : ClientPacket
-{
-    public ReorderCharacters(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        uint count = _worldPacket.ReadBits<uint>(9);
-        Entries = new ReorderInfo[count];
-        for (uint i = 0; i < count; i++)
-        {
-            Entries[i].PlayerGuid = _worldPacket.ReadPackedGuid128();
-            Entries[i].NewPosition = _worldPacket.ReadUInt8();
-        }
-    }
-
-    public ReorderInfo[] Entries = System.Array.Empty<ReorderInfo>();
-
-    public struct ReorderInfo
-    {
-        public WowGuid128 PlayerGuid;
-        public byte NewPosition;
-    }
-}
+public readonly record struct ReorderInfo(WowGuid128 PlayerGuid, byte NewPosition);
 
 public sealed class EnumCharactersResult : ServerPacket
 {
@@ -560,17 +533,7 @@ public class AccountCharacterListEntry
     public uint Unk;
 }
 
-public class GetAccountCharacterListRequest : ClientPacket
-{
-    public GetAccountCharacterListRequest(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Token = _worldPacket.ReadUInt32();
-    }
-
-    public uint Token = 0;
-}
+public readonly record struct GetAccountCharacterListRequest(uint Token);
 
 public class GetAccountCharacterListResult : ServerPacket
 {
@@ -594,19 +557,7 @@ public class GetAccountCharacterListResult : ServerPacket
     public List<AccountCharacterListEntry> CharacterList = new();
 }
 
-public class GenerateRandomCharacterNameRequest : ClientPacket
-{
-    public GenerateRandomCharacterNameRequest(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Race = (Race)_worldPacket.ReadUInt8();
-        Sex = (Gender)_worldPacket.ReadUInt8();
-    }
-
-    public Race Race;
-    public Gender Sex;
-}
+public readonly record struct GenerateRandomCharacterNameRequest(Race Race, Gender Sex);
 
 public class GenerateRandomCharacterNameResult : ServerPacket, ISpanWritable
 {
@@ -666,37 +617,11 @@ public class ChrCustomizationChoice : IComparable<ChrCustomizationChoice>
     }
 }
 
-public class CreateCharacter : ClientPacket
-{
-    public CreateCharacter(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        CreateInfo = new CharacterCreateInfo();
-        uint nameLength = _worldPacket.ReadBits<uint>(6);
-        bool hasTemplateSet = _worldPacket.HasBit();
-        CreateInfo.IsTrialBoost = _worldPacket.HasBit();
-        CreateInfo.UseNPE = _worldPacket.HasBit();
-
-        CreateInfo.RaceId = (Race)_worldPacket.ReadUInt8();
-        CreateInfo.ClassId = (Class)_worldPacket.ReadUInt8();
-        CreateInfo.Sex = (Gender)_worldPacket.ReadUInt8();
-        var customizationCount = _worldPacket.ReadUInt32();
-
-        CreateInfo.Name = _worldPacket.ReadString(nameLength);
-        if (hasTemplateSet)
-            CreateInfo.TemplateSet = _worldPacket.ReadUInt32();
-
-        for (var i = 0; i < customizationCount; ++i)
-        {
-            CreateInfo.Customizations.Add(new ChrCustomizationChoice(_worldPacket.ReadUInt32(), _worldPacket.ReadUInt32()));
-        }
-
-        CreateInfo.Customizations.Sort();
-    }
-
-    public CharacterCreateInfo CreateInfo = null!;
-}
+/// <param name="CreateInfo">
+/// Stays a class: it nests a customization list and is shared with the character-creation
+/// path. One allocation per character created is not worth chasing.
+/// </param>
+public readonly record struct CreateCharacter(CharacterCreateInfo CreateInfo);
 
 public class CharacterCreateInfo
 {
@@ -738,17 +663,8 @@ public class CreateChar : ServerPacket, ISpanWritable
     public WowGuid128 Guid;
 }
 
-public class CharDelete : ClientPacket
-{
-    public CharDelete(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Guid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Guid; // Guid of the character to delete
-}
+/// <param name="Guid">Guid of the character to delete.</param>
+public readonly record struct CharDelete(WowGuid128 Guid);
 
 public class DeleteChar : ServerPacket, ISpanWritable
 {
@@ -771,28 +687,11 @@ public class DeleteChar : ServerPacket, ISpanWritable
     public byte Code;
 }
 
-public class AlterAppearance : ClientPacket
-{
-    public AlterAppearance(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        var customizationCount = _worldPacket.ReadUInt32();
-        NewSexId = (Gender)_worldPacket.ReadUInt8();
-        CustomizedRace = (Race)_worldPacket.ReadUInt32();
-        CustomizedChrModelId = _worldPacket.ReadUInt32();
-
-        for (var i = 0; i < customizationCount; ++i)
-            Customizations.Add(new ChrCustomizationChoice(_worldPacket.ReadUInt32(), _worldPacket.ReadUInt32()));
-
-        Customizations.Sort();
-    }
-
-    public Gender NewSexId;
-    public Race CustomizedRace;
-    public uint CustomizedChrModelId;
-    public List<ChrCustomizationChoice> Customizations = new(8);
-}
+public readonly record struct AlterAppearance(
+    Gender NewSexId,
+    Race CustomizedRace,
+    uint CustomizedChrModelId,
+    List<ChrCustomizationChoice> Customizations);
 
 public class EnableBarberShop : ServerPacket, ISpanWritable
 {
@@ -838,38 +737,11 @@ public class BarberShopResult : ServerPacket, ISpanWritable
     public int Result;
 }
 
-public class LoadingScreenNotify : ClientPacket
-{
-    public LoadingScreenNotify(WorldPacket packet) : base(packet) { }
+public readonly record struct LoadingScreenNotify(uint MapID, bool Showing);
 
-    public override void Read()
-    {
-        MapID = _worldPacket.ReadUInt32();
-        Showing = _worldPacket.HasBit();
-    }
-
-    public uint MapID;
-    public bool Showing;
-}
-
-public class PlayerLogin : ClientPacket
-{
-    public PlayerLogin(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Guid = _worldPacket.ReadPackedGuid128();
-        FarClip = _worldPacket.ReadFloat();
-        // 3.4.3 client doesn't send the trailing bit — packet is exactly Guid+FarClip.
-        // Per WPP V3_4_0_45166 SessionHandler.cs:143, gated on V3_4_3_51505+.
-        if (ModernVersion.ExpansionVersion < 3)
-            UnkBit = _worldPacket.HasBit();
-    }
-
-    public WowGuid128 Guid;      // Guid of the player that is logging in
-    public float FarClip;        // Visibility distance (for terrain)
-    public bool UnkBit;
-}
+/// <param name="Guid">Guid of the player that is logging in.</param>
+/// <param name="FarClip">Visibility distance (for terrain).</param>
+public readonly record struct PlayerLogin(WowGuid128 Guid, float FarClip, bool UnkBit);
 
 public class LoginVerifyWorld : ServerPacket, ISpanWritable
 {
@@ -925,17 +797,7 @@ public class CharacterLoginFailed : ServerPacket, ISpanWritable
     public LoginFailureReason Code;
 }
 
-public class LogoutRequest : ClientPacket
-{
-    public LogoutRequest(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        IdleLogout = _worldPacket.HasBit();
-    }
-
-    public bool IdleLogout;
-}
+public readonly record struct LogoutRequest(bool IdleLogout);
 
 public class LogoutResponse : ServerPacket, ISpanWritable
 {
@@ -972,13 +834,6 @@ public class LogoutComplete : ServerPacket, ISpanWritable
     public int MaxSize => 0;
 
     public int WriteToSpan(Span<byte> buffer) => 0;
-}
-
-public class LogoutCancel : ClientPacket
-{
-    public LogoutCancel(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
 }
 
 public class LogoutCancelAck : ServerPacket, ISpanWritable
@@ -1028,17 +883,7 @@ class LogXPGain : ServerPacket, ISpanWritable
     public byte RAFBonus; // 1 - 300% of normal XP; 2 - 150% of normal XP
 }
 
-public class RequestPlayedTime : ClientPacket
-{
-    public RequestPlayedTime(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        TriggerScriptEvent = _worldPacket.HasBit();
-    }
-
-    public bool TriggerScriptEvent;
-}
+public readonly record struct RequestPlayedTime(bool TriggerScriptEvent);
 
 public class PlayedTime : ServerPacket, ISpanWritable
 {
@@ -1069,52 +914,13 @@ public class PlayedTime : ServerPacket, ISpanWritable
     public bool TriggerEvent;
 }
 
-public class SetTitle : ClientPacket
-{
-    public int TitleID;
+public readonly record struct SetTitle(int TitleID);
 
-    public SetTitle(WorldPacket packet) : base(packet) { }
+public readonly record struct SetPvP(bool Enable);
 
-    public override void Read()
-    {
-        TitleID = _worldPacket.ReadInt32();
-    }
-}
-
-class TogglePvP : ClientPacket
-{
-    public TogglePvP(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
-
-class SetPvP : ClientPacket
-{
-    public SetPvP(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Enable = _worldPacket.HasBit();
-    }
-
-    public bool Enable;
-}
-
-public class SetActionButton : ClientPacket
-{
-    public SetActionButton(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Action = _worldPacket.ReadUInt16();
-        Type = _worldPacket.ReadUInt16();
-        Index = _worldPacket.ReadUInt8();
-    }
-
-    public ushort Action;
-    public ushort Type;
-    public byte Index;
-}
+/// <param name="Action">Low 16 bits as the client sent them; what they mean depends on the build.</param>
+/// <param name="Type">High 16 bits, likewise. See the handler for the V3_4_3 recombination.</param>
+public readonly record struct SetActionButton(ushort Action, ushort Type, byte Index);
 
 public class UpdateActionButtons : ServerPacket
 {
@@ -1175,17 +981,7 @@ public class UpdateActionButtons : ServerPacket
     }
 }
 
-public class SetActionBarToggles : ClientPacket
-{
-    public SetActionBarToggles(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Mask = _worldPacket.ReadUInt8();
-    }
-
-    public byte Mask;
-}
+public readonly record struct SetActionBarToggles(byte Mask);
 
 public class LevelUpInfo : ServerPacket, ISpanWritable
 {
@@ -1246,42 +1042,11 @@ public class LevelUpInfo : ServerPacket, ISpanWritable
     public int NumNewPvpTalentSlots;
 }
 
-class UnlearnSkill : ClientPacket
-{
-    public UnlearnSkill(WorldPacket packet) : base(packet) { }
+public readonly record struct UnlearnSkill(uint SkillLine);
 
-    public override void Read()
-    {
-        SkillLine = _worldPacket.ReadUInt32();
-    }
+public readonly record struct PlayerShowingHelmOrCloak(bool Showing);
 
-    public uint SkillLine;
-}
-
-class PlayerShowingHelmOrCloak : ClientPacket
-{
-    public PlayerShowingHelmOrCloak(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        _worldPacket.ResetBitPos();
-        Showing = _worldPacket.HasBit();
-    }
-
-    public bool Showing;
-}
-
-public class Inspect : ClientPacket
-{
-    public Inspect(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Target = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Target;
-}
+public readonly record struct Inspect(WowGuid128 Target);
 
 public class InspectResult : ServerPacket
 {
@@ -1786,19 +1551,7 @@ public class ArenaTeamInspectData
     public int PersonalRating;
 }
 
-public class CharacterRenameRequest : ClientPacket
-{
-    public CharacterRenameRequest(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Guid = _worldPacket.ReadPackedGuid128();
-        NewName = _worldPacket.ReadString(_worldPacket.ReadBits<uint>(6));
-    }
-
-    public string NewName = string.Empty;
-    public WowGuid128 Guid;
-}
+public readonly record struct CharacterRenameRequest(WowGuid128 Guid, string NewName);
 
 public class CharacterRenameResult : ServerPacket, ISpanWritable
 {

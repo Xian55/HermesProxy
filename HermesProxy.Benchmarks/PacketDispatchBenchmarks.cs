@@ -46,6 +46,20 @@ public class PacketDispatchBenchmarks
         public uint Slot;
     }
 
+    private sealed class FrozenSetActionButton : ClientPacket
+    {
+        public FrozenSetActionButton(WorldPacket packet) : base(packet) { }
+        public override void Read()
+        {
+            Action = _worldPacket.ReadUInt16();
+            Type = _worldPacket.ReadUInt16();
+            Index = _worldPacket.ReadUInt8();
+        }
+        public ushort Action;
+        public ushort Type;
+        public byte Index;
+    }
+
     private sealed class FrozenChatMessageWhisper : ClientPacket
     {
         public FrozenChatMessageWhisper(WorldPacket packet) : base(packet) { }
@@ -105,7 +119,7 @@ public class PacketDispatchBenchmarks
         });
 
         _buyBackItemHandler = Wrap<FrozenBuyBackItem>(static (_, p) => s_sink = p.Slot);
-        _setActionButtonHandler = Wrap<SetActionButton>(static (_, p) => s_sink = p.Action);
+        _setActionButtonHandler = Wrap<FrozenSetActionButton>(static (_, p) => s_sink = p.Action);
         _attackSwingHandler = Wrap<FrozenAttackSwing>(static (_, p) => s_sink = (uint)p.Victim.Low);
         _whisperHandler = Wrap<FrozenChatMessageWhisper>(static (_, p) => s_sink = (uint)(p.Text.Length + p.Target.Length));
 
@@ -174,25 +188,25 @@ public class PacketDispatchBenchmarks
     // ---- SetActionButton: three small integers ----
 
     [Benchmark]
-    public uint SetActionButton_Activator() => InvokeViaActivator(typeof(SetActionButton), _setActionButton, _setActionButtonHandler);
+    public uint SetActionButton_Activator() => InvokeViaActivator(typeof(FrozenSetActionButton), _setActionButton, _setActionButtonHandler);
 
     [Benchmark]
     public uint SetActionButton_Direct()
     {
-        using var packet = new SetActionButton(new WorldPacket(_setActionButton));
+        using var packet = new FrozenSetActionButton(new WorldPacket(_setActionButton));
         packet.Read();
         _setActionButtonHandler(HandlerTarget, packet);
         return s_sink;
     }
 
+    /// The production path for this packet since the character slice: the real codec, not a
+    /// hand-written approximation of one.
     [Benchmark]
-    public uint SetActionButton_Span()
+    public uint SetActionButton_Codec()
     {
         var r = new SpanPacketReader(_setActionButton.AsSpan(2));
-        ushort action = r.ReadUInt16();
-        ushort type = r.ReadUInt16();
-        byte index = r.ReadUInt8();
-        s_sink = (uint)(action + type + index);
+        SetActionButtonCodec.Read(ref r, out var packet);
+        s_sink = (uint)(packet.Action + packet.Type + packet.Index);
         return s_sink;
     }
 
