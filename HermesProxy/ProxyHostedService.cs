@@ -10,6 +10,7 @@ using Framework.Logging;
 using Framework.Networking;
 using HermesProxy.Configuration.Options;
 using HermesProxy.World;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Server;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -95,6 +96,14 @@ internal sealed class ProxyHostedService : BackgroundService
         // assigned them yet, RequireBuild() throws and the Host fails to start (intentional).
         VersionBootstrap.ModernBuild = _clientOptions.Value.ClientBuild;
         VersionBootstrap.LegacyBuild = _legacyServerOptions.Value.ResolvedBuild;
+
+        // Build the generated dispatch tables here, immediately after the bootstrap they depend
+        // on. Their static initializers read the version statics, and a type initializer that
+        // throws poisons its type for the life of the process — every later access rethrows a
+        // TypeInitializationException naming the wrong culprit. Forcing them at a known point
+        // keeps that failure at startup rather than on the first packet of a session.
+        GeneratedCmsgDispatch.EnsureInitialized();
+        GeneratedSmsgDispatch.EnsureInitialized();
 
         GameData.LoadEverything();
 

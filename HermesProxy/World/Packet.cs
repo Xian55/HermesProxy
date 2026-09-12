@@ -61,15 +61,7 @@ public abstract class ClientPacket : IDisposable
     }
 
     public void LogPacket(ref SniffFile sniffFile, in PacketLogContext context)
-    {
-        if (!context.PacketsLog)
-            return;
-
-        var sniff = SniffFile.EnsureOpen(ref sniffFile, "modern", (ushort)context.ClientBuild);
-        // GetDataSpan: this packet was received into a pooled rental, and GetData would hand back
-        // the whole bucket-rounded buffer rather than the payload (issue #248).
-        sniff.WritePacket(GetOpcode(), true, _worldPacket.GetDataSpan());
-    }
+        => _worldPacket.LogPacket(ref sniffFile, in context);
 
     protected WorldPacket _worldPacket;
 }
@@ -368,6 +360,23 @@ public class WorldPacket : ByteBuffer
     {
         FlushBits();
         WriteBytes(data.GetData());
+    }
+
+    /// <summary>
+    /// Writes this inbound packet to the modern sniff. Lives here rather than on
+    /// <see cref="ClientPacket"/> because generated dispatch reads straight off the
+    /// <see cref="WorldPacket"/> and never builds a <see cref="ClientPacket"/> — and losing the
+    /// sniff for converted opcodes would be invisible, with the capture still looking plausible.
+    /// </summary>
+    public void LogPacket(ref SniffFile sniffFile, in PacketLogContext context)
+    {
+        if (!context.PacketsLog)
+            return;
+
+        var sniff = SniffFile.EnsureOpen(ref sniffFile, "modern", (ushort)context.ClientBuild);
+        // GetDataSpan: this packet was received into a pooled rental, and GetData would hand back
+        // the whole bucket-rounded buffer rather than the payload (issue #248).
+        sniff.WritePacket(GetOpcode(), true, GetDataSpan());
     }
 
     public uint GetOpcode() { return opcode; }

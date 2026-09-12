@@ -4,6 +4,8 @@
     <IsTestProject>true</IsTestProject>
     <Nullable>enable</Nullable>
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+    <!-- The generated dispatch tables hold function pointers, so asserting on them needs unsafe. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

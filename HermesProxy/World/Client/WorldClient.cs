@@ -10,6 +10,7 @@ using System.Numerics;
 using Framework.Constants;
 using Framework;
 using Framework.IO;
+using HermesProxy.World.Dispatch;
 using Framework.Logging;
 using HermesProxy.World.Enums;
 using System.Reflection;
@@ -59,6 +60,8 @@ public partial class WorldClient
     LegacyWorldCrypt _worldCrypt = null!;
     FrozenDictionary<Opcode, Action<WorldPacket>> _packetHandlers = null!;
     GlobalSessionData _globalSession = null!;
+    // Built alongside _globalSession in ConnectToWorldServer; the ctor runs before a session exists.
+    SessionContext _sessionContext;
     readonly Lock _sendLock = new();
     Timer? _keepAliveTimer;
     uint _keepAlivePingSerial;
@@ -124,6 +127,7 @@ public partial class WorldClient
         _worldCrypt = null!;
         _realm = realm;
         _globalSession = globalSession;
+        _sessionContext = new SessionContext(globalSession, globalSession.RealmSocket, this);
         _username = globalSession.Username;
         _isSuccessful = null;
         LastAuthResult = null;
@@ -582,7 +586,7 @@ public partial class WorldClient
             || op == Opcode.SMSG_CACHE_VERSION;
     }
 
-    private void HandlePacket(WorldPacket packet)
+    private unsafe void HandlePacket(WorldPacket packet)
     {
         Opcode universalOpcode = packet.GetUniversalOpcode(false);
         if (NoisyOpcodes.IsNoisy(universalOpcode))
@@ -644,7 +648,14 @@ public partial class WorldClient
             case Opcode.SMSG_ADDON_INFO:
                 break; // don't need to handle
             default:
-                if (_packetHandlers.TryGetValue(universalOpcode, out var handler))
+                // Converted opcodes own a slot in the generated table; a null slot falls through
+                // to the reflective registry so the two coexist during migration.
+                var generated = GeneratedSmsgDispatch.Get(universalOpcode);
+                if (generated != null)
+                {
+                    HandleGeneratedPacket(generated, packet, universalOpcode);
+                }
+                else if (_packetHandlers.TryGetValue(universalOpcode, out var handler))
                 {
                     // A throwing legacy handler used to escape into the read loop's catch,
                     // which tears down the world connection (and previously the process).
@@ -692,6 +703,40 @@ public partial class WorldClient
         }
 
         SendDelayedPacketsToServerOnOpcode(universalOpcode);
+    }
+
+    /// <summary>
+    /// Runs a generated thunk with the same swallow-and-log the reflective arm has. The packet is
+    /// not disposed here: on this side the caller owns the buffer, and the reflective handlers it
+    /// sits beside do not dispose either.
+    /// </summary>
+    private unsafe void HandleGeneratedPacket(
+        delegate*<ref SpanPacketReader, in SessionContext, void> thunk,
+        WorldPacket packet,
+        Opcode universalOpcode)
+    {
+        System.Diagnostics.Debug.Assert(_sessionContext.IsBound, "generated dispatch reached before the session was bound");
+
+        try
+        {
+            var reader = new SpanPacketReader(packet.GetDataSpan());
+            thunk(ref reader, in _sessionContext);
+        }
+        catch (UnmappedOpcodeException unmapped)
+        {
+            Log.Print(LogType.Warn,
+                $"C P<S | Handling {universalOpcode} ({packet.GetOpcode()}): {unmapped.Message}");
+        }
+        catch (Exception handlerException)
+        {
+            byte[] raw = packet.GetData();
+            int size = (int)packet.GetSize();
+            int hexLen = System.Math.Min(1024, System.Math.Min(size, raw.Length));
+            string body = hexLen > 0 ? System.BitConverter.ToString(raw, 0, hexLen) : "<empty>";
+            Log.Print(LogType.Error,
+                $"C P<S | Unhandled exception in handler for {universalOpcode} ({packet.GetOpcode()}) " +
+                $"[size={size} dumped={hexLen}]{System.Environment.NewLine}bytes={body}{System.Environment.NewLine}{handlerException}");
+        }
     }
 
     private void HandleAuthChallenge(WorldPacket packet)
@@ -863,6 +908,11 @@ public partial class WorldClient
                     continue;
 
                 if (msgAttr.Opcode == Opcode.MSG_NULL_ACTION)
+                    continue;
+
+                // Defence in depth alongside the generator's own duplicate-claim error and the
+                // disjointness test: never register a shadow handler that can never run.
+                if (GeneratedSmsgDispatch.ClaimedOpcodes.Contains(msgAttr.Opcode))
                     continue;
 
                 if (dict.ContainsKey(msgAttr.Opcode))

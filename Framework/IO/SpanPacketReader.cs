@@ -215,16 +215,31 @@ public ref struct SpanPacketReader
         return Encoding.UTF8.GetString(slice);
     }
 
+    /// <summary>
+    /// Reads <paramref name="length"/> bytes as UTF-8, clamped to what remains. The clamp
+    /// matches <c>ByteBuffer.ReadString(uint)</c>, which routes through the clamping
+    /// <c>ReadBytes</c>: slicing unclamped would turn a truncated packet that the ByteBuffer
+    /// path silently shortened into an ArgumentOutOfRangeException, and that behaviour
+    /// change is not one the handler migration can absorb.
+    /// </summary>
     public string ReadString(int length)
     {
-        if (length == 0)
+        if (length <= 0)
             return string.Empty;
 
         ResetBitPos();
-        var slice = _buffer.Slice(_position, length);
-        _position += length;
+        int available = Math.Min(length, Remaining);
+        if (available <= 0)
+            return string.Empty;
+
+        var slice = _buffer.Slice(_position, available);
+        _position += available;
         return Encoding.UTF8.GetString(slice);
     }
+
+    /// <inheritdoc cref="ReadString(int)"/>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public string ReadString(uint length) => ReadString((int)length);
 
     #endregion
 
@@ -315,6 +330,64 @@ public ref struct SpanPacketReader
     {
         return ReadBytes(Remaining);
     }
+
+    #region ByteBuffer parity
+
+    // The handler bodies this reader replaces were written against ByteBuffer. These carry
+    // its exact names and semantics so a converted body compiles and behaves identically;
+    // where one deliberately differs, the member says so.
+
+    /// <summary>Reads one bit. ByteBuffer spells <see cref="ReadBit"/> this way.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool HasBit() => ReadBit();
+
+    /// <summary>True when at least <paramref name="count"/> more bytes can be read.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public readonly bool CanReadCount(int count) => Remaining >= count;
+
+    /// <summary>
+    /// Copies <paramref name="count"/> bytes into a new array. The copy is deliberate: the
+    /// span overload aliases a pooled rental that is reused on the next packet, so anything
+    /// outliving the dispatch call must own its storage.
+    /// </summary>
+    public byte[] ReadBytes(uint count)
+    {
+        var slice = ReadBytes((int)count);
+        return slice.IsEmpty ? [] : slice.ToArray();
+    }
+
+    /// <inheritdoc cref="ReadBytes(uint)"/>
+    public byte[] ReadToEndArray()
+    {
+        var slice = ReadToEnd();
+        return slice.IsEmpty ? [] : slice.ToArray();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public uint ReadPackedTime() => (uint)Time.GetUnixTimeFromPackedTime(ReadUInt32());
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public DateTime ReadTime() => DateTimeOffset.FromUnixTimeSeconds(ReadUInt32()).DateTime;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public DateTime ReadTime64() => DateTimeOffset.FromUnixTimeSeconds((int)ReadUInt64()).DateTime;
+
+    public Vector3 ReadPackedVector3()
+    {
+        int packed = ReadInt32();
+        float x = ((packed & 0x7FF) << 21 >> 21) * 0.25f;
+        float y = ((((packed >> 11) & 0x7FF) << 21) >> 21) * 0.25f;
+        float z = ((packed >> 22 << 22) >> 22) * 0.25f;
+        return new Vector3(x, y, z);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Quaternion ReadPackedQuaternion() => NumericsExtensions.FromPackedLong(ReadInt64());
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Quaternion ReadQuaternion() => new(ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat());
+
+    #endregion
 
     /// <summary>
     /// Resets position to beginning of buffer.

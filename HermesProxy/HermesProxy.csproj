@@ -29,6 +29,11 @@
          fresh TrimmerRootDescriptor entries for the Options DTOs. -->
     <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
 
+    <!-- The generated packet dispatch table is an array of function pointers
+         (delegate*<...>[]), which is only expressible in an unsafe context. Framework already
+         sets this; the dispatch generator is what needs it here. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
     <!-- Write generator output to disk under obj/Generated/ for inspection during prototyping.
          Safe to leave on — the compiler doesn't read these files back, it uses the in-memory copy. -->
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>

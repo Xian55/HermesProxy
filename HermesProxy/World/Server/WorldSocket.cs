@@ -36,6 +36,7 @@ using HermesProxy.Configuration.Options;
 using HermesProxy.Enums;
 using Microsoft.Extensions.Options;
 using Framework.Realm;
+using HermesProxy.World.Dispatch;
 
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
@@ -87,6 +88,9 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     private DeflateStream? _deflater;
     ConcurrentDictionary<Opcode, PacketHandler> _clientPacketTable = new();
     GlobalSessionData _globalSession = null!;
+    // Built alongside _globalSession rather than in the ctor: the session binds later, in
+    // HandleAuthSession. Passed `in` to every generated system, so dispatch copies a pointer.
+    SessionContext _sessionContext;
     readonly Lock _sendLock = new();
 
     private BnetServices.ServiceManager _bnetRpc = null!;
@@ -427,9 +431,20 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         return ReadDataHandlerResult.Ok;
     }
 
-    public void HandlePacket(WorldPacket packet)
+    public unsafe void HandlePacket(WorldPacket packet)
     {
         Opcode universalOpcode = packet.GetUniversalOpcode(isModern: true);
+
+        // Converted opcodes own a slot in the generated table; everything else is still in the
+        // reflective registry. A null slot is the fall-through, which is what lets the two
+        // coexist while handlers migrate one domain at a time.
+        var generated = GeneratedCmsgDispatch.Get(universalOpcode);
+        if (generated != null)
+        {
+            HandleGeneratedPacket(generated, packet, universalOpcode);
+            return;
+        }
+
         var handler = GetHandler(universalOpcode);
         if (handler == null)
         {
@@ -466,6 +481,54 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             // error, which is harder to diagnose than the crash this guard replaced.
             if (universalOpcode == Opcode.CMSG_PLAYER_LOGIN)
                 AbortLogin(LoginFailureReason.NoWorld);
+        }
+    }
+
+    /// <summary>
+    /// Runs a generated thunk with the same bracketing the reflective path has: the sniff write
+    /// that used to sit inside PacketHandler.Invoke (before Read, so the capture is of the bytes
+    /// as received), the --metrics timing, the swallow-and-log, and the pooled-buffer return that
+    /// `using var clientPacket` used to perform.
+    /// </summary>
+    private unsafe void HandleGeneratedPacket(
+        delegate*<ref SpanPacketReader, in SessionContext, void> thunk,
+        WorldPacket packet,
+        Opcode universalOpcode)
+    {
+        Debug.Assert(_sessionContext.IsBound, "generated dispatch reached before the session was bound");
+
+        try
+        {
+            packet.LogPacket(ref GetSession().ModernSniff, GetSession().PacketLogContext);
+
+            // GetDataSpan, not GetData: the payload arrived in a pooled rental whose length is
+            // rounded up to the bucket size, and the extra bytes would change what Remaining
+            // reports and therefore where reads stop (issue #248).
+            var reader = new SpanPacketReader(packet.GetDataSpan());
+
+            if (HermesProxy.Server.MetricsEnabled)
+            {
+                long startTimestamp = Stopwatch.GetTimestamp();
+                long allocBefore = GC.GetAllocatedBytesForCurrentThread();
+                thunk(ref reader, in _sessionContext);
+                long allocated = GC.GetAllocatedBytesForCurrentThread() - allocBefore;
+                HermesProxy.Server.Metrics.RecordClientToServer(universalOpcode, Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds, allocated);
+            }
+            else
+            {
+                thunk(ref reader, in _sessionContext);
+            }
+        }
+        catch (Exception e)
+        {
+            LogHandlerException(universalOpcode, packet, e);
+
+            if (universalOpcode == Opcode.CMSG_PLAYER_LOGIN)
+                AbortLogin(LoginFailureReason.NoWorld);
+        }
+        finally
+        {
+            packet.Dispose();
         }
     }
 
@@ -704,6 +767,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         }
 
         _globalSession = session;
+        _sessionContext = new SessionContext(session, this, session.WorldClient);
         _bnetRpc = new BnetServices.ServiceManager("WorldSocket", this, _globalSession);
         HandleAuthSessionCallback(authSession);
     }
@@ -867,6 +931,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         }
 
         _globalSession = session;
+        _sessionContext = new SessionContext(session, this, session.WorldClient);
         Log.Print(LogType.Server, $"[Login] instance socket authenticated for account '{GetSession().Username}', key=0x{_key:X16}");
 
         uint accountId = key.AccountId;
@@ -1431,6 +1496,12 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
                     continue;
 
                 if (msgAttr.Opcode == Opcode.MSG_NULL_ACTION)
+                    continue;
+
+                // Defence in depth: the generator also errors when an opcode is claimed twice,
+                // and a test asserts the two registries are disjoint. This makes the runtime
+                // agree with both rather than registering a shadow handler that never runs.
+                if (GeneratedCmsgDispatch.ClaimedOpcodes.Contains(msgAttr.Opcode))
                     continue;
 
                 if (_clientPacketTable.ContainsKey(msgAttr.Opcode))
