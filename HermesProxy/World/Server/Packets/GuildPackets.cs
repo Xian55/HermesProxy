@@ -25,6 +25,7 @@ using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace HermesProxy.World.Server.Packets;
 
@@ -59,19 +60,7 @@ public class GuildCommandResult : ServerPacket, ISpanWritable
     public GuildCommandType Command;
 }
 
-public class QueryGuildInfo : ClientPacket
-{
-    public QueryGuildInfo(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        GuildGuid = _worldPacket.ReadPackedGuid128();
-        PlayerGuid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 GuildGuid;
-    public WowGuid128 PlayerGuid;
-}
+public readonly record struct QueryGuildInfo(WowGuid128 GuildGuid, WowGuid128 PlayerGuid);
 
 public class QueryGuildInfoResponse : ServerPacket
 {
@@ -147,13 +136,6 @@ public class QueryGuildInfoResponse : ServerPacket
     }
 }
 
-public class GuildPermissionsQuery : ClientPacket
-{
-    public GuildPermissionsQuery(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
-
 public class GuildPermissionsQueryResults : ServerPacket
 {
     public GuildPermissionsQueryResults() : base(Opcode.SMSG_GUILD_PERMISSIONS_QUERY_RESULTS) { }
@@ -186,20 +168,6 @@ public struct GuildRankTabPermissions
 {
     public int Flags;
     public int WithdrawItemLimit;
-}
-
-public class GuildBankRemainingWithdrawMoneyQuery : ClientPacket
-{
-    public GuildBankRemainingWithdrawMoneyQuery(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
-
-public class GuildGetRoster : ClientPacket
-{
-    public GuildGetRoster(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
 }
 
 public class GuildRoster : ServerPacket
@@ -722,105 +690,20 @@ public class GuildEventTabTextChanged : ServerPacket, ISpanWritable
     public int Tab;
 }
 
-public class GuildUpdateMotdText : ClientPacket
-{
-    public GuildUpdateMotdText(WorldPacket packet) : base(packet) { }
+public readonly record struct GuildUpdateMotdText(string MotdText);
 
-    public override void Read()
-    {
-        uint textLen = _worldPacket.ReadBits<uint>(11);
-        MotdText = _worldPacket.ReadString(textLen);
-    }
+public readonly record struct GuildUpdateInfoText(string InfoText);
 
-    public string MotdText = string.Empty;
-}
+/// <param name="IsPublic">0 == Officer, 1 == Public.</param>
+public readonly record struct GuildSetMemberNote(WowGuid128 NoteeGUID, bool IsPublic, string Note);
 
-public class GuildUpdateInfoText : ClientPacket
-{
-    public GuildUpdateInfoText(WorldPacket packet) : base(packet) { }
+public readonly record struct GuildPromoteMember(WowGuid128 Promotee);
 
-    public override void Read()
-    {
-        uint textLen = _worldPacket.ReadBits<uint>(11);
-        InfoText = _worldPacket.ReadString(textLen);
-    }
+public readonly record struct GuildDemoteMember(WowGuid128 Demotee);
 
-    public string InfoText = string.Empty;
-}
+public readonly record struct GuildOfficerRemoveMember(WowGuid128 Removee);
 
-public class GuildSetMemberNote : ClientPacket
-{
-    public GuildSetMemberNote(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        NoteeGUID = _worldPacket.ReadPackedGuid128();
-
-        uint noteLen = _worldPacket.ReadBits<uint>(8);
-        IsPublic = _worldPacket.HasBit();
-
-        Note = _worldPacket.ReadString(noteLen);
-    }
-
-    public WowGuid128 NoteeGUID;
-    public bool IsPublic;          // 0 == Officer, 1 == Public
-    public string Note = string.Empty;
-}
-
-public class GuildPromoteMember : ClientPacket
-{
-    public GuildPromoteMember(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Promotee = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Promotee;
-}
-
-public class GuildDemoteMember : ClientPacket
-{
-    public GuildDemoteMember(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Demotee = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Demotee;
-}
-
-public class GuildOfficerRemoveMember : ClientPacket
-{
-    public GuildOfficerRemoveMember(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Removee = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Removee;
-}
-
-public class GuildInviteByName : ClientPacket
-{
-    public GuildInviteByName(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        uint nameLen = _worldPacket.ReadBits<uint>(9);
-        bool isArena = _worldPacket.HasBit();
-
-        Name = _worldPacket.ReadString(nameLen);
-
-        if (isArena)
-            ArenaTeamId = _worldPacket.ReadUInt32();
-    }
-
-    public string Name = string.Empty;
-    public uint ArenaTeamId;
-}
+public readonly record struct GuildInviteByName(string Name, uint ArenaTeamId);
 
 public class GuildInvite : ServerPacket, ISpanWritable
 {
@@ -895,20 +778,6 @@ public class GuildInvite : ServerPacket, ISpanWritable
     public string OldGuildName = "";
 }
 
-public class AcceptGuildInvite : ClientPacket
-{
-    public AcceptGuildInvite(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
-
-public class DeclineGuildInvite : ClientPacket
-{
-    public DeclineGuildInvite(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
-
 public class GuildInviteDeclined : ServerPacket, ISpanWritable
 {
     public GuildInviteDeclined() : base(Opcode.SMSG_GUILD_INVITE_DECLINED) { }
@@ -944,95 +813,48 @@ public class GuildInviteDeclined : ServerPacket, ISpanWritable
     public string InviterName = string.Empty;
 }
 
-public class GuildSetRankPermissions : ClientPacket
+/// <summary>
+/// One rank's complete permission state. The 3.4.3 control panel sends one of these per
+/// changed setting when Apply is clicked, each carrying the whole rank.
+/// </summary>
+/// <remarks>
+/// The two per-tab arrays are <see cref="GuildBankTabLimits"/> inline arrays rather than
+/// <c>uint[]</c>, so the packet is a flat 72-byte value with nothing on the heap. That also
+/// matters for correctness here and not only for allocation: this is the one CMSG the proxy
+/// *stores* — <c>LatestPerKeyCoalescer</c> holds the newest per rank for 100 ms — and a value
+/// type is copied into that store, where a reference to a pooled array would not be.
+/// </remarks>
+public readonly record struct GuildSetRankPermissions(
+    uint RankID,
+    uint RankOrder,
+    uint Flags,
+    int WithdrawGoldLimit,
+    GuildBankTabLimits TabFlags,
+    GuildBankTabLimits TabWithdrawItemLimit,
+    uint OldFlags,
+    string RankName);
+
+/// <summary>
+/// Per-tab storage for <see cref="GuildSetRankPermissions"/>, one entry per bank tab.
+/// </summary>
+/// <remarks>
+/// Inline, following <c>PacketTag</c>. The synthesized record equality on the packet that holds
+/// two of these falls back to <c>ValueType.Equals</c>, which reflects and boxes — nothing
+/// compares these packets today, and a hot path that wanted to would need
+/// <see cref="System.MemoryExtensions.SequenceEqual{T}(System.ReadOnlySpan{T}, System.ReadOnlySpan{T})"/>
+/// over the spans instead.
+/// </remarks>
+[InlineArray(GuildConst.MaxBankTabs)]
+public struct GuildBankTabLimits
 {
-    public GuildSetRankPermissions(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        RankID = _worldPacket.ReadUInt32();
-        RankOrder = _worldPacket.ReadUInt32();
-        Flags = _worldPacket.ReadUInt32();
-        WithdrawGoldLimit = _worldPacket.ReadInt32();
-
-        for (byte i = 0; i < GuildConst.MaxBankTabs; i++)
-        {
-            TabFlags[i] = _worldPacket.ReadUInt32();
-            TabWithdrawItemLimit[i] = _worldPacket.ReadUInt32();
-        }
-
-        OldFlags = _worldPacket.ReadUInt32();
-
-        _worldPacket.ResetBitPos();
-        uint rankNameLen = _worldPacket.ReadBits<uint>(7);
-        RankName = _worldPacket.ReadString(rankNameLen);
-    }
-
-    public uint RankID;
-    public uint RankOrder;
-    public int WithdrawGoldLimit;
-    public uint Flags;
-    public uint OldFlags;
-    public uint[] TabFlags = new uint[GuildConst.MaxBankTabs];
-    public uint[] TabWithdrawItemLimit = new uint[GuildConst.MaxBankTabs];
-    public string RankName = string.Empty;
+    private uint _element0;
 }
 
-public class GuildAddRank : ClientPacket
-{
-    public GuildAddRank(WorldPacket packet) : base(packet) { }
+public readonly record struct GuildAddRank(string Name, int RankOrder);
 
-    public override void Read()
-    {
-        uint nameLen = _worldPacket.ReadBits<uint>(7);
-        _worldPacket.ResetBitPos();
+public readonly record struct GuildDeleteRank(int RankOrder);
 
-        RankOrder = _worldPacket.ReadInt32();
-        Name = _worldPacket.ReadString(nameLen);
-    }
-
-    public string Name = string.Empty;
-    public int RankOrder;
-}
-
-public class GuildDeleteRank : ClientPacket
-{
-    public GuildDeleteRank(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        RankOrder = _worldPacket.ReadInt32();
-    }
-
-    public int RankOrder;
-}
-
-public class GuildSetGuildMaster : ClientPacket
-{
-    public GuildSetGuildMaster(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        uint nameLen = _worldPacket.ReadBits<uint>(9);
-        NewMasterName = _worldPacket.ReadString(nameLen);
-    }
-
-    public string NewMasterName = string.Empty;
-}
-
-public class GuildLeave : ClientPacket
-{
-    public GuildLeave(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
-
-public class GuildDelete : ClientPacket
-{
-    public GuildDelete(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
+public readonly record struct GuildSetGuildMaster(string NewMasterName);
 
 public class PlayerTabardVendorActivate : ServerPacket, ISpanWritable
 {
@@ -1074,27 +896,13 @@ public class PlayerTabardVendorActivate : ServerPacket, ISpanWritable
     public WowGuid128 DesignerGUID;
 }
 
-public class SaveGuildEmblem : ClientPacket
-{
-    public SaveGuildEmblem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        DesignerGUID = _worldPacket.ReadPackedGuid128();
-        EmblemStyle = _worldPacket.ReadUInt32();
-        EmblemColor = _worldPacket.ReadUInt32();
-        BorderStyle = _worldPacket.ReadUInt32();
-        BorderColor = _worldPacket.ReadUInt32();
-        BackgroundColor = _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 DesignerGUID;
-    public uint EmblemStyle;
-    public uint EmblemColor;
-    public uint BorderStyle;
-    public uint BorderColor;
-    public uint BackgroundColor;
-}
+public readonly record struct SaveGuildEmblem(
+    WowGuid128 DesignerGUID,
+    uint EmblemStyle,
+    uint EmblemColor,
+    uint BorderStyle,
+    uint BorderColor,
+    uint BackgroundColor);
 
 public class PlayerSaveGuildEmblem : ServerPacket, ISpanWritable
 {
@@ -1117,38 +925,9 @@ public class PlayerSaveGuildEmblem : ServerPacket, ISpanWritable
     public GuildEmblemError Error;
 }
 
-public class SetAutoDeclineGuildInvites : ClientPacket
-{
-    public SetAutoDeclineGuildInvites(WorldPacket packet) : base(packet) { }
+public readonly record struct SetAutoDeclineGuildInvites(bool GuildInvitesShouldGetBlocked);
 
-    public override void Read()
-    {
-        GuildInvitesShouldGetBlocked = _worldPacket.ReadBool();
-    }
-
-    public bool GuildInvitesShouldGetBlocked;
-}
-
-public class AutoDeclineGuildInvite : ClientPacket
-{
-    public AutoDeclineGuildInvite(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
-
-public class GuildBankAtivate : ClientPacket
-{
-    public GuildBankAtivate(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        BankGuid = _worldPacket.ReadPackedGuid128();
-        FullUpdate = _worldPacket.HasBit();
-    }
-
-    public WowGuid128 BankGuid;
-    public bool FullUpdate;
-}
+public readonly record struct GuildBankAtivate(WowGuid128 BankGuid, bool FullUpdate);
 
 public class GuildBankItemInfo
 {
@@ -1227,48 +1006,11 @@ public class GuildBankQueryResults : ServerPacket
     public bool FullUpdate;
 }
 
-public class GuildBankQueryTab : ClientPacket
-{
-    public GuildBankQueryTab(WorldPacket packet) : base(packet) { }
+public readonly record struct GuildBankQueryTab(WowGuid128 BankGuid, byte Tab, bool FullUpdate);
 
-    public override void Read()
-    {
-        BankGuid = _worldPacket.ReadPackedGuid128();
-        Tab = _worldPacket.ReadUInt8();
+public readonly record struct GuildBankDepositMoney(WowGuid128 BankGuid, ulong Money);
 
-        FullUpdate = _worldPacket.HasBit();
-    }
-
-    public WowGuid128 BankGuid;
-    public byte Tab;
-    public bool FullUpdate;
-}
-
-public class GuildBankDepositMoney : ClientPacket
-{
-    public GuildBankDepositMoney(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        BankGuid = _worldPacket.ReadPackedGuid128();
-        Money = _worldPacket.ReadUInt64();
-    }
-
-    public WowGuid128 BankGuid;
-    public ulong Money;
-}
-
-public class GuildBankTextQuery : ClientPacket
-{
-    public GuildBankTextQuery(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Tab = _worldPacket.ReadInt32();
-    }
-
-    public int Tab;
-}
+public readonly record struct GuildBankTextQuery(int Tab);
 
 public class GuildBankTextQueryResult : ServerPacket, ISpanWritable
 {
@@ -1305,40 +1047,9 @@ public class GuildBankTextQueryResult : ServerPacket, ISpanWritable
     public string Text = string.Empty;
 }
 
-public class GuildBankUpdateTab : ClientPacket
-{
-    public GuildBankUpdateTab(WorldPacket packet) : base(packet) { }
+public readonly record struct GuildBankUpdateTab(WowGuid128 BankGuid, byte BankTab, string Name, string Icon);
 
-    public override void Read()
-    {
-        BankGuid = _worldPacket.ReadPackedGuid128();
-        BankTab = _worldPacket.ReadUInt8();
-
-        _worldPacket.ResetBitPos();
-        uint nameLen = _worldPacket.ReadBits<uint>(7);
-        uint iconLen = _worldPacket.ReadBits<uint>(9);
-
-        Name = _worldPacket.ReadString(nameLen);
-        Icon = _worldPacket.ReadString(iconLen);
-    }
-
-    public WowGuid128 BankGuid;
-    public byte BankTab;
-    public string Name = string.Empty;
-    public string Icon = string.Empty;
-}
-
-public class GuildBankLogQuery : ClientPacket
-{
-    public GuildBankLogQuery(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Tab = _worldPacket.ReadInt32();
-    }
-
-    public int Tab;
-}
+public readonly record struct GuildBankLogQuery(int Tab);
 
 public class GuildBankLogEntry
 {
@@ -1399,33 +1110,9 @@ public class GuildBankLogQueryResults : ServerPacket
     public ulong? WeeklyBonusMoney;
 }
 
-public class GuildBankSetTabText : ClientPacket
-{
-    public GuildBankSetTabText(WorldPacket packet) : base(packet) { }
+public readonly record struct GuildBankSetTabText(int Tab, string TabText);
 
-    public override void Read()
-    {
-        Tab = _worldPacket.ReadInt32();
-        TabText = _worldPacket.ReadString(_worldPacket.ReadBits<uint>(14));
-    }
-
-    public int Tab;
-    public string TabText = string.Empty;
-}
-
-public class GuildBankBuyTab : ClientPacket
-{
-    public GuildBankBuyTab(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        BankGuid = _worldPacket.ReadPackedGuid128();
-        BankTab = _worldPacket.ReadUInt8();
-    }
-
-    public WowGuid128 BankGuid;
-    public byte BankTab;
-}
+public readonly record struct GuildBankBuyTab(WowGuid128 BankGuid, byte BankTab);
 
 public class GuildBankRemainingWithdrawMoney : ServerPacket, ISpanWritable
 {
@@ -1448,120 +1135,37 @@ public class GuildBankRemainingWithdrawMoney : ServerPacket, ISpanWritable
     public long RemainingWithdrawMoney;
 }
 
-public class GuildBankWithdrawMoney : ClientPacket
-{
-    public GuildBankWithdrawMoney(WorldPacket packet) : base(packet) { }
+public readonly record struct GuildBankWithdrawMoney(WowGuid128 BankGuid, ulong Money);
 
-    public override void Read()
-    {
-        BankGuid = _worldPacket.ReadPackedGuid128();
-        Money = _worldPacket.ReadUInt64();
-    }
+/// <param name="ContainerSlot">Absent when the item sits in the backpack rather than a bag.</param>
+public readonly record struct AutoGuildBankItem(
+    WowGuid128 BankGuid,
+    byte BankTab,
+    byte BankSlot,
+    byte? ContainerSlot,
+    byte ContainerItemSlot);
 
-    public WowGuid128 BankGuid;
-    public ulong Money;
-}
+public readonly record struct SplitItemToGuildBank(
+    WowGuid128 BankGuid,
+    byte BankTab,
+    byte BankSlot,
+    byte? ContainerSlot,
+    byte ContainerItemSlot,
+    uint StackCount);
 
-class AutoGuildBankItem : ClientPacket
-{
-    public AutoGuildBankItem(WorldPacket packet) : base(packet) { }
+public readonly record struct AutoStoreGuildBankItem(WowGuid128 BankGuid, byte BankTab, byte BankSlot);
 
-    public override void Read()
-    {
-        BankGuid = _worldPacket.ReadPackedGuid128();
-        BankTab = _worldPacket.ReadUInt8();
-        BankSlot = _worldPacket.ReadUInt8(); ;
-        ContainerItemSlot = _worldPacket.ReadUInt8();
+public readonly record struct MoveGuildBankItem(
+    WowGuid128 BankGuid,
+    byte BankTab1,
+    byte BankSlot1,
+    byte BankTab2,
+    byte BankSlot2);
 
-        if (_worldPacket.HasBit())
-            ContainerSlot = _worldPacket.ReadUInt8();
-    }
-
-    public WowGuid128 BankGuid;
-    public byte BankTab;
-    public byte BankSlot;
-    public byte? ContainerSlot;
-    public byte ContainerItemSlot;
-}
-
-class SplitItemToGuildBank : ClientPacket
-{
-    public SplitItemToGuildBank(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        BankGuid = _worldPacket.ReadPackedGuid128();
-        BankTab = _worldPacket.ReadUInt8();
-        BankSlot = _worldPacket.ReadUInt8(); ;
-        ContainerItemSlot = _worldPacket.ReadUInt8();
-        StackCount = _worldPacket.ReadUInt32();
-
-        if (_worldPacket.HasBit())
-            ContainerSlot = _worldPacket.ReadUInt8();
-    }
-
-    public WowGuid128 BankGuid;
-    public byte BankTab;
-    public byte BankSlot;
-    public byte? ContainerSlot;
-    public byte ContainerItemSlot;
-    public uint StackCount;
-}
-
-class AutoStoreGuildBankItem : ClientPacket
-{
-    public AutoStoreGuildBankItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        BankGuid = _worldPacket.ReadPackedGuid128();
-        BankTab = _worldPacket.ReadUInt8();
-        BankSlot = _worldPacket.ReadUInt8();
-    }
-
-    public WowGuid128 BankGuid;
-    public byte BankTab;
-    public byte BankSlot;
-}
-
-class MoveGuildBankItem : ClientPacket
-{
-    public MoveGuildBankItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        BankGuid = _worldPacket.ReadPackedGuid128();
-        BankTab1 = _worldPacket.ReadUInt8();
-        BankSlot1 = _worldPacket.ReadUInt8();
-        BankTab2 = _worldPacket.ReadUInt8();
-        BankSlot2 = _worldPacket.ReadUInt8();
-    }
-
-    public WowGuid128 BankGuid;
-    public byte BankTab1;
-    public byte BankSlot1;
-    public byte BankTab2;
-    public byte BankSlot2;
-}
-
-class SplitGuildBankItem : ClientPacket
-{
-    public SplitGuildBankItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        BankGuid = _worldPacket.ReadPackedGuid128();
-        BankTab1 = _worldPacket.ReadUInt8();
-        BankSlot1 = _worldPacket.ReadUInt8();
-        BankTab2 = _worldPacket.ReadUInt8();
-        BankSlot2 = _worldPacket.ReadUInt8();
-        StackCount = _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 BankGuid;
-    public byte BankTab1;
-    public byte BankSlot1;
-    public byte BankTab2;
-    public byte BankSlot2;
-    public uint StackCount;
-}
+public readonly record struct SplitGuildBankItem(
+    WowGuid128 BankGuid,
+    byte BankTab1,
+    byte BankSlot1,
+    byte BankTab2,
+    byte BankSlot2,
+    uint StackCount);

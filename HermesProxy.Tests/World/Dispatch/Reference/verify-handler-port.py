@@ -28,11 +28,16 @@ import subprocess
 import sys
 
 
-def extract_body(text: str, method: str) -> str | None:
-    """The braced body of `method`, by brace matching rather than indentation."""
-    m = re.search(r'\b' + re.escape(method) + r'\s*\([^)]*\)\s*\n?\s*\{', text)
-    if not m:
+def extract_body(text: str, method: str, occurrence: int = 1) -> str | None:
+    """The braced body of `method`, by brace matching rather than indentation.
+
+    `occurrence` picks among overloads -- several handlers were distinguished only by their
+    packet type, and both sides of the port keep that shape.
+    """
+    matches = list(re.finditer(r'\b' + re.escape(method) + r'\s*\([^)]*\)\s*\n?\s*\{', text))
+    if len(matches) < occurrence:
         return None
+    m = matches[occurrence - 1]
 
     i = text.index('{', m.start())
     depth, j = 0, i
@@ -55,6 +60,10 @@ def normalise(body: str) -> list[str]:
     body = body.replace('ctx.SendPacket(', 'SendPacket(')
     body = body.replace('ctx.GameState', 'GetSession().GameState')
     body = body.replace('Session.GameState', 'GetSession().GameState')
+
+    # A private helper that reached the session through `this` takes the context as its first
+    # argument now. Same class of required rewrite as the `ctx.` prefixes above.
+    body = body.replace('(in ctx, ', '(')
 
     # Shape B: the opcode is a parameter now rather than a call on the packet, and a data-only
     # packet has no GetOpcode() either. Collapse all three spellings to one token — specific
@@ -79,15 +88,26 @@ def main() -> int:
     ap.add_argument('--original-ref', default='HEAD')
     ap.add_argument('--original', required=True, help='path of the pre-conversion handler file')
     ap.add_argument('--ported', required=True, help='path of the new system file')
-    ap.add_argument('methods', nargs='+')
+    ap.add_argument(
+        'methods', nargs='+',
+        help='method name; `Name#2` selects the second overload, `Orig=Ported` a renamed one')
     args = ap.parse_args()
 
     original = read_original(args.original_ref, args.original)
     ported = open(args.ported, encoding='utf-8-sig').read()
 
+    def split(spec: str) -> tuple[str, int]:
+        name, _, index = spec.partition('#')
+        return name, int(index or 1)
+
     mismatches = 0
     for method in args.methods:
-        a_raw, b_raw = extract_body(original, method), extract_body(ported, method)
+        orig_spec, _, ported_spec = method.partition('=')
+        a_name, a_index = split(orig_spec)
+        b_name, b_index = split(ported_spec or orig_spec)
+
+        a_raw = extract_body(original, a_name, a_index)
+        b_raw = extract_body(ported, b_name, b_index)
         if a_raw is None or b_raw is None:
             where = 'original' if a_raw is None else 'ported'
             print(f'  ??  {method}: not found in {where}')

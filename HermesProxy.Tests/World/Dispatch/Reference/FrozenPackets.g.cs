@@ -604,4 +604,438 @@ internal static class FrozenPackets
     {
         public void Read(WorldPacket p) { }
     }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class QueryGuildInfo
+    {
+        public void Read(WorldPacket p)
+        {
+            GuildGuid = p.ReadPackedGuid128();
+            PlayerGuid = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 GuildGuid;
+        public WowGuid128 PlayerGuid;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildUpdateMotdText
+    {
+        public void Read(WorldPacket p)
+        {
+            uint textLen = p.ReadBits<uint>(11);
+            MotdText = p.ReadString(textLen);
+        }
+
+        public string MotdText = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildUpdateInfoText
+    {
+        public void Read(WorldPacket p)
+        {
+            uint textLen = p.ReadBits<uint>(11);
+            InfoText = p.ReadString(textLen);
+        }
+
+        public string InfoText = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildSetMemberNote
+    {
+        public void Read(WorldPacket p)
+        {
+            NoteeGUID = p.ReadPackedGuid128();
+
+            uint noteLen = p.ReadBits<uint>(8);
+            IsPublic = p.HasBit();
+
+            Note = p.ReadString(noteLen);
+        }
+
+        public WowGuid128 NoteeGUID;
+        public bool IsPublic;          // 0 == Officer, 1 == Public
+        public string Note = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildPromoteMember
+    {
+        public void Read(WorldPacket p)
+        {
+            Promotee = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Promotee;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildDemoteMember
+    {
+        public void Read(WorldPacket p)
+        {
+            Demotee = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Demotee;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildOfficerRemoveMember
+    {
+        public void Read(WorldPacket p)
+        {
+            Removee = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Removee;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildInviteByName
+    {
+        public void Read(WorldPacket p)
+        {
+            uint nameLen = p.ReadBits<uint>(9);
+            bool isArena = p.HasBit();
+
+            Name = p.ReadString(nameLen);
+
+            if (isArena)
+                ArenaTeamId = p.ReadUInt32();
+        }
+
+        public string Name = string.Empty;
+        public uint ArenaTeamId;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildSetRankPermissions
+    {
+        public void Read(WorldPacket p)
+        {
+            RankID = p.ReadUInt32();
+            RankOrder = p.ReadUInt32();
+            Flags = p.ReadUInt32();
+            WithdrawGoldLimit = p.ReadInt32();
+
+            for (byte i = 0; i < GuildConst.MaxBankTabs; i++)
+            {
+                TabFlags[i] = p.ReadUInt32();
+                TabWithdrawItemLimit[i] = p.ReadUInt32();
+            }
+
+            OldFlags = p.ReadUInt32();
+
+            p.ResetBitPos();
+            uint rankNameLen = p.ReadBits<uint>(7);
+            RankName = p.ReadString(rankNameLen);
+        }
+
+        public uint RankID;
+        public uint RankOrder;
+        public int WithdrawGoldLimit;
+        public uint Flags;
+        public uint OldFlags;
+        public uint[] TabFlags = new uint[GuildConst.MaxBankTabs];
+        public uint[] TabWithdrawItemLimit = new uint[GuildConst.MaxBankTabs];
+        public string RankName = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildAddRank
+    {
+        public void Read(WorldPacket p)
+        {
+            uint nameLen = p.ReadBits<uint>(7);
+            p.ResetBitPos();
+
+            RankOrder = p.ReadInt32();
+            Name = p.ReadString(nameLen);
+        }
+
+        public string Name = string.Empty;
+        public int RankOrder;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildDeleteRank
+    {
+        public void Read(WorldPacket p)
+        {
+            RankOrder = p.ReadInt32();
+        }
+
+        public int RankOrder;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildSetGuildMaster
+    {
+        public void Read(WorldPacket p)
+        {
+            uint nameLen = p.ReadBits<uint>(9);
+            NewMasterName = p.ReadString(nameLen);
+        }
+
+        public string NewMasterName = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class SaveGuildEmblem
+    {
+        public void Read(WorldPacket p)
+        {
+            DesignerGUID = p.ReadPackedGuid128();
+            EmblemStyle = p.ReadUInt32();
+            EmblemColor = p.ReadUInt32();
+            BorderStyle = p.ReadUInt32();
+            BorderColor = p.ReadUInt32();
+            BackgroundColor = p.ReadUInt32();
+        }
+
+        public WowGuid128 DesignerGUID;
+        public uint EmblemStyle;
+        public uint EmblemColor;
+        public uint BorderStyle;
+        public uint BorderColor;
+        public uint BackgroundColor;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class SetAutoDeclineGuildInvites
+    {
+        public void Read(WorldPacket p)
+        {
+            GuildInvitesShouldGetBlocked = p.ReadBool();
+        }
+
+        public bool GuildInvitesShouldGetBlocked;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildBankAtivate
+    {
+        public void Read(WorldPacket p)
+        {
+            BankGuid = p.ReadPackedGuid128();
+            FullUpdate = p.HasBit();
+        }
+
+        public WowGuid128 BankGuid;
+        public bool FullUpdate;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildBankQueryTab
+    {
+        public void Read(WorldPacket p)
+        {
+            BankGuid = p.ReadPackedGuid128();
+            Tab = p.ReadUInt8();
+
+            FullUpdate = p.HasBit();
+        }
+
+        public WowGuid128 BankGuid;
+        public byte Tab;
+        public bool FullUpdate;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildBankDepositMoney
+    {
+        public void Read(WorldPacket p)
+        {
+            BankGuid = p.ReadPackedGuid128();
+            Money = p.ReadUInt64();
+        }
+
+        public WowGuid128 BankGuid;
+        public ulong Money;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildBankTextQuery
+    {
+        public void Read(WorldPacket p)
+        {
+            Tab = p.ReadInt32();
+        }
+
+        public int Tab;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildBankUpdateTab
+    {
+        public void Read(WorldPacket p)
+        {
+            BankGuid = p.ReadPackedGuid128();
+            BankTab = p.ReadUInt8();
+
+            p.ResetBitPos();
+            uint nameLen = p.ReadBits<uint>(7);
+            uint iconLen = p.ReadBits<uint>(9);
+
+            Name = p.ReadString(nameLen);
+            Icon = p.ReadString(iconLen);
+        }
+
+        public WowGuid128 BankGuid;
+        public byte BankTab;
+        public string Name = string.Empty;
+        public string Icon = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildBankLogQuery
+    {
+        public void Read(WorldPacket p)
+        {
+            Tab = p.ReadInt32();
+        }
+
+        public int Tab;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildBankSetTabText
+    {
+        public void Read(WorldPacket p)
+        {
+            Tab = p.ReadInt32();
+            TabText = p.ReadString(p.ReadBits<uint>(14));
+        }
+
+        public int Tab;
+        public string TabText = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildBankBuyTab
+    {
+        public void Read(WorldPacket p)
+        {
+            BankGuid = p.ReadPackedGuid128();
+            BankTab = p.ReadUInt8();
+        }
+
+        public WowGuid128 BankGuid;
+        public byte BankTab;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class GuildBankWithdrawMoney
+    {
+        public void Read(WorldPacket p)
+        {
+            BankGuid = p.ReadPackedGuid128();
+            Money = p.ReadUInt64();
+        }
+
+        public WowGuid128 BankGuid;
+        public ulong Money;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class AutoGuildBankItem
+    {
+        public void Read(WorldPacket p)
+        {
+            BankGuid = p.ReadPackedGuid128();
+            BankTab = p.ReadUInt8();
+            BankSlot = p.ReadUInt8(); ;
+            ContainerItemSlot = p.ReadUInt8();
+
+            if (p.HasBit())
+                ContainerSlot = p.ReadUInt8();
+        }
+
+        public WowGuid128 BankGuid;
+        public byte BankTab;
+        public byte BankSlot;
+        public byte? ContainerSlot;
+        public byte ContainerItemSlot;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class SplitItemToGuildBank
+    {
+        public void Read(WorldPacket p)
+        {
+            BankGuid = p.ReadPackedGuid128();
+            BankTab = p.ReadUInt8();
+            BankSlot = p.ReadUInt8(); ;
+            ContainerItemSlot = p.ReadUInt8();
+            StackCount = p.ReadUInt32();
+
+            if (p.HasBit())
+                ContainerSlot = p.ReadUInt8();
+        }
+
+        public WowGuid128 BankGuid;
+        public byte BankTab;
+        public byte BankSlot;
+        public byte? ContainerSlot;
+        public byte ContainerItemSlot;
+        public uint StackCount;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class AutoStoreGuildBankItem
+    {
+        public void Read(WorldPacket p)
+        {
+            BankGuid = p.ReadPackedGuid128();
+            BankTab = p.ReadUInt8();
+            BankSlot = p.ReadUInt8();
+        }
+
+        public WowGuid128 BankGuid;
+        public byte BankTab;
+        public byte BankSlot;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class MoveGuildBankItem
+    {
+        public void Read(WorldPacket p)
+        {
+            BankGuid = p.ReadPackedGuid128();
+            BankTab1 = p.ReadUInt8();
+            BankSlot1 = p.ReadUInt8();
+            BankTab2 = p.ReadUInt8();
+            BankSlot2 = p.ReadUInt8();
+        }
+
+        public WowGuid128 BankGuid;
+        public byte BankTab1;
+        public byte BankSlot1;
+        public byte BankTab2;
+        public byte BankSlot2;
+    }
+
+    /// Frozen verbatim from <c>GuildPackets.cs</c>.
+    internal sealed class SplitGuildBankItem
+    {
+        public void Read(WorldPacket p)
+        {
+            BankGuid = p.ReadPackedGuid128();
+            BankTab1 = p.ReadUInt8();
+            BankSlot1 = p.ReadUInt8();
+            BankTab2 = p.ReadUInt8();
+            BankSlot2 = p.ReadUInt8();
+            StackCount = p.ReadUInt32();
+        }
+
+        public WowGuid128 BankGuid;
+        public byte BankTab1;
+        public byte BankSlot1;
+        public byte BankTab2;
+        public byte BankSlot2;
+        public uint StackCount;
+    }
 }
