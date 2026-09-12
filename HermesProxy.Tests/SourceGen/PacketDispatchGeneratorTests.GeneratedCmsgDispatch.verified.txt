@@ -48,6 +48,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.GuildSystem.HandleGuildAccept(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleAcceptTrade_CMSG_ACCEPT_TRADE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.AcceptTradeCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.TradeSystem.HandleAcceptTrade(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_TaxiSystem_HandleActivateTaxi_CMSG_ACTIVATE_TAXI(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ActivateTaxiCodec.Read(ref reader, out var packet);
@@ -474,6 +480,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatUnregisterAllAddonPrefixes(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleClearTradeItem_CMSG_CLEAR_TRADE_ITEM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClearTradeItemCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.TradeSystem.HandleClearTradeItem(global::HermesProxy.World.Enums.Opcode.CMSG_CLEAR_TRADE_ITEM, in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleCloseInteraction_CMSG_CLOSE_INTERACTION(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.CloseInteractionCodec.Read(ref reader, out var packet);
@@ -756,6 +768,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.TradeSystem.HandleEmptyTradePacket(global::HermesProxy.World.Enums.Opcode.CMSG_IGNORE_TRADE, in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleInitiateTrade_CMSG_INITIATE_TRADE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.InitiateTradeCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.TradeSystem.HandleInitiateTrade(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleInspect_CMSG_INSPECT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.InspectCodec.Read(ref reader, out var packet);
@@ -814,6 +832,42 @@ internal static unsafe class GeneratedCmsgDispatch
     {
         global::HermesProxy.World.Server.Packets.LogoutRequestCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.CharacterSystem.HandleLogoutRequest(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleLootItem_CMSG_LOOT_ITEM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.LootItemPktCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LootSystem.HandleLootItem(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleLootMasterGive_CMSG_LOOT_MASTER_GIVE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.LootMasterGiveCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LootSystem.HandleLootMasterGive(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleLootMoney_CMSG_LOOT_MONEY(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.LootMoneyCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LootSystem.HandleLootMoney(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleLootRelease_CMSG_LOOT_RELEASE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.LootReleaseCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LootSystem.HandleLootRelease(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleLootRoll_CMSG_LOOT_ROLL(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.LootRollCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LootSystem.HandleLootRoll(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleLootUnit_CMSG_LOOT_UNIT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.LootUnitCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LootSystem.HandleLootUnit(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleMoveGuildBankItem_CMSG_MERGE_GUILD_BANK_ITEM_WITH_GUILD_BANK_ITEM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -1192,6 +1246,12 @@ internal static unsafe class GeneratedCmsgDispatch
     {
         global::HermesProxy.World.Server.Packets.OpenItemCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.ItemSystem.HandleOpenItem(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleOptOutOfLoot_CMSG_OPT_OUT_OF_LOOT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.OptOutOfLootCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LootSystem.HandleOptOutOfLoot(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandlePartyInvite_CMSG_PARTY_INVITE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -1632,6 +1692,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.GroupSystem.HandleSetEveryoneIsAssistant(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleSetLootMethod_CMSG_SET_LOOT_METHOD(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.SetLootMethodCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LootSystem.HandleSetLootMethod(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleSetPartyLeader_CMSG_SET_PARTY_LEADER(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.SetPartyLeaderCodec.Read(ref reader, out var packet);
@@ -1678,6 +1744,18 @@ internal static unsafe class GeneratedCmsgDispatch
     {
         global::HermesProxy.World.Server.Packets.SetTitleCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.CharacterSystem.HandleSetTitle(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleSetTradeGold_CMSG_SET_TRADE_GOLD(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.SetTradeGoldCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.TradeSystem.HandleSetTradeGold(global::HermesProxy.World.Enums.Opcode.CMSG_SET_TRADE_GOLD, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleSetTradeItem_CMSG_SET_TRADE_ITEM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.SetTradeItemCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.TradeSystem.HandleSetTradeItem(global::HermesProxy.World.Enums.Opcode.CMSG_SET_TRADE_ITEM, in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleSocketGems_CMSG_SOCKET_GEMS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -1877,6 +1955,7 @@ internal static unsafe class GeneratedCmsgDispatch
         var table = new delegate*<ref global::Framework.IO.SpanPacketReader, in global::HermesProxy.World.Dispatch.SessionContext, void>[MaxClaimedOpcode + 1];
 
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ACCEPT_GUILD_INVITE] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildAccept_CMSG_ACCEPT_GUILD_INVITE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ACCEPT_TRADE] = &Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleAcceptTrade_CMSG_ACCEPT_TRADE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ACTIVATE_TAXI] = &Thunk_HermesProxy_World_Server_Systems_TaxiSystem_HandleActivateTaxi_CMSG_ACTIVATE_TAXI;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ALTER_APPEARANCE] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleAlterAppearance_CMSG_ALTER_APPEARANCE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AREA_SPIRIT_HEALER_QUERY] = &Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleInteractWithNPC_CMSG_AREA_SPIRIT_HEALER_QUERY;
@@ -2004,6 +2083,7 @@ internal static unsafe class GeneratedCmsgDispatch
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_YELL_ChatMessageCodecWotLKClassic;
         }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_UNREGISTER_ALL_ADDON_PREFIXES] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatUnregisterAllAddonPrefixes_CMSG_CHAT_UNREGISTER_ALL_ADDON_PREFIXES;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CLEAR_TRADE_ITEM] = &Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleClearTradeItem_CMSG_CLEAR_TRADE_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CLOSE_INTERACTION] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleCloseInteraction_CMSG_CLOSE_INTERACTION;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_COMPLETE_CINEMATIC] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCinematicPacket_CMSG_COMPLETE_CINEMATIC;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CONFIRM_RESPEC_WIPE] = &Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleConfirmRespecWipe_CMSG_CONFIRM_RESPEC_WIPE;
@@ -2055,6 +2135,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_UPDATE_INFO_TEXT] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildUpdateInfoText_CMSG_GUILD_UPDATE_INFO_TEXT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_UPDATE_MOTD_TEXT] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildUpdateMotdText_CMSG_GUILD_UPDATE_MOTD_TEXT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_IGNORE_TRADE] = &Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleEmptyTradePacket_CMSG_IGNORE_TRADE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_INITIATE_TRADE] = &Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleInitiateTrade_CMSG_INITIATE_TRADE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_INSPECT] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleInspect_CMSG_INSPECT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_INSPECT_HONOR_STATS] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleInspectHonorStats_CMSG_INSPECT_HONOR_STATS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_INSPECT_PVP] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleInspectArenaTeams_CMSG_INSPECT_PVP;
@@ -2065,6 +2146,12 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LOADING_SCREEN_NOTIFY] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleLoadScreen_CMSG_LOADING_SCREEN_NOTIFY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LOGOUT_CANCEL] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleLogoutCancel_CMSG_LOGOUT_CANCEL;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LOGOUT_REQUEST] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleLogoutRequest_CMSG_LOGOUT_REQUEST;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LOOT_ITEM] = &Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleLootItem_CMSG_LOOT_ITEM;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LOOT_MASTER_GIVE] = &Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleLootMasterGive_CMSG_LOOT_MASTER_GIVE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LOOT_MONEY] = &Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleLootMoney_CMSG_LOOT_MONEY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LOOT_RELEASE] = &Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleLootRelease_CMSG_LOOT_RELEASE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LOOT_ROLL] = &Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleLootRoll_CMSG_LOOT_ROLL;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LOOT_UNIT] = &Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleLootUnit_CMSG_LOOT_UNIT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MERGE_GUILD_BANK_ITEM_WITH_GUILD_BANK_ITEM] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleMoveGuildBankItem_CMSG_MERGE_GUILD_BANK_ITEM_WITH_GUILD_BANK_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MERGE_GUILD_BANK_ITEM_WITH_ITEM] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleMergeGuildBankItemWithItem_CMSG_MERGE_GUILD_BANK_ITEM_WITH_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MERGE_ITEM_WITH_GUILD_BANK_ITEM] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleSplitItemToGuildBank_CMSG_MERGE_ITEM_WITH_GUILD_BANK_ITEM;
@@ -2128,6 +2215,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_OBJECT_UPDATE_FAILED] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleObjectUpdateFailed_CMSG_OBJECT_UPDATE_FAILED;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_OPENING_CINEMATIC] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCinematicPacket_CMSG_OPENING_CINEMATIC;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_OPEN_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleOpenItem_CMSG_OPEN_ITEM;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_OPT_OUT_OF_LOOT] = &Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleOptOutOfLoot_CMSG_OPT_OUT_OF_LOOT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PARTY_INVITE] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandlePartyInvite_CMSG_PARTY_INVITE;
         {
             if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
@@ -2221,6 +2309,7 @@ internal static unsafe class GeneratedCmsgDispatch
             else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_EVERYONE_IS_ASSISTANT] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleSetEveryoneIsAssistant_CMSG_SET_EVERYONE_IS_ASSISTANT_SetEveryoneIsAssistantCodecWotLKClassic;
         }
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_LOOT_METHOD] = &Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleSetLootMethod_CMSG_SET_LOOT_METHOD;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_PARTY_LEADER] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleSetPartyLeader_CMSG_SET_PARTY_LEADER;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_PVP] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleSetPvP_CMSG_SET_PVP;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_RAID_DIFFICULTY] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleSetRaidDifficulty_CMSG_SET_RAID_DIFFICULTY;
@@ -2233,6 +2322,8 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_SELECTION] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleSetSelection_CMSG_SET_SELECTION;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_SHEATHED] = &Thunk_HermesProxy_World_Server_Systems_CombatSystem_HandleSetSheathed_CMSG_SET_SHEATHED;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_TITLE] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleSetTitle_CMSG_SET_TITLE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_TRADE_GOLD] = &Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleSetTradeGold_CMSG_SET_TRADE_GOLD;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_TRADE_ITEM] = &Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleSetTradeItem_CMSG_SET_TRADE_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SOCKET_GEMS] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleSocketGems_CMSG_SOCKET_GEMS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SPELL_CLICK] = &Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleInteractWithNPC_CMSG_SPELL_CLICK;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SPIRIT_HEALER_ACTIVATE] = &Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleInteractWithNPC_CMSG_SPIRIT_HEALER_ACTIVATE;
@@ -2276,6 +2367,7 @@ internal static unsafe class GeneratedCmsgDispatch
         return global::System.Collections.Frozen.FrozenSet.ToFrozenSet(new global::HermesProxy.World.Enums.Opcode[]
         {
             global::HermesProxy.World.Enums.Opcode.CMSG_ACCEPT_GUILD_INVITE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_ACCEPT_TRADE,
             global::HermesProxy.World.Enums.Opcode.CMSG_ACTIVATE_TAXI,
             global::HermesProxy.World.Enums.Opcode.CMSG_ALTER_APPEARANCE,
             global::HermesProxy.World.Enums.Opcode.CMSG_AREA_SPIRIT_HEALER_QUERY,
@@ -2333,6 +2425,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_WHISPER,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_UNREGISTER_ALL_ADDON_PREFIXES,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CLEAR_TRADE_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_CLOSE_INTERACTION,
             global::HermesProxy.World.Enums.Opcode.CMSG_COMPLETE_CINEMATIC,
             global::HermesProxy.World.Enums.Opcode.CMSG_CONFIRM_RESPEC_WIPE,
@@ -2379,6 +2472,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_UPDATE_INFO_TEXT,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_UPDATE_MOTD_TEXT,
             global::HermesProxy.World.Enums.Opcode.CMSG_IGNORE_TRADE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_INITIATE_TRADE,
             global::HermesProxy.World.Enums.Opcode.CMSG_INSPECT,
             global::HermesProxy.World.Enums.Opcode.CMSG_INSPECT_HONOR_STATS,
             global::HermesProxy.World.Enums.Opcode.CMSG_INSPECT_PVP,
@@ -2389,6 +2483,12 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_LOADING_SCREEN_NOTIFY,
             global::HermesProxy.World.Enums.Opcode.CMSG_LOGOUT_CANCEL,
             global::HermesProxy.World.Enums.Opcode.CMSG_LOGOUT_REQUEST,
+            global::HermesProxy.World.Enums.Opcode.CMSG_LOOT_ITEM,
+            global::HermesProxy.World.Enums.Opcode.CMSG_LOOT_MASTER_GIVE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_LOOT_MONEY,
+            global::HermesProxy.World.Enums.Opcode.CMSG_LOOT_RELEASE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_LOOT_ROLL,
+            global::HermesProxy.World.Enums.Opcode.CMSG_LOOT_UNIT,
             global::HermesProxy.World.Enums.Opcode.CMSG_MERGE_GUILD_BANK_ITEM_WITH_GUILD_BANK_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_MERGE_GUILD_BANK_ITEM_WITH_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_MERGE_ITEM_WITH_GUILD_BANK_ITEM,
@@ -2452,6 +2552,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_OBJECT_UPDATE_FAILED,
             global::HermesProxy.World.Enums.Opcode.CMSG_OPENING_CINEMATIC,
             global::HermesProxy.World.Enums.Opcode.CMSG_OPEN_ITEM,
+            global::HermesProxy.World.Enums.Opcode.CMSG_OPT_OUT_OF_LOOT,
             global::HermesProxy.World.Enums.Opcode.CMSG_PARTY_INVITE,
             global::HermesProxy.World.Enums.Opcode.CMSG_PARTY_INVITE_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.CMSG_PARTY_UNINVITE,
@@ -2520,6 +2621,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_ASSISTANT_LEADER,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_DUNGEON_DIFFICULTY,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_EVERYONE_IS_ASSISTANT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_SET_LOOT_METHOD,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_PARTY_LEADER,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_PVP,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_RAID_DIFFICULTY,
@@ -2527,6 +2629,8 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_SELECTION,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_SHEATHED,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_TITLE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_SET_TRADE_GOLD,
+            global::HermesProxy.World.Enums.Opcode.CMSG_SET_TRADE_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_SOCKET_GEMS,
             global::HermesProxy.World.Enums.Opcode.CMSG_SPELL_CLICK,
             global::HermesProxy.World.Enums.Opcode.CMSG_SPIRIT_HEALER_ACTIVATE,

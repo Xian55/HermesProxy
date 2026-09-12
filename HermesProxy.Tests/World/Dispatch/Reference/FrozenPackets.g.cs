@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using HermesProxy;
 using HermesProxy.Enums;
@@ -2502,5 +2502,188 @@ internal static class FrozenPackets
         }
         public byte Slot;
         public WowGuid128 Guid;
+    }
+
+    /// Frozen verbatim from <c>LootPackets.cs</c>, where <c>LootRequest</c> was a mutable struct
+    /// before the loot slice made it a readonly record struct. The oracles below build it with an
+    /// object initializer, which a readonly type cannot express — and pointing them at the
+    /// converted type would have them validate the new reader against itself.
+    internal struct LootRequest
+    {
+        public WowGuid128 LootObj;
+        public byte LootListID;
+    }
+
+/// Frozen verbatim from <c>LootPackets.cs</c>.
+    internal sealed class LootRelease
+    {
+        public void Read(WorldPacket p)
+        {
+            Owner = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Owner;
+    }
+
+    /// Frozen verbatim from <c>LootPackets.cs</c>.
+    internal sealed class LootItemPkt
+    {
+        public void Read(WorldPacket p)
+        {
+            uint Count = p.ReadUInt32();
+
+            for (uint i = 0; i < Count; ++i)
+            {
+                var loot = new LootRequest()
+                {
+                    LootObj = p.ReadPackedGuid128(),
+                    LootListID = p.ReadUInt8()
+                };
+
+                Loot.Add(loot);
+            }
+        }
+
+        public List<LootRequest> Loot = new();
+    }
+
+    /// Frozen verbatim from <c>LootPackets.cs</c>.
+    internal sealed class LootUnit
+    {
+        public void Read(WorldPacket p)
+        {
+            Unit = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Unit;
+    }
+
+    /// Frozen verbatim from <c>LootPackets.cs</c>.
+    internal sealed class LootMoney
+    {
+        public void Read(WorldPacket p) { }
+    }
+
+    /// Frozen verbatim from <c>LootPackets.cs</c>.
+    internal sealed class SetLootMethod
+    {
+        public void Read(WorldPacket p)
+        {
+            PartyIndex = p.ReadInt8();
+            LootMethod = (LootMethod)p.ReadUInt8();
+            LootMasterGUID = p.ReadPackedGuid128();
+            LootThreshold = p.ReadUInt32();
+        }
+
+        public sbyte PartyIndex;
+        public LootMethod LootMethod;
+        public WowGuid128 LootMasterGUID;
+        public uint LootThreshold;
+    }
+
+    /// Frozen verbatim from <c>LootPackets.cs</c>.
+    internal sealed class OptOutOfLoot
+    {
+        public void Read(WorldPacket p)
+        {
+            PassOnLoot = p.HasBit();
+        }
+
+        public bool PassOnLoot;
+    }
+
+    /// Frozen verbatim from <c>LootPackets.cs</c>.
+    internal sealed class LootRoll
+    {
+        public void Read(WorldPacket p)
+        {
+            LootObj = p.ReadPackedGuid128();
+            LootListID = p.ReadUInt8();
+            RollType = (RollType)p.ReadUInt8();
+        }
+
+        public WowGuid128 LootObj;
+        public byte LootListID;
+        public RollType RollType;
+    }
+
+    /// Frozen verbatim from <c>LootPackets.cs</c>.
+    internal sealed class LootMasterGive
+    {
+        public void Read(WorldPacket p)
+        {
+            uint Count = p.ReadUInt32();
+            TargetGUID = p.ReadPackedGuid128();
+
+            for (int i = 0; i < Count; ++i)
+            {
+                LootRequest lootRequest = new();
+                lootRequest.LootObj = p.ReadPackedGuid128();
+                lootRequest.LootListID = p.ReadUInt8();
+                Loot.Add(lootRequest);
+            }
+        }
+
+        public WowGuid128 TargetGUID;
+        public List<LootRequest> Loot = new();
+    }
+
+    /// Frozen verbatim from <c>TradePackets.cs</c>.
+    internal sealed class InitiateTrade
+    {
+        public void Read(WorldPacket p)
+        {
+            Guid = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Guid;
+    }
+
+    /// Frozen verbatim from <c>TradePackets.cs</c>.
+    internal sealed class SetTradeGold
+    {
+        public void Read(WorldPacket p)
+        {
+            Coinage = p.ReadUInt64();
+        }
+
+        public ulong Coinage;
+    }
+
+    /// Frozen verbatim from <c>TradePackets.cs</c>.
+    internal sealed class AcceptTrade
+    {
+        public void Read(WorldPacket p)
+        {
+            StateIndex = p.ReadUInt32();
+        }
+
+        public uint StateIndex;
+    }
+
+    /// Frozen verbatim from <c>TradePackets.cs</c>.
+    internal sealed class ClearTradeItem
+    {
+        public void Read(WorldPacket p)
+        {
+            TradeSlot = p.ReadUInt8();
+        }
+
+        public byte TradeSlot;
+    }
+
+    /// Frozen verbatim from <c>TradePackets.cs</c>.
+    internal sealed class SetTradeItem
+    {
+        public void Read(WorldPacket p)
+        {
+            TradeSlot = p.ReadUInt8();
+            PackSlot = p.ReadUInt8();
+            ItemSlotInPack = p.ReadUInt8();
+        }
+
+        public byte TradeSlot;
+        public byte PackSlot;
+        public byte ItemSlotInPack;
     }
 }

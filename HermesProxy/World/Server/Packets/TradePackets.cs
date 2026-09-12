@@ -26,41 +26,11 @@ using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets;
 
-public class InitiateTrade : ClientPacket
-{
-    public InitiateTrade(WorldPacket packet) : base(packet) { }
+public readonly record struct InitiateTrade(WowGuid128 Guid);
 
-    public override void Read()
-    {
-        Guid = _worldPacket.ReadPackedGuid128();
-    }
+public readonly record struct AcceptTrade(uint StateIndex);
 
-    public WowGuid128 Guid;
-}
-
-public class AcceptTrade : ClientPacket
-{
-    public AcceptTrade(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        StateIndex = _worldPacket.ReadUInt32();
-    }
-
-    public uint StateIndex;
-}
-
-public class ClearTradeItem : ClientPacket
-{
-    public ClearTradeItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        TradeSlot = _worldPacket.ReadUInt8();
-    }
-
-    public byte TradeSlot;
-}
+public readonly record struct ClearTradeItem(byte TradeSlot);
 
 public class TradeStatusPkt : ServerPacket, ISpanWritable
 {
@@ -155,33 +125,9 @@ public class TradeStatusPkt : ServerPacket, ISpanWritable
     public int CurrencyQuantity;
 }
 
-public class SetTradeGold : ClientPacket
-{
-    public SetTradeGold(WorldPacket packet) : base(packet) { }
+public readonly record struct SetTradeGold(ulong Coinage);
 
-    public override void Read()
-    {
-        Coinage = _worldPacket.ReadUInt64();
-    }
-
-    public ulong Coinage;
-}
-
-public class SetTradeItem : ClientPacket
-{
-    public SetTradeItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        TradeSlot = _worldPacket.ReadUInt8();
-        PackSlot = _worldPacket.ReadUInt8();
-        ItemSlotInPack = _worldPacket.ReadUInt8();
-    }
-
-    public byte TradeSlot;
-    public byte PackSlot;
-    public byte ItemSlotInPack;
-}
+public readonly record struct SetTradeItem(byte TradeSlot, byte PackSlot, byte ItemSlotInPack);
 
 public class TradeUpdated : ServerPacket
 {

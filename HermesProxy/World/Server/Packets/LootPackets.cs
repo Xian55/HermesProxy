@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2012-2020 CypherCore <http://github.com/CypherCore>
  * 
  * This program is free software: you can redistribute it and/or modify
@@ -27,17 +27,7 @@ using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets;
 
-class LootUnit : ClientPacket
-{
-    public LootUnit(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Unit = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Unit;
-}
+public readonly record struct LootUnit(WowGuid128 Unit);
 
 public class LootResponse : ServerPacket, ISpanWritable
 {
@@ -172,17 +162,7 @@ public struct LootCurrency
     public byte UIType;
 }
 
-class LootRelease : ClientPacket
-{
-    public LootRelease(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Owner = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Owner;
-}
+public readonly record struct LootRelease(WowGuid128 Owner);
 
 class LootReleaseResponse : ServerPacket, ISpanWritable
 {
@@ -208,12 +188,7 @@ class LootReleaseResponse : ServerPacket, ISpanWritable
     public WowGuid128 Owner;
 }
 
-class LootMoney : ClientPacket
-{
-    public LootMoney(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
+public readonly record struct LootMoney;
 
 class LootMoneyNotify : ServerPacket, ISpanWritable
 {
@@ -265,33 +240,8 @@ class CoinRemoved : ServerPacket, ISpanWritable
     public WowGuid128 LootObj;
 }
 
-class LootItemPkt : ClientPacket
-{
-    public LootItemPkt(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        uint Count = _worldPacket.ReadUInt32();
-
-        for (uint i = 0; i < Count; ++i)
-        {
-            var loot = new LootRequest()
-            {
-                LootObj = _worldPacket.ReadPackedGuid128(),
-                LootListID = _worldPacket.ReadUInt8()
-            };
-
-            Loot.Add(loot);
-        }
-    }
-
-    public List<LootRequest> Loot = new();
-}
-public struct LootRequest
-{
-    public WowGuid128 LootObj;
-    public byte LootListID;
-}
+public readonly record struct LootItemPkt(List<LootRequest> Loot);
+public readonly record struct LootRequest(WowGuid128 LootObj, byte LootListID);
 
 class LootRemoved : ServerPacket, ISpanWritable
 {
@@ -320,35 +270,10 @@ class LootRemoved : ServerPacket, ISpanWritable
     public byte LootListID;
 }
 
-class SetLootMethod : ClientPacket
-{
-    public SetLootMethod(WorldPacket packet) : base(packet) { }
+public readonly record struct SetLootMethod(
+    sbyte PartyIndex, LootMethod LootMethod, WowGuid128 LootMasterGUID, uint LootThreshold);
 
-    public override void Read()
-    {
-        PartyIndex = _worldPacket.ReadInt8();
-        LootMethod = (LootMethod)_worldPacket.ReadUInt8();
-        LootMasterGUID = _worldPacket.ReadPackedGuid128();
-        LootThreshold = _worldPacket.ReadUInt32();
-    }
-
-    public sbyte PartyIndex;
-    public LootMethod LootMethod;
-    public WowGuid128 LootMasterGUID;
-    public uint LootThreshold;
-}
-
-class OptOutOfLoot : ClientPacket
-{
-    public OptOutOfLoot(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PassOnLoot = _worldPacket.HasBit();
-    }
-
-    public bool PassOnLoot;
-}
+public readonly record struct OptOutOfLoot(bool PassOnLoot);
 
 class StartLootRoll : ServerPacket, ISpanWritable
 {
@@ -425,21 +350,7 @@ class StartLootRoll : ServerPacket, ISpanWritable
     public LootItemData Item = new();
 }
 
-class LootRoll : ClientPacket
-{
-    public LootRoll(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        LootObj = _worldPacket.ReadPackedGuid128();
-        LootListID = _worldPacket.ReadUInt8();
-        RollType = (RollType)_worldPacket.ReadUInt8();
-    }
-
-    public WowGuid128 LootObj;
-    public byte LootListID;
-    public RollType RollType;
-}
+public readonly record struct LootRoll(WowGuid128 LootObj, byte LootListID, RollType RollType);
 
 /// <summary>
 /// V3_4_3 writes an int32 DungeonEncounterID before the Item block in the loot-roll result
@@ -650,27 +561,7 @@ class LootRollsComplete : ServerPacket, ISpanWritable
     public byte LootListID;
 }
 
-class LootMasterGive : ClientPacket
-{
-    public LootMasterGive(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        uint Count = _worldPacket.ReadUInt32();
-        TargetGUID = _worldPacket.ReadPackedGuid128();
-
-        for (int i = 0; i < Count; ++i)
-        {
-            LootRequest lootRequest = new();
-            lootRequest.LootObj = _worldPacket.ReadPackedGuid128();
-            lootRequest.LootListID = _worldPacket.ReadUInt8();
-            Loot.Add(lootRequest);
-        }
-    }
-
-    public WowGuid128 TargetGUID;
-    public List<LootRequest> Loot = new();
-}
+public readonly record struct LootMasterGive(WowGuid128 TargetGUID, List<LootRequest> Loot);
 
 class MasterLootCandidateList : ServerPacket, ISpanWritable
 {
