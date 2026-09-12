@@ -1320,4 +1320,312 @@ internal static class FrozenPackets
         public uint QuestID;
         public QuestPushReason Result;
     }
+
+    /// <summary>
+    /// Frozen verbatim from <c>ItemPackets.cs</c>, where <c>InvUpdate</c> was a struct holding a
+    /// <c>List&lt;InvItem&gt;</c> before the item slice made it an inline array.
+    /// </summary>
+    /// <remarks>
+    /// The oracles below construct this one, not the production type. An oracle that referenced
+    /// the converted type would be validating the new reader against itself.
+    /// </remarks>
+    internal struct InvUpdate
+    {
+        public InvUpdate(WorldPacket data)
+        {
+            Items = new List<InvItem>();
+            int size = data.ReadBits<int>(2);
+            data.ResetBitPos();
+            for (int i = 0; i < size; ++i)
+            {
+                var item = new InvItem
+                {
+                    ContainerSlot = data.ReadUInt8(),
+                    Slot = data.ReadUInt8()
+                };
+                Items.Add(item);
+            }
+        }
+
+        public List<InvItem> Items;
+
+        public struct InvItem
+        {
+            public byte ContainerSlot;
+            public byte Slot;
+        }
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class BuyItem
+    {
+        public BuyItem()
+        {
+            Item = new ItemInstance();
+        }
+
+        public void Read(WorldPacket p)
+        {
+            VendorGUID = p.ReadPackedGuid128();
+            ContainerGUID = p.ReadPackedGuid128();
+            Quantity = p.ReadUInt32();
+
+            // V3_4_3 (WotLK Classic) reordered the trailing fields and inserted MuID
+            // (the 1-based vendor slot index returned in SMSG_VENDOR_INVENTORY).
+            // Reading the older (pre-WotLK) layout against this packet shifts every
+            // following field, so the proxy forwarded a garbage Slot to the legacy
+            // server and the buy was silently rejected. Layout mirrors fork
+            // HermesProxy-WOTLK Server/Packets/BuyItem.cs:Read for ExpansionVersion>=3.
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                MuID = p.ReadUInt32();
+                Slot = p.ReadUInt32();
+                ItemType = (ItemVendorType)p.ReadInt32();
+                Item.Read(p);
+            }
+            else
+            {
+                Slot = p.ReadUInt32();
+                BagSlot = p.ReadUInt32();
+                Item.Read(p);
+                ItemType = (ItemVendorType)p.ReadBits<int>(3);
+            }
+        }
+
+        public WowGuid128 VendorGUID;
+        public ItemInstance Item;
+        public uint MuID;
+        public uint Slot;
+        public uint BagSlot;
+        public ItemVendorType ItemType;
+        public uint Quantity;
+        public WowGuid128 ContainerGUID;
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class SellItem
+    {
+        public void Read(WorldPacket p)
+        {
+            VendorGUID = p.ReadPackedGuid128();
+            ItemGUID = p.ReadPackedGuid128();
+            Amount = p.ReadUInt32();
+        }
+
+        public WowGuid128 VendorGUID;
+        public WowGuid128 ItemGUID;
+        public uint Amount;
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class SplitItem
+    {
+        public void Read(WorldPacket p)
+        {
+            Inv = new InvUpdate(p);
+            FromPackSlot = p.ReadUInt8();
+            FromSlot = p.ReadUInt8();
+            ToPackSlot = p.ReadUInt8();
+            ToSlot = p.ReadUInt8();
+            Quantity = p.ReadInt32();
+        }
+
+        public byte ToSlot;
+        public byte ToPackSlot;
+        public byte FromPackSlot;
+        public int Quantity;
+        public InvUpdate Inv;
+        public byte FromSlot;
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class SwapInvItem
+    {
+        public void Read(WorldPacket p)
+        {
+            Inv = new InvUpdate(p);
+            Slot2 = p.ReadUInt8();
+            Slot1 = p.ReadUInt8();
+        }
+
+        public InvUpdate Inv;
+        public byte Slot1; // Source Slot
+        public byte Slot2; // Destination Slot
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class SwapItem
+    {
+        public void Read(WorldPacket p)
+        {
+            Inv = new InvUpdate(p);
+            ContainerSlotB = p.ReadUInt8();
+            ContainerSlotA = p.ReadUInt8();
+            SlotB = p.ReadUInt8();
+            SlotA = p.ReadUInt8();
+        }
+
+        public InvUpdate Inv;
+        public byte SlotA;
+        public byte ContainerSlotB;
+        public byte SlotB;
+        public byte ContainerSlotA;
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class DestroyItem
+    {
+        public void Read(WorldPacket p)
+        {
+            Count = p.ReadUInt32();
+            ContainerId = p.ReadUInt8();
+            SlotNum = p.ReadUInt8();
+        }
+
+        public uint Count;
+        public byte SlotNum;
+        public byte ContainerId;
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class AutoStoreBagItem
+    {
+        public void Read(WorldPacket p)
+        {
+            Inv = new InvUpdate(p);
+            ContainerSlotA = p.ReadUInt8();
+            ContainerSlotB = p.ReadUInt8();
+            SlotA = p.ReadUInt8();
+        }
+
+        public InvUpdate Inv;
+        public byte ContainerSlotA;
+        public byte ContainerSlotB;
+        public byte SlotA;
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class AutoEquipItem
+    {
+        public void Read(WorldPacket p)
+        {
+            Inv = new InvUpdate(p);
+            PackSlot = p.ReadUInt8();
+            Slot = p.ReadUInt8();
+        }
+
+        public byte Slot;
+        public InvUpdate Inv;
+        public byte PackSlot;
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class AutoEquipItemSlot
+    {
+        public void Read(WorldPacket p)
+        {
+            Inv = new InvUpdate(p);
+            Item = p.ReadPackedGuid128();
+            ItemDstSlot = p.ReadUInt8();
+        }
+
+        public WowGuid128 Item;
+        public byte ItemDstSlot;
+        public InvUpdate Inv;
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class ReadItem
+    {
+        public void Read(WorldPacket p)
+        {
+            PackSlot = p.ReadUInt8();
+            Slot = p.ReadUInt8();
+        }
+
+        public byte PackSlot;
+        public byte Slot;
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class RepairItem
+    {
+        public void Read(WorldPacket p)
+        {
+            VendorGUID = p.ReadPackedGuid128();
+            ItemGUID = p.ReadPackedGuid128();
+            UseGuildBank = p.HasBit();
+        }
+
+        public WowGuid128 VendorGUID;
+        public WowGuid128 ItemGUID;
+        public bool UseGuildBank;
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class SocketGems
+    {
+        public void Read(WorldPacket p)
+        {
+            ItemGuid = p.ReadPackedGuid128();
+            for (int i = 0; i < ItemConst.MaxGemSockets; ++i)
+                Gems[i] = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 ItemGuid;
+        public WowGuid128[] Gems = new WowGuid128[ItemConst.MaxGemSockets];
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class OpenItem
+    {
+        public void Read(WorldPacket p)
+        {
+            PackSlot = p.ReadUInt8();
+            Slot = p.ReadUInt8();
+        }
+
+        public byte PackSlot;
+        public byte Slot;
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class SetAmmo
+    {
+        public void Read(WorldPacket p)
+        {
+            ItemId = p.ReadUInt32();
+        }
+
+        public uint ItemId;
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class CancelTempEnchantment
+    {
+        public void Read(WorldPacket p)
+        {
+            EnchantmentSlot = p.ReadUInt32();
+        }
+
+        public uint EnchantmentSlot;
+    }
+
+    /// Frozen verbatim from <c>ItemPackets.cs</c>.
+    internal sealed class WrapItem
+    {
+        public void Read(WorldPacket p)
+        {
+            _ = p.ReadUInt8(); // Unknown Value. Usually 128
+            GiftBag = p.ReadUInt8();
+            GiftSlot = p.ReadUInt8();
+            ItemBag = p.ReadUInt8();
+            ItemSlot = p.ReadUInt8();
+        }
+
+        public byte GiftBag;
+        public byte GiftSlot;
+        public byte ItemBag;
+        public byte ItemSlot;
+    }
 }

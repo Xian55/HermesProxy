@@ -1,9 +1,14 @@
+using Framework.IO;
 using HermesProxy.World;
 using HermesProxy.World.Server.Packets;
 using Xunit;
 
 namespace HermesProxy.Tests.World.Server;
 
+/// <summary>
+/// Pins the field order on <c>CMSG_AUTO_STORE_BAG_ITEM</c>: the inventory preamble, then source
+/// bag, destination bag, source slot — not the bag/slot/bag/slot pairing the name suggests.
+/// </summary>
 public class AutoStoreBagItemTests
 {
     [Fact]
@@ -16,13 +21,15 @@ public class AutoStoreBagItemTests
         payload.WriteUInt8(255);
         payload.WriteUInt8(4);
 
-        using var packet = new AutoStoreBagItem(new WorldPacket(Frame(payload.GetData())));
-        packet.Read();
+        // Through the production accessor, as the dispatch site builds it.
+        var reader = new SpanPacketReader(new WorldPacket(Frame(payload.GetData())).GetRemainingSpan());
+        AutoStoreBagItemCodec.Read(ref reader, out var packet);
 
         Assert.Equal(255, packet.ContainerSlotA);
         Assert.Equal(255, packet.ContainerSlotB);
         Assert.Equal(4, packet.SlotA);
-        Assert.Empty(packet.Inv.Items);
+        Assert.Equal(0, packet.Inv.Count);
+        Assert.Equal(0, reader.Remaining);
     }
 
     static byte[] Frame(byte[] body)

@@ -53,6 +53,12 @@ def freeze(name: str, body: str, source: str) -> str:
         "\n",
         inner,
     )
+    # A constructor that carries a body keeps it — it sets field defaults the oracle needs —
+    # but loses the parameter and the base call, since the frozen copy has no base class.
+    inner = inner.replace(
+        "public " + name + "(WorldPacket packet) : base(packet)",
+        "public " + name + "()",
+    )
     inner = inner.replace("public override void Read()", "public void Read(WorldPacket p)")
     inner = inner.replace("_worldPacket", "p")
 

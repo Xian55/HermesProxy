@@ -20,6 +20,7 @@ using System;
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using System.Runtime.CompilerServices;
 using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
@@ -56,50 +57,19 @@ public class SetProficiency : ServerPacket, ISpanWritable
 /// <summary>Data only — parsing lives in <c>BuyBackItemCodec</c>, behaviour in <c>ItemSystem</c>.</summary>
 public readonly record struct BuyBackItem(WowGuid128 VendorGUID, uint Slot);
 
-public class BuyItem : ClientPacket
-{
-    public BuyItem(WorldPacket packet) : base(packet)
-    {
-        Item = new ItemInstance();
-    }
-
-    public override void Read()
-    {
-        VendorGUID = _worldPacket.ReadPackedGuid128();
-        ContainerGUID = _worldPacket.ReadPackedGuid128();
-        Quantity = _worldPacket.ReadUInt32();
-
-        // V3_4_3 (WotLK Classic) reordered the trailing fields and inserted MuID
-        // (the 1-based vendor slot index returned in SMSG_VENDOR_INVENTORY).
-        // Reading the older (pre-WotLK) layout against this packet shifts every
-        // following field, so the proxy forwarded a garbage Slot to the legacy
-        // server and the buy was silently rejected. Layout mirrors fork
-        // HermesProxy-WOTLK Server/Packets/BuyItem.cs:Read for ExpansionVersion>=3.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            MuID = _worldPacket.ReadUInt32();
-            Slot = _worldPacket.ReadUInt32();
-            ItemType = (ItemVendorType)_worldPacket.ReadInt32();
-            Item.Read(_worldPacket);
-        }
-        else
-        {
-            Slot = _worldPacket.ReadUInt32();
-            BagSlot = _worldPacket.ReadUInt32();
-            Item.Read(_worldPacket);
-            ItemType = (ItemVendorType)_worldPacket.ReadBits<int>(3);
-        }
-    }
-
-    public WowGuid128 VendorGUID;
-    public ItemInstance Item;
-    public uint MuID;
-    public uint Slot;
-    public uint BagSlot;
-    public ItemVendorType ItemType;
-    public uint Quantity;
-    public WowGuid128 ContainerGUID;
-}
+/// <param name="MuID">
+/// The 1-based vendor slot index from SMSG_VENDOR_INVENTORY. Sent only by V3_4_3, which is
+/// what the legacy CMSG_BUY_ITEM wants in its slot field.
+/// </param>
+public readonly record struct BuyItem(
+    WowGuid128 VendorGUID,
+    WowGuid128 ContainerGUID,
+    uint Quantity,
+    uint MuID,
+    uint Slot,
+    uint BagSlot,
+    ItemVendorType ItemType,
+    ItemInstance Item);
 
 public class BuySucceeded : ServerPacket, ISpanWritable
 {
@@ -247,21 +217,7 @@ class ItemPushResult : ServerPacket, ISpanWritable
     }
 }
 
-public class SellItem : ClientPacket
-{
-    public SellItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        VendorGUID = _worldPacket.ReadPackedGuid128();
-        ItemGUID = _worldPacket.ReadPackedGuid128();
-        Amount = _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 VendorGUID;
-    public WowGuid128 ItemGUID;
-    public uint Amount;
-}
+public readonly record struct SellItem(WowGuid128 VendorGUID, WowGuid128 ItemGUID, uint Amount);
 
 public class SellResponse : ServerPacket, ISpanWritable
 {
@@ -310,156 +266,60 @@ public class SellResponse : ServerPacket, ISpanWritable
     public int Reason;
 }
 
-public class SplitItem : ClientPacket
+public readonly record struct SplitItem(
+    InvUpdate Inv,
+    byte FromPackSlot,
+    byte FromSlot,
+    byte ToPackSlot,
+    byte ToSlot,
+    int Quantity);
+
+/// <param name="Slot1">Source slot.</param>
+/// <param name="Slot2">Destination slot — but see the handler: V3_4_3 packs them the other way round.</param>
+public readonly record struct SwapInvItem(InvUpdate Inv, byte Slot2, byte Slot1);
+
+public readonly record struct SwapItem(
+    InvUpdate Inv,
+    byte ContainerSlotB,
+    byte ContainerSlotA,
+    byte SlotB,
+    byte SlotA);
+
+public readonly record struct AutoEquipItem(InvUpdate Inv, byte PackSlot, byte Slot);
+
+public readonly record struct AutoStoreBagItem(
+    InvUpdate Inv,
+    byte ContainerSlotA,
+    byte ContainerSlotB,
+    byte SlotA);
+
+public readonly record struct AutoEquipItemSlot(InvUpdate Inv, WowGuid128 Item, byte ItemDstSlot);
+
+/// <summary>
+/// The inventory-change preamble the modern client prefixes to every item move.
+/// </summary>
+/// <remarks>
+/// No handler reads it — it is consumed to stay aligned with the fields that follow — but it is
+/// carried faithfully rather than skipped, so a layout change shows up as a field mismatch
+/// instead of a silent offset. The count is two bits, so at most three entries: an inline array
+/// keeps the whole thing on the stack, which matters because this rides along with every drag.
+/// </remarks>
+public readonly record struct InvUpdate(byte Count, InvItems Items)
 {
-    public SplitItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Inv = new InvUpdate(_worldPacket);
-        FromPackSlot = _worldPacket.ReadUInt8();
-        FromSlot = _worldPacket.ReadUInt8();
-        ToPackSlot = _worldPacket.ReadUInt8();
-        ToSlot = _worldPacket.ReadUInt8();
-        Quantity = _worldPacket.ReadInt32();
-    }
-
-    public byte ToSlot;
-    public byte ToPackSlot;
-    public byte FromPackSlot;
-    public int Quantity;
-    public InvUpdate Inv;
-    public byte FromSlot;
+    /// <summary>The count is read from two bits, so it can never exceed this.</summary>
+    public const int MaxItems = 3;
 }
 
-public class SwapInvItem : ClientPacket
+public readonly record struct InvItem(byte ContainerSlot, byte Slot);
+
+/// <summary>Storage for <see cref="InvUpdate.Items"/>; the 2-bit count caps it at three.</summary>
+[InlineArray(InvUpdate.MaxItems)]
+public struct InvItems
 {
-    public SwapInvItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Inv = new InvUpdate(_worldPacket);
-        Slot2 = _worldPacket.ReadUInt8();
-        Slot1 = _worldPacket.ReadUInt8();
-    }
-
-    public InvUpdate Inv;
-    public byte Slot1; // Source Slot
-    public byte Slot2; // Destination Slot
+    private InvItem _element0;
 }
 
-public class SwapItem : ClientPacket
-{
-    public SwapItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Inv = new InvUpdate(_worldPacket);
-        ContainerSlotB = _worldPacket.ReadUInt8();
-        ContainerSlotA = _worldPacket.ReadUInt8();
-        SlotB = _worldPacket.ReadUInt8();
-        SlotA = _worldPacket.ReadUInt8();
-    }
-
-    public InvUpdate Inv;
-    public byte SlotA;
-    public byte ContainerSlotB;
-    public byte SlotB;
-    public byte ContainerSlotA;
-}
-
-public class AutoEquipItem : ClientPacket
-{
-    public AutoEquipItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Inv = new InvUpdate(_worldPacket);
-        PackSlot = _worldPacket.ReadUInt8();
-        Slot = _worldPacket.ReadUInt8();
-    }
-
-    public byte Slot;
-    public InvUpdate Inv;
-    public byte PackSlot;
-}
-
-public class AutoStoreBagItem : ClientPacket
-{
-    public AutoStoreBagItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Inv = new InvUpdate(_worldPacket);
-        ContainerSlotA = _worldPacket.ReadUInt8();
-        ContainerSlotB = _worldPacket.ReadUInt8();
-        SlotA = _worldPacket.ReadUInt8();
-    }
-
-    public InvUpdate Inv;
-    public byte ContainerSlotA;
-    public byte ContainerSlotB;
-    public byte SlotA;
-}
-
-class AutoEquipItemSlot : ClientPacket
-{
-    public AutoEquipItemSlot(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Inv = new InvUpdate(_worldPacket);
-        Item = _worldPacket.ReadPackedGuid128();
-        ItemDstSlot = _worldPacket.ReadUInt8();
-    }
-
-    public WowGuid128 Item;
-    public byte ItemDstSlot;
-    public InvUpdate Inv;
-}
-
-public struct InvUpdate
-{
-    public InvUpdate(WorldPacket data)
-    {
-        Items = new List<InvItem>();
-        int size = data.ReadBits<int>(2);
-        data.ResetBitPos();
-        for (int i = 0; i < size; ++i)
-        {
-            var item = new InvItem
-            {
-                ContainerSlot = data.ReadUInt8(),
-                Slot = data.ReadUInt8()
-            };
-            Items.Add(item);
-        }
-    }
-
-    public List<InvItem> Items;
-
-    public struct InvItem
-    {
-        public byte ContainerSlot;
-        public byte Slot;
-    }
-}
-
-public class DestroyItem : ClientPacket
-{
-    public DestroyItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Count = _worldPacket.ReadUInt32();
-        ContainerId = _worldPacket.ReadUInt8();
-        SlotNum = _worldPacket.ReadUInt8();
-    }
-
-    public uint Count;
-    public byte SlotNum;
-    public byte ContainerId;
-}
+public readonly record struct DestroyItem(uint Count, byte ContainerId, byte SlotNum);
 
 public class ItemInstance
 {
@@ -636,19 +496,7 @@ public class ItemModList
     }
 }
 
-class ReadItem : ClientPacket
-{
-    public ReadItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PackSlot = _worldPacket.ReadUInt8();
-        Slot = _worldPacket.ReadUInt8();
-    }
-
-    public byte PackSlot;
-    public byte Slot;
-}
+public readonly record struct ReadItem(byte PackSlot, byte Slot);
 
 class ReadItemResultFailed : ServerPacket, ISpanWritable
 {
@@ -795,35 +643,15 @@ public class InventoryChangeFailure : ServerPacket, ISpanWritable
     public WowGuid128[] Item = new WowGuid128[2];
 }
 
-public class RepairItem : ClientPacket
+public readonly record struct RepairItem(WowGuid128 VendorGUID, WowGuid128 ItemGUID, bool UseGuildBank);
+
+public readonly record struct SocketGems(WowGuid128 ItemGuid, GemSockets Gems);
+
+/// <summary>Storage for <see cref="SocketGems.Gems"/>, one entry per socket.</summary>
+[InlineArray(ItemConst.MaxGemSockets)]
+public struct GemSockets
 {
-    public RepairItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        VendorGUID = _worldPacket.ReadPackedGuid128();
-        ItemGUID = _worldPacket.ReadPackedGuid128();
-        UseGuildBank = _worldPacket.HasBit();
-    }
-
-    public WowGuid128 VendorGUID;
-    public WowGuid128 ItemGUID;
-    public bool UseGuildBank;
-}
-
-class SocketGems : ClientPacket
-{
-    public SocketGems(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        ItemGuid = _worldPacket.ReadPackedGuid128();
-        for (int i = 0; i < ItemConst.MaxGemSockets; ++i)
-            Gems[i] = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 ItemGuid;
-    public WowGuid128[] Gems = new WowGuid128[ItemConst.MaxGemSockets];
+    private WowGuid128 _element0;
 }
 
 class SocketGemsSuccess : ServerPacket, ISpanWritable
@@ -895,31 +723,9 @@ class ItemCooldown : ServerPacket, ISpanWritable
     public uint Cooldown;
 }
 
-public class OpenItem : ClientPacket
-{
-    public OpenItem(WorldPacket packet) : base(packet) { }
+public readonly record struct OpenItem(byte PackSlot, byte Slot);
 
-    public override void Read()
-    {
-        PackSlot = _worldPacket.ReadUInt8();
-        Slot = _worldPacket.ReadUInt8();
-    }
-
-    public byte PackSlot;
-    public byte Slot;
-}
-
-public class SetAmmo : ClientPacket
-{
-    public SetAmmo(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        ItemId = _worldPacket.ReadUInt32();
-    }
-
-    public uint ItemId;
-}
+public readonly record struct SetAmmo(uint ItemId);
 
 class ItemEnchantTimeUpdate : ServerPacket, ISpanWritable
 {
@@ -987,36 +793,9 @@ class EnchantmentLog : ServerPacket, ISpanWritable
     public int EnchantSlot;
 }
 
-public class CancelTempEnchantment : ClientPacket
-{
-    public CancelTempEnchantment(WorldPacket packet) : base(packet) { }
+public readonly record struct CancelTempEnchantment(uint EnchantmentSlot);
 
-    public override void Read()
-    {
-        EnchantmentSlot = _worldPacket.ReadUInt32();
-    }
-
-    public uint EnchantmentSlot;
-}
-
-public class WrapItem : ClientPacket
-{
-    public WrapItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        _ = _worldPacket.ReadUInt8(); // Unknown Value. Usually 128
-        GiftBag = _worldPacket.ReadUInt8();
-        GiftSlot = _worldPacket.ReadUInt8();
-        ItemBag = _worldPacket.ReadUInt8();
-        ItemSlot = _worldPacket.ReadUInt8();
-    }
-
-    public byte GiftBag;
-    public byte GiftSlot;
-    public byte ItemBag;
-    public byte ItemSlot;
-}
+public readonly record struct WrapItem(byte GiftBag, byte GiftSlot, byte ItemBag, byte ItemSlot);
 
 internal static class ItemPacketHelpers
 {
