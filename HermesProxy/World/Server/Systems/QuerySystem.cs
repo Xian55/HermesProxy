@@ -93,4 +93,11 @@ public static class QuerySystem
         packet.WriteGuid(legacy ?? queryName.UnitGUID.To64(ctx.GetSession().GameState));
         ctx.SendPacketToServer(packet);
     }
+
+    [HandlesCmsg(Opcode.CMSG_QUERY_TIME)]
+    public static void HandleQueryTime(in EmptyClientPacket queryTime, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_QUERY_TIME);
+        ctx.SendPacketToServer(packet);
+    }
 }

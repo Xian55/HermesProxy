@@ -27,17 +27,7 @@ public partial class WorldSocket
         SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_RESET_INSTANCES)]
-    void HandleResetInstances(EmptyClientPacket reset)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_RESET_INSTANCES);
-        SendPacketToServer(packet);
-    }
 
-    [PacketHandler(Opcode.CMSG_REQUEST_RAID_INFO)]
-    void HandleRequestRaidInfo(EmptyClientPacket reset)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_REQUEST_RAID_INFO);
-        SendPacketToServer(packet);
-    }
+
+
 }

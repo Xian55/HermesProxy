@@ -482,36 +482,7 @@ public partial class WorldSocket
         packet.WriteUInt32(aura.SpellID);
         SendPacketToServer(packet);
     }
-    [PacketHandler(Opcode.CMSG_CANCEL_MOUNT_AURA)]
-    void HandleCancelMountAura(EmptyClientPacket cancel)
-    {
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-        {
-            WorldPacket packet = new WorldPacket(Opcode.CMSG_CANCEL_MOUNT_AURA);
-            SendPacketToServer(packet);
-        }
-        else
-        {
-            WowGuid128 guid = GetSession().GameState.CurrentPlayerGuid;
-            var updateFields = GetSession().GameState.GetCachedObjectFieldsLegacy(guid);
-            if (updateFields == null)
-                return;
 
-            for (byte i = 0; i < 32; i++)
-            {
-                var aura = GetSession().WorldClient!.ReadAuraSlot(i, guid, updateFields);
-                if (aura == null)
-                    continue;
-
-                if (GameData.MountAuras.Contains(aura.SpellID))
-                {
-                    WorldPacket packet = new WorldPacket(Opcode.CMSG_CANCEL_AURA);
-                    packet.WriteUInt32(aura.SpellID);
-                    SendPacketToServer(packet);
-                }
-            }
-        }
-    }
     [PacketHandler(Opcode.CMSG_LEARN_TALENT)]
     void HandleLearnTalent(LearnTalent talent)
     {

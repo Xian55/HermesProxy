@@ -7,16 +7,7 @@ namespace HermesProxy.World.Server;
 
 public partial class WorldSocket
 {
-    [PacketHandler(Opcode.CMSG_BATTLE_PET_REQUEST_JOURNAL)]
-    void HandleBattlePetRequestJournal(EmptyClientPacket request)
-    {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
-            return;
 
-        EnsureCollectionFavorites();
-        SendPacket(BattlePetJournal.FromSession(GetSession().GameState));
-        CollectionSync.SendSummonedBattlePet(GetSession());
-    }
 
     [PacketHandler(Opcode.CMSG_BATTLE_PET_SUMMON)]
     void HandleBattlePetSummon(BattlePetSummon summon)
@@ -49,7 +40,7 @@ public partial class WorldSocket
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
             return;
 
-        var favorites = EnsureCollectionFavorites();
+        var favorites = Systems.BattlePetSystem.EnsureCollectionFavorites(GetSession());
         uint speciesId = (uint)setFlags.PetGuid.GetCounter();
         if (speciesId == 0)
             return;
@@ -72,21 +63,13 @@ public partial class WorldSocket
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
             return;
 
-        var favorites = EnsureCollectionFavorites();
+        var favorites = Systems.BattlePetSystem.EnsureCollectionFavorites(GetSession());
         if (setFavorite.IsFavorite)
             favorites.FavoriteMountSpells.Add(setFavorite.MountSpellID);
         else
             favorites.FavoriteMountSpells.Remove(setFavorite.MountSpellID);
         GetSession().AccountMetaDataMgr.SaveCollectionFavorites(favorites);
         SendPacket(AccountMountUpdate.FromSession(GetSession().GameState));
-    }
-
-    CollectionFavorites EnsureCollectionFavorites()
-    {
-        var state = GetSession().GameState;
-        if (state.CollectionFavorites == null)
-            state.CollectionFavorites = GetSession().AccountMetaDataMgr.LoadCollectionFavorites();
-        return state.CollectionFavorites;
     }
 
     void CastCompanionSpell(uint spellId)

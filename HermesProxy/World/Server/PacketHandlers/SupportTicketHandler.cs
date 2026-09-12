@@ -12,18 +12,9 @@ public partial class WorldSocket
     // parity with native, not a working support portal - the 3.4.3 customer support UI hangs on
     // "loading" against a native server too, even when it replies enabled with zero cases, because
     // the UI expects Blizzard's web backend. Without these the proxy logged "No handler" instead.
-    [PacketHandler(Opcode.CMSG_GM_TICKET_GET_SYSTEM_STATUS)]
-    void HandleGMTicketGetSystemStatus(EmptyClientPacket packet)
-    {
-        // Forward so the answer reflects the backend's own ticket-system setting.
-        SendPacketToServer(new WorldPacket(Opcode.CMSG_GM_TICKET_GET_SYSTEM_STATUS));
-    }
 
-    [PacketHandler(Opcode.CMSG_GM_TICKET_GET_CASE_STATUS)]
-    void HandleGMTicketGetCaseStatus(EmptyClientPacket packet)
-    {
-        SendPacket(new GMTicketCaseStatus());
-    }
+
+
 
     [PacketHandler(Opcode.CMSG_SUPPORT_TICKET_SUBMIT_COMPLAINT)]
     void HandleSupportTicketSubmitComplaint(SupportTicketSubmitComplaint complaint)

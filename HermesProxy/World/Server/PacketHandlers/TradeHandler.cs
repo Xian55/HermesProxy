@@ -43,16 +43,7 @@ public partial class WorldSocket
         SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_BEGIN_TRADE)]
-    [PacketHandler(Opcode.CMSG_BUSY_TRADE)]
-    [PacketHandler(Opcode.CMSG_CANCEL_TRADE)]
-    [PacketHandler(Opcode.CMSG_UNACCEPT_TRADE)]
-    [PacketHandler(Opcode.CMSG_IGNORE_TRADE)]
-    void HandleEmptyTradePacket(EmptyClientPacket trade)
-    {
-        WorldPacket packet = new WorldPacket(trade.GetUniversalOpcode());
-        SendPacketToServer(packet);
-    }
+
 
     [PacketHandler(Opcode.CMSG_CLEAR_TRADE_ITEM)]
     void HandleClearTradeItem(ClearTradeItem trade)

@@ -27,23 +27,11 @@ using HermesProxy.World.Objects;
 
 namespace HermesProxy.World.Server.Packets;
 
-public class EmptyClientPacket : ClientPacket
-{
-    public EmptyClientPacket(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        // Was a Trace.Assert, which is compiled into Release and aborts the process rather
-        // than throwing. This type backs a lot of client-facing handlers, so any client
-        // sending a payload we expect to be empty took the whole proxy down. Unread bytes
-        // mean our layout is wrong, which is worth knowing but never worth aborting for.
-        if (_worldPacket.CanRead())
-        {
-            Log.Print(LogType.Debug,
-                $"Expected an empty payload for opcode {_worldPacket.GetUniversalOpcode(isModern: true)} but {_worldPacket.Remaining()} bytes remain.");
-        }
-    }
-}
+/// <summary>
+/// A message whose opcode is the whole content. Shared by every empty-payload CMSG, because the
+/// type carries no information — the opcode does, and shape-B systems receive it as a parameter.
+/// </summary>
+public readonly record struct EmptyClientPacket;
 
 public class BindPointUpdate : ServerPacket, ISpanWritable
 {

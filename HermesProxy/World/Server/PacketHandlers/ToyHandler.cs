@@ -19,7 +19,7 @@ public partial class WorldSocket
             return;
 
         var session = GetSession();
-        var favorites = EnsureCollectionFavorites();
+        var favorites = Systems.BattlePetSystem.EnsureCollectionFavorites(GetSession());
         bool firstLearn = favorites.LearnedToys.Add(itemId);
         if (firstLearn)
             session.AccountMetaDataMgr.SaveCollectionFavorites(favorites);
@@ -106,7 +106,7 @@ public partial class WorldSocket
         if (setFavorite.Type != ItemCollectionType.Toy || setFavorite.ID == 0)
             return;
 
-        var favorites = EnsureCollectionFavorites();
+        var favorites = Systems.BattlePetSystem.EnsureCollectionFavorites(GetSession());
         if (setFavorite.IsFavorite)
             favorites.FavoriteToys.Add(setFavorite.ID);
         else

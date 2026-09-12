@@ -289,4 +289,10 @@ public static class ChatSystem
 
         return toBeSendTextParts;
     }
+
+    [HandlesCmsg(Opcode.CMSG_CHAT_UNREGISTER_ALL_ADDON_PREFIXES)]
+    public static void HandleChatUnregisterAllAddonPrefixes(in EmptyClientPacket addons, in SessionContext ctx)
+    {
+        ctx.GetSession().GameState.AddonPrefixes.Clear();
+    }
 }

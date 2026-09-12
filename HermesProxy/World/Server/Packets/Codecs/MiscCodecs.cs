@@ -119,3 +119,27 @@ public static class SetRaidDifficultyCodec
         packet = new SetRaidDifficulty(difficultyId, legacy);
     }
 }
+
+public static class EmptyClientPacketCodec
+{
+    /// <summary>
+    /// Reads nothing — but checks that there was nothing to read.
+    /// </summary>
+    /// <remarks>
+    /// The class this replaced carried the same check. Leftover bytes on a packet we believe is
+    /// empty mean our layout is wrong, which is worth a line in the log and never worth more: it
+    /// was a <c>Trace.Assert</c> once, which is compiled into Release and aborted the whole proxy
+    /// over one malformed client packet. The opcode is no longer available here — a data-only
+    /// packet has none — so the shape-B systems that take it are where to look when this fires.
+    /// </remarks>
+    public static void Read(ref SpanPacketReader r, out EmptyClientPacket packet)
+    {
+        if (r.CanRead)
+        {
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Debug,
+                $"Expected an empty payload but {r.Remaining} bytes remain.");
+        }
+
+        packet = default;
+    }
+}

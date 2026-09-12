@@ -69,11 +69,7 @@ public partial class WorldSocket
             GetSession().GameState.AddonPrefixes.Add(prefix);
     }
 
-    [PacketHandler(Opcode.CMSG_CHAT_UNREGISTER_ALL_ADDON_PREFIXES)]
-    void HandleChatUnregisterAllAddonPrefixes(EmptyClientPacket addons)
-    {
-        GetSession().GameState.AddonPrefixes.Clear();
-    }
+
 
     private static List<string> ConvertTextMessageIntoMaxLengthParts(string originalTextMessage)
     {

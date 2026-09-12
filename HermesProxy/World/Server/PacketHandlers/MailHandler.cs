@@ -12,12 +12,7 @@ namespace HermesProxy.World.Server;
 public partial class WorldSocket
 {
     // Handlers for CMSG opcodes coming from the modern client
-    [PacketHandler(Opcode.CMSG_QUERY_NEXT_MAIL_TIME)]
-    void HandleMailGetList(EmptyClientPacket mail)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.MSG_QUERY_NEXT_MAIL_TIME);
-        SendPacketToServer(packet);
-    }
+
 
     [PacketHandler(Opcode.CMSG_MAIL_GET_LIST)]
     void HandleMailGetList(MailGetList mail)
