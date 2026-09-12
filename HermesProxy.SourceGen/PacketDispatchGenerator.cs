@@ -44,6 +44,7 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
 {
     private const string CmsgAttributeFullName = "HermesProxy.World.Dispatch.HandlesCmsgAttribute";
     private const string SmsgAttributeFullName = "HermesProxy.World.Dispatch.HandlesSmsgAttribute";
+    private const string CodecAttributeFullName = "HermesProxy.World.Dispatch.PacketCodecAttribute";
 
     private const string DispatchNamespace = "HermesProxy.World.Dispatch";
     private const string OpcodeFullName = "global::HermesProxy.World.Enums.Opcode";
@@ -88,14 +89,57 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
     {
         var cmsg = Collect(context, CmsgAttributeFullName);
         var smsg = Collect(context, SmsgAttributeFullName);
+        var codecs = CollectCodecs(context);
 
-        context.RegisterSourceOutput(cmsg, static (ctx, handlers) =>
-            EmitTable(ctx, handlers, "GeneratedCmsgDispatch", ModernVersionFullName,
+        context.RegisterSourceOutput(cmsg.Combine(codecs), static (ctx, pair) =>
+            EmitTable(ctx, pair.Left, pair.Right, "GeneratedCmsgDispatch", ModernVersionFullName,
                       "modern client → proxy (CMSG)"));
 
-        context.RegisterSourceOutput(smsg, static (ctx, handlers) =>
-            EmitTable(ctx, handlers, "GeneratedSmsgDispatch", LegacyVersionFullName,
+        context.RegisterSourceOutput(smsg.Combine(codecs), static (ctx, pair) =>
+            EmitTable(ctx, pair.Left, pair.Right, "GeneratedSmsgDispatch", LegacyVersionFullName,
                       "legacy emulator → proxy (SMSG)"));
+    }
+
+    /// Codecs that declare a build range. A packet with none of these keeps the convention
+    /// lookup, so ranging is opt-in per packet rather than a new requirement on all of them.
+    private static IncrementalValueProvider<ImmutableArray<CodecModel>> CollectCodecs(
+        IncrementalGeneratorInitializationContext context)
+    {
+        return context.SyntaxProvider
+            .ForAttributeWithMetadataName(
+                CodecAttributeFullName,
+                predicate: static (node, _) => true,
+                transform: static (ctx, _) => ParseCodec(ctx))
+            .Where(static m => m is not null)
+            .Select(static (m, _) => m!)
+            .Collect();
+    }
+
+    private static CodecModel? ParseCodec(GeneratorAttributeSyntaxContext ctx)
+    {
+        if (ctx.TargetSymbol is not INamedTypeSymbol codec)
+            return null;
+
+        var attr = ctx.Attributes[0];
+        if (attr.ConstructorArguments.Length != 1)
+            return null;
+        if (attr.ConstructorArguments[0].Value is not INamedTypeSymbol packetType)
+            return null;
+
+        bool againstLegacy = false;
+        foreach (var na in attr.NamedArguments)
+        {
+            if (na.Key == "AgainstLegacyVersion" && na.Value.Value is bool b)
+                againstLegacy = b;
+        }
+
+        return new CodecModel(
+            CodecFullName: codec.ToDisplayString(),
+            PacketFullName: packetType.ToDisplayString(),
+            AddedIn: NamedBuild(attr, "AddedIn"),
+            RemovedIn: NamedBuild(attr, "RemovedIn"),
+            AgainstLegacyVersion: againstLegacy,
+            Location: codec.Locations.FirstOrDefault() ?? Location.None);
     }
 
     private static IncrementalValueProvider<ImmutableArray<HandlerModel>> Collect(
@@ -257,10 +301,20 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
     private static void EmitTable(
         SourceProductionContext ctx,
         ImmutableArray<HandlerModel> handlers,
+        ImmutableArray<CodecModel> codecs,
         string className,
         string versionClass,
         string directionDescription)
     {
+        // Ranged codecs, indexed by the packet they read.
+        var rangedByPacket = new Dictionary<string, List<CodecModel>>(StringComparer.Ordinal);
+        foreach (var c in codecs)
+        {
+            if (!rangedByPacket.TryGetValue(c.PacketFullName, out var list))
+                rangedByPacket[c.PacketFullName] = list = new List<CodecModel>();
+            list.Add(c);
+        }
+
         var usable = new List<HandlerModel>();
         foreach (var h in handlers)
         {
@@ -269,6 +323,25 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
                 ctx.ReportDiagnostic(Diagnostic.Create(BadSignature, h.Location, h.MethodDisplay, h.ShapeError));
                 continue;
             }
+
+            // A packet with declared codecs uses them, one table candidate each, chosen by the
+            // build once at table-build time. Otherwise the convention lookup stands.
+            if (h.PacketTypeFullName is not null &&
+                rangedByPacket.TryGetValue(h.PacketTypeFullName, out var declared))
+            {
+                foreach (var c in declared)
+                {
+                    usable.Add(h with
+                    {
+                        CodecFullName = c.CodecFullName,
+                        CodecAddedIn = c.AddedIn,
+                        CodecRemovedIn = c.RemovedIn,
+                        CodecAgainstLegacy = c.AgainstLegacyVersion,
+                    });
+                }
+                continue;
+            }
+
             if (h.CodecFullName is null)
             {
                 string packet = h.PacketTypeFullName ?? "?";
@@ -328,8 +401,15 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
             if (all.Count < 2)
                 continue;
 
-            var unranged = all.Where(h => h.AddedIn is null && h.RemovedIn is null).ToList();
-            var ranged = all.Where(h => h.AddedIn is not null || h.RemovedIn is not null).ToList();
+            // "Ranged" means the candidate is guarded by *something* — a handler range or a codec
+            // range. A packet with two ranged codecs legitimately produces two candidates for one
+            // opcode, and that must not read as a duplicate claim.
+            static bool IsRanged(HandlerModel h)
+                => h.AddedIn is not null || h.RemovedIn is not null
+                || h.CodecAddedIn is not null || h.CodecRemovedIn is not null;
+
+            var unranged = all.Where(h => !IsRanged(h)).ToList();
+            var ranged = all.Where(IsRanged).ToList();
 
             if (unranged.Count > 0 && ranged.Count > 0)
             {
@@ -350,7 +430,10 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
 
             for (int i = 1; i < ranged.Count; i++)
             {
-                if (ranged[i].AddedIn == ranged[i - 1].AddedIn && ranged[i].RemovedIn == ranged[i - 1].RemovedIn)
+                if (ranged[i].AddedIn == ranged[i - 1].AddedIn &&
+                    ranged[i].RemovedIn == ranged[i - 1].RemovedIn &&
+                    ranged[i].CodecAddedIn == ranged[i - 1].CodecAddedIn &&
+                    ranged[i].CodecRemovedIn == ranged[i - 1].CodecRemovedIn)
                 {
                     ctx.ReportDiagnostic(Diagnostic.Create(OverlappingRanges, ranged[i].Location,
                         group.Key, ranged[i - 1].MethodDisplay, ranged[i].MethodDisplay));
@@ -482,13 +565,74 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
     /// statics are `static readonly`, it is evaluated exactly once when the table is built.
     private static string BuildCondition(HandlerModel h, string versionClass)
     {
-        const string cvb = "global::HermesProxy.Enums.ClientVersionBuild";
         var parts = new List<string>();
+
         if (h.AddedIn is not null)
-            parts.Add($"{versionClass}.AddedInVersion({cvb}.{h.AddedIn})");
+            parts.Add(Added(versionClass, h.AddedIn));
         if (h.RemovedIn is not null)
-            parts.Add($"{versionClass}.RemovedInVersion({cvb}.{h.RemovedIn})");
+            parts.Add(Removed(versionClass, h.RemovedIn));
+
+        // A packet's *shape* is chosen by whichever side's build produced it, which is not always
+        // the side the handler is registered on: a legacy SMSG's layout follows the server build,
+        // while a modern CMSG's follows the client build.
+        string codecVersion = h.CodecAgainstLegacy ? LegacyVersionFullName : versionClass;
+        if (h.CodecAddedIn is not null)
+            parts.Add(Added(codecVersion, h.CodecAddedIn));
+        if (h.CodecRemovedIn is not null)
+            parts.Add(Removed(codecVersion, h.CodecRemovedIn));
+
         return parts.Count == 0 ? "true" : string.Join(" && ", parts);
+    }
+
+    /// <summary>
+    /// Emits a lower-bound test against <paramref name="buildName"/>.
+    /// </summary>
+    /// <remarks>
+    /// On the modern axis this must be the expansion/major/minor overload, never the raw-build one.
+    /// ClientVersionBuild is valued by build number, and the modern side spans two release lines —
+    /// a Classic Era client (1.14.2 = 42597) compared against a Classic build (3.4.3 = 54261) is a
+    /// cross-branch comparison whose answer is meaningless. It happens to come out right for this
+    /// pair and would not for the next one. The expansion/major/minor form is parsed from the enum
+    /// *name*, so it stays correct across lines. VersionChecker.AssertComparableBranch catches the
+    /// raw form in DEBUG, and did catch this generator emitting it.
+    /// <para>
+    /// The legacy axis keeps the raw-build form: LegacyVersion has no triple overload, and every
+    /// supported legacy build is on the original line, which ClientBranchTests asserts.
+    /// </para>
+    /// </remarks>
+    private static string Added(string versionClass, string buildName)
+    {
+        if (versionClass == LegacyVersionFullName)
+            return $"{versionClass}.AddedInVersion(global::HermesProxy.Enums.ClientVersionBuild.{buildName})";
+
+        var (expansion, major, minor) = ParseVersion(buildName);
+        return $"{versionClass}.AddedInVersion({expansion}, {major}, {minor})";
+    }
+
+    /// <summary>Upper bound, exclusive. There is no three-byte RemovedInVersion, so negate.</summary>
+    private static string Removed(string versionClass, string buildName)
+    {
+        if (versionClass == LegacyVersionFullName)
+            return $"{versionClass}.RemovedInVersion(global::HermesProxy.Enums.ClientVersionBuild.{buildName})";
+
+        var (expansion, major, minor) = ParseVersion(buildName);
+        return $"!{versionClass}.AddedInVersion({expansion}, {major}, {minor})";
+    }
+
+    /// Parses "V3_4_3_54261" into (3, 4, 3). The minor segment can carry a patch letter
+    /// ("V3_0_8a_9506"), which is stripped — the same rule VersionChecker's own parser uses.
+    private static (int Expansion, int Major, int Minor) ParseVersion(string buildName)
+    {
+        string[] parts = buildName.TrimStart('V').Split('_');
+        int expansion = int.Parse(parts[0]);
+        int major = int.Parse(parts[1]);
+
+        string minorText = parts[2];
+        int end = minorText.Length;
+        while (end > 0 && !char.IsDigit(minorText[end - 1]))
+            end--;
+
+        return (expansion, major, int.Parse(minorText.Substring(0, end)));
     }
 
     private static void EmitBuildClaimed(StringBuilder sb, List<HandlerModel> usable)
@@ -514,10 +658,20 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
         sb.AppendLine("    }");
     }
 
+    /// One handler can now produce several table candidates — one per ranged codec — so the
+    /// codec has to be part of the name or they collide.
     private static string ThunkName(HandlerModel h)
     {
         string method = h.MethodFullName.Replace('.', '_');
-        return "Thunk_" + method + "_" + h.OpcodeName;
+        string name = "Thunk_" + method + "_" + h.OpcodeName;
+
+        if (h.CodecAddedIn is not null || h.CodecRemovedIn is not null)
+        {
+            int lastDot = h.CodecFullName!.LastIndexOf('.');
+            name += "_" + (lastDot >= 0 ? h.CodecFullName.Substring(lastDot + 1) : h.CodecFullName);
+        }
+
+        return name;
     }
 
     private sealed record HandlerModel(
@@ -531,5 +685,19 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
         string? AddedIn,
         string? RemovedIn,
         string? ShapeError,
+        Location Location)
+    {
+        /// Set when the codec came from a [PacketCodec] range rather than the convention lookup.
+        public string? CodecAddedIn { get; init; }
+        public string? CodecRemovedIn { get; init; }
+        public bool CodecAgainstLegacy { get; init; }
+    }
+
+    private sealed record CodecModel(
+        string CodecFullName,
+        string PacketFullName,
+        string? AddedIn,
+        string? RemovedIn,
+        bool AgainstLegacyVersion,
         Location Location);
 }

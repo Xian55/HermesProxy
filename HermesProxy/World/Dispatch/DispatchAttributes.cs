@@ -65,3 +65,45 @@ public sealed class HandlesSmsgAttribute : Attribute
     /// <inheritdoc cref="HandlesCmsgAttribute.RemovedIn"/>
     public ClientVersionBuild RemovedIn { get; init; } = ClientVersionBuild.Zero;
 }
+
+/// <summary>
+/// Marks a codec as the reader for <paramref name="packetType"/> over a build range.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Without this a packet has exactly one codec, found by convention (<c>Foo</c> ⇒ <c>FooCodec</c>),
+/// and any per-build difference in its layout has to live as an <c>if (ModernVersion.Build == …)</c>
+/// inside the read. That is the shape <c>docs/version-shape-dispatch.md</c> argues against: the
+/// branch is re-evaluated on every packet, and — because it is exact equality — a build the code
+/// has never seen silently takes the <c>else</c>, which is the V1_14/V2_5 layout. That is the
+/// cliff issue #202 walks off.
+/// </para>
+/// <para>
+/// Declaring the range as data instead lets the generator emit one thunk per candidate and choose
+/// between them once, when the table is built. The per-packet branch disappears, and a new client
+/// becomes a new codec plus a range rather than an edit to every reader.
+/// </para>
+/// <para>
+/// A packet with no <c>[PacketCodec]</c> anywhere keeps the convention lookup, so this is opt-in
+/// per packet.
+/// </para>
+/// </remarks>
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+public sealed class PacketCodecAttribute : Attribute
+{
+    public PacketCodecAttribute(Type packetType) => PacketType = packetType;
+
+    public Type PacketType { get; }
+
+    /// <inheritdoc cref="HandlesCmsgAttribute.AddedIn"/>
+    public ClientVersionBuild AddedIn { get; init; } = ClientVersionBuild.Zero;
+
+    /// <inheritdoc cref="HandlesCmsgAttribute.RemovedIn"/>
+    public ClientVersionBuild RemovedIn { get; init; } = ClientVersionBuild.Zero;
+
+    /// <summary>
+    /// Which side's build the range is measured against. Packet *shape* on the modern side is
+    /// chosen by the client build; on the legacy side by the server build.
+    /// </summary>
+    public bool AgainstLegacyVersion { get; init; }
+}

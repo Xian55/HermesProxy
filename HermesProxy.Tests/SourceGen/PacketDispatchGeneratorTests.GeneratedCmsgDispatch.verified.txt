@@ -66,6 +66,204 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ItemSystem.HandleBuyBackItem(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelCommand_CMSG_CHAT_CHANNEL_ANNOUNCEMENTS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChannelCommandCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelCommand(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_ANNOUNCEMENTS, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelDeclineInvite_CMSG_CHAT_CHANNEL_DECLINE_INVITE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChannelCommandCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelDeclineInvite(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelDisplayList_CMSG_CHAT_CHANNEL_DISPLAY_LIST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChannelCommandCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelDisplayList(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelList_CMSG_CHAT_CHANNEL_LIST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChannelCommandCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelList(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelCommand_CMSG_CHAT_CHANNEL_OWNER(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChannelCommandCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelCommand(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_OWNER, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatJoinChannel_CMSG_CHAT_JOIN_CHANNEL(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.JoinChannelCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatJoinChannel(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatLeaveChannel_CMSG_CHAT_LEAVE_CHANNEL(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.LeaveChannelCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatLeaveChannel(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageAFK_CMSG_CHAT_MESSAGE_AFK_ChatMessageAFKCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageAFKCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageAFK(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageAFK_CMSG_CHAT_MESSAGE_AFK_ChatMessageAFKCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageAFKCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageAFK(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageChannel_CMSG_CHAT_MESSAGE_CHANNEL_ChatMessageChannelCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageChannelCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageChannel(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageChannel_CMSG_CHAT_MESSAGE_CHANNEL_ChatMessageChannelCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageChannelCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageChannel(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageDND_CMSG_CHAT_MESSAGE_DND_ChatMessageDNDCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageDNDCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageDND(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageDND_CMSG_CHAT_MESSAGE_DND_ChatMessageDNDCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageDNDCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageDND(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageEmote_CMSG_CHAT_MESSAGE_EMOTE_ChatMessageEmoteCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageEmoteCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageEmote(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageEmote_CMSG_CHAT_MESSAGE_EMOTE_ChatMessageEmoteCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageEmoteCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageEmote(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_GUILD_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_GUILD, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_GUILD_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_GUILD, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_INSTANCE_CHAT_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_INSTANCE_CHAT, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_INSTANCE_CHAT_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_INSTANCE_CHAT, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_OFFICER_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_OFFICER, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_OFFICER_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_OFFICER, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_PARTY_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_PARTY, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_PARTY_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_PARTY, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_WARNING_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID_WARNING, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_WARNING_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID_WARNING, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_SAY_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_SAY, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_SAY_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_SAY, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageWhisper_CMSG_CHAT_MESSAGE_WHISPER_ChatMessageWhisperCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageWhisperCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageWhisper(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageWhisper_CMSG_CHAT_MESSAGE_WHISPER_ChatMessageWhisperCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageWhisperCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageWhisper(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_YELL_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_YELL_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL, in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCinematicPacket_CMSG_COMPLETE_CINEMATIC(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ClientCinematicPktCodec.Read(ref reader, out var packet);
@@ -206,6 +404,91 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ATTACK_STOP] = &Thunk_HermesProxy_World_Server_Systems_CombatSystem_HandleAttackStop_CMSG_ATTACK_STOP;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ATTACK_SWING] = &Thunk_HermesProxy_World_Server_Systems_CombatSystem_HandleAttackSwing_CMSG_ATTACK_SWING;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BUY_BACK_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleBuyBackItem_CMSG_BUY_BACK_ITEM;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_ANNOUNCEMENTS] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelCommand_CMSG_CHAT_CHANNEL_ANNOUNCEMENTS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_DECLINE_INVITE] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelDeclineInvite_CMSG_CHAT_CHANNEL_DECLINE_INVITE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_DISPLAY_LIST] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelDisplayList_CMSG_CHAT_CHANNEL_DISPLAY_LIST;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_LIST] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelList_CMSG_CHAT_CHANNEL_LIST;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_OWNER] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelCommand_CMSG_CHAT_CHANNEL_OWNER;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_JOIN_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatJoinChannel_CMSG_CHAT_JOIN_CHANNEL;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_LEAVE_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatLeaveChannel_CMSG_CHAT_LEAVE_CHANNEL;
+        {
+            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_AFK] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageAFK_CMSG_CHAT_MESSAGE_AFK_ChatMessageAFKCodecWotLKClassic;
+            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_AFK] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageAFK_CMSG_CHAT_MESSAGE_AFK_ChatMessageAFKCodecPreWotLKClassic;
+        }
+        {
+            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageChannel_CMSG_CHAT_MESSAGE_CHANNEL_ChatMessageChannelCodecWotLKClassic;
+            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageChannel_CMSG_CHAT_MESSAGE_CHANNEL_ChatMessageChannelCodecPreWotLKClassic;
+        }
+        {
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_DND] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageDND_CMSG_CHAT_MESSAGE_DND_ChatMessageDNDCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_DND] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageDND_CMSG_CHAT_MESSAGE_DND_ChatMessageDNDCodecWotLKClassic;
+        }
+        {
+            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_EMOTE] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageEmote_CMSG_CHAT_MESSAGE_EMOTE_ChatMessageEmoteCodecWotLKClassic;
+            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_EMOTE] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageEmote_CMSG_CHAT_MESSAGE_EMOTE_ChatMessageEmoteCodecPreWotLKClassic;
+        }
+        {
+            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_GUILD] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_GUILD_ChatMessageCodecWotLKClassic;
+            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_GUILD] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_GUILD_ChatMessageCodecPreWotLKClassic;
+        }
+        {
+            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_INSTANCE_CHAT] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_INSTANCE_CHAT_ChatMessageCodecWotLKClassic;
+            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_INSTANCE_CHAT] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_INSTANCE_CHAT_ChatMessageCodecPreWotLKClassic;
+        }
+        {
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_OFFICER] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_OFFICER_ChatMessageCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_OFFICER] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_OFFICER_ChatMessageCodecWotLKClassic;
+        }
+        {
+            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_PARTY] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_PARTY_ChatMessageCodecWotLKClassic;
+            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_PARTY] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_PARTY_ChatMessageCodecPreWotLKClassic;
+        }
+        {
+            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_ChatMessageCodecWotLKClassic;
+            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_ChatMessageCodecPreWotLKClassic;
+        }
+        {
+            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID_WARNING] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_WARNING_ChatMessageCodecWotLKClassic;
+            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID_WARNING] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_WARNING_ChatMessageCodecPreWotLKClassic;
+        }
+        {
+            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_SAY] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_SAY_ChatMessageCodecWotLKClassic;
+            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_SAY] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_SAY_ChatMessageCodecPreWotLKClassic;
+        }
+        {
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_WHISPER] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageWhisper_CMSG_CHAT_MESSAGE_WHISPER_ChatMessageWhisperCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_WHISPER] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageWhisper_CMSG_CHAT_MESSAGE_WHISPER_ChatMessageWhisperCodecWotLKClassic;
+        }
+        {
+            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_YELL_ChatMessageCodecWotLKClassic;
+            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_YELL_ChatMessageCodecPreWotLKClassic;
+        }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_COMPLETE_CINEMATIC] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCinematicPacket_CMSG_COMPLETE_CINEMATIC;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_FAR_SIGHT] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleFarSight_CMSG_FAR_SIGHT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_TEXT_QUERY] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleItemTextQuery_CMSG_ITEM_TEXT_QUERY;
@@ -242,6 +525,26 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_ATTACK_STOP,
             global::HermesProxy.World.Enums.Opcode.CMSG_ATTACK_SWING,
             global::HermesProxy.World.Enums.Opcode.CMSG_BUY_BACK_ITEM,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_ANNOUNCEMENTS,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_DECLINE_INVITE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_DISPLAY_LIST,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_LIST,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_OWNER,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_JOIN_CHANNEL,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_LEAVE_CHANNEL,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_AFK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_CHANNEL,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_DND,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_EMOTE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_GUILD,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_INSTANCE_CHAT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_OFFICER,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_PARTY,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID_WARNING,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_SAY,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_WHISPER,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL,
             global::HermesProxy.World.Enums.Opcode.CMSG_COMPLETE_CINEMATIC,
             global::HermesProxy.World.Enums.Opcode.CMSG_FAR_SIGHT,
             global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_TEXT_QUERY,

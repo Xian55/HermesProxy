@@ -46,6 +46,22 @@ public class PacketDispatchBenchmarks
         public uint Slot;
     }
 
+    private sealed class FrozenChatMessageWhisper : ClientPacket
+    {
+        public FrozenChatMessageWhisper(WorldPacket packet) : base(packet) { }
+        public override void Read()
+        {
+            Language = _worldPacket.ReadUInt32();
+            uint targetLen = _worldPacket.ReadBits<uint>(9);
+            uint textLen = _worldPacket.ReadBits<uint>(11);
+            Target = _worldPacket.ReadString(targetLen);
+            Text = _worldPacket.ReadString(textLen);
+        }
+        public uint Language;
+        public string Target = string.Empty;
+        public string Text = string.Empty;
+    }
+
     private sealed class FrozenAttackSwing : ClientPacket
     {
         public FrozenAttackSwing(WorldPacket packet) : base(packet) { }
@@ -91,21 +107,17 @@ public class PacketDispatchBenchmarks
         _buyBackItemHandler = Wrap<FrozenBuyBackItem>(static (_, p) => s_sink = p.Slot);
         _setActionButtonHandler = Wrap<SetActionButton>(static (_, p) => s_sink = p.Action);
         _attackSwingHandler = Wrap<FrozenAttackSwing>(static (_, p) => s_sink = (uint)p.Victim.Low);
-        _whisperHandler = Wrap<ChatMessageWhisper>(static (_, p) => s_sink = (uint)(p.Text.Length + p.Target.Length));
+        _whisperHandler = Wrap<FrozenChatMessageWhisper>(static (_, p) => s_sink = (uint)(p.Text.Length + p.Target.Length));
 
         // Fail loudly if the span parse disagrees with the ByteBuffer parse; a wrong floor
         // is worse than no floor.
-        using (var reference = new ChatMessageWhisper(new WorldPacket(_whisper)))
+        using (var reference = new FrozenChatMessageWhisper(new WorldPacket(_whisper)))
         {
             reference.Read();
-            var r = new SpanPacketReader(_whisper.AsSpan(2));
-            r.ReadUInt32();
-            int targetLen = (int)r.ReadBits<uint>(9);
-            int textLen = (int)r.ReadBits<uint>(11);
-            string target = r.ReadString(targetLen);
-            string text = r.ReadString(textLen);
-            if (target != reference.Target || text != reference.Text)
-                throw new InvalidOperationException($"Span parse mismatch: '{target}'/'{text}' vs '{reference.Target}'/'{reference.Text}'");
+            var r = new SpanPacketReader(new WorldPacket(_whisper).GetRemainingSpan());
+            ChatMessageWhisperCodecWotLKClassic.Read(ref r, out var actual);
+            if (actual.Target != reference.Target || actual.Text != reference.Text)
+                throw new InvalidOperationException($"Codec parse mismatch: '{actual.Target}'/'{actual.Text}' vs '{reference.Target}'/'{reference.Text}'");
         }
     }
 
@@ -211,19 +223,29 @@ public class PacketDispatchBenchmarks
     // ---- ChatMessageWhisper: bit-packed lengths + two strings (strings must allocate) ----
 
     [Benchmark]
-    public uint Whisper_Activator() => InvokeViaActivator(typeof(ChatMessageWhisper), _whisper, _whisperHandler);
+    public uint Whisper_Activator() => InvokeViaActivator(typeof(FrozenChatMessageWhisper), _whisper, _whisperHandler);
 
     [Benchmark]
     public uint Whisper_Direct()
     {
-        using var packet = new ChatMessageWhisper(new WorldPacket(_whisper));
+        using var packet = new FrozenChatMessageWhisper(new WorldPacket(_whisper));
         packet.Read();
         _whisperHandler(HandlerTarget, packet);
         return s_sink;
     }
 
+    /// The production path since the chat slice. The two strings are the floor — they are handed
+    /// to SendMessageChat* as strings, so no amount of span work in the codec removes them.
     [Benchmark]
-    public uint Whisper_Span()
+    public uint Whisper_Codec()
+    {
+        var r = new SpanPacketReader(new WorldPacket(_whisper).GetRemainingSpan());
+        ChatMessageWhisperCodecWotLKClassic.Read(ref r, out var packet);
+        s_sink = (uint)(packet.Text.Length + packet.Target.Length);
+        return s_sink;
+    }
+
+    private uint Whisper_SpanUnused()
     {
         var r = new SpanPacketReader(_whisper.AsSpan(2));
         r.ReadUInt32();

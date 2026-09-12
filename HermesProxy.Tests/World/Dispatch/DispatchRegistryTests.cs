@@ -150,12 +150,19 @@ public class DispatchRegistryTests
                 continue;
             }
 
-            // The generator finds codecs by convention and errors when one is missing; assert the
-            // same convention so the rule is discoverable from the test suite too.
-            string codecName = packet.FullName + "Codec";
-            Type? codec = packet.Assembly.GetType(codecName);
-            if (codec is null)
-                broken.Add($"{name}: no codec type {codecName}");
+            // A packet either declares ranged codecs with [PacketCodec] — one per build range —
+            // or relies on the convention lookup. The generator accepts both and errors when
+            // neither is present; assert the same rule so it is discoverable from the tests.
+            bool hasRangedCodec = packet.Assembly.GetTypes().Any(t =>
+                t.GetCustomAttributes<PacketCodecAttribute>()
+                 .Any(a => a.PacketType == packet));
+
+            if (!hasRangedCodec)
+            {
+                string codecName = packet.FullName + "Codec";
+                if (packet.Assembly.GetType(codecName) is null)
+                    broken.Add($"{name}: no [PacketCodec] for {packet.Name} and no convention codec {codecName}");
+            }
         }
 
         Assert.True(broken.Count == 0, string.Join(Environment.NewLine, broken));

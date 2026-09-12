@@ -67,4 +67,22 @@ public static class GameLimits
     /// Maximum byte size for arena team names in UTF-8 (24 chars * 2 bytes).
     /// </summary>
     public const int MaxArenaTeamNameBytes = MaxArenaTeamNameChars * 2;
+
+    /// <summary>
+    /// Maximum character count for a single chat message. Longer messages are split into
+    /// several packets before being forwarded.
+    /// </summary>
+    /// <remarks>
+    /// This lived as a local <c>const int maxAllowedTextLength = 255</c> inside
+    /// <c>ChatHandler.ConvertTextMessageIntoMaxLengthParts</c>. It is a game-defined limit like
+    /// the name bounds above, and having it here is what would let the chat path move to a
+    /// bounded buffer later — the text currently becomes a <c>string</c> on its way to
+    /// <c>SendMessageChat*</c>, so a bounded read buys nothing until that signature takes a span.
+    /// </remarks>
+    public const int MaxChatMessageChars = 255;
+
+    /// <summary>
+    /// Maximum byte size for a chat message in UTF-8, worst case (255 chars * 2 bytes).
+    /// </summary>
+    public const int MaxChatMessageBytes = MaxChatMessageChars * 2;
 }
