@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Framework.IO;
 using HermesProxy.World.Dispatch;
@@ -109,7 +109,9 @@ public static class QueryPlayerNamesCodec
     public static void Read(ref SpanPacketReader r, out QueryPlayerNames packet)
     {
         uint count = r.ReadUInt32();
-        var players = new List<WowGuid128>((int)count);
+        // A packed guid128 is never under 2 bytes (both mask bytes zero), so the buffer bounds
+        // how many can follow — pre-size on that, not on the wire count.
+        var players = new List<WowGuid128>(CodecHelpers.WireCountCapacity(count, in r, minElementBytes: 2));
         for (uint i = 0; i < count; i++)
             players.Add(r.ReadPackedGuid128());
         packet = new QueryPlayerNames(players);

@@ -1,3 +1,4 @@
+﻿using System;
 using System.Runtime.CompilerServices;
 using Framework.IO;
 using HermesProxy.World.Dispatch;
@@ -80,6 +81,13 @@ public static class QuestPOIQueryCodec
         // 175-slot array but only reads `count` ints from the stream — only the
         // populated prefix is on the wire.
         int count = r.ReadInt32();
+        // The count is wire data. Sizing the array from it directly allocates before the element
+        // loop can fail, so a corrupt count is gigabytes gone before the first read. Four bytes
+        // per id bounds what can actually follow; the array cannot be clamped instead, because it
+        // is the packet field and a short one would silently drop ids.
+        if (count < 0 || count > r.Remaining / sizeof(int))
+            throw new ArgumentOutOfRangeException(nameof(count), count,
+                $"CMSG_QUEST_POI_QUERY claims {count} quest ids but only {r.Remaining} bytes remain.");
         int[] missingQuestPOIs = new int[count];
         for (int i = 0; i < count; i++)
             missingQuestPOIs[i] = r.ReadInt32();
