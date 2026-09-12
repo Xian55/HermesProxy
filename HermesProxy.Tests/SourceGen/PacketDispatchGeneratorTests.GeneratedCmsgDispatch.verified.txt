@@ -108,27 +108,27 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatLeaveChannel(in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageAFK_CMSG_CHAT_MESSAGE_AFK_ChatMessageAFKCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
-    {
-        global::HermesProxy.World.Server.Packets.ChatMessageAFKCodecWotLKClassic.Read(ref reader, out var packet);
-        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageAFK(in packet, in ctx);
-    }
-
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageAFK_CMSG_CHAT_MESSAGE_AFK_ChatMessageAFKCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ChatMessageAFKCodecPreWotLKClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageAFK(in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageChannel_CMSG_CHAT_MESSAGE_CHANNEL_ChatMessageChannelCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageAFK_CMSG_CHAT_MESSAGE_AFK_ChatMessageAFKCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
-        global::HermesProxy.World.Server.Packets.ChatMessageChannelCodecWotLKClassic.Read(ref reader, out var packet);
-        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageChannel(in packet, in ctx);
+        global::HermesProxy.World.Server.Packets.ChatMessageAFKCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageAFK(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageChannel_CMSG_CHAT_MESSAGE_CHANNEL_ChatMessageChannelCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ChatMessageChannelCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageChannel(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageChannel_CMSG_CHAT_MESSAGE_CHANNEL_ChatMessageChannelCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageChannelCodecWotLKClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageChannel(in packet, in ctx);
     }
 
@@ -144,22 +144,16 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageDND(in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageEmote_CMSG_CHAT_MESSAGE_EMOTE_ChatMessageEmoteCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
-    {
-        global::HermesProxy.World.Server.Packets.ChatMessageEmoteCodecWotLKClassic.Read(ref reader, out var packet);
-        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageEmote(in packet, in ctx);
-    }
-
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageEmote_CMSG_CHAT_MESSAGE_EMOTE_ChatMessageEmoteCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ChatMessageEmoteCodecPreWotLKClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageEmote(in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_GUILD_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageEmote_CMSG_CHAT_MESSAGE_EMOTE_ChatMessageEmoteCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
-        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
-        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_GUILD, in packet, in ctx);
+        global::HermesProxy.World.Server.Packets.ChatMessageEmoteCodecWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageEmote(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_GUILD_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -168,15 +162,21 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_GUILD, in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_INSTANCE_CHAT_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_GUILD_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
-        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_INSTANCE_CHAT, in packet, in ctx);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_GUILD, in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_INSTANCE_CHAT_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ChatMessageCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_INSTANCE_CHAT, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_INSTANCE_CHAT_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_INSTANCE_CHAT, in packet, in ctx);
     }
 
@@ -192,22 +192,16 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_OFFICER, in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_PARTY_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
-    {
-        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
-        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_PARTY, in packet, in ctx);
-    }
-
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_PARTY_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ChatMessageCodecPreWotLKClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_PARTY, in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_PARTY_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
-        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID, in packet, in ctx);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_PARTY, in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -216,10 +210,10 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID, in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_WARNING_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
-        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID_WARNING, in packet, in ctx);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID, in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_WARNING_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -228,15 +222,21 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID_WARNING, in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_SAY_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_WARNING_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
-        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_SAY, in packet, in ctx);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID_WARNING, in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_SAY_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ChatMessageCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_SAY, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_SAY_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_SAY, in packet, in ctx);
     }
 
@@ -252,15 +252,15 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessageWhisper(in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_YELL_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
-    {
-        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
-        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL, in packet, in ctx);
-    }
-
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_YELL_ChatMessageCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ChatMessageCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_YELL_ChatMessageCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatMessageCodecWotLKClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatMessage(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL, in packet, in ctx);
     }
 
@@ -280,6 +280,330 @@ internal static unsafe class GeneratedCmsgDispatch
     {
         global::HermesProxy.World.Server.Packets.ItemTextQueryCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.QuerySystem.HandleItemTextQuery(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_CHANGE_TRANSPORT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_CHANGE_TRANSPORT, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRequestVehicleSeatChange_CMSG_MOVE_DISMISS_VEHICLE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.RequestVehicleSeatChangeCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleRequestVehicleSeatChange(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_DISMISS_VEHICLE, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_DOUBLE_JUMP(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_DOUBLE_JUMP, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_FALL_LAND(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FALL_LAND, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_FALL_RESET(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FALL_RESET, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck1_CMSG_MOVE_FEATHER_FALL_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementAckMessageCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceAck1(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FEATHER_FALL_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementSpeedAckCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceSpeedChangeAck(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_FLIGHT_SPEED_CHANGE_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementSpeedAckCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceSpeedChangeAck(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_FLIGHT_SPEED_CHANGE_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementSpeedAckCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceSpeedChangeAck(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck2_CMSG_MOVE_FORCE_ROOT_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementAckMessageCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceAck2(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_ROOT_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_RUN_BACK_SPEED_CHANGE_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementSpeedAckCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceSpeedChangeAck(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_RUN_BACK_SPEED_CHANGE_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_RUN_SPEED_CHANGE_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementSpeedAckCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceSpeedChangeAck(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_RUN_SPEED_CHANGE_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_SWIM_BACK_SPEED_CHANGE_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementSpeedAckCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceSpeedChangeAck(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_SWIM_BACK_SPEED_CHANGE_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_SWIM_SPEED_CHANGE_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementSpeedAckCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceSpeedChangeAck(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_SWIM_SPEED_CHANGE_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementSpeedAckCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceSpeedChangeAck(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck2_CMSG_MOVE_FORCE_UNROOT_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementAckMessageCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceAck2(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_UNROOT_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_WALK_SPEED_CHANGE_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementSpeedAckCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceSpeedChangeAck(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_WALK_SPEED_CHANGE_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck2_CMSG_MOVE_GRAVITY_DISABLE_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementAckMessageCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceAck2(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_GRAVITY_DISABLE_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck2_CMSG_MOVE_GRAVITY_ENABLE_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementAckMessageCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceAck2(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_GRAVITY_ENABLE_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_HEARTBEAT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_HEARTBEAT, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck1_CMSG_MOVE_HOVER_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementAckMessageCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceAck1(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_HOVER_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveInitActiveMoverComplete_CMSG_MOVE_INIT_ACTIVE_MOVER_COMPLETE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.InitActiveMoverCompleteCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveInitActiveMoverComplete(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_JUMP(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_JUMP, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck2_CMSG_MOVE_KNOCK_BACK_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementAckMessageCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceAck2(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_KNOCK_BACK_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_REMOVE_MOVEMENT_FORCES(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_REMOVE_MOVEMENT_FORCES, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck1_CMSG_MOVE_SET_CAN_FLY_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementAckMessageCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceAck1(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_CAN_FLY_ACK, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveSetCollisionHeightAck_CMSG_MOVE_SET_COLLISION_HEIGHT_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MoveSetCollisionHeightAckCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveSetCollisionHeightAck(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_FACING(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_FACING, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_FACING_HEARTBEAT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_FACING_HEARTBEAT, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_FLY(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_FLY, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_PITCH(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_PITCH, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_RUN_MODE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_RUN_MODE, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_WALK_MODE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_WALK_MODE, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveSplineDone_CMSG_MOVE_SPLINE_DONE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MoveSplineDoneCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveSplineDone(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_ASCEND(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_ASCEND, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_BACKWARD(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_BACKWARD, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_DESCEND(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_DESCEND, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_FORWARD(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_FORWARD, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_PITCH_DOWN(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_PITCH_DOWN, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_PITCH_UP(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_PITCH_UP, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_STRAFE_LEFT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_STRAFE_LEFT, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_STRAFE_RIGHT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_STRAFE_RIGHT, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_SWIM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_SWIM, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_TURN_LEFT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_TURN_LEFT, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_TURN_RIGHT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_TURN_RIGHT, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_STOP(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_STOP_ASCEND(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_ASCEND, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_STOP_PITCH(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_PITCH, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_STOP_STRAFE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_STRAFE, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_STOP_SWIM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_SWIM, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_STOP_TURN(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_TURN, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveTeleportAck_CMSG_MOVE_TELEPORT_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MoveTeleportAckCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveTeleportAck(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveTimeSkipped_CMSG_MOVE_TIME_SKIPPED(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MoveTimeSkippedCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveTimeSkipped(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck1_CMSG_MOVE_WATER_WALK_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MovementAckMessageCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveForceAck1(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_WATER_WALK_ACK, in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCinematicPacket_CMSG_NEXT_CINEMATIC_CAMERA(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -354,6 +678,30 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.MiscSystem.HandleRepopRequest(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRequestVehicleSeatChange_CMSG_REQUEST_VEHICLE_EXIT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.RequestVehicleSeatChangeCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleRequestVehicleSeatChange(global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_EXIT, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRequestVehicleSeatChange_CMSG_REQUEST_VEHICLE_NEXT_SEAT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.RequestVehicleSeatChangeCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleRequestVehicleSeatChange(global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_NEXT_SEAT, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRequestVehicleSeatChange_CMSG_REQUEST_VEHICLE_PREV_SEAT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.RequestVehicleSeatChangeCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleRequestVehicleSeatChange(global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_PREV_SEAT, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveSetActiveMover_CMSG_SET_ACTIVE_MOVER(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.SetActiveMoverCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveSetActiveMover(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleSetDungeonDifficulty_CMSG_SET_DUNGEON_DIFFICULTY(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.SetDungeonDifficultyCodec.Read(ref reader, out var packet);
@@ -396,6 +744,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.MiscSystem.HandleTutorialFlag(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleWorldPortResponse_CMSG_WORLD_PORT_RESPONSE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.WorldPortResponseCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleWorldPortResponse(in packet, in ctx);
+    }
+
     private static delegate*<ref global::Framework.IO.SpanPacketReader, in global::HermesProxy.World.Dispatch.SessionContext, void>[] BuildTable()
     {
         var table = new delegate*<ref global::Framework.IO.SpanPacketReader, in global::HermesProxy.World.Dispatch.SessionContext, void>[MaxClaimedOpcode + 1];
@@ -412,16 +766,16 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_JOIN_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatJoinChannel_CMSG_CHAT_JOIN_CHANNEL;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_LEAVE_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatLeaveChannel_CMSG_CHAT_LEAVE_CHANNEL;
         {
-            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
-                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_AFK] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageAFK_CMSG_CHAT_MESSAGE_AFK_ChatMessageAFKCodecWotLKClassic;
-            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_AFK] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageAFK_CMSG_CHAT_MESSAGE_AFK_ChatMessageAFKCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_AFK] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageAFK_CMSG_CHAT_MESSAGE_AFK_ChatMessageAFKCodecWotLKClassic;
         }
         {
-            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
-                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageChannel_CMSG_CHAT_MESSAGE_CHANNEL_ChatMessageChannelCodecWotLKClassic;
-            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageChannel_CMSG_CHAT_MESSAGE_CHANNEL_ChatMessageChannelCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageChannel_CMSG_CHAT_MESSAGE_CHANNEL_ChatMessageChannelCodecWotLKClassic;
         }
         {
             if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
@@ -430,22 +784,22 @@ internal static unsafe class GeneratedCmsgDispatch
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_DND] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageDND_CMSG_CHAT_MESSAGE_DND_ChatMessageDNDCodecWotLKClassic;
         }
         {
-            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
-                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_EMOTE] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageEmote_CMSG_CHAT_MESSAGE_EMOTE_ChatMessageEmoteCodecWotLKClassic;
-            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_EMOTE] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageEmote_CMSG_CHAT_MESSAGE_EMOTE_ChatMessageEmoteCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_EMOTE] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageEmote_CMSG_CHAT_MESSAGE_EMOTE_ChatMessageEmoteCodecWotLKClassic;
         }
         {
-            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
-                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_GUILD] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_GUILD_ChatMessageCodecWotLKClassic;
-            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_GUILD] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_GUILD_ChatMessageCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_GUILD] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_GUILD_ChatMessageCodecWotLKClassic;
         }
         {
-            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
-                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_INSTANCE_CHAT] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_INSTANCE_CHAT_ChatMessageCodecWotLKClassic;
-            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_INSTANCE_CHAT] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_INSTANCE_CHAT_ChatMessageCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_INSTANCE_CHAT] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_INSTANCE_CHAT_ChatMessageCodecWotLKClassic;
         }
         {
             if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
@@ -454,28 +808,28 @@ internal static unsafe class GeneratedCmsgDispatch
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_OFFICER] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_OFFICER_ChatMessageCodecWotLKClassic;
         }
         {
-            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
-                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_PARTY] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_PARTY_ChatMessageCodecWotLKClassic;
-            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_PARTY] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_PARTY_ChatMessageCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_PARTY] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_PARTY_ChatMessageCodecWotLKClassic;
         }
         {
-            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
-                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_ChatMessageCodecWotLKClassic;
-            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_ChatMessageCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_ChatMessageCodecWotLKClassic;
         }
         {
-            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
-                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID_WARNING] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_WARNING_ChatMessageCodecWotLKClassic;
-            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID_WARNING] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_WARNING_ChatMessageCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_RAID_WARNING] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_RAID_WARNING_ChatMessageCodecWotLKClassic;
         }
         {
-            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
-                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_SAY] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_SAY_ChatMessageCodecWotLKClassic;
-            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_SAY] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_SAY_ChatMessageCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_SAY] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_SAY_ChatMessageCodecWotLKClassic;
         }
         {
             if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
@@ -484,14 +838,68 @@ internal static unsafe class GeneratedCmsgDispatch
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_WHISPER] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessageWhisper_CMSG_CHAT_MESSAGE_WHISPER_ChatMessageWhisperCodecWotLKClassic;
         }
         {
-            if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
-                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_YELL_ChatMessageCodecWotLKClassic;
-            else if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_YELL_ChatMessageCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_YELL_ChatMessageCodecWotLKClassic;
         }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_COMPLETE_CINEMATIC] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCinematicPacket_CMSG_COMPLETE_CINEMATIC;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_FAR_SIGHT] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleFarSight_CMSG_FAR_SIGHT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_TEXT_QUERY] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleItemTextQuery_CMSG_ITEM_TEXT_QUERY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_CHANGE_TRANSPORT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_CHANGE_TRANSPORT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_DISMISS_VEHICLE] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRequestVehicleSeatChange_CMSG_MOVE_DISMISS_VEHICLE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_DOUBLE_JUMP] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_DOUBLE_JUMP;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FALL_LAND] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_FALL_LAND;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FALL_RESET] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_FALL_RESET;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FEATHER_FALL_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck1_CMSG_MOVE_FEATHER_FALL_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_FLIGHT_SPEED_CHANGE_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_FLIGHT_SPEED_CHANGE_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_ROOT_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck2_CMSG_MOVE_FORCE_ROOT_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_RUN_BACK_SPEED_CHANGE_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_RUN_BACK_SPEED_CHANGE_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_RUN_SPEED_CHANGE_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_RUN_SPEED_CHANGE_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_SWIM_BACK_SPEED_CHANGE_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_SWIM_BACK_SPEED_CHANGE_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_SWIM_SPEED_CHANGE_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_SWIM_SPEED_CHANGE_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_UNROOT_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck2_CMSG_MOVE_FORCE_UNROOT_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_WALK_SPEED_CHANGE_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceSpeedChangeAck_CMSG_MOVE_FORCE_WALK_SPEED_CHANGE_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_GRAVITY_DISABLE_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck2_CMSG_MOVE_GRAVITY_DISABLE_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_GRAVITY_ENABLE_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck2_CMSG_MOVE_GRAVITY_ENABLE_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_HEARTBEAT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_HEARTBEAT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_HOVER_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck1_CMSG_MOVE_HOVER_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_INIT_ACTIVE_MOVER_COMPLETE] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveInitActiveMoverComplete_CMSG_MOVE_INIT_ACTIVE_MOVER_COMPLETE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_JUMP] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_JUMP;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_KNOCK_BACK_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck2_CMSG_MOVE_KNOCK_BACK_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_REMOVE_MOVEMENT_FORCES] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_REMOVE_MOVEMENT_FORCES;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_CAN_FLY_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck1_CMSG_MOVE_SET_CAN_FLY_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_COLLISION_HEIGHT_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveSetCollisionHeightAck_CMSG_MOVE_SET_COLLISION_HEIGHT_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_FACING] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_FACING;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_FACING_HEARTBEAT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_FACING_HEARTBEAT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_FLY] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_FLY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_PITCH] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_PITCH;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_RUN_MODE] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_RUN_MODE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_WALK_MODE] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_WALK_MODE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SPLINE_DONE] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveSplineDone_CMSG_MOVE_SPLINE_DONE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_ASCEND] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_ASCEND;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_BACKWARD] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_BACKWARD;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_DESCEND] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_DESCEND;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_FORWARD] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_FORWARD;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_PITCH_DOWN] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_PITCH_DOWN;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_PITCH_UP] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_PITCH_UP;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_STRAFE_LEFT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_STRAFE_LEFT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_STRAFE_RIGHT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_STRAFE_RIGHT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_SWIM] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_SWIM;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_TURN_LEFT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_TURN_LEFT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_TURN_RIGHT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_TURN_RIGHT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_STOP;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_ASCEND] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_STOP_ASCEND;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_PITCH] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_STOP_PITCH;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_STRAFE] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_STOP_STRAFE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_SWIM] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_STOP_SWIM;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_TURN] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_STOP_TURN;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_TELEPORT_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveTeleportAck_CMSG_MOVE_TELEPORT_ACK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_TIME_SKIPPED] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveTimeSkipped_CMSG_MOVE_TIME_SKIPPED;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_WATER_WALK_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveForceAck1_CMSG_MOVE_WATER_WALK_ACK;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_NEXT_CINEMATIC_CAMERA] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCinematicPacket_CMSG_NEXT_CINEMATIC_CAMERA;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_OBJECT_UPDATE_FAILED] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleObjectUpdateFailed_CMSG_OBJECT_UPDATE_FAILED;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_OPENING_CINEMATIC] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCinematicPacket_CMSG_OPENING_CINEMATIC;
@@ -504,6 +912,10 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_QUEST_INFO] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleQueryQuestInfo_CMSG_QUERY_QUEST_INFO;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_RECLAIM_CORPSE] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleReclaimCorpse_CMSG_RECLAIM_CORPSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REPOP_REQUEST] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleRepopRequest_CMSG_REPOP_REQUEST;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_EXIT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRequestVehicleSeatChange_CMSG_REQUEST_VEHICLE_EXIT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_NEXT_SEAT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRequestVehicleSeatChange_CMSG_REQUEST_VEHICLE_NEXT_SEAT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_PREV_SEAT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRequestVehicleSeatChange_CMSG_REQUEST_VEHICLE_PREV_SEAT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_ACTIVE_MOVER] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveSetActiveMover_CMSG_SET_ACTIVE_MOVER;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_DUNGEON_DIFFICULTY] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleSetDungeonDifficulty_CMSG_SET_DUNGEON_DIFFICULTY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_RAID_DIFFICULTY] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleSetRaidDifficulty_CMSG_SET_RAID_DIFFICULTY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_SELECTION] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleSetSelection_CMSG_SET_SELECTION;
@@ -511,11 +923,12 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_STAND_STATE_CHANGE] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleStandStateChange_CMSG_STAND_STATE_CHANGE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_TIME_SYNC_RESPONSE] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleTimeSyncResponse_CMSG_TIME_SYNC_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_TUTORIAL_FLAG] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleTutorialFlag_CMSG_TUTORIAL_FLAG;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_WORLD_PORT_RESPONSE] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleWorldPortResponse_CMSG_WORLD_PORT_RESPONSE;
 
         return table;
     }
 
-    private const int MaxClaimedOpcode = (int)global::HermesProxy.World.Enums.Opcode.CMSG_TUTORIAL_FLAG;
+    private const int MaxClaimedOpcode = (int)global::HermesProxy.World.Enums.Opcode.CMSG_WORLD_PORT_RESPONSE;
 
     private static global::System.Collections.Frozen.FrozenSet<global::HermesProxy.World.Enums.Opcode> BuildClaimed()
     {
@@ -548,6 +961,60 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_COMPLETE_CINEMATIC,
             global::HermesProxy.World.Enums.Opcode.CMSG_FAR_SIGHT,
             global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_TEXT_QUERY,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_CHANGE_TRANSPORT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_DISMISS_VEHICLE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_DOUBLE_JUMP,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FALL_LAND,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FALL_RESET,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FEATHER_FALL_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_FLIGHT_SPEED_CHANGE_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_ROOT_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_RUN_BACK_SPEED_CHANGE_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_RUN_SPEED_CHANGE_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_SWIM_BACK_SPEED_CHANGE_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_SWIM_SPEED_CHANGE_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_UNROOT_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_FORCE_WALK_SPEED_CHANGE_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_GRAVITY_DISABLE_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_GRAVITY_ENABLE_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_HEARTBEAT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_HOVER_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_INIT_ACTIVE_MOVER_COMPLETE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_JUMP,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_KNOCK_BACK_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_REMOVE_MOVEMENT_FORCES,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_CAN_FLY_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_COLLISION_HEIGHT_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_FACING,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_FACING_HEARTBEAT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_FLY,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_PITCH,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_RUN_MODE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_WALK_MODE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SPLINE_DONE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_ASCEND,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_BACKWARD,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_DESCEND,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_FORWARD,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_PITCH_DOWN,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_PITCH_UP,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_STRAFE_LEFT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_STRAFE_RIGHT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_SWIM,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_TURN_LEFT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_TURN_RIGHT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_ASCEND,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_PITCH,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_STRAFE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_SWIM,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_STOP_TURN,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_TELEPORT_ACK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_TIME_SKIPPED,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_WATER_WALK_ACK,
             global::HermesProxy.World.Enums.Opcode.CMSG_NEXT_CINEMATIC_CAMERA,
             global::HermesProxy.World.Enums.Opcode.CMSG_OBJECT_UPDATE_FAILED,
             global::HermesProxy.World.Enums.Opcode.CMSG_OPENING_CINEMATIC,
@@ -560,6 +1027,10 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_QUEST_INFO,
             global::HermesProxy.World.Enums.Opcode.CMSG_RECLAIM_CORPSE,
             global::HermesProxy.World.Enums.Opcode.CMSG_REPOP_REQUEST,
+            global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_EXIT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_NEXT_SEAT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_PREV_SEAT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_SET_ACTIVE_MOVER,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_DUNGEON_DIFFICULTY,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_RAID_DIFFICULTY,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_SELECTION,
@@ -567,6 +1038,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_STAND_STATE_CHANGE,
             global::HermesProxy.World.Enums.Opcode.CMSG_TIME_SYNC_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.CMSG_TUTORIAL_FLAG,
+            global::HermesProxy.World.Enums.Opcode.CMSG_WORLD_PORT_RESPONSE,
         });
     }
 }

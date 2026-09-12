@@ -2,6 +2,7 @@
 using Framework.IO;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using System;
 using System.Collections.Generic;
@@ -636,6 +637,120 @@ public sealed class MovementInfo
 
         if (hasVehicleId)
             writer.WriteUInt32(moveInfo.VehicleId);
+    }
+
+
+    // ---- span overloads -------------------------------------------------------------------
+    //
+    // Generated mechanically from the WorldPacket versions above, not retyped: the only edits are
+    // the parameter type and passing `data` on by ref. Two implementations of one wire layout is
+    // the same hand-sync hazard docs/version-shape-dispatch.md calls out for Write()/WriteToSpan(),
+    // so MovementInfoReaderEquivalenceTests runs both over the same bytes and compares every field
+    // and the final position. The WorldPacket pair survives only for SpellCastRequest, the last
+    // unconverted caller; delete both when it converts.
+
+    public void ReadMovementInfoModern(ref SpanPacketReader data)
+    {
+        var moveInfo = this;
+
+        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
+        {
+            moveInfo.Flags = data.ReadUInt32();
+            moveInfo.FlagsExtra = data.ReadUInt32();
+            moveInfo.FlagsExtra2 = data.ReadUInt32();
+        }
+
+        moveInfo.MoveTime = data.ReadUInt32();
+        moveInfo.Position = data.ReadVector3();
+        moveInfo.Orientation = data.ReadFloat();
+
+        moveInfo.SwimPitch = data.ReadFloat();
+        moveInfo.SplineElevation = data.ReadFloat();
+
+        uint removeMovementForcesCount = data.ReadUInt32();
+
+        uint moveIndex = data.ReadUInt32();
+
+        for (uint i = 0; i < removeMovementForcesCount; ++i)
+        {
+            data.ReadPackedGuid128();
+        }
+
+        // ResetBitReader
+
+        if (!ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
+        {
+            moveInfo.Flags = data.ReadBits<uint>(30);
+            moveInfo.FlagsExtra = data.ReadBits<uint>(18);
+        }
+
+        // V3_4_3 client adds two extra header bits (hasStandingOnGameObjectGUID, hasAdvFlying).
+        bool hasStandingOnGameObjectGUID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && data.HasBit();
+        bool hasTransport = data.HasBit();
+        bool hasFall = data.HasBit();
+        bool hasSpline = data.HasBit(); // todo 6.x read this infos
+
+        data.ReadBit(); // HeightChangeFailed
+        data.ReadBit(); // RemoteTimeValid
+        bool hasInertia = ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3) ? data.HasBit() : false;
+        bool hasAdvFlying = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && data.HasBit();
+
+        if (hasTransport)
+            ReadTransportInfoModern(ref data);
+
+        if (hasStandingOnGameObjectGUID)
+            moveInfo.StandingOnGameObjectGuid = data.ReadPackedGuid128();
+
+        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
+        {
+            if (hasInertia)
+            {
+                data.ReadPackedGuid128();
+                data.ReadVector3(); // Force
+                data.ReadUInt32(); // Lifetime
+            }
+        }
+
+        if (hasAdvFlying)
+        {
+            data.ReadFloat(); // forwardVelocity
+            data.ReadFloat(); // upVelocity
+        }
+
+        if (hasFall)
+        {
+            moveInfo.FallTime = data.ReadUInt32();
+            moveInfo.JumpVerticalSpeed = data.ReadFloat();
+
+            // ResetBitReader
+
+            bool hasFallDirection = data.HasBit();
+            if (hasFallDirection)
+            {
+                moveInfo.JumpSinAngle = data.ReadFloat();
+                moveInfo.JumpCosAngle = data.ReadFloat();
+                moveInfo.JumpHorizontalSpeed = data.ReadFloat();
+            }
+        }
+    }
+
+    public void ReadTransportInfoModern(ref SpanPacketReader data)
+    {
+        var moveInfo = this;
+        moveInfo.TransportGuid = data.ReadPackedGuid128();
+        moveInfo.TransportOffset = data.ReadVector3();
+        moveInfo.TransportOrientation = data.ReadFloat();
+        moveInfo.TransportSeat = data.ReadInt8();           // VehicleSeatIndex
+        moveInfo.TransportTime = data.ReadUInt32();         // MoveTime
+
+        bool hasPrevTime = data.HasBit();
+        bool hasVehicleId = data.HasBit();
+
+        if (hasPrevTime)
+            moveInfo.TransportTime2 = data.ReadUInt32();    // PrevMoveTime
+
+        if (hasVehicleId)
+            moveInfo.VehicleId = data.ReadUInt32();         // VehicleRecID
     }
 
     public static void ClampOrientation(ref float orientation)

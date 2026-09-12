@@ -4,6 +4,7 @@ using HermesProxy.Enums;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Server.Packets;
 
 namespace HermesProxy.Tests.World.Dispatch.Reference;
 
@@ -448,5 +449,159 @@ internal static class FrozenPackets
         }
 
         public string ChannelName = string.Empty;
+    }
+
+    /// Frozen copy of <c>MovementAck.Read</c>, which the conversion deleted once its holders
+    /// moved to codecs. The oracle has to keep reading the pre-conversion way.
+    internal struct MovementAck
+    {
+        public void Read(WorldPacket p)
+        {
+            MoveInfo = new();
+            MoveInfo.ReadMovementInfoModern(p);
+            MoveCounter = p.ReadUInt32();
+        }
+
+        public MovementInfo MoveInfo;
+        public uint MoveCounter;
+    }
+
+    /// Frozen verbatim from <c>MovementPackets.cs</c>.
+    internal sealed class ClientPlayerMovement
+    {
+        public void Read(WorldPacket p)
+        {
+            Guid = p.ReadPackedGuid128(); ;
+            MoveInfo = new MovementInfo();
+            MoveInfo.ReadMovementInfoModern(p);
+        }
+
+        public WowGuid128 Guid;
+        public MovementInfo MoveInfo = null!;
+    }
+
+    /// Frozen verbatim from <c>MovementPackets.cs</c>.
+    internal sealed class MoveTeleportAck
+    {
+        public void Read(WorldPacket p)
+        {
+            MoverGUID = p.ReadPackedGuid128();
+            MoveCounter = p.ReadUInt32();
+            MoveTime = p.ReadUInt32();
+        }
+
+        public WowGuid128 MoverGUID;
+        public uint MoveCounter;
+        public uint MoveTime;
+    }
+
+    /// Frozen verbatim from <c>MovementPackets.cs</c>.
+    internal sealed class WorldPortResponse
+    {
+        public void Read(WorldPacket p) { }
+    }
+
+    /// Frozen verbatim from <c>MovementPackets.cs</c>.
+    internal sealed class MovementSpeedAck
+    {
+        public void Read(WorldPacket p)
+        {
+            MoverGUID = p.ReadPackedGuid128();
+            Ack.Read(p);
+            Speed = p.ReadFloat();
+        }
+
+        public WowGuid128 MoverGUID;
+        public MovementAck Ack;
+        public float Speed;
+    }
+
+    /// Frozen verbatim from <c>MovementPackets.cs</c>.
+    internal sealed class MovementAckMessage
+    {
+        public void Read(WorldPacket p)
+        {
+            MoverGUID = p.ReadPackedGuid128();
+            Ack.Read(p);
+        }
+
+        public WowGuid128 MoverGUID;
+        public MovementAck Ack;
+    }
+
+    /// Frozen verbatim from <c>MovementPackets.cs</c>.
+    internal sealed class MoveSetCollisionHeightAck
+    {
+        public void Read(WorldPacket p)
+        {
+            MoverGUID = p.ReadPackedGuid128();
+            Ack.Read(p);
+            Height = p.ReadFloat();
+            MountDisplayID = p.ReadUInt32();
+            Reason = p.ReadUInt8();
+        }
+
+        public WowGuid128 MoverGUID;
+        public MovementAck Ack;
+        public float Height;
+        public uint MountDisplayID;
+        public byte Reason;
+    }
+
+    /// Frozen verbatim from <c>MovementPackets.cs</c>.
+    internal sealed class SetActiveMover
+    {
+        public void Read(WorldPacket p)
+        {
+            MoverGUID = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 MoverGUID;
+    }
+
+    /// Frozen verbatim from <c>MovementPackets.cs</c>.
+    internal sealed class InitActiveMoverComplete
+    {
+        public void Read(WorldPacket p)
+        {
+            Ticks = p.ReadUInt32();
+        }
+
+        public uint Ticks;
+    }
+
+    /// Frozen verbatim from <c>MovementPackets.cs</c>.
+    internal sealed class MoveSplineDone
+    {
+        public void Read(WorldPacket p)
+        {
+            Guid = p.ReadPackedGuid128();
+            MoveInfo = new();
+            MoveInfo.ReadMovementInfoModern(p);
+            SplineID = p.ReadInt32();
+        }
+
+        public WowGuid128 Guid;
+        public MovementInfo MoveInfo = null!;
+        public int SplineID;
+    }
+
+    /// Frozen verbatim from <c>MovementPackets.cs</c>.
+    internal sealed class MoveTimeSkipped
+    {
+        public void Read(WorldPacket p)
+        {
+            MoverGUID = p.ReadPackedGuid128();
+            TimeSkipped = p.ReadUInt32();
+        }
+
+        public WowGuid128 MoverGUID;
+        public uint TimeSkipped;
+    }
+
+    /// Frozen verbatim from <c>MiscPackets.cs</c>.
+    internal sealed class RequestVehicleSeatChange
+    {
+        public void Read(WorldPacket p) { }
     }
 }

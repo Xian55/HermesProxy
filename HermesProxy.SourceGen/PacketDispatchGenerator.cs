@@ -353,10 +353,18 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
 
         // Deterministic output: the snapshot test compares emitted source, so ordering must not
         // depend on the order Roslyn happened to visit syntax trees in.
+        // The codec is part of the key: one handler can yield several candidates for the same
+        // opcode — one per ranged codec — and without it their order falls out of whatever order
+        // Roslyn happened to visit syntax trees in. That makes the emitted source flap between
+        // builds, which would turn the snapshot gate into noise and train everyone to accept it.
         usable.Sort(static (a, b) =>
         {
             int byOpcode = string.CompareOrdinal(a.OpcodeName, b.OpcodeName);
-            return byOpcode != 0 ? byOpcode : string.CompareOrdinal(a.MethodFullName, b.MethodFullName);
+            if (byOpcode != 0)
+                return byOpcode;
+
+            int byMethod = string.CompareOrdinal(a.MethodFullName, b.MethodFullName);
+            return byMethod != 0 ? byMethod : string.CompareOrdinal(a.CodecFullName, b.CodecFullName);
         });
 
         ReportClashes(ctx, usable);

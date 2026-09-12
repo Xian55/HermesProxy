@@ -920,12 +920,7 @@ public readonly record struct ClientCinematicPkt;
 // with no payload (verified via CypherCore Source/Game/Networking/Packets/VehiclePackets.cs).
 // Legacy 3.3.5a CMSG_REQUEST_VEHICLE_EXIT also reads no payload — TC's HandleRequestVehicleExit
 // resolves the vehicle from session state. One empty class covers all three opcodes.
-class RequestVehicleSeatChange : ClientPacket
-{
-    public RequestVehicleSeatChange(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
+public readonly record struct RequestVehicleSeatChange;
 
 public readonly record struct FarSight(bool Enable);
 

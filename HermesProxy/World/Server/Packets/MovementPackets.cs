@@ -27,20 +27,7 @@ using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets;
 
-public class ClientPlayerMovement : ClientPacket
-{
-    public ClientPlayerMovement(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Guid = _worldPacket.ReadPackedGuid128(); ;
-        MoveInfo = new MovementInfo();
-        MoveInfo.ReadMovementInfoModern(_worldPacket);
-    }
-
-    public WowGuid128 Guid;
-    public MovementInfo MoveInfo = null!;
-}
+public readonly record struct ClientPlayerMovement(WowGuid128 Guid, MovementInfo MoveInfo);
 public class MoveUpdate : ServerPacket, ISpanWritable
 {
     public MoveUpdate() : base(Opcode.SMSG_MOVE_UPDATE, ConnectionType.Instance) { }
@@ -272,21 +259,7 @@ public class MonsterMove : ServerPacket, ISpanWritable
     public List<Vector3> PackedDeltas = new();
 }
 
-class MoveTeleportAck : ClientPacket
-{
-    public MoveTeleportAck(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        MoverGUID = _worldPacket.ReadPackedGuid128();
-        MoveCounter = _worldPacket.ReadUInt32();
-        MoveTime = _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 MoverGUID;
-    public uint MoveCounter;
-    public uint MoveTime;
-}
+public readonly record struct MoveTeleportAck(WowGuid128 MoverGUID, uint MoveCounter, uint MoveTime);
 
 public class MoveTeleport : ServerPacket, ISpanWritable
 {
@@ -486,12 +459,7 @@ public class NewWorld : ServerPacket, ISpanWritable
     public Vector3 MovementOffset;    // Adjusts all pending movement events by this offset
 }
 
-public class WorldPortResponse : ClientPacket
-{
-    public WorldPortResponse(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
+public readonly record struct WorldPortResponse;
 
 // for server controlled units
 public class MoveSplineSetSpeed : ServerPacket, ISpanWritable
@@ -546,30 +514,12 @@ public class MoveSetSpeed : ServerPacket, ISpanWritable
     public float Speed = 1.0f;
 }
 
-public class MovementSpeedAck : ClientPacket
-{
-    public MovementSpeedAck(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        MoverGUID = _worldPacket.ReadPackedGuid128();
-        Ack.Read(_worldPacket);
-        Speed = _worldPacket.ReadFloat();
-    }
-
-    public WowGuid128 MoverGUID;
-    public MovementAck Ack;
-    public float Speed;
-}
+public readonly record struct MovementSpeedAck(WowGuid128 MoverGUID, MovementAck Ack, float Speed);
 
 public struct MovementAck
 {
-    public void Read(WorldPacket data)
-    {
-        MoveInfo = new();
-        MoveInfo.ReadMovementInfoModern(data);
-        MoveCounter = data.ReadUInt32();
-    }
+    // Read lives in MovementAckCodec now; this had no callers left once the packets
+    // holding it converted.
 
     public MovementInfo MoveInfo;
     public uint MoveCounter;
@@ -646,39 +596,9 @@ public class MoveSetFlag : ServerPacket, ISpanWritable
     public uint MoveCounter = 0;
 }
 
-public class MovementAckMessage : ClientPacket
-{
-    public MovementAckMessage(WorldPacket packet) : base(packet) { }
+public readonly record struct MovementAckMessage(WowGuid128 MoverGUID, MovementAck Ack);
 
-    public override void Read()
-    {
-        MoverGUID = _worldPacket.ReadPackedGuid128();
-        Ack.Read(_worldPacket);
-    }
-
-    public WowGuid128 MoverGUID;
-    public MovementAck Ack;
-}
-
-public class MoveSetCollisionHeightAck : ClientPacket
-{
-    public MoveSetCollisionHeightAck(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        MoverGUID = _worldPacket.ReadPackedGuid128();
-        Ack.Read(_worldPacket);
-        Height = _worldPacket.ReadFloat();
-        MountDisplayID = _worldPacket.ReadUInt32();
-        Reason = _worldPacket.ReadUInt8();
-    }
-
-    public WowGuid128 MoverGUID;
-    public MovementAck Ack;
-    public float Height;
-    public uint MountDisplayID;
-    public byte Reason;
-}
+public readonly record struct MoveSetCollisionHeightAck(WowGuid128 MoverGUID, float Height, uint MountDisplayID, byte Reason);
 
 class MoveSetCollisionHeight : ServerPacket, ISpanWritable
 {
@@ -857,17 +777,7 @@ public class ControlUpdate : ServerPacket, ISpanWritable
     public bool HasControl;
 }
 
-public class SetActiveMover : ClientPacket
-{
-    public SetActiveMover(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        MoverGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 MoverGUID;
-}
+public readonly record struct SetActiveMover(WowGuid128 MoverGUID);
 
 public class MoveSetActiveMover : ServerPacket
 {
@@ -916,44 +826,7 @@ public class PhaseShiftChange : ServerPacket
     public List<ushort> UiMapPhaseIDs = new();
 }
 
-public class InitActiveMoverComplete : ClientPacket
-{
-    public InitActiveMoverComplete(WorldPacket packet) : base(packet) { }
+public readonly record struct InitActiveMoverComplete(uint Ticks);
 
-    public override void Read()
-    {
-        Ticks = _worldPacket.ReadUInt32();
-    }
-
-    public uint Ticks;
-}
-
-class MoveSplineDone : ClientPacket
-{
-    public MoveSplineDone(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Guid = _worldPacket.ReadPackedGuid128();
-        MoveInfo = new();
-        MoveInfo.ReadMovementInfoModern(_worldPacket);
-        SplineID = _worldPacket.ReadInt32();
-    }
-
-    public WowGuid128 Guid;
-    public MovementInfo MoveInfo = null!;
-    public int SplineID;
-}
-class MoveTimeSkipped : ClientPacket
-{
-    public MoveTimeSkipped(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        MoverGUID = _worldPacket.ReadPackedGuid128();
-        TimeSkipped = _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 MoverGUID;
-    public uint TimeSkipped;
-}
+public readonly record struct MoveSplineDone(WowGuid128 Guid, MovementInfo MoveInfo, int SplineID);
+public readonly record struct MoveTimeSkipped(WowGuid128 MoverGUID, uint TimeSkipped);
