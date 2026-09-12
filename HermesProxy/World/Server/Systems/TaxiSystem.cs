@@ -1,28 +1,35 @@
-﻿using Framework.Constants;
-using HermesProxy.Enums;
-using HermesProxy.World;
-using HermesProxy.World.Enums;
-using HermesProxy.World.Objects;
-using HermesProxy.World.Server.Packets;
 using System;
 using System.Collections.Generic;
+using Framework.Constants;
+using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
+using HermesProxy.World.Enums;
+using HermesProxy.World.Server.Packets;
 
-namespace HermesProxy.World.Server;
+namespace HermesProxy.World.Server.Systems;
 
-public partial class WorldSocket
+/// <summary>
+/// Translation for the modern client's flight-master CMSGs, including the Dijkstra route search
+/// that turns a single destination into the multi-hop express route a legacy server expects.
+/// </summary>
+/// <remarks>
+/// The path helpers below were instance methods on <c>WorldSocket</c> that never touched
+/// <see langword="this"/> — they read <c>GameData</c> and their arguments. They become private
+/// statics unchanged; nothing outside this file ever called them.
+/// </remarks>
+public static class TaxiSystem
 {
-    // Handlers for CMSG opcodes coming from the modern client
-    [PacketHandler(Opcode.CMSG_TAXI_NODE_STATUS_QUERY)]
-    [PacketHandler(Opcode.CMSG_TAXI_QUERY_AVAILABLE_NODES)]
-    void HandleTaxiNodesQuery(InteractWithNPC interact)
+    [HandlesCmsg(Opcode.CMSG_TAXI_NODE_STATUS_QUERY)]
+    [HandlesCmsg(Opcode.CMSG_TAXI_QUERY_AVAILABLE_NODES)]
+    public static void HandleTaxiNodesQuery(Opcode opcode, in InteractWithNPC interact, in SessionContext ctx)
     {
-        WorldPacket packet = new WorldPacket(interact.GetUniversalOpcode());
+        WorldPacket packet = new WorldPacket(opcode);
         packet.WriteGuid(interact.CreatureGUID.To64());
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_ENABLE_TAXI_NODE)]
-    void HandleEnableTaxiNode(InteractWithNPC interact)
+    [HandlesCmsg(Opcode.CMSG_ENABLE_TAXI_NODE)]
+    public static void HandleEnableTaxiNode(in InteractWithNPC interact, in SessionContext ctx)
     {
         // The modern client sends this for a flight master whose node it has not
         // discovered yet, meaning "open the taxi map". Forwarding it as
@@ -43,24 +50,24 @@ public partial class WorldSocket
         // confirmed against a live backend with an undiscovered flight master.
         WorldPacket packet = new WorldPacket(Opcode.CMSG_TAXI_QUERY_AVAILABLE_NODES);
         packet.WriteGuid(interact.CreatureGUID.To64());
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_ACTIVATE_TAXI)]
-    void HandleActivateTaxi(ActivateTaxi taxi)
+    [HandlesCmsg(Opcode.CMSG_ACTIVATE_TAXI)]
+    public static void HandleActivateTaxi(in ActivateTaxi taxi, in SessionContext ctx)
     {
         // direct path exist
-        if (TaxiPathExist(GetSession().GameState.CurrentTaxiNode, taxi.Node))
+        if (TaxiPathExist(ctx.GetSession().GameState.CurrentTaxiNode, taxi.Node))
         {
             WorldPacket packet = new WorldPacket(Opcode.CMSG_ACTIVATE_TAXI);
             packet.WriteGuid(taxi.FlightMaster.To64());
-            packet.WriteUInt32(GetSession().GameState.CurrentTaxiNode);
+            packet.WriteUInt32(ctx.GetSession().GameState.CurrentTaxiNode);
             packet.WriteUInt32(taxi.Node);
-            SendPacketToServer(packet);
+            ctx.SendPacketToServer(packet);
         }
         else // find shortest path
         {
-            HashSet<uint> path = GetTaxiPath(GetSession().GameState.CurrentTaxiNode, taxi.Node, GetSession().GameState.UsableTaxiNodes);
+            HashSet<uint> path = GetTaxiPath(ctx.GetSession().GameState.CurrentTaxiNode, taxi.Node, ctx.GetSession().GameState.UsableTaxiNodes);
             if (path.Count <= 1) // no nodes found
                 return;
 
@@ -82,11 +89,12 @@ public partial class WorldSocket
             packet.WriteUInt32((uint)path.Count); // node count
             foreach (uint itr in path)
                 packet.WriteUInt32(itr);
-            SendPacketToServer(packet);
+            ctx.SendPacketToServer(packet);
         }
-        GetSession().GameState.IsWaitingForTaxiStart = true;
+        ctx.GetSession().GameState.IsWaitingForTaxiStart = true;
     }
-    bool TaxiPathExist(uint from, uint to)
+
+    static bool TaxiPathExist(uint from, uint to)
     {
         foreach (var itr in GameData.TaxiPaths)
         {
@@ -96,7 +104,8 @@ public partial class WorldSocket
         }
         return false;
     }
-    bool IsTaxiNodeKnown(uint node, List<byte> usableNodes)
+
+    static bool IsTaxiNodeKnown(uint node, List<byte> usableNodes)
     {
         if (node == 0)
             return false;
@@ -111,7 +120,8 @@ public partial class WorldSocket
         uint submask = 1u << (int)((node - 1) % 8);
         return (usableNodes[(int)field] & submask) == submask;
     }
-    HashSet<uint> GetTaxiPath(uint from, uint to, List<byte> usableNodes)
+
+    static HashSet<uint> GetTaxiPath(uint from, uint to, List<byte> usableNodes)
     {
         // shortest path node list
         HashSet<uint> nodes = new HashSet<uint> { from };
@@ -140,7 +150,8 @@ public partial class WorldSocket
         int minDist = Dijkstra(graphCopy, (int)from, (int)to, graphCopy.GetLength(0), nodes);
         return nodes;
     }
-    int MinDistance(int[] dist, bool[] sptSet, int vCnt)
+
+    static int MinDistance(int[] dist, bool[] sptSet, int vCnt)
     {
         int min = int.MaxValue, min_index = -1;
         for (int v = 0; v < vCnt; v++)
@@ -151,15 +162,17 @@ public partial class WorldSocket
             }
         return min_index;
     }
-    void SavePath(int[] parent, int j, HashSet<uint> nodes)
+
+    static void SavePath(int[] parent, int j, HashSet<uint> nodes)
     {
         if (parent[j] == -1)
             return;
         SavePath(parent, parent[j], nodes);
         nodes.Add((uint)j);
     }
+
     // taken from https://www.geeksforgeeks.org/printing-paths-dijkstras-shortest-path-algorithm/
-    int Dijkstra(int[,] graph, int src, int dest, int vCnt, HashSet<uint> nodes)
+    static int Dijkstra(int[,] graph, int src, int dest, int vCnt, HashSet<uint> nodes)
     {
         int[] dist = new int[vCnt];
         int[] parent = new int[vCnt];

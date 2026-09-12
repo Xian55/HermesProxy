@@ -114,7 +114,7 @@ public partial class WorldSocket
                 return;
             }
 
-            ReturnQuestFrameToGossip((uint)close.QuestID, state.AwaitingQuestGiver, "close-request-items");
+            Systems.QuestSystem.ReturnQuestFrameToGossip(in _sessionContext, (uint)close.QuestID, state.AwaitingQuestGiver, "close-request-items");
             return;
         }
 
@@ -137,7 +137,7 @@ public partial class WorldSocket
                 return;
             }
 
-            ReturnQuestFrameToGossip(state.AwaitingQuestRewardId, state.AwaitingQuestGiver, "cancel-request-items");
+            Systems.QuestSystem.ReturnQuestFrameToGossip(in _sessionContext, state.AwaitingQuestRewardId, state.AwaitingQuestGiver, "cancel-request-items");
             return;
         }
 
@@ -158,40 +158,6 @@ public partial class WorldSocket
         WorldSocketLogMessages.QuestClose(_melLog, _sourceFile, _netDirRecv, questId, "release-details");
         _ = close;
     }
-
-    // 3.4.3 Decline is TALK_TO_GOSSIP, not a cancel opcode. Dismiss the
-    // parchment, then put back this NPC's cached list only.
-    void ReturnDetailsToGossip(string action)
-    {
-        var state = GetSession().GameState;
-        int questId = (int)(state.LastQuestDetails?.QuestID ?? 0);
-        WowGuid128 npc = state.LastQuestDetails?.QuestGiverGUID ?? default;
-        ReturnQuestFrameToGossip((uint)questId, npc, action);
-    }
-
-    void ReturnQuestFrameToGossip(uint questId, WowGuid128 npc, string action)
-    {
-        var state = GetSession().GameState;
-        var gossip = state.LastGossip;
-        var list = state.LastQuestList;
-        state.CloseQuestDetails();
-        state.ClearQuestRewardWait();
-
-        SendPacket(new QuestGiverInvalidQuest
-        {
-            Reason = QuestFailedReasons.None,
-            SendErrorMessage = false
-        });
-
-        if (gossip != null && npc != default && gossip.GossipGUID == npc)
-            SendPacket(gossip);
-        else if (list != null && npc != default && list.QuestGiverGUID == npc)
-            SendPacket(list);
-
-        WorldSocketLogMessages.QuestClose(_melLog, _sourceFile, _netDirRecv, (int)questId, action);
-    }
-
-
 
     [PacketHandler(Opcode.CMSG_QUEST_POI_QUERY)]
     void HandleQuestPOIQuery(QuestPOIQuery query)

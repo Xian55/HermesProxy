@@ -94,19 +94,7 @@ class AuctionListBidderItems : ClientPacket
     public List<uint> AuctionItemIDs = new();
 }
 
-class AuctionListOwnerItems : ClientPacket
-{
-    public AuctionListOwnerItems(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Auctioneer = _worldPacket.ReadPackedGuid128();
-        Offset = _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 Auctioneer;
-    public uint Offset;
-}
+public readonly record struct AuctionListOwnerItems(WowGuid128 Auctioneer, uint Offset);
 
 class AuctionListItems: ClientPacket
 {

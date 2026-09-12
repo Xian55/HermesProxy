@@ -69,11 +69,4 @@ public partial class WorldSocket
         }
     }
 
-    [PacketHandler(Opcode.CMSG_TABARD_VENDOR_ACTIVATE)]
-    void HandleTabardVendorActivate(InteractWithNPC interact)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.MSG_TABARDVENDOR_ACTIVATE);
-        packet.WriteGuid(interact.CreatureGUID.To64());
-        SendPacketToServer(packet);
-    }
 }

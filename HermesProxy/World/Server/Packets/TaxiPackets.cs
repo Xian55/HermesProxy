@@ -233,23 +233,11 @@ public class ShowTaxiNodesWindowInfo
     public uint CurrentNode;
 }
 
-class ActivateTaxi : ClientPacket
-{
-    public ActivateTaxi(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        FlightMaster = _worldPacket.ReadPackedGuid128();
-        Node = _worldPacket.ReadUInt32();
-        GroundMountID = _worldPacket.ReadUInt32();
-        FlyingMountID = _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 FlightMaster;
-    public uint Node;
-    public uint GroundMountID;
-    public uint FlyingMountID;
-}
+public readonly record struct ActivateTaxi(
+    WowGuid128 FlightMaster,
+    uint Node,
+    uint GroundMountID,
+    uint FlyingMountID);
 
 class NewTaxiPath : ServerPacket, ISpanWritable
 {

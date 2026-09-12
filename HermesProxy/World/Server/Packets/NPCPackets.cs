@@ -30,17 +30,7 @@ using System.Text;
 
 namespace HermesProxy.World.Server.Packets;
 
-public class InteractWithNPC : ClientPacket
-{
-    public InteractWithNPC(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        CreatureGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 CreatureGUID;
-}
+public readonly record struct InteractWithNPC(WowGuid128 CreatureGUID);
 
 public class GossipMessagePkt : ServerPacket
 {
@@ -238,25 +228,11 @@ public class ClientGossipQuest
     }
 }
 
-public class GossipSelectOption : ClientPacket
-{
-    public GossipSelectOption(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        GossipUnit = _worldPacket.ReadPackedGuid128();
-        GossipID = _worldPacket.ReadUInt32();
-        GossipIndex = _worldPacket.ReadUInt32();
-
-        uint length = _worldPacket.ReadBits<uint>(8);
-        PromotionCode = _worldPacket.ReadString(length);
-    }
-
-    public WowGuid128 GossipUnit;
-    public uint GossipIndex;
-    public uint GossipID;
-    public string PromotionCode = string.Empty;
-}
+public readonly record struct GossipSelectOption(
+    WowGuid128 GossipUnit,
+    uint GossipID,
+    uint GossipIndex,
+    string PromotionCode);
 
 public class GossipComplete : ServerPacket, ISpanWritable
 {
@@ -457,17 +433,7 @@ public class ShowBank : ServerPacket, ISpanWritable
     public WowGuid128 Guid;
 }
 
-public class BuyBankSlot : ClientPacket
-{
-    public BuyBankSlot(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Guid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Guid;
-}
+public readonly record struct BuyBankSlot(WowGuid128 Guid);
 
 public class TrainerList : ServerPacket, ISpanWritable
 {
@@ -556,21 +522,7 @@ public class TrainerListSpell
     public byte ReqLevel;
 }
 
-class TrainerBuySpell : ClientPacket
-{
-    public TrainerBuySpell(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        TrainerGUID = _worldPacket.ReadPackedGuid128();
-        TrainerID = _worldPacket.ReadUInt32();
-        SpellID = _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 TrainerGUID;
-    public uint TrainerID;
-    public uint SpellID;
-}
+public readonly record struct TrainerBuySpell(WowGuid128 TrainerGUID, uint TrainerID, uint SpellID);
 
 class TrainerBuyFailed : ServerPacket, ISpanWritable
 {
@@ -626,19 +578,7 @@ class RespecWipeConfirm : ServerPacket, ISpanWritable
     public WowGuid128 TrainerGUID;
 }
 
-class ConfirmRespecWipe : ClientPacket
-{
-    public ConfirmRespecWipe(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        TrainerGUID = _worldPacket.ReadPackedGuid128();
-        RespecType = (SpecResetType)_worldPacket.ReadUInt8();
-    }
-
-    public WowGuid128 TrainerGUID;
-    public SpecResetType RespecType;
-}
+public readonly record struct ConfirmRespecWipe(WowGuid128 TrainerGUID, SpecResetType RespecType);
 
 class GossipPOI : ServerPacket, ISpanWritable
 {

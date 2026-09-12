@@ -13,13 +13,6 @@ namespace HermesProxy.World.Server;
 
 public partial class WorldSocket
 {
-    [PacketHandler(Opcode.CMSG_AUCTION_HELLO_REQUEST)]
-    void HandleAuctionHelloRequest(InteractWithNPC interact)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.MSG_AUCTION_HELLO);
-        packet.WriteGuid(interact.CreatureGUID.To64());
-        SendPacketToServer(packet);
-    }
 
     // Handlers for CMSG opcodes coming from the modern client
     [PacketHandler(Opcode.CMSG_AUCTION_LIST_BIDDED_ITEMS)]
@@ -31,15 +24,6 @@ public partial class WorldSocket
         packet.WriteInt32(auction.AuctionItemIDs.Count);
         foreach (var itemId in auction.AuctionItemIDs)
             packet.WriteUInt32(itemId);
-        SendPacketToServer(packet);
-    }
-
-    [PacketHandler(Opcode.CMSG_AUCTION_LIST_OWNED_ITEMS)]
-    void HandleAuctionListOwnerItems(AuctionListOwnerItems auction)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_AUCTION_LIST_OWNED_ITEMS);
-        packet.WriteGuid(auction.Auctioneer.To64());
-        packet.WriteUInt32(auction.Offset);
         SendPacketToServer(packet);
     }
 

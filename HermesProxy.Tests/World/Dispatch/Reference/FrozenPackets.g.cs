@@ -1038,4 +1038,103 @@ internal static class FrozenPackets
         public byte BankSlot2;
         public uint StackCount;
     }
+
+    /// Frozen verbatim from <c>NPCPackets.cs</c>.
+    internal sealed class InteractWithNPC
+    {
+        public void Read(WorldPacket p)
+        {
+            CreatureGUID = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 CreatureGUID;
+    }
+
+    /// Frozen verbatim from <c>NPCPackets.cs</c>.
+    internal sealed class GossipSelectOption
+    {
+        public void Read(WorldPacket p)
+        {
+            GossipUnit = p.ReadPackedGuid128();
+            GossipID = p.ReadUInt32();
+            GossipIndex = p.ReadUInt32();
+
+            uint length = p.ReadBits<uint>(8);
+            PromotionCode = p.ReadString(length);
+        }
+
+        public WowGuid128 GossipUnit;
+        public uint GossipIndex;
+        public uint GossipID;
+        public string PromotionCode = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>NPCPackets.cs</c>.
+    internal sealed class BuyBankSlot
+    {
+        public void Read(WorldPacket p)
+        {
+            Guid = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Guid;
+    }
+
+    /// Frozen verbatim from <c>NPCPackets.cs</c>.
+    internal sealed class TrainerBuySpell
+    {
+        public void Read(WorldPacket p)
+        {
+            TrainerGUID = p.ReadPackedGuid128();
+            TrainerID = p.ReadUInt32();
+            SpellID = p.ReadUInt32();
+        }
+
+        public WowGuid128 TrainerGUID;
+        public uint TrainerID;
+        public uint SpellID;
+    }
+
+    /// Frozen verbatim from <c>NPCPackets.cs</c>.
+    internal sealed class ConfirmRespecWipe
+    {
+        public void Read(WorldPacket p)
+        {
+            TrainerGUID = p.ReadPackedGuid128();
+            RespecType = (SpecResetType)p.ReadUInt8();
+        }
+
+        public WowGuid128 TrainerGUID;
+        public SpecResetType RespecType;
+    }
+
+    /// Frozen verbatim from <c>TaxiPackets.cs</c>.
+    internal sealed class ActivateTaxi
+    {
+        public void Read(WorldPacket p)
+        {
+            FlightMaster = p.ReadPackedGuid128();
+            Node = p.ReadUInt32();
+            GroundMountID = p.ReadUInt32();
+            FlyingMountID = p.ReadUInt32();
+        }
+
+        public WowGuid128 FlightMaster;
+        public uint Node;
+        public uint GroundMountID;
+        public uint FlyingMountID;
+    }
+
+    /// Frozen verbatim from <c>AuctionPackets.cs</c>.
+    internal sealed class AuctionListOwnerItems
+    {
+        public void Read(WorldPacket p)
+        {
+            Auctioneer = p.ReadPackedGuid128();
+            Offset = p.ReadUInt32();
+        }
+
+        public WowGuid128 Auctioneer;
+        public uint Offset;
+    }
 }

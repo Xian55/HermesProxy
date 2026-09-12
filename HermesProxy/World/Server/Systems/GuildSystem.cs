@@ -230,6 +230,14 @@ public static class GuildSystem
         ctx.SendPacketToServer(packet);
     }
 
+    [HandlesCmsg(Opcode.CMSG_TABARD_VENDOR_ACTIVATE)]
+    public static void HandleTabardVendorActivate(in InteractWithNPC interact, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.MSG_TABARDVENDOR_ACTIVATE);
+        packet.WriteGuid(interact.CreatureGUID.To64());
+        ctx.SendPacketToServer(packet);
+    }
+
     [HandlesCmsg(Opcode.CMSG_SAVE_GUILD_EMBLEM)]
     public static void HandleSaveGuildEmblem(in SaveGuildEmblem emblem, in SessionContext ctx)
     {
