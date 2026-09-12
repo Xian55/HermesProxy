@@ -29,21 +29,7 @@ using System.Text;
 
 namespace HermesProxy.World.Server.Packets;
 
-public class QuestGiverQueryQuest : ClientPacket
-{
-    public QuestGiverQueryQuest(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        QuestGiverGUID = _worldPacket.ReadPackedGuid128();
-        QuestID = _worldPacket.ReadUInt32();
-        RespondToGiver = _worldPacket.HasBit();
-    }
-
-    public WowGuid128 QuestGiverGUID;
-    public uint QuestID;
-    public bool RespondToGiver;
-}
+public readonly record struct QuestGiverQueryQuest(WowGuid128 QuestGiverGUID, uint QuestID, bool RespondToGiver);
 
 public class QuestGiverQuestDetails : ServerPacket
 {
@@ -320,6 +306,16 @@ public class QuestChoiceItem
         Quantity = data.ReadUInt32();
     }
 
+    /// <inheritdoc cref="Read(WorldPacket)"/>
+    /// <remarks>Generated from the WorldPacket reader; ItemInstanceReaderEquivalenceTests keeps the pair in step.</remarks>
+    public void Read(ref SpanPacketReader data)
+    {
+        data.ResetBitPos();
+        LootItemType = data.ReadBits<byte>(2);
+        Item.Read(ref data);
+        Quantity = data.ReadUInt32();
+    }
+
     public void Write(WorldPacket data)
     {
         data.WriteBits(LootItemType, 2);
@@ -342,76 +338,19 @@ public struct QuestDescEmote
     public uint Delay;
 }
 
-public class QuestGiverAcceptQuest : ClientPacket
-{
-    public QuestGiverAcceptQuest(WorldPacket packet) : base(packet) { }
+public readonly record struct QuestGiverAcceptQuest(WowGuid128 QuestGiverGUID, uint QuestID, bool StartCheat);
 
-    public override void Read()
-    {
-        QuestGiverGUID = _worldPacket.ReadPackedGuid128();
-        QuestID = _worldPacket.ReadUInt32();
-        StartCheat = _worldPacket.HasBit();
-    }
+public readonly record struct QuestLogRemoveQuest(byte Slot);
 
-    public WowGuid128 QuestGiverGUID;
-    public uint QuestID;
-    public bool StartCheat;
+public readonly record struct QuestGiverCloseQuest(int QuestID);
 
-}
+public readonly record struct CloseInteraction(WowGuid128 Guid);
 
-public class QuestLogRemoveQuest : ClientPacket
-{
-    public QuestLogRemoveQuest(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Slot = _worldPacket.ReadUInt8();
-    }
-
-    public byte Slot;
-}
-
-public class QuestGiverCloseQuest : ClientPacket
-{
-    public QuestGiverCloseQuest(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        QuestID = _worldPacket.ReadInt32();
-    }
-
-    public int QuestID;
-}
-
-public class CloseInteraction : ClientPacket
-{
-    public CloseInteraction(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Guid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Guid;
-}
-
-public class QuestPOIQuery : ClientPacket
-{
-    public QuestPOIQuery(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        // Wire: int32 count, int32[count] questIds. CypherCore over-allocates a
-        // 175-slot array but only reads `count` ints from the stream — only the
-        // populated prefix is on the wire.
-        int count = _worldPacket.ReadInt32();
-        MissingQuestPOIs = new int[count];
-        for (int i = 0; i < count; i++)
-            MissingQuestPOIs[i] = _worldPacket.ReadInt32();
-    }
-
-    public int[] MissingQuestPOIs = Array.Empty<int>();
-}
+/// <param name="MissingQuestPOIs">
+/// Only the populated prefix is on the wire. CypherCore over-allocates a 175-slot array but
+/// still reads exactly <c>count</c> ints, so the array here is that long and no longer.
+/// </param>
+public readonly record struct QuestPOIQuery(int[] MissingQuestPOIs);
 
 public class QuestPOIBlobPoint
 {
@@ -490,24 +429,7 @@ public class QuestPOIQueryResponse : ServerPacket
     public List<QuestPOIData> QuestPOIDataStats = new();
 }
 
-public class QuestGiverStatusQuery : ClientPacket
-{
-    public QuestGiverStatusQuery(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        QuestGiverGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 QuestGiverGUID;
-}
-
-public class QuestGiverStatusMultipleQuery : ClientPacket
-{
-    public QuestGiverStatusMultipleQuery(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
+public readonly record struct QuestGiverStatusQuery(WowGuid128 QuestGiverGUID);
 
 public class QuestGiverStatusPkt : ServerPacket, ISpanWritable
 {
@@ -635,17 +557,7 @@ public class QuestGiverInfo
     public QuestGiverStatusModern Status = QuestGiverStatusModern.None;
 }
 
-public class QuestGiverHello : ClientPacket
-{
-    public QuestGiverHello(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        QuestGiverGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 QuestGiverGUID;
-}
+public readonly record struct QuestGiverHello(WowGuid128 QuestGiverGUID);
 
 public class QuestGiverQuestListMessage : ServerPacket
 {
@@ -832,19 +744,7 @@ public struct QuestCurrency
     public int Amount;
 }
 
-public class QuestGiverRequestReward : ClientPacket
-{
-    public QuestGiverRequestReward(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        QuestGiverGUID = _worldPacket.ReadPackedGuid128();
-        QuestID = _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 QuestGiverGUID;
-    public uint QuestID;
-}
+public readonly record struct QuestGiverRequestReward(WowGuid128 QuestGiverGUID, uint QuestID);
 
 public class QuestGiverOfferRewardMessage : ServerPacket
 {
@@ -991,21 +891,16 @@ public class QuestGiverOfferReward
     public uint[] QuestFlags = new uint[2]; // Flags and FlagsEx
 }
 
-public class QuestGiverChooseReward : ClientPacket
-{
-    public QuestGiverChooseReward(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        QuestGiverGUID = _worldPacket.ReadPackedGuid128();
-        QuestID = _worldPacket.ReadUInt32();
-        Choice.Read(_worldPacket);
-    }
-
-    public WowGuid128 QuestGiverGUID;
-    public uint QuestID;
-    public QuestChoiceItem Choice = new();
-}
+/// <param name="Choice">
+/// Stays a class. <c>QuestChoiceItem</c> nests <c>ItemInstance</c>, which the outbound path
+/// builds field-by-field in 30-odd places, so converting it is outbound work — the same reason
+/// <c>MovementInfo</c> is still a class. The struct holds the reference, so one allocation per
+/// reward click survives and nothing else does.
+/// </param>
+public readonly record struct QuestGiverChooseReward(
+    WowGuid128 QuestGiverGUID,
+    uint QuestID,
+    QuestChoiceItem Choice);
 
 public class QuestGiverQuestComplete : ServerPacket
 {
@@ -1078,21 +973,12 @@ public class DisplayToast : ServerPacket
     public uint CurrencyID;
 }
 
-public class QuestGiverCompleteQuest : ClientPacket
-{
-    public QuestGiverCompleteQuest(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        QuestGiverGUID = _worldPacket.ReadPackedGuid128();
-        QuestID = _worldPacket.ReadUInt32();
-        FromScript = _worldPacket.HasBit();
-    }
-
-    public WowGuid128 QuestGiverGUID; // NPC / GameObject guid for normal quest completion. Player guid for self-completed quests
-    public uint QuestID;
-    public bool FromScript; // 0 - standart complete quest mode with npc, 1 - auto-complete mode
-}
+/// <param name="QuestGiverGUID">NPC / GameObject guid for normal quest completion. Player guid for self-completed quests.</param>
+/// <param name="FromScript">0 - standart complete quest mode with npc, 1 - auto-complete mode.</param>
+public readonly record struct QuestGiverCompleteQuest(
+    WowGuid128 QuestGiverGUID,
+    uint QuestID,
+    bool FromScript);
 
 class QuestGiverQuestFailed : ServerPacket, ISpanWritable
 {
@@ -1281,29 +1167,9 @@ class QuestConfirmAccept : ServerPacket, ISpanWritable
     public string QuestTitle = string.Empty;
 }
 
-class QuestConfirmAcceptResponse : ClientPacket
-{
-    public QuestConfirmAcceptResponse(WorldPacket packet) : base(packet) { }
+public readonly record struct QuestConfirmAcceptResponse(uint QuestID);
 
-    public override void Read()
-    {
-        QuestID = _worldPacket.ReadUInt32();
-    }
-
-    public uint QuestID;
-}
-
-class PushQuestToParty : ClientPacket
-{
-    public PushQuestToParty(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        QuestID = _worldPacket.ReadUInt32();
-    }
-
-    public uint QuestID;
-}
+public readonly record struct PushQuestToParty(uint QuestID);
 
 class QuestPushResult : ServerPacket, ISpanWritable
 {
@@ -1329,18 +1195,4 @@ class QuestPushResult : ServerPacket, ISpanWritable
     public QuestPushReason Result;
 }
 
-class QuestPushResultResponse : ClientPacket
-{
-    public QuestPushResultResponse(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        SenderGUID = _worldPacket.ReadPackedGuid128();
-        QuestID = _worldPacket.ReadUInt32();
-        Result = (QuestPushReason)_worldPacket.ReadUInt8();
-    }
-
-    public WowGuid128 SenderGUID;
-    public uint QuestID;
-    public QuestPushReason Result;
-}
+public readonly record struct QuestPushResultResponse(WowGuid128 SenderGUID, uint QuestID, QuestPushReason Result);

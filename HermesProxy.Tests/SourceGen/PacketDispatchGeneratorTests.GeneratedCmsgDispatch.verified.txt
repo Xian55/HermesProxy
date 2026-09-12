@@ -372,6 +372,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatUnregisterAllAddonPrefixes(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleCloseInteraction_CMSG_CLOSE_INTERACTION(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CloseInteractionCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleCloseInteraction(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCinematicPacket_CMSG_COMPLETE_CINEMATIC(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ClientCinematicPktCodec.Read(ref reader, out var packet);
@@ -966,6 +972,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.MiscSystem.HandleCinematicPacket(global::HermesProxy.World.Enums.Opcode.CMSG_OPENING_CINEMATIC, in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandlePushQuestToParty_CMSG_PUSH_QUEST_TO_PARTY(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.PushQuestToPartyCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandlePushQuestToParty(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleQueryCorpseLocationFromClient_CMSG_QUERY_CORPSE_LOCATION_FROM_CLIENT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.QueryCorpseLocationFromClientCodec.Read(ref reader, out var packet);
@@ -1024,6 +1036,84 @@ internal static unsafe class GeneratedCmsgDispatch
     {
         global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.QuerySystem.HandleQueryTime(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestConfirmAcceptResponse_CMSG_QUEST_CONFIRM_ACCEPT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.QuestConfirmAcceptResponseCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestConfirmAcceptResponse(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverAcceptQuest_CMSG_QUEST_GIVER_ACCEPT_QUEST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.QuestGiverAcceptQuestCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestGiverAcceptQuest(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverChooseReward_CMSG_QUEST_GIVER_CHOOSE_REWARD(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.QuestGiverChooseRewardCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestGiverChooseReward(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverCloseQuest_CMSG_QUEST_GIVER_CLOSE_QUEST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.QuestGiverCloseQuestCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestGiverCloseQuest(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverCompleteQuest_CMSG_QUEST_GIVER_COMPLETE_QUEST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.QuestGiverCompleteQuestCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestGiverCompleteQuest(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverHello_CMSG_QUEST_GIVER_HELLO(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.QuestGiverHelloCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestGiverHello(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverQueryQuest_CMSG_QUEST_GIVER_QUERY_QUEST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.QuestGiverQueryQuestCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestGiverQueryQuest(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverRequestReward_CMSG_QUEST_GIVER_REQUEST_REWARD(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.QuestGiverRequestRewardCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestGiverRequestReward(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverStatusMultipleQuery_CMSG_QUEST_GIVER_STATUS_MULTIPLE_QUERY(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestGiverStatusMultipleQuery(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverStatusQuery_CMSG_QUEST_GIVER_STATUS_QUERY(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.QuestGiverStatusQueryCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestGiverStatusQuery(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestLogRemoveQuest_CMSG_QUEST_LOG_REMOVE_QUEST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.QuestLogRemoveQuestCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestLogRemoveQuest(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestPOIQuery_CMSG_QUEST_POI_QUERY(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.QuestPOIQueryCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestPOIQuery(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestPushResult_CMSG_QUEST_PUSH_RESULT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.QuestPushResultResponseCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestPushResult(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleReclaimCorpse_CMSG_RECLAIM_CORPSE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -1335,6 +1425,7 @@ internal static unsafe class GeneratedCmsgDispatch
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatMessage_CMSG_CHAT_MESSAGE_YELL_ChatMessageCodecWotLKClassic;
         }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_UNREGISTER_ALL_ADDON_PREFIXES] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatUnregisterAllAddonPrefixes_CMSG_CHAT_UNREGISTER_ALL_ADDON_PREFIXES;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CLOSE_INTERACTION] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleCloseInteraction_CMSG_CLOSE_INTERACTION;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_COMPLETE_CINEMATIC] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCinematicPacket_CMSG_COMPLETE_CINEMATIC;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CONFIRM_RESPEC_WIPE] = &Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleConfirmRespecWipe_CMSG_CONFIRM_RESPEC_WIPE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DECLINE_GUILD_INVITES] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleDeclineGuildInvites_CMSG_DECLINE_GUILD_INVITES;
@@ -1434,6 +1525,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_NEXT_CINEMATIC_CAMERA] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCinematicPacket_CMSG_NEXT_CINEMATIC_CAMERA;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_OBJECT_UPDATE_FAILED] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleObjectUpdateFailed_CMSG_OBJECT_UPDATE_FAILED;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_OPENING_CINEMATIC] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCinematicPacket_CMSG_OPENING_CINEMATIC;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PUSH_QUEST_TO_PARTY] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandlePushQuestToParty_CMSG_PUSH_QUEST_TO_PARTY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_CORPSE_LOCATION_FROM_CLIENT] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleQueryCorpseLocationFromClient_CMSG_QUERY_CORPSE_LOCATION_FROM_CLIENT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_CREATURE] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleQueryCreature_CMSG_QUERY_CREATURE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_GAME_OBJECT] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleQueryGameObject_CMSG_QUERY_GAME_OBJECT;
@@ -1444,6 +1536,19 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_PET_NAME] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleQueryPetName_CMSG_QUERY_PET_NAME;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_QUEST_INFO] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleQueryQuestInfo_CMSG_QUERY_QUEST_INFO;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_TIME] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleQueryTime_CMSG_QUERY_TIME;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_CONFIRM_ACCEPT] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestConfirmAcceptResponse_CMSG_QUEST_CONFIRM_ACCEPT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_ACCEPT_QUEST] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverAcceptQuest_CMSG_QUEST_GIVER_ACCEPT_QUEST;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_CHOOSE_REWARD] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverChooseReward_CMSG_QUEST_GIVER_CHOOSE_REWARD;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_CLOSE_QUEST] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverCloseQuest_CMSG_QUEST_GIVER_CLOSE_QUEST;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_COMPLETE_QUEST] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverCompleteQuest_CMSG_QUEST_GIVER_COMPLETE_QUEST;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_HELLO] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverHello_CMSG_QUEST_GIVER_HELLO;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_QUERY_QUEST] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverQueryQuest_CMSG_QUEST_GIVER_QUERY_QUEST;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_REQUEST_REWARD] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverRequestReward_CMSG_QUEST_GIVER_REQUEST_REWARD;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_STATUS_MULTIPLE_QUERY] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverStatusMultipleQuery_CMSG_QUEST_GIVER_STATUS_MULTIPLE_QUERY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_STATUS_QUERY] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverStatusQuery_CMSG_QUEST_GIVER_STATUS_QUERY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_LOG_REMOVE_QUEST] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestLogRemoveQuest_CMSG_QUEST_LOG_REMOVE_QUEST;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_POI_QUERY] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestPOIQuery_CMSG_QUEST_POI_QUERY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_PUSH_RESULT] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestPushResult_CMSG_QUEST_PUSH_RESULT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_RECLAIM_CORPSE] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleReclaimCorpse_CMSG_RECLAIM_CORPSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REPOP_REQUEST] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleRepopRequest_CMSG_REPOP_REQUEST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleRequestConquestFormulaConstants_CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS;
@@ -1529,6 +1634,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_WHISPER,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_UNREGISTER_ALL_ADDON_PREFIXES,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CLOSE_INTERACTION,
             global::HermesProxy.World.Enums.Opcode.CMSG_COMPLETE_CINEMATIC,
             global::HermesProxy.World.Enums.Opcode.CMSG_CONFIRM_RESPEC_WIPE,
             global::HermesProxy.World.Enums.Opcode.CMSG_DECLINE_GUILD_INVITES,
@@ -1628,6 +1734,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_NEXT_CINEMATIC_CAMERA,
             global::HermesProxy.World.Enums.Opcode.CMSG_OBJECT_UPDATE_FAILED,
             global::HermesProxy.World.Enums.Opcode.CMSG_OPENING_CINEMATIC,
+            global::HermesProxy.World.Enums.Opcode.CMSG_PUSH_QUEST_TO_PARTY,
             global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_CORPSE_LOCATION_FROM_CLIENT,
             global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_CREATURE,
             global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_GAME_OBJECT,
@@ -1638,6 +1745,19 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_PET_NAME,
             global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_QUEST_INFO,
             global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_TIME,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_CONFIRM_ACCEPT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_ACCEPT_QUEST,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_CHOOSE_REWARD,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_CLOSE_QUEST,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_COMPLETE_QUEST,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_HELLO,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_QUERY_QUEST,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_REQUEST_REWARD,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_STATUS_MULTIPLE_QUERY,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_STATUS_QUERY,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_LOG_REMOVE_QUEST,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_POI_QUERY,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_PUSH_RESULT,
             global::HermesProxy.World.Enums.Opcode.CMSG_RECLAIM_CORPSE,
             global::HermesProxy.World.Enums.Opcode.CMSG_REPOP_REQUEST,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS,

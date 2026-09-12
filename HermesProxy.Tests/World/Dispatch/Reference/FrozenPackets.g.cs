@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using HermesProxy;
 using HermesProxy.Enums;
@@ -1136,5 +1137,187 @@ internal static class FrozenPackets
 
         public WowGuid128 Auctioneer;
         public uint Offset;
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class QuestGiverQueryQuest
+    {
+        public void Read(WorldPacket p)
+        {
+            QuestGiverGUID = p.ReadPackedGuid128();
+            QuestID = p.ReadUInt32();
+            RespondToGiver = p.HasBit();
+        }
+
+        public WowGuid128 QuestGiverGUID;
+        public uint QuestID;
+        public bool RespondToGiver;
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class QuestGiverAcceptQuest
+    {
+        public void Read(WorldPacket p)
+        {
+            QuestGiverGUID = p.ReadPackedGuid128();
+            QuestID = p.ReadUInt32();
+            StartCheat = p.HasBit();
+        }
+
+        public WowGuid128 QuestGiverGUID;
+        public uint QuestID;
+        public bool StartCheat;
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class QuestLogRemoveQuest
+    {
+        public void Read(WorldPacket p)
+        {
+            Slot = p.ReadUInt8();
+        }
+
+        public byte Slot;
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class QuestGiverStatusQuery
+    {
+        public void Read(WorldPacket p)
+        {
+            QuestGiverGUID = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 QuestGiverGUID;
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class QuestGiverHello
+    {
+        public void Read(WorldPacket p)
+        {
+            QuestGiverGUID = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 QuestGiverGUID;
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class QuestGiverCloseQuest
+    {
+        public void Read(WorldPacket p)
+        {
+            QuestID = p.ReadInt32();
+        }
+
+        public int QuestID;
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class CloseInteraction
+    {
+        public void Read(WorldPacket p)
+        {
+            Guid = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Guid;
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class QuestPOIQuery
+    {
+        public void Read(WorldPacket p)
+        {
+            // Wire: int32 count, int32[count] questIds. CypherCore over-allocates a
+            // 175-slot array but only reads `count` ints from the stream — only the
+            // populated prefix is on the wire.
+            int count = p.ReadInt32();
+            MissingQuestPOIs = new int[count];
+            for (int i = 0; i < count; i++)
+                MissingQuestPOIs[i] = p.ReadInt32();
+        }
+
+        public int[] MissingQuestPOIs = Array.Empty<int>();
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class QuestGiverRequestReward
+    {
+        public void Read(WorldPacket p)
+        {
+            QuestGiverGUID = p.ReadPackedGuid128();
+            QuestID = p.ReadUInt32();
+        }
+
+        public WowGuid128 QuestGiverGUID;
+        public uint QuestID;
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class QuestGiverChooseReward
+    {
+        public void Read(WorldPacket p)
+        {
+            QuestGiverGUID = p.ReadPackedGuid128();
+            QuestID = p.ReadUInt32();
+            Choice.Read(p);
+        }
+
+        public WowGuid128 QuestGiverGUID;
+        public uint QuestID;
+        public QuestChoiceItem Choice = new();
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class QuestGiverCompleteQuest
+    {
+        public void Read(WorldPacket p)
+        {
+            QuestGiverGUID = p.ReadPackedGuid128();
+            QuestID = p.ReadUInt32();
+            FromScript = p.HasBit();
+        }
+
+        public WowGuid128 QuestGiverGUID; // NPC / GameObject guid for normal quest completion. Player guid for self-completed quests
+        public uint QuestID;
+        public bool FromScript; // 0 - standart complete quest mode with npc, 1 - auto-complete mode
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class QuestConfirmAcceptResponse
+    {
+        public void Read(WorldPacket p)
+        {
+            QuestID = p.ReadUInt32();
+        }
+
+        public uint QuestID;
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class PushQuestToParty
+    {
+        public void Read(WorldPacket p)
+        {
+            QuestID = p.ReadUInt32();
+        }
+
+        public uint QuestID;
+    }
+
+    /// Frozen verbatim from <c>QuestPackets.cs</c>.
+    internal sealed class QuestPushResultResponse
+    {
+        public void Read(WorldPacket p)
+        {
+            SenderGUID = p.ReadPackedGuid128();
+            QuestID = p.ReadUInt32();
+            Result = (QuestPushReason)p.ReadUInt8();
+        }
+
+        public WowGuid128 SenderGUID;
+        public uint QuestID;
+        public QuestPushReason Result;
     }
 }

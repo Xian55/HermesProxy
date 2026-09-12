@@ -499,6 +499,23 @@ public class ItemInstance
         if (ItemBonus != null)
             ItemBonus.Read(data);
     }
+
+    /// <inheritdoc cref="Read(WorldPacket)"/>
+    public void Read(ref SpanPacketReader data)
+    {
+        ItemID = data.ReadUInt32();
+        RandomPropertiesSeed = data.ReadUInt32();
+        RandomPropertiesID = data.ReadUInt32();
+
+        if (data.HasBit())
+            ItemBonus = new();
+        data.ResetBitPos();
+
+        Modifications.Read(ref data);
+
+        if (ItemBonus != null)
+            ItemBonus.Read(ref data);
+    }
 }
 
 public class ItemBonuses
@@ -512,6 +529,20 @@ public class ItemBonuses
     }
 
     public void Read(WorldPacket data)
+    {
+        Context = (ItemContext)data.ReadUInt8();
+        uint bonusListIdSize = data.ReadUInt32();
+
+        BonusListIDs = new List<uint>();
+        for (uint i = 0u; i < bonusListIdSize; ++i)
+        {
+            uint bonusId = data.ReadUInt32();
+            BonusListIDs.Add(bonusId);
+        }
+    }
+
+    /// <inheritdoc cref="Read(WorldPacket)"/>
+    public void Read(ref SpanPacketReader data)
     {
         Context = (ItemContext)data.ReadUInt8();
         uint bonusListIdSize = data.ReadUInt32();
@@ -549,6 +580,14 @@ public class ItemMod
         Type = (ItemModifier)data.ReadUInt8();
     }
 
+    /// <inheritdoc cref="Read(WorldPacket)"/>
+    /// <remarks>Generated from the WorldPacket reader; ItemInstanceReaderEquivalenceTests keeps the pair in step.</remarks>
+    public void Read(ref SpanPacketReader data)
+    {
+        Value = data.ReadUInt32();
+        Type = (ItemModifier)data.ReadUInt8();
+    }
+
     public void Write(WorldPacket data)
     {
         data.WriteUInt32(Value);
@@ -569,6 +608,20 @@ public class ItemModList
         {
             var itemMod = new ItemMod();
             itemMod.Read(data);
+            Values.Add(itemMod);
+        }
+    }
+
+    /// <inheritdoc cref="Read(WorldPacket)"/>
+    public void Read(ref SpanPacketReader data)
+    {
+        var itemModListCount = data.ReadBits<uint>(6);
+        data.ResetBitPos();
+
+        for (var i = 0; i < itemModListCount; ++i)
+        {
+            var itemMod = new ItemMod();
+            itemMod.Read(ref data);
             Values.Add(itemMod);
         }
     }
