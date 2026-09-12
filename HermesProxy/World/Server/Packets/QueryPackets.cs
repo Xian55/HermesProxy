@@ -49,17 +49,7 @@ public class QueryTimeResponse : ServerPacket, ISpanWritable
     public long CurrentTime;
 }
 
-class QueryPetName : ClientPacket
-{
-    public QueryPetName(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        UnitGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 UnitGUID;
-}
+public readonly record struct QueryPetName(WowGuid128 UnitGUID);
 
 class QueryPetNameResponse : ServerPacket, ISpanWritable
 {
@@ -312,19 +302,7 @@ public class DeclinedName
     }
 }
 
-public class QueryQuestInfo : ClientPacket
-{
-    public QueryQuestInfo(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        QuestID = _worldPacket.ReadUInt32();
-        QuestGiver = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 QuestGiver;
-    public uint QuestID;
-}
+public readonly record struct QueryQuestInfo(uint QuestID, WowGuid128 QuestGiver);
 
 public class QueryQuestInfoResponse : ServerPacket
 {
@@ -520,17 +498,7 @@ public class QueryQuestInfoResponse : ServerPacket
     public uint QuestID;
 }
 
-public class QueryCreature : ClientPacket
-{
-    public QueryCreature(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        CreatureID = _worldPacket.ReadUInt32();
-    }
-
-    public uint CreatureID;
-}
+public readonly record struct QueryCreature(uint CreatureID);
 
 public class QueryCreatureResponse : ServerPacket
 {
@@ -628,19 +596,7 @@ public class QueryCreatureResponse : ServerPacket
     public uint CreatureID;
 }
 
-public class QueryGameObject : ClientPacket
-{
-    public QueryGameObject(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        GameObjectID = _worldPacket.ReadUInt32();
-        Guid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public uint GameObjectID;
-    public WowGuid128 Guid;
-}
+public readonly record struct QueryGameObject(uint GameObjectID, WowGuid128 Guid);
 
 public class QueryGameObjectResponse : ServerPacket
 {
@@ -747,19 +703,7 @@ public class GameObjectStats
     public uint ContentTuningId;
 }
 
-public class QueryPageText : ClientPacket
-{
-    public QueryPageText(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PageTextID = _worldPacket.ReadUInt32();
-        ItemGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 ItemGUID;
-    public uint PageTextID;
-}
+public readonly record struct QueryPageText(uint PageTextID, WowGuid128 ItemGUID);
 
 public class QueryPageTextResponse : ServerPacket
 {
@@ -805,19 +749,7 @@ public class QueryPageTextResponse : ServerPacket
     }
 }
 
-public class QueryNPCText : ClientPacket
-{
-    public QueryNPCText(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        TextID = _worldPacket.ReadUInt32();
-        Guid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Guid;
-    public uint TextID;
-}
+public readonly record struct QueryNPCText(uint TextID, WowGuid128 Guid);
 
 public class QueryNPCTextResponse : ServerPacket, ISpanWritable
 {
@@ -994,17 +926,7 @@ public class WhoEntry
     public bool IsGM;
 }
 
-class ItemTextQuery : ClientPacket
-{
-    public ItemTextQuery(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Id = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Id = WowGuid128.Empty;
-}
+public readonly record struct ItemTextQuery(WowGuid128 Id);
 
 class QueryItemTextResponse : ServerPacket
 {

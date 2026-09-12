@@ -48,10 +48,33 @@ public class RaidDifficultyTests
         byte[] body = payload.GetData();
         var framed = new byte[body.Length + 2];
         body.CopyTo(framed, 2);
-        using var packet = new SetRaidDifficulty(new WorldPacket(framed));
-        packet.Read();
+
+        // Reads through the same accessor the dispatch site uses, not a hand-written offset.
+        var reader = new global::Framework.IO.SpanPacketReader(new WorldPacket(framed).GetRemainingSpan());
+        SetRaidDifficultyCodec.Read(ref reader, out var packet);
 
         Assert.Equal((int)DifficultyModern.Raid10N, packet.DifficultyID);
+        Assert.Equal(0, packet.Legacy);
+    }
+
+    [Fact]
+    public void SetRaidDifficulty_Read_OmitsLegacyByteWhenAbsent()
+    {
+        // The trailing Legacy byte is optional — older clients stop after DifficultyID. This is
+        // the conditional-read path, which is where a conversion to a positional record struct
+        // goes wrong: the struct defaults to 0 where the class defaulted to 0, so the two agree
+        // only as long as the codec actually honours the CanRead guard.
+        var payload = new WorldPacket(1u);
+        payload.WriteInt32((int)DifficultyModern.Raid25N);
+
+        byte[] body = payload.GetData();
+        var framed = new byte[body.Length + 2];
+        body.CopyTo(framed, 2);
+
+        var reader = new global::Framework.IO.SpanPacketReader(new WorldPacket(framed).GetRemainingSpan());
+        SetRaidDifficultyCodec.Read(ref reader, out var packet);
+
+        Assert.Equal((int)DifficultyModern.Raid25N, packet.DifficultyID);
         Assert.Equal(0, packet.Legacy);
     }
 

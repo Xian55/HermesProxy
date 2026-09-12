@@ -11,126 +11,12 @@ namespace HermesProxy.World.Server;
 
 public partial class WorldSocket
 {
-    // Handlers for CMSG opcodes coming from the modern client
-    [PacketHandler(Opcode.CMSG_TIME_SYNC_RESPONSE)]
-    void HandleTimeSyncResponse(TimeSyncResponse response)
-    {
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-        {
-            WorldPacket packet = new WorldPacket(Opcode.CMSG_TIME_SYNC_RESPONSE);
-            packet.WriteUInt32(response.SequenceIndex);
-            packet.WriteUInt32(response.ClientTime);
-            SendPacketToServer(packet);
-        }
-    }
-
-    [PacketHandler(Opcode.CMSG_AREA_TRIGGER)]
-    void HandleAreaTrigger(AreaTriggerPkt at)
-    {
-        if (at.Entered == false)
-            return;
-
-        // Reconcile post-Cataclysm DB2 ids back to the 3.3.5a-era ids the
-        // legacy server's areatrigger_teleport table is keyed on. V3_4_3 only.
-        // Table is data-driven: CSV/AreaTriggerRemap*.csv.
-        uint idToForward = at.AreaTriggerID;
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
-            GameData.AreaTriggerModernToLegacy.TryGetValue(at.AreaTriggerID, out var legacyId))
-        {
-            idToForward = legacyId;
-        }
-
-        GetSession().GameState.LastEnteredAreaTrigger = idToForward;
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_AREA_TRIGGER);
-        packet.WriteUInt32(idToForward);
-        SendPacketToServer(packet);
-    }
-
-    [PacketHandler(Opcode.CMSG_SET_SELECTION)]
-    void HandleSetSelection(SetSelection selection)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_SELECTION);
-        packet.WriteGuid(selection.TargetGUID.To64());
-        SendPacketToServer(packet);
-    }
-    [PacketHandler(Opcode.CMSG_REPOP_REQUEST)]
-    void HandleRepopRequest(RepopRequest repop)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_REPOP_REQUEST);
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-            packet.WriteBool(repop.CheckInstance);
-        SendPacketToServer(packet);
-    }
-    [PacketHandler(Opcode.CMSG_QUERY_CORPSE_LOCATION_FROM_CLIENT)]
-    void HandleQueryCorpseLocationFromClient(QueryCorpseLocationFromClient query)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.MSG_CORPSE_QUERY);
-        SendPacketToServer(packet);
-    }
-    [PacketHandler(Opcode.CMSG_RECLAIM_CORPSE)]
-    void HandleReclaimCorpse(ReclaimCorpse corpse)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_RECLAIM_CORPSE);
-        packet.WriteGuid(corpse.CorpseGUID.To64());
-        SendPacketToServer(packet);
-    }
-    [PacketHandler(Opcode.CMSG_STAND_STATE_CHANGE)]
-    void HandleStandStateChange(StandStateChange state)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_STAND_STATE_CHANGE);
-        packet.WriteUInt32(state.StandState);
-        SendPacketToServer(packet);
-    }
-    [PacketHandler(Opcode.CMSG_OPENING_CINEMATIC)]
-    [PacketHandler(Opcode.CMSG_NEXT_CINEMATIC_CAMERA)]
-    [PacketHandler(Opcode.CMSG_COMPLETE_CINEMATIC)]
-    void HandleCinematicPacket(ClientCinematicPkt cinematic)
-    {
-        WorldPacket packet = new WorldPacket(cinematic.GetUniversalOpcode());
-        SendPacketToServer(packet);
-    }
-
-    [PacketHandler(Opcode.CMSG_FAR_SIGHT)]
-    void HandleFarSight(FarSight sight)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_FAR_SIGHT);
-        packet.WriteBool(sight.Enable);
-        SendPacketToServer(packet);
-        GetSession().GameState.IsInFarSight = sight.Enable;
-    }
 
     [PacketHandler(Opcode.CMSG_MOUNT_SPECIAL_ANIM)]
     void HandleMountSpecialAnim(MountSpecial mount)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MOUNT_SPECIAL_ANIM);
         SendPacketToServer(packet);
-    }
-
-    [PacketHandler(Opcode.CMSG_TUTORIAL_FLAG)]
-    void HandleTutorialFlag(TutorialSetFlag tutorial)
-    {
-        switch (tutorial.Action)
-        {
-            case TutorialAction.Clear:
-            {
-                WorldPacket packet = new WorldPacket(Opcode.CMSG_TUTORIAL_CLEAR);
-                SendPacketToServer(packet);
-                break;
-            }
-            case TutorialAction.Reset:
-            {
-                WorldPacket packet = new WorldPacket(Opcode.CMSG_TUTORIAL_RESET);
-                SendPacketToServer(packet);
-                break;
-            }
-            case TutorialAction.Update:
-            {
-                WorldPacket packet = new WorldPacket(Opcode.CMSG_TUTORIAL_FLAG);
-                packet.WriteUInt32(tutorial.TutorialBit);
-                SendPacketToServer(packet);
-                break;
-            }
-        }
     }
 
     [PacketHandler(Opcode.CMSG_REQUEST_LFG_LIST_BLACKLIST)]
@@ -272,49 +158,5 @@ public partial class WorldSocket
         response.PvpCPExpCoefficient = 1639.28f;
         response.PvpCPNumerator = 0.00412f;
         SendPacket(response);
-    }
-
-    [PacketHandler(Opcode.CMSG_OBJECT_UPDATE_FAILED)]
-    void HandleObjectUpdateFailed(ObjectUpdateFailed fail)
-    {
-        // Phase 5a-7c diagnostic: surface the modern high-guid type so we can correlate
-        // failures to specific object kinds (Transport / GameObject / Item / Unit / etc.)
-        // when the client rejects what the proxy serialized.
-        Log.Print(LogType.Error,
-            $"CMSG_OBJECT_UPDATE_FAILED guid={fail.ObjectGuid} highType={fail.ObjectGuid.GetHighType()} entry={fail.ObjectGuid.GetEntry()}.");
-    }
-
-    [PacketHandler(Opcode.CMSG_SET_DUNGEON_DIFFICULTY)]
-    void HandleSetDungeonDifficulty(SetDungeonDifficulty difficulty)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.MSG_SET_DUNGEON_DIFFICULTY);
-        uint dificultyId = (byte)((DifficultyModern)difficulty.DifficultyID).CastEnum<DifficultyLegacy>();
-        packet.WriteUInt32(dificultyId);
-        SendPacketToServer(packet);
-
-        // 2.4.3 server does not send response to same client on difficulty change
-        DungeonDifficultySet difficultySet = new();
-        difficultySet.DifficultyID = (int)difficulty.DifficultyID;
-        SendPacket(difficultySet);
-    }
-
-    [PacketHandler(Opcode.CMSG_SET_RAID_DIFFICULTY)]
-    void HandleSetRaidDifficulty(SetRaidDifficulty difficulty)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.MSG_SET_RAID_DIFFICULTY);
-        packet.WriteUInt32(RaidDifficulties.ToLegacy(difficulty.DifficultyID));
-        SendPacketToServer(packet);
-
-        // AC solo (no group) SetRaidDifficulty is silent, so the UI would snap back without an
-        // echo. In a group both AC and TC broadcast MSG_SET_RAID_DIFFICULTY, which the client
-        // handler already turns into SMSG_RAID_DIFFICULTY_SET - echoing as well produced two
-        // packets per click and a duplicate "Raid Difficulty set to..." line in chat.
-        if (Session.GameState.GetCurrentGroup() == null)
-        {
-            RaidDifficultySet difficultySet = new();
-            difficultySet.DifficultyID = difficulty.DifficultyID;
-            difficultySet.Legacy = difficulty.Legacy;
-            SendPacket(difficultySet);
-        }
     }
 }

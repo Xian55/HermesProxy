@@ -117,20 +117,7 @@ public class ServerTimeOffset : ServerPacket, ISpanWritable
     public long Time;
 }
 
-public class TutorialSetFlag : ClientPacket
-{
-    public TutorialSetFlag(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Action = (TutorialAction)_worldPacket.ReadBits<byte>(2);
-        if (Action == TutorialAction.Update)
-            TutorialBit = _worldPacket.ReadUInt32();
-    }
-
-    public TutorialAction Action;
-    public uint TutorialBit;
-}
+public readonly record struct TutorialSetFlag(TutorialAction Action, uint TutorialBit);
 
 public class TutorialFlags : ServerPacket, ISpanWritable
 {
@@ -368,19 +355,7 @@ public class TimeSyncRequest : ServerPacket, ISpanWritable
     public uint SequenceIndex;
 }
 
-public class TimeSyncResponse : ClientPacket
-{
-    public TimeSyncResponse(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        SequenceIndex = _worldPacket.ReadUInt32();
-        ClientTime = _worldPacket.ReadUInt32();
-    }
-
-    public uint ClientTime; // Client ticks in ms
-    public uint SequenceIndex; // Same index as in request
-}
+public readonly record struct TimeSyncResponse(uint SequenceIndex, uint ClientTime);
 
 public class WeatherPkt : ServerPacket, ISpanWritable
 {
@@ -466,21 +441,7 @@ public class LoginSetTimeSpeed : ServerPacket, ISpanWritable
     public int GameTimeHolidayOffset;
 }
 
-class AreaTriggerPkt : ClientPacket
-{
-    public AreaTriggerPkt(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        AreaTriggerID = _worldPacket.ReadUInt32();
-        Entered = _worldPacket.HasBit();
-        FromClient = _worldPacket.HasBit();
-    }
-
-    public uint AreaTriggerID;
-    public bool Entered;
-    public bool FromClient;
-}
+public readonly record struct AreaTriggerPkt(uint AreaTriggerID, bool Entered, bool FromClient);
 
 class AreaTriggerMessage : ServerPacket, ISpanWritable
 {
@@ -503,17 +464,7 @@ class AreaTriggerMessage : ServerPacket, ISpanWritable
     public uint AreaTriggerID = 0;
 }
 
-public class SetSelection : ClientPacket
-{
-    public SetSelection(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        TargetGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 TargetGUID;
-}
+public readonly record struct SetSelection(WowGuid128 TargetGUID);
 
 public class WorldServerInfo : ServerPacket, ISpanWritable
 {
@@ -573,17 +524,7 @@ public class WorldServerInfo : ServerPacket, ISpanWritable
     public uint? InstanceGroupSize;
 }
 
-public class SetDungeonDifficulty : ClientPacket
-{
-    public SetDungeonDifficulty(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        DifficultyID = _worldPacket.ReadUInt32();
-    }
-
-    public uint DifficultyID;
-}
+public readonly record struct SetDungeonDifficulty(uint DifficultyID);
 
 public class DungeonDifficultySet : ServerPacket, ISpanWritable
 {
@@ -606,20 +547,7 @@ public class DungeonDifficultySet : ServerPacket, ISpanWritable
     public int DifficultyID;
 }
 
-public class SetRaidDifficulty : ClientPacket
-{
-    public SetRaidDifficulty(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        DifficultyID = _worldPacket.ReadInt32();
-        if (_worldPacket.CanRead())
-            Legacy = _worldPacket.ReadUInt8();
-    }
-
-    public int DifficultyID;
-    public byte Legacy;
-}
+public readonly record struct SetRaidDifficulty(int DifficultyID, byte Legacy);
 
 public class RaidDifficultySet : ServerPacket, ISpanWritable
 {
@@ -738,29 +666,9 @@ public class InitialSetup : ServerPacket, ISpanWritable
     public byte ServerExpansionTier;
 }
 
-public class RepopRequest : ClientPacket
-{
-    public RepopRequest(WorldPacket packet) : base(packet) { }
+public readonly record struct RepopRequest(bool CheckInstance);
 
-    public override void Read()
-    {
-        CheckInstance = _worldPacket.HasBit();
-    }
-
-    public bool CheckInstance;
-}
-
-public class QueryCorpseLocationFromClient : ClientPacket
-{
-    public QueryCorpseLocationFromClient(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Player = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Player;
-}
+public readonly record struct QueryCorpseLocationFromClient(WowGuid128 Player);
 
 public class CorpseLocation : ServerPacket, ISpanWritable
 {
@@ -846,29 +754,9 @@ public class PreRessurect : ServerPacket, ISpanWritable
     public WowGuid128 PlayerGUID;
 }
 
-public class ReclaimCorpse : ClientPacket
-{
-    public ReclaimCorpse(WorldPacket packet) : base(packet) { }
+public readonly record struct ReclaimCorpse(WowGuid128 CorpseGUID);
 
-    public override void Read()
-    {
-        CorpseGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 CorpseGUID;
-}
-
-public class StandStateChange : ClientPacket
-{
-    public StandStateChange(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        StandState = _worldPacket.ReadUInt32();
-    }
-
-    public uint StandState;
-}
+public readonly record struct StandStateChange(uint StandState);
 
 public class StandStateUpdate : ServerPacket, ISpanWritable
 {
@@ -1026,12 +914,7 @@ public class TriggerCinematic : ServerPacket, ISpanWritable
     public uint CinematicID;
 }
 
-class ClientCinematicPkt : ClientPacket
-{
-    public ClientCinematicPkt(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
+public readonly record struct ClientCinematicPkt;
 
 // Modern V3_4_3 client emits CMSG_REQUEST_VEHICLE_EXIT / _PREV_SEAT / _NEXT_SEAT
 // with no payload (verified via CypherCore Source/Game/Networking/Packets/VehiclePackets.cs).
@@ -1044,17 +927,7 @@ class RequestVehicleSeatChange : ClientPacket
     public override void Read() { }
 }
 
-class FarSight : ClientPacket
-{
-    public FarSight(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Enable = _worldPacket.HasBit();
-    }
-
-    public bool Enable;
-}
+public readonly record struct FarSight(bool Enable);
 
 class MountSpecial : ClientPacket
 {

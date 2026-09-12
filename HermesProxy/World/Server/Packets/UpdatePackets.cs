@@ -1094,14 +1094,4 @@ public struct PowerUpdatePower
     public byte PowerType;
 }
 
-public class ObjectUpdateFailed : ClientPacket
-{
-    public ObjectUpdateFailed(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        ObjectGuid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 ObjectGuid;
-}
+public readonly record struct ObjectUpdateFailed(WowGuid128 ObjectGuid);
