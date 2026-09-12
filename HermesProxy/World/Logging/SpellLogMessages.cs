@@ -34,6 +34,14 @@ internal static partial class SpellLogMessages
         uint incomingBytes, int aurasShipped, int trackedTotal, bool dedupHit);
 
     [LoggerMessage(
+        EventId = 322,
+        Level = LogLevel.Trace,
+        Message = "[AuraUpdateTrace][write] guidLow={GuidLow} guidHigh={GuidHigh} " +
+                  "updateAll={UpdateAll} aurasCount={AurasCount} packetBytes={PacketBytes}")]
+    public static partial void AuraUpdateWritten(
+        ILogger logger, ulong guidLow, ulong guidHigh, bool updateAll, int aurasCount, uint packetBytes);
+
+    [LoggerMessage(
         EventId = 317,
         Level = LogLevel.Trace,
         Message = "[AuraDedup] skipped no-op resync guidLow={GuidLow} slots={Slots}")]

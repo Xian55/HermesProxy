@@ -539,6 +539,9 @@ public class CancelAutoRepeat : ServerPacket, ISpanWritable
 
 public class AuraUpdate : ServerPacket
 {
+    private static readonly Microsoft.Extensions.Logging.ILogger _melAuraWriteLog =
+        Framework.Logging.Log.CreateMelLogger(Framework.Logging.Log.CategoryServer);
+
     public AuraUpdate(WowGuid128 guid, bool all) : base(Opcode.SMSG_AURA_UPDATE, ConnectionType.Instance) 
     {
         UnitGUID = guid;
@@ -554,8 +557,8 @@ public class AuraUpdate : ServerPacket
 
         _worldPacket.WritePackedGuid128(UnitGUID);
 
-        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
-            $"[AuraUpdateTrace][write] guid={UnitGUID} updateAll={UpdateAll} aurasCount={Auras.Count} packetBytes={_worldPacket.GetSize()}");
+        World.Logging.SpellLogMessages.AuraUpdateWritten(
+            _melAuraWriteLog, UnitGUID.Low, UnitGUID.High, UpdateAll, Auras.Count, _worldPacket.GetSize());
     }
 
     public bool UpdateAll;
