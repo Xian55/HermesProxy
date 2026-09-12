@@ -709,7 +709,7 @@ public partial class WorldClient
             if (PLAYER_GUILDID >= 0 && updates.ContainsKey(PLAYER_GUILDID))
             {
                 inspect.GuildData = new InspectGuildData();
-                inspect.GuildData.GuildGUID = WowGuid128.Create(HighGuidType703.Guild, updates[PLAYER_GUILDID].UInt32Value);
+                inspect.GuildData.GuildGUID = WowGuid128.CreateGuildOrEmpty(updates[PLAYER_GUILDID].UInt32Value);
             }
             int PLAYER_FIELD_BYTES = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_BYTES);
             if (PLAYER_FIELD_BYTES >= 0 && updates.ContainsKey(PLAYER_FIELD_BYTES))

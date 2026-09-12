@@ -3336,7 +3336,7 @@ public partial class WorldClient
             if (PLAYER_GUILDID >= 0 && updateMaskArray[PLAYER_GUILDID])
             {
                 GetSession().GameState.StorePlayerGuildId(guid, updates[PLAYER_GUILDID].UInt32Value);
-                updateData.UnitData.GuildGUID = WowGuid128.Create(HighGuidType703.Guild, updates[PLAYER_GUILDID].UInt32Value);
+                updateData.UnitData.GuildGUID = WowGuid128.CreateGuildOrEmpty(updates[PLAYER_GUILDID].UInt32Value);
             }
             int PLAYER_GUILDRANK = LegacyVersion.GetUpdateField(PlayerField.PLAYER_GUILDRANK);
             if (PLAYER_GUILDRANK >= 0 && updateMaskArray[PLAYER_GUILDRANK])
@@ -4759,7 +4759,7 @@ public partial class WorldClient
             int CORPSE_FIELD_GUILD = LegacyVersion.GetUpdateField(CorpseField.CORPSE_FIELD_GUILD);
             if (CORPSE_FIELD_GUILD >= 0 && updateMaskArray[CORPSE_FIELD_GUILD])
             {
-                updateData.CorpseData.GuildGUID = WowGuid128.Create(HighGuidType703.Guild, updates[CORPSE_FIELD_GUILD].UInt32Value);
+                updateData.CorpseData.GuildGUID = WowGuid128.CreateGuildOrEmpty(updates[CORPSE_FIELD_GUILD].UInt32Value);
             }
             int CORPSE_FIELD_FLAGS = LegacyVersion.GetUpdateField(CorpseField.CORPSE_FIELD_FLAGS);
             if (CORPSE_FIELD_FLAGS >= 0 && updateMaskArray[CORPSE_FIELD_FLAGS])

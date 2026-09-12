@@ -1,4 +1,4 @@
-using Framework;
+﻿using Framework;
 using HermesProxy.World.Enums;
 using Framework.Logging;
 
@@ -72,6 +72,18 @@ public readonly record struct WowGuid128(ulong Low, ulong High)
         }
         return WowGuid128.Empty;
     }
+
+    /// <summary>
+    /// A guild GUID from a legacy 32-bit guild id, mapping id 0 to <see cref="Empty"/>.
+    /// </summary>
+    /// <remarks>
+    /// Legacy servers signal "not in a guild" with <c>PLAYER_GUILDID = 0</c>, but
+    /// <c>Create(Guild, 0)</c> packs the guild type and realm id into the high half and so returns
+    /// a perfectly valid-looking guild GUID whose counter happens to be zero. A modern client reads
+    /// that as still being in a guild, which is why leaving one left the guild UI up until relog.
+    /// </remarks>
+    public static WowGuid128 CreateGuildOrEmpty(uint legacyGuildId)
+        => legacyGuildId != 0 ? Create(HighGuidType703.Guild, legacyGuildId) : Empty;
 
     public static WowGuid128 Create(HighGuidType703 type, uint mapId, uint entry, ulong counter)
     {
