@@ -2257,4 +2257,250 @@ internal static class FrozenPackets
         public string NewName = string.Empty;
         public WowGuid128 Guid;
     }
+
+    /// Frozen verbatim from <c>PetPackets.cs</c>.
+    internal sealed class PetAction
+    {
+        public void Read(WorldPacket p)
+        {
+            PetGUID = p.ReadPackedGuid128();
+
+            Action = p.ReadUInt32();
+            TargetGUID = p.ReadPackedGuid128();
+
+            ActionPosition = p.ReadVector3();
+        }
+
+        public WowGuid128 PetGUID;
+        public uint Action;
+        public WowGuid128 TargetGUID;
+        public Vector3 ActionPosition;
+    }
+
+    /// Frozen verbatim from <c>PetPackets.cs</c>.
+    internal sealed class PetStopAttack
+    {
+        public void Read(WorldPacket p)
+        {
+            PetGUID = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 PetGUID;
+    }
+
+    /// Frozen verbatim from <c>PetPackets.cs</c>.
+    internal sealed class PetSetAction
+    {
+        public void Read(WorldPacket p)
+        {
+            PetGUID = p.ReadPackedGuid128();
+
+            Index = p.ReadUInt32();
+            Action = p.ReadUInt32();
+        }
+
+        public WowGuid128 PetGUID;
+        public uint Index;
+        public uint Action;
+    }
+
+    /// Frozen verbatim from <c>PetPackets.cs</c>.
+    internal sealed class PetRename
+    {
+        public void Read(WorldPacket p)
+        {
+            RenameData.PetGUID = p.ReadPackedGuid128();
+            RenameData.PetNumber = p.ReadInt32();
+
+            uint nameLen = p.ReadBits<uint>(8);
+
+            RenameData.HasDeclinedNames = p.HasBit();
+            if (RenameData.HasDeclinedNames)
+            {
+                RenameData.DeclinedNames = new DeclinedName();
+                uint[] count = new uint[PlayerConst.MaxDeclinedNameCases];
+                for (int i = 0; i < PlayerConst.MaxDeclinedNameCases; i++)
+                    count[i] = p.ReadBits<uint>(7);
+
+                for (int i = 0; i < PlayerConst.MaxDeclinedNameCases; i++)
+                    RenameData.DeclinedNames.name[i] = p.ReadString(count[i]);
+            }
+
+            RenameData.NewName = p.ReadString(nameLen);
+        }
+
+        public PetRenameData RenameData;
+    }
+
+    /// Frozen verbatim from <c>PetPackets.cs</c>.
+    internal sealed class RequestStabledPets
+    {
+        public void Read(WorldPacket p)
+        {
+            StableMaster = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 StableMaster;
+    }
+
+    /// Frozen verbatim from <c>PetPackets.cs</c>.
+    internal sealed class BuyStableSlot
+    {
+        public void Read(WorldPacket p)
+        {
+            StableMaster = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 StableMaster;
+    }
+
+    /// Frozen verbatim from <c>PetPackets.cs</c>.
+    internal sealed class PetAbandon
+    {
+        public void Read(WorldPacket p)
+        {
+            PetGUID = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 PetGUID;
+    }
+
+    /// Frozen verbatim from <c>PetPackets.cs</c>.
+    internal sealed class StablePet
+    {
+        public void Read(WorldPacket p)
+        {
+            StableMaster = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 StableMaster;
+    }
+
+    /// Frozen verbatim from <c>PetPackets.cs</c>.
+    internal sealed class UnstablePet
+    {
+        public void Read(WorldPacket p)
+        {
+            PetNumber = p.ReadUInt32();
+            StableMaster = p.ReadPackedGuid128();
+        }
+
+        public uint PetNumber;
+        public WowGuid128 StableMaster;
+    }
+
+    /// Frozen verbatim from <c>PetPackets.cs</c>.
+    internal sealed class StableSwapPet
+    {
+        public void Read(WorldPacket p)
+        {
+            PetNumber = p.ReadUInt32();
+            StableMaster = p.ReadPackedGuid128();
+        }
+
+        public uint PetNumber;
+        public WowGuid128 StableMaster;
+    }
+
+    /// Frozen verbatim from <c>PetPackets.cs</c>.
+    internal sealed class PetCancelAura
+    {
+        public void Read(WorldPacket p)
+        {
+            PetGUID = p.ReadPackedGuid128();
+            SpellID = p.ReadUInt32();
+        }
+
+        public WowGuid128 PetGUID;
+        public uint SpellID;
+    }
+
+    /// Frozen verbatim from <c>SpellPackets.cs</c>.
+    internal sealed class CancelCast
+    {
+        public void Read(WorldPacket p)
+        {
+            CastID = p.ReadPackedGuid128();
+            SpellID = p.ReadUInt32();
+        }
+
+        public uint SpellID;
+        public WowGuid128 CastID;
+    }
+
+    /// Frozen verbatim from <c>SpellPackets.cs</c>.
+    internal sealed class CancelChannelling
+    {
+        public void Read(WorldPacket p)
+        {
+            SpellID = p.ReadInt32();
+            Reason = p.ReadInt32();
+        }
+
+        public int SpellID;
+        public int Reason;       // 40 = /run SpellStopCasting(), 16 = movement/AURA_INTERRUPT_FLAG_MOVE, 41 = turning/AURA_INTERRUPT_FLAG_TURNING
+                                 // does not match SpellCastResult enum
+    }
+
+    /// Frozen verbatim from <c>SpellPackets.cs</c>.
+    internal sealed class CancelAura
+    {
+        public void Read(WorldPacket p)
+        {
+            SpellID = p.ReadUInt32();
+            CasterGUID = p.ReadPackedGuid128();
+        }
+
+        public uint SpellID;
+        public WowGuid128 CasterGUID;
+    }
+
+    /// Frozen verbatim from <c>SpellPackets.cs</c>.
+    internal sealed class LearnTalent
+    {
+        public void Read(WorldPacket p)
+        {
+            TalentID = p.ReadUInt32();
+            Rank = p.ReadUInt16();
+        }
+
+        public uint TalentID;
+        public ushort Rank;
+    }
+
+    /// Frozen verbatim from <c>SpellPackets.cs</c>.
+    internal sealed class ResurrectResponse
+    {
+        public void Read(WorldPacket p)
+        {
+            CasterGUID = p.ReadPackedGuid128();
+            Response = p.ReadUInt32();
+        }
+
+        public WowGuid128 CasterGUID;
+        public uint Response;
+    }
+
+    /// Frozen verbatim from <c>SpellPackets.cs</c>.
+    internal sealed class SelfRes
+    {
+        public void Read(WorldPacket p)
+        {
+            SpellId = p.ReadUInt32();
+        }
+
+        public uint SpellId;
+    }
+
+    /// Frozen verbatim from <c>SpellPackets.cs</c>.
+    internal sealed class TotemDestroyed
+    {
+        public void Read(WorldPacket p)
+        {
+            Slot = p.ReadUInt8();
+            Guid = p.ReadPackedGuid128();
+        }
+        public byte Slot;
+        public WowGuid128 Guid;
+    }
 }

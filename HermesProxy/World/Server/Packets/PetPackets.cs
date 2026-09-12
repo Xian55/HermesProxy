@@ -156,54 +156,11 @@ public class PetUnlearnedSpells : ServerPacket
     public List<uint> Spells = new();
 }
 
-class PetAction : ClientPacket
-{
-    public PetAction(WorldPacket packet) : base(packet) { }
+public readonly record struct PetAction(WowGuid128 PetGUID, uint Action, WowGuid128 TargetGUID, Vector3 ActionPosition);
 
-    public override void Read()
-    {
-        PetGUID = _worldPacket.ReadPackedGuid128();
+public readonly record struct PetStopAttack(WowGuid128 PetGUID);
 
-        Action = _worldPacket.ReadUInt32();
-        TargetGUID = _worldPacket.ReadPackedGuid128();
-
-        ActionPosition = _worldPacket.ReadVector3();
-    }
-
-    public WowGuid128 PetGUID;
-    public uint Action;
-    public WowGuid128 TargetGUID;
-    public Vector3 ActionPosition;
-}
-
-class PetStopAttack : ClientPacket
-{
-    public PetStopAttack(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PetGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 PetGUID;
-}
-
-class PetSetAction : ClientPacket
-{
-    public PetSetAction(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PetGUID = _worldPacket.ReadPackedGuid128();
-
-        Index = _worldPacket.ReadUInt32();
-        Action = _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 PetGUID;
-    public uint Index;
-    public uint Action;
-}
+public readonly record struct PetSetAction(WowGuid128 PetGUID, uint Index, uint Action);
 
 class PetActionSound : ServerPacket, ISpanWritable
 {
@@ -229,36 +186,9 @@ class PetActionSound : ServerPacket, ISpanWritable
     public uint Action;
 }
 
-class PetRename : ClientPacket
-{
-    public PetRename(WorldPacket packet) : base(packet) { }
+public readonly record struct PetRename(PetRenameData RenameData);
 
-    public override void Read()
-    {
-        RenameData.PetGUID = _worldPacket.ReadPackedGuid128();
-        RenameData.PetNumber = _worldPacket.ReadInt32();
-
-        uint nameLen = _worldPacket.ReadBits<uint>(8);
-
-        RenameData.HasDeclinedNames = _worldPacket.HasBit();
-        if (RenameData.HasDeclinedNames)
-        {
-            RenameData.DeclinedNames = new DeclinedName();
-            uint[] count = new uint[PlayerConst.MaxDeclinedNameCases];
-            for (int i = 0; i < PlayerConst.MaxDeclinedNameCases; i++)
-                count[i] = _worldPacket.ReadBits<uint>(7);
-
-            for (int i = 0; i < PlayerConst.MaxDeclinedNameCases; i++)
-                RenameData.DeclinedNames.name[i] = _worldPacket.ReadString(count[i]);
-        }
-
-        RenameData.NewName = _worldPacket.ReadString(nameLen);
-    }
-
-    public PetRenameData RenameData;
-}
-
-struct PetRenameData
+public struct PetRenameData
 {
     public WowGuid128 PetGUID;
     public int PetNumber;
@@ -267,29 +197,9 @@ struct PetRenameData
     public DeclinedName DeclinedNames;
 }
 
-class PetAbandon : ClientPacket
-{
-    public PetAbandon(WorldPacket packet) : base(packet) { }
+public readonly record struct PetAbandon(WowGuid128 PetGUID);
 
-    public override void Read()
-    {
-        PetGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 PetGUID;
-}
-
-class RequestStabledPets : ClientPacket
-{
-    public RequestStabledPets(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        StableMaster = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 StableMaster;
-}
+public readonly record struct RequestStabledPets(WowGuid128 StableMaster);
 
 class PetStableList : ServerPacket, ISpanWritable
 {
@@ -475,17 +385,7 @@ class PetStableInfo
     public string PetName = string.Empty;
 }
 
-class BuyStableSlot : ClientPacket
-{
-    public BuyStableSlot(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        StableMaster = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 StableMaster;
-}
+public readonly record struct BuyStableSlot(WowGuid128 StableMaster);
 
 public class PetGuids : ServerPacket, ISpanWritable
 {
@@ -560,66 +460,11 @@ sealed class PetTameFailure : ServerPacket, ISpanWritable
     public byte Reason;
 }
 
-class StablePet : ClientPacket
-{
-    public StablePet(WorldPacket packet) : base(packet) { }
+public readonly record struct StablePet(WowGuid128 StableMaster);
 
-    public override void Read()
-    {
-        StableMaster = _worldPacket.ReadPackedGuid128();
-    }
+public readonly record struct UnstablePet(uint PetNumber, WowGuid128 StableMaster);
 
-    public WowGuid128 StableMaster;
-}
+public readonly record struct StableSwapPet(uint PetNumber, WowGuid128 StableMaster);
 
-class UnstablePet : ClientPacket
-{
-    public UnstablePet(WorldPacket packet) : base(packet) { }
+public readonly record struct PetCancelAura(WowGuid128 PetGUID, uint SpellID);
 
-    public override void Read()
-    {
-        PetNumber = _worldPacket.ReadUInt32();
-        StableMaster = _worldPacket.ReadPackedGuid128();
-    }
-
-    public uint PetNumber;
-    public WowGuid128 StableMaster;
-}
-
-class StableSwapPet : ClientPacket
-{
-    public StableSwapPet(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PetNumber = _worldPacket.ReadUInt32();
-        StableMaster = _worldPacket.ReadPackedGuid128();
-    }
-
-    public uint PetNumber;
-    public WowGuid128 StableMaster;
-}
-
-class PetCancelAura : ClientPacket
-{
-    public PetCancelAura(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PetGUID = _worldPacket.ReadPackedGuid128();
-        SpellID = _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 PetGUID;
-    public uint SpellID;
-}
-
-class PetInfoRequest : ClientPacket
-{
-    public PetInfoRequest(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-    }
-
-}

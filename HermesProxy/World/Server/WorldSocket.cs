@@ -91,6 +91,12 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     // Built alongside _globalSession rather than in the ctor: the session binds later, in
     // HandleAuthSession. Passed `in` to every generated system, so dispatch copies a pointer.
     SessionContext _sessionContext;
+
+    /// <summary>
+    /// The context the dispatch site passes to systems, exposed so code that holds a socket rather
+    /// than a context — the legacy handlers, mainly — can call the same statics.
+    /// </summary>
+    internal ref readonly SessionContext SessionContext => ref _sessionContext;
     readonly Lock _sendLock = new();
 
     private BnetServices.ServiceManager _bnetRpc = null!;

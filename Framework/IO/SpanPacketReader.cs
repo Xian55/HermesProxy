@@ -296,6 +296,25 @@ public ref struct SpanPacketReader
         _bitValue = 0;
     }
 
+    /// <summary>
+    /// Drops the cached partial byte so the next bit read loads a fresh one. Mirrors
+    /// <see cref="Framework.IO.ByteBuffer.ResetBitReader"/> and WPP's <c>packet.ResetBitReader</c>.
+    /// </summary>
+    /// <remarks>
+    /// Identical in effect to <see cref="ResetBitPos"/> — both leave the bit position at 8 — but
+    /// kept as a separate name because the two mean different things at a call site. ResetBitPos
+    /// ends a bit section; this one says "the wire pads here and the next section starts on a byte
+    /// boundary", which is load-bearing between <c>SpellCastRequest</c>'s bit fields and
+    /// <c>SpellTargetData</c>'s. Reading the second section without it consumes the leftover
+    /// cached bits and the byte stream falls one byte behind the wire.
+    /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void ResetBitReader()
+    {
+        _bitPosition = 8;
+        _bitValue = 0;
+    }
+
     #endregion
 
     #region Packed GUID Methods

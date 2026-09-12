@@ -20,6 +20,7 @@ using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -513,26 +514,7 @@ public class SpellChargeEntry
     public byte ConsumedCharges;
 }
 
-class CancelAura : ClientPacket
-{
-    public CancelAura(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        SpellID = _worldPacket.ReadUInt32();
-        CasterGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public uint SpellID;
-    public WowGuid128 CasterGUID;
-}
-
-class CancelAutoRepeatSpell : ClientPacket
-{
-    public CancelAutoRepeatSpell(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
+public readonly record struct CancelAura(uint SpellID, WowGuid128 CasterGUID);
 
 public class CancelAutoRepeat : ServerPacket, ISpanWritable
 {
@@ -724,58 +706,16 @@ public class ContentTuningParams
     }
 }
 
-public class CastSpell : ClientPacket
-{
-    public CastSpell(WorldPacket packet) : base(packet)
-    {
-        Cast = new SpellCastRequest();
-    }
+/// <param name="Cast">
+/// Stays a class. It nests the target block, two optional-cost lists and a MovementInfo, and
+/// MovementInfo is a mutable builder on the outbound path — the same reason it is still a class
+/// everywhere else. One allocation per cast survives until outbound converts.
+/// </param>
+public readonly record struct CastSpell(SpellCastRequest Cast);
 
-    public override void Read()
-    {
-        Cast.Read(_worldPacket);
-    }
+public readonly record struct PetCastSpell(WowGuid128 PetGUID, SpellCastRequest Cast);
 
-    public SpellCastRequest Cast;
-}
-
-public class PetCastSpell : ClientPacket
-{
-    public PetCastSpell(WorldPacket packet) : base(packet)
-    {
-        Cast = new SpellCastRequest();
-    }
-
-    public override void Read()
-    {
-        PetGUID = _worldPacket.ReadPackedGuid128();
-        Cast.Read(_worldPacket);
-    }
-
-    public WowGuid128 PetGUID;
-    public SpellCastRequest Cast;
-}
-
-public class UseItem : ClientPacket
-{
-    public UseItem(WorldPacket packet) : base(packet)
-    {
-        Cast = new SpellCastRequest();
-    }
-
-    public override void Read()
-    {
-        PackSlot = _worldPacket.ReadUInt8();
-        Slot = _worldPacket.ReadUInt8();
-        CastItem = _worldPacket.ReadPackedGuid128();
-        Cast.Read(_worldPacket);
-    }
-
-    public byte PackSlot;
-    public byte Slot;
-    public WowGuid128 CastItem;
-    public SpellCastRequest Cast;
-}
+public readonly record struct UseItem(byte PackSlot, byte Slot, WowGuid128 CastItem, SpellCastRequest Cast);
 
 public class SpellCastRequest
 {
@@ -841,6 +781,69 @@ public class SpellCastRequest
         }
     }
 
+    /// <inheritdoc cref="Read(WorldPacket)"/>
+    public void Read(ref SpanPacketReader data)
+    {
+        CastID = data.ReadPackedGuid128();
+        Misc[0] = data.ReadUInt32();
+        Misc[1] = data.ReadUInt32();
+        SpellID = data.ReadUInt32();
+
+        SpellXSpellVisualID = data.ReadUInt32();
+
+        MissileTrajectory.Read(ref data);
+        CraftingNPC = data.ReadPackedGuid128();
+
+        // V3_4_3.54261 wire quirks: `removedModificationsCount` is a count-only uint32
+        // (no per-entry payload), and `hasCraftingOrderID` is bit-only (no UInt64
+        // follow-up). Newer V3_4_4+ ships per-entry payloads for both — adding those
+        // reads on 54261 throws IndexOutOfRange.
+        var optionalReagentsCount = data.ReadUInt32();
+        var optionalCurrenciesCount = data.ReadUInt32();
+        // V3_4_1+ wire field; not present in V1_14 / V2_5 SpellCastRequest layout.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            _ = data.ReadUInt32(); // removedModificationsCount — count only, no per-entry payload in 54261
+
+        for (var i = 0; i < optionalReagentsCount; ++i)
+        {
+            var reagent = new SpellOptionalReagent();
+            reagent.Read(ref data);
+            OptionalReagents.Add(reagent);
+        }
+
+        for (var i = 0; i < optionalCurrenciesCount; ++i)
+        {
+            var currency = new SpellExtraCurrencyCost();
+            currency.Read(ref data);
+            OptionalCurrencies.Add(currency);
+        }
+
+        SendCastFlags = data.ReadBits<uint>(5);
+        if (data.HasBit())
+            MoveUpdate = new();
+        var weightCount = data.ReadBits<uint>(2);
+        // V3_4_1+ bit; not present in V1_14 / V2_5 SpellCastRequest layout.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            _ = data.HasBit(); // hasCraftingOrderID — bit only, no UInt64 follow-up in 54261
+        Target.Read(ref data);
+
+        if (MoveUpdate != null)
+        {
+            MoverGUID = data.ReadPackedGuid128();
+            MoveUpdate.ReadMovementInfoModern(ref data);
+        }
+
+        for (var i = 0; i < weightCount; ++i)
+        {
+            data.ResetBitPos();
+            SpellWeight weight;
+            weight.Type = data.ReadBits<uint>(2);
+            weight.ID = data.ReadInt32();
+            weight.Quantity = data.ReadUInt32();
+            Weight.Add(weight);
+        }
+    }
+
     public WowGuid128 CastID;
     public uint SpellID;
     public uint SpellXSpellVisualID;
@@ -859,6 +862,14 @@ public class SpellCastRequest
 public struct MissileTrajectoryRequest
 {
     public void Read(WorldPacket data)
+    {
+        Pitch = data.ReadFloat();
+        Speed = data.ReadFloat();
+    }
+
+    /// <inheritdoc cref="Read(WorldPacket)"/>
+    /// <remarks>Generated from the WorldPacket reader; SpellCastRequestReaderEquivalenceTests keeps the pair in step.</remarks>
+    public void Read(ref SpanPacketReader data)
     {
         Pitch = data.ReadFloat();
         Speed = data.ReadFloat();
@@ -884,6 +895,15 @@ public struct SpellOptionalReagent
         Count = data.ReadInt32();
     }
 
+    /// <inheritdoc cref="Read(WorldPacket)"/>
+    /// <remarks>Generated from the WorldPacket reader; SpellCastRequestReaderEquivalenceTests keeps the pair in step.</remarks>
+    public void Read(ref SpanPacketReader data)
+    {
+        ItemID = data.ReadInt32();
+        Slot = data.ReadInt32();
+        Count = data.ReadInt32();
+    }
+
     public int ItemID;
     public int Slot;
     public int Count;
@@ -898,39 +918,27 @@ public struct SpellExtraCurrencyCost
         Count = data.ReadInt32();
     }
 
+    /// <inheritdoc cref="Read(WorldPacket)"/>
+    /// <remarks>Generated from the WorldPacket reader; SpellCastRequestReaderEquivalenceTests keeps the pair in step.</remarks>
+    public void Read(ref SpanPacketReader data)
+    {
+        CurrencyID = data.ReadInt32();
+        Slot = data.ReadInt32();
+        Count = data.ReadInt32();
+    }
+
     public int CurrencyID;
     public int Slot;
     public int Count;
 }
 
-public class CancelCast : ClientPacket
-{
-    public CancelCast(WorldPacket packet) : base(packet) { }
+public readonly record struct CancelCast(WowGuid128 CastID, uint SpellID);
 
-    public override void Read()
-    {
-        CastID = _worldPacket.ReadPackedGuid128();
-        SpellID = _worldPacket.ReadUInt32();
-    }
-
-    public uint SpellID;
-    public WowGuid128 CastID;
-}
-
-class CancelChannelling : ClientPacket
-{
-    public CancelChannelling(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        SpellID = _worldPacket.ReadInt32();
-        Reason = _worldPacket.ReadInt32();
-    }
-
-    public int SpellID;
-    public int Reason;       // 40 = /run SpellStopCasting(), 16 = movement/AURA_INTERRUPT_FLAG_MOVE, 41 = turning/AURA_INTERRUPT_FLAG_TURNING
-                             // does not match SpellCastResult enum
-}
+/// <param name="Reason">
+/// 40 = /run SpellStopCasting(), 16 = movement/AURA_INTERRUPT_FLAG_MOVE,
+/// 41 = turning/AURA_INTERRUPT_FLAG_TURNING. Does not match SpellCastResult.
+/// </param>
+public readonly record struct CancelChannelling(int SpellID, int Reason);
 
 class SpellPrepare : ServerPacket, ISpanWritable
 {
@@ -1278,6 +1286,14 @@ public class TargetLocation
         Location = data.ReadVector3();
     }
 
+    /// <inheritdoc cref="Read(WorldPacket)"/>
+    /// <remarks>Generated from the WorldPacket reader; SpellCastRequestReaderEquivalenceTests keeps the pair in step.</remarks>
+    public void Read(ref SpanPacketReader data)
+    {
+        Transport = data.ReadPackedGuid128();
+        Location = data.ReadVector3();
+    }
+
     public void Write(WorldPacket data)
     {
         data.WritePackedGuid128(Transport);
@@ -1327,6 +1343,54 @@ public class SpellTargetData
 
         if (DstLocation != null)
             DstLocation.Read(data);
+
+        if (Orientation != null)
+            Orientation = data.ReadFloat();
+
+        if (MapID != null)
+            MapID = data.ReadInt32();
+
+        Name = data.ReadString(nameLength);
+    }
+
+    /// <inheritdoc cref="Read(WorldPacket)"/>
+    public void Read(ref SpanPacketReader data)
+    {
+        // WPP V8_0_1 ReadSpellTargetData calls packet.ResetBitReader() FIRST, discarding
+        // any unread bits in the cached partial byte left over from the prior section.
+        // Without this, the V3_4_3 SpellCastRequest's 9 bit-fields (5+1+2+1) leave 7 bits
+        // cached; Target's 39 bits (28 Flags + 4 has-bits + 7 nameLength) consume those
+        // 7 cached bits first and end up reading 1 byte fewer from the stream than the
+        // wire contains — pushing Unit's PackedGuid128 mask byte 1 byte earlier than it
+        // should be, which makes ReadPackedUInt64 try to read past end-of-packet and
+        // throws IndexOutOfRange (observed on every CMSG_CAST_SPELL after the V3_4_1+
+        // hasCraftingOrderID bit was added to SpellCastRequest.Read).
+        // Gated to V3_4_3_54261: V1_14 / V2_5 SpellCastRequest doesn't leave dangling
+        // cached bits, so a reset there would not corrupt anything but is unnecessary.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            data.ResetBitReader();
+
+        // V3_4_3 client uses 28-bit target flags (WPP V3_4_0 module gates 28 at V3_4_1+).
+        int flagBits = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 28 : 26;
+        Flags = (SpellCastTargetFlags)data.ReadBits<uint>(flagBits);
+        if (data.HasBit())
+            SrcLocation = new();
+        if (data.HasBit())
+            DstLocation = new();
+        if (data.HasBit())
+            Orientation = new();
+        if (data.HasBit())
+            MapID = new();
+        uint nameLength = data.ReadBits<uint>(7);
+
+        Unit = data.ReadPackedGuid128();
+        Item = data.ReadPackedGuid128();
+
+        if (SrcLocation != null)
+            SrcLocation.Read(ref data);
+
+        if (DstLocation != null)
+            DstLocation.Read(ref data);
 
         if (Orientation != null)
             Orientation = data.ReadFloat();
@@ -1446,19 +1510,7 @@ public class SpellHealPrediction
     public byte Type;
 }
 
-class LearnTalent : ClientPacket
-{
-    public LearnTalent(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        TalentID = _worldPacket.ReadUInt32();
-        Rank = _worldPacket.ReadUInt16();
-    }
-
-    public uint TalentID;
-    public ushort Rank;
-}
+public readonly record struct LearnTalent(uint TalentID, ushort Rank);
 
 public class SpellCooldownPkt : ServerPacket, ISpanWritable
 {
@@ -2343,31 +2395,9 @@ class ResurrectRequest : ServerPacket, ISpanWritable
     public string Name = string.Empty;
 }
 
-public class ResurrectResponse : ClientPacket
-{
-    public ResurrectResponse(WorldPacket packet) : base(packet) { }
+public readonly record struct ResurrectResponse(WowGuid128 CasterGUID, uint Response);
 
-    public override void Read()
-    {
-        CasterGUID = _worldPacket.ReadPackedGuid128();
-        Response = _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 CasterGUID;
-    public uint Response;
-}
-
-class SelfRes : ClientPacket
-{
-    public SelfRes(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        SpellId = _worldPacket.ReadUInt32();
-    }
-
-    public uint SpellId;
-}
+public readonly record struct SelfRes(uint SpellId);
 
 class TotemCreated : ServerPacket, ISpanWritable
 {
@@ -2407,18 +2437,7 @@ class TotemCreated : ServerPacket, ISpanWritable
     public bool CannotDismiss = false;
 }
 
-class TotemDestroyed : ClientPacket
-{
-    public TotemDestroyed(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Slot = _worldPacket.ReadUInt8();
-        Guid = _worldPacket.ReadPackedGuid128();
-    }
-    public byte Slot;
-    public WowGuid128 Guid;
-}
+public readonly record struct TotemDestroyed(byte Slot, WowGuid128 Guid);
 
 public class SetSpellModifier : ServerPacket, ISpanWritable
 {

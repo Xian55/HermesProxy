@@ -1,5 +1,6 @@
 using HermesProxy.World.Client;
 using HermesProxy.World.Server;
+using HermesProxy.World.Server.Systems;
 using Xunit;
 
 namespace HermesProxy.Tests.World;
@@ -77,7 +78,7 @@ public class PetActionButtonEncodingTests
         uint legacy = (0xC1u << 24) | spellId;
 
         uint modern = WorldClient.TranslateLegacyPetActionButtonToV343(legacy);
-        uint roundTripped = WorldSocket.TranslateV343PetActionToLegacy(modern);
+        uint roundTripped = PetSystem.TranslateV343PetActionToLegacy(modern);
 
         Assert.Equal(legacy, roundTripped);
     }
@@ -88,7 +89,7 @@ public class PetActionButtonEncodingTests
         // The client casts vehicle abilities through CMSG_PET_CAST_SPELL, so this path is a
         // fallback — but echoing the UI position back would hit the legacy handler's
         // "unknown PET flag" default and be dropped.
-        uint legacy = WorldSocket.TranslateV343PetActionToLegacy((8u << 23) | Thrust);
+        uint legacy = PetSystem.TranslateV343PetActionToLegacy((8u << 23) | Thrust);
 
         Assert.Equal(0x81u, legacy >> 24);
         Assert.Equal(Thrust, legacy & 0x00FFFFFF);
@@ -98,6 +99,6 @@ public class PetActionButtonEncodingTests
     public void EmptyButton_StaysEmpty()
     {
         Assert.Equal(0u, WorldClient.TranslateLegacyPetActionButtonToV343(0));
-        Assert.Equal(0u, WorldSocket.TranslateV343PetActionToLegacy(0));
+        Assert.Equal(0u, PetSystem.TranslateV343PetActionToLegacy(0));
     }
 }

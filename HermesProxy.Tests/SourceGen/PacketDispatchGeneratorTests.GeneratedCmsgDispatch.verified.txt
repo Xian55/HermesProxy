@@ -204,6 +204,36 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ItemSystem.HandleBuyItem(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleBuyStableSlot_CMSG_BUY_STABLE_SLOT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.BuyStableSlotCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandleBuyStableSlot(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelAura_CMSG_CANCEL_AURA(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CancelAuraCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.SpellSystem.HandleCancelAura(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelAutoRepeatSpell_CMSG_CANCEL_AUTO_REPEAT_SPELL(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.SpellSystem.HandleCancelAutoRepeatSpell(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelCast_CMSG_CANCEL_CAST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CancelCastCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.SpellSystem.HandleCancelCast(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelChannelling_CMSG_CANCEL_CHANNELLING(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CancelChannellingCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.SpellSystem.HandleCancelChannelling(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelMountAura_CMSG_CANCEL_MOUNT_AURA(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
@@ -220,6 +250,12 @@ internal static unsafe class GeneratedCmsgDispatch
     {
         global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.TradeSystem.HandleEmptyTradePacket(global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_TRADE, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCastSpell_CMSG_CAST_SPELL(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CastSpellCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.SpellSystem.HandleCastSpell(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleCharacterRenameRequest_CMSG_CHARACTER_RENAME_REQUEST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -744,6 +780,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.QuerySystem.HandleItemTextQuery(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleLearnTalent_CMSG_LEARN_TALENT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.LearnTalentCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.SpellSystem.HandleLearnTalent(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleLeaveGroup_CMSG_LEAVE_GROUP(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.LeaveGroupCodec.Read(ref reader, out var packet);
@@ -1182,6 +1224,48 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.GroupSystem.HandlePartyUninvite(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetAbandon_CMSG_PET_ABANDON(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.PetAbandonCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandlePetAbandon(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetAction_CMSG_PET_ACTION(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.PetActionCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandlePetAction(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetCancelAura_CMSG_PET_CANCEL_AURA(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.PetCancelAuraCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandlePetCancelAura(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandlePetCastSpell_CMSG_PET_CAST_SPELL(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.PetCastSpellCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.SpellSystem.HandlePetCastSpell(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetRename_CMSG_PET_RENAME(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.PetRenameCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandlePetRename(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetStopAttack_CMSG_PET_SET_ACTION(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.PetSetActionCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandlePetStopAttack(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetStopAttack_CMSG_PET_STOP_ATTACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.PetStopAttackCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandlePetStopAttack(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandlePlayerLogin_CMSG_PLAYER_LOGIN(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.PlayerLoginCodec.Read(ref reader, out var packet);
@@ -1422,6 +1506,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.GroupSystem.HandleRequestPartyMemberStats(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleRequestPetInfo_CMSG_REQUEST_PET_INFO(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandleRequestPetInfo(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleRequestPlayedTime_CMSG_REQUEST_PLAYED_TIME(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.RequestPlayedTimeCodec.Read(ref reader, out var packet);
@@ -1432,6 +1522,12 @@ internal static unsafe class GeneratedCmsgDispatch
     {
         global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.InstanceSystem.HandleRequestRaidInfo(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleRequestStabledPets_CMSG_REQUEST_STABLED_PETS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.RequestStabledPetsCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandleRequestStabledPets(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRequestVehicleSeatChange_CMSG_REQUEST_VEHICLE_EXIT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -1458,10 +1554,22 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.InstanceSystem.HandleResetInstances(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleResurrectResponse_CMSG_RESURRECT_RESPONSE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ResurrectResponseCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.SpellSystem.HandleResurrectResponse(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleSaveGuildEmblem_CMSG_SAVE_GUILD_EMBLEM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.SaveGuildEmblemCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.GuildSystem.HandleSaveGuildEmblem(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleSelfRes_CMSG_SELF_RES(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.SelfResCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.SpellSystem.HandleSelfRes(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleSellItem_CMSG_SELL_ITEM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -1614,6 +1722,18 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.GuildSystem.HandleSplitItemToGuildBank(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleStablePet_CMSG_STABLE_PET(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.StablePetCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandleStablePet(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleStableSwapPet_CMSG_STABLE_SWAP_PET(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.StableSwapPetCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandleStableSwapPet(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleStandStateChange_CMSG_STAND_STATE_CHANGE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.StandStateChangeCodec.Read(ref reader, out var packet);
@@ -1686,6 +1806,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.CharacterSystem.HandleTogglePvP(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleTotemDestroyed_CMSG_TOTEM_DESTROYED(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.TotemDestroyedCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.SpellSystem.HandleTotemDestroyed(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleTrainerBuySpell_CMSG_TRAINER_BUY_SPELL(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.TrainerBuySpellCodec.Read(ref reader, out var packet);
@@ -1716,10 +1842,22 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.CharacterSystem.HandleUnlearnSkill(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleUnstablePet_CMSG_UNSTABLE_PET(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.UnstablePetCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandleUnstablePet(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleUpdateRaidTarget_CMSG_UPDATE_RAID_TARGET(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.UpdateRaidTargetCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.GroupSystem.HandleUpdateRaidTarget(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleUseItem_CMSG_USE_ITEM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.UseItemCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.SpellSystem.HandleUseItem(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleWorldPortResponse_CMSG_WORLD_PORT_RESPONSE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -1769,9 +1907,15 @@ internal static unsafe class GeneratedCmsgDispatch
             else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BUY_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleBuyItem_CMSG_BUY_ITEM_BuyItemCodecWotLKClassic;
         }
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BUY_STABLE_SLOT] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleBuyStableSlot_CMSG_BUY_STABLE_SLOT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_AURA] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelAura_CMSG_CANCEL_AURA;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_AUTO_REPEAT_SPELL] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelAutoRepeatSpell_CMSG_CANCEL_AUTO_REPEAT_SPELL;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_CAST] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelCast_CMSG_CANCEL_CAST;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_CHANNELLING] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelChannelling_CMSG_CANCEL_CHANNELLING;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_MOUNT_AURA] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelMountAura_CMSG_CANCEL_MOUNT_AURA;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_TEMP_ENCHANTMENT] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleCancelTempEnchantment_CMSG_CANCEL_TEMP_ENCHANTMENT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_TRADE] = &Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleEmptyTradePacket_CMSG_CANCEL_TRADE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CAST_SPELL] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCastSpell_CMSG_CAST_SPELL;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHARACTER_RENAME_REQUEST] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleCharacterRenameRequest_CMSG_CHARACTER_RENAME_REQUEST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAR_DELETE] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleCharDelete_CMSG_CHAR_DELETE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_ANNOUNCEMENTS] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelCommand_CMSG_CHAT_CHANNEL_ANNOUNCEMENTS;
@@ -1915,6 +2059,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_INSPECT_HONOR_STATS] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleInspectHonorStats_CMSG_INSPECT_HONOR_STATS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_INSPECT_PVP] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleInspectArenaTeams_CMSG_INSPECT_PVP;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_TEXT_QUERY] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleItemTextQuery_CMSG_ITEM_TEXT_QUERY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_TALENT] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleLearnTalent_CMSG_LEARN_TALENT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LEAVE_GROUP] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleLeaveGroup_CMSG_LEAVE_GROUP;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LIST_INVENTORY] = &Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleInteractWithNPC_CMSG_LIST_INVENTORY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LOADING_SCREEN_NOTIFY] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleLoadScreen_CMSG_LOADING_SCREEN_NOTIFY;
@@ -1996,6 +2141,13 @@ internal static unsafe class GeneratedCmsgDispatch
             else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PARTY_UNINVITE] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandlePartyUninvite_CMSG_PARTY_UNINVITE_PartyUninviteCodecWotLKClassic;
         }
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_ABANDON] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetAbandon_CMSG_PET_ABANDON;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_ACTION] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetAction_CMSG_PET_ACTION;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_CANCEL_AURA] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetCancelAura_CMSG_PET_CANCEL_AURA;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_CAST_SPELL] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandlePetCastSpell_CMSG_PET_CAST_SPELL;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_RENAME] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetRename_CMSG_PET_RENAME;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_SET_ACTION] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetStopAttack_CMSG_PET_SET_ACTION;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_STOP_ATTACK] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetStopAttack_CMSG_PET_STOP_ATTACK;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PLAYER_LOGIN] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandlePlayerLogin_CMSG_PLAYER_LOGIN;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PLAYER_SHOWING_CLOAK] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleShowHelmOrCloak_CMSG_PLAYER_SHOWING_CLOAK;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PLAYER_SHOWING_HELM] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleShowHelmOrCloak_CMSG_PLAYER_SHOWING_HELM;
@@ -2040,13 +2192,17 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleRequestConquestFormulaConstants_CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_LFG_LIST_BLACKLIST] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleRequestLFGListBlacklist_CMSG_REQUEST_LFG_LIST_BLACKLIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_PARTY_MEMBER_STATS] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleRequestPartyMemberStats_CMSG_REQUEST_PARTY_MEMBER_STATS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_PET_INFO] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleRequestPetInfo_CMSG_REQUEST_PET_INFO;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_PLAYED_TIME] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleRequestPlayedTime_CMSG_REQUEST_PLAYED_TIME;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_RAID_INFO] = &Thunk_HermesProxy_World_Server_Systems_InstanceSystem_HandleRequestRaidInfo_CMSG_REQUEST_RAID_INFO;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_STABLED_PETS] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleRequestStabledPets_CMSG_REQUEST_STABLED_PETS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_EXIT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRequestVehicleSeatChange_CMSG_REQUEST_VEHICLE_EXIT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_NEXT_SEAT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRequestVehicleSeatChange_CMSG_REQUEST_VEHICLE_NEXT_SEAT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_PREV_SEAT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRequestVehicleSeatChange_CMSG_REQUEST_VEHICLE_PREV_SEAT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_RESET_INSTANCES] = &Thunk_HermesProxy_World_Server_Systems_InstanceSystem_HandleResetInstances_CMSG_RESET_INSTANCES;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_RESURRECT_RESPONSE] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleResurrectResponse_CMSG_RESURRECT_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SAVE_GUILD_EMBLEM] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleSaveGuildEmblem_CMSG_SAVE_GUILD_EMBLEM;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SELF_RES] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleSelfRes_CMSG_SELF_RES;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SELL_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleSellItem_CMSG_SELL_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_ACTION_BAR_TOGGLES] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleSetActionBarToggles_CMSG_SET_ACTION_BAR_TOGGLES;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_ACTION_BUTTON] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleSetActionButton_CMSG_SET_ACTION_BUTTON;
@@ -2084,6 +2240,8 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SPLIT_GUILD_BANK_ITEM_TO_INVENTORY] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleMergeGuildBankItemWithItem_CMSG_SPLIT_GUILD_BANK_ITEM_TO_INVENTORY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SPLIT_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleSplitItem_CMSG_SPLIT_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SPLIT_ITEM_TO_GUILD_BANK] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleSplitItemToGuildBank_CMSG_SPLIT_ITEM_TO_GUILD_BANK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_STABLE_PET] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleStablePet_CMSG_STABLE_PET;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_STABLE_SWAP_PET] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleStableSwapPet_CMSG_STABLE_SWAP_PET;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_STAND_STATE_CHANGE] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleStandStateChange_CMSG_STAND_STATE_CHANGE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_STORE_GUILD_BANK_ITEM] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleStoreGuildBankItem_CMSG_STORE_GUILD_BANK_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SUMMON_RESPONSE] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleSummonResponse_CMSG_SUMMON_RESPONSE;
@@ -2096,12 +2254,15 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_TAXI_QUERY_AVAILABLE_NODES] = &Thunk_HermesProxy_World_Server_Systems_TaxiSystem_HandleTaxiNodesQuery_CMSG_TAXI_QUERY_AVAILABLE_NODES;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_TIME_SYNC_RESPONSE] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleTimeSyncResponse_CMSG_TIME_SYNC_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_TOGGLE_PVP] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleTogglePvP_CMSG_TOGGLE_PVP;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_TOTEM_DESTROYED] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleTotemDestroyed_CMSG_TOTEM_DESTROYED;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_TRAINER_BUY_SPELL] = &Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleTrainerBuySpell_CMSG_TRAINER_BUY_SPELL;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_TRAINER_LIST] = &Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleInteractWithNPC_CMSG_TRAINER_LIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_TUTORIAL_FLAG] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleTutorialFlag_CMSG_TUTORIAL_FLAG;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_UNACCEPT_TRADE] = &Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleEmptyTradePacket_CMSG_UNACCEPT_TRADE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_UNLEARN_SKILL] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleUnlearnSkill_CMSG_UNLEARN_SKILL;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_UNSTABLE_PET] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleUnstablePet_CMSG_UNSTABLE_PET;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_UPDATE_RAID_TARGET] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleUpdateRaidTarget_CMSG_UPDATE_RAID_TARGET;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_USE_ITEM] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleUseItem_CMSG_USE_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_WORLD_PORT_RESPONSE] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleWorldPortResponse_CMSG_WORLD_PORT_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_WRAP_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleWrapItem_CMSG_WRAP_ITEM;
 
@@ -2140,9 +2301,15 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_BUY_BACK_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_BUY_BANK_SLOT,
             global::HermesProxy.World.Enums.Opcode.CMSG_BUY_ITEM,
+            global::HermesProxy.World.Enums.Opcode.CMSG_BUY_STABLE_SLOT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_AURA,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_AUTO_REPEAT_SPELL,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_CAST,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_CHANNELLING,
             global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_MOUNT_AURA,
             global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_TEMP_ENCHANTMENT,
             global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_TRADE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CAST_SPELL,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHARACTER_RENAME_REQUEST,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAR_DELETE,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_ANNOUNCEMENTS,
@@ -2216,6 +2383,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_INSPECT_HONOR_STATS,
             global::HermesProxy.World.Enums.Opcode.CMSG_INSPECT_PVP,
             global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_TEXT_QUERY,
+            global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_TALENT,
             global::HermesProxy.World.Enums.Opcode.CMSG_LEAVE_GROUP,
             global::HermesProxy.World.Enums.Opcode.CMSG_LIST_INVENTORY,
             global::HermesProxy.World.Enums.Opcode.CMSG_LOADING_SCREEN_NOTIFY,
@@ -2287,6 +2455,13 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_PARTY_INVITE,
             global::HermesProxy.World.Enums.Opcode.CMSG_PARTY_INVITE_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.CMSG_PARTY_UNINVITE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_PET_ABANDON,
+            global::HermesProxy.World.Enums.Opcode.CMSG_PET_ACTION,
+            global::HermesProxy.World.Enums.Opcode.CMSG_PET_CANCEL_AURA,
+            global::HermesProxy.World.Enums.Opcode.CMSG_PET_CAST_SPELL,
+            global::HermesProxy.World.Enums.Opcode.CMSG_PET_RENAME,
+            global::HermesProxy.World.Enums.Opcode.CMSG_PET_SET_ACTION,
+            global::HermesProxy.World.Enums.Opcode.CMSG_PET_STOP_ATTACK,
             global::HermesProxy.World.Enums.Opcode.CMSG_PLAYER_LOGIN,
             global::HermesProxy.World.Enums.Opcode.CMSG_PLAYER_SHOWING_CLOAK,
             global::HermesProxy.World.Enums.Opcode.CMSG_PLAYER_SHOWING_HELM,
@@ -2326,13 +2501,17 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_LFG_LIST_BLACKLIST,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_PARTY_MEMBER_STATS,
+            global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_PET_INFO,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_PLAYED_TIME,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_RAID_INFO,
+            global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_STABLED_PETS,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_EXIT,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_NEXT_SEAT,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_PREV_SEAT,
             global::HermesProxy.World.Enums.Opcode.CMSG_RESET_INSTANCES,
+            global::HermesProxy.World.Enums.Opcode.CMSG_RESURRECT_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.CMSG_SAVE_GUILD_EMBLEM,
+            global::HermesProxy.World.Enums.Opcode.CMSG_SELF_RES,
             global::HermesProxy.World.Enums.Opcode.CMSG_SELL_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_ACTION_BAR_TOGGLES,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_ACTION_BUTTON,
@@ -2355,6 +2534,8 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_SPLIT_GUILD_BANK_ITEM_TO_INVENTORY,
             global::HermesProxy.World.Enums.Opcode.CMSG_SPLIT_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_SPLIT_ITEM_TO_GUILD_BANK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_STABLE_PET,
+            global::HermesProxy.World.Enums.Opcode.CMSG_STABLE_SWAP_PET,
             global::HermesProxy.World.Enums.Opcode.CMSG_STAND_STATE_CHANGE,
             global::HermesProxy.World.Enums.Opcode.CMSG_STORE_GUILD_BANK_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_SUMMON_RESPONSE,
@@ -2367,12 +2548,15 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_TAXI_QUERY_AVAILABLE_NODES,
             global::HermesProxy.World.Enums.Opcode.CMSG_TIME_SYNC_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.CMSG_TOGGLE_PVP,
+            global::HermesProxy.World.Enums.Opcode.CMSG_TOTEM_DESTROYED,
             global::HermesProxy.World.Enums.Opcode.CMSG_TRAINER_BUY_SPELL,
             global::HermesProxy.World.Enums.Opcode.CMSG_TRAINER_LIST,
             global::HermesProxy.World.Enums.Opcode.CMSG_TUTORIAL_FLAG,
             global::HermesProxy.World.Enums.Opcode.CMSG_UNACCEPT_TRADE,
             global::HermesProxy.World.Enums.Opcode.CMSG_UNLEARN_SKILL,
+            global::HermesProxy.World.Enums.Opcode.CMSG_UNSTABLE_PET,
             global::HermesProxy.World.Enums.Opcode.CMSG_UPDATE_RAID_TARGET,
+            global::HermesProxy.World.Enums.Opcode.CMSG_USE_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_WORLD_PORT_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.CMSG_WRAP_ITEM,
         });

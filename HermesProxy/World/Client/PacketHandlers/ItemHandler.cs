@@ -136,7 +136,7 @@ public partial class WorldClient
         // Check if item use cast failed (queue-based)
         if (GetSession().GameState.TryDequeueItemCast(failure.Item[0], out var pendingCast))
         {
-            GetSession().InstanceSocket.SendCastRequestFailed(pendingCast!, false);
+            Server.Systems.SpellSystem.SendCastRequestFailed(in GetSession().InstanceSocket.SessionContext, pendingCast!, false);
         }
     }
     [PacketHandler(Opcode.SMSG_INVENTORY_CHANGE_FAILURE, ClientVersionBuild.V2_0_1_6180)]
@@ -173,7 +173,7 @@ public partial class WorldClient
         // Check if item use cast failed (queue-based)
         if (GetSession().GameState.TryDequeueItemCast(failure.Item[0], out var pendingCast))
         {
-            GetSession().InstanceSocket.SendCastRequestFailed(pendingCast!, false);
+            Server.Systems.SpellSystem.SendCastRequestFailed(in GetSession().InstanceSocket.SessionContext, pendingCast!, false);
         }
     }
     [PacketHandler(Opcode.SMSG_DURABILITY_DAMAGE_DEATH)]

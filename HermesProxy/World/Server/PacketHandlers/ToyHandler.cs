@@ -62,7 +62,7 @@ public partial class WorldSocket
             return;
         }
 
-        UseInventoryItem(found.Value.guid, found.Value.containerSlot, found.Value.slot, use.Cast);
+        Systems.SpellSystem.UseInventoryItem(in _sessionContext, found.Value.guid, found.Value.containerSlot, found.Value.slot, use.Cast);
     }
 
     bool TryCastToyWithoutItem(UseToy use, uint itemId)
@@ -75,7 +75,7 @@ public partial class WorldSocket
         if (!known.Contains(serverSpellId) && !known.Contains(use.Cast.SpellID))
             return false;
 
-        ForwardKnownSpellCast(use.Cast, serverSpellId);
+        Systems.SpellSystem.ForwardKnownSpellCast(in _sessionContext, use.Cast, serverSpellId);
         return true;
     }
 

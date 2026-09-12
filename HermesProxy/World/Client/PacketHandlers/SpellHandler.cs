@@ -461,7 +461,7 @@ public partial class WorldClient
             // (keeps the started cast so SPELL_GO can dequeue it)
             var failedCasts = GetSession().GameState.ClearNonStartedNormalCasts();
             foreach (var failed in failedCasts)
-                GetSession().InstanceSocket.SendCastRequestFailed(failed, false);
+                Server.Systems.SpellSystem.SendCastRequestFailed(in GetSession().InstanceSocket.SessionContext, failed, false);
         }
         else if (GetSession().GameState.CurrentPetGuid == spell.Cast.CasterUnit &&
                  GetSession().GameState.TryMarkPendingPetCastStarted((uint)spell.Cast.SpellID, out var pendingPetCast))
@@ -479,7 +479,7 @@ public partial class WorldClient
             // Clear non-started pet casts and send failures for them
             var failedPetCasts = GetSession().GameState.ClearNonStartedPetCasts();
             foreach (var failed in failedPetCasts)
-                GetSession().InstanceSocket.SendCastRequestFailed(failed, true);
+                Server.Systems.SpellSystem.SendCastRequestFailed(in GetSession().InstanceSocket.SessionContext, failed, true);
         }
 
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
