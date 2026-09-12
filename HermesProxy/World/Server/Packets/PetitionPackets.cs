@@ -27,19 +27,7 @@ using HermesProxy.World.Objects;
 
 namespace HermesProxy.World.Server.Packets;
 
-public class QueryPetition : ClientPacket
-{
-    public QueryPetition(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PetitionID = _worldPacket.ReadUInt32();
-        ItemGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 ItemGUID;
-    public uint PetitionID;
-}
+public readonly record struct QueryPetition(uint PetitionID, WowGuid128 ItemGUID);
 
 public class QueryPetitionResponse : ServerPacket, ISpanWritable
 {
@@ -240,34 +228,9 @@ public struct PetitionEntry
     public uint RequiredSignatures;
 }
 
-public class PetitionBuy : ClientPacket
-{
-    public PetitionBuy(WorldPacket packet) : base(packet) { }
+public readonly record struct PetitionBuy(WowGuid128 Unit, uint Index, string Title);
 
-    public override void Read()
-    {
-        uint titleLen = _worldPacket.ReadBits<uint>(7);
-        Unit = _worldPacket.ReadPackedGuid128();
-        Index = _worldPacket.ReadUInt32();
-        Title = _worldPacket.ReadString(titleLen);
-    }
-
-    public WowGuid128 Unit;
-    public uint Index;
-    public string Title = string.Empty;
-}
-
-public class PetitionShowSignatures : ClientPacket
-{
-    public PetitionShowSignatures(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Item = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Item;
-}
+public readonly record struct PetitionShowSignatures(WowGuid128 Item);
 
 public class ServerPetitionShowSignatures : ServerPacket, ISpanWritable
 {
@@ -331,23 +294,7 @@ public class ServerPetitionShowSignatures : ServerPacket, ISpanWritable
     }
 }
 
-public class PetitionRenameGuild : ClientPacket
-{
-    public PetitionRenameGuild(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PetitionGuid = _worldPacket.ReadPackedGuid128();
-
-        _worldPacket.ResetBitPos();
-        uint nameLen = _worldPacket.ReadBits<uint>(7);
-
-        NewGuildName = _worldPacket.ReadString(nameLen);
-    }
-
-    public WowGuid128 PetitionGuid;
-    public string NewGuildName = string.Empty;
-}
+public readonly record struct PetitionRenameGuild(WowGuid128 PetitionGuid, string NewGuildName);
 
 public class PetitionRenameGuildResponse : ServerPacket, ISpanWritable
 {
@@ -380,47 +327,11 @@ public class PetitionRenameGuildResponse : ServerPacket, ISpanWritable
     public string NewGuildName = string.Empty;
 }
 
-public class OfferPetition : ClientPacket
-{
-    public OfferPetition(WorldPacket packet) : base(packet) { }
+public readonly record struct OfferPetition(uint UnkInt, WowGuid128 ItemGUID, WowGuid128 TargetPlayer);
 
-    public override void Read()
-    {
-        UnkInt = _worldPacket.ReadUInt32();
-        ItemGUID = _worldPacket.ReadPackedGuid128();
-        TargetPlayer = _worldPacket.ReadPackedGuid128();
-    }
+public readonly record struct DeclinePetition(WowGuid128 PetitionGUID);
 
-    public uint UnkInt;
-    public WowGuid128 TargetPlayer;
-    public WowGuid128 ItemGUID;
-}
-
-public class DeclinePetition : ClientPacket
-{
-    public DeclinePetition(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PetitionGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 PetitionGUID;
-}
-
-public class SignPetition : ClientPacket
-{
-    public SignPetition(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PetitionGUID = _worldPacket.ReadPackedGuid128();
-        Choice = _worldPacket.ReadUInt8();
-    }
-
-    public WowGuid128 PetitionGUID;
-    public byte Choice;
-}
+public readonly record struct SignPetition(WowGuid128 PetitionGUID, byte Choice);
 
 public class PetitionSignResults : ServerPacket, ISpanWritable
 {
@@ -452,31 +363,9 @@ public class PetitionSignResults : ServerPacket, ISpanWritable
     public PetitionSignResult Error = 0;
 }
 
-public class TurnInPetition : ClientPacket
-{
-    public TurnInPetition(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Item = _worldPacket.ReadPackedGuid128();
-
-        if (_worldPacket.CanRead())
-        {
-            BackgroundColor = _worldPacket.ReadUInt32();
-            EmblemStyle = _worldPacket.ReadUInt32();
-            EmblemColor = _worldPacket.ReadUInt32();
-            BorderStyle = _worldPacket.ReadUInt32();
-            BorderColor = _worldPacket.ReadUInt32();
-        }
-    }
-
-    public WowGuid128 Item;
-    public uint BackgroundColor;
-    public uint EmblemStyle;
-    public uint EmblemColor;
-    public uint BorderStyle;
-    public uint BorderColor;
-}
+public readonly record struct TurnInPetition(
+    WowGuid128 Item,
+    uint BackgroundColor, uint EmblemStyle, uint EmblemColor, uint BorderStyle, uint BorderColor);
 
 public class TurnInPetitionResult : ServerPacket, ISpanWritable
 {

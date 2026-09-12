@@ -107,17 +107,7 @@ public class MailQueryNextTimeResult : ServerPacket, ISpanWritable
     }
 }
 
-public class MailGetList : ClientPacket
-{
-    public MailGetList(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Mailbox = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Mailbox;
-}
+public readonly record struct MailGetList(WowGuid128 Mailbox);
 
 public class MailListResult : ServerPacket
 {
@@ -268,160 +258,27 @@ public class MailAttachedItem
     public List<ItemGemData> Gems = new();
 }
 
-public class MailCreateTextItem : ClientPacket
-{
-    public MailCreateTextItem(WorldPacket packet) : base(packet) { }
+public readonly record struct MailCreateTextItem(WowGuid128 Mailbox, long MailID);
 
-    public override void Read()
-    {
-        Mailbox = _worldPacket.ReadPackedGuid128();
-        MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
-            ? _worldPacket.ReadInt64()
-            : _worldPacket.ReadUInt32();
-    }
+public readonly record struct MailDelete(long MailID, int DeleteReason);
 
-    public WowGuid128 Mailbox;
-    public long MailID;
-}
+public readonly record struct MailMarkAsRead(WowGuid128 Mailbox, long MailID);
 
-public class MailDelete : ClientPacket
-{
-    public MailDelete(WorldPacket packet) : base(packet) { }
+public readonly record struct MailReturnToSender(long MailID, WowGuid128 SenderGUID);
 
-    public override void Read()
-    {
-        MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
-            ? _worldPacket.ReadInt64()
-            : _worldPacket.ReadUInt32();
-        DeleteReason = _worldPacket.ReadInt32();
-    }
+public readonly record struct MailTakeItem(WowGuid128 Mailbox, long MailID, long AttachID);
 
-    public long MailID;
-    public int DeleteReason;
-}
+public readonly record struct MailTakeMoney(WowGuid128 Mailbox, long MailID, long Money);
 
-public class MailMarkAsRead : ClientPacket
-{
-    public MailMarkAsRead(WorldPacket packet) : base(packet) { }
+public readonly record struct SendMail(
+    WowGuid128 Mailbox, int StationeryID, long SendMoney, long Cod,
+    string Target, string Subject, string Body, List<MailAttachment> Attachments);
 
-    public override void Read()
-    {
-        Mailbox = _worldPacket.ReadPackedGuid128();
-        MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
-            ? _worldPacket.ReadInt64()
-            : _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 Mailbox;
-    public long MailID;
-}
-
-public class MailReturnToSender : ClientPacket
-{
-    public MailReturnToSender(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
-            ? _worldPacket.ReadInt64()
-            : _worldPacket.ReadUInt32();
-        SenderGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public long MailID;
-    public WowGuid128 SenderGUID;
-}
-
-public class MailTakeItem : ClientPacket
-{
-    public MailTakeItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Mailbox = _worldPacket.ReadPackedGuid128();
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            MailID = _worldPacket.ReadInt64();
-            AttachID = _worldPacket.ReadInt64();
-        }
-        else
-        {
-            MailID = _worldPacket.ReadUInt32();
-            AttachID = _worldPacket.ReadUInt32();
-        }
-    }
-
-    public WowGuid128 Mailbox;
-    public long MailID;
-    public long AttachID;
-}
-
-public class MailTakeMoney : ClientPacket
-{
-    public MailTakeMoney(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Mailbox = _worldPacket.ReadPackedGuid128();
-        MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
-            ? _worldPacket.ReadInt64()
-            : _worldPacket.ReadUInt32();
-        Money = _worldPacket.ReadInt64();
-    }
-
-    public WowGuid128 Mailbox;
-    public long MailID;
-    public long Money;
-}
-
-public class SendMail : ClientPacket
-{
-    public SendMail(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Mailbox = _worldPacket.ReadPackedGuid128();
-        StationeryID = _worldPacket.ReadInt32();
-        SendMoney = _worldPacket.ReadInt64();
-        Cod = _worldPacket.ReadInt64();
-
-        uint targetLength = _worldPacket.ReadBits<uint>(9);
-        uint subjectLength = _worldPacket.ReadBits<uint>(9);
-        uint bodyLength = _worldPacket.ReadBits<uint>(11);
-
-        uint count = _worldPacket.ReadBits<uint>(5);
-
-        Target = _worldPacket.ReadString(targetLength);
-        Subject = _worldPacket.ReadString(subjectLength);
-        Body = _worldPacket.ReadString(bodyLength);
-
-        for (var i = 0; i < count; ++i)
-        {
-            var att = new MailAttachment()
-            {
-                AttachPosition = _worldPacket.ReadUInt8(),
-                ItemGUID = _worldPacket.ReadPackedGuid128()
-            };
-
-            Attachments.Add(att);
-        }
-    }
-
-    public WowGuid128 Mailbox;
-    public int StationeryID;
-    public long SendMoney;
-    public long Cod;
-    public string Target = string.Empty;
-    public string Subject = string.Empty;
-    public string Body = string.Empty;
-    public List<MailAttachment> Attachments = new();
-
-    public struct MailAttachment
-    {
-        public byte AttachPosition;
-        public WowGuid128 ItemGUID;
-    }
-}
+/// <remarks>
+/// Lifted out of <see cref="SendMail"/> when that became a record struct. The attachment count is
+/// five bits on the wire, so a mail carries at most 31 of these however malformed the packet is.
+/// </remarks>
+public readonly record struct MailAttachment(byte AttachPosition, WowGuid128 ItemGUID);
 
 public class MailCommandResult : ServerPacket, ISpanWritable
 {

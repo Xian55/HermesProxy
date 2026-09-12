@@ -2686,4 +2686,284 @@ internal static class FrozenPackets
         public byte PackSlot;
         public byte ItemSlotInPack;
     }
+
+/// Frozen verbatim from <c>MailPackets.cs</c>.
+    internal sealed class MailGetList
+    {
+        public void Read(WorldPacket p)
+        {
+            Mailbox = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Mailbox;
+    }
+
+    /// Frozen verbatim from <c>MailPackets.cs</c>.
+    internal sealed class MailCreateTextItem
+    {
+        public void Read(WorldPacket p)
+        {
+            Mailbox = p.ReadPackedGuid128();
+            MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+                ? p.ReadInt64()
+                : p.ReadUInt32();
+        }
+
+        public WowGuid128 Mailbox;
+        public long MailID;
+    }
+
+    /// Frozen verbatim from <c>MailPackets.cs</c>.
+    internal sealed class MailDelete
+    {
+        public void Read(WorldPacket p)
+        {
+            MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+                ? p.ReadInt64()
+                : p.ReadUInt32();
+            DeleteReason = p.ReadInt32();
+        }
+
+        public long MailID;
+        public int DeleteReason;
+    }
+
+    /// Frozen verbatim from <c>MailPackets.cs</c>.
+    internal sealed class MailMarkAsRead
+    {
+        public void Read(WorldPacket p)
+        {
+            Mailbox = p.ReadPackedGuid128();
+            MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+                ? p.ReadInt64()
+                : p.ReadUInt32();
+        }
+
+        public WowGuid128 Mailbox;
+        public long MailID;
+    }
+
+    /// Frozen verbatim from <c>MailPackets.cs</c>.
+    internal sealed class MailReturnToSender
+    {
+        public void Read(WorldPacket p)
+        {
+            MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+                ? p.ReadInt64()
+                : p.ReadUInt32();
+            SenderGUID = p.ReadPackedGuid128();
+        }
+
+        public long MailID;
+        public WowGuid128 SenderGUID;
+    }
+
+    /// Frozen verbatim from <c>MailPackets.cs</c>.
+    internal sealed class MailTakeItem
+    {
+        public void Read(WorldPacket p)
+        {
+            Mailbox = p.ReadPackedGuid128();
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                MailID = p.ReadInt64();
+                AttachID = p.ReadInt64();
+            }
+            else
+            {
+                MailID = p.ReadUInt32();
+                AttachID = p.ReadUInt32();
+            }
+        }
+
+        public WowGuid128 Mailbox;
+        public long MailID;
+        public long AttachID;
+    }
+
+    /// Frozen verbatim from <c>MailPackets.cs</c>.
+    internal sealed class MailTakeMoney
+    {
+        public void Read(WorldPacket p)
+        {
+            Mailbox = p.ReadPackedGuid128();
+            MailID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+                ? p.ReadInt64()
+                : p.ReadUInt32();
+            Money = p.ReadInt64();
+        }
+
+        public WowGuid128 Mailbox;
+        public long MailID;
+        public long Money;
+    }
+
+    /// Frozen verbatim from <c>MailPackets.cs</c>.
+    internal sealed class SendMail
+    {
+        public void Read(WorldPacket p)
+        {
+            Mailbox = p.ReadPackedGuid128();
+            StationeryID = p.ReadInt32();
+            SendMoney = p.ReadInt64();
+            Cod = p.ReadInt64();
+
+            uint targetLength = p.ReadBits<uint>(9);
+            uint subjectLength = p.ReadBits<uint>(9);
+            uint bodyLength = p.ReadBits<uint>(11);
+
+            uint count = p.ReadBits<uint>(5);
+
+            Target = p.ReadString(targetLength);
+            Subject = p.ReadString(subjectLength);
+            Body = p.ReadString(bodyLength);
+
+            for (var i = 0; i < count; ++i)
+            {
+                var att = new MailAttachment()
+                {
+                    AttachPosition = p.ReadUInt8(),
+                    ItemGUID = p.ReadPackedGuid128()
+                };
+
+                Attachments.Add(att);
+            }
+        }
+
+        public WowGuid128 Mailbox;
+        public int StationeryID;
+        public long SendMoney;
+        public long Cod;
+        public string Target = string.Empty;
+        public string Subject = string.Empty;
+        public string Body = string.Empty;
+        public List<MailAttachment> Attachments = new();
+
+        public struct MailAttachment
+        {
+            public byte AttachPosition;
+            public WowGuid128 ItemGUID;
+        }
+    }
+
+    /// Frozen verbatim from <c>PetitionPackets.cs</c>.
+    internal sealed class PetitionBuy
+    {
+        public void Read(WorldPacket p)
+        {
+            uint titleLen = p.ReadBits<uint>(7);
+            Unit = p.ReadPackedGuid128();
+            Index = p.ReadUInt32();
+            Title = p.ReadString(titleLen);
+        }
+
+        public WowGuid128 Unit;
+        public uint Index;
+        public string Title = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>PetitionPackets.cs</c>.
+    internal sealed class PetitionShowSignatures
+    {
+        public void Read(WorldPacket p)
+        {
+            Item = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Item;
+    }
+
+    /// Frozen verbatim from <c>PetitionPackets.cs</c>.
+    internal sealed class QueryPetition
+    {
+        public void Read(WorldPacket p)
+        {
+            PetitionID = p.ReadUInt32();
+            ItemGUID = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 ItemGUID;
+        public uint PetitionID;
+    }
+
+    /// Frozen verbatim from <c>PetitionPackets.cs</c>.
+    internal sealed class PetitionRenameGuild
+    {
+        public void Read(WorldPacket p)
+        {
+            PetitionGuid = p.ReadPackedGuid128();
+
+            p.ResetBitPos();
+            uint nameLen = p.ReadBits<uint>(7);
+
+            NewGuildName = p.ReadString(nameLen);
+        }
+
+        public WowGuid128 PetitionGuid;
+        public string NewGuildName = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>PetitionPackets.cs</c>.
+    internal sealed class OfferPetition
+    {
+        public void Read(WorldPacket p)
+        {
+            UnkInt = p.ReadUInt32();
+            ItemGUID = p.ReadPackedGuid128();
+            TargetPlayer = p.ReadPackedGuid128();
+        }
+
+        public uint UnkInt;
+        public WowGuid128 TargetPlayer;
+        public WowGuid128 ItemGUID;
+    }
+
+    /// Frozen verbatim from <c>PetitionPackets.cs</c>.
+    internal sealed class DeclinePetition
+    {
+        public void Read(WorldPacket p)
+        {
+            PetitionGUID = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 PetitionGUID;
+    }
+
+    /// Frozen verbatim from <c>PetitionPackets.cs</c>.
+    internal sealed class SignPetition
+    {
+        public void Read(WorldPacket p)
+        {
+            PetitionGUID = p.ReadPackedGuid128();
+            Choice = p.ReadUInt8();
+        }
+
+        public WowGuid128 PetitionGUID;
+        public byte Choice;
+    }
+
+    /// Frozen verbatim from <c>PetitionPackets.cs</c>.
+    internal sealed class TurnInPetition
+    {
+        public void Read(WorldPacket p)
+        {
+            Item = p.ReadPackedGuid128();
+
+            if (p.CanRead())
+            {
+                BackgroundColor = p.ReadUInt32();
+                EmblemStyle = p.ReadUInt32();
+                EmblemColor = p.ReadUInt32();
+                BorderStyle = p.ReadUInt32();
+                BorderColor = p.ReadUInt32();
+            }
+        }
+
+        public WowGuid128 Item;
+        public uint BackgroundColor;
+        public uint EmblemStyle;
+        public uint EmblemColor;
+        public uint BorderStyle;
+        public uint BorderColor;
+    }
 }
