@@ -83,8 +83,10 @@ class AuctionListBidderItems : ClientPacket
         uint auctionIDCount = _worldPacket.ReadBits<uint>(7);
         _worldPacket.ResetBitPos();
 
+        // Add, not the indexer: the list starts empty and List<T>'s setter requires an index
+        // below Count, so assigning through it threw for every client that had an active bid.
         for (var i = 0; i < auctionIDCount; ++i)
-            AuctionItemIDs[i] = _worldPacket.ReadUInt32();
+            AuctionItemIDs.Add(_worldPacket.ReadUInt32());
     }
 
     public WowGuid128 Auctioneer;
