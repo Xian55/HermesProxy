@@ -42,16 +42,52 @@ internal static unsafe class GeneratedCmsgDispatch
         _ = ClaimedOpcodes.Count;
     }
 
-    // No systems carry the attribute yet — the table is empty and every opcode
-    // falls through to the reflective registry.
+    private static void Thunk_HermesProxy_World_Server_Systems_CombatSystem_HandleAttackStop_CMSG_ATTACK_STOP(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.AttackStopCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CombatSystem.HandleAttackStop(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CombatSystem_HandleAttackSwing_CMSG_ATTACK_SWING(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.AttackSwingCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CombatSystem.HandleAttackSwing(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleBuyBackItem_CMSG_BUY_BACK_ITEM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.BuyBackItemCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ItemSystem.HandleBuyBackItem(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CombatSystem_HandleSetSheathed_CMSG_SET_SHEATHED(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.SetSheathedCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CombatSystem.HandleSetSheathed(in packet, in ctx);
+    }
 
     private static delegate*<ref global::Framework.IO.SpanPacketReader, in global::HermesProxy.World.Dispatch.SessionContext, void>[] BuildTable()
     {
-        return new delegate*<ref global::Framework.IO.SpanPacketReader, in global::HermesProxy.World.Dispatch.SessionContext, void>[0];
+        var table = new delegate*<ref global::Framework.IO.SpanPacketReader, in global::HermesProxy.World.Dispatch.SessionContext, void>[MaxClaimedOpcode + 1];
+
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ATTACK_STOP] = &Thunk_HermesProxy_World_Server_Systems_CombatSystem_HandleAttackStop_CMSG_ATTACK_STOP;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ATTACK_SWING] = &Thunk_HermesProxy_World_Server_Systems_CombatSystem_HandleAttackSwing_CMSG_ATTACK_SWING;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BUY_BACK_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleBuyBackItem_CMSG_BUY_BACK_ITEM;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_SHEATHED] = &Thunk_HermesProxy_World_Server_Systems_CombatSystem_HandleSetSheathed_CMSG_SET_SHEATHED;
+
+        return table;
     }
+
+    private const int MaxClaimedOpcode = (int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_SHEATHED;
 
     private static global::System.Collections.Frozen.FrozenSet<global::HermesProxy.World.Enums.Opcode> BuildClaimed()
     {
-        return global::System.Collections.Frozen.FrozenSet<global::HermesProxy.World.Enums.Opcode>.Empty;
+        return global::System.Collections.Frozen.FrozenSet.ToFrozenSet(new global::HermesProxy.World.Enums.Opcode[]
+        {
+            global::HermesProxy.World.Enums.Opcode.CMSG_ATTACK_STOP,
+            global::HermesProxy.World.Enums.Opcode.CMSG_ATTACK_SWING,
+            global::HermesProxy.World.Enums.Opcode.CMSG_BUY_BACK_ITEM,
+            global::HermesProxy.World.Enums.Opcode.CMSG_SET_SHEATHED,
+        });
     }
 }

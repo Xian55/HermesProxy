@@ -501,10 +501,11 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         {
             packet.LogPacket(ref GetSession().ModernSniff, GetSession().PacketLogContext);
 
-            // GetDataSpan, not GetData: the payload arrived in a pooled rental whose length is
-            // rounded up to the bucket size, and the extra bytes would change what Remaining
-            // reports and therefore where reads stop (issue #248).
-            var reader = new SpanPacketReader(packet.GetDataSpan());
+            // GetRemainingSpan, not GetData or GetDataSpan. GetData hands back the whole
+            // bucket-rounded ArrayPool rental (issue #248), and GetDataSpan starts at index 0 —
+            // which for a read-mode WorldPacket includes the 2-byte opcode its constructor already
+            // consumed, shifting every field by two bytes with nothing thrown.
+            var reader = new SpanPacketReader(packet.GetRemainingSpan());
 
             if (HermesProxy.Server.MetricsEnabled)
             {

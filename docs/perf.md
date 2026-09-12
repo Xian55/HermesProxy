@@ -66,6 +66,34 @@ the same time, the counters' own formatting dominates the trace.
 
 ---
 
+## Generated dispatch, measured 2026-09-12
+
+First converted slice: `CMSG_ATTACK_SWING`, `CMSG_ATTACK_STOP`, `CMSG_SET_SHEATHED`,
+`CMSG_BUY_BACK_ITEM` moved from the reflective registry to the generated function-pointer table,
+with `readonly record struct` packets and codecs over `SpanPacketReader`.
+
+`PacketDispatchBenchmarks`, Windows dev box (i7-6700K), `--job short`. `*_Activator` is the
+pre-migration path, kept alive against frozen copies of the old `ClientPacket` classes so the
+comparison survives the conversion; `*_Codec` is what production runs now.
+
+| Method | Mean | Allocated |
+|---|---:|---:|
+| `BuyBackItem_Activator` | 270.8 ns | 368 B |
+| `BuyBackItem_Direct` | 85.8 ns | 112 B |
+| **`BuyBackItem_Codec`** | **6.0 ns** | **0 B** |
+| `AttackSwing_Activator` | 280.0 ns | 360 B |
+| `AttackSwing_Direct` | 84.5 ns | 104 B |
+| **`AttackSwing_Codec`** | **5.1 ns** | **0 B** |
+
+That lands on the 0 B / 6 ns x64 floor the baseline predicted — ~45x on latency and the whole
+per-packet allocation gone. Reflective dispatch was only 1.3% of CPU, so the value here is
+allocation and the per-session startup scan, not throughput; see the baseline table above for
+where the bytes actually are.
+
+Numbers quoted in a PR should come from the Mac mini M4, not this host.
+
+---
+
 The sections below are historical: undated micro-benchmark results from the original
 Span/ByteBuffer work, kept for reference. Compare new work against the dated baseline above.
 

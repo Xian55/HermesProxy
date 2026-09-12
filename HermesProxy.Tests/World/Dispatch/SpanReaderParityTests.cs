@@ -28,7 +28,20 @@ public class SpanReaderParityTests
         return (new WorldPacket(framed), framed);
     }
 
-    private static SpanPacketReader ReaderOver(byte[] framed) => new(framed.AsSpan(2));
+    /// <summary>
+    /// Positions the reader exactly as production does — via the same accessor the dispatch site
+    /// calls, not a hand-written offset.
+    /// </summary>
+    /// <remarks>
+    /// This used to be <c>framed.AsSpan(2)</c>, hardcoding the opcode-prefix width. That made the
+    /// test agree with itself rather than with production: the dispatch site was handing the
+    /// reader <c>GetDataSpan()</c>, which starts at index 0 and therefore included the two opcode
+    /// bytes the WorldPacket constructor had already consumed. Every converted packet parsed two
+    /// bytes early in the proxy while every test passed. Going through the real accessor is what
+    /// makes an offset bug expressible here at all.
+    /// </remarks>
+    private static SpanPacketReader ReaderOver(byte[] framed)
+        => new(new WorldPacket(framed).GetRemainingSpan());
 
     [Fact]
     public void Integers_MatchByteBuffer()

@@ -53,19 +53,8 @@ public class SetProficiency : ServerPacket, ISpanWritable
     public byte ProficiencyClass;
 }
 
-public class BuyBackItem : ClientPacket
-{
-    public BuyBackItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        VendorGUID = _worldPacket.ReadPackedGuid128();
-        Slot = _worldPacket.ReadUInt32();
-    }
-
-    public WowGuid128 VendorGUID;
-    public uint Slot;
-}
+/// <summary>Data only — parsing lives in <c>BuyBackItemCodec</c>, behaviour in <c>ItemSystem</c>.</summary>
+public readonly record struct BuyBackItem(WowGuid128 VendorGUID, uint Slot);
 
 public class BuyItem : ClientPacket
 {

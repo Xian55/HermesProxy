@@ -719,7 +719,9 @@ public partial class WorldClient
 
         try
         {
-            var reader = new SpanPacketReader(packet.GetDataSpan());
+            // See WorldSocket.HandleGeneratedPacket: the reader must continue from where the
+            // WorldPacket left off, not from index 0.
+            var reader = new SpanPacketReader(packet.GetRemainingSpan());
             thunk(ref reader, in _sessionContext);
         }
         catch (UnmappedOpcodeException unmapped)

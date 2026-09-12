@@ -186,16 +186,6 @@ public partial class WorldSocket
         SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_BUY_BACK_ITEM)]
-    void HandleBuyBackItem(BuyBackItem item)
-    {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_BUY_BACK_ITEM);
-        packet.WriteGuid(item.VendorGUID.To64());
-        byte slot = ModernVersion.AdjustModernInventorySlotToLegacy((byte)item.Slot);
-        packet.WriteUInt32(slot);
-        SendPacketToServer(packet);
-    }
-
     [PacketHandler(Opcode.CMSG_REPAIR_ITEM)]
     void HandleRepairItem(RepairItem item)
     {

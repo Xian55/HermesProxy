@@ -10,11 +10,17 @@ namespace HermesProxy.Benchmarks;
 
 // Inbound modern-client dispatch, from framed bytes to a populated packet object.
 //
-// *_Activator reproduces WorldSocket.PacketHandler.Invoke as it runs in production:
-// Activator.CreateInstance over the packet type (boxes the argument array), Read(), then a
-// closure delegate hop with a downcast. *_Direct drops the reflection so what remains is the
-// ClientPacket + WorldPacket objects and the parse itself. *_Span is the floor the planned
-// struct + SpanPacketReader path can reach: same bytes, no packet object, no WorldPacket.
+// *_Activator reproduces WorldSocket.PacketHandler.Invoke as it ran before the dispatch
+// migration: Activator.CreateInstance over the packet type (boxes the argument array), Read(),
+// then a closure delegate hop with a downcast. *_Direct drops the reflection so what remains is
+// the ClientPacket + WorldPacket objects and the parse itself. *_Codec is the production path
+// today for a converted packet: the real codec over a SpanPacketReader, no packet object, no
+// WorldPacket.
+//
+// Once a packet converts, its ClientPacket class is gone from HermesProxy — so the *_Activator
+// and *_Direct arms for converted packets run against frozen copies kept in this file. Deleting
+// those arms instead would silently retire the comparison at exactly the moment it starts being
+// worth reporting; keeping them means every slice can still ship a measured before/after.
 //
 // The handler target is a dummy object because the real handlers are instance methods on
 // WorldSocket and need a live session; the delegate shape is what costs, not the target.
@@ -24,6 +30,31 @@ public class PacketDispatchBenchmarks
 {
     private static readonly object HandlerTarget = new();
     private static uint s_sink;
+
+    // Frozen pre-migration copies of the converted packets, so the baseline arms keep measuring
+    // the path this work replaces. Do not edit to match the codecs — the point is that they do
+    // not change.
+    private sealed class FrozenBuyBackItem : ClientPacket
+    {
+        public FrozenBuyBackItem(WorldPacket packet) : base(packet) { }
+        public override void Read()
+        {
+            VendorGUID = _worldPacket.ReadPackedGuid128();
+            Slot = _worldPacket.ReadUInt32();
+        }
+        public WowGuid128 VendorGUID;
+        public uint Slot;
+    }
+
+    private sealed class FrozenAttackSwing : ClientPacket
+    {
+        public FrozenAttackSwing(WorldPacket packet) : base(packet) { }
+        public override void Read()
+        {
+            Victim = _worldPacket.ReadPackedGuid128();
+        }
+        public WowGuid128 Victim;
+    }
 
     private byte[] _buyBackItem = null!;
     private byte[] _setActionButton = null!;
@@ -57,9 +88,9 @@ public class PacketDispatchBenchmarks
             w.WriteString("hello from the proxy!");
         });
 
-        _buyBackItemHandler = Wrap<BuyBackItem>(static (_, p) => s_sink = p.Slot);
+        _buyBackItemHandler = Wrap<FrozenBuyBackItem>(static (_, p) => s_sink = p.Slot);
         _setActionButtonHandler = Wrap<SetActionButton>(static (_, p) => s_sink = p.Action);
-        _attackSwingHandler = Wrap<AttackSwing>(static (_, p) => s_sink = (uint)p.Victim.Low);
+        _attackSwingHandler = Wrap<FrozenAttackSwing>(static (_, p) => s_sink = (uint)p.Victim.Low);
         _whisperHandler = Wrap<ChatMessageWhisper>(static (_, p) => s_sink = (uint)(p.Text.Length + p.Target.Length));
 
         // Fail loudly if the span parse disagrees with the ByteBuffer parse; a wrong floor
@@ -106,25 +137,25 @@ public class PacketDispatchBenchmarks
     // ---- BuyBackItem: packed GUID + uint ----
 
     [Benchmark(Baseline = true)]
-    public uint BuyBackItem_Activator() => InvokeViaActivator(typeof(BuyBackItem), _buyBackItem, _buyBackItemHandler);
+    public uint BuyBackItem_Activator() => InvokeViaActivator(typeof(FrozenBuyBackItem), _buyBackItem, _buyBackItemHandler);
 
     [Benchmark]
     public uint BuyBackItem_Direct()
     {
-        using var packet = new BuyBackItem(new WorldPacket(_buyBackItem));
+        using var packet = new FrozenBuyBackItem(new WorldPacket(_buyBackItem));
         packet.Read();
         _buyBackItemHandler(HandlerTarget, packet);
         return s_sink;
     }
 
+    /// The production path for this packet since the item slice: the real codec, not a
+    /// hand-written approximation of one.
     [Benchmark]
-    public uint BuyBackItem_Span()
+    public uint BuyBackItem_Codec()
     {
         var r = new SpanPacketReader(_buyBackItem.AsSpan(2));
-        r.ReadPackedGuid128(out ulong low, out ulong high);
-        var vendor = new WowGuid128(low, high);
-        uint slot = r.ReadUInt32();
-        s_sink = slot + (uint)vendor.Low;
+        BuyBackItemCodec.Read(ref r, out var packet);
+        s_sink = packet.Slot + (uint)packet.VendorGUID.Low;
         return s_sink;
     }
 
@@ -156,23 +187,24 @@ public class PacketDispatchBenchmarks
     // ---- AttackSwing: single packed GUID, the most frequent combat CMSG ----
 
     [Benchmark]
-    public uint AttackSwing_Activator() => InvokeViaActivator(typeof(AttackSwing), _attackSwing, _attackSwingHandler);
+    public uint AttackSwing_Activator() => InvokeViaActivator(typeof(FrozenAttackSwing), _attackSwing, _attackSwingHandler);
 
     [Benchmark]
     public uint AttackSwing_Direct()
     {
-        using var packet = new AttackSwing(new WorldPacket(_attackSwing));
+        using var packet = new FrozenAttackSwing(new WorldPacket(_attackSwing));
         packet.Read();
         _attackSwingHandler(HandlerTarget, packet);
         return s_sink;
     }
 
+    /// <inheritdoc cref="BuyBackItem_Codec"/>
     [Benchmark]
-    public uint AttackSwing_Span()
+    public uint AttackSwing_Codec()
     {
         var r = new SpanPacketReader(_attackSwing.AsSpan(2));
-        r.ReadPackedGuid128(out ulong low, out _);
-        s_sink = (uint)low;
+        AttackSwingCodec.Read(ref r, out var packet);
+        s_sink = (uint)packet.Victim.Low;
         return s_sink;
     }
 

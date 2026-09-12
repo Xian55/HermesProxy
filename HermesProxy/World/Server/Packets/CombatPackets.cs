@@ -26,17 +26,8 @@ using HermesProxy.World.Objects;
 
 namespace HermesProxy.World.Server.Packets;
 
-public class AttackSwing : ClientPacket
-{
-    public AttackSwing(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Victim = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Victim;
-}
+/// <summary>Data only — parsing lives in <c>AttackSwingCodec</c>, behaviour in <c>CombatSystem</c>.</summary>
+public readonly record struct AttackSwing(WowGuid128 Victim);
 
 public class AttackSwingError : ServerPacket, ISpanWritable
 {
@@ -61,12 +52,8 @@ public class AttackSwingError : ServerPacket, ISpanWritable
     public AttackSwingErr Reason;
 }
 
-public class AttackStop : ClientPacket
-{
-    public AttackStop(WorldPacket packet) : base(packet) { }
-
-    public override void Read() { }
-}
+/// <summary>An empty payload; the opcode itself is the whole message.</summary>
+public readonly record struct AttackStop;
 
 public class SAttackStart : ServerPacket, ISpanWritable
 {
@@ -278,19 +265,12 @@ public class CancelCombat : ServerPacket, ISpanWritable
     public int WriteToSpan(Span<byte> buffer) => 0;
 }
 
-public class SetSheathed : ClientPacket
-{
-    public SetSheathed(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        SheathState = _worldPacket.ReadInt32();
-        Animate = _worldPacket.HasBit();
-    }
-
-    public int SheathState;
-    public bool Animate = true;
-}
+/// <summary>
+/// Data only. The class this replaced defaulted <c>Animate</c> to true, which a positional record
+/// struct cannot express — harmless here because the codec assigns it on every path, but the
+/// reason the frozen oracle keeps that initializer.
+/// </summary>
+public readonly record struct SetSheathed(int SheathState, bool Animate);
 
 public class AIReaction : ServerPacket, ISpanWritable
 {

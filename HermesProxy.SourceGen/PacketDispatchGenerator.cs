@@ -129,12 +129,13 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
 
         foreach (var attr in ctx.Attributes)
         {
-            string? opcodeName = OpcodeNameOf(attr);
-            if (opcodeName is null)
+            var opcode = OpcodeOf(attr);
+            if (opcode is null)
                 continue;
 
             results.Add(new HandlerModel(
-                OpcodeName: opcodeName,
+                OpcodeName: opcode.Value.Name,
+                OpcodeValue: opcode.Value.Value,
                 MethodFullName: method.ContainingType.ToDisplayString() + "." + method.Name,
                 MethodDisplay: methodName,
                 PacketTypeFullName: packetType?.ToDisplayString(),
@@ -212,16 +213,19 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
         return hasRead ? codec.ToDisplayString() : null;
     }
 
-    private static string? OpcodeNameOf(AttributeData attr)
+    /// The member *name* is what gets emitted, so no enum is ever mirrored here. The value is
+    /// carried only to size the table, which has to be the numerically largest claimed opcode.
+    private static (string Name, long Value)? OpcodeOf(AttributeData attr)
     {
         if (attr.ConstructorArguments.Length != 1)
             return null;
         var arg = attr.ConstructorArguments[0];
-        // The enum member's *name* is emitted back out, so the generator never needs to know
-        // the numeric value and no enum has to be mirrored here.
         if (arg.Type is not INamedTypeSymbol enumType || enumType.TypeKind != TypeKind.Enum)
             return null;
-        return MemberNameForValue(enumType, arg.Value);
+        string? name = MemberNameForValue(enumType, arg.Value);
+        if (name is null || arg.Value is null)
+            return null;
+        return (name, Convert.ToInt64(arg.Value));
     }
 
     private static string? NamedBuild(AttributeData attr, string name)
@@ -465,9 +469,12 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
         sb.AppendLine("    }");
         sb.AppendLine();
 
+        // Sized by the numerically largest claimed opcode. Ordering by name would only agree
+        // with that while the universal enum stays alphabetical, which is not a property worth
+        // depending on — a member added out of order would size the table short.
+        string maxOpcode = usable.OrderByDescending(h => h.OpcodeValue).First().OpcodeName;
         sb.Append("    private const int MaxClaimedOpcode = (int)").Append(OpcodeFullName).Append('.')
-          .Append(usable.OrderByDescending(h => h.OpcodeName, StringComparer.Ordinal).First().OpcodeName)
-          .AppendLine(";");
+          .Append(maxOpcode).AppendLine(";");
         sb.AppendLine();
     }
 
@@ -498,7 +505,7 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
             return;
         }
 
-        sb.Append("        return global::System.Collections.Frozen.FrozenDictionary.ToFrozenSet(new ")
+        sb.Append("        return global::System.Collections.Frozen.FrozenSet.ToFrozenSet(new ")
           .Append(OpcodeFullName).AppendLine("[]");
         sb.AppendLine("        {");
         foreach (var name in usable.Select(h => h.OpcodeName).Distinct(StringComparer.Ordinal))
@@ -515,6 +522,7 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
 
     private sealed record HandlerModel(
         string OpcodeName,
+        long OpcodeValue,
         string MethodFullName,
         string MethodDisplay,
         string? PacketTypeFullName,

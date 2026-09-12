@@ -931,6 +931,24 @@ public class ByteBuffer : IDisposable
     /// because in read mode <c>GetData</c> hands back the whole rental, which is rounded up to an
     /// <see cref="System.Buffers.ArrayPool{T}"/> bucket and so is routinely larger than the packet.
     /// </summary>
+    /// <summary>
+    /// The unread remainder, from the current read position to the end.
+    /// </summary>
+    /// <remarks>
+    /// This is what a reader that continues where this buffer left off must start from.
+    /// <see cref="GetDataSpan"/> deliberately starts at index 0, so for a read-mode
+    /// <c>WorldPacket</c> — whose constructor has already consumed the 2-byte opcode — it hands
+    /// back the opcode as if it were payload. Handing that to a fresh parser shifts every field
+    /// by two bytes, which does not throw: it silently yields wrong values.
+    /// </remarks>
+    public ReadOnlySpan<byte> GetRemainingSpan()
+    {
+        if (_isWriteMode)
+            FlushBits();
+
+        return _buffer.AsSpan(_position, _length - _position);
+    }
+
     public ReadOnlySpan<byte> GetDataSpan()
     {
         if (_isWriteMode)
