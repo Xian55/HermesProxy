@@ -1628,4 +1628,350 @@ internal static class FrozenPackets
         public byte ItemBag;
         public byte ItemSlot;
     }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class PartyInviteClient
+    {
+        public void Read(WorldPacket p)
+        {
+            PartyIndex = p.ReadUInt8();
+
+            uint targetNameLen = p.ReadBits<uint>(9);
+            uint targetRealmLen = p.ReadBits<uint>(9);
+
+            VirtualRealmAddress = p.ReadUInt32();
+            TargetGUID = p.ReadPackedGuid128();
+
+            TargetName = p.ReadString(targetNameLen);
+            TargetRealm = p.ReadString(targetRealmLen);
+        }
+
+        public byte PartyIndex;
+        public uint VirtualRealmAddress;
+        public WowGuid128 TargetGUID;
+        public string TargetName = string.Empty;
+        public string TargetRealm = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class PartyInviteResponse
+    {
+        public void Read(WorldPacket p)
+        {
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                // V3_4_3 wire layout: 3 header bits first, then optional bytes.
+                // /reload emits this packet with all flags=0 (size=1) as a state flush.
+                bool hasPartyIndex = p.HasBit();
+                Accept = p.HasBit();
+                bool hasRolesDesiredV343 = p.HasBit();
+
+                if (hasPartyIndex)
+                    PartyIndex = p.ReadUInt8();
+                if (hasRolesDesiredV343)
+                    RolesDesired = p.ReadUInt8();
+                return;
+            }
+
+            PartyIndex = p.ReadUInt8();
+
+            Accept = p.HasBit();
+
+            bool hasRolesDesired = p.HasBit();
+            if (hasRolesDesired)
+                RolesDesired = p.ReadUInt32();
+        }
+
+        public byte PartyIndex;
+        public bool Accept;
+        public uint? RolesDesired;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class LeaveGroup
+    {
+        public void Read(WorldPacket p)
+        {
+            PartyIndex = p.ReadInt8();
+        }
+
+        public sbyte PartyIndex;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class PartyUninvite
+    {
+        public void Read(WorldPacket p)
+        {
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                // V3_4_3 wire layout: bits first, then GUID, then optional PartyIndex byte.
+                bool hasPartyIndex = p.HasBit();
+                byte reasonLen = p.ReadBits<byte>(8);
+                TargetGUID = p.ReadPackedGuid128();
+                if (hasPartyIndex)
+                    PartyIndex = p.ReadUInt8();
+                Reason = p.ReadString(reasonLen);
+                return;
+            }
+
+            PartyIndex = p.ReadUInt8();
+            TargetGUID = p.ReadPackedGuid128();
+
+            byte legacyReasonLen = p.ReadBits<byte>(8);
+            Reason = p.ReadString(legacyReasonLen);
+        }
+
+        public byte PartyIndex;
+        public WowGuid128 TargetGUID;
+        public string Reason = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class SetAssistantLeader
+    {
+        public void Read(WorldPacket p)
+        {
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                // V3_4_3 wire layout: 2 header bits, then GUID, then optional PartyIndex byte.
+                // Mirrors CypherCore WorldPackets::Party::SetAssistantLeader::Read.
+                bool hasPartyIndex = p.HasBit();
+                Apply = p.HasBit();
+                TargetGUID = p.ReadPackedGuid128();
+                if (hasPartyIndex)
+                    PartyIndex = p.ReadUInt8();
+                return;
+            }
+
+            PartyIndex = p.ReadUInt8();
+            TargetGUID = p.ReadPackedGuid128();
+            Apply = p.HasBit();
+        }
+
+        public byte PartyIndex;
+        public WowGuid128 TargetGUID;
+        public bool Apply;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class SetEveryoneIsAssistant
+    {
+        public void Read(WorldPacket p)
+        {
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                // V3_4_3 wire layout: 2 header bits, then optional PartyIndex byte.
+                // Mirrors CypherCore WorldPackets::Party::SetEveryoneIsAssistant::Read.
+                bool hasPartyIndex = p.HasBit();
+                Apply = p.HasBit();
+                if (hasPartyIndex)
+                    PartyIndex = p.ReadUInt8();
+                return;
+            }
+
+            PartyIndex = p.ReadUInt8();
+            Apply = p.HasBit();
+        }
+
+        public byte PartyIndex;
+        public bool Apply;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class SetPartyLeader
+    {
+        public void Read(WorldPacket p)
+        {
+            PartyIndex = p.ReadInt8();
+            TargetGUID = p.ReadPackedGuid128();
+        }
+
+        public sbyte PartyIndex;
+        public WowGuid128 TargetGUID;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class ConvertRaid
+    {
+        public void Read(WorldPacket p)
+        {
+            Raid = p.HasBit();
+        }
+
+        public bool Raid;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class DoReadyCheck
+    {
+        public void Read(WorldPacket p)
+        {
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                // V3_4_3 wire layout: a HasPartyIndex bit first, then the optional byte.
+                bool hasPartyIndex = p.HasBit();
+                if (hasPartyIndex)
+                    PartyIndex = p.ReadInt8();
+                return;
+            }
+
+            PartyIndex = p.ReadInt8();
+        }
+
+        public sbyte PartyIndex;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class ReadyCheckResponseClient
+    {
+        public void Read(WorldPacket p)
+        {
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                // V3_4_3 wire layout: a HasPartyIndex bit, then IsReady, then the optional
+                // PartyIndex byte - the same bits-first shape as PartyInviteResponse above.
+                // Reading PartyIndex first consumed the bit byte and then took the MSB of the
+                // (always zero) index byte as IsReady, so every answer reached the group as
+                // "not ready". Observed bytes: Ready = C0 00, Not Ready = 80 00. WPP's
+                // V3_4_0 parser orders these bits the other way round, but it is registered
+                // at V3_4_4_59817 and does not hold for 54261.
+                bool hasPartyIndex = p.HasBit();
+                IsReady = p.HasBit();
+                if (hasPartyIndex)
+                    PartyIndex = p.ReadUInt8();
+                return;
+            }
+
+            PartyIndex = p.ReadUInt8();
+            IsReady = p.HasBit();
+        }
+
+        public byte PartyIndex;
+        public bool IsReady;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class UpdateRaidTarget
+    {
+        public void Read(WorldPacket p)
+        {
+            PartyIndex = p.ReadInt8();
+            Target = p.ReadPackedGuid128();
+            Symbol = p.ReadInt8();
+        }
+
+        public sbyte PartyIndex;
+        public WowGuid128 Target;
+        public sbyte Symbol;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class SummonResponse
+    {
+        public void Read(WorldPacket p)
+        {
+            SummonerGUID = p.ReadPackedGuid128();
+            Accept = p.HasBit();
+        }
+
+        public WowGuid128 SummonerGUID;
+        public bool Accept;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class MinimapPingClient
+    {
+        public void Read(WorldPacket p)
+        {
+            Position = p.ReadVector2();
+            PartyIndex = p.ReadInt8();
+        }
+
+        public Vector2 Position;
+        public sbyte PartyIndex;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class RandomRollClient
+    {
+        public void Read(WorldPacket p)
+        {
+            Min = p.ReadInt32();
+            Max = p.ReadInt32();
+            PartyIndex = p.ReadUInt8();
+        }
+
+        public int Min;
+        public int Max;
+        public byte PartyIndex;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class RequestPartyMemberStats
+    {
+        public void Read(WorldPacket p)
+        {
+            PartyIndex = p.ReadUInt8();
+            TargetGUID = p.ReadPackedGuid128();
+        }
+
+        public byte PartyIndex;
+        public WowGuid128 TargetGUID;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class ChangeSubGroup
+    {
+        public void Read(WorldPacket p)
+        {
+            TargetGUID = p.ReadPackedGuid128();
+            PartyIndex = p.ReadInt8();
+            NewSubGroup = p.ReadUInt8();
+        }
+
+        public WowGuid128 TargetGUID;
+        public sbyte PartyIndex;
+        public byte NewSubGroup;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class SwapSubGroups
+    {
+        public void Read(WorldPacket p)
+        {
+            PartyIndex = p.ReadInt8();
+            FirstTarget = p.ReadPackedGuid128();
+            SecondTarget = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 FirstTarget;
+        public WowGuid128 SecondTarget;
+        public sbyte PartyIndex;
+    }
+
+    /// Frozen verbatim from <c>GroupPackets.cs</c>.
+    internal sealed class SetRole
+    {
+        public void Read(WorldPacket p)
+        {
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                bool hasPartyIndex = p.HasBit();
+                ChangedUnit = p.ReadPackedGuid128();
+                Role = p.ReadUInt8();
+                if (hasPartyIndex)
+                    PartyIndex = p.ReadUInt8();
+                return;
+            }
+
+            PartyIndex = (byte)p.ReadInt8();
+            ChangedUnit = p.ReadPackedGuid128();
+            Role = (byte)p.ReadInt32();
+        }
+
+        public byte PartyIndex;
+        public WowGuid128 ChangedUnit;
+        public byte Role;
+    }
 }

@@ -28,30 +28,12 @@ using System.Text;
 
 namespace HermesProxy.World.Server.Packets;
 
-class PartyInviteClient : ClientPacket
-{
-    public PartyInviteClient(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PartyIndex = _worldPacket.ReadUInt8();
-
-        uint targetNameLen = _worldPacket.ReadBits<uint>(9);
-        uint targetRealmLen = _worldPacket.ReadBits<uint>(9);
-
-        VirtualRealmAddress = _worldPacket.ReadUInt32();
-        TargetGUID = _worldPacket.ReadPackedGuid128();
-
-        TargetName = _worldPacket.ReadString(targetNameLen);
-        TargetRealm = _worldPacket.ReadString(targetRealmLen);
-    }
-
-    public byte PartyIndex;
-    public uint VirtualRealmAddress;
-    public WowGuid128 TargetGUID;
-    public string TargetName = string.Empty;
-    public string TargetRealm = string.Empty;
-}
+public readonly record struct PartyInviteClient(
+    byte PartyIndex,
+    uint VirtualRealmAddress,
+    WowGuid128 TargetGUID,
+    string TargetName,
+    string TargetRealm);
 
 class PartyCommandResult : ServerPacket, ISpanWritable
 {
@@ -177,40 +159,7 @@ class PartyInvite : ServerPacket
     public List<int> LfgSlots = new();
 }
 
-class PartyInviteResponse : ClientPacket
-{
-    public PartyInviteResponse(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            // V3_4_3 wire layout: 3 header bits first, then optional bytes.
-            // /reload emits this packet with all flags=0 (size=1) as a state flush.
-            bool hasPartyIndex = _worldPacket.HasBit();
-            Accept = _worldPacket.HasBit();
-            bool hasRolesDesiredV343 = _worldPacket.HasBit();
-
-            if (hasPartyIndex)
-                PartyIndex = _worldPacket.ReadUInt8();
-            if (hasRolesDesiredV343)
-                RolesDesired = _worldPacket.ReadUInt8();
-            return;
-        }
-
-        PartyIndex = _worldPacket.ReadUInt8();
-
-        Accept = _worldPacket.HasBit();
-
-        bool hasRolesDesired = _worldPacket.HasBit();
-        if (hasRolesDesired)
-            RolesDesired = _worldPacket.ReadUInt32();
-    }
-
-    public byte PartyIndex;
-    public bool Accept;
-    public uint? RolesDesired;
-}
+public readonly record struct PartyInviteResponse(byte PartyIndex, bool Accept, uint? RolesDesired);
 
 public class PartyUpdate : ServerPacket
 {
@@ -393,47 +342,9 @@ public class PartyDifficultySettings
     public DifficultyModern LegacyRaidDifficultyID;
 }
 
-class LeaveGroup : ClientPacket
-{
-    public LeaveGroup(WorldPacket packet) : base(packet) { }
+public readonly record struct LeaveGroup(sbyte PartyIndex);
 
-    public override void Read()
-    {
-        PartyIndex = _worldPacket.ReadInt8();
-    }
-
-    public sbyte PartyIndex;
-}
-
-class PartyUninvite : ClientPacket
-{
-    public PartyUninvite(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            // V3_4_3 wire layout: bits first, then GUID, then optional PartyIndex byte.
-            bool hasPartyIndex = _worldPacket.HasBit();
-            byte reasonLen = _worldPacket.ReadBits<byte>(8);
-            TargetGUID = _worldPacket.ReadPackedGuid128();
-            if (hasPartyIndex)
-                PartyIndex = _worldPacket.ReadUInt8();
-            Reason = _worldPacket.ReadString(reasonLen);
-            return;
-        }
-
-        PartyIndex = _worldPacket.ReadUInt8();
-        TargetGUID = _worldPacket.ReadPackedGuid128();
-
-        byte legacyReasonLen = _worldPacket.ReadBits<byte>(8);
-        Reason = _worldPacket.ReadString(legacyReasonLen);
-    }
-
-    public byte PartyIndex;
-    public WowGuid128 TargetGUID;
-    public string Reason = string.Empty;
-}
+public readonly record struct PartyUninvite(byte PartyIndex, WowGuid128 TargetGUID, string Reason);
 
 class GroupUninvite : ServerPacket, ISpanWritable
 {
@@ -457,98 +368,13 @@ class GroupDestroyed : ServerPacket, ISpanWritable
     public int WriteToSpan(Span<byte> buffer) => 0;
 }
 
-class SetAssistantLeader : ClientPacket
-{
-    public SetAssistantLeader(WorldPacket packet) : base(packet) { }
+public readonly record struct SetAssistantLeader(byte PartyIndex, WowGuid128 TargetGUID, bool Apply);
 
-    public override void Read()
-    {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            // V3_4_3 wire layout: 2 header bits, then GUID, then optional PartyIndex byte.
-            // Mirrors CypherCore WorldPackets::Party::SetAssistantLeader::Read.
-            bool hasPartyIndex = _worldPacket.HasBit();
-            Apply = _worldPacket.HasBit();
-            TargetGUID = _worldPacket.ReadPackedGuid128();
-            if (hasPartyIndex)
-                PartyIndex = _worldPacket.ReadUInt8();
-            return;
-        }
+public readonly record struct SetEveryoneIsAssistant(byte PartyIndex, bool Apply);
 
-        PartyIndex = _worldPacket.ReadUInt8();
-        TargetGUID = _worldPacket.ReadPackedGuid128();
-        Apply = _worldPacket.HasBit();
-    }
+public readonly record struct SetPartyLeader(sbyte PartyIndex, WowGuid128 TargetGUID);
 
-    public byte PartyIndex;
-    public WowGuid128 TargetGUID;
-    public bool Apply;
-}
-
-class SetEveryoneIsAssistant : ClientPacket
-{
-    public SetEveryoneIsAssistant(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            // V3_4_3 wire layout: 2 header bits, then optional PartyIndex byte.
-            // Mirrors CypherCore WorldPackets::Party::SetEveryoneIsAssistant::Read.
-            bool hasPartyIndex = _worldPacket.HasBit();
-            Apply = _worldPacket.HasBit();
-            if (hasPartyIndex)
-                PartyIndex = _worldPacket.ReadUInt8();
-            return;
-        }
-
-        PartyIndex = _worldPacket.ReadUInt8();
-        Apply = _worldPacket.HasBit();
-    }
-
-    public byte PartyIndex;
-    public bool Apply;
-}
-
-class SetPartyLeader : ClientPacket
-{
-    public SetPartyLeader(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PartyIndex = _worldPacket.ReadInt8();
-        TargetGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public sbyte PartyIndex;
-    public WowGuid128 TargetGUID;
-}
-
-public class SetRole : ClientPacket
-{
-    public SetRole(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            bool hasPartyIndex = _worldPacket.HasBit();
-            ChangedUnit = _worldPacket.ReadPackedGuid128();
-            Role = _worldPacket.ReadUInt8();
-            if (hasPartyIndex)
-                PartyIndex = _worldPacket.ReadUInt8();
-            return;
-        }
-
-        PartyIndex = (byte)_worldPacket.ReadInt8();
-        ChangedUnit = _worldPacket.ReadPackedGuid128();
-        Role = (byte)_worldPacket.ReadInt32();
-    }
-
-    public byte PartyIndex;
-    public WowGuid128 ChangedUnit;
-    public byte Role;
-}
+public readonly record struct SetRole(byte PartyIndex, WowGuid128 ChangedUnit, byte Role);
 
 public class RoleChangedInform : ServerPacket, ISpanWritable
 {
@@ -610,38 +436,9 @@ class GroupNewLeader : ServerPacket, ISpanWritable
     public string Name = string.Empty;
 }
 
-class ConvertRaid : ClientPacket
-{
-    public ConvertRaid(WorldPacket packet) : base(packet) { }
+public readonly record struct ConvertRaid(bool Raid);
 
-    public override void Read()
-    {
-        Raid = _worldPacket.HasBit();
-    }
-
-    public bool Raid;
-}
-
-class DoReadyCheck : ClientPacket
-{
-    public DoReadyCheck(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            // V3_4_3 wire layout: a HasPartyIndex bit first, then the optional byte.
-            bool hasPartyIndex = _worldPacket.HasBit();
-            if (hasPartyIndex)
-                PartyIndex = _worldPacket.ReadInt8();
-            return;
-        }
-
-        PartyIndex = _worldPacket.ReadInt8();
-    }
-
-    public sbyte PartyIndex;
-}
+public readonly record struct DoReadyCheck(sbyte PartyIndex);
 
 class ReadyCheckStarted : ServerPacket, ISpanWritable
 {
@@ -673,35 +470,7 @@ class ReadyCheckStarted : ServerPacket, ISpanWritable
     public ulong Duration = 35000;
 }
 
-class ReadyCheckResponseClient : ClientPacket
-{
-    public ReadyCheckResponseClient(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            // V3_4_3 wire layout: a HasPartyIndex bit, then IsReady, then the optional
-            // PartyIndex byte - the same bits-first shape as PartyInviteResponse above.
-            // Reading PartyIndex first consumed the bit byte and then took the MSB of the
-            // (always zero) index byte as IsReady, so every answer reached the group as
-            // "not ready". Observed bytes: Ready = C0 00, Not Ready = 80 00. WPP's
-            // V3_4_0 parser orders these bits the other way round, but it is registered
-            // at V3_4_4_59817 and does not hold for 54261.
-            bool hasPartyIndex = _worldPacket.HasBit();
-            IsReady = _worldPacket.HasBit();
-            if (hasPartyIndex)
-                PartyIndex = _worldPacket.ReadUInt8();
-            return;
-        }
-
-        PartyIndex = _worldPacket.ReadUInt8();
-        IsReady = _worldPacket.HasBit();
-    }
-
-    public byte PartyIndex;
-    public bool IsReady;
-}
+public readonly record struct ReadyCheckResponseClient(byte PartyIndex, bool IsReady);
 
 class ReadyCheckResponse : ServerPacket, ISpanWritable
 {
@@ -757,21 +526,7 @@ class ReadyCheckCompleted : ServerPacket, ISpanWritable
     public WowGuid128 PartyGUID;
 }
 
-class UpdateRaidTarget : ClientPacket
-{
-    public UpdateRaidTarget(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PartyIndex = _worldPacket.ReadInt8();
-        Target = _worldPacket.ReadPackedGuid128();
-        Symbol = _worldPacket.ReadInt8();
-    }
-
-    public sbyte PartyIndex;
-    public WowGuid128 Target;
-    public sbyte Symbol;
-}
+public readonly record struct UpdateRaidTarget(sbyte PartyIndex, WowGuid128 Target, sbyte Symbol);
 
 class SendRaidTargetUpdateSingle : ServerPacket, ISpanWritable
 {
@@ -889,33 +644,9 @@ class SummonRequest : ServerPacket, ISpanWritable
     }
 }
 
-class SummonResponse : ClientPacket
-{
-    public SummonResponse(WorldPacket packet) : base(packet) { }
+public readonly record struct SummonResponse(WowGuid128 SummonerGUID, bool Accept);
 
-    public override void Read()
-    {
-        SummonerGUID = _worldPacket.ReadPackedGuid128();
-        Accept = _worldPacket.HasBit();
-    }
-
-    public WowGuid128 SummonerGUID;
-    public bool Accept;
-}
-
-class RequestPartyMemberStats : ClientPacket
-{
-    public RequestPartyMemberStats(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PartyIndex = _worldPacket.ReadUInt8();
-        TargetGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public byte PartyIndex;
-    public WowGuid128 TargetGUID;
-}
+public readonly record struct RequestPartyMemberStats(byte PartyIndex, WowGuid128 TargetGUID);
 
 class PartyMemberPartialState : ServerPacket
 {
@@ -1265,19 +996,7 @@ public class PartyMemberPetStats
     public List<PartyMemberAuraStates> Auras = new();
 }
 
-class MinimapPingClient : ClientPacket
-{
-    public MinimapPingClient(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Position = _worldPacket.ReadVector2();
-        PartyIndex = _worldPacket.ReadInt8();
-    }
-
-    public Vector2 Position;
-    public sbyte PartyIndex;
-}
+public readonly record struct MinimapPingClient(Vector2 Position, sbyte PartyIndex);
 
 class MinimapPing : ServerPacket, ISpanWritable
 {
@@ -1303,21 +1022,7 @@ class MinimapPing : ServerPacket, ISpanWritable
     public Vector2 Position;
 }
 
-public class RandomRollClient : ClientPacket
-{
-    public RandomRollClient(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Min = _worldPacket.ReadInt32();
-        Max = _worldPacket.ReadInt32();
-        PartyIndex = _worldPacket.ReadUInt8();
-    }
-
-    public int Min;
-    public int Max;
-    public byte PartyIndex;
-}
+public readonly record struct RandomRollClient(int Min, int Max, byte PartyIndex);
 
 public class RandomRoll : ServerPacket, ISpanWritable
 {
@@ -1352,34 +1057,6 @@ public class RandomRoll : ServerPacket, ISpanWritable
     public int Result;
 }
 
-class ChangeSubGroup : ClientPacket
-{
-    public ChangeSubGroup(WorldPacket packet) : base(packet) { }
+public readonly record struct ChangeSubGroup(WowGuid128 TargetGUID, sbyte PartyIndex, byte NewSubGroup);
 
-    public override void Read()
-    {
-        TargetGUID = _worldPacket.ReadPackedGuid128();
-        PartyIndex = _worldPacket.ReadInt8();
-        NewSubGroup = _worldPacket.ReadUInt8();
-    }
-
-    public WowGuid128 TargetGUID;
-    public sbyte PartyIndex;
-    public byte NewSubGroup;
-}
-
-class SwapSubGroups : ClientPacket
-{
-    public SwapSubGroups(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PartyIndex = _worldPacket.ReadInt8();
-        FirstTarget = _worldPacket.ReadPackedGuid128();
-        SecondTarget = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 FirstTarget;
-    public WowGuid128 SecondTarget;
-    public sbyte PartyIndex;
-}
+public readonly record struct SwapSubGroups(sbyte PartyIndex, WowGuid128 FirstTarget, WowGuid128 SecondTarget);

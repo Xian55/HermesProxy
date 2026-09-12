@@ -1,4 +1,5 @@
 using System;
+using Framework.IO;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -19,6 +20,10 @@ public class SetRolePktTests
         body.CopyTo(framed, 2);
         return new WorldPacket(framed);
     }
+
+    /// Through the production accessor, as the dispatch site builds it.
+    private static SpanPacketReader ReaderOver(WorldPacket payload)
+        => new(FrameClientBody(payload).GetRemainingSpan());
 
     private static byte[] ExpectedInformBody(byte partyIndex, byte oldRole, byte newRole)
     {
@@ -42,12 +47,13 @@ public class SetRolePktTests
         payload.WritePackedGuid128(Target);
         payload.WriteInt32(role);
 
-        using var packet = new SetRole(FrameClientBody(payload));
-        packet.Read();
+        var reader = ReaderOver(payload);
+        SetRoleCodecPreWotLKClassic.Read(ref reader, out var packet);
 
         Assert.Equal(0, packet.PartyIndex);
         Assert.Equal(Target, packet.ChangedUnit);
         Assert.Equal(role, packet.Role);
+        Assert.Equal(0, reader.Remaining);
     }
 
     [Fact]
@@ -59,14 +65,13 @@ public class SetRolePktTests
         payload.WritePackedGuid128(Target);
         payload.WriteUInt8(8);
 
-        using var packet = FrameClientBody(payload);
-        bool hasPartyIndex = packet.HasBit();
-        var guid = packet.ReadPackedGuid128();
-        byte role = packet.ReadUInt8();
+        var reader = ReaderOver(payload);
+        SetRoleCodecWotLKClassic.Read(ref reader, out var packet);
 
-        Assert.False(hasPartyIndex);
-        Assert.Equal(Target, guid);
-        Assert.Equal(8, role);
+        Assert.Equal(0, packet.PartyIndex);          // the optional byte was absent
+        Assert.Equal(Target, packet.ChangedUnit);
+        Assert.Equal(8, packet.Role);
+        Assert.Equal(0, reader.Remaining);
     }
 
     [Fact]
