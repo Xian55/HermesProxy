@@ -1254,10 +1254,10 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.PetSystem.HandlePetRename(in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetStopAttack_CMSG_PET_SET_ACTION(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetSetAction_CMSG_PET_SET_ACTION(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.PetSetActionCodec.Read(ref reader, out var packet);
-        global::HermesProxy.World.Server.Systems.PetSystem.HandlePetStopAttack(in packet, in ctx);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandlePetSetAction(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetStopAttack_CMSG_PET_STOP_ATTACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -2146,7 +2146,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_CANCEL_AURA] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetCancelAura_CMSG_PET_CANCEL_AURA;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_CAST_SPELL] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandlePetCastSpell_CMSG_PET_CAST_SPELL;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_RENAME] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetRename_CMSG_PET_RENAME;
-        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_SET_ACTION] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetStopAttack_CMSG_PET_SET_ACTION;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_SET_ACTION] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetSetAction_CMSG_PET_SET_ACTION;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_STOP_ATTACK] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetStopAttack_CMSG_PET_STOP_ATTACK;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PLAYER_LOGIN] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandlePlayerLogin_CMSG_PLAYER_LOGIN;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PLAYER_SHOWING_CLOAK] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleShowHelmOrCloak_CMSG_PLAYER_SHOWING_CLOAK;

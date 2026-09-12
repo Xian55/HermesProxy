@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Framework.Constants;
 using Framework.Logging;
@@ -74,7 +74,7 @@ public static class PetSystem
     }
 
     [HandlesCmsg(Opcode.CMSG_PET_SET_ACTION)]
-    public static void HandlePetStopAttack(in PetSetAction action, in SessionContext ctx)
+    public static void HandlePetSetAction(in PetSetAction action, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_SET_ACTION);
         packet.WriteGuid(action.PetGUID.To64(ctx.GetSession().GameState));

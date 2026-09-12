@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Framework.Constants;
@@ -37,7 +37,7 @@ public static class SpellSystem
     static SpellCastTargetFlags ConvertSpellTargetFlags(SpellTargetData target)
     {
         SpellCastTargetFlags targetFlags = SpellCastTargetFlags.None;
-        if (target.Unit != default && !target.Unit.IsEmpty())
+        if (!target.Unit.IsEmpty())
         {
             if (target.Flags.HasFlag(SpellCastTargetFlags.Unit))
                 targetFlags |= SpellCastTargetFlags.Unit;
@@ -50,7 +50,7 @@ public static class SpellSystem
             if (target.Flags.HasFlag(SpellCastTargetFlags.UnitMinipet))
                 targetFlags |= SpellCastTargetFlags.UnitMinipet;
         }
-        if (target.Item != default & !target.Item.IsEmpty())
+        if (!target.Item.IsEmpty())
         {
             if (target.Flags.HasFlag(SpellCastTargetFlags.Item))
                 targetFlags |= SpellCastTargetFlags.Item;
