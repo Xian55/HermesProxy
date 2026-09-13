@@ -141,6 +141,53 @@ Three things the table says that the headline does not:
   indistinguishable from an empty method. That is the JIT eliding the work, not a real number.
   Read it as "too fast to measure".
 
+### Mac mini M4, 2026-09-13 — extended coverage, `--job medium`
+
+`ShortRun` is what let the `Whisper` bug above survive, so this run uses `--job medium` (15
+iterations) and adds the arms that were missing: an array-bearing packet, a second `_Generated`,
+and the legacy dispatch mechanism.
+
+| arm | mean | error | allocated |
+|---|---:|---:|---:|
+| `BuyBackItem_Activator` | 121.90 ns | ±0.89 | 368 B |
+| `BuyBackItem_Direct` | 37.92 ns | ±0.25 | 112 B |
+| **`BuyBackItem_Codec`** | **1.95 ns** | ±0.001 | **0 B** |
+| `BuyBackItem_Generated` | 4.26 ns | ±0.57 | 0 B |
+| `SetActionButton_Activator` | 116.88 ns | ±0.54 | 352 B |
+| `SetActionButton_Direct` | 30.90 ns | ±0.24 | 96 B |
+| **`SetActionButton_Codec`** | below measurement | — | **0 B** |
+| `AttackSwing_Activator` | 120.46 ns | ±0.65 | 360 B |
+| `AttackSwing_Direct` | 37.47 ns | ±0.19 | 104 B |
+| **`AttackSwing_Codec`** | **1.78 ns** | ±0.03 | **0 B** |
+| `Whisper_Activator` | 163.36 ns | ±0.48 | 552 B |
+| `Whisper_Direct` | 72.78 ns | ±0.35 | 296 B |
+| **`Whisper_Codec`** | **23.64 ns** | ±0.05 | **104 B** |
+| `Whisper_Generated` | 34.64 ns | ±0.38 | 104 B |
+| `DBQueryBulk_Activator` | 239.21 ns | ±0.65 | 1008 B |
+| `DBQueryBulk_Direct` | 156.88 ns | ±0.36 | 752 B |
+| **`DBQueryBulk_Codec`** | **40.93 ns** | ±0.05 | **216 B** |
+| `LegacySmsg_Dictionary` | 0.810 ns | ±0.017 | 0 B |
+| `LegacySmsg_Table` | 0.767 ns | ±0.057 | 0 B |
+
+**The legacy conversion has no measurable per-packet win.** 0.810 ns against 0.767 ns, a 0.044 ns
+gap on error bars of ±0.017 and ±0.057 - noise. The `FrozenDictionary` hash plus closed-delegate
+invoke that Phase A replaced was already effectively free, so the 443-handler conversion bought
+the per-`WorldClient` reflection scan at startup and a uniform dispatch shape, **not throughput**.
+Do not claim otherwise. This arm exists to be able to say that, and it said it.
+
+**The dispatch indirection does not cost a fixed amount.** `BuyBackItem` pays 2.31 ns for the
+lookup plus indirect call (4.26 vs 1.95); `Whisper` pays 11.0 ns (34.64 vs 23.64). Same mechanism,
+~5x apart, well outside the error bars. The earlier "~1.6 ns" was a single sample of something
+that varies - most likely table locality, the table being ~118 KB. Unresolved; quote a range or
+nothing.
+
+**The array case converts well.** `DBQueryBulk` is 5.8x on latency and 1008 B -> 216 B, where 216 B
+is the `List<uint>` floor for 40 ids. Pre-sizing against what the wire can hold beats growing from
+empty, which is what the old reader did.
+
+**What is still not measured:** no arm runs a system handler, so nothing here is end-to-end - the
+codec is the cheap half. Coverage is 5 of 384 CMSG opcodes and one synthetic legacy pair.
+
 ### Live run, Arathi Basin with bots, 2026-09-13 (`hermes-20260913_053412.log`)
 
 Same shape as the 2026-09-02 baseline run 5 - login, queue, one full Arathi Basin against

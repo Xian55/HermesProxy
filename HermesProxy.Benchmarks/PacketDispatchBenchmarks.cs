@@ -1,10 +1,13 @@
 ﻿using System;
+using System.Collections.Frozen;
+using System.Collections.Generic;
 using BenchmarkDotNet.Attributes;
 using Framework.IO;
 using HermesProxy.Enums;
 using HermesProxy.World;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Client;
 using HermesProxy.World.Server.Packets;
 
 namespace HermesProxy.Benchmarks;
@@ -87,15 +90,41 @@ public class PacketDispatchBenchmarks
         public WowGuid128 Victim;
     }
 
+    /// <summary>
+    /// Frozen verbatim from <c>HotfixPackets.cs</c> before conversion. The only benchmarked packet
+    /// with a count-driven loop: the old reader grew its list from empty, the codec pre-sizes it
+    /// against what the wire can actually hold, and nothing else here exercises that difference.
+    /// </summary>
+    private sealed class FrozenDBQueryBulk : ClientPacket
+    {
+        public FrozenDBQueryBulk(WorldPacket packet) : base(packet) { }
+        public override void Read()
+        {
+            TableHash = (DB2Hash)_worldPacket.ReadUInt32();
+
+            uint count = _worldPacket.ReadBits<uint>(13);
+            for (uint i = 0; i < count; ++i)
+            {
+                Queries.Add(_worldPacket.ReadUInt32());
+            }
+        }
+        public DB2Hash TableHash;
+        public List<uint> Queries = new();
+    }
+
     private byte[] _buyBackItem = null!;
     private byte[] _setActionButton = null!;
     private byte[] _attackSwing = null!;
     private byte[] _whisper = null!;
+    private byte[] _dbQueryBulk = null!;
 
     private Action<object, ClientPacket> _buyBackItemHandler = null!;
     private Action<object, ClientPacket> _setActionButtonHandler = null!;
     private Action<object, ClientPacket> _attackSwingHandler = null!;
     private Action<object, ClientPacket> _whisperHandler = null!;
+    private Action<object, ClientPacket> _dbQueryBulkHandler = null!;
+    private FrozenDictionary<Opcode, Action<WorldPacket>> _legacyHandlers = null!;
+    private WorldPacket _legacyPacket = null!;
 
     [GlobalSetup]
     public void Setup()
@@ -119,17 +148,38 @@ public class PacketDispatchBenchmarks
             w.WriteString("hello from the proxy!");
         });
 
+        // 40 ids: what a login-time bulk query actually looks like, and enough that the
+        // pre-size-vs-grow difference is not lost in noise.
+        _dbQueryBulk = Frame(w =>
+        {
+            w.WriteUInt32((uint)DB2Hash.BroadcastText);
+            w.WriteBits(40u, 13);
+            for (uint i = 0; i < 40; i++)
+                w.WriteUInt32(1000 + i);
+        });
+
         _buyBackItemHandler = Wrap<FrozenBuyBackItem>(static (_, p) => s_sink = p.Slot);
         _setActionButtonHandler = Wrap<FrozenSetActionButton>(static (_, p) => s_sink = p.Action);
         _attackSwingHandler = Wrap<FrozenAttackSwing>(static (_, p) => s_sink = (uint)p.Victim.Low);
         _whisperHandler = Wrap<FrozenChatMessageWhisper>(static (_, p) => s_sink = (uint)(p.Text.Length + p.Target.Length));
+        _dbQueryBulkHandler = Wrap<FrozenDBQueryBulk>(static (_, p) => s_sink = (uint)p.Queries.Count);
+
+        // Legacy-side fixtures. Phase A left handler bodies untouched and changed only how the
+        // handler is found and called, so that is all these measure: a FrozenDictionary hash plus
+        // a closed-delegate invoke against a table index plus an indirect call. Both targets are
+        // no-ops, because the work either side of the call is identical by construction.
+        _legacyPacket = new WorldPacket(_attackSwing);
+        _legacyHandlers = new Dictionary<Opcode, Action<WorldPacket>>
+        {
+            [Opcode.SMSG_ATTACK_START] = static _ => s_sink++,
+        }.ToFrozenDictionary();
 
         // Fail loudly if the span parse disagrees with the ByteBuffer parse; a wrong floor
         // is worse than no floor.
         using (var reference = new FrozenChatMessageWhisper(new WorldPacket(_whisper)))
         {
             reference.Read();
-            var r = new SpanPacketReader(new WorldPacket(_whisper).GetRemainingSpan());
+            var r = new SpanPacketReader(_whisper.AsSpan(2));
             ChatMessageWhisperCodecWotLKClassic.Read(ref r, out var actual);
             if (actual.Target != reference.Target || actual.Text != reference.Text)
                 throw new InvalidOperationException($"Codec parse mismatch: '{actual.Target}'/'{actual.Text}' vs '{reference.Target}'/'{reference.Text}'");
@@ -320,4 +370,100 @@ public class PacketDispatchBenchmarks
         s_sink = (uint)(text.Length + target.Length);
         return s_sink;
     }
+    // ---- DBQueryBulk: a 13-bit count driving a uint32 loop ----
+
+    [Benchmark]
+    public uint DBQueryBulk_Activator() => InvokeViaActivator(typeof(FrozenDBQueryBulk), _dbQueryBulk, _dbQueryBulkHandler);
+
+    [Benchmark]
+    public uint DBQueryBulk_Direct()
+    {
+        using var packet = new FrozenDBQueryBulk(new WorldPacket(_dbQueryBulk));
+        packet.Read();
+        _dbQueryBulkHandler(HandlerTarget, packet);
+        return s_sink;
+    }
+
+    /// <summary>
+    /// The list is the floor here, the same way the two strings are for Whisper: the handler takes
+    /// a <c>List&lt;uint&gt;</c>, so the codec cannot get to zero. What it can do is pre-size the
+    /// list against what the wire can actually hold instead of growing it from empty, which is the
+    /// difference this pair is here to show.
+    /// </summary>
+    [Benchmark]
+    public uint DBQueryBulk_Codec()
+    {
+        var r = new SpanPacketReader(_dbQueryBulk.AsSpan(2));
+        DBQueryBulkCodec.Read(ref r, out var packet);
+        s_sink = (uint)packet.Queries.Count;
+        return s_sink;
+    }
+
+    // ---- Whisper through the generated table ----
+
+    /// <summary>
+    /// A second <c>_Generated</c> arm, so the dispatch overhead figure does not rest on
+    /// <see cref="BuyBackItem_Generated"/> alone. Same construction: the real lookup, then an
+    /// indirect call to a local thunk of identical signature.
+    /// </summary>
+    [Benchmark]
+    public unsafe uint Whisper_Generated()
+    {
+        var fn = GeneratedCmsgDispatch.Get(Opcode.CMSG_CHAT_MESSAGE_WHISPER);
+        if (fn == null)
+            throw new InvalidOperationException("CMSG_CHAT_MESSAGE_WHISPER is not in the generated table.");
+
+        var r = new SpanPacketReader(_whisper.AsSpan(2));
+        delegate*<ref SpanPacketReader, in SessionContext, void> call = &WhisperThunk;
+        call(ref r, in s_ctx);
+        return s_sink;
+    }
+
+    private static void WhisperThunk(ref SpanPacketReader r, in SessionContext ctx)
+    {
+        ChatMessageWhisperCodecWotLKClassic.Read(ref r, out var packet);
+        s_sink = (uint)(packet.Text.Length + packet.Target.Length);
+    }
+
+    // ---- Legacy (SMSG) dispatch mechanism ----
+
+    /// <summary>
+    /// What legacy Phase A replaced: a <c>FrozenDictionary</c> hash plus a closed-delegate invoke,
+    /// per packet, per WorldClient.
+    /// </summary>
+    /// <remarks>
+    /// Phase A moved 443 handlers to the generated table without touching a single handler body,
+    /// so the only thing that changed is how the handler is found and called — and that is all
+    /// this pair measures. Both targets are no-ops on purpose: the parse and translate either side
+    /// of the call are identical by construction, so including them would bury the difference
+    /// under work that did not change. The claim being tested is that the legacy conversion is
+    /// close to free per packet; this is the arm that can refute it.
+    /// </remarks>
+    [Benchmark]
+    public uint LegacySmsg_Dictionary()
+    {
+        if (_legacyHandlers.TryGetValue(Opcode.SMSG_ATTACK_START, out var handler))
+            handler(_legacyPacket);
+        return s_sink;
+    }
+
+    /// <summary>The generated legacy table: one bounds check, one load, one indirect call.</summary>
+    [Benchmark]
+    public unsafe uint LegacySmsg_Table()
+    {
+        // The real lookup against the real table, so both arms pay for finding the handler.
+        // Calling only the local thunk after that would measure a bare call against a hash.
+        var fn = GeneratedSmsgDispatch.Get(Opcode.SMSG_ATTACK_START);
+        if (fn == null)
+            throw new InvalidOperationException("SMSG_ATTACK_START is not in the generated table.");
+
+        delegate*<WorldClient, WorldPacket, void> call = &LegacySmsgThunk;
+        call(null!, _legacyPacket);
+        return s_sink;
+    }
+
+    // Null target is deliberate and safe: the thunk never dereferences the client, and the point
+    // is the call shape, not the callee. The real generated thunk invokes an instance handler that
+    // needs a live session and sockets.
+    private static void LegacySmsgThunk(WorldClient client, WorldPacket packet) => s_sink++;
 }
