@@ -3145,4 +3145,100 @@ internal static class FrozenPackets
         public uint ID;
         public bool IsFavorite;
     }
+
+/// Frozen verbatim from <c>DFGetSystemInfoPkt.cs</c>.
+    internal sealed class DFGetSystemInfoPkt
+    {
+        public bool Player;
+
+        public void Read(WorldPacket p)
+        {
+            Player = p.HasBit();
+            // optional PartyIndex byte follows — unused
+        }
+    }
+
+    /// Frozen verbatim from <c>DFGetJoinStatusPkt.cs</c>.
+    internal sealed class DFGetJoinStatusPkt
+    {
+        public void Read(WorldPacket p) { }
+    }
+
+    /// Frozen verbatim from <c>DFJoinPkt.cs</c>.
+    internal sealed class DFJoinPkt
+    {
+        public bool QueueAsGroup;
+        public byte Roles;
+        public uint[] Slots = System.Array.Empty<uint>();
+
+        public void Read(WorldPacket p)
+        {
+            QueueAsGroup = p.HasBit();
+            bool hasPartyIndex = p.HasBit();
+            p.HasBit(); // Mercenary
+            Roles = p.ReadUInt8();
+            uint slotCount = p.ReadUInt32();
+            if (hasPartyIndex)
+                p.ReadUInt8();
+            Slots = new uint[slotCount];
+            for (int i = 0; i < slotCount; i++)
+                Slots[i] = p.ReadUInt32();
+        }
+    }
+
+    /// Frozen verbatim from <c>DFLeavePkt.cs</c>.
+    internal sealed class DFLeavePkt
+    {
+        public void Read(WorldPacket p) { }
+    }
+
+    /// Frozen verbatim from <c>DFTeleportPkt.cs</c>.
+    internal sealed class DFTeleportPkt
+    {
+        public bool TeleportOut;
+
+        public void Read(WorldPacket p)
+        {
+            TeleportOut = p.HasBit();
+        }
+    }
+
+    /// Frozen verbatim from <c>DFSetRolesPkt.cs</c>.
+    internal sealed class DFSetRolesPkt
+    {
+        public byte Roles;
+
+        public void Read(WorldPacket p)
+        {
+            Roles = p.ReadUInt8();
+            // optional PartyIndex byte — unused
+        }
+    }
+
+    /// Frozen verbatim from <c>DFProposalResponsePkt.cs</c>.
+    internal sealed class DFProposalResponsePkt
+    {
+        public RideTicket Ticket = new();
+        public ulong InstanceID;
+        public uint ProposalID;
+        public bool Accepted;
+
+        public void Read(WorldPacket p)
+        {
+            // RideTicket.Read owns the V3_4_3 trailing Unknown925 bit and the byte-align that
+            // follows it (see BattleGroundPackets.RideTicket). This used to consume a second
+            // one here, which over-read the buffer by a byte and made the final Accepted bit
+            // throw IndexOutOfRangeException, crashing the proxy on every proposal reply (#103).
+            Ticket.Read(p);
+            InstanceID = p.ReadUInt64();
+            ProposalID = p.ReadUInt32();
+            Accepted = p.HasBit();
+        }
+    }
+
+    /// Frozen verbatim from <c>LFGListGetStatusPkt.cs</c>.
+    internal sealed class LFGListGetStatusPkt
+    {
+        public void Read(WorldPacket p) { }
+    }
 }

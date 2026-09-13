@@ -1,7 +1,3 @@
-namespace HermesProxy.World.Server.Packets;
+﻿namespace HermesProxy.World.Server.Packets;
 
-public class DFLeavePkt : ClientPacket
-{
-    public DFLeavePkt(WorldPacket packet) : base(packet) { }
-    public override void Read() { }
-}
+public readonly record struct DFLeavePkt;

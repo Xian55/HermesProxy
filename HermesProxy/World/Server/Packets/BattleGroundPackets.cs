@@ -20,6 +20,7 @@ using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -353,6 +354,26 @@ public class RideTicket
         // consuming it, the next bit read — BattlefieldPort.AcceptedInvite — lands on THIS bit
         // instead of the real accept bit in the following byte, so "Enter Battle" was read as a
         // decline and the player never entered the popped battleground (#102).
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            data.HasBit();         // Unknown925
+            data.ResetBitReader(); // byte-align to the next field's bit byte
+        }
+    }
+
+    /// <summary>Span-reader twin of <see cref="Read(WorldPacket)"/>, kept in lockstep with it.</summary>
+    /// <remarks>
+    /// The V3_4_3 branch is exact equality rather than a range because this is a helper shared by
+    /// inbound and outbound packets, so it cannot become a ranged codec pair — a PacketCodec
+    /// attribute binds to a packet type. It carries the same caveat the ranged pairs exist to fix:
+    /// a future build falls into the else and skips the Unknown925 bit.
+    /// </remarks>
+    public void Read(ref Framework.IO.SpanPacketReader data)
+    {
+        RequesterGuid = data.ReadPackedGuid128();
+        Id = data.ReadUInt32();
+        Type = (RideType)data.ReadUInt32();
+        Time = data.ReadInt64();
         if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
         {
             data.HasBit();         // Unknown925

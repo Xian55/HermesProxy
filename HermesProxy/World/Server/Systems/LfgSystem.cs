@@ -1,19 +1,28 @@
 using System;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
 
-namespace HermesProxy.World.Server;
+namespace HermesProxy.World.Server.Systems;
 
-public partial class WorldSocket
+/// <summary>
+/// Translation for the modern client's Dungeon Finder CMSGs.
+/// </summary>
+/// <remarks>
+/// LFG arrived in WotLK 3.3.0, so every handler here is gated on the legacy backend being at least
+/// that — a vanilla or TBC emulator has no opcode to forward to.
+/// <para>
+/// Two of these have no legacy counterpart at all and are dropped on purpose rather than by
+/// omission: the client polls join status on a timer, and the modern browsable group list has no
+/// 3.3.5a equivalent.
+/// </para>
+/// </remarks>
+public static class LfgSystem
 {
-    // Modern client -> Legacy server (LFG / Dungeon Finder).
-    // LFG (Dungeon Finder) was added in WotLK 3.3.0; pre-WotLK legacy backends
-    // do not implement these opcodes. Gate accordingly.
-
-    [PacketHandler(Opcode.CMSG_DF_GET_SYSTEM_INFO)]
-    void HandleDFGetSystemInfo(DFGetSystemInfoPkt packet)
+    [HandlesCmsg(Opcode.CMSG_DF_GET_SYSTEM_INFO)]
+    public static void HandleDFGetSystemInfo(in DFGetSystemInfoPkt packet, in SessionContext ctx)
     {
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
             return;
@@ -21,17 +30,17 @@ public partial class WorldSocket
         WorldPacket legacy = new WorldPacket(packet.Player
             ? Opcode.CMSG_LFG_PLAYER_LOCK_INFO_REQUEST
             : Opcode.CMSG_LFG_PARTY_LOCK_INFO_REQUEST);
-        SendPacketToServer(legacy);
+        ctx.SendPacketToServer(legacy);
     }
 
-    [PacketHandler(Opcode.CMSG_DF_GET_JOIN_STATUS)]
-    void HandleDFGetJoinStatus(DFGetJoinStatusPkt packet)
+    [HandlesCmsg(Opcode.CMSG_DF_GET_JOIN_STATUS)]
+    public static void HandleDFGetJoinStatus(in DFGetJoinStatusPkt packet, in SessionContext ctx)
     {
         // No equivalent legacy request; client polls this — drop silently.
     }
 
-    [PacketHandler(Opcode.CMSG_DF_JOIN)]
-    void HandleDFJoin(DFJoinPkt packet)
+    [HandlesCmsg(Opcode.CMSG_DF_JOIN)]
+    public static void HandleDFJoin(in DFJoinPkt packet, in SessionContext ctx)
     {
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
             return;
@@ -45,11 +54,11 @@ public partial class WorldSocket
         //   uint8  needsCount (always 3)
         //   uint8  Needs[3]
         //   cstr   Comment
-        byte roles = OverlayAssignedLfgRoles(packet.Roles);
+        byte roles = OverlayAssignedLfgRoles(in ctx, packet.Roles);
         Log.Print(LogType.Debug,
             $"LFG[diag]: CMSG_DF_JOIN roles=0x{roles:X2} slots=[{string.Join(", ", packet.Slots)}]");
 
-        GetSession().GameState.LfgRequestedRoles = roles;
+        ctx.GetSession().GameState.LfgRequestedRoles = roles;
 
         // Titan Rune / other post-3.3.5 LFGDungeons IDs. A legacy backend drops
         // CMSG_LFG_JOIN for those with no SMSG_LFG_JOIN_RESULT, so the client sits
@@ -59,7 +68,7 @@ public partial class WorldSocket
         {
             Log.Print(LogType.Debug,
                 $"LFG[diag]: rejecting CMSG_DF_JOIN, dungeon {unknownDungeonId} is unknown to the {LegacyVersion.Build} backend");
-            SendDFJoinFailure(LfgJoinResults.ModernInvalidSlot);
+            SendDFJoinFailure(in ctx, LfgJoinResults.ModernInvalidSlot);
             return;
         }
 
@@ -75,16 +84,16 @@ public partial class WorldSocket
         legacy.WriteUInt8(0);
         legacy.WriteUInt8(0);
         legacy.WriteCString(string.Empty);
-        SendPacketToServer(legacy);
+        ctx.SendPacketToServer(legacy);
     }
 
-    private void SendDFJoinFailure(byte modernResult)
+    private static void SendDFJoinFailure(in SessionContext ctx, byte modernResult)
     {
         DFJoinResult response = new DFJoinResult
         {
             Ticket = new RideTicket
             {
-                RequesterGuid = GetSession().GameState.CurrentPlayerGuid,
+                RequesterGuid = ctx.GetSession().GameState.CurrentPlayerGuid,
                 Id = 1,
                 Type = RideType.Lfg,
                 Time = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
@@ -92,11 +101,11 @@ public partial class WorldSocket
             Result = modernResult,
             ResultDetail = 0,
         };
-        SendPacket(response);
+        ctx.SendPacket(response);
     }
 
-    [PacketHandler(Opcode.CMSG_DF_LEAVE)]
-    void HandleDFLeave(DFLeavePkt packet)
+    [HandlesCmsg(Opcode.CMSG_DF_LEAVE)]
+    public static void HandleDFLeave(in DFLeavePkt packet, in SessionContext ctx)
     {
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
             return;
@@ -110,11 +119,11 @@ public partial class WorldSocket
         // asking for it. Legacy LFGMgr::LeaveLfg has no LFG_STATE_DUNGEON case at all, so
         // leaving from inside is a server-side no-op — which is what a native client sees too.
         WorldPacket leave = new WorldPacket(Opcode.CMSG_LFG_LEAVE);
-        SendPacketToServer(leave);
+        ctx.SendPacketToServer(leave);
     }
 
-    [PacketHandler(Opcode.CMSG_DF_TELEPORT)]
-    void HandleDFTeleport(DFTeleportPkt packet)
+    [HandlesCmsg(Opcode.CMSG_DF_TELEPORT)]
+    public static void HandleDFTeleport(in DFTeleportPkt packet, in SessionContext ctx)
     {
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
             return;
@@ -127,40 +136,40 @@ public partial class WorldSocket
 
         WorldPacket legacy = new WorldPacket(Opcode.CMSG_LFG_TELEPORT);
         legacy.WriteUInt8((byte)(packet.TeleportOut ? 1 : 0));
-        SendPacketToServer(legacy);
+        ctx.SendPacketToServer(legacy);
     }
 
-    [PacketHandler(Opcode.CMSG_DF_SET_ROLES)]
-    void HandleDFSetRoles(DFSetRolesPkt packet)
+    [HandlesCmsg(Opcode.CMSG_DF_SET_ROLES)]
+    public static void HandleDFSetRoles(in DFSetRolesPkt packet, in SessionContext ctx)
     {
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
             return;
 
-        byte roles = OverlayAssignedLfgRoles(packet.Roles);
+        byte roles = OverlayAssignedLfgRoles(in ctx, packet.Roles);
         WorldPacket legacy = new WorldPacket(Opcode.CMSG_LFG_SET_ROLES);
         Log.Print(LogType.Debug, $"LFG[diag]: CMSG_DF_SET_ROLES roles=0x{roles:X2}");
 
-        GetSession().GameState.LfgRequestedRoles = roles;
+        ctx.GetSession().GameState.LfgRequestedRoles = roles;
         legacy.WriteUInt8(roles);
-        SendPacketToServer(legacy);
+        ctx.SendPacketToServer(legacy);
     }
 
-    byte OverlayAssignedLfgRoles(byte roles)
+    static byte OverlayAssignedLfgRoles(in SessionContext ctx, byte roles)
     {
         const byte tankHealerDamage = 0x0E;
         if ((roles & tankHealerDamage) != 0)
             return roles;
 
-        var guid = GetSession().GameState.CurrentPlayerGuid;
-        if (GetSession().GameState.GroupAssignedRoles.TryGetValue(guid, out var assigned) && assigned != 0)
+        var guid = ctx.GetSession().GameState.CurrentPlayerGuid;
+        if (ctx.GetSession().GameState.GroupAssignedRoles.TryGetValue(guid, out var assigned) && assigned != 0)
             return (byte)((roles & ~tankHealerDamage) | (assigned & tankHealerDamage));
-        if (GetSession().GameState.LfgRequestedRoles != 0)
-            return (byte)((roles & ~tankHealerDamage) | (GetSession().GameState.LfgRequestedRoles & tankHealerDamage));
+        if (ctx.GetSession().GameState.LfgRequestedRoles != 0)
+            return (byte)((roles & ~tankHealerDamage) | (ctx.GetSession().GameState.LfgRequestedRoles & tankHealerDamage));
         return roles;
     }
 
-    [PacketHandler(Opcode.CMSG_DF_PROPOSAL_RESPONSE)]
-    void HandleDFProposalResponse(DFProposalResponsePkt packet)
+    [HandlesCmsg(Opcode.CMSG_DF_PROPOSAL_RESPONSE)]
+    public static void HandleDFProposalResponse(in DFProposalResponsePkt packet, in SessionContext ctx)
     {
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
             return;
@@ -168,11 +177,11 @@ public partial class WorldSocket
         WorldPacket legacy = new WorldPacket(Opcode.CMSG_LFG_PROPOSAL_RESULT);
         legacy.WriteUInt32(packet.ProposalID);
         legacy.WriteUInt8((byte)(packet.Accepted ? 1 : 0));
-        SendPacketToServer(legacy);
+        ctx.SendPacketToServer(legacy);
     }
 
-    [PacketHandler(Opcode.CMSG_LFG_LIST_GET_STATUS)]
-    void HandleLFGListGetStatus(LFGListGetStatusPkt packet)
+    [HandlesCmsg(Opcode.CMSG_LFG_LIST_GET_STATUS)]
+    public static void HandleLFGListGetStatus(in LFGListGetStatusPkt packet, in SessionContext ctx)
     {
         // Modern LFG list (browsable groups) — no legacy equivalent. Drop.
     }

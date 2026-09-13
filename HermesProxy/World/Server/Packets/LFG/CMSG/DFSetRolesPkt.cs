@@ -1,14 +1,4 @@
-namespace HermesProxy.World.Server.Packets;
+﻿namespace HermesProxy.World.Server.Packets;
 
-public class DFSetRolesPkt : ClientPacket
-{
-    public byte Roles;
-
-    public DFSetRolesPkt(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Roles = _worldPacket.ReadUInt8();
-        // optional PartyIndex byte — unused
-    }
-}
+/// <remarks>An optional PartyIndex byte follows on the wire and is not read.</remarks>
+public readonly record struct DFSetRolesPkt(byte Roles);

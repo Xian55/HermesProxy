@@ -582,6 +582,48 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ItemSystem.HandleDestroyItem(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFGetJoinStatus_CMSG_DF_GET_JOIN_STATUS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.DFGetJoinStatusPktCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LfgSystem.HandleDFGetJoinStatus(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFGetSystemInfo_CMSG_DF_GET_SYSTEM_INFO(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.DFGetSystemInfoPktCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LfgSystem.HandleDFGetSystemInfo(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFJoin_CMSG_DF_JOIN(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.DFJoinPktCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LfgSystem.HandleDFJoin(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFLeave_CMSG_DF_LEAVE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.DFLeavePktCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LfgSystem.HandleDFLeave(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFProposalResponse_CMSG_DF_PROPOSAL_RESPONSE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.DFProposalResponsePktCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LfgSystem.HandleDFProposalResponse(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFSetRoles_CMSG_DF_SET_ROLES(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.DFSetRolesPktCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LfgSystem.HandleDFSetRoles(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFTeleport_CMSG_DF_TELEPORT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.DFTeleportPktCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LfgSystem.HandleDFTeleport(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleReadyCheck_CMSG_DO_READY_CHECK_DoReadyCheckCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.DoReadyCheckCodecPreWotLKClassic.Read(ref reader, out var packet);
@@ -868,6 +910,12 @@ internal static unsafe class GeneratedCmsgDispatch
     {
         global::HermesProxy.World.Server.Packets.LeaveGroupCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.GroupSystem.HandleLeaveGroup(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleLFGListGetStatus_CMSG_LFG_LIST_GET_STATUS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.LFGListGetStatusPktCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.LfgSystem.HandleLFGListGetStatus(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleInteractWithNPC_CMSG_LIST_INVENTORY(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -2328,6 +2376,13 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DEL_FRIEND] = &Thunk_HermesProxy_World_Server_Systems_SocialSystem_HandleDelFriend_CMSG_DEL_FRIEND;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DEL_IGNORE] = &Thunk_HermesProxy_World_Server_Systems_SocialSystem_HandleDelFriend_CMSG_DEL_IGNORE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DESTROY_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleDestroyItem_CMSG_DESTROY_ITEM;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DF_GET_JOIN_STATUS] = &Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFGetJoinStatus_CMSG_DF_GET_JOIN_STATUS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DF_GET_SYSTEM_INFO] = &Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFGetSystemInfo_CMSG_DF_GET_SYSTEM_INFO;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DF_JOIN] = &Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFJoin_CMSG_DF_JOIN;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DF_LEAVE] = &Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFLeave_CMSG_DF_LEAVE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DF_PROPOSAL_RESPONSE] = &Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFProposalResponse_CMSG_DF_PROPOSAL_RESPONSE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DF_SET_ROLES] = &Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFSetRoles_CMSG_DF_SET_ROLES;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DF_TELEPORT] = &Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleDFTeleport_CMSG_DF_TELEPORT;
         {
             if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DO_READY_CHECK] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleReadyCheck_CMSG_DO_READY_CHECK_DoReadyCheckCodecPreWotLKClassic;
@@ -2380,6 +2435,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_TEXT_QUERY] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleItemTextQuery_CMSG_ITEM_TEXT_QUERY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_TALENT] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleLearnTalent_CMSG_LEARN_TALENT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LEAVE_GROUP] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleLeaveGroup_CMSG_LEAVE_GROUP;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LFG_LIST_GET_STATUS] = &Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleLFGListGetStatus_CMSG_LFG_LIST_GET_STATUS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LIST_INVENTORY] = &Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleInteractWithNPC_CMSG_LIST_INVENTORY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LOADING_SCREEN_NOTIFY] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleLoadScreen_CMSG_LOADING_SCREEN_NOTIFY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LOGOUT_CANCEL] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleLogoutCancel_CMSG_LOGOUT_CANCEL;
@@ -2732,6 +2788,13 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_DEL_FRIEND,
             global::HermesProxy.World.Enums.Opcode.CMSG_DEL_IGNORE,
             global::HermesProxy.World.Enums.Opcode.CMSG_DESTROY_ITEM,
+            global::HermesProxy.World.Enums.Opcode.CMSG_DF_GET_JOIN_STATUS,
+            global::HermesProxy.World.Enums.Opcode.CMSG_DF_GET_SYSTEM_INFO,
+            global::HermesProxy.World.Enums.Opcode.CMSG_DF_JOIN,
+            global::HermesProxy.World.Enums.Opcode.CMSG_DF_LEAVE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_DF_PROPOSAL_RESPONSE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_DF_SET_ROLES,
+            global::HermesProxy.World.Enums.Opcode.CMSG_DF_TELEPORT,
             global::HermesProxy.World.Enums.Opcode.CMSG_DO_READY_CHECK,
             global::HermesProxy.World.Enums.Opcode.CMSG_DUEL_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.CMSG_ENABLE_TAXI_NODE,
@@ -2779,6 +2842,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_TEXT_QUERY,
             global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_TALENT,
             global::HermesProxy.World.Enums.Opcode.CMSG_LEAVE_GROUP,
+            global::HermesProxy.World.Enums.Opcode.CMSG_LFG_LIST_GET_STATUS,
             global::HermesProxy.World.Enums.Opcode.CMSG_LIST_INVENTORY,
             global::HermesProxy.World.Enums.Opcode.CMSG_LOADING_SCREEN_NOTIFY,
             global::HermesProxy.World.Enums.Opcode.CMSG_LOGOUT_CANCEL,

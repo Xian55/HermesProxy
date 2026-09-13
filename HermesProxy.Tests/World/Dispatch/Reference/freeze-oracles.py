@@ -26,7 +26,9 @@ def find_class(name: str):
         r"^(?:public |internal )?(?:sealed )?class " + re.escape(name) + r" : ClientPacket\s*\{",
         re.MULTILINE,
     )
-    for path in sorted(PACKETS_DIR.glob("*.cs")):
+    # Recursive: some domains keep one class per file under a subdirectory (Packets/LFG/CMSG),
+    # and a flat glob silently reports those as NOT FOUND.
+    for path in sorted(PACKETS_DIR.rglob("*.cs")):
         text = path.read_text(encoding="utf-8-sig")
         m = pattern.search(text)
         if not m:
