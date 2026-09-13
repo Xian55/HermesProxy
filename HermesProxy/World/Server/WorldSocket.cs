@@ -885,7 +885,14 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             // Only reached once, on a dead session, so the interpolation here is not on any path
             // that runs twice. Without the code this line said nothing about *why* the backend
             // refused us and the answer could only be recovered by decoding the .pkt (issue #248).
-            var legacyResult = GetSession().WorldClient!.LastAuthResult;
+            //
+            // Read through `?.`, not `!`. WorldClient.Disconnect clears this very field when the
+            // socket it owns goes away, and on a BNet reconnect that teardown races the new
+            // connect landing here - so by the time this runs the client can already be null. It
+            // threw an unhandled NullReferenceException out of the read loop, which killed the
+            // realm connection and left the client sitting on the realm-selection screen; the one
+            // thing this branch exists to do, report why the backend refused us, was lost with it.
+            var legacyResult = GetSession().WorldClient?.LastAuthResult;
             WorldSocketLogMessages.WorldClientConnectFailed(
                 _melLog, _sourceFile, _netDirNone,
                 legacyResult is { } r ? $"{r} ({(byte)r})" : "none received");
