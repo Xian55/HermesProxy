@@ -599,6 +599,9 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
                 else if (session.InstanceSocket == this)
                     session.InstanceSocket = null!;
             }
+            // Nothing will write this packet now, so nothing will return the buffer its
+            // constructor rented. Hand it back here rather than leaving it to finalization.
+            packet.Discard();
             return;
         }
 

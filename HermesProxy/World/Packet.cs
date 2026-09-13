@@ -167,6 +167,17 @@ public abstract class ServerPacket
         }
     }
 
+    /// <summary>
+    /// Releases the pooled buffer of a packet that will never be sent.
+    /// </summary>
+    /// <remarks>
+    /// The constructor rents through <c>new WorldPacket(opcode)</c>, and it is
+    /// <see cref="WritePacketData"/> that gives that rental back. A packet dropped before it is
+    /// written - the socket closed between construction and send - would otherwise reach the pool
+    /// only through ~ByteBuffer. Safe to call twice; ByteBuffer.Dispose is idempotent.
+    /// </remarks>
+    public void Discard() => _worldPacket.Dispose();
+
     public ConnectionType GetConnection() { return connectionType; }
 
     byte[]? buffer;

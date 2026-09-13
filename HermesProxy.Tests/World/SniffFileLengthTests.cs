@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.IO;
@@ -65,8 +65,12 @@ public class SniffFileLengthTests
             Assert.Equal((uint)(PacketSize + sizeof(ushort)), recordedSize);
             Assert.Equal(PktHeaderSize + RecordPrologueSize + PacketSize + sizeof(ushort), written.Length);
 
-            // None of the 0xAA slack may have reached the file.
-            Assert.DoesNotContain((byte)0xAA, written);
+            // None of the 0xAA slack may have reached the packet bytes. Scoped to the record
+            // payload rather than the whole file: the prologue carries a unixtime and a tick
+            // count, ~8 effectively random bytes, so asserting over the file failed roughly 3% of
+            // runs whenever one of them happened to be 0xAA.
+            Assert.DoesNotContain((byte)0xAA,
+                written.AsSpan(PktHeaderSize + RecordPrologueSize).ToArray());
         }
         finally
         {
