@@ -109,9 +109,9 @@ sockets - so the pair is comparable to each other, not to production end to end.
 | `SetActionButton_Codec` | below measurement | 0 B |
 | `AttackSwing_Activator` | 122.31 ns | 360 B |
 | `AttackSwing_Codec` | 1.79 ns | 0 B |
-| `Whisper_Activator` | 163.65 ns | 552 B |
-| `Whisper_Direct` | 72.47 ns | 296 B |
-| `Whisper_Codec` | 125.41 ns | 168 B |
+| `Whisper_Activator` | 164.08 ns | 552 B |
+| `Whisper_Direct` | 72.72 ns | 296 B |
+| **`Whisper_Codec`** | **23.43 ns** | **104 B** |
 
 ~36x on latency and the whole per-packet allocation gone, on value-type packets.
 
@@ -121,10 +121,22 @@ Three things the table says that the headline does not:
   would land within noise of the codec and said that if it did not, the thunk was not inlining
   and that was a finding. It is a finding, and it is also irrelevant next to the 125 ns it
   replaces - but it is not free, and the table is ~118 KB so a cold lookup is not an L1 hit.
-- **`Whisper_Codec` is slower than `Whisper_Direct`** (125 ns vs 72 ns) while still allocating
-  less (168 B vs 296 B). The one arm where the converted path loses on latency. Its error bar is
-  +/-74 ns, so this may be noise rather than a regression, but it is unresolved and a longer run
-  should settle it before anyone quotes the 36x as universal.
+- **`Whisper_Codec` was recorded here as 125 ns / 168 B, slower than `Whisper_Direct`. That was a
+  benchmark bug, corrected 2026-09-13.** The arm built a `WorldPacket` for `GetRemainingSpan()`
+  and never disposed it. `ByteBuffer` has a finalizer and `Dispose` is what calls
+  `GC.SuppressFinalize`, so the undisposed instance was queued for finalization, survived Gen0 and
+  was promoted - that arm was the only one reporting Gen1 (0.0103) and Gen2 (0.0012) collections.
+  It was measuring finalization, which production never pays because `HandleGeneratedPacket`
+  disposes in a `finally`. Re-measured with `--job medium` after reading the payload span directly
+  as the other `*_Codec` arms do: **23.43 ns +/-0.041, 104 B** - 7x faster than the reflection path
+  and 3.1x faster than direct, landing exactly on the 104 B two-string floor the baseline
+  predicted. There is no string-packet regression.
+
+  Two lessons worth keeping. The `ShortRun` error bar was +/-74 ns on a 125 ns mean, which read as
+  "noisy" and hid a real defect; `--job medium` brought it to +/-0.041 ns and made it obvious. And
+  an arm that allocates *less* but runs *slower* is a contradiction worth chasing rather than
+  writing off - here it was the exact Gen1/Gen2 promotion pathology this refactor exists to remove,
+  reproduced accidentally inside the benchmark.
 - **`SetActionButton_Codec` measured as exactly zero** and BenchmarkDotNet flagged it as
   indistinguishable from an empty method. That is the JIT eliding the work, not a real number.
   Read it as "too fast to measure".

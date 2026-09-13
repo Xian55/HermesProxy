@@ -285,12 +285,25 @@ public class PacketDispatchBenchmarks
         return s_sink;
     }
 
+    /// <summary>
     /// The production path since the chat slice. The two strings are the floor — they are handed
     /// to SendMessageChat* as strings, so no amount of span work in the codec removes them.
+    /// </summary>
+    /// <remarks>
+    /// Reads the payload span directly, exactly as <see cref="BuyBackItem_Codec"/> does, rather
+    /// than building a <c>WorldPacket</c> to call <c>GetRemainingSpan()</c> on. This used to do
+    /// the latter and never dispose it, which measured something entirely different:
+    /// <c>ByteBuffer</c> has a finalizer, so an undisposed one is queued for finalization,
+    /// survives Gen0, and is promoted — the arm reported 217 ns with Gen1 and Gen2 collections no
+    /// other arm showed, and read as the converted path being slower than the reflection it
+    /// replaced. Production disposes in <c>HandleGeneratedPacket</c>'s finally, so it never paid
+    /// that. All *_Codec arms exclude the WorldPacket because production already has one by the
+    /// time dispatch runs; it is not work the conversion added or removed.
+    /// </remarks>
     [Benchmark]
     public uint Whisper_Codec()
     {
-        var r = new SpanPacketReader(new WorldPacket(_whisper).GetRemainingSpan());
+        var r = new SpanPacketReader(_whisper.AsSpan(2));
         ChatMessageWhisperCodecWotLKClassic.Read(ref r, out var packet);
         s_sink = (uint)(packet.Text.Length + packet.Target.Length);
         return s_sink;
