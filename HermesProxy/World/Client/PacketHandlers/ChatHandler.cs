@@ -3,11 +3,13 @@ using HermesProxy.Enums;
 using HermesProxy.World.Chat;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 using System;
 using System.Globalization;
 using Framework.Logging;
+using Microsoft.Extensions.Logging;
 using static HermesProxy.World.Server.Packets.ChannelListResponse;
 
 namespace HermesProxy.World.Client;
@@ -389,11 +391,9 @@ public partial class WorldClient
         ChatMessageTypeModern chatTypeModern = chatType.CastEnum<ChatMessageTypeModern>();
         ChatPkt chat = new ChatPkt(GetSession(), chatTypeModern, text, language, sender, senderName, receiver, receiverName, channelName, chatFlags, addonPrefix, achievementId);
 
-        var preview = text.Length > 30 ? text.Substring(0, 30) + "…" : text;
-        Log.Print(LogType.Trace,
-            $"[ChatTrace] <- legacy SMSG_CHAT (WotLK): chatType={chatType} -> modern={chatTypeModern} " +
-            $"lang={language} sender={sender} senderName=\"{senderName}\" receiver={receiver} " +
-            $"channel=\"{channelName}\" textLen={text.Length} preview=\"{preview}\"");
+        if (_melLog.IsEnabled(LogLevel.Trace))
+            ChatLogMessages.ReceivedFromLegacy(_melLog, chatType.ToString(), chatTypeModern.ToString(),
+                language, senderName, channelName, text.Length, ChatLogMessages.Preview(text));
 
         SendPacketToClient(chat);
     }
@@ -509,14 +509,13 @@ public partial class WorldClient
         if (lang != (uint)Language.Addon)
             msg = ItemLinkTranslator.ModernToLegacy(msg);
 
-        var preview = msg.Length > 30 ? msg.Substring(0, 30) + "…" : msg;
-        Log.Print(LogType.Trace,
-            $"[ChatTrace] -> legacy CMSG_MESSAGECHAT (WotLK): type={type} lang={lang} " +
-            $"textLen={msg.Length} channel=\"{channel}\" to=\"{to}\" preview=\"{preview}\"");
+        if (_melLog.IsEnabled(LogLevel.Trace))
+            ChatLogMessages.ForwardedToLegacy(_melLog, type.ToString(), lang, msg.Length,
+                channel, to, ChatLogMessages.Preview(msg));
 
         if (HandleHermesInternalChatCommand(msg))
         {
-            Log.Print(LogType.Trace, $"[ChatTrace] handled internally as Hermes command, no legacy send");
+            ChatLogMessages.HandledAsInternalCommand(_melLog);
             return; // was handled by us
         }
 

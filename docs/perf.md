@@ -165,9 +165,26 @@ a baseline a year of other work separates it from, and the two were not isolated
 360 B/packet as attributable and the rest as unattributed until someone runs the A/B.
 
 Not everything improved. The heap sits at 118 MB against the baseline's 92 MB, with no
-explanation offered here. `CMSG_CHAT_MESSAGE_SAY` still carries the 286,984 B spike - 22% of
-all client-to-server allocation across 81 packets - and `CMSG_PLAYER_LOGIN` is still 2.36 MB in
-one shot. Both are larger levers than anything left in dispatch.
+explanation offered here. `CMSG_PLAYER_LOGIN` is still 2.36 MB in one shot, which remains a
+larger lever than anything left in dispatch.
+
+`CMSG_CHAT_MESSAGE_SAY` was listed here as a recurring 286,984 B spike carrying 22% of all
+client-to-server allocation. **That reading was wrong, corrected 2026-09-13.** The spike is a
+one-shot warm-up on the first chat message of a session, and the per-packet cost afterwards is
+small: across consecutive cumulative windows in `hermes-20260913_143628.log` the packet count
+went 67 -> 71 while `TotalKB` went 1203.2 -> 1213.6, i.e. **2.6 KB for each additional message**,
+with `MaxB` pinned at exactly 287,088 the whole time. A large `AvgB` on a low-count opcode is
+that single allocation smeared across the count, and the `Share` column inherits the error - so
+read `MaxB` against the marginal cost between windows before believing a share figure on any
+opcode with few packets.
+
+Part of the 2.6 KB steady state was five `[ChatTrace]` sites building a `Substring`, a concat and
+a full interpolation before `Log.Print` could discard them - three per outgoing message, one per
+incoming one on the path that carries every message from every player in every joined channel.
+Converted to `[LoggerMessage]` in `World/Logging/ChatLogMessages.cs` with explicit `IsEnabled`
+guards, since the attribute stops the formatting but not the argument evaluation. What allocates
+the 287 KB on first use is still unidentified; `ItemLinkTranslator` and the message splitter were
+both checked and are not it.
 
 
 ---

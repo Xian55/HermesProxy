@@ -8,7 +8,9 @@ using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Logging;
 using HermesProxy.World.Server.Packets;
+using Microsoft.Extensions.Logging;
 
 namespace HermesProxy.World.Server.Systems;
 
@@ -23,6 +25,8 @@ namespace HermesProxy.World.Server.Systems;
 /// </remarks>
 public static class ChatSystem
 {
+    private static readonly Microsoft.Extensions.Logging.ILogger _melLog = Log.CreateMelLogger(Log.CategoryPacket);
+
     [HandlesCmsg(Opcode.CMSG_CHAT_JOIN_CHANNEL)]
     public static void HandleChatJoinChannel(in JoinChannel join, in SessionContext ctx)
     {
@@ -146,9 +150,8 @@ public static class ChatSystem
     [HandlesCmsg(Opcode.CMSG_CHAT_MESSAGE_EMOTE)]
     public static void HandleChatMessageEmote(in ChatMessageEmote emote, in SessionContext ctx)
     {
-        var rawPreview = emote.Text.Length > 30 ? emote.Text.Substring(0, 30) + "…" : emote.Text;
-        Log.Print(LogType.Trace,
-            $"[ChatTrace] CMSG_CHAT_MESSAGE_EMOTE received: textLen={emote.Text.Length} preview=\"{rawPreview}\"");
+        if (_melLog.IsEnabled(LogLevel.Trace))
+            ChatLogMessages.EmoteReceived(_melLog, emote.Text.Length, ChatLogMessages.Preview(emote.Text));
 
         var toBeSentTextParts = ConvertTextMessageIntoMaxLengthParts(emote.Text);
         if (toBeSentTextParts.Count < 1)
@@ -183,10 +186,9 @@ public static class ChatSystem
     [HandlesCmsg(Opcode.CMSG_CHAT_MESSAGE_INSTANCE_CHAT)]
     public static void HandleChatMessage(Opcode opcode, in ChatMessage packet, in SessionContext ctx)
     {
-        var preview = packet.Text.Length > 30 ? packet.Text.Substring(0, 30) + "…" : packet.Text;
-        Log.Print(LogType.Trace,
-            $"[ChatTrace] CMSG_CHAT_MESSAGE_* received: opcode={opcode} " +
-            $"lang={packet.Language} textLen={packet.Text.Length} preview=\"{preview}\"");
+        if (_melLog.IsEnabled(LogLevel.Trace))
+            ChatLogMessages.OutgoingReceived(_melLog, opcode.ToString(), packet.Language,
+                packet.Text.Length, ChatLogMessages.Preview(packet.Text));
 
         ChatMessageTypeModern type;
 
