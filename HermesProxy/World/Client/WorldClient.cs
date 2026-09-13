@@ -13,12 +13,10 @@ using Framework.IO;
 using HermesProxy.World.Dispatch;
 using Framework.Logging;
 using HermesProxy.World.Enums;
-using System.Reflection;
 using System.Threading.Tasks;
 using System.Threading;
 using Framework.Networking;
 using HermesProxy.World.Server;
-using System.Collections.Frozen;
 using System.Diagnostics;
 using HermesProxy.World.Logging;
 
@@ -58,7 +56,6 @@ public partial class WorldClient
     string _username = null!;
     Realm _realm = null!;
     LegacyWorldCrypt _worldCrypt = null!;
-    FrozenDictionary<Opcode, Action<WorldPacket>> _packetHandlers = null!;
     GlobalSessionData _globalSession = null!;
     // Built alongside _globalSession in ConnectToWorldServer; the ctor runs before a session exists.
     SessionContext _sessionContext;
@@ -78,11 +75,6 @@ public partial class WorldClient
     /// backend's verdict instead of only reporting that the connect failed.
     /// </summary>
     public AuthResult? LastAuthResult { get; private set; }
-
-    public WorldClient()
-    {
-        InitializePacketHandlers();
-    }
 
     public GlobalSessionData GetSession()
     {
@@ -683,44 +675,12 @@ public partial class WorldClient
             case Opcode.SMSG_ADDON_INFO:
                 break; // don't need to handle
             default:
-                // Converted opcodes own a slot in the generated table; a null slot falls through
-                // to the reflective registry so the two coexist during migration.
+                // Every SMSG handler is generated now, so a null slot means the opcode has no
+                // handler at all rather than one still sitting in a reflective registry.
                 var generated = GeneratedSmsgDispatch.Get(universalOpcode);
                 if (generated != null)
                 {
                     HandleGeneratedLegacyPacket(generated, packet, universalOpcode);
-                }
-                else if (_packetHandlers.TryGetValue(universalOpcode, out var handler))
-                {
-                    // A throwing legacy handler used to escape into the read loop's catch,
-                    // which tears down the world connection (and previously the process).
-                    // The packet is already fully read off the socket, so dropping it here
-                    // cannot desync the stream, so keep the session alive instead.
-                    try
-                    {
-                        handler(packet);
-                    }
-                    catch (UnmappedOpcodeException unmapped)
-                    {
-                        Log.Print(LogType.Warn,
-                            $"C P<S | Handling {universalOpcode} ({packet.GetOpcode()}): {unmapped.Message}");
-                    }
-                    catch (Exception handlerException)
-                    {
-                        // Dump the whole packet, not a prefix. A parser that over-reads is
-                        // usually wrong about a field well past the first few bytes, and this
-                        // only fires on an exception so the volume is irrelevant.
-                        // GetSize is the real payload length; GetData can hand back a larger
-                        // ArrayPool rental, and reporting that length makes an over-read look
-                        // like it had spare bytes to read.
-                        byte[] raw = packet.GetData();
-                        int size = (int)packet.GetSize();
-                        int hexLen = System.Math.Min(1024, System.Math.Min(size, raw.Length));
-                        string body = hexLen > 0 ? System.BitConverter.ToString(raw, 0, hexLen) : "<empty>";
-                        Log.Print(LogType.Error,
-                            $"C P<S | Unhandled exception in handler for {universalOpcode} ({packet.GetOpcode()}) " +
-                            $"[size={size} dumped={hexLen}]{System.Environment.NewLine}bytes={body}{System.Environment.NewLine}{handlerException}");
-                    }
                 }
                 else
                 {
@@ -970,50 +930,4 @@ public partial class WorldClient
         SendPing(serial | 0x80000000, 0);
     }
 
-    public void InitializePacketHandlers()
-    {
-        Dictionary<Opcode, Action<WorldPacket>> dict = [];
-
-        foreach (var methodInfo in typeof(WorldClient).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic))
-        {
-            foreach (var msgAttr in methodInfo.GetCustomAttributes<PacketHandlerAttribute>())
-            {
-                if (msgAttr == null)
-                    continue;
-
-                if (msgAttr.Opcode == Opcode.MSG_NULL_ACTION)
-                    continue;
-
-                // Defence in depth alongside the generator's own duplicate-claim error and the
-                // disjointness test: never register a shadow handler that can never run.
-                if (GeneratedSmsgDispatch.ClaimedOpcodes.Contains(msgAttr.Opcode))
-                    continue;
-
-                if (dict.ContainsKey(msgAttr.Opcode))
-                {
-                    Log.Print(LogType.Error, $"Tried to override OpcodeHandler of {_packetHandlers[msgAttr.Opcode]} with {methodInfo.Name} (Opcode {msgAttr.Opcode})");
-                    continue;
-                }
-
-                var parameters = methodInfo.GetParameters();
-                if (parameters.Length == 0)
-                {
-                    Log.Print(LogType.Error, $"Method: {methodInfo.Name} Has no parameters");
-                    continue;
-                }
-
-                if (parameters[0].ParameterType != typeof(WorldPacket))
-                {
-                    Log.Print(LogType.Error, $"Method: {methodInfo.Name} has wrong BaseType");
-                    continue;
-                }
-
-                var del = (Action<WorldPacket>)Delegate.CreateDelegate(typeof(Action<WorldPacket>), this, methodInfo);
-
-                dict[msgAttr.Opcode] = del;
-            }
-        }
-
-        _packetHandlers = dict.ToFrozenDictionary();
-    }
 }

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <InternalsVisibleTo Include="HermesProxy.Tests" />
@@ -60,8 +60,7 @@
        Without these, PublishTrimmed=true binaries fail at runtime:
          HermesProxy — VersionChecker.cs Assembly.GetType("HermesProxy.World.Enums.V*.*")
            per-build enums; AccountDataManager.cs JsonSerializer on account data;
-           Server.cs JsonSerializer for update check; WorldSocket.cs packet
-           handler reflection; BnetServices.ServiceManager.cs Assembly.GetTypes()
+           Server.cs JsonSerializer for update check; BnetServices.ServiceManager.cs Assembly.GetTypes()
            + Activator.CreateInstance on request/response types; GameData.cs
            Type.GetFields/GetProperties for EstimateAvgBytesPerRow<T>.
          Framework — Framework.Serialization.Json and Framework.Util.RandomHelper

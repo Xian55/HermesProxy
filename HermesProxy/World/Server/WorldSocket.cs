@@ -23,8 +23,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Sockets;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Collections.Concurrent;
 using System.Threading;
 
 using Framework.Constants;
@@ -86,7 +84,6 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     // under _sendLock (CompressPacket runs inside SendPacket's lock scope).
     private MemoryStream? _compressBuffer;
     private DeflateStream? _deflater;
-    ConcurrentDictionary<Opcode, PacketHandler> _clientPacketTable = new();
     GlobalSessionData _globalSession = null!;
     // Built alongside _globalSession rather than in the ctor: the session binds later, in
     // HandleAuthSession. Passed `in` to every generated system, so dispatch copies a pointer.
@@ -175,8 +172,6 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
         _headerBuffer = new SocketBuffer(HeaderSize);
         _packetBuffer = new SocketBuffer(0);
-
-        InitializePacketHandlers();
     }
 
     public override void Dispose()
@@ -450,60 +445,24 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     {
         Opcode universalOpcode = packet.GetUniversalOpcode(isModern: true);
 
-        // Converted opcodes own a slot in the generated table; everything else is still in the
-        // reflective registry. A null slot is the fall-through, which is what lets the two
-        // coexist while handlers migrate one domain at a time.
+        // Every converted opcode owns a slot in the generated table, and all of them are
+        // converted - a null slot now means the opcode genuinely has no handler rather than
+        // one still waiting in a reflective registry.
         var generated = GeneratedCmsgDispatch.Get(universalOpcode);
-        if (generated != null)
-        {
-            HandleGeneratedPacket(generated, packet, universalOpcode);
-            return;
-        }
-
-        var handler = GetHandler(universalOpcode);
-        if (handler == null)
+        if (generated == null)
         {
             WorldSocketLogMessages.NoHandlerForOpcode(_melLog, _sourceFile, _netDirRecv, universalOpcode, packet.GetOpcode());
             return;
         }
 
-        // A throwing handler used to escape all the way to AppDomain.UnhandledException and
-        // abort the whole proxy, taking the session with it. The packet is already fully
-        // read out of the socket buffer at this point, so swallowing here cannot desync the
-        // stream. Worst case one client packet is dropped and the session keeps running.
-        try
-        {
-            if (HermesProxy.Server.MetricsEnabled)
-            {
-                // Handlers run synchronously on this thread, so the per-thread allocation
-                // counter brackets exactly this packet's parse + translate + send.
-                long startTimestamp = Stopwatch.GetTimestamp();
-                long allocBefore = GC.GetAllocatedBytesForCurrentThread();
-                handler.Invoke(this, packet);
-                long allocated = GC.GetAllocatedBytesForCurrentThread() - allocBefore;
-                HermesProxy.Server.Metrics.RecordClientToServer(universalOpcode, Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds, allocated);
-            }
-            else
-            {
-                handler.Invoke(this, packet);
-            }
-        }
-        catch (Exception e)
-        {
-            LogHandlerException(universalOpcode, packet, e);
-
-            // Without this the client sits on the entering-world screen forever with no
-            // error, which is harder to diagnose than the crash this guard replaced.
-            if (universalOpcode == Opcode.CMSG_PLAYER_LOGIN)
-                AbortLogin(LoginFailureReason.NoWorld);
-        }
+        HandleGeneratedPacket(generated, packet, universalOpcode);
     }
 
     /// <summary>
-    /// Runs a generated thunk with the same bracketing the reflective path has: the sniff write
-    /// that used to sit inside PacketHandler.Invoke (before Read, so the capture is of the bytes
-    /// as received), the --metrics timing, the swallow-and-log, and the pooled-buffer return that
-    /// `using var clientPacket` used to perform.
+    /// Runs a generated thunk with the bracketing the reflective path used to provide: the sniff
+    /// write (before the codec reads, so the capture is of the bytes as received), the --metrics
+    /// timing, the swallow-and-log, and the pooled-buffer return that the disposed ClientPacket
+    /// used to perform.
     /// </summary>
     private unsafe void HandleGeneratedPacket(
         delegate*<ref SpanPacketReader, in SessionContext, void> thunk,
@@ -578,11 +537,6 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             GetSession().WorldClient!.SendPacketToServer(packet, delayUntilOpcode);
         else
             Log.Print(LogType.Error, $"Attempt to send opcode {packet.GetUniversalOpcode(false)} ({packet.GetOpcode()}) while WorldClient is disconnected!");
-    }
-
-    public PacketHandler? GetHandler(Opcode opcode)
-    {
-        return _clientPacketTable.LookupByKey(opcode);
     }
 
     // C<P S: Sends data to modern client
@@ -1511,82 +1465,6 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         return GetRemoteIpAddress()!;
     }
 
-    [UnconditionalSuppressMessage("Trimming", "IL2072", Justification = Trimming.RootedAssembly)]
-    public void InitializePacketHandlers()
-    {
-        foreach (var methodInfo in typeof(WorldSocket).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic))
-        {
-            foreach (var msgAttr in methodInfo.GetCustomAttributes<PacketHandlerAttribute>())
-            {
-                if (msgAttr == null)
-                    continue;
-
-                if (msgAttr.Opcode == Opcode.MSG_NULL_ACTION)
-                    continue;
-
-                // Defence in depth: the generator also errors when an opcode is claimed twice,
-                // and a test asserts the two registries are disjoint. This makes the runtime
-                // agree with both rather than registering a shadow handler that never runs.
-                if (GeneratedCmsgDispatch.ClaimedOpcodes.Contains(msgAttr.Opcode))
-                    continue;
-
-                if (_clientPacketTable.ContainsKey(msgAttr.Opcode))
-                {
-                    Log.Print(LogType.Error, $"Tried to override OpcodeHandler of {_clientPacketTable[msgAttr.Opcode].ToString()} with {methodInfo.Name} (Opcode {msgAttr.Opcode})");
-                    continue;
-                }
-
-                var parameters = methodInfo.GetParameters();
-                if (parameters.Length == 0)
-                {
-                    Log.Print(LogType.Error, $"Method: {methodInfo.Name} Has no paramters");
-                    continue;
-                }
-
-                if (parameters[0].ParameterType.BaseType != typeof(ClientPacket))
-                {
-                    Log.Print(LogType.Error, $"Method: {methodInfo.Name} has wrong BaseType");
-                    continue;
-                }
-
-                _clientPacketTable[msgAttr.Opcode] = new PacketHandler(methodInfo, parameters[0].ParameterType);
-            }
-        }
-    }
-
-    public class PacketHandler
-    {
-        public PacketHandler(MethodInfo info, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type type)
-        {
-            methodCaller = (Action<WorldSocket, ClientPacket>)typeof(PacketHandler).GetMethod(nameof(CreateDelegate), BindingFlags.Static | BindingFlags.NonPublic)!.MakeGenericMethod(type).Invoke(null, new object[] { info })!;
-            packetType = type;
-        }
-
-        public void Invoke(WorldSocket session, WorldPacket packet)
-        {
-            if (packetType == null)
-                return;
-
-            using var clientPacket = (ClientPacket)Activator.CreateInstance(packetType, packet)!;
-            clientPacket.LogPacket(ref session.GetSession().ModernSniff, session.GetSession().PacketLogContext);
-            clientPacket.Read();
-            methodCaller(session, clientPacket);
-        }
-
-        static Action<WorldSocket, ClientPacket> CreateDelegate<P1>(MethodInfo method) where P1 : ClientPacket
-        {
-            // create first delegate. It is not fine because its 
-            // signature contains unknown types T and P1
-            Action<WorldSocket, P1> d = (Action<WorldSocket, P1>)method.CreateDelegate(typeof(Action<WorldSocket, P1>));
-            // create another delegate having necessary signature. 
-            // It encapsulates first delegate with a closure
-            return delegate (WorldSocket target, ClientPacket p) { d(target, (P1)p); };
-        }
-
-        Action<WorldSocket, ClientPacket> methodCaller = null!;
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
-        Type packetType;
-    }
 }
 
 enum ReadDataHandlerResult

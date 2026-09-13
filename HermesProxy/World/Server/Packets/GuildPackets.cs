@@ -278,18 +278,6 @@ public struct GuildRosterProfessionData
     public int Step;
 }
 
-public class GuildGetRanks : ClientPacket
-{
-    public GuildGetRanks(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        GuildGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 GuildGUID;
-}
-
 public class GuildRanks : ServerPacket
 {
     public GuildRanks() : base(Opcode.SMSG_GUILD_RANKS) { }

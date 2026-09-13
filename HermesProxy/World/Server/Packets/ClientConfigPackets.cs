@@ -152,18 +152,6 @@ public readonly record struct UserClientUpdateAccountData(
     uint DataType,
     byte[] CompressedData);
 
-class SetAdvancedCombatLogging : ClientPacket
-{
-    public SetAdvancedCombatLogging(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Enable = _worldPacket.HasBit();
-    }
-
-    public bool Enable;
-}
-
 public readonly record struct SaveCUFProfiles(byte[] Data);
 
 public class LoadCUFProfiles : ServerPacket, ISpanWritable

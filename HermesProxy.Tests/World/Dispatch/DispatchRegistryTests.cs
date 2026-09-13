@@ -13,15 +13,14 @@ using Xunit;
 namespace HermesProxy.Tests.World.Dispatch;
 
 /// <summary>
-/// Guards the coexistence of the generated dispatch tables and the reflective registries they
-/// are replacing.
+/// Guards the generated dispatch tables now that they are the only inbound registry.
 /// </summary>
 /// <remarks>
-/// The existing <c>PacketHandlerRegistrationTests</c> queries methods <i>on WorldSocket and
-/// WorldClient</i>. As handlers move to static systems they drop out of that query, so it keeps
-/// passing while covering less on every slice — it fails open. These assert the properties that
-/// actually have to hold during the migration, and they get stricter as opcodes convert rather
-/// than weaker.
+/// The reflective registries these replaced were queried by opcode count, which fails open: a
+/// handler that silently stopped being registered just made the set smaller and nothing noticed.
+/// These assert properties that get stricter rather than weaker — every claimed opcode resolves
+/// to a real thunk, every system has the shape the generator requires, and the claimed counts
+/// never fall below what was converted.
 /// </remarks>
 public class DispatchRegistryTests
 {
@@ -36,48 +35,10 @@ public class DispatchRegistryTests
             VersionBootstrap.ModernBuild = ClientVersionBuild.V3_4_3_54261;
     }
 
-    private static IEnumerable<MethodInfo> ReflectiveHandlers(Type hostType) =>
-        hostType.GetMethods(BindingFlags.Instance | BindingFlags.Static |
-                            BindingFlags.Public | BindingFlags.NonPublic)
-                .Where(m => m.GetCustomAttributes<PacketHandlerAttribute>().Any());
-
-    private static HashSet<Opcode> ReflectiveOpcodes(Type hostType) =>
-        ReflectiveHandlers(hostType)
-            .SelectMany(m => m.GetCustomAttributes<PacketHandlerAttribute>())
-            .Select(a => a.Opcode)
-            .Where(o => o != Opcode.MSG_NULL_ACTION)
-            .ToHashSet();
-
     private static IEnumerable<MethodInfo> SystemsWith<TAttribute>() where TAttribute : Attribute =>
         typeof(SessionContext).Assembly.GetTypes()
             .SelectMany(t => t.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
             .Where(m => m.GetCustomAttributes<TAttribute>().Any());
-
-    [Fact]
-    public void Cmsg_GeneratedAndReflectiveRegistriesAreDisjoint()
-    {
-        var overlap = GeneratedCmsgDispatch.ClaimedOpcodes
-            .Intersect(ReflectiveOpcodes(typeof(WorldSocket)))
-            .Select(o => o.ToString())
-            .ToList();
-
-        Assert.True(overlap.Count == 0,
-            "An opcode is claimed by the generated table AND still registered reflectively. " +
-            "One of them would never run: " + string.Join(", ", overlap));
-    }
-
-    [Fact]
-    public void Smsg_GeneratedAndReflectiveRegistriesAreDisjoint()
-    {
-        var overlap = GeneratedSmsgDispatch.ClaimedOpcodes
-            .Intersect(ReflectiveOpcodes(typeof(WorldClient)))
-            .Select(o => o.ToString())
-            .ToList();
-
-        Assert.True(overlap.Count == 0,
-            "An opcode is claimed by the generated table AND still registered reflectively. " +
-            "One of them would never run: " + string.Join(", ", overlap));
-    }
 
     [Fact]
     public void EveryCmsgSystemHasTheShapeTheGeneratorRequires()
@@ -196,16 +157,40 @@ public class DispatchRegistryTests
             $"{(isModern ? "CMSG" : "SMSG")} opcodes are claimed but have no thunk: {string.Join(", ", unresolved)}");
     }
 
-    [Fact]
-    public void EveryOpcodeHandledBeforeTheMigrationIsStillHandled()
-    {
-        // Slice 1 converts nothing, so the two registries together must still cover exactly what
-        // the reflective one covered alone. As slices land, opcodes move from the right column to
-        // the left and this stays true — it is what catches a handler dropped in transit.
-        var cmsgTotal = GeneratedCmsgDispatch.ClaimedOpcodes.Count + ReflectiveOpcodes(typeof(WorldSocket)).Count;
-        var smsgTotal = GeneratedSmsgDispatch.ClaimedOpcodes.Count + ReflectiveOpcodes(typeof(WorldClient)).Count;
+    // Opcodes claimed at the moment the reflective registries were deleted. There is no second
+    // registry left to fall through to, so an opcode that stops being claimed is simply unhandled
+    // at runtime with nothing but a log line to show for it. Raise these when opcodes are genuinely
+    // added; a drop is a handler lost in transit.
+    //
+    // These count distinct *opcodes in the table for one build*, which is not the number of
+    // [HandlesCmsg]/[HandlesSmsg] attributes in the source: a ranged handler contributes several
+    // attributes that resolve to the same slot, so the attribute count is the larger number and
+    // makes a useless floor.
+    private const int ConvertedCmsgFloor = 384;
+    private const int ConvertedSmsgFloor = 431;
 
-        Assert.True(cmsgTotal > 0, "no CMSG opcodes are handled by either registry");
-        Assert.True(smsgTotal > 0, "no SMSG opcodes are handled by either registry");
+    [Fact]
+    public void ConvertedOpcodeCountsNeverFallBelowWhatWasMigrated()
+    {
+        Assert.True(GeneratedCmsgDispatch.ClaimedOpcodes.Count >= ConvertedCmsgFloor,
+            $"CMSG dispatch claims {GeneratedCmsgDispatch.ClaimedOpcodes.Count} opcodes, " +
+            $"below the {ConvertedCmsgFloor} that were converted. A handler lost its attribute.");
+
+        Assert.True(GeneratedSmsgDispatch.ClaimedOpcodes.Count >= ConvertedSmsgFloor,
+            $"SMSG dispatch claims {GeneratedSmsgDispatch.ClaimedOpcodes.Count} opcodes, " +
+            $"below the {ConvertedSmsgFloor} that were converted. A handler lost its attribute.");
+    }
+
+    /// <summary>
+    /// The update-object opcodes carry 79% of inbound bytes; losing their registration is the
+    /// single most expensive way for an attribute to slip onto the wrong declaration.
+    /// </summary>
+    [Fact]
+    public void UpdateObjectOpcodesAreHandled()
+    {
+        Assert.True(GeneratedSmsgDispatch.ClaimedOpcodes.Contains(Opcode.SMSG_UPDATE_OBJECT),
+            "SMSG_UPDATE_OBJECT is not claimed by the generated table");
+        Assert.True(GeneratedSmsgDispatch.ClaimedOpcodes.Contains(Opcode.SMSG_COMPRESSED_UPDATE_OBJECT),
+            "SMSG_COMPRESSED_UPDATE_OBJECT is not claimed by the generated table");
     }
 }
