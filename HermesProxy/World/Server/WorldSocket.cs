@@ -101,6 +101,15 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
     private BnetServices.ServiceManager _bnetRpc = null!;
 
+    /// <summary>
+    /// The BNet RPC service manager for this connection, for SessionSystem.
+    /// </summary>
+    /// <remarks>
+    /// Per-connection rather than per-session, so it cannot live on SessionContext's session the
+    /// way the other forwarders do. Null until HandleAuthSession builds it - both callers check.
+    /// </remarks>
+    internal BnetServices.ServiceManager? BnetRpc => _bnetRpc;
+
     private readonly string _externalAddress;
     private readonly int _instancePort;
 

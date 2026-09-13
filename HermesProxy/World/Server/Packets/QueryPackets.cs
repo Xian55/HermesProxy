@@ -776,28 +776,55 @@ public class QueryNPCTextResponse : ServerPacket, ISpanWritable
     public uint[] BroadcastTextID = new uint[8];
 }
 
-public class WhoRequestPkt : ClientPacket
-{
-    public WhoRequestPkt(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        uint areasCount = _worldPacket.ReadBits<uint>(4);
-
-        Request.Read(_worldPacket);
-        RequestID = _worldPacket.ReadUInt32();
-
-        for (int i = 0; i < areasCount; ++i)
-            Areas.Add(_worldPacket.ReadInt32());
-    }
-
-    public WhoRequest Request = new();
-    public uint RequestID;
-    public List<int> Areas = new();
-}
+/// <remarks>
+/// Holds <see cref="WhoRequest"/> by reference. It carries a non-zero default — ClassFilter is
+/// -1, meaning "any class" — and flattening it into a positional record struct would make that
+/// default a zero, which is the Warrior class id.
+/// </remarks>
+public readonly record struct WhoRequestPkt(WhoRequest Request, uint RequestID, List<int> Areas);
 
 public class WhoRequest
 {
+    /// <remarks>
+    /// Span twin of <see cref="Read(WorldPacket)"/>. The five bit lengths are all read before any
+    /// of their strings and the words list sits between them and the names, so the two bodies
+    /// must stay in step field for field.
+    /// </remarks>
+    public void Read(ref SpanPacketReader data)
+    {
+        MinLevel = data.ReadInt32();
+        MaxLevel = data.ReadInt32();
+        RaceFilter = data.ReadInt64();
+        ClassFilter = data.ReadInt32();
+
+        uint nameLength = data.ReadBits<uint>(6);
+        uint virtualRealmNameLength = data.ReadBits<uint>(9);
+        uint guildNameLength = data.ReadBits<uint>(7);
+        uint guildVirtualRealmNameLength = data.ReadBits<uint>(9);
+        uint wordsCount = data.ReadBits<uint>(3);
+
+        ShowEnemies = data.HasBit();
+        ShowArenaPlayers = data.HasBit();
+        ExactName = data.HasBit();
+        if (data.HasBit())
+            ServerInfo = new();
+        data.ResetBitPos();
+
+        for (int i = 0; i < wordsCount; ++i)
+        {
+            Words.Add(data.ReadString(data.ReadBits<uint>(7)));
+            data.ResetBitPos();
+        }
+
+        Name = data.ReadString(nameLength);
+        VirtualRealmName = data.ReadString(virtualRealmNameLength);
+        Guild = data.ReadString(guildNameLength);
+        GuildVirtualRealmName = data.ReadString(guildVirtualRealmNameLength);
+
+        if (ServerInfo != null)
+            ServerInfo.Read(ref data);
+    }
+
     public void Read(WorldPacket data)
     {
         MinLevel = data.ReadInt32();
@@ -850,6 +877,14 @@ public class WhoRequest
 
 public class WhoRequestServerInfo
 {
+    /// <remarks>Span twin; kept in step with the ByteBuffer form below.</remarks>
+    public void Read(ref SpanPacketReader data)
+    {
+        FactionGroup = data.ReadInt32();
+        Locale = data.ReadInt32();
+        RequesterVirtualRealmAddress = data.ReadUInt32();
+    }
+
     public void Read(WorldPacket data)
     {
         FactionGroup = data.ReadInt32();

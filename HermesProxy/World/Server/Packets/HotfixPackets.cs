@@ -25,24 +25,7 @@ using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets;
 
-class DBQueryBulk : ClientPacket
-{
-    public DBQueryBulk(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        TableHash = (DB2Hash)_worldPacket.ReadUInt32();
-
-        uint count = _worldPacket.ReadBits<uint>(13);
-        for (uint i = 0; i < count; ++i)
-        {
-            Queries.Add(_worldPacket.ReadUInt32());
-        }
-    }
-
-    public DB2Hash TableHash;
-    public List<uint> Queries = new();
-}
+public readonly record struct DBQueryBulk(DB2Hash TableHash, List<uint> Queries);
 
 public class DBReply : ServerPacket
 {
@@ -97,24 +80,7 @@ class AvailableHotfixes : ServerPacket
     public HashSet<DB2Hash>? TableFilter;
 }
 
-class HotfixRequest : ClientPacket
-{
-    public HotfixRequest(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        ClientBuild = _worldPacket.ReadUInt32();
-        DataBuild = _worldPacket.ReadUInt32();
-
-        uint hotfixCount = _worldPacket.ReadUInt32();
-        for (var i = 0; i < hotfixCount; ++i)
-            Hotfixes.Add(_worldPacket.ReadUInt32());
-    }
-
-    public uint ClientBuild;
-    public uint DataBuild;
-    public List<uint> Hotfixes = new();
-}
+public readonly record struct HotfixRequest(uint ClientBuild, uint DataBuild, List<uint> Hotfixes);
 
 class HotfixConnect : ServerPacket
 {

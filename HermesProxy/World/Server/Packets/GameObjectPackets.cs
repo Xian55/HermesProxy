@@ -26,29 +26,9 @@ using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets;
 
-public class GameObjUse : ClientPacket
-{
-    public GameObjUse(WorldPacket packet) : base(packet) { }
+public readonly record struct GameObjUse(WowGuid128 Guid);
 
-    public override void Read()
-    {
-        Guid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Guid;
-}
-
-public class GameObjReportUse : ClientPacket
-{
-    public GameObjReportUse(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Guid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 Guid;
-}
+public readonly record struct GameObjReportUse(WowGuid128 Guid);
 
 class GameObjectDespawn : ServerPacket, ISpanWritable
 {

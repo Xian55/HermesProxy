@@ -302,14 +302,4 @@ class PendingRaidLock : ServerPacket
     public bool WarningOnly;
 }
 
-class InstanceLockResponse : ClientPacket
-{
-    public InstanceLockResponse(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        AcceptLock = _worldPacket.HasBit();
-    }
-
-    public bool AcceptLock;
-}
+public readonly record struct InstanceLockResponse(bool AcceptLock);

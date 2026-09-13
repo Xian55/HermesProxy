@@ -913,22 +913,9 @@ public readonly record struct RequestVehicleSeatChange;
 
 public readonly record struct FarSight(bool Enable);
 
-class MountSpecial : ClientPacket
-{
-    public MountSpecial(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        SpellVisualKitIDs = new int[_worldPacket.ReadUInt32()];
-        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 2, 2, 5, 3))
-            SequenceVariation = _worldPacket.ReadInt32();
-        for (var i = 0; i < SpellVisualKitIDs.Length; ++i)
-            SpellVisualKitIDs[i] = _worldPacket.ReadInt32();
-    }
-
-    public int[] SpellVisualKitIDs = Array.Empty<int>();
-    public int SequenceVariation;
-}
+/// <remarks>The handler forwards none of this — 3.3.5a's CMSG_MOUNT_SPECIAL_ANIM has no body at
+/// all — but the fields are still read so the codec consumes the whole packet.</remarks>
+public readonly record struct MountSpecial(int[] SpellVisualKitIDs, int SequenceVariation);
 
 class SpecialMountAnim : ServerPacket, ISpanWritable
 {

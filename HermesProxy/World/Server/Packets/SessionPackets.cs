@@ -104,35 +104,9 @@ class ChangeRealmTicketResponse : ServerPacket
     public ByteBuffer Ticket = new ByteBuffer();
 }
 
-class BattlenetRequest : ClientPacket
-{
-    public BattlenetRequest(WorldPacket packet) : base(packet) { }
+public readonly record struct BattlenetRequest(MethodCall Method, byte[] Data);
 
-    public override void Read()
-    {
-        Method.Read(_worldPacket);
-
-        uint protoSize = _worldPacket.ReadUInt32();
-        Data = _worldPacket.ReadBytes(protoSize);
-    }
-
-    public MethodCall Method;
-    public byte[] Data = Array.Empty<byte>();
-}
-
-class ChangeRealmTicket : ClientPacket
-{
-    public ChangeRealmTicket(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Token = _worldPacket.ReadUInt32();
-        Secret = _worldPacket.ReadBytes(32);
-    }
-
-    public uint Token;
-    public byte[] Secret = new byte[32];
-}
+public readonly record struct ChangeRealmTicket(uint Token, byte[] Secret);
 
 public struct MethodCall
 {
@@ -147,6 +121,15 @@ public struct MethodCall
     public void SetMethodId(uint methodId)
     {
         Type = (Type & 0xFFFFFFFF_00000000) | methodId;
+    }
+
+    /// <remarks>Span twin of <see cref="Read(ByteBuffer)"/>; the outbound side still needs the
+    /// ByteBuffer form, so both stay and must be kept in step.</remarks>
+    public void Read(ref SpanPacketReader data)
+    {
+        Type = data.ReadUInt64();
+        ObjectId = data.ReadUInt64();
+        Token = data.ReadUInt32();
     }
 
     public void Read(ByteBuffer data)

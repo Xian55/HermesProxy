@@ -2,19 +2,28 @@
 using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 
 using static HermesProxy.World.GameData;
 
-namespace HermesProxy.World.Server;
+namespace HermesProxy.World.Server.Systems;
 
-public partial class WorldSocket
+/// <summary>
+/// DB2 hotfix queries: the client asking for record data the proxy serves from its own tables.
+/// </summary>
+/// <remarks>
+/// Neither of these translates a legacy packet. The bulk query answers per record from GameData,
+/// and falls back to asking the legacy server for item data it has not cached yet - which is why
+/// it can forward CMSG_ITEM_QUERY_SINGLE mid-loop and skip that record's reply until the answer
+/// arrives.
+/// </remarks>
+public static class HotfixSystem
 {
-    // Handlers for CMSG opcodes coming from the modern client
-    [PacketHandler(Opcode.CMSG_DB_QUERY_BULK)]
-    void HandleDbQueryBulk(DBQueryBulk query)
+    [HandlesCmsg(Opcode.CMSG_DB_QUERY_BULK)]
+    public static void HandleDbQueryBulk(in DBQueryBulk query, in SessionContext ctx)
     {
         foreach (uint id in query.Queries)
         {
@@ -38,7 +47,7 @@ public partial class WorldSocket
             if (query.TableHash == DB2Hash.TactKey)
             {
                 reply.Status = HotfixStatus.NotPublic;
-                SendPacket(reply);
+                ctx.SendPacket(reply);
                 continue;
             }
 
@@ -81,16 +90,16 @@ public partial class WorldSocket
                     reply.Status = HotfixStatus.Valid;
                     GameData.WriteItemHotfix(item, reply.Data);
                 }
-                else if (!GetSession().GameState.RequestedItemHotfixes.Contains(id) &&
-                          GetSession().WorldClient != null && GetSession().WorldClient!.IsConnected())
+                else if (!ctx.GetSession().GameState.RequestedItemHotfixes.Contains(id) &&
+                          ctx.GetSession().WorldClient != null && ctx.GetSession().WorldClient!.IsConnected())
                 {
                     //Log.PrintNet(LogType.Storage, LogNetDir.P2S, $"Item #{id} not cached, requesting server data...");
-                    GetSession().GameState.RequestedItemHotfixes.Add(id);
+                    ctx.GetSession().GameState.RequestedItemHotfixes.Add(id);
                     WorldPacket packet2 = new WorldPacket(Opcode.CMSG_ITEM_QUERY_SINGLE);
                     packet2.WriteUInt32(id);
                     if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
                         packet2.WriteGuid(WowGuid64.Empty);
-                    SendPacketToServer(packet2);
+                    ctx.SendPacketToServer(packet2);
                     continue;
                 }
             }
@@ -103,26 +112,26 @@ public partial class WorldSocket
                     reply.Status = HotfixStatus.Valid;
                     GameData.WriteItemSparseHotfix(item, reply.Data);
                 }
-                else if (!GetSession().GameState.RequestedItemSparseHotfixes.Contains(id) &&
-                          GetSession().WorldClient != null && GetSession().WorldClient!.IsConnected())
+                else if (!ctx.GetSession().GameState.RequestedItemSparseHotfixes.Contains(id) &&
+                          ctx.GetSession().WorldClient != null && ctx.GetSession().WorldClient!.IsConnected())
                 {
-                    GetSession().GameState.RequestedItemSparseHotfixes.Add(id);
+                    ctx.GetSession().GameState.RequestedItemSparseHotfixes.Add(id);
                     //Log.PrintNet(LogType.Storage, LogNetDir.P2S, $"ItemSparse #{id} not cached, requesting server data...");
                     WorldPacket packet2 = new WorldPacket(Opcode.CMSG_ITEM_QUERY_SINGLE);
                     packet2.WriteUInt32(id);
                     if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
                         packet2.WriteGuid(WowGuid64.Empty);
-                    SendPacketToServer(packet2);
+                    ctx.SendPacketToServer(packet2);
                     continue;
                 }
             }
 
-            SendPacket(reply);
+            ctx.SendPacket(reply);
         }
     }
 
-    [PacketHandler(Opcode.CMSG_HOTFIX_REQUEST)]
-    void HandleHotfixRequest(HotfixRequest request)
+    [HandlesCmsg(Opcode.CMSG_HOTFIX_REQUEST)]
+    public static void HandleHotfixRequest(in HotfixRequest request, in SessionContext ctx)
     {
         Log.Print(LogType.Network,
             $"[Hotfix] CMSG_HOTFIX_REQUEST: client requested {request.Hotfixes.Count} hotfix IDs " +
@@ -142,6 +151,6 @@ public partial class WorldSocket
         }
         Log.Print(LogType.Network,
             $"[Hotfix] Sending SMSG_HOTFIX_CONNECT: matched={matched}/{request.Hotfixes.Count}");
-        SendPacket(connect);
+        ctx.SendPacket(connect);
     }
 }

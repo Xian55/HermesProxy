@@ -1,4 +1,4 @@
-using Framework.Constants;
+﻿using Framework.Constants;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
@@ -34,32 +34,13 @@ public sealed class ActiveGlyphs : ServerPacket
 
 // Modern V3_4_3 CMSG_REMOVE_GLYPH (opcode 13056 / 0x32E0). Payload: uint8 GlyphSlot (0-5).
 // CypherCore Source/Game/Networking/Packets/TalentPackets.cs:166-176 confirms the wire shape.
-public sealed class RemoveGlyph : ClientPacket
-{
-    public byte GlyphSlot;
-    public RemoveGlyph(WorldPacket packet) : base(packet) { }
-    public override void Read() => GlyphSlot = _worldPacket.ReadUInt8();
-}
+public readonly record struct RemoveGlyph(byte GlyphSlot);
 
 // Modern V3_4_3 CMSG_PET_LEARN_TALENT (opcode 0x3554 / 13652).
 // Payload best-guess (no WPP parser, no TC handler): PackedGuid128 PetGUID + uint32 TalentID
 // + uint16 Rank — matches the modern CMSG_LEARN_TALENT player payload (uint32+uint16) with
 // a leading PetGUID. Verify against the first packet capture; adjust if the read overruns.
-public sealed class LearnPetTalent : ClientPacket
-{
-    public WowGuid128 PetGUID = WowGuid128.Empty;
-    public uint TalentID;
-    public ushort Rank;
-
-    public LearnPetTalent(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PetGUID = _worldPacket.ReadPackedGuid128();
-        TalentID = _worldPacket.ReadUInt32();
-        Rank = _worldPacket.ReadUInt16();
-    }
-}
+public readonly record struct LearnPetTalent(WowGuid128 PetGUID, uint TalentID, ushort Rank);
 
 // Modern V3_4_3.54261 SMSG_UPDATE_TALENT_DATA. Layout matches WPP's V3_4_0 parser
 // (canonical reader): X:/Programming/RioMcBoo/WowPacketParser/WowPacketParserModule.V3_4_0_45166/Parsers/SpellHandler.cs:436-475

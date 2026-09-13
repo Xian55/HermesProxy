@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Framework.Constants;
 using Framework.Logging;
 using HermesProxy.Enums;
@@ -22,6 +22,14 @@ public static class InstanceSystem
     public static void HandleRequestRaidInfo(in EmptyClientPacket reset, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_REQUEST_RAID_INFO);
+        ctx.SendPacketToServer(packet);
+    }
+
+    [HandlesCmsg(Opcode.CMSG_INSTANCE_LOCK_RESPONSE)]
+    public static void HandleInstanceLockResponse(in InstanceLockResponse response, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_INSTANCE_LOCK_RESPONSE);
+        packet.WriteBool(response.AcceptLock);
         ctx.SendPacketToServer(packet);
     }
 }

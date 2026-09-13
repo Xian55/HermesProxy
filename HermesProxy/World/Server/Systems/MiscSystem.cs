@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Framework.Constants;
 using Framework.Logging;
 using HermesProxy.Enums;
@@ -321,5 +321,12 @@ public static class MiscSystem
         response.PvpCPExpCoefficient = 1639.28f;
         response.PvpCPNumerator = 0.00412f;
         ctx.SendPacket(response);
+    }
+
+    [HandlesCmsg(Opcode.CMSG_MOUNT_SPECIAL_ANIM)]
+    public static void HandleMountSpecialAnim(in MountSpecial mount, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_MOUNT_SPECIAL_ANIM);
+        ctx.SendPacketToServer(packet);
     }
 }
