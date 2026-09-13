@@ -3601,4 +3601,97 @@ internal static class FrozenPackets
     {
         public void Read(WorldPacket p) { }
     }
+
+/// Frozen verbatim from <c>ArenaPackets.cs</c>.
+    internal sealed class ArenaTeamRosterRequest
+    {
+        public void Read(WorldPacket p)
+        {
+            TeamIndex = p.ReadUInt32();
+        }
+
+        public uint TeamIndex;
+    }
+
+    /// Frozen verbatim from <c>ArenaPackets.cs</c>.
+    internal sealed class ArenaTeamQuery
+    {
+        public void Read(WorldPacket p)
+        {
+            TeamId = p.ReadUInt32();
+        }
+
+        public uint TeamId;
+    }
+
+    /// Frozen verbatim from <c>ArenaPackets.cs</c>.
+    internal sealed class BattlemasterJoinArena
+    {
+        public void Read(WorldPacket p)
+        {
+            Guid = p.ReadPackedGuid128();
+            TeamIndex = p.ReadUInt8();
+            Roles = p.ReadUInt8();
+        }
+
+        public WowGuid128 Guid;
+        public byte TeamIndex;
+        public byte Roles;
+    }
+
+    /// Frozen verbatim from <c>ArenaPackets.cs</c>.
+    internal sealed class BattlemasterJoinSkirmish
+    {
+        public void Read(WorldPacket p)
+        {
+            Guid = p.ReadPackedGuid128();
+            Roles = p.ReadUInt8();
+            TeamSize = p.ReadUInt8();
+            AsGroup = p.HasBit();
+            Requeue = p.HasBit();
+        }
+
+        public WowGuid128 Guid;
+        public byte Roles;
+        public byte TeamSize;
+        public bool AsGroup;
+        public bool Requeue;
+    }
+
+    /// Frozen verbatim from <c>ArenaPackets.cs</c>.
+    internal sealed class ArenaTeamRemove
+    {
+        public void Read(WorldPacket p)
+        {
+            TeamId = p.ReadUInt32();
+            PlayerGuid = p.ReadPackedGuid128();
+        }
+
+        public uint TeamId;
+        public WowGuid128 PlayerGuid;
+    }
+
+    /// Frozen verbatim from <c>ArenaPackets.cs</c>.
+    internal sealed class ArenaTeamLeave
+    {
+        public void Read(WorldPacket p)
+        {
+            TeamId = p.ReadUInt32();
+        }
+
+        public uint TeamId;
+    }
+
+    /// Frozen verbatim from <c>ArenaPackets.cs</c>.
+    internal sealed class ArenaTeamAccept
+    {
+        public void Read(WorldPacket p)
+        {
+            PlayerGuid = p.ReadPackedGuid128();
+            TeamGuid = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 PlayerGuid;
+        public WowGuid128 TeamGuid;
+    }
 }

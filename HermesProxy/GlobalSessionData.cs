@@ -98,6 +98,23 @@ public sealed class RuneStateData
     public byte UsableRuneMask => (byte)(~RechargingRuneMask & 0x3F);
 }
 
+/// <summary>
+/// One arena bracket's personal rated standing, as the 3.4.3 client asks for it.
+/// </summary>
+/// <remarks>
+/// Only the five values 3.3.5a actually carries: the legacy arena-team player fields give personal
+/// rating plus the weekly and season counters. The rest of the native bracket record — rounds,
+/// tier, best-rating history — has no 3.3.5a equivalent and stays zero.
+/// </remarks>
+public class RatedBracketInfo
+{
+    public uint PersonalRating;
+    public uint WeeklyPlayed;
+    public uint WeeklyWon;
+    public uint SeasonPlayed;
+    public uint SeasonWon;
+}
+
 public sealed class GameSessionData
 {
     // Back-reference to the owning session. Set by CreateNewGameSessionData. Used by writers
@@ -316,6 +333,11 @@ public sealed class GameSessionData
     public bool WaitingForAttackStart;           // true between CMSG_ATTACK_SWING and SMSG_ATTACK_START
     public bool DeferredAttackStop;              // CMSG_ATTACK_STOP received while waiting for SMSG_ATTACK_START
     public uint[] CurrentArenaTeamIds = new uint[3];
+    // Personal rated standing per arena bracket, mirrored from the legacy arena-team player
+    // fields. The 3.4.3 client asks for this with CMSG_REQUEST_RATED_PVP_INFO every time the PvP
+    // panel opens and renders its bracket tiles from the reply, so it has to be answerable at any
+    // moment rather than only while an update is being parsed.
+    public RatedBracketInfo[] CurrentArenaBrackets = [new(), new(), new()];
     public ConcurrentQueue<ClientCastRequest> PendingNormalCasts = new();  // regular spell casts (queue for proper FIFO handling)
     public ClientCastRequest? CurrentClientNextMeleeCast; // next melee spells (Raptor Strike, Heroic Strike, etc.)
     public ClientCastRequest? CurrentClientAutoRepeatCast; // auto repeat spells (Auto Shot, Shoot, etc.)

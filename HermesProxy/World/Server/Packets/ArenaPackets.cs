@@ -16,6 +16,7 @@
  */
 
 
+using HermesProxy.Enums;
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
@@ -27,34 +28,45 @@ using System.Text;
 
 namespace HermesProxy.World.Server.Packets;
 
-public class ArenaTeamRosterRequest : ClientPacket
+/// <summary>
+/// Gate for SMSG_PVP_SEASON, whose V3_4_3 layout was corrected against the native captures under
+/// <c>refs/native-captures/</c> (25 bytes, six int32).
+/// </summary>
+/// <remarks>
+/// <c>ModernVersion.Build</c> is <see langword="static readonly"/> and the test process runs as one
+/// fixed build, so <c>SpanWriteParityTests</c> cannot otherwise reach the V3_4_3 arms — which is
+/// precisely where a Write/WriteToSpan pair drifts unnoticed (#156, #162). Production never sets it.
+/// </remarks>
+internal static class PvpWire
 {
-    public ArenaTeamRosterRequest(WorldPacket packet) : base(packet) { }
+    internal static bool? ForceV343ForTests;
 
-    public override void Read()
-    {
-        TeamIndex = _worldPacket.ReadUInt32();
-    }
-
-    public uint TeamIndex;
+    public static bool IsV343 =>
+        ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
 }
 
-public class ArenaTeamQuery : ClientPacket
-{
-    public ArenaTeamQuery(WorldPacket packet) : base(packet) { }
+public readonly record struct ArenaTeamRosterRequest(uint TeamIndex);
 
-    public override void Read()
-    {
-        TeamId = _worldPacket.ReadUInt32();
-    }
+public readonly record struct ArenaTeamQuery(uint TeamId);
 
-    public uint TeamId;
-}
+/// <summary>CMSG_REQUEST_RATED_PVP_INFO carries no fields; the native Read() body is empty too.</summary>
+public readonly record struct RequestRatedPvpInfo;
 
 class ArenaTeamRosterResponse : ServerPacket, ISpanWritable
 {
     public ArenaTeamRosterResponse() : base(Opcode.SMSG_ARENA_TEAM_ROSTER) { }
 
+    /// <remarks>
+    /// The leading field is the team id, and the member records do belong on the wire, despite
+    /// both looking wrong against the native 3.4.3 source. Wrathion names that field TeamSlot and
+    /// writes a fixed 37-byte header with no members
+    /// (<c>WorldPackets::Arena::ArenaTeamRosterResponse::Write</c>), and the native captures under
+    /// <c>refs/native-captures/</c> agree — but Wrathion's handler is a stub that answers every
+    /// bracket with an empty team and leaves that field at 0, so it never exercises either
+    /// question. Sending the bracket index there was tried on a live 3.4.3 client against a real
+    /// team and the bracket went from "team exists" to empty: the team sat in bracket 0, so the
+    /// index written was the literal 0 the client reads as "no team".
+    /// </remarks>
     public override void Write()
     {
         _worldPacket.WriteUInt32(TeamId);
@@ -95,6 +107,7 @@ class ArenaTeamRosterResponse : ServerPacket, ISpanWritable
         }
 
         var writer = new SpanPacketWriter(buffer);
+
         writer.WriteUInt32(TeamId);
         writer.WriteUInt32(TeamSize);
         writer.WriteUInt32(TeamPlayed);
@@ -190,6 +203,90 @@ struct ArenaTeamMember
     public float? dword68;
 }
 
+/// <summary>
+/// SMSG_RATED_PVP_INFO — the reply to CMSG_REQUEST_RATED_PVP_INFO.
+/// </summary>
+/// <remarks>
+/// This is how the 3.4.3 PvP panel fills its bracket tiles. WotLK Classic replaced arena teams
+/// with a personal rating per bracket, so the client asks with <c>RequestRatedInfo</c> whenever
+/// the panel opens and reads the answer back through <c>GetPersonalRatedInfo(bracketIndex)</c>.
+/// Leaving the request unanswered is what left the tiles blank while the arena-team packets were
+/// all arriving correctly — those feed the team roster view, not the tiles.
+/// <para>
+/// Seven fixed bracket records, each nineteen int32 then the Disqualified bit and a flush —
+/// exactly <c>WorldPackets::Battleground::RatedPvpInfo::Write</c> and its BracketInfo operator on
+/// the native 3.4.3 server. There are no counts and no bits outside each record, so the packet is
+/// a fixed 7 × 77 bytes.
+/// </para>
+/// <para>
+/// Only five of the nineteen have a 3.3.5a source; the rest are left zero, which is also what the
+/// native server sends for them since it only fills the same five.
+/// </para>
+/// </remarks>
+class RatedPvpInfo : ServerPacket, ISpanWritable
+{
+    public RatedPvpInfo() : base(Opcode.SMSG_RATED_PVP_INFO) { }
+
+    public const int BracketCount = 7;
+
+    public override void Write()
+    {
+        for (int i = 0; i < BracketCount; i++)
+            WriteBracket(_worldPacket, i < Brackets.Length ? Brackets[i] : null);
+    }
+
+    private static void WriteBracket(WorldPacket data, RatedBracketInfo? b)
+    {
+        data.WriteInt32((int)(b?.PersonalRating ?? 0));
+        data.WriteInt32(0);                                   // Ranking
+        data.WriteInt32((int)(b?.SeasonPlayed ?? 0));
+        data.WriteInt32((int)(b?.SeasonWon ?? 0));
+        data.WriteInt32(0);                                   // Unused1
+        data.WriteInt32(0);                                   // Unused2
+        data.WriteInt32((int)(b?.WeeklyPlayed ?? 0));
+        data.WriteInt32((int)(b?.WeeklyWon ?? 0));
+        data.WriteInt32(0);                                   // RoundsSeasonPlayed
+        data.WriteInt32(0);                                   // RoundsSeasonWon
+        data.WriteInt32(0);                                   // RoundsWeeklyPlayed
+        data.WriteInt32(0);                                   // RoundsWeeklyWon
+        data.WriteInt32(0);                                   // BestWeeklyRating
+        data.WriteInt32(0);                                   // LastWeeksBestRating
+        data.WriteInt32(0);                                   // BestSeasonRating
+        data.WriteInt32(0);                                   // PvpTierID
+        data.WriteInt32(0);                                   // Unused3
+        data.WriteInt32(0);                                   // Unused4
+        data.WriteInt32(0);                                   // Rank
+        data.WriteBit(false);                                 // Disqualified
+        data.FlushBits();
+    }
+
+    public int MaxSize => BracketCount * (19 * 4 + 1);
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        for (int i = 0; i < BracketCount; i++)
+        {
+            RatedBracketInfo? b = i < Brackets.Length ? Brackets[i] : null;
+            writer.WriteInt32((int)(b?.PersonalRating ?? 0));
+            writer.WriteInt32(0);
+            writer.WriteInt32((int)(b?.SeasonPlayed ?? 0));
+            writer.WriteInt32((int)(b?.SeasonWon ?? 0));
+            writer.WriteInt32(0);
+            writer.WriteInt32(0);
+            writer.WriteInt32((int)(b?.WeeklyPlayed ?? 0));
+            writer.WriteInt32((int)(b?.WeeklyWon ?? 0));
+            for (int n = 0; n < 11; n++)
+                writer.WriteInt32(0);
+            writer.WriteBit(false);
+            writer.FlushBits();
+        }
+        return writer.Position;
+    }
+
+    public RatedBracketInfo[] Brackets = [];
+}
+
 class ArenaTeamQueryResponse : ServerPacket, ISpanWritable
 {
     public ArenaTeamQueryResponse() : base(Opcode.SMSG_QUERY_ARENA_TEAM_RESPONSE) { }
@@ -263,67 +360,14 @@ public class ArenaTeamEmblem
     public string TeamName = string.Empty;
 }
 
-class BattlemasterJoinArena : ClientPacket
-{
-    public BattlemasterJoinArena(WorldPacket packet) : base(packet) { }
+public readonly record struct BattlemasterJoinArena(WowGuid128 Guid, byte TeamIndex, byte Roles);
 
-    public override void Read()
-    {
-        Guid = _worldPacket.ReadPackedGuid128();
-        TeamIndex = _worldPacket.ReadUInt8();
-        Roles = _worldPacket.ReadUInt8();
-    }
+public readonly record struct BattlemasterJoinSkirmish(
+    WowGuid128 Guid, byte Roles, byte TeamSize, bool AsGroup, bool Requeue);
 
-    public WowGuid128 Guid;
-    public byte TeamIndex;
-    public byte Roles;
-}
+public readonly record struct ArenaTeamRemove(uint TeamId, WowGuid128 PlayerGuid);
 
-class BattlemasterJoinSkirmish : ClientPacket
-{
-    public BattlemasterJoinSkirmish(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Guid = _worldPacket.ReadPackedGuid128();
-        Roles = _worldPacket.ReadUInt8();
-        TeamSize = _worldPacket.ReadUInt8();
-        AsGroup = _worldPacket.HasBit();
-        Requeue = _worldPacket.HasBit();
-    }
-
-    public WowGuid128 Guid;
-    public byte Roles;
-    public byte TeamSize;
-    public bool AsGroup;
-    public bool Requeue;
-}
-
-public class ArenaTeamRemove : ClientPacket
-{
-    public ArenaTeamRemove(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        TeamId = _worldPacket.ReadUInt32();
-        PlayerGuid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public uint TeamId;
-    public WowGuid128 PlayerGuid;
-}
-
-public class ArenaTeamLeave : ClientPacket
-{
-    public ArenaTeamLeave(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        TeamId = _worldPacket.ReadUInt32();
-    }
-
-    public uint TeamId;
-}
+public readonly record struct ArenaTeamLeave(uint TeamId);
 
 class ArenaTeamEvent : ServerPacket, ISpanWritable
 {
@@ -449,16 +493,4 @@ class ArenaTeamInvite : ServerPacket, ISpanWritable
     public string TeamName = string.Empty;
 }
 
-public class ArenaTeamAccept : ClientPacket
-{
-    public ArenaTeamAccept(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PlayerGuid = _worldPacket.ReadPackedGuid128();
-        TeamGuid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 PlayerGuid;
-    public WowGuid128 TeamGuid;
-}
+public readonly record struct ArenaTeamAccept(WowGuid128 PlayerGuid, WowGuid128 TeamGuid);
