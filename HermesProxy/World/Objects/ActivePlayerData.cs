@@ -21,8 +21,21 @@ public class RestInfo
     public uint? StateID;
     public uint? Threshold;
 }
+/// <summary>
+/// One PvP bracket's standing. Mirrors the native V3_4_3 <c>UF::PVPInfo</c> field for field and
+/// in the same order, which is also the order both descriptor writers emit.
+/// </summary>
+/// <remarks>
+/// <see cref="Bracket"/> is the field the client keys on: its <c>GetPvpInfoForBracket</c> scans
+/// the array for the element whose Bracket matches, rather than indexing it, so an element with
+/// no Bracket set is unreachable no matter which slot it occupies. It is nullable because 0 is
+/// the 2v2 bracket — a plain <c>!= 0</c> mask test would drop precisely the bracket most players
+/// have a team in.
+/// </remarks>
 public class PVPInfo
 {
+    public sbyte? Bracket;
+    public int PvpRatingID;
     public uint WeeklyPlayed;
     public uint WeeklyWon;
     public uint SeasonPlayed;
@@ -34,6 +47,10 @@ public class PVPInfo
     public uint WeeklyBestWinPvpTierID;
     public uint Field_28;
     public uint Field_2C;
+    public uint WeeklyRoundsPlayed;
+    public uint WeeklyRoundsWon;
+    public uint SeasonRoundsPlayed;
+    public uint SeasonRoundsWon;
     public bool Disqualified;
 }
 public class ActivePlayerData

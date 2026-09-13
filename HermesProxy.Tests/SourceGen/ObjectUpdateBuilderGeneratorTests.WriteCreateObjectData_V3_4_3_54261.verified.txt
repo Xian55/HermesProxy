@@ -572,13 +572,13 @@ public partial class ObjectUpdateBuilder
         if (src.CombatRatings != null && src.CombatRatings[29].HasValue) { blocks.SetBit(574); blocks.SetBit(604); }
         if (src.CombatRatings != null && src.CombatRatings[30].HasValue) { blocks.SetBit(574); blocks.SetBit(605); }
         if (src.CombatRatings != null && src.CombatRatings[31].HasValue) { blocks.SetBit(574); blocks.SetBit(606); }
-        if (src.PvpInfo != null && src.PvpInfo != null && 0 < src.PvpInfo.Length && src.PvpInfo[0] != null && (src.PvpInfo[0].Rating != 0 || src.PvpInfo[0].SeasonPlayed != 0 || src.PvpInfo[0].Disqualified)) { blocks.SetBit(607); blocks.SetBit(608); }
-        if (src.PvpInfo != null && src.PvpInfo != null && 1 < src.PvpInfo.Length && src.PvpInfo[1] != null && (src.PvpInfo[1].Rating != 0 || src.PvpInfo[1].SeasonPlayed != 0 || src.PvpInfo[1].Disqualified)) { blocks.SetBit(607); blocks.SetBit(609); }
-        if (src.PvpInfo != null && src.PvpInfo != null && 2 < src.PvpInfo.Length && src.PvpInfo[2] != null && (src.PvpInfo[2].Rating != 0 || src.PvpInfo[2].SeasonPlayed != 0 || src.PvpInfo[2].Disqualified)) { blocks.SetBit(607); blocks.SetBit(610); }
-        if (src.PvpInfo != null && src.PvpInfo != null && 3 < src.PvpInfo.Length && src.PvpInfo[3] != null && (src.PvpInfo[3].Rating != 0 || src.PvpInfo[3].SeasonPlayed != 0 || src.PvpInfo[3].Disqualified)) { blocks.SetBit(607); blocks.SetBit(611); }
-        if (src.PvpInfo != null && src.PvpInfo != null && 4 < src.PvpInfo.Length && src.PvpInfo[4] != null && (src.PvpInfo[4].Rating != 0 || src.PvpInfo[4].SeasonPlayed != 0 || src.PvpInfo[4].Disqualified)) { blocks.SetBit(607); blocks.SetBit(612); }
-        if (src.PvpInfo != null && src.PvpInfo != null && 5 < src.PvpInfo.Length && src.PvpInfo[5] != null && (src.PvpInfo[5].Rating != 0 || src.PvpInfo[5].SeasonPlayed != 0 || src.PvpInfo[5].Disqualified)) { blocks.SetBit(607); blocks.SetBit(613); }
-        if (src.PvpInfo != null && src.PvpInfo != null && 6 < src.PvpInfo.Length && src.PvpInfo[6] != null && (src.PvpInfo[6].Rating != 0 || src.PvpInfo[6].SeasonPlayed != 0 || src.PvpInfo[6].Disqualified)) { blocks.SetBit(607); blocks.SetBit(614); }
+        if (src.PvpInfo != null && src.PvpInfo != null && 0 < src.PvpInfo.Length && src.PvpInfo[0] != null) { blocks.SetBit(607); blocks.SetBit(608); }
+        if (src.PvpInfo != null && src.PvpInfo != null && 1 < src.PvpInfo.Length && src.PvpInfo[1] != null) { blocks.SetBit(607); blocks.SetBit(609); }
+        if (src.PvpInfo != null && src.PvpInfo != null && 2 < src.PvpInfo.Length && src.PvpInfo[2] != null) { blocks.SetBit(607); blocks.SetBit(610); }
+        if (src.PvpInfo != null && src.PvpInfo != null && 3 < src.PvpInfo.Length && src.PvpInfo[3] != null) { blocks.SetBit(607); blocks.SetBit(611); }
+        if (src.PvpInfo != null && src.PvpInfo != null && 4 < src.PvpInfo.Length && src.PvpInfo[4] != null) { blocks.SetBit(607); blocks.SetBit(612); }
+        if (src.PvpInfo != null && src.PvpInfo != null && 5 < src.PvpInfo.Length && src.PvpInfo[5] != null) { blocks.SetBit(607); blocks.SetBit(613); }
+        if (src.PvpInfo != null && src.PvpInfo != null && 6 < src.PvpInfo.Length && src.PvpInfo[6] != null) { blocks.SetBit(607); blocks.SetBit(614); }
         if (src.NoReagentCostMask != null && src.NoReagentCostMask[0].HasValue) { blocks.SetBit(615); blocks.SetBit(616); }
         if (src.NoReagentCostMask != null && src.NoReagentCostMask[1].HasValue) { blocks.SetBit(615); blocks.SetBit(617); }
         if (src.NoReagentCostMask != null && src.NoReagentCostMask[2].HasValue) { blocks.SetBit(615); blocks.SetBit(618); }
@@ -2919,13 +2919,13 @@ public partial class ObjectUpdateBuilder
         if (src.BuybackPrice != null) for (int i = 0; i < 12; i++) if (src.BuybackPrice[i].HasValue) return true;
         if (src.BuybackTimestamp != null) for (int i = 0; i < 12; i++) if (src.BuybackTimestamp[i].HasValue) return true;
         if (src.CombatRatings != null) for (int i = 0; i < 32; i++) if (src.CombatRatings[i].HasValue) return true;
-        if (src.PvpInfo != null && 0 < src.PvpInfo.Length && src.PvpInfo[0] != null && (src.PvpInfo[0].Rating != 0 || src.PvpInfo[0].SeasonPlayed != 0 || src.PvpInfo[0].Disqualified)) return true;
-        if (src.PvpInfo != null && 1 < src.PvpInfo.Length && src.PvpInfo[1] != null && (src.PvpInfo[1].Rating != 0 || src.PvpInfo[1].SeasonPlayed != 0 || src.PvpInfo[1].Disqualified)) return true;
-        if (src.PvpInfo != null && 2 < src.PvpInfo.Length && src.PvpInfo[2] != null && (src.PvpInfo[2].Rating != 0 || src.PvpInfo[2].SeasonPlayed != 0 || src.PvpInfo[2].Disqualified)) return true;
-        if (src.PvpInfo != null && 3 < src.PvpInfo.Length && src.PvpInfo[3] != null && (src.PvpInfo[3].Rating != 0 || src.PvpInfo[3].SeasonPlayed != 0 || src.PvpInfo[3].Disqualified)) return true;
-        if (src.PvpInfo != null && 4 < src.PvpInfo.Length && src.PvpInfo[4] != null && (src.PvpInfo[4].Rating != 0 || src.PvpInfo[4].SeasonPlayed != 0 || src.PvpInfo[4].Disqualified)) return true;
-        if (src.PvpInfo != null && 5 < src.PvpInfo.Length && src.PvpInfo[5] != null && (src.PvpInfo[5].Rating != 0 || src.PvpInfo[5].SeasonPlayed != 0 || src.PvpInfo[5].Disqualified)) return true;
-        if (src.PvpInfo != null && 6 < src.PvpInfo.Length && src.PvpInfo[6] != null && (src.PvpInfo[6].Rating != 0 || src.PvpInfo[6].SeasonPlayed != 0 || src.PvpInfo[6].Disqualified)) return true;
+        if (src.PvpInfo != null && 0 < src.PvpInfo.Length && src.PvpInfo[0] != null) return true;
+        if (src.PvpInfo != null && 1 < src.PvpInfo.Length && src.PvpInfo[1] != null) return true;
+        if (src.PvpInfo != null && 2 < src.PvpInfo.Length && src.PvpInfo[2] != null) return true;
+        if (src.PvpInfo != null && 3 < src.PvpInfo.Length && src.PvpInfo[3] != null) return true;
+        if (src.PvpInfo != null && 4 < src.PvpInfo.Length && src.PvpInfo[4] != null) return true;
+        if (src.PvpInfo != null && 5 < src.PvpInfo.Length && src.PvpInfo[5] != null) return true;
+        if (src.PvpInfo != null && 6 < src.PvpInfo.Length && src.PvpInfo[6] != null) return true;
         if (src.NoReagentCostMask != null) for (int i = 0; i < 4; i++) if (src.NoReagentCostMask[i].HasValue) return true;
         if (src.ProfessionSkillLine != null) for (int i = 0; i < 2; i++) if (src.ProfessionSkillLine[i].HasValue) return true;
         if (src.BagSlotFlags != null) for (int i = 0; i < 4; i++) if (src.BagSlotFlags[i].HasValue) return true;

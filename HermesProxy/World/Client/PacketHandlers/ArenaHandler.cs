@@ -28,6 +28,25 @@ public partial class WorldClient
         team.EmblemColor = packet.ReadUInt32();
         team.BorderStyle = packet.ReadUInt32();
         team.BorderColor = packet.ReadUInt32();
+
+        // Forward it as well as caching it. The modern client is never told the team exists
+        // otherwise: it does not send CMSG_ARENA_TEAM_QUERY on 3.4.3, which was the only thing
+        // that turned this cache into a packet, so the roster below arrived describing members of
+        // a team the client had no name, size or emblem for — and the arena panel rendered three
+        // empty brackets. Legacy order is QUERY_RESPONSE -> STATS -> ROSTER, so sending here puts
+        // the team identity ahead of its members.
+        ArenaTeamQueryResponse response = new ArenaTeamQueryResponse();
+        response.TeamId = teamId;
+        response.Emblem = new ArenaTeamEmblem();
+        response.Emblem.TeamId = teamId;
+        response.Emblem.TeamSize = team.TeamSize;
+        response.Emblem.BackgroundColor = team.BackgroundColor;
+        response.Emblem.EmblemStyle = team.EmblemStyle;
+        response.Emblem.EmblemColor = team.EmblemColor;
+        response.Emblem.BorderStyle = team.BorderStyle;
+        response.Emblem.BorderColor = team.BorderColor;
+        response.Emblem.TeamName = team.Name;
+        SendPacketToClient(response);
     }
 
     [PacketHandler(Opcode.SMSG_ARENA_TEAM_STATS)]
@@ -55,9 +74,12 @@ public partial class WorldClient
         ArenaTeamRosterResponse arena = new ArenaTeamRosterResponse();
         arena.TeamId = packet.ReadUInt32();
 
+        // The flag and the two per-member floats below arrived together in 3.0.8; reading the
+        // flag without keeping it left the floats unconsumed, so on a 3.3.5a roster every member
+        // after the first was read 8 bytes out of alignment.
         var hiddenRating = false;
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_8_9464))
-            packet.ReadBool();
+            hiddenRating = packet.ReadBool();
 
         var count = packet.ReadUInt32();
         arena.TeamSize = packet.ReadUInt32();

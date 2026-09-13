@@ -797,6 +797,11 @@ public enum ActivePlayerField
 
     // PvpInfo[7] at bits 608-614 under parent 607 — nested struct PerElement+CustomWriter.
     // Source is PVPInfo[6] on data but bits cover 7 slots; predicate guards with length check.
+    // The null check is the whole guard: an element only exists once UpdateHandler has been told
+    // something about that bracket. It used to also require a non-zero Rating or SeasonPlayed,
+    // which silently dropped a real but unplayed arena team — every stat on a freshly created
+    // team is zero, so the bracket was suppressed exactly when the client most needed telling
+    // it existed, and the arena panel's tile stayed blank.
     // WriteOrder=999999 forces emit AFTER GlyphsGroup (bit 1512) to match TC's
     // ActivePlayerData::WriteUpdate layout (hand-port file:2018-2072 — PvpInfo
     // serialized last despite low bit position).
@@ -804,7 +809,7 @@ public enum ActivePlayerField
         ArrayCount = 7, ArrayMode = ArrayMode.PerElement, ParentBit = 607,
         WriteOrder = 999999,
         CustomWriter = nameof(HermesProxy.World.Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.WriteUpdateActivePlayerPvpInfo),
-        CustomPredicate = "src.PvpInfo != null && {i} < src.PvpInfo.Length && src.PvpInfo[{i}] != null && (src.PvpInfo[{i}].Rating != 0 || src.PvpInfo[{i}].SeasonPlayed != 0 || src.PvpInfo[{i}].Disqualified)")]
+        CustomPredicate = "src.PvpInfo != null && {i} < src.PvpInfo.Length && src.PvpInfo[{i}] != null")]
     ACTIVEPLAYER_PVP_INFO,
 
     // NoReagentCostMask[4] at bits 616-619 under parent 615.

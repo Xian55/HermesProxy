@@ -4106,6 +4106,16 @@ public partial class WorldClient
 
                         if (teamId != 0)
                         {
+                            // A bracket the player has a team in exists from the moment the team
+                            // does, before a single rated game. Without an element here there is
+                            // nothing for the PvpInfo descriptor to send, so the client is never
+                            // told the bracket changed and the arena panel's tile never repaints —
+                            // a new team's stats are all zero, which is indistinguishable from
+                            // "no team" unless the element itself is present.
+                            if (updateData.EnsureActivePlayerData().PvpInfo[i] == null)
+                                updateData.EnsureActivePlayerData().PvpInfo[i] = new PVPInfo();
+                            updateData.EnsureActivePlayerData().PvpInfo[i].Bracket = (sbyte)i;
+
                             WorldPacket packet = new WorldPacket(Opcode.CMSG_ARENA_TEAM_QUERY);
                             packet.WriteUInt32(teamId);
                             SendPacketToServer(packet);
@@ -4122,42 +4132,41 @@ public partial class WorldClient
                         }
                     }
                     
-                    /*
-                    if (updateMaskArray[startOffset + teamMemberOffset])
-                    {
-                        if (updateData.EnsureActivePlayerData().PvpInfo[i] == null)
-                            updateData.EnsureActivePlayerData().PvpInfo[i] = new PVPInfo();
-
-                        updateData.EnsureActivePlayerData().PvpInfo[i].Captain = updates[startOffset + teamMemberOffset].Int32Value;
-                    }
-                    */
                     if (updateMaskArray[startOffset + teamGamesWeekOffset])
                     {
                         if (updateData.EnsureActivePlayerData().PvpInfo[i] == null)
                             updateData.EnsureActivePlayerData().PvpInfo[i] = new PVPInfo();
+                        updateData.EnsureActivePlayerData().PvpInfo[i].Bracket = (sbyte)i;
 
                         updateData.EnsureActivePlayerData().PvpInfo[i].WeeklyPlayed = updates[startOffset + teamGamesWeekOffset].UInt32Value;
+                        GetSession().GameState.CurrentArenaBrackets[i].WeeklyPlayed = updates[startOffset + teamGamesWeekOffset].UInt32Value;
                     }
                     if (updateMaskArray[startOffset + teamGamesSeasonOffset])
                     {
                         if (updateData.EnsureActivePlayerData().PvpInfo[i] == null)
                             updateData.EnsureActivePlayerData().PvpInfo[i] = new PVPInfo();
+                        updateData.EnsureActivePlayerData().PvpInfo[i].Bracket = (sbyte)i;
 
                         updateData.EnsureActivePlayerData().PvpInfo[i].SeasonPlayed = updates[startOffset + teamGamesSeasonOffset].UInt32Value;
+                        GetSession().GameState.CurrentArenaBrackets[i].SeasonPlayed = updates[startOffset + teamGamesSeasonOffset].UInt32Value;
                     }
                     if (updateMaskArray[startOffset + teamWinsSeasonOffset])
                     {
                         if (updateData.EnsureActivePlayerData().PvpInfo[i] == null)
                             updateData.EnsureActivePlayerData().PvpInfo[i] = new PVPInfo();
+                        updateData.EnsureActivePlayerData().PvpInfo[i].Bracket = (sbyte)i;
 
                         updateData.EnsureActivePlayerData().PvpInfo[i].SeasonWon = updates[startOffset + teamWinsSeasonOffset].UInt32Value;
+                        GetSession().GameState.CurrentArenaBrackets[i].SeasonWon = updates[startOffset + teamWinsSeasonOffset].UInt32Value;
                     }
                     if (updateMaskArray[startOffset + teamPersonalRatingOffset])
                     {
                         if (updateData.EnsureActivePlayerData().PvpInfo[i] == null)
                             updateData.EnsureActivePlayerData().PvpInfo[i] = new PVPInfo();
+                        updateData.EnsureActivePlayerData().PvpInfo[i].Bracket = (sbyte)i;
 
                         updateData.EnsureActivePlayerData().PvpInfo[i].Rating = updates[startOffset + teamPersonalRatingOffset].UInt32Value;
+                        GetSession().GameState.CurrentArenaBrackets[i].PersonalRating = updates[startOffset + teamPersonalRatingOffset].UInt32Value;
                     }
                 }
             }

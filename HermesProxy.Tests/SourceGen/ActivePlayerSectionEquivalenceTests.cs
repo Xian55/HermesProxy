@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.CompilerServices;
 using Framework.Util;
 using HermesProxy;
@@ -520,7 +520,7 @@ public class ActivePlayerSectionEquivalenceTests
 
         if (a.PvpInfo != null)
             for (int i = 0; i < Math.Min(a.PvpInfo.Length, 7); i++)
-                if (a.PvpInfo[i] != null && (a.PvpInfo[i].Rating != 0 || a.PvpInfo[i].SeasonPlayed != 0 || a.PvpInfo[i].Disqualified))
+                if (a.PvpInfo[i] != null)
                 { blocks.SetBit(607); blocks.SetBit(608 + i); }
 
         if (hasGlyphChanges)
@@ -777,6 +777,8 @@ public class ActivePlayerSectionEquivalenceTests
                     if (pi != null)
                     {
                         if (pi.Disqualified) pvpMask |= (1u << 1);
+                        if (pi.Bracket.HasValue) pvpMask |= (1u << 2);
+                        if (pi.PvpRatingID != 0) pvpMask |= (1u << 3);
                         if (pi.WeeklyPlayed != 0) pvpMask |= (1u << 4);
                         if (pi.WeeklyWon != 0) pvpMask |= (1u << 5);
                         if (pi.SeasonPlayed != 0) pvpMask |= (1u << 6);
@@ -788,6 +790,10 @@ public class ActivePlayerSectionEquivalenceTests
                         if (pi.WeeklyBestWinPvpTierID != 0) pvpMask |= (1u << 12);
                         if (pi.Field_28 != 0) pvpMask |= (1u << 13);
                         if (pi.Field_2C != 0) pvpMask |= (1u << 14);
+                        if (pi.WeeklyRoundsPlayed != 0) pvpMask |= (1u << 15);
+                        if (pi.WeeklyRoundsWon != 0) pvpMask |= (1u << 16);
+                        if (pi.SeasonRoundsPlayed != 0) pvpMask |= (1u << 17);
+                        if (pi.SeasonRoundsWon != 0) pvpMask |= (1u << 18);
                     }
                     if (pvpMask != 0) pvpMask |= 1;
                     data.WriteBits(pvpMask, 19);
@@ -795,6 +801,8 @@ public class ActivePlayerSectionEquivalenceTests
                     data.FlushBits();
                     if ((pvpMask & 1) != 0)
                     {
+                        if ((pvpMask & (1u << 2)) != 0) data.WriteInt8(pi!.Bracket!.Value);
+                        if ((pvpMask & (1u << 3)) != 0) data.WriteInt32(pi!.PvpRatingID);
                         if ((pvpMask & (1u << 4)) != 0) data.WriteUInt32(pi!.WeeklyPlayed);
                         if ((pvpMask & (1u << 5)) != 0) data.WriteUInt32(pi!.WeeklyWon);
                         if ((pvpMask & (1u << 6)) != 0) data.WriteUInt32(pi!.SeasonPlayed);
@@ -806,6 +814,10 @@ public class ActivePlayerSectionEquivalenceTests
                         if ((pvpMask & (1u << 12)) != 0) data.WriteUInt32(pi!.WeeklyBestWinPvpTierID);
                         if ((pvpMask & (1u << 13)) != 0) data.WriteUInt32(pi!.Field_28);
                         if ((pvpMask & (1u << 14)) != 0) data.WriteUInt32(pi!.Field_2C);
+                        if ((pvpMask & (1u << 15)) != 0) data.WriteUInt32(pi!.WeeklyRoundsPlayed);
+                        if ((pvpMask & (1u << 16)) != 0) data.WriteUInt32(pi!.WeeklyRoundsWon);
+                        if ((pvpMask & (1u << 17)) != 0) data.WriteUInt32(pi!.SeasonRoundsPlayed);
+                        if ((pvpMask & (1u << 18)) != 0) data.WriteUInt32(pi!.SeasonRoundsWon);
                     }
                 }
             }
@@ -1087,15 +1099,31 @@ public class ActivePlayerSectionEquivalenceTests
         for (int i = 0; i < GameData.Heirlooms.Count; i++)
             data.WriteUInt32(0u);
 
-        // bits 608-614 (parent 607): PvpInfo[7] nested struct.
-        // Per-element layout per WriteUpdateActivePlayerPvpInfo: Int8 + 16×UInt32 + 1 bit + FlushBits.
-        // Live property is PVPInfo[6] on ActivePlayerData. TODO mirror update writer.
+        // bits 608-614 (parent 607): PvpInfo[7] nested struct, per PVPInfo::WriteCreate —
+        // int8 Bracket, int32 PvpRatingID, fifteen uint32, Disqualified bit, flush.
+        // Live property is PVPInfo[6] on ActivePlayerData, so slot 6 is always defaults.
         for (int t = 0; t < 7; t++)
         {
-            data.WriteInt8(0);                                                     // PvpInfo[t]: per-element prefix byte
-            for (int x = 0; x < 16; x++)
-                data.WriteUInt32(0u);                                              // PvpInfo[t]: 16× UInt32 payload (Rating/SeasonPlayed/WeeklyPlayed/etc.)
-            data.WriteBit(false);                                                  // PvpInfo[t]: Disqualified bit
+            PVPInfo? pi = (src.PvpInfo != null && t < src.PvpInfo.Length) ? src.PvpInfo[t] : null;
+
+            data.WriteInt8(pi?.Bracket ?? (sbyte)t);
+            data.WriteInt32(pi?.PvpRatingID ?? 0);
+            data.WriteUInt32(pi?.WeeklyPlayed ?? 0u);
+            data.WriteUInt32(pi?.WeeklyWon ?? 0u);
+            data.WriteUInt32(pi?.SeasonPlayed ?? 0u);
+            data.WriteUInt32(pi?.SeasonWon ?? 0u);
+            data.WriteUInt32(pi?.Rating ?? 0u);
+            data.WriteUInt32(pi?.WeeklyBestRating ?? 0u);
+            data.WriteUInt32(pi?.SeasonBestRating ?? 0u);
+            data.WriteUInt32(pi?.PvpTierID ?? 0u);
+            data.WriteUInt32(pi?.WeeklyBestWinPvpTierID ?? 0u);
+            data.WriteUInt32(pi?.Field_28 ?? 0u);
+            data.WriteUInt32(pi?.Field_2C ?? 0u);
+            data.WriteUInt32(pi?.WeeklyRoundsPlayed ?? 0u);
+            data.WriteUInt32(pi?.WeeklyRoundsWon ?? 0u);
+            data.WriteUInt32(pi?.SeasonRoundsPlayed ?? 0u);
+            data.WriteUInt32(pi?.SeasonRoundsWon ?? 0u);
+            data.WriteBit(pi?.Disqualified ?? false);
             data.FlushBits();
         }
         data.FlushBits();
