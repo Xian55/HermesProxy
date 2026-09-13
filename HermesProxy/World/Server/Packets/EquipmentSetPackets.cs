@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Framework.Constants;
 using HermesProxy.World.Enums;
@@ -59,67 +60,32 @@ class UseEquipmentSetResult : ServerPacket
     public byte Reason;
 }
 
-class SaveEquipmentSet : ClientPacket
+/// <remarks>
+/// Holds <see cref="EquipmentSetData"/> by reference rather than flattening it: the same type
+/// carries the outbound LoadEquipmentSet payload, and outbound packets are out of scope for the
+/// dispatch conversion. One allocation per saved gear set is not a hot path.
+/// </remarks>
+public readonly record struct SaveEquipmentSet(EquipmentSetData Set);
+
+public readonly record struct DeleteEquipmentSet(ulong ID);
+
+/// <summary>The nineteen equipment slots, inline so the read allocates nothing.</summary>
+[InlineArray(LoadEquipmentSet.SlotCount)]
+public struct EquipmentSetItems
 {
-    public SaveEquipmentSet(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Set.Read(_worldPacket);
-    }
-
-    public EquipmentSetData Set = new();
+    private EquipmentSetItem _element0;
 }
 
-class DeleteEquipmentSet : ClientPacket
-{
-    public DeleteEquipmentSet(WorldPacket packet) : base(packet) { }
+public readonly record struct UseEquipmentSet(EquipmentSetItems Items, ulong GUID);
 
-    public override void Read()
-    {
-        ID = _worldPacket.ReadUInt64();
-    }
-
-    public ulong ID;
-}
-
-class UseEquipmentSet : ClientPacket
-{
-    public UseEquipmentSet(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        uint invCount = _worldPacket.ReadBits<uint>(2);
-        _worldPacket.ResetBitPos();
-        for (uint i = 0; i < invCount; i++)
-        {
-            _worldPacket.ReadUInt8();
-            _worldPacket.ReadUInt8();
-        }
-
-        Items = new EquipmentSetItem[LoadEquipmentSet.SlotCount];
-        for (int i = 0; i < LoadEquipmentSet.SlotCount; i++)
-        {
-            Items[i].Item = _worldPacket.ReadPackedGuid128();
-            Items[i].ContainerSlot = _worldPacket.ReadUInt8();
-            Items[i].Slot = _worldPacket.ReadUInt8();
-        }
-
-        GUID = _worldPacket.ReadUInt64();
-    }
-
-    public EquipmentSetItem[] Items = [];
-    public ulong GUID;
-}
-
-struct EquipmentSetItem
+public struct EquipmentSetItem
 {
     public WowGuid128 Item;
     public byte ContainerSlot;
     public byte Slot;
 }
 
-class EquipmentSetData
+public class EquipmentSetData
 {
     public int Type;
     public ulong Guid;

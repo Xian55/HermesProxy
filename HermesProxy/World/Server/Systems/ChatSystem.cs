@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -238,6 +238,61 @@ public static class ChatSystem
                 ctx.GetSession().WorldClient!.SendMessageChatVanilla(chatMsg, packet.Language, text, "", "");
             }
         }
+    }
+
+    [HandlesCmsg(Opcode.CMSG_CHAT_ADDON_MESSAGE)]
+    public static void HandleAddonMessage(in ChatAddonMessage packet, in SessionContext ctx)
+    {
+        uint language = (uint)Language.Addon;
+        string text = packet.Params.Prefix + '\t' + packet.Params.Text;
+
+        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
+        {
+            ChatMessageTypeWotLK chatMsg = packet.Params.Type.CastEnum<ChatMessageTypeWotLK>();
+            ctx.GetSession().WorldClient!.SendMessageChatWotLK(chatMsg, language, text, "", "");
+        }
+        else
+        {
+            ChatMessageTypeVanilla chatMsg = packet.Params.Type.CastEnum<ChatMessageTypeVanilla>();
+            ctx.GetSession().WorldClient!.SendMessageChatVanilla(chatMsg, language, text, "", "");
+        }
+    }
+
+    [HandlesCmsg(Opcode.CMSG_CHAT_ADDON_MESSAGE_TARGETED)]
+    public static void HandleAddonMessageTargeted(in ChatAddonMessageTargeted packet, in SessionContext ctx)
+    {
+        uint language = (uint)Language.Addon;
+        string text = packet.Params.Prefix + '\t' + packet.Params.Text;
+        string channelName = packet.ChannelGuid.IsEmpty() ? "" :
+            ctx.GetSession().GameState.GetChannelName((int)packet.ChannelGuid.GetCounter());
+
+        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
+        {
+            ChatMessageTypeWotLK chatMsg = packet.Params.Type.CastEnum<ChatMessageTypeWotLK>();
+            ctx.GetSession().WorldClient!.SendMessageChatWotLK(chatMsg, language, text, channelName, packet.Target);
+        }
+        else
+        {
+            ChatMessageTypeVanilla chatMsg = packet.Params.Type.CastEnum<ChatMessageTypeVanilla>();
+            ctx.GetSession().WorldClient!.SendMessageChatVanilla(chatMsg, language, text, channelName, packet.Target);
+        }
+    }
+
+    [HandlesCmsg(Opcode.CMSG_SEND_TEXT_EMOTE)]
+    public static void HandleSendTextEmote(in CTextEmote emote, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_SEND_TEXT_EMOTE);
+        packet.WriteInt32(emote.EmoteID);
+        packet.WriteInt32(emote.SoundIndex);
+        packet.WriteGuid(emote.Target.To64());
+        ctx.SendPacketToServer(packet);
+    }
+
+    [HandlesCmsg(Opcode.CMSG_CHAT_REGISTER_ADDON_PREFIXES)]
+    public static void HandleChatRegisterAddonPrefixes(in ChatRegisterAddonPrefixes addons, in SessionContext ctx)
+    {
+        foreach (var prefix in addons.Prefixes)
+            ctx.GetSession().GameState.AddonPrefixes.Add(prefix);
     }
 
     /// <summary>

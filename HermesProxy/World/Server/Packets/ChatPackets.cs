@@ -203,53 +203,13 @@ public readonly record struct ChatMessageEmote(string Text);
 
 public readonly record struct ChatMessage(uint Language, string Text, bool IsSecure);
 
-public class ChatAddonMessage : ClientPacket
-{
-    public ChatAddonMessage(WorldPacket packet) : base(packet) { }
+public readonly record struct ChatAddonMessageParams(
+    string Prefix, string Text, ChatMessageTypeModern Type, bool IsLogged);
 
-    public override void Read()
-    {
-        Params.Read(_worldPacket);
-    }
+public readonly record struct ChatAddonMessage(ChatAddonMessageParams Params);
 
-    public ChatAddonMessageParams Params = new();
-}
-
-class ChatAddonMessageTargeted : ClientPacket
-{
-    public ChatAddonMessageTargeted(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        uint targetLen = _worldPacket.ReadBits<uint>(9);
-        Params.Read(_worldPacket);
-        ChannelGuid = _worldPacket.ReadPackedGuid128();
-        Target = _worldPacket.ReadString(targetLen);
-    }
-
-    public ChatAddonMessageParams Params = new();
-    public WowGuid128 ChannelGuid;
-    public string Target = string.Empty;
-}
-
-public class ChatAddonMessageParams
-{
-    public void Read(WorldPacket data)
-    {
-        data.ResetBitPos();
-        uint prefixLen = data.ReadBits<uint>(5);
-        uint textLen = data.ReadBits<uint>(8);
-        IsLogged = data.HasBit();
-        Type = (ChatMessageTypeModern)data.ReadInt32();
-        Prefix = data.ReadString(prefixLen);
-        Text = data.ReadString(textLen);
-    }
-
-    public string Prefix = string.Empty;
-    public string Text = string.Empty;
-    public ChatMessageTypeModern Type;
-    public bool IsLogged;
-}
+public readonly record struct ChatAddonMessageTargeted(
+    ChatAddonMessageParams Params, WowGuid128 ChannelGuid, string Target);
 
 public class ChatPkt : ServerPacket, ISpanWritable
 {
@@ -560,32 +520,13 @@ public class EmoteMessage : ServerPacket, ISpanWritable
     public List<uint> SpellVisualKitIDs = new();
 }
 
-public class CTextEmote : ClientPacket
-{
-    public CTextEmote(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Target = _worldPacket.ReadPackedGuid128();
-        EmoteID = _worldPacket.ReadInt32();
-        SoundIndex = _worldPacket.ReadInt32();
-
-        if (ModernVersion.AddedInVersion(9, 0, 5, 1, 14, 0, 2, 5, 1))
-        {
-            SpellVisualKitIDs = new uint[_worldPacket.ReadUInt32()];
-            if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 2, 2, 5, 3))
-                SequenceVariation = _worldPacket.ReadInt32();
-            for (var i = 0; i < SpellVisualKitIDs.Length; ++i)
-                SpellVisualKitIDs[i] = _worldPacket.ReadUInt32();
-        }
-    }
-
-    public WowGuid128 Target;
-    public int EmoteID;
-    public int SoundIndex;
-    public int SequenceVariation;
-    public uint[] SpellVisualKitIDs = Array.Empty<uint>();
-}
+/// <remarks>
+/// The two trailing fields are read on newer builds only and the handler forwards none of them —
+/// 3.3.5a's CMSG_SEND_TEXT_EMOTE is emote, sound and target. They are kept so the codec still
+/// consumes the whole packet on the builds that send them.
+/// </remarks>
+public readonly record struct CTextEmote(
+    WowGuid128 Target, int EmoteID, int SoundIndex, int SequenceVariation, uint[] SpellVisualKitIDs);
 
 public class STextEmote : ServerPacket, ISpanWritable
 {
@@ -743,17 +684,4 @@ class ChatServerMessage : ServerPacket, ISpanWritable
     public string StringParam = "";
 }
 
-class ChatRegisterAddonPrefixes : ClientPacket
-{
-    public ChatRegisterAddonPrefixes(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        int count = _worldPacket.ReadInt32();
-
-        for (int i = 0; i < count && i < 64; ++i)
-            Prefixes.Add(_worldPacket.ReadString(_worldPacket.ReadBits<uint>(5)));
-    }
-
-    public List<string> Prefixes = new List<string>();
-}
+public readonly record struct ChatRegisterAddonPrefixes(List<string> Prefixes);

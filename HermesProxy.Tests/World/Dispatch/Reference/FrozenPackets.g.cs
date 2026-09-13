@@ -3694,4 +3694,408 @@ internal static class FrozenPackets
         public WowGuid128 PlayerGuid;
         public WowGuid128 TeamGuid;
     }
+
+    /// Frozen verbatim from <c>ChatPackets.cs</c>. Shadows the live type, which is now a record
+    /// struct with no Read of its own - the two addon oracles below read through it.
+    internal sealed class ChatAddonMessageParams
+    {
+        public void Read(WorldPacket data)
+        {
+            data.ResetBitPos();
+            uint prefixLen = data.ReadBits<uint>(5);
+            uint textLen = data.ReadBits<uint>(8);
+            IsLogged = data.HasBit();
+            Type = (ChatMessageTypeModern)data.ReadInt32();
+            Prefix = data.ReadString(prefixLen);
+            Text = data.ReadString(textLen);
+        }
+
+        public string Prefix = string.Empty;
+        public string Text = string.Empty;
+        public ChatMessageTypeModern Type;
+        public bool IsLogged;
+    }
+
+    /// Frozen verbatim from <c>ChatPackets.cs</c>.
+    internal sealed class ChatAddonMessage
+    {
+        public void Read(WorldPacket p)
+        {
+            Params.Read(p);
+        }
+
+        public ChatAddonMessageParams Params = new();
+    }
+
+    /// Frozen verbatim from <c>ChatPackets.cs</c>.
+    internal sealed class ChatAddonMessageTargeted
+    {
+        public void Read(WorldPacket p)
+        {
+            uint targetLen = p.ReadBits<uint>(9);
+            Params.Read(p);
+            ChannelGuid = p.ReadPackedGuid128();
+            Target = p.ReadString(targetLen);
+        }
+
+        public ChatAddonMessageParams Params = new();
+        public WowGuid128 ChannelGuid;
+        public string Target = string.Empty;
+    }
+
+    /// Frozen verbatim from <c>ChatPackets.cs</c>.
+    internal sealed class CTextEmote
+    {
+        public void Read(WorldPacket p)
+        {
+            Target = p.ReadPackedGuid128();
+            EmoteID = p.ReadInt32();
+            SoundIndex = p.ReadInt32();
+
+            if (ModernVersion.AddedInVersion(9, 0, 5, 1, 14, 0, 2, 5, 1))
+            {
+                SpellVisualKitIDs = new uint[p.ReadUInt32()];
+                if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 2, 2, 5, 3))
+                    SequenceVariation = p.ReadInt32();
+                for (var i = 0; i < SpellVisualKitIDs.Length; ++i)
+                    SpellVisualKitIDs[i] = p.ReadUInt32();
+            }
+        }
+
+        public WowGuid128 Target;
+        public int EmoteID;
+        public int SoundIndex;
+        public int SequenceVariation;
+        public uint[] SpellVisualKitIDs = Array.Empty<uint>();
+    }
+
+    /// Frozen verbatim from <c>ChatPackets.cs</c>.
+    internal sealed class ChatRegisterAddonPrefixes
+    {
+        public void Read(WorldPacket p)
+        {
+            int count = p.ReadInt32();
+
+            for (int i = 0; i < count && i < 64; ++i)
+                Prefixes.Add(p.ReadString(p.ReadBits<uint>(5)));
+        }
+
+        public List<string> Prefixes = new List<string>();
+    }
+
+    /// Frozen verbatim from <c>ClientConfigPackets.cs</c>.
+    internal sealed class UserClientUpdateAccountData
+    {
+        public void Read(WorldPacket p)
+        {
+            PlayerGuid = p.ReadPackedGuid128();
+            Time = p.ReadInt64();
+            Size = p.ReadUInt32();
+
+            if (ModernVersion.GetAccountDataCount() <= 8)
+                DataType = (uint)p.ReadBits<uint>(3);
+            else
+                DataType = (uint)p.ReadBits<uint>(4);
+
+            uint compressedSize = p.ReadUInt32();
+            if (compressedSize != 0)
+            {
+                CompressedData = p.ReadBytes(compressedSize);
+            }
+        }
+
+        public WowGuid128 PlayerGuid;
+        public long Time; // UnixTime
+        public uint Size; // decompressed size
+        public uint DataType;
+        public byte[] CompressedData = Array.Empty<byte>();
+    }
+
+    /// Frozen verbatim from <c>ClientConfigPackets.cs</c>.
+    internal sealed class RequestAccountData
+    {
+        public void Read(WorldPacket p)
+        {
+            PlayerGuid = p.ReadPackedGuid128();
+
+            if (ModernVersion.GetAccountDataCount() <= 8)
+                DataType = (uint)p.ReadBits<uint>(3);
+            else
+                DataType = (uint)p.ReadBits<uint>(4);
+        }
+
+        public WowGuid128 PlayerGuid;
+        public uint DataType;
+    }
+
+    /// Frozen verbatim from <c>ClientConfigPackets.cs</c>.
+    internal sealed class SaveCUFProfiles
+    {
+        public void Read(WorldPacket p)
+        {
+            Data = p.ReadToEnd();
+        }
+
+        public byte[] Data = Array.Empty<byte>();
+    }
+
+    /// Frozen verbatim from <c>BattlePetPackets.cs</c>.
+    internal sealed class BattlePetSummon
+    {
+        public void Read(WorldPacket p)
+        {
+            PetGuid = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 PetGuid;
+    }
+
+    /// Frozen verbatim from <c>BattlePetPackets.cs</c>.
+    internal sealed class BattlePetSetFlags
+    {
+        public const byte ControlApply = 1;
+        public const byte ControlRemove = 2;
+
+        public void Read(WorldPacket p)
+        {
+            // 3.4.3 / WPP V3_4_4: PackedGuid128 + uint16 Flags + 2-bit ControlType.
+            // Retail TC and lineagedr still document uint32 Flags; that over-reads
+            // the 7-byte payload (guid 4 + flags 2 + control 1) and throws.
+            PetGuid = p.ReadPackedGuid128();
+            Flags = p.ReadUInt16();
+            ControlType = (byte)p.ReadBits<uint>(2);
+        }
+
+        public WowGuid128 PetGuid;
+        public ushort Flags;
+        public byte ControlType;
+    }
+
+    /// Frozen verbatim from <c>CollectionPackets.cs</c>.
+    internal sealed class MountSetFavorite
+    {
+        public void Read(WorldPacket p)
+        {
+            MountSpellID = p.ReadUInt32();
+            IsFavorite = p.ReadBit();
+        }
+
+        public uint MountSpellID;
+        public bool IsFavorite;
+    }
+
+    /// Frozen verbatim from <c>BattlePetPackets.cs</c>.
+    internal sealed class DismissCritter
+    {
+        public void Read(WorldPacket p)
+        {
+            CritterGUID = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 CritterGUID;
+    }
+
+    /// Frozen verbatim from <c>EquipmentSetPackets.cs</c>.
+    internal sealed class SaveEquipmentSet
+    {
+        public void Read(WorldPacket p)
+        {
+            Set.Read(p);
+        }
+
+        public EquipmentSetData Set = new();
+    }
+
+    /// Frozen verbatim from <c>EquipmentSetPackets.cs</c>.
+    internal sealed class DeleteEquipmentSet
+    {
+        public void Read(WorldPacket p)
+        {
+            ID = p.ReadUInt64();
+        }
+
+        public ulong ID;
+    }
+
+    /// Frozen verbatim from <c>EquipmentSetPackets.cs</c>.
+    internal sealed class UseEquipmentSet
+    {
+        public void Read(WorldPacket p)
+        {
+            uint invCount = p.ReadBits<uint>(2);
+            p.ResetBitPos();
+            for (uint i = 0; i < invCount; i++)
+            {
+                p.ReadUInt8();
+                p.ReadUInt8();
+            }
+
+            Items = new EquipmentSetItem[LoadEquipmentSet.SlotCount];
+            for (int i = 0; i < LoadEquipmentSet.SlotCount; i++)
+            {
+                Items[i].Item = p.ReadPackedGuid128();
+                Items[i].ContainerSlot = p.ReadUInt8();
+                Items[i].Slot = p.ReadUInt8();
+            }
+
+            GUID = p.ReadUInt64();
+        }
+
+        public EquipmentSetItem[] Items = [];
+        public ulong GUID;
+    }
+
+    /// Frozen verbatim from <c>TalentPackets.cs</c>.
+    internal sealed class LearnPetTalent
+    {
+        public WowGuid128 PetGUID = WowGuid128.Empty;
+        public uint TalentID;
+        public ushort Rank;
+
+        public void Read(WorldPacket p)
+        {
+            PetGUID = p.ReadPackedGuid128();
+            TalentID = p.ReadUInt32();
+            Rank = p.ReadUInt16();
+        }
+    }
+
+    /// Frozen verbatim from <c>TalentPackets.cs</c>.
+    internal sealed class RemoveGlyph
+    {
+        public byte GlyphSlot;
+        public void Read(WorldPacket p) => GlyphSlot = p.ReadUInt8();
+    }
+
+    /// Frozen verbatim from <c>SessionPackets.cs</c>.
+    internal sealed class ChangeRealmTicket
+    {
+        public void Read(WorldPacket p)
+        {
+            Token = p.ReadUInt32();
+            Secret = p.ReadBytes(32);
+        }
+
+        public uint Token;
+        public byte[] Secret = new byte[32];
+    }
+
+    /// Frozen verbatim from <c>SessionPackets.cs</c>.
+    internal sealed class BattlenetRequest
+    {
+        public void Read(WorldPacket p)
+        {
+            Method.Read(p);
+
+            uint protoSize = p.ReadUInt32();
+            Data = p.ReadBytes(protoSize);
+        }
+
+        public MethodCall Method;
+        public byte[] Data = Array.Empty<byte>();
+    }
+
+    /// Frozen verbatim from <c>HotfixPackets.cs</c>.
+    internal sealed class DBQueryBulk
+    {
+        public void Read(WorldPacket p)
+        {
+            TableHash = (DB2Hash)p.ReadUInt32();
+
+            uint count = p.ReadBits<uint>(13);
+            for (uint i = 0; i < count; ++i)
+            {
+                Queries.Add(p.ReadUInt32());
+            }
+        }
+
+        public DB2Hash TableHash;
+        public List<uint> Queries = new();
+    }
+
+    /// Frozen verbatim from <c>HotfixPackets.cs</c>.
+    internal sealed class HotfixRequest
+    {
+        public void Read(WorldPacket p)
+        {
+            ClientBuild = p.ReadUInt32();
+            DataBuild = p.ReadUInt32();
+
+            uint hotfixCount = p.ReadUInt32();
+            for (var i = 0; i < hotfixCount; ++i)
+                Hotfixes.Add(p.ReadUInt32());
+        }
+
+        public uint ClientBuild;
+        public uint DataBuild;
+        public List<uint> Hotfixes = new();
+    }
+
+    /// Frozen verbatim from <c>GameObjectPackets.cs</c>.
+    internal sealed class GameObjUse
+    {
+        public void Read(WorldPacket p)
+        {
+            Guid = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Guid;
+    }
+
+    /// Frozen verbatim from <c>GameObjectPackets.cs</c>.
+    internal sealed class GameObjReportUse
+    {
+        public void Read(WorldPacket p)
+        {
+            Guid = p.ReadPackedGuid128();
+        }
+
+        public WowGuid128 Guid;
+    }
+
+    /// Frozen verbatim from <c>QueryPackets.cs</c>.
+    internal sealed class WhoRequestPkt
+    {
+        public void Read(WorldPacket p)
+        {
+            uint areasCount = p.ReadBits<uint>(4);
+
+            Request.Read(p);
+            RequestID = p.ReadUInt32();
+
+            for (int i = 0; i < areasCount; ++i)
+                Areas.Add(p.ReadInt32());
+        }
+
+        public WhoRequest Request = new();
+        public uint RequestID;
+        public List<int> Areas = new();
+    }
+
+    /// Frozen verbatim from <c>MiscPackets.cs</c>.
+    internal sealed class MountSpecial
+    {
+        public void Read(WorldPacket p)
+        {
+            SpellVisualKitIDs = new int[p.ReadUInt32()];
+            if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 2, 2, 5, 3))
+                SequenceVariation = p.ReadInt32();
+            for (var i = 0; i < SpellVisualKitIDs.Length; ++i)
+                SpellVisualKitIDs[i] = p.ReadInt32();
+        }
+
+        public int[] SpellVisualKitIDs = Array.Empty<int>();
+        public int SequenceVariation;
+    }
+
+    /// Frozen verbatim from <c>InstancePackets.cs</c>.
+    internal sealed class InstanceLockResponse
+    {
+        public void Read(WorldPacket p)
+        {
+            AcceptLock = p.HasBit();
+        }
+
+        public bool AcceptLock;
+    }
 }

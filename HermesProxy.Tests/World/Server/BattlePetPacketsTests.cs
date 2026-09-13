@@ -1,3 +1,4 @@
+﻿using Framework.IO;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -120,8 +121,8 @@ public class BattlePetPacketsTests
         var payload = new WorldPacket(1u);
         payload.WritePackedGuid128(guid);
 
-        using var packet = new BattlePetSummon(new WorldPacket(Frame(payload.GetData())));
-        packet.Read();
+        var reader2 = new SpanPacketReader(new WorldPacket(Frame(payload.GetData())).GetRemainingSpan());
+        BattlePetSummonCodec.Read(ref reader2, out var packet);
 
         Assert.Equal(guid, packet.PetGuid);
     }
@@ -136,8 +137,8 @@ public class BattlePetPacketsTests
         payload.WriteBits(BattlePetSetFlags.ControlApply, 2);
         payload.FlushBits();
 
-        using var packet = new BattlePetSetFlags(new WorldPacket(Frame(payload.GetData())));
-        packet.Read();
+        var reader2 = new SpanPacketReader(new WorldPacket(Frame(payload.GetData())).GetRemainingSpan());
+        BattlePetSetFlagsCodec.Read(ref reader2, out var packet);
 
         Assert.Equal(guid, packet.PetGuid);
         Assert.Equal(BattlePetInfo.FavoriteFlag, packet.Flags);
@@ -158,8 +159,8 @@ public class BattlePetPacketsTests
         payload.WriteBits(1, 2);
         payload.FlushBits();
 
-        using var packet = new BattlePetSetFlags(new WorldPacket(Frame(payload.GetData())));
-        packet.Read();
+        var reader2 = new SpanPacketReader(new WorldPacket(Frame(payload.GetData())).GetRemainingSpan());
+        BattlePetSetFlagsCodec.Read(ref reader2, out var packet);
 
         Assert.Equal(WowGuid128.Create(HighGuidType703.BattlePet, 165), packet.PetGuid);
         Assert.Equal(BattlePetInfo.FavoriteFlag, packet.Flags);
@@ -174,8 +175,8 @@ public class BattlePetPacketsTests
         payload.WriteBit(true);
         payload.FlushBits();
 
-        using var packet = new MountSetFavorite(new WorldPacket(Frame(payload.GetData())));
-        packet.Read();
+        var reader2 = new SpanPacketReader(new WorldPacket(Frame(payload.GetData())).GetRemainingSpan());
+        MountSetFavoriteCodec.Read(ref reader2, out var packet);
 
         Assert.Equal(40192u, packet.MountSpellID);
         Assert.True(packet.IsFavorite);

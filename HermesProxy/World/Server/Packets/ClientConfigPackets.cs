@@ -75,23 +75,7 @@ public class ClientCacheVersion : ServerPacket, ISpanWritable
     public uint CacheVersion = 0;
 }
 
-public class RequestAccountData : ClientPacket
-{
-    public RequestAccountData(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PlayerGuid = _worldPacket.ReadPackedGuid128();
-
-        if (ModernVersion.GetAccountDataCount() <= 8)
-            DataType = (uint)_worldPacket.ReadBits<uint>(3);
-        else
-            DataType = (uint)_worldPacket.ReadBits<uint>(4);
-    }
-
-    public WowGuid128 PlayerGuid;
-    public uint DataType;
-}
+public readonly record struct RequestAccountData(WowGuid128 PlayerGuid, uint DataType);
 
 public class UpdateAccountData : ServerPacket, ISpanWritable
 {
@@ -161,34 +145,12 @@ public class UpdateAccountData : ServerPacket, ISpanWritable
     public byte[] CompressedData = Array.Empty<byte>();
 }
 
-public class UserClientUpdateAccountData : ClientPacket
-{
-    public UserClientUpdateAccountData(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        PlayerGuid = _worldPacket.ReadPackedGuid128();
-        Time = _worldPacket.ReadInt64();
-        Size = _worldPacket.ReadUInt32();
-
-        if (ModernVersion.GetAccountDataCount() <= 8)
-            DataType = (uint)_worldPacket.ReadBits<uint>(3);
-        else
-            DataType = (uint)_worldPacket.ReadBits<uint>(4);
-
-        uint compressedSize = _worldPacket.ReadUInt32();
-        if (compressedSize != 0)
-        {
-            CompressedData = _worldPacket.ReadBytes(compressedSize);
-        }
-    }
-
-    public WowGuid128 PlayerGuid;
-    public long Time; // UnixTime
-    public uint Size; // decompressed size
-    public uint DataType;
-    public byte[] CompressedData = Array.Empty<byte>();
-}
+public readonly record struct UserClientUpdateAccountData(
+    WowGuid128 PlayerGuid,
+    long Time,          // UnixTime
+    uint Size,          // decompressed size
+    uint DataType,
+    byte[] CompressedData);
 
 class SetAdvancedCombatLogging : ClientPacket
 {
@@ -202,17 +164,7 @@ class SetAdvancedCombatLogging : ClientPacket
     public bool Enable;
 }
 
-class SaveCUFProfiles : ClientPacket
-{
-    public SaveCUFProfiles(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Data = _worldPacket.ReadToEnd();
-    }
-
-    public byte[] Data = Array.Empty<byte>();
-}
+public readonly record struct SaveCUFProfiles(byte[] Data);
 
 public class LoadCUFProfiles : ServerPacket, ISpanWritable
 {

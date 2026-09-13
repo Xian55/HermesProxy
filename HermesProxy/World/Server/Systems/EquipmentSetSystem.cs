@@ -1,16 +1,31 @@
 using HermesProxy.Enums;
-using HermesProxy.World;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
 
-namespace HermesProxy.World.Server;
+namespace HermesProxy.World.Server.Systems;
 
-public partial class WorldSocket
+/// <summary>
+/// Translation for the modern client's equipment-set CMSGs.
+/// </summary>
+/// <remarks>
+/// All three are gated to V3_4_3 and drop silently on anything else, which is how they arrived —
+/// the legacy opcodes exist only from 3.3.5a and the modern layouts were only ever verified
+/// against the 3.4.3 client.
+/// <para>
+/// The two send paths translate a modern 128-bit item GUID per slot into the legacy packed 64-bit
+/// form, with two sentinel values that are not GUIDs at all: a slot the set ignores goes out as
+/// packed GUID 1, and an empty slot as a packed zero. Those are the values 3.3.5a's
+/// HandleEquipmentSetSave and HandleEquipmentSetUse test for, so neither can be folded into the
+/// ordinary conversion.
+/// </para>
+/// </remarks>
+public static class EquipmentSetSystem
 {
     const int EquipmentSetSlots = 19;
 
-    [PacketHandler(Opcode.CMSG_SAVE_EQUIPMENT_SET)]
-    void HandleSaveEquipmentSet(SaveEquipmentSet save)
+    [HandlesCmsg(Opcode.CMSG_SAVE_EQUIPMENT_SET)]
+    public static void HandleSaveEquipmentSet(in SaveEquipmentSet save, in SessionContext ctx)
     {
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
             return;
@@ -31,27 +46,27 @@ public partial class WorldSocket
                 packet.WritePackedGuid(save.Set.Pieces[i].To64());
         }
 
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_DELETE_EQUIPMENT_SET)]
-    void HandleDeleteEquipmentSet(DeleteEquipmentSet delete)
+    [HandlesCmsg(Opcode.CMSG_DELETE_EQUIPMENT_SET)]
+    public static void HandleDeleteEquipmentSet(in DeleteEquipmentSet delete, in SessionContext ctx)
     {
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
             return;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_EQUIPMENT_SET_DELETE);
         packet.WritePackedGuid(new WowGuid64(delete.ID));
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 
-    [PacketHandler(Opcode.CMSG_USE_EQUIPMENT_SET)]
-    void HandleUseEquipmentSet(UseEquipmentSet use)
+    [HandlesCmsg(Opcode.CMSG_USE_EQUIPMENT_SET)]
+    public static void HandleUseEquipmentSet(in UseEquipmentSet use, in SessionContext ctx)
     {
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
             return;
 
-        GetSession().GameState.LastUsedEquipmentSetGuid = use.GUID;
+        ctx.GetSession().GameState.LastUsedEquipmentSetGuid = use.GUID;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_EQUIPMENT_SET_USE);
         for (int i = 0; i < EquipmentSetSlots; i++)
@@ -68,6 +83,6 @@ public partial class WorldSocket
             packet.WriteUInt8(slot.Slot);
         }
 
-        SendPacketToServer(packet);
+        ctx.SendPacketToServer(packet);
     }
 }

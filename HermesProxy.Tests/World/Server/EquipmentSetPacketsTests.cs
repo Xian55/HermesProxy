@@ -1,3 +1,5 @@
+﻿using System;
+using Framework.IO;
 using HermesProxy.World;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -89,11 +91,12 @@ public class EquipmentSetPacketsTests
         }
         payload.WriteUInt64(55);
 
-        using var packet = new UseEquipmentSet(new WorldPacket(Frame(payload.GetData())));
-        packet.Read();
+        var reader2 = new SpanPacketReader(new WorldPacket(Frame(payload.GetData())).GetRemainingSpan());
+        UseEquipmentSetCodec.Read(ref reader2, out var packet);
 
         Assert.Equal(55ul, packet.GUID);
-        Assert.Equal(LoadEquipmentSet.SlotCount, packet.Items.Length);
+        var items = packet.Items;
+        Assert.Equal(LoadEquipmentSet.SlotCount, ((ReadOnlySpan<EquipmentSetItem>)items).Length);
         Assert.Equal(EquipmentSetModern.IgnoredSlot, packet.Items[2].Item);
         Assert.Equal(2, packet.Items[2].Slot);
     }

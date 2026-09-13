@@ -1,4 +1,4 @@
-using Framework.Constants;
+﻿using Framework.Constants;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
@@ -156,48 +156,12 @@ public class BattlePetInfo
     }
 }
 
-public class BattlePetSummon : ClientPacket
-{
-    public BattlePetSummon(WorldPacket packet) : base(packet) { }
+public readonly record struct BattlePetSummon(WowGuid128 PetGuid);
 
-    public override void Read()
-    {
-        PetGuid = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 PetGuid;
-}
-
-public class BattlePetSetFlags : ClientPacket
+public readonly record struct BattlePetSetFlags(WowGuid128 PetGuid, ushort Flags, byte ControlType)
 {
     public const byte ControlApply = 1;
     public const byte ControlRemove = 2;
-
-    public BattlePetSetFlags(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        // 3.4.3 / WPP V3_4_4: PackedGuid128 + uint16 Flags + 2-bit ControlType.
-        // Retail TC and lineagedr still document uint32 Flags; that over-reads
-        // the 7-byte payload (guid 4 + flags 2 + control 1) and throws.
-        PetGuid = _worldPacket.ReadPackedGuid128();
-        Flags = _worldPacket.ReadUInt16();
-        ControlType = (byte)_worldPacket.ReadBits<uint>(2);
-    }
-
-    public WowGuid128 PetGuid;
-    public ushort Flags;
-    public byte ControlType;
 }
 
-public class DismissCritter : ClientPacket
-{
-    public DismissCritter(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        CritterGUID = _worldPacket.ReadPackedGuid128();
-    }
-
-    public WowGuid128 CritterGUID;
-}
+public readonly record struct DismissCritter(WowGuid128 CritterGUID);

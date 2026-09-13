@@ -86,19 +86,7 @@ public class AccountMountUpdate : ServerPacket
     }
 }
 
-public class MountSetFavorite : ClientPacket
-{
-    public MountSetFavorite(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        MountSpellID = _worldPacket.ReadUInt32();
-        IsFavorite = _worldPacket.ReadBit();
-    }
-
-    public uint MountSpellID;
-    public bool IsFavorite;
-}
+public readonly record struct MountSetFavorite(uint MountSpellID, bool IsFavorite);
 
 // SMSG_ACCOUNT_TOY_UPDATE — Wrathion ToyPackets.cpp AccountToyUpdate::Write
 public class AccountToyUpdate : ServerPacket
