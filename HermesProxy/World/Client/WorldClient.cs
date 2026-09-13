@@ -190,6 +190,10 @@ public partial class WorldClient
         StopKeepAliveTimer();
         StopReadyCheckDeadline();
 
+        // Anything still waiting on an opcode that will now never arrive would otherwise reach
+        // the pool only via finalization, which is the case this class is least likely to notice.
+        DiscardDelayedPacketsToServer();
+
         // Unhook before closing so the receive loop does not treat this as an
         // unexpected drop and call OnDisconnect (that nulls AuthClient, which
         // change-realm still needs for the next CMSG_AUTH_SESSION).
@@ -386,6 +390,22 @@ public partial class WorldClient
     // server forcibly closed the connection after our CMSG_AUTH_SESSION when SendPacket
     // hopped onto a SendLoopAsync task. Until that interaction is understood, the legacy
     // outbound path stays synchronous-under-lock. The Wave 1 `using ByteBuffer` is kept.
+    /// <summary>
+    /// Writes one packet to the legacy server and disposes it.
+    /// </summary>
+    /// <remarks>
+    /// Disposal belongs here because this is the only place a legacy packet stops being needed.
+    /// Every WorldPacket rents a pooled buffer in its constructor, and before this returned it the
+    /// rental came back only through ~ByteBuffer - so each of the ~300 outbound construction sites
+    /// put its packet on the finalizer queue, which kept it alive through a GC, promoted it out of
+    /// Gen0, and released the array long after the burst that wanted it. The pool ended up growing
+    /// new arrays rather than recycling the ones already out.
+    /// <para>
+    /// Safe to dispose here because no caller touches a packet after handing it over: the delayed
+    /// queues own theirs until they are drained through this same method, and every direct caller
+    /// is terminal. That was checked across all 300 sites rather than assumed.
+    /// </para>
+    /// </remarks>
     private void SendPacket(WorldPacket packet)
     {
         lock (_sendLock)
@@ -422,6 +442,10 @@ public partial class WorldClient
                 Log.PrintNet(LogType.Error, LogNetDir.P2S, $"Packet Write Error: {ex.Message}");
                 if (_isSuccessful == null)
                     _isSuccessful = false;
+            }
+            finally
+            {
+                packet.Dispose();
             }
         }
     }
@@ -544,6 +568,17 @@ public partial class WorldClient
 
         SendPacket(packet);
         SendDelayedPacketsToServerOnOpcode(opcode);
+    }
+
+    /// <summary>Drops packets queued behind an opcode that is no longer coming.</summary>
+    private void DiscardDelayedPacketsToServer()
+    {
+        foreach (var queued in _delayedPacketsToServer.Values)
+        {
+            foreach (var packet in queued)
+                packet.Dispose();
+        }
+        _delayedPacketsToServer.Clear();
     }
 
     private void SendDelayedPacketsToServerOnOpcode(Opcode opcode)
