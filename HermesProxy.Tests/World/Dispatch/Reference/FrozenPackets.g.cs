@@ -3241,4 +3241,296 @@ internal static class FrozenPackets
     {
         public void Read(WorldPacket p) { }
     }
+
+    /// Frozen verbatim from <c>AuctionPackets.cs</c>: the auction helper types as they were
+    /// before the auction slice made them readonly. The oracles below assign their fields one
+    /// by one, which a readonly type cannot express — and pointing them at the converted types
+    /// would have them validate the new readers against themselves.
+    internal class ClassFilter
+    {
+        public int ItemClass;
+        public List<SubClassFilter> SubClassFilters = new();
+    }
+
+    internal struct SubClassFilter
+    {
+        public int ItemSubclass;
+        public uint InvTypeMask;
+    }
+
+    internal struct AuctionSort
+    {
+        public byte Type;
+        public byte Direction;
+    }
+
+    internal struct AuctionItemForSale
+    {
+        public AuctionItemForSale(WorldPacket data)
+        {
+            Guid = data.ReadPackedGuid128();
+            UseCount = data.ReadUInt32();
+        }
+
+        public WowGuid128 Guid;
+        public uint UseCount;
+    }
+
+    internal class AddOnInfo
+    {
+        public void Read(WorldPacket data)
+        {
+            data.ResetBitPos();
+
+            uint nameLength = data.ReadBits<uint>(10);
+            uint versionLength = data.ReadBits<uint>(10);
+            Loaded = data.HasBit();
+            Disabled = data.HasBit();
+            if (nameLength > 1)
+            {
+                Name = data.ReadString(nameLength - 1);
+                data.ReadUInt8(); // null terminator
+            }
+            if (versionLength > 1)
+            {
+                Version = data.ReadString(versionLength - 1);
+                data.ReadUInt8(); // null terminator
+            }
+        }
+
+        public string Name = string.Empty;
+        public string Version = string.Empty;
+        public bool Loaded;
+        public bool Disabled;
+    }
+
+/// Frozen verbatim from <c>AuctionPackets.cs</c>.
+    internal sealed class AuctionListBidderItems
+    {
+        public void Read(WorldPacket p)
+        {
+            Auctioneer = p.ReadPackedGuid128();
+            Offset = p.ReadUInt32();
+
+            uint auctionIDCount = p.ReadBits<uint>(7);
+            p.ResetBitPos();
+
+            // Add, not the indexer: the list starts empty and List<T>'s setter requires an index
+            // below Count, so assigning through it threw for every client that had an active bid.
+            for (var i = 0; i < auctionIDCount; ++i)
+                AuctionItemIDs.Add(p.ReadUInt32());
+        }
+
+        public WowGuid128 Auctioneer;
+        public uint Offset;
+        public List<uint> AuctionItemIDs = new();
+    }
+
+    /// Frozen verbatim from <c>AuctionPackets.cs</c>.
+    internal sealed class AuctionListItems
+    {
+        public void Read(WorldPacket p)
+        {
+            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
+                // V3_4_3 CMSG_AUCTION_LIST_ITEMS — wire per CypherCore WotLK-Classic
+                // AuctionListItems.Read (the authoritative 54261 layout; TC 3.4.3_Source and WPP's
+                // retail handler both mis-handle it). Auctioneer precedes Offset; the pet bytes,
+                // class-filter bodies and sort bodies ARE sent — earlier revisions discarded the
+                // filter bodies, which silently dropped category filtering (#85).
+                Auctioneer = p.ReadPackedGuid128();
+                Offset = p.ReadUInt32();
+                MinLevel = p.ReadUInt8();
+                MaxLevel = p.ReadUInt8();
+                Quality = p.ReadInt32();
+                int sortsCount = p.ReadUInt8();
+                int knownPetSize = p.ReadInt32();
+                MaxPetLevel = (byte)p.ReadInt8();
+
+                for (int i = 0; i < knownPetSize; ++i)
+                    KnownPets.Add(p.ReadUInt8());
+
+                bool tainted = p.HasBit();
+                uint nameLen = p.ReadBits<uint>(8);
+                Name = p.ReadString(nameLen);
+
+                p.ResetBitPos();
+                uint itemClassFilterCount = p.ReadBits<uint>(3);
+                OnlyUsable = p.HasBit();
+                ExactMatch = p.HasBit();
+
+                if (tainted)
+                {
+                    // Consume the AddOnInfo (TaintedBy) body to stay aligned; not forwarded.
+                    p.ResetBitPos();
+                    uint addonNameLen = p.ReadBits<uint>(10);
+                    uint addonVerLen = p.ReadBits<uint>(10);
+                    p.HasBit(); // Loaded
+                    p.HasBit(); // Disabled
+                    if (addonNameLen > 1) { p.ReadString(addonNameLen - 1); p.ReadUInt8(); }
+                    if (addonVerLen > 1) { p.ReadString(addonVerLen - 1); p.ReadUInt8(); }
+                }
+
+                for (uint i = 0; i < itemClassFilterCount; ++i)
+                {
+                    ClassFilter classFilter = new ClassFilter();
+                    classFilter.ItemClass = p.ReadInt32();
+                    uint subClassFilterCount = p.ReadBits<uint>(5);
+                    for (uint j = 0; j < subClassFilterCount; ++j)
+                    {
+                        SubClassFilter filter = new SubClassFilter();
+                        filter.InvTypeMask = (uint)p.ReadUInt64();
+                        filter.ItemSubclass = p.ReadInt32();
+                        classFilter.SubClassFilters.Add(filter);
+                    }
+                    ClassFilters.Add(classFilter);
+                }
+
+                p.ReadInt32(); // sortDataSize
+                for (int i = 0; i < sortsCount; ++i)
+                {
+                    AuctionSort sort = new AuctionSort();
+                    p.ResetBitPos();
+                    sort.Type = p.ReadUInt8();
+                    sort.Direction = p.ReadUInt8();
+                    Sorts.Add(sort);
+                }
+                return;
+            }
+
+            Offset = p.ReadUInt32();
+            Auctioneer = p.ReadPackedGuid128();
+
+            MinLevel = p.ReadUInt8();
+            MaxLevel = p.ReadUInt8();
+            Quality = p.ReadInt32();
+            var sortCount = p.ReadUInt8();
+            var knownPetsCount = p.ReadUInt32();
+            MaxPetLevel = p.ReadUInt8();
+
+            for (int i = 0; i < knownPetsCount; ++i)
+                KnownPets.Add(p.ReadUInt8());
+
+            uint nameLength = p.ReadBits<uint>(8);
+            Name = p.ReadString(nameLength);
+
+            uint classFiltersCount = p.ReadBits<uint>(3);
+
+            OnlyUsable = p.HasBit();
+            ExactMatch = p.HasBit();
+            p.ResetBitPos();
+
+            for (int i = 0; i < classFiltersCount; ++i)
+            {
+                ClassFilter classFilter = new ClassFilter();
+                classFilter.ItemClass = p.ReadInt32();
+
+                uint subClassFiltersCount = p.ReadBits<uint>(5);
+                for (uint j = 0; j < subClassFiltersCount; ++j)
+                {
+                    SubClassFilter filter = new SubClassFilter();
+                    filter.ItemSubclass = p.ReadInt32();
+                    filter.InvTypeMask = p.ReadUInt32();
+                    classFilter.SubClassFilters.Add(filter);
+                }
+
+                ClassFilters.Add(classFilter);
+            }
+
+            var size = p.ReadUInt32();
+            var data = p.ReadBytes(size);
+            var sorts = new WorldPacket(p.GetOpcode(), data);
+            for (var i = 0; i < sortCount; ++i)
+            {
+                AuctionSort sort = new AuctionSort();
+                sort.Type = sorts.ReadUInt8();
+                sort.Direction = sorts.ReadUInt8();
+                Sorts.Add(sort);
+            }
+        }
+
+        public uint Offset;
+        public WowGuid128 Auctioneer;
+        public byte MinLevel;
+        public byte MaxLevel;
+        public int Quality;
+        public byte MaxPetLevel;
+        public List<byte> KnownPets = new();
+        public string Name = string.Empty;
+        public bool OnlyUsable;
+        public bool ExactMatch;
+        public List<ClassFilter> ClassFilters = new List<ClassFilter>();
+        public List<AuctionSort> Sorts = new();
+    }
+
+    /// Frozen verbatim from <c>AuctionPackets.cs</c>.
+    internal sealed class AuctionSellItem
+    {
+        public void Read(WorldPacket p)
+        {
+            Auctioneer = p.ReadPackedGuid128();
+            MinBid = p.ReadUInt64();
+            BuyoutPrice = p.ReadUInt64();
+            ExpireTime = p.ReadUInt32();
+
+            if (p.HasBit())
+                TaintedBy = new();
+
+            int itemCountBits = ModernVersion.AddedInClassicVersion(1, 14, 3, 2, 5, 4) ? 6 : 5;
+            uint itemCount = p.ReadBits<uint>(itemCountBits);
+
+            if (TaintedBy != null)
+                TaintedBy.Read(p);
+
+            for (var i = 0; i < itemCount; ++i)
+                Items.Add(new AuctionItemForSale(p));
+        }
+
+        public ulong BuyoutPrice;
+        public WowGuid128 Auctioneer;
+        public ulong MinBid;
+        public uint ExpireTime;
+        public AddOnInfo TaintedBy = null!;
+        public List<AuctionItemForSale> Items = new();
+    }
+
+    /// Frozen verbatim from <c>AuctionPackets.cs</c>.
+    internal sealed class AuctionRemoveItem
+    {
+        public void Read(WorldPacket p)
+        {
+            Auctioneer = p.ReadPackedGuid128();
+            AuctionID = p.ReadUInt32();
+            if (p.HasBit())
+                TaintedBy = new();
+
+            if (TaintedBy != null)
+                TaintedBy.Read(p);
+        }
+
+        public WowGuid128 Auctioneer;
+        public uint AuctionID;
+        public AddOnInfo TaintedBy = null!;
+    }
+
+    /// Frozen verbatim from <c>AuctionPackets.cs</c>.
+    internal sealed class AuctionPlaceBid
+    {
+        public WowGuid128 Auctioneer;
+        public ulong BidAmount;
+        public uint AuctionID;
+        public AddOnInfo TaintedBy = null!;
+
+        public void Read(WorldPacket p)
+        {
+            Auctioneer = p.ReadPackedGuid128();
+            AuctionID = p.ReadUInt32();
+            BidAmount = p.ReadUInt64();
+            if (p.HasBit())
+                TaintedBy = new();
+
+            if (TaintedBy != null)
+                TaintedBy.Read(p);
+        }
+    }
 }

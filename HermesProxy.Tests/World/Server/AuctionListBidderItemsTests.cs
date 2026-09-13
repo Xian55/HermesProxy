@@ -1,4 +1,5 @@
-using System.Linq;
+﻿using System.Linq;
+using Framework.IO;
 using HermesProxy.World;
 using HermesProxy.World.Server.Packets;
 using Xunit;
@@ -32,8 +33,9 @@ public class AuctionListBidderItemsTests
         byte[] framed = new byte[payload.Length + 2];
         payload.CopyTo(framed, 2);
 
-        var packet = new AuctionListBidderItems(new WorldPacket(framed));
-        packet.Read();
+        var r = new SpanPacketReader(new WorldPacket(framed).GetRemainingSpan());
+        AuctionListBidderItemsCodec.Read(ref r, out var packet);
+        Assert.Equal(0, r.Remaining);
         return packet;
     }
 

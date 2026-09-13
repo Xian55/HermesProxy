@@ -71,185 +71,26 @@ class AuctionHelloResponse : ServerPacket, ISpanWritable
     public bool OpenForBusiness = true;
 }
 
-class AuctionListBidderItems : ClientPacket
-{
-    public AuctionListBidderItems(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Auctioneer = _worldPacket.ReadPackedGuid128();
-        Offset = _worldPacket.ReadUInt32();
-
-        uint auctionIDCount = _worldPacket.ReadBits<uint>(7);
-        _worldPacket.ResetBitPos();
-
-        // Add, not the indexer: the list starts empty and List<T>'s setter requires an index
-        // below Count, so assigning through it threw for every client that had an active bid.
-        for (var i = 0; i < auctionIDCount; ++i)
-            AuctionItemIDs.Add(_worldPacket.ReadUInt32());
-    }
-
-    public WowGuid128 Auctioneer;
-    public uint Offset;
-    public List<uint> AuctionItemIDs = new();
-}
+public readonly record struct AuctionListBidderItems(
+    WowGuid128 Auctioneer, uint Offset, List<uint> AuctionItemIDs);
 
 public readonly record struct AuctionListOwnerItems(WowGuid128 Auctioneer, uint Offset);
 
-class AuctionListItems: ClientPacket
-{
-    public AuctionListItems(WorldPacket packet) : base(packet) { }
+public readonly record struct AuctionListItems(
+    uint Offset, WowGuid128 Auctioneer, byte MinLevel, byte MaxLevel, int Quality,
+    byte MaxPetLevel, List<byte> KnownPets, string Name, bool OnlyUsable, bool ExactMatch,
+    List<ClassFilter> ClassFilters, List<AuctionSort> Sorts);
 
-    public override void Read()
-    {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            // V3_4_3 CMSG_AUCTION_LIST_ITEMS — wire per CypherCore WotLK-Classic
-            // AuctionListItems.Read (the authoritative 54261 layout; TC 3.4.3_Source and WPP's
-            // retail handler both mis-handle it). Auctioneer precedes Offset; the pet bytes,
-            // class-filter bodies and sort bodies ARE sent — earlier revisions discarded the
-            // filter bodies, which silently dropped category filtering (#85).
-            Auctioneer = _worldPacket.ReadPackedGuid128();
-            Offset = _worldPacket.ReadUInt32();
-            MinLevel = _worldPacket.ReadUInt8();
-            MaxLevel = _worldPacket.ReadUInt8();
-            Quality = _worldPacket.ReadInt32();
-            int sortsCount = _worldPacket.ReadUInt8();
-            int knownPetSize = _worldPacket.ReadInt32();
-            MaxPetLevel = (byte)_worldPacket.ReadInt8();
+public readonly record struct AuctionSort(byte Type, byte Direction);
 
-            for (int i = 0; i < knownPetSize; ++i)
-                KnownPets.Add(_worldPacket.ReadUInt8());
+public readonly record struct ClassFilter(int ItemClass, List<SubClassFilter> SubClassFilters);
 
-            bool tainted = _worldPacket.HasBit();
-            uint nameLen = _worldPacket.ReadBits<uint>(8);
-            Name = _worldPacket.ReadString(nameLen);
-
-            _worldPacket.ResetBitPos();
-            uint itemClassFilterCount = _worldPacket.ReadBits<uint>(3);
-            OnlyUsable = _worldPacket.HasBit();
-            ExactMatch = _worldPacket.HasBit();
-
-            if (tainted)
-            {
-                // Consume the AddOnInfo (TaintedBy) body to stay aligned; not forwarded.
-                _worldPacket.ResetBitPos();
-                uint addonNameLen = _worldPacket.ReadBits<uint>(10);
-                uint addonVerLen = _worldPacket.ReadBits<uint>(10);
-                _worldPacket.HasBit(); // Loaded
-                _worldPacket.HasBit(); // Disabled
-                if (addonNameLen > 1) { _worldPacket.ReadString(addonNameLen - 1); _worldPacket.ReadUInt8(); }
-                if (addonVerLen > 1) { _worldPacket.ReadString(addonVerLen - 1); _worldPacket.ReadUInt8(); }
-            }
-
-            for (uint i = 0; i < itemClassFilterCount; ++i)
-            {
-                ClassFilter classFilter = new ClassFilter();
-                classFilter.ItemClass = _worldPacket.ReadInt32();
-                uint subClassFilterCount = _worldPacket.ReadBits<uint>(5);
-                for (uint j = 0; j < subClassFilterCount; ++j)
-                {
-                    SubClassFilter filter = new SubClassFilter();
-                    filter.InvTypeMask = (uint)_worldPacket.ReadUInt64();
-                    filter.ItemSubclass = _worldPacket.ReadInt32();
-                    classFilter.SubClassFilters.Add(filter);
-                }
-                ClassFilters.Add(classFilter);
-            }
-
-            _worldPacket.ReadInt32(); // sortDataSize
-            for (int i = 0; i < sortsCount; ++i)
-            {
-                AuctionSort sort = new AuctionSort();
-                _worldPacket.ResetBitPos();
-                sort.Type = _worldPacket.ReadUInt8();
-                sort.Direction = _worldPacket.ReadUInt8();
-                Sorts.Add(sort);
-            }
-            return;
-        }
-
-        Offset = _worldPacket.ReadUInt32();
-        Auctioneer = _worldPacket.ReadPackedGuid128();
-
-        MinLevel = _worldPacket.ReadUInt8();
-        MaxLevel = _worldPacket.ReadUInt8();
-        Quality = _worldPacket.ReadInt32();
-        var sortCount = _worldPacket.ReadUInt8();
-        var knownPetsCount = _worldPacket.ReadUInt32();
-        MaxPetLevel = _worldPacket.ReadUInt8();
-
-        for (int i = 0; i < knownPetsCount; ++i)
-            KnownPets.Add(_worldPacket.ReadUInt8());
-
-        uint nameLength = _worldPacket.ReadBits<uint>(8);
-        Name = _worldPacket.ReadString(nameLength);
-
-        uint classFiltersCount = _worldPacket.ReadBits<uint>(3);
-
-        OnlyUsable = _worldPacket.HasBit();
-        ExactMatch = _worldPacket.HasBit();
-        _worldPacket.ResetBitPos();
-
-        for (int i = 0; i < classFiltersCount; ++i)
-        {
-            ClassFilter classFilter = new ClassFilter();
-            classFilter.ItemClass = _worldPacket.ReadInt32();
-
-            uint subClassFiltersCount = _worldPacket.ReadBits<uint>(5);
-            for (uint j = 0; j < subClassFiltersCount; ++j)
-            {
-                SubClassFilter filter = new SubClassFilter();
-                filter.ItemSubclass = _worldPacket.ReadInt32();
-                filter.InvTypeMask = _worldPacket.ReadUInt32();
-                classFilter.SubClassFilters.Add(filter);
-            }
-
-            ClassFilters.Add(classFilter);
-        }
-
-        var size = _worldPacket.ReadUInt32();
-        var data = _worldPacket.ReadBytes(size);
-        var sorts = new WorldPacket(_worldPacket.GetOpcode(), data);
-        for (var i = 0; i < sortCount; ++i)
-        {
-            AuctionSort sort = new AuctionSort();
-            sort.Type = sorts.ReadUInt8();
-            sort.Direction = sorts.ReadUInt8();
-            Sorts.Add(sort);
-        }
-    }
-
-    public uint Offset;
-    public WowGuid128 Auctioneer;
-    public byte MinLevel;
-    public byte MaxLevel;
-    public int Quality;
-    public byte MaxPetLevel;
-    public List<byte> KnownPets = new();
-    public string Name = string.Empty;
-    public bool OnlyUsable;
-    public bool ExactMatch;
-    public List<ClassFilter> ClassFilters = new List<ClassFilter>();
-    public List<AuctionSort> Sorts = new();
-}
-
-public struct AuctionSort
-{
-    public byte Type;
-    public byte Direction;
-}
-
-public class ClassFilter
-{
-    public int ItemClass;
-    public List<SubClassFilter> SubClassFilters = new();
-}
-public struct SubClassFilter
-{
-    public int ItemSubclass;
-    public uint InvTypeMask;
-}
+/// <remarks>
+/// The two fields swap order between builds — V3_4_3 sends InvTypeMask (as a uint64) first, every
+/// earlier build sends ItemSubclass first. That is one of the reasons AuctionListItems needs a
+/// ranged codec pair rather than a branch inside one reader.
+/// </remarks>
+public readonly record struct SubClassFilter(int ItemSubclass, uint InvTypeMask);
 
 public class AuctionListMyItemsResult : ServerPacket
 {
@@ -454,72 +295,38 @@ public class ItemEnchantData
     public byte Slot;
 }
 
-class AuctionSellItem : ClientPacket
-{
-    public AuctionSellItem(WorldPacket packet) : base(packet) { }
+public readonly record struct AuctionSellItem(
+    WowGuid128 Auctioneer, ulong MinBid, ulong BuyoutPrice, uint ExpireTime,
+    AddOnInfo? TaintedBy, List<AuctionItemForSale> Items);
 
-    public override void Read()
-    {
-        Auctioneer = _worldPacket.ReadPackedGuid128();
-        MinBid = _worldPacket.ReadUInt64();
-        BuyoutPrice = _worldPacket.ReadUInt64();
-        ExpireTime = _worldPacket.ReadUInt32();
+public readonly record struct AuctionItemForSale(WowGuid128 Guid, uint UseCount);
 
-        if (_worldPacket.HasBit())
-            TaintedBy = new();
-
-        int itemCountBits = ModernVersion.AddedInClassicVersion(1, 14, 3, 2, 5, 4) ? 6 : 5;
-        uint itemCount = _worldPacket.ReadBits<uint>(itemCountBits);
-
-        if (TaintedBy != null)
-            TaintedBy.Read(_worldPacket);
-
-        for (var i = 0; i < itemCount; ++i)
-            Items.Add(new AuctionItemForSale(_worldPacket));
-    }
-
-    public ulong BuyoutPrice;
-    public WowGuid128 Auctioneer;
-    public ulong MinBid;
-    public uint ExpireTime;
-    public AddOnInfo TaintedBy = null!;
-    public List<AuctionItemForSale> Items = new();
-}
-
-public struct AuctionItemForSale
-{
-    public AuctionItemForSale(WorldPacket data)
-    {
-        Guid = data.ReadPackedGuid128();
-        UseCount = data.ReadUInt32();
-    }
-
-    public WowGuid128 Guid;
-    public uint UseCount;
-}
-
-class AuctionRemoveItem : ClientPacket
-{
-    public AuctionRemoveItem(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Auctioneer = _worldPacket.ReadPackedGuid128();
-        AuctionID = _worldPacket.ReadUInt32();
-        if (_worldPacket.HasBit())
-            TaintedBy = new();
-
-        if (TaintedBy != null)
-            TaintedBy.Read(_worldPacket);
-    }
-
-    public WowGuid128 Auctioneer;
-    public uint AuctionID;
-    public AddOnInfo TaintedBy = null!;
-}
+public readonly record struct AuctionRemoveItem(
+    WowGuid128 Auctioneer, uint AuctionID, AddOnInfo? TaintedBy);
 
 public class AddOnInfo
 {
+    /// <summary>Span-reader twin of <see cref="Read(WorldPacket)"/>, kept in lockstep with it.</summary>
+    public void Read(ref Framework.IO.SpanPacketReader data)
+    {
+        data.ResetBitReader();
+
+        uint nameLength = data.ReadBits<uint>(10);
+        uint versionLength = data.ReadBits<uint>(10);
+        Loaded = data.HasBit();
+        Disabled = data.HasBit();
+        if (nameLength > 1)
+        {
+            Name = data.ReadString(nameLength - 1);
+            data.ReadUInt8(); // null terminator
+        }
+        if (versionLength > 1)
+        {
+            Version = data.ReadString(versionLength - 1);
+            data.ReadUInt8(); // null terminator
+        }
+    }
+
     public void Read(WorldPacket data)
     {
         data.ResetBitPos();
@@ -546,27 +353,8 @@ public class AddOnInfo
     public bool Disabled;
 }
 
-class AuctionPlaceBid : ClientPacket
-{
-    public WowGuid128 Auctioneer;
-    public ulong BidAmount;
-    public uint AuctionID;
-    public AddOnInfo TaintedBy = null!;
-
-    public AuctionPlaceBid(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
-    {
-        Auctioneer = _worldPacket.ReadPackedGuid128();
-        AuctionID = _worldPacket.ReadUInt32();
-        BidAmount = _worldPacket.ReadUInt64();
-        if (_worldPacket.HasBit())
-            TaintedBy = new();
-
-        if (TaintedBy != null)
-            TaintedBy.Read(_worldPacket);
-    }
-}
+public readonly record struct AuctionPlaceBid(
+    WowGuid128 Auctioneer, uint AuctionID, ulong BidAmount, AddOnInfo? TaintedBy);
 
 class AuctionCommandResult : ServerPacket, ISpanWritable
 {

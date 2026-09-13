@@ -22,8 +22,11 @@ PACKETS_DIR = Path(__file__).resolve().parents[4] / "HermesProxy" / "World" / "S
 
 
 def find_class(name: str):
+    # The colon spacing is a style choice: `class Foo: ClientPacket` is as valid as
+    # `class Foo : ClientPacket`, and requiring the space made AuctionListItems report as
+    # NOT FOUND rather than failing loudly.
     pattern = re.compile(
-        r"^(?:public |internal )?(?:sealed )?class " + re.escape(name) + r" : ClientPacket\s*\{",
+        r"^(?:public |internal )?(?:sealed )?class " + re.escape(name) + r"\s*:\s*ClientPacket\s*\{",
         re.MULTILINE,
     )
     # Recursive: some domains keep one class per file under a subdirectory (Packets/LFG/CMSG),
