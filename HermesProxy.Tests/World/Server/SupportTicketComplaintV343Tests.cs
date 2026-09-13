@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Framework.IO;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
@@ -27,11 +27,16 @@ public class SupportTicketComplaintV343Tests
     // report-line bit(1) + noteLength/flag bits(3) + club-message bit(1) + Horus count(4) + note.
     private static SupportTicketSubmitComplaint Parse(byte[] raw)
     {
-        var worldPacket = new WorldPacket(0u, raw);
-        var complaint = new SupportTicketSubmitComplaint(worldPacket);
-        complaint.ReadV343(worldPacket);
+        var r = ReaderOver(raw);
+        SupportTicketSubmitComplaintCodec.ReadV343(ref r, out var complaint);
         return complaint;
     }
+
+    /// <remarks>
+    /// The captures are raw payloads with no opcode prefix, so the reader is built over the whole
+    /// array rather than through WorldPacket's two-byte offset.
+    /// </remarks>
+    private static SpanPacketReader ReaderOver(byte[] raw) => new(raw);
 
     private static byte[] Bytes(string hex) => Convert.FromHexString(hex.Replace(" ", ""));
 
@@ -120,11 +125,10 @@ public class SupportTicketComplaintV343Tests
         // If any field were mis-sized the note would still parse, but trailing bytes would be
         // left over. The client sends no optional blocks in these captures, so the note is last.
         var raw = Bytes(StolenName);
-        var worldPacket = new WorldPacket(0u, raw);
-        var complaint = new SupportTicketSubmitComplaint(worldPacket);
+        var r = ReaderOver(raw);
 
-        complaint.ReadV343(worldPacket);
+        SupportTicketSubmitComplaintCodec.ReadV343(ref r, out _);
 
-        Assert.False(worldPacket.CanRead());
+        Assert.Equal(0, r.Remaining);
     }
 }

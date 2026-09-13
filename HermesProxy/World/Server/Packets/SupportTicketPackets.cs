@@ -1,208 +1,110 @@
 ﻿using System;
 using System.Collections.Generic;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.Enums;
 using Framework.Logging;
 using HermesProxy.World.Enums;
 
 namespace HermesProxy.World.Server.Packets;
 
-public class SupportTicketSubmitComplaint : ClientPacket
+/// <summary>
+/// CMSG_SUPPORT_TICKET_SUBMIT_COMPLAINT — the in-game "report player" form.
+/// </summary>
+/// <remarks>
+/// The codec has two layouts and both can bail out part-way, leaving the later fields at their
+/// defaults for the system to work with. That is deliberate and matches the body this replaced:
+/// a complaint carrying a payload the proxy cannot translate is still forwarded as a plain
+/// harassment ticket rather than dropped, because the report itself is the point.
+/// </remarks>
+public readonly record struct SupportTicketSubmitComplaint(
+    SupportTicketHeader Header,
+    WowGuid128 TargetCharacterGuid,
+    ReportType ReportType,
+    ReportMajorCategory MajorCategory,
+    ReportMinorCategory MinorCategoryFlags,
+    SupportTicketChatLog ChatLog,
+    SupportTicketMailInfo? SelectedMailInfo,
+    GmTicketComplaintType ComplaintType,
+    string TextNote);
+
+/// <summary>Where the reporting player was standing.</summary>
+public class SupportTicketHeader
 {
-    public SupportTicketSubmitComplaint(WorldPacket packet) : base(packet) { }
-
-    public override void Read()
+    /// <remarks>
+    /// V3_4_3 appends a program FourCC - observed as 0x00576F57 ("WoW") in every native capture.
+    /// WowPacketParser omits it entirely, which is why its parse of this packet desyncs on this
+    /// build.
+    /// </remarks>
+    public void Read(ref SpanPacketReader r, bool withProgram)
     {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            ReadV343(_worldPacket);
-            return;
-        }
+        SelfPlayerMapId = r.ReadUInt32();
+        SelfPlayerPos = r.ReadVector3();
+        SelfPlayerOrientation = r.ReadFloat();
 
-        Header.Read(_worldPacket, withProgram: false);
-        TargetCharacterGuid = _worldPacket.ReadPackedGuid128();
-
-        ChatLog.Read(_worldPacket);
-
-        ComplaintType = (GmTicketComplaintType)_worldPacket.ReadBits<uint>(5);
-
-        var noteLength = _worldPacket.ReadBits<uint>(10);
-
-        var hasMailInfo = _worldPacket.ReadBit();
-        var unk2 = _worldPacket.ReadBit();
-        var unk3 = _worldPacket.ReadBit();
-        var hasGuildInfo = _worldPacket.ReadBit();
-        var unk5 = _worldPacket.ReadBit();
-        var unk6 = _worldPacket.ReadBit();
-        var hasClubMessage = _worldPacket.ReadBit();
-        var unk8 = _worldPacket.ReadBit();
-        var unk9 = _worldPacket.ReadBit();
-
-        _worldPacket.ResetBitPos();
-
-        if (hasClubMessage)
-        {
-            bool isUsingVoice = _worldPacket.ReadBit();
-            _worldPacket.ResetBitPos();
-        }
-
-        var unkAlwaysZero = _worldPacket.ReadUInt32();
-        if  (unkAlwaysZero != 0)
-        {
-            Log.Print(LogType.Error, "You reported something that we do not handle (?)");
-            Log.Print(LogType.Error, "Please create a new issue on GitHub and tell us what you did");
-            return;
-        }
-
-        if (hasMailInfo)
-        {
-            SelectedMailInfo = new MailInfo();
-            SelectedMailInfo.Read(_worldPacket);
-        }
-
-        TextNote = _worldPacket.ReadString(noteLength);
+        if (withProgram)
+            Program = r.ReadUInt32();
     }
 
-    /// <summary>
-    /// V3_4_3 layout, byte-verified against six native captures covering every report category the
-    /// client offers. It differs from the older builds in three ways: three int32 category fields
-    /// sit between the target GUID and the chat log, the note is read *after* the Horus chat log
-    /// rather than after the optional blocks, and the header carries a trailing Program FourCC.
-    /// </summary>
-    internal void ReadV343(WorldPacket _worldPacket)
+    public uint SelfPlayerMapId;
+    public Vector3 SelfPlayerPos;
+    public float SelfPlayerOrientation;
+    public uint Program;
+}
+
+/// <summary>The chat lines the player selected when reporting.</summary>
+public class SupportTicketChatLog
+{
+    /// <remarks>
+    /// Each line's 12-bit text length sits inside the loop, after its own timestamp, so the lines
+    /// cannot be skipped in bulk - and the optional reported-line index trails all of them.
+    /// </remarks>
+    public void Read(ref SpanPacketReader r)
     {
-        Header.Read(_worldPacket, withProgram: true);
-        TargetCharacterGuid = _worldPacket.ReadPackedGuid128();
+        uint chatLogLineCount = r.ReadUInt32();
+        bool hasReportedLineIndex = r.ReadBool();
 
-        ReportType = (ReportType)_worldPacket.ReadInt32();
-        MajorCategory = (ReportMajorCategory)_worldPacket.ReadInt32();
-        MinorCategoryFlags = (ReportMinorCategory)_worldPacket.ReadInt32();
-
-        ChatLog.Read(_worldPacket);
-
-        var noteLength = _worldPacket.ReadBits<uint>(10);
-
-        var hasMailInfo = _worldPacket.ReadBit();
-        var hasCalendarInfo = _worldPacket.ReadBit();
-        var hasPetInfo = _worldPacket.ReadBit();
-        var hasGuildInfo = _worldPacket.ReadBit();
-        var hasLFGListSearchResult = _worldPacket.ReadBit();
-        var hasLFGListApplicant = _worldPacket.ReadBit();
-        var hasClubMessage = _worldPacket.ReadBit();
-        var hasClubFinderResult = _worldPacket.ReadBit();
-        var hasUnk910 = _worldPacket.ReadBit();
-
-        _worldPacket.ResetBitPos();
-
-        if (hasClubMessage)
+        for (var i = 0; i < chatLogLineCount; i++)
         {
-            _worldPacket.ReadBit(); // IsPlayerUsingVoice
-            _worldPacket.ResetBitPos();
+            DateTime time = r.ReadTime64();
+            uint textLength = r.ReadBits<uint>(12);
+            r.ResetBitPos();
+            ChatLines.Add(new ChatLine { Time = time, Text = r.ReadString(textLength) });
         }
 
-        // HorusChatLog: a line count followed by that many lines. Always empty in the captures,
-        // and the proxy has nothing to do with community chat, so the lines are not decoded -
-        // bail out rather than read past a structure we cannot forward anyway.
-        var horusLineCount = _worldPacket.ReadUInt32();
-        if (horusLineCount != 0)
-        {
-            Log.Print(LogType.Error, "Support ticket carried a community chat log, which is not translated");
-            return;
-        }
-
-        TextNote = _worldPacket.ReadString(noteLength);
-
-        if (hasMailInfo)
-        {
-            SelectedMailInfo = new MailInfo();
-            SelectedMailInfo.Read(_worldPacket);
-        }
+        if (hasReportedLineIndex)
+            ReportedLineIdx = r.ReadUInt32();
     }
 
-    public HeaderInfo Header = new();
-    public WowGuid128 TargetCharacterGuid;
-    public ReportType ReportType;
-    public ReportMajorCategory MajorCategory;
-    public ReportMinorCategory MinorCategoryFlags;
-    public ChatLogInfo ChatLog = new();
-    public MailInfo? SelectedMailInfo = null;
-    public GmTicketComplaintType ComplaintType;
-    public string TextNote = string.Empty;
-    
-    public class HeaderInfo
+    public List<ChatLine> ChatLines = new();
+    public uint? ReportedLineIdx;
+
+    public class ChatLine
     {
-        public void Read(WorldPacket worldPacket, bool withProgram)
-        {
-            SelfPlayerMapId = worldPacket.ReadUInt32();
-            SelfPlayerPos = worldPacket.ReadVector3();
-            SelfPlayerOrientation = worldPacket.ReadFloat();
+        public DateTime Time;
+        public string Text = string.Empty;
+    }
+}
 
-            // V3_4_3 appends a program FourCC - observed as 0x00576F57 ("WoW") in every native
-            // capture. WowPacketParser omits it entirely, which is why its parse of this packet
-            // desyncs on this build.
-            if (withProgram)
-                Program = worldPacket.ReadUInt32();
-        }
+/// <summary>The mail a player is reporting, when the complaint is about one.</summary>
+public class SupportTicketMailInfo
+{
+    /// <remarks>Both lengths are read before either string, so neither can be read in place.</remarks>
+    public void Read(ref SpanPacketReader r)
+    {
+        MailId = r.ReadUInt32();
 
-        public uint SelfPlayerMapId;
-        public Vector3 SelfPlayerPos;
-        public float SelfPlayerOrientation;
-        public uint Program;
+        uint textBodyLength = r.ReadBits<uint>(13);
+        uint subjectLength = r.ReadBits<uint>(9);
+        r.ResetBitPos();
+
+        MailTextBody = r.ReadString(textBodyLength);
+        MailSubject = r.ReadString(subjectLength);
     }
 
-    public class ChatLogInfo
-    {
-        public void Read(WorldPacket worldPacket)
-        {
-            var chatLogLineCount = worldPacket.ReadUInt32();
-
-            var hasReportedLineIndex = worldPacket.ReadBool();
-
-            for (var i = 0; i < chatLogLineCount; i++)
-            {
-                var time = worldPacket.ReadTime64(); 
-                var textLength = worldPacket.ReadBits<uint>(12);
-                worldPacket.ResetBitPos();
-                var text = worldPacket.ReadString(textLength);
-                ChatLines.Add(new ChatLine
-                {
-                    Time = time,
-                    Text = text,
-                });
-            }
-
-            if (hasReportedLineIndex)
-                ReportedLineIdx = worldPacket.ReadUInt32();
-        }
-
-        public List<ChatLine> ChatLines = new();
-        public uint? ReportedLineIdx;
-
-        public class ChatLine
-        {
-            public DateTime Time;
-            public string Text = string.Empty;
-        }
-    }
-
-    public class MailInfo
-    {
-        public void Read(WorldPacket worldPacket)
-        {
-            MailId = worldPacket.ReadUInt32();
-            
-            var textBodyLength = worldPacket.ReadBits<uint>(13);
-            var subjectLength = worldPacket.ReadBits<uint>(9);
-            worldPacket.ResetBitPos();
-
-            MailTextBody = worldPacket.ReadString(textBodyLength);
-            MailSubject = worldPacket.ReadString(subjectLength);
-        }
-        
-        public uint MailId;
-        public string MailTextBody = string.Empty;
-        public string MailSubject = string.Empty;
-    }
+    public uint MailId;
+    public string MailTextBody = string.Empty;
+    public string MailSubject = string.Empty;
 }
 
 /// <summary>
