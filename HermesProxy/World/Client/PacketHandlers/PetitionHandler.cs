@@ -1,5 +1,6 @@
 ﻿using Framework;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
@@ -12,8 +13,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_PETITION_SHOW_LIST)]
-    void HandlePetitionShowList(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PETITION_SHOW_LIST)]
+    internal void HandlePetitionShowList(WorldPacket packet)
     {
         ServerPetitionShowList petitions = new();
         petitions.Unit = packet.ReadGuid().To128(GetSession().GameState);
@@ -54,8 +55,8 @@ public partial class WorldClient
         SendPacketToClient(petitions);
     }
 
-    [PacketHandler(Opcode.SMSG_PETITION_SHOW_SIGNATURES)]
-    void HandlePetitionShowSignatures(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PETITION_SHOW_SIGNATURES)]
+    internal void HandlePetitionShowSignatures(WorldPacket packet)
     {
         ServerPetitionShowSignatures petition = new();
         petition.Item = packet.ReadGuid().To128(GetSession().GameState);
@@ -73,8 +74,8 @@ public partial class WorldClient
         SendPacketToClient(petition);
     }
 
-    [PacketHandler(Opcode.SMSG_QUERY_PETITION_RESPONSE)]
-    void HandlePetitionQueryResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUERY_PETITION_RESPONSE)]
+    internal void HandlePetitionQueryResponse(WorldPacket packet)
     {
         QueryPetitionResponse petition = new();
         petition.PetitionID = packet.ReadUInt32();
@@ -113,8 +114,8 @@ public partial class WorldClient
         SendPacketToClient(petition);
     }
 
-    [PacketHandler(Opcode.MSG_PETITION_RENAME)]
-    void HandlePetitionRename(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_PETITION_RENAME)]
+    internal void HandlePetitionRename(WorldPacket packet)
     {
         PetitionRenameGuildResponse petition = new();
         petition.PetitionGuid = packet.ReadGuid().To128(GetSession().GameState);
@@ -122,8 +123,8 @@ public partial class WorldClient
         SendPacketToClient(petition);
     }
 
-    [PacketHandler(Opcode.MSG_PETITION_DECLINE)]
-    void HandlePetitionDecline(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_PETITION_DECLINE)]
+    internal void HandlePetitionDecline(WorldPacket packet)
     {
         WowGuid128 guid = packet.ReadGuid().To128(GetSession().GameState);
         string name = GetSession().GameState.GetPlayerName(guid);
@@ -134,8 +135,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_PETITION_SIGN_RESULTS)]
-    void HandlePetitionSignResults(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PETITION_SIGN_RESULTS)]
+    internal void HandlePetitionSignResults(WorldPacket packet)
     {
         PetitionSignResults petition = new();
         petition.Item = packet.ReadGuid().To128(GetSession().GameState);
@@ -144,8 +145,8 @@ public partial class WorldClient
         SendPacketToClient(petition);
     }
 
-    [PacketHandler(Opcode.SMSG_TURN_IN_PETITION_RESULT)]
-    void HandleTurnInPetitionResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_TURN_IN_PETITION_RESULT)]
+    internal void HandleTurnInPetitionResult(WorldPacket packet)
     {
         TurnInPetitionResult petition = new();
         petition.Result = (PetitionTurnResult)packet.ReadUInt32();

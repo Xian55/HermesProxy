@@ -1,5 +1,6 @@
-using Framework;
+﻿using Framework;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -12,8 +13,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_LOOT_RESPONSE)]
-    void HandleLootResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOOT_RESPONSE)]
+    internal void HandleLootResponse(WorldPacket packet)
     {
         LootResponse loot = new();
         var state = GetSession().GameState;
@@ -56,8 +57,8 @@ public partial class WorldClient
         SendPacketToClient(loot);
     }
 
-    [PacketHandler(Opcode.SMSG_LOOT_RELEASE)]
-    void HandleLootRelease(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOOT_RELEASE)]
+    internal void HandleLootRelease(WorldPacket packet)
     {
         LootReleaseResponse loot = new();
         WowGuid64 owner = packet.ReadGuid();
@@ -92,8 +93,8 @@ public partial class WorldClient
         // else: suppress; session is logically still open. Leave LastMasterLootSentTarget.
     }
 
-    [PacketHandler(Opcode.SMSG_LOOT_REMOVED)]
-    void HandleLootRemoved(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOOT_REMOVED)]
+    internal void HandleLootRemoved(WorldPacket packet)
     {
         LootRemoved loot = new();
         var state = GetSession().GameState;
@@ -136,8 +137,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_LOOT_MONEY_NOTIFY)]
-    void HandleLootMoneyNotify(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOOT_MONEY_NOTIFY)]
+    internal void HandleLootMoneyNotify(WorldPacket packet)
     {
         LootMoneyNotify loot = new();
         loot.Money = packet.ReadUInt32();
@@ -162,8 +163,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_LOOT_CLEAR_MONEY)]
-    void HandleLootCelarMoney(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOOT_CLEAR_MONEY)]
+    internal void HandleLootCelarMoney(WorldPacket packet)
     {
         CoinRemoved loot = new();
         var state = GetSession().GameState;
@@ -177,8 +178,8 @@ public partial class WorldClient
         // the wire and the UI refuses to auto-close.
     }
 
-    [PacketHandler(Opcode.SMSG_LOOT_START_ROLL)]
-    void HandleLootStartRoll(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOOT_START_ROLL)]
+    internal void HandleLootStartRoll(WorldPacket packet)
     {
         StartLootRoll loot = new StartLootRoll();
         WowGuid64 owner = packet.ReadGuid();
@@ -235,8 +236,8 @@ public partial class WorldClient
             : converted;
     }
 
-    [PacketHandler(Opcode.SMSG_LOOT_ROLL)]
-    void HandleLootRoll(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOOT_ROLL)]
+    internal void HandleLootRoll(WorldPacket packet)
     {
         LootRollBroadcast loot = new LootRollBroadcast();
         WowGuid64 owner = packet.ReadGuid();
@@ -267,8 +268,8 @@ public partial class WorldClient
         SendPacketToClient(loot);
     }
 
-    [PacketHandler(Opcode.SMSG_LOOT_ROLL_WON)]
-    void HandleLootRollWon(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOOT_ROLL_WON)]
+    internal void HandleLootRollWon(WorldPacket packet)
     {
         LootRollWon loot = new LootRollWon();
         WowGuid64 wonOwner = packet.ReadGuid();
@@ -295,8 +296,8 @@ public partial class WorldClient
         GetSession().GameState.LootRollObjects.Remove(loot.Item.LootListID);
     }
 
-    [PacketHandler(Opcode.SMSG_LOOT_ALL_PASSED)]
-    void HandleLootAllPassed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOOT_ALL_PASSED)]
+    internal void HandleLootAllPassed(WorldPacket packet)
     {
         LootAllPassed loot = new LootAllPassed();
         loot.LootObj = packet.ReadGuid().ToLootGuid();
@@ -316,8 +317,8 @@ public partial class WorldClient
         GetSession().GameState.LootRollObjects.Remove(loot.Item.LootListID);
     }
 
-    [PacketHandler(Opcode.SMSG_LOOT_MASTER_LIST)]
-    void HandleLootMasterList(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOOT_MASTER_LIST)]
+    internal void HandleLootMasterList(WorldPacket packet)
     {
         // Cache the candidate list -- do NOT send packets here.
         // The legacy server sends this only once per corpse (to whoever loots first),

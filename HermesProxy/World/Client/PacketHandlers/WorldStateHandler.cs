@@ -1,6 +1,7 @@
 ﻿using Framework;
 using HermesProxy.Enums;
 using HermesProxy.World;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -11,8 +12,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_INIT_WORLD_STATES)]
-    void HandleInitWorldStates(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_INIT_WORLD_STATES)]
+    internal void HandleInitWorldStates(WorldPacket packet)
     {
         InitWorldStates states = new InitWorldStates();
         states.MapID = packet.ReadUInt32();
@@ -76,8 +77,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_UPDATE_WORLD_STATE)]
-    void HandleUpdateWorldState(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_UPDATE_WORLD_STATE)]
+    internal void HandleUpdateWorldState(WorldPacket packet)
     {
         UpdateWorldState update = new UpdateWorldState();
         update.VariableID = packet.ReadUInt32();

@@ -1,5 +1,6 @@
 ﻿using Framework;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -10,15 +11,15 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_FEATURE_SYSTEM_STATUS)]
-    void HandleFeatureSystemStatus(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_FEATURE_SYSTEM_STATUS)]
+    internal void HandleFeatureSystemStatus(WorldPacket packet)
     {
         GetSession().RealmSocket.SendFeatureSystemStatus();
     }
 
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_MOTD)]
-    void HandleMotd(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_MOTD)]
+    internal void HandleMotd(WorldPacket packet)
     {
         MOTD motd = new MOTD();
         uint count = packet.ReadUInt32();

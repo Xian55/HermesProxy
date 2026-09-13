@@ -1,5 +1,6 @@
 ﻿using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
@@ -14,8 +15,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_ENUM_CHARACTERS_RESULT)]
-    void HandleEnumCharactersResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ENUM_CHARACTERS_RESULT)]
+    internal void HandleEnumCharactersResult(WorldPacket packet)
     {
         Log.Print(LogType.Trace, "[Trace] HandleEnumCharactersResult: ENTER — translating legacy SMSG_ENUM_CHARACTERS_RESULT to modern");
         EnumCharactersResult charEnum = new();
@@ -234,8 +235,8 @@ public partial class WorldClient
         Log.Print(LogType.Trace, "[Trace] HandleEnumCharactersResult: EXIT — translation complete, packet queued for modern client");
     }
 
-    [PacketHandler(Opcode.SMSG_CREATE_CHAR)]
-    void HandleCreateChar(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CREATE_CHAR)]
+    internal void HandleCreateChar(WorldPacket packet)
     {
         byte result = packet.ReadUInt8();
         var state = GetSession().GameState;
@@ -267,8 +268,8 @@ public partial class WorldClient
         SendPacketToClient(createChar);
     }
 
-    [PacketHandler(Opcode.SMSG_DELETE_CHAR)]
-    void HandleDeleteChar(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DELETE_CHAR)]
+    internal void HandleDeleteChar(WorldPacket packet)
     {
         byte result = packet.ReadUInt8();
 
@@ -277,8 +278,8 @@ public partial class WorldClient
         SendPacketToClient(deleteChar);
     }
 
-    [PacketHandler(Opcode.SMSG_QUERY_PLAYER_NAME_RESPONSE)]
-    void HandleQueryPlayerNameResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUERY_PLAYER_NAME_RESPONSE)]
+    internal void HandleQueryPlayerNameResponse(WorldPacket packet)
     {
         QueryPlayerNameResponse response = new QueryPlayerNameResponse();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
@@ -335,8 +336,8 @@ public partial class WorldClient
         SendPacketToClient(response);
     }
 
-    [PacketHandler(Opcode.SMSG_LOGIN_VERIFY_WORLD)]
-    void HandleLoginVerifyWorld(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOGIN_VERIFY_WORLD)]
+    internal void HandleLoginVerifyWorld(WorldPacket packet)
     {
         LoginVerifyWorld verify = new LoginVerifyWorld();
         verify.MapID = packet.ReadUInt32();
@@ -454,8 +455,8 @@ public partial class WorldClient
         return packet;
     }
 
-    [PacketHandler(Opcode.SMSG_CHARACTER_LOGIN_FAILED)]
-    void HandleCharacterLoginFailed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CHARACTER_LOGIN_FAILED)]
+    internal void HandleCharacterLoginFailed(WorldPacket packet)
     {
         CharacterLoginFailed failed = new CharacterLoginFailed();
         failed.Code = (Framework.Constants.LoginFailureReason)packet.ReadUInt8();
@@ -464,8 +465,8 @@ public partial class WorldClient
         GetSession().GameState.IsInWorld = false;
     }
 
-    [PacketHandler(Opcode.SMSG_UPDATE_ACTION_BUTTONS)]
-    void HandleUpdateActionButtons(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_UPDATE_ACTION_BUTTONS)]
+    internal void HandleUpdateActionButtons(WorldPacket packet)
     {
         byte reason = 0;
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
@@ -536,23 +537,23 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_ENABLE_BARBER_SHOP)]
-    void HandleEnableBarberShop(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ENABLE_BARBER_SHOP)]
+    internal void HandleEnableBarberShop(WorldPacket packet)
     {
         // Legacy carries no payload. Native 3.4.3 sends CustomizationScope 0 for a barber chair,
         // which is the only scope a WotLK backend can produce.
         SendPacketToClient(new EnableBarberShop { CustomizationScope = 0 });
     }
 
-    [PacketHandler(Opcode.SMSG_BARBER_SHOP_RESULT)]
-    void HandleBarberShopResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BARBER_SHOP_RESULT)]
+    internal void HandleBarberShopResult(WorldPacket packet)
     {
         // Legacy writes uint32, modern reads int32, and the result values did not change.
         SendPacketToClient(new BarberShopResult { Result = packet.ReadInt32() });
     }
 
-    [PacketHandler(Opcode.SMSG_LOGOUT_RESPONSE)]
-    void HandleLogoutResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOGOUT_RESPONSE)]
+    internal void HandleLogoutResponse(WorldPacket packet)
     {
         LogoutResponse logout = new LogoutResponse();
         logout.LogoutResult = packet.ReadInt32();
@@ -560,8 +561,8 @@ public partial class WorldClient
         SendPacketToClient(logout);
     }
 
-    [PacketHandler(Opcode.SMSG_LOGOUT_COMPLETE)]
-    void HandleLogoutComplete(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOGOUT_COMPLETE)]
+    internal void HandleLogoutComplete(WorldPacket packet)
     {
         LogoutComplete logout = new LogoutComplete();
         SendPacketToClient(logout);
@@ -571,15 +572,15 @@ public partial class WorldClient
         GetSession().InstanceSocket = null!;
     }
 
-    [PacketHandler(Opcode.SMSG_LOGOUT_CANCEL_ACK)]
-    void HandleLogoutCancelAck(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOGOUT_CANCEL_ACK)]
+    internal void HandleLogoutCancelAck(WorldPacket packet)
     {
         LogoutCancelAck logout = new LogoutCancelAck();
         SendPacketToClient(logout);
     }
 
-    [PacketHandler(Opcode.SMSG_LOG_XP_GAIN)]
-    void HandleLogXPGain(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOG_XP_GAIN)]
+    internal void HandleLogXPGain(WorldPacket packet)
     {
         LogXPGain log = new();
         log.Victim = packet.ReadGuid().To128(GetSession().GameState);
@@ -595,8 +596,8 @@ public partial class WorldClient
         SendPacketToClient(log);
     }
 
-    [PacketHandler(Opcode.SMSG_PLAYED_TIME)]
-    void HandlePlayedTime(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PLAYED_TIME)]
+    internal void HandlePlayedTime(WorldPacket packet)
     {
         PlayedTime played = new();
         played.TotalTime = packet.ReadUInt32();
@@ -608,8 +609,8 @@ public partial class WorldClient
         SendPacketToClient(played);
     }
 
-    [PacketHandler(Opcode.SMSG_LEVEL_UP_INFO)]
-    void HandleLevelUpInfo(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LEVEL_UP_INFO)]
+    internal void HandleLevelUpInfo(WorldPacket packet)
     {
         LevelUpInfo info = new LevelUpInfo();
         info.Level = packet.ReadInt32();
@@ -624,8 +625,8 @@ public partial class WorldClient
         SendPacketToClient(info);
     }
 
-    [PacketHandler(Opcode.SMSG_UPDATE_COMBO_POINTS)]
-    void HandleUpdateComboPoints(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_UPDATE_COMBO_POINTS)]
+    internal void HandleUpdateComboPoints(WorldPacket packet)
     {
         ObjectUpdate updateData = new ObjectUpdate(GetSession().GameState.CurrentPlayerGuid, UpdateTypeModern.Values, GetSession());
         var comboTarget = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -645,9 +646,9 @@ public partial class WorldClient
         SendPacketToClient(updatePacket);
     }
 
-    [PacketHandler(Opcode.SMSG_INSPECT_RESULT)]
-    [PacketHandler(Opcode.SMSG_INSPECT_TALENT)]
-    void HandleInspectResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_INSPECT_RESULT)]
+    [HandlesSmsg(Opcode.SMSG_INSPECT_TALENT)]
+    internal void HandleInspectResult(WorldPacket packet)
     {
         InspectResult inspect = new InspectResult();
         if (packet.GetUniversalOpcode(false) == Opcode.SMSG_INSPECT_RESULT)
@@ -752,8 +753,8 @@ public partial class WorldClient
         SendPacketToClient(inspect);
     }
 
-    [PacketHandler(Opcode.MSG_INSPECT_HONOR_STATS, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
-    void HandleInspectHonorStatsVanilla(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_INSPECT_HONOR_STATS, RemovedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleInspectHonorStatsVanilla(WorldPacket packet)
     {
         WowGuid128 playerGuid = packet.ReadGuid().To128(GetSession().GameState);
         byte lifetimeHighestRank = packet.ReadUInt8();
@@ -806,8 +807,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.MSG_INSPECT_HONOR_STATS, ClientVersionBuild.V2_0_1_6180)]
-    void HandleInspectHonorStatsTBC(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_INSPECT_HONOR_STATS, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleInspectHonorStatsTBC(WorldPacket packet)
     {
         WowGuid128 playerGuid = packet.ReadGuid().To128(GetSession().GameState);
         byte lifetimeHighestRank = packet.ReadUInt8();
@@ -840,8 +841,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.MSG_INSPECT_ARENA_TEAMS)]
-    void HandleInspectArenaTeams(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_INSPECT_ARENA_TEAMS)]
+    internal void HandleInspectArenaTeams(WorldPacket packet)
     {
         InspectPvP inspect = new InspectPvP();
         inspect.PlayerGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -860,8 +861,8 @@ public partial class WorldClient
         SendPacketToClient(inspect);
     }
 
-    [PacketHandler(Opcode.SMSG_CHARACTER_RENAME_RESULT)]
-    void HandleCharacterRenameResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CHARACTER_RENAME_RESULT)]
+    internal void HandleCharacterRenameResult(WorldPacket packet)
     {
         byte result = packet.ReadUInt8();
 

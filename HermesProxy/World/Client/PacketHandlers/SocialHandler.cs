@@ -1,5 +1,6 @@
 ﻿using Framework;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -11,8 +12,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_FRIEND_LIST)]
-    void HandleFriendList(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_FRIEND_LIST)]
+    internal void HandleFriendList(WorldPacket packet)
     {
         ContactList contacts = new ContactList();
         contacts.Flags = SocialFlag.Friend;
@@ -39,8 +40,8 @@ public partial class WorldClient
         SendPacketToClient(contacts);
     }
 
-    [PacketHandler(Opcode.SMSG_IGNORE_LIST)]
-    void HandleIgnoreList(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_IGNORE_LIST)]
+    internal void HandleIgnoreList(WorldPacket packet)
     {
         ContactList contacts = new ContactList();
         contacts.Flags = SocialFlag.Ignored;
@@ -63,8 +64,8 @@ public partial class WorldClient
         SendPacketToClient(contacts);
     }
 
-    [PacketHandler(Opcode.SMSG_CONTACT_LIST)]
-    void HandleContactList(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CONTACT_LIST)]
+    internal void HandleContactList(WorldPacket packet)
     {
         ContactList contacts = new ContactList();
         contacts.Flags = (SocialFlag)packet.ReadUInt32();
@@ -95,8 +96,8 @@ public partial class WorldClient
         SendPacketToClient(contacts);
     }
 
-    [PacketHandler(Opcode.SMSG_FRIEND_STATUS)]
-    void HandleFriendStatus(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_FRIEND_STATUS)]
+    internal void HandleFriendStatus(WorldPacket packet)
     {
         FriendStatusPkt friend = new FriendStatusPkt();
         friend.FriendResult = (FriendsResult)packet.ReadUInt8();

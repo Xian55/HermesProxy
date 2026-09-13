@@ -1,6 +1,7 @@
 ﻿using Framework.GameMath;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -11,43 +12,43 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.MSG_MOVE_START_FORWARD)]
-    [PacketHandler(Opcode.MSG_MOVE_START_BACKWARD)]
-    [PacketHandler(Opcode.MSG_MOVE_STOP)]
-    [PacketHandler(Opcode.MSG_MOVE_START_STRAFE_LEFT)]
-    [PacketHandler(Opcode.MSG_MOVE_START_STRAFE_RIGHT)]
-    [PacketHandler(Opcode.MSG_MOVE_STOP_STRAFE)]
-    [PacketHandler(Opcode.MSG_MOVE_START_ASCEND)]
-    [PacketHandler(Opcode.MSG_MOVE_START_DESCEND)]
-    [PacketHandler(Opcode.MSG_MOVE_STOP_ASCEND)]
-    [PacketHandler(Opcode.MSG_MOVE_JUMP)]
-    [PacketHandler(Opcode.MSG_MOVE_START_TURN_LEFT)]
-    [PacketHandler(Opcode.MSG_MOVE_START_TURN_RIGHT)]
-    [PacketHandler(Opcode.MSG_MOVE_STOP_TURN)]
-    [PacketHandler(Opcode.MSG_MOVE_START_PITCH_UP)]
-    [PacketHandler(Opcode.MSG_MOVE_START_PITCH_DOWN)]
-    [PacketHandler(Opcode.MSG_MOVE_STOP_PITCH)]
-    [PacketHandler(Opcode.MSG_MOVE_SET_RUN_MODE)]
-    [PacketHandler(Opcode.MSG_MOVE_SET_WALK_MODE)]
-    [PacketHandler(Opcode.MSG_MOVE_TELEPORT)]
-    [PacketHandler(Opcode.MSG_MOVE_SET_FACING)]
-    [PacketHandler(Opcode.MSG_MOVE_SET_PITCH)]
-    [PacketHandler(Opcode.MSG_MOVE_TOGGLE_COLLISION_CHEAT)]
-    [PacketHandler(Opcode.MSG_MOVE_GRAVITY_CHNG)]
-    [PacketHandler(Opcode.MSG_MOVE_ROOT)]
-    [PacketHandler(Opcode.MSG_MOVE_UNROOT)]
-    [PacketHandler(Opcode.MSG_MOVE_START_SWIM)]
-    [PacketHandler(Opcode.MSG_MOVE_STOP_SWIM)]
-    [PacketHandler(Opcode.MSG_MOVE_START_SWIM_CHEAT)]
-    [PacketHandler(Opcode.MSG_MOVE_STOP_SWIM_CHEAT)]
-    [PacketHandler(Opcode.MSG_MOVE_HEARTBEAT)]
-    [PacketHandler(Opcode.MSG_MOVE_FALL_LAND)]
-    [PacketHandler(Opcode.MSG_MOVE_UPDATE_CAN_FLY)]
-    [PacketHandler(Opcode.MSG_MOVE_UPDATE_CAN_TRANSITION_BETWEEN_SWIM_AND_FLY)]
-    [PacketHandler(Opcode.MSG_MOVE_HOVER)]
-    [PacketHandler(Opcode.MSG_MOVE_FEATHER_FALL)]
-    [PacketHandler(Opcode.MSG_MOVE_WATER_WALK)]
-    void HandleMovementMessages(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_MOVE_START_FORWARD)]
+    [HandlesSmsg(Opcode.MSG_MOVE_START_BACKWARD)]
+    [HandlesSmsg(Opcode.MSG_MOVE_STOP)]
+    [HandlesSmsg(Opcode.MSG_MOVE_START_STRAFE_LEFT)]
+    [HandlesSmsg(Opcode.MSG_MOVE_START_STRAFE_RIGHT)]
+    [HandlesSmsg(Opcode.MSG_MOVE_STOP_STRAFE)]
+    [HandlesSmsg(Opcode.MSG_MOVE_START_ASCEND)]
+    [HandlesSmsg(Opcode.MSG_MOVE_START_DESCEND)]
+    [HandlesSmsg(Opcode.MSG_MOVE_STOP_ASCEND)]
+    [HandlesSmsg(Opcode.MSG_MOVE_JUMP)]
+    [HandlesSmsg(Opcode.MSG_MOVE_START_TURN_LEFT)]
+    [HandlesSmsg(Opcode.MSG_MOVE_START_TURN_RIGHT)]
+    [HandlesSmsg(Opcode.MSG_MOVE_STOP_TURN)]
+    [HandlesSmsg(Opcode.MSG_MOVE_START_PITCH_UP)]
+    [HandlesSmsg(Opcode.MSG_MOVE_START_PITCH_DOWN)]
+    [HandlesSmsg(Opcode.MSG_MOVE_STOP_PITCH)]
+    [HandlesSmsg(Opcode.MSG_MOVE_SET_RUN_MODE)]
+    [HandlesSmsg(Opcode.MSG_MOVE_SET_WALK_MODE)]
+    [HandlesSmsg(Opcode.MSG_MOVE_TELEPORT)]
+    [HandlesSmsg(Opcode.MSG_MOVE_SET_FACING)]
+    [HandlesSmsg(Opcode.MSG_MOVE_SET_PITCH)]
+    [HandlesSmsg(Opcode.MSG_MOVE_TOGGLE_COLLISION_CHEAT)]
+    [HandlesSmsg(Opcode.MSG_MOVE_GRAVITY_CHNG)]
+    [HandlesSmsg(Opcode.MSG_MOVE_ROOT)]
+    [HandlesSmsg(Opcode.MSG_MOVE_UNROOT)]
+    [HandlesSmsg(Opcode.MSG_MOVE_START_SWIM)]
+    [HandlesSmsg(Opcode.MSG_MOVE_STOP_SWIM)]
+    [HandlesSmsg(Opcode.MSG_MOVE_START_SWIM_CHEAT)]
+    [HandlesSmsg(Opcode.MSG_MOVE_STOP_SWIM_CHEAT)]
+    [HandlesSmsg(Opcode.MSG_MOVE_HEARTBEAT)]
+    [HandlesSmsg(Opcode.MSG_MOVE_FALL_LAND)]
+    [HandlesSmsg(Opcode.MSG_MOVE_UPDATE_CAN_FLY)]
+    [HandlesSmsg(Opcode.MSG_MOVE_UPDATE_CAN_TRANSITION_BETWEEN_SWIM_AND_FLY)]
+    [HandlesSmsg(Opcode.MSG_MOVE_HOVER)]
+    [HandlesSmsg(Opcode.MSG_MOVE_FEATHER_FALL)]
+    [HandlesSmsg(Opcode.MSG_MOVE_WATER_WALK)]
+    internal void HandleMovementMessages(WorldPacket packet)
     {
         MoveUpdate moveUpdate = new MoveUpdate();
         moveUpdate.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -58,8 +59,8 @@ public partial class WorldClient
         SendPacketToClient(moveUpdate);
     }
 
-    [PacketHandler(Opcode.MSG_MOVE_KNOCK_BACK)]
-    void HandleMoveKnockBack(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_MOVE_KNOCK_BACK)]
+    internal void HandleMoveKnockBack(WorldPacket packet)
     {
         MoveUpdateKnockBack knockback = new MoveUpdateKnockBack();
         knockback.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -74,8 +75,8 @@ public partial class WorldClient
         SendPacketToClient(knockback);
     }
 
-    [PacketHandler(Opcode.SMSG_MOVE_KNOCK_BACK)]
-    void HandleMoveForceKnockBack(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_MOVE_KNOCK_BACK)]
+    internal void HandleMoveForceKnockBack(WorldPacket packet)
     {
         MoveKnockBack knockback = new MoveKnockBack();
         knockback.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -86,8 +87,8 @@ public partial class WorldClient
         SendPacketToClient(knockback);
     }
 
-    [PacketHandler(Opcode.SMSG_CONTROL_UPDATE)]
-    void HandleControlUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CONTROL_UPDATE)]
+    internal void HandleControlUpdate(WorldPacket packet)
     {
         ControlUpdate control = new ControlUpdate();
         control.Guid = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -107,8 +108,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.MSG_MOVE_TELEPORT_ACK)]
-    void HandleMoveTeleportAck(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_MOVE_TELEPORT_ACK)]
+    internal void HandleMoveTeleportAck(WorldPacket packet)
     {
         WowGuid128 guid = packet.ReadPackedGuid().To128(GetSession().GameState);
 
@@ -152,8 +153,8 @@ public partial class WorldClient
         SendPacketToClient(teleport);
     }
 
-    [PacketHandler(Opcode.SMSG_TRANSFER_PENDING)]
-    void HandleTransferPending(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_TRANSFER_PENDING)]
+    internal void HandleTransferPending(WorldPacket packet)
     {
         if (GetSession().GameState.IsWaitingForWorldPortAck)
         {
@@ -194,8 +195,8 @@ public partial class WorldClient
         SendPacketToClient(suspend);
     }
 
-    [PacketHandler(Opcode.SMSG_TRANSFER_ABORTED)]
-    void HandleTransferAborted(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_TRANSFER_ABORTED)]
+    internal void HandleTransferAborted(WorldPacket packet)
     {
         TransferAborted transfer = new TransferAborted();
 
@@ -219,8 +220,8 @@ public partial class WorldClient
         GetSession().GameState.IsWaitingForNewWorld = false;
     }
 
-    [PacketHandler(Opcode.SMSG_NEW_WORLD)]
-    void HandleNewWorld(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_NEW_WORLD)]
+    internal void HandleNewWorld(WorldPacket packet)
     {
         NewWorld teleport = new NewWorld();
         GetSession().GameState.CurrentMapId = teleport.MapID = packet.ReadUInt32();
@@ -275,16 +276,16 @@ public partial class WorldClient
     }
 
     // for server controlled units
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_FLIGHT_BACK_SPEED)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_FLIGHT_SPEED)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_PITCH_RATE)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_RUN_BACK_SPEED)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_RUN_SPEED)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_SWIM_BACK_SPEED)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_SWIM_SPEED)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_TURN_RATE)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_WALK_SPEED)]
-    void HandleMoveSplineSetSpeed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_FLIGHT_BACK_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_FLIGHT_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_PITCH_RATE)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_RUN_BACK_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_RUN_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_SWIM_BACK_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_SWIM_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_TURN_RATE)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_WALK_SPEED)]
+    internal void HandleMoveSplineSetSpeed(WorldPacket packet)
     {
         MoveSplineSetSpeed speed = new MoveSplineSetSpeed(packet.GetUniversalOpcode(false));
         speed.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -293,16 +294,16 @@ public partial class WorldClient
     }
 
     // for own player
-    [PacketHandler(Opcode.SMSG_FORCE_WALK_SPEED_CHANGE)]
-    [PacketHandler(Opcode.SMSG_FORCE_RUN_SPEED_CHANGE)]
-    [PacketHandler(Opcode.SMSG_FORCE_RUN_BACK_SPEED_CHANGE)]
-    [PacketHandler(Opcode.SMSG_FORCE_SWIM_SPEED_CHANGE)]
-    [PacketHandler(Opcode.SMSG_FORCE_SWIM_BACK_SPEED_CHANGE)]
-    [PacketHandler(Opcode.SMSG_FORCE_TURN_RATE_CHANGE)]
-    [PacketHandler(Opcode.SMSG_FORCE_FLIGHT_SPEED_CHANGE)]
-    [PacketHandler(Opcode.SMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE)]
-    [PacketHandler(Opcode.SMSG_FORCE_PITCH_RATE_CHANGE)]
-    void HandleMoveForceSpeedChange(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_FORCE_WALK_SPEED_CHANGE)]
+    [HandlesSmsg(Opcode.SMSG_FORCE_RUN_SPEED_CHANGE)]
+    [HandlesSmsg(Opcode.SMSG_FORCE_RUN_BACK_SPEED_CHANGE)]
+    [HandlesSmsg(Opcode.SMSG_FORCE_SWIM_SPEED_CHANGE)]
+    [HandlesSmsg(Opcode.SMSG_FORCE_SWIM_BACK_SPEED_CHANGE)]
+    [HandlesSmsg(Opcode.SMSG_FORCE_TURN_RATE_CHANGE)]
+    [HandlesSmsg(Opcode.SMSG_FORCE_FLIGHT_SPEED_CHANGE)]
+    [HandlesSmsg(Opcode.SMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE)]
+    [HandlesSmsg(Opcode.SMSG_FORCE_PITCH_RATE_CHANGE)]
+    internal void HandleMoveForceSpeedChange(WorldPacket packet)
     { // for own player
         string opcodeName = packet.GetUniversalOpcode(false).ToString().Replace("SMSG_FORCE_", "SMSG_MOVE_SET_").Replace("_CHANGE", "");
         Opcode universalOpcode = Opcodes.GetUniversalOpcode(opcodeName);
@@ -335,16 +336,16 @@ public partial class WorldClient
     }
 
     // for other players
-    [PacketHandler(Opcode.MSG_MOVE_SET_FLIGHT_BACK_SPEED)]
-    [PacketHandler(Opcode.MSG_MOVE_SET_FLIGHT_SPEED)]
-    [PacketHandler(Opcode.MSG_MOVE_SET_PITCH_RATE)]
-    [PacketHandler(Opcode.MSG_MOVE_SET_RUN_BACK_SPEED)]
-    [PacketHandler(Opcode.MSG_MOVE_SET_RUN_SPEED)]
-    [PacketHandler(Opcode.MSG_MOVE_SET_SWIM_BACK_SPEED)]
-    [PacketHandler(Opcode.MSG_MOVE_SET_SWIM_SPEED)]
-    [PacketHandler(Opcode.MSG_MOVE_SET_TURN_RATE)]
-    [PacketHandler(Opcode.MSG_MOVE_SET_WALK_SPEED)]
-    void HandleMoveUpdateSpeed(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_MOVE_SET_FLIGHT_BACK_SPEED)]
+    [HandlesSmsg(Opcode.MSG_MOVE_SET_FLIGHT_SPEED)]
+    [HandlesSmsg(Opcode.MSG_MOVE_SET_PITCH_RATE)]
+    [HandlesSmsg(Opcode.MSG_MOVE_SET_RUN_BACK_SPEED)]
+    [HandlesSmsg(Opcode.MSG_MOVE_SET_RUN_SPEED)]
+    [HandlesSmsg(Opcode.MSG_MOVE_SET_SWIM_BACK_SPEED)]
+    [HandlesSmsg(Opcode.MSG_MOVE_SET_SWIM_SPEED)]
+    [HandlesSmsg(Opcode.MSG_MOVE_SET_TURN_RATE)]
+    [HandlesSmsg(Opcode.MSG_MOVE_SET_WALK_SPEED)]
+    internal void HandleMoveUpdateSpeed(WorldPacket packet)
     { // for other players
         string opcodeName = packet.GetUniversalOpcode(false).ToString().Replace("MSG_MOVE_SET", "SMSG_MOVE_UPDATE");
         Opcode universalOpcode = Opcodes.GetUniversalOpcode(opcodeName);
@@ -373,44 +374,44 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_ROOT)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_UNROOT)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_ENABLE_GRAVITY)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_DISABLE_GRAVITY)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_FEATHER_FALL)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_NORMAL_FALL)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_HOVER)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_UNSET_HOVER)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_WATER_WALK)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_LAND_WALK)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_START_SWIM)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_STOP_SWIM)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_RUN_MODE)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_WALK_MODE)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_SET_FLYING)]
-    [PacketHandler(Opcode.SMSG_MOVE_SPLINE_UNSET_FLYING)]
-    void HandleSplineMovementMessages(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_ROOT)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_UNROOT)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_ENABLE_GRAVITY)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_DISABLE_GRAVITY)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_FEATHER_FALL)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_NORMAL_FALL)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_HOVER)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_UNSET_HOVER)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_WATER_WALK)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_LAND_WALK)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_START_SWIM)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_STOP_SWIM)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_RUN_MODE)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_WALK_MODE)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_SET_FLYING)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SPLINE_UNSET_FLYING)]
+    internal void HandleSplineMovementMessages(WorldPacket packet)
     {
         MoveSplineSetFlag spline = new MoveSplineSetFlag(packet.GetUniversalOpcode(false));
         spline.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
         SendPacketToClient(spline);
     }
 
-    [PacketHandler(Opcode.SMSG_MOVE_ROOT)]
-    [PacketHandler(Opcode.SMSG_MOVE_UNROOT)]
-    [PacketHandler(Opcode.SMSG_MOVE_SET_WATER_WALK)]
-    [PacketHandler(Opcode.SMSG_MOVE_SET_LAND_WALK)]
-    [PacketHandler(Opcode.SMSG_MOVE_SET_HOVERING)]
-    [PacketHandler(Opcode.SMSG_MOVE_UNSET_HOVERING)]
-    [PacketHandler(Opcode.SMSG_MOVE_SET_CAN_FLY)]
-    [PacketHandler(Opcode.SMSG_MOVE_UNSET_CAN_FLY)]
-    [PacketHandler(Opcode.SMSG_MOVE_ENABLE_TRANSITION_BETWEEN_SWIM_AND_FLY)]
-    [PacketHandler(Opcode.SMSG_MOVE_DISABLE_TRANSITION_BETWEEN_SWIM_AND_FLY)]
-    [PacketHandler(Opcode.SMSG_MOVE_DISABLE_GRAVITY)]
-    [PacketHandler(Opcode.SMSG_MOVE_ENABLE_GRAVITY)]
-    [PacketHandler(Opcode.SMSG_MOVE_SET_FEATHER_FALL)]
-    [PacketHandler(Opcode.SMSG_MOVE_SET_NORMAL_FALL)]
-    void HandleMoveForceFlagChange(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_MOVE_ROOT)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_UNROOT)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_WATER_WALK)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_LAND_WALK)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_HOVERING)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_UNSET_HOVERING)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_CAN_FLY)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_UNSET_CAN_FLY)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_ENABLE_TRANSITION_BETWEEN_SWIM_AND_FLY)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_DISABLE_TRANSITION_BETWEEN_SWIM_AND_FLY)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_DISABLE_GRAVITY)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_ENABLE_GRAVITY)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_FEATHER_FALL)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_NORMAL_FALL)]
+    internal void HandleMoveForceFlagChange(WorldPacket packet)
     {
         MoveSetFlag flag = new MoveSetFlag(packet.GetUniversalOpcode(false));
         flag.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -418,8 +419,8 @@ public partial class WorldClient
         SendPacketToClient(flag);
     }
 
-    [PacketHandler(Opcode.SMSG_COMPRESSED_MOVES)]
-    void HandleCompressedMoves(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_COMPRESSED_MOVES)]
+    internal void HandleCompressedMoves(WorldPacket packet)
     {
         var uncompressedSize = packet.ReadInt32();
 
@@ -439,9 +440,9 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_ON_MONSTER_MOVE)]
-    [PacketHandler(Opcode.SMSG_MONSTER_MOVE_TRANSPORT)]
-    void HandleMonsterMove(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ON_MONSTER_MOVE)]
+    [HandlesSmsg(Opcode.SMSG_MONSTER_MOVE_TRANSPORT)]
+    internal void HandleMonsterMove(WorldPacket packet)
     {
         WowGuid128 guid = packet.ReadPackedGuid().To128(GetSession().GameState);
         ServerSideMovement moveSpline = new();

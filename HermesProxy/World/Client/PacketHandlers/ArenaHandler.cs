@@ -1,4 +1,5 @@
 ﻿using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -10,8 +11,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_ARENA_TEAM_QUERY_RESPONSE)]
-    void HandleArenaTeamQueryResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ARENA_TEAM_QUERY_RESPONSE)]
+    internal void HandleArenaTeamQueryResponse(WorldPacket packet)
     {
         uint teamId = packet.ReadUInt32();
         ArenaTeamData? team;
@@ -49,8 +50,8 @@ public partial class WorldClient
         SendPacketToClient(response);
     }
 
-    [PacketHandler(Opcode.SMSG_ARENA_TEAM_STATS)]
-    void HandleArenaTeamStats(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ARENA_TEAM_STATS)]
+    internal void HandleArenaTeamStats(WorldPacket packet)
     {
         uint teamId = packet.ReadUInt32();
         ArenaTeamData? team;
@@ -68,8 +69,8 @@ public partial class WorldClient
         team.Rank = packet.ReadUInt32();
     }
 
-    [PacketHandler(Opcode.SMSG_ARENA_TEAM_ROSTER)]
-    void HandleArenaTeamRoster(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ARENA_TEAM_ROSTER)]
+    internal void HandleArenaTeamRoster(WorldPacket packet)
     {
         ArenaTeamRosterResponse arena = new ArenaTeamRosterResponse();
         arena.TeamId = packet.ReadUInt32();
@@ -124,8 +125,8 @@ public partial class WorldClient
         SendPacketToClient(arena);
     }
 
-    [PacketHandler(Opcode.SMSG_ARENA_TEAM_EVENT)]
-    void HandleArenaTeamEvent(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ARENA_TEAM_EVENT)]
+    internal void HandleArenaTeamEvent(WorldPacket packet)
     {
         ArenaTeamEvent arena = new ArenaTeamEvent();
         var eventType = (ArenaTeamEventLegacy)packet.ReadUInt8();
@@ -152,8 +153,8 @@ public partial class WorldClient
         SendPacketToClient(arena);
     }
 
-    [PacketHandler(Opcode.SMSG_ARENA_TEAM_COMMAND_RESULT)]
-    void HandleArenaTeamCommandResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ARENA_TEAM_COMMAND_RESULT)]
+    internal void HandleArenaTeamCommandResult(WorldPacket packet)
     {
         ArenaTeamCommandResult arena = new ArenaTeamCommandResult();
         arena.Action = (ArenaTeamCommandType)packet.ReadUInt32();
@@ -164,8 +165,8 @@ public partial class WorldClient
         SendPacketToClient(arena);
     }
 
-    [PacketHandler(Opcode.SMSG_ARENA_TEAM_INVITE)]
-    void HandleArenaTeamInvite(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ARENA_TEAM_INVITE)]
+    internal void HandleArenaTeamInvite(WorldPacket packet)
     {
         ArenaTeamInvite arena = new ArenaTeamInvite();
         arena.PlayerName = packet.ReadCString();

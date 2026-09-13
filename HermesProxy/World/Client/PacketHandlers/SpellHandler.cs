@@ -1,6 +1,7 @@
 ﻿using Framework;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server;
@@ -15,8 +16,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_SEND_KNOWN_SPELLS)]
-    void HandleSendKnownSpells(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SEND_KNOWN_SPELLS)]
+    internal void HandleSendKnownSpells(WorldPacket packet)
     {
         SendKnownSpells spells = new SendKnownSpells();
         bool legacyInitialLogin = packet.ReadBool();
@@ -131,8 +132,8 @@ public partial class WorldClient
         CollectionSync.SendSummonedBattlePet(session);
     }
 
-    [PacketHandler(Opcode.SMSG_SUPERCEDED_SPELLS)]
-    void HandleSupercededSpells(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SUPERCEDED_SPELLS)]
+    internal void HandleSupercededSpells(WorldPacket packet)
     {
         SupercededSpells spells = new SupercededSpells();
         uint spellId;
@@ -152,8 +153,8 @@ public partial class WorldClient
         SendPacketToClient(spells);
     }
 
-    [PacketHandler(Opcode.SMSG_LEARNED_SPELL)]
-    void HandleLearnedSpell(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LEARNED_SPELL)]
+    internal void HandleLearnedSpell(WorldPacket packet)
     {
         LearnedSpells spells = new LearnedSpells();
         uint spellId = packet.ReadUInt32();
@@ -171,8 +172,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_SEND_UNLEARN_SPELLS)]
-    void HandleSendUnlearnSpells(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SEND_UNLEARN_SPELLS)]
+    internal void HandleSendUnlearnSpells(WorldPacket packet)
     {
         SendUnlearnSpells spells = new SendUnlearnSpells();
         uint spellCount = packet.ReadUInt32();
@@ -184,8 +185,8 @@ public partial class WorldClient
         SendPacketToClient(spells);
     }
 
-    [PacketHandler(Opcode.SMSG_UNLEARNED_SPELLS)]
-    void HandleUnlearnedSpells(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_UNLEARNED_SPELLS)]
+    internal void HandleUnlearnedSpells(WorldPacket packet)
     {
         UnlearnedSpells spells = new UnlearnedSpells();
         uint spellId;
@@ -202,8 +203,8 @@ public partial class WorldClient
             SendPacketToClient(BattlePetJournal.FromSession(GetSession().GameState));
     }
 
-    [PacketHandler(Opcode.SMSG_CAST_FAILED)]
-    void HandleCastFailed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CAST_FAILED)]
+    internal void HandleCastFailed(WorldPacket packet)
     {
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             packet.ReadUInt8(); // cast count
@@ -299,8 +300,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_PET_CAST_FAILED, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
-    void HandlePetCastFailed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PET_CAST_FAILED, RemovedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandlePetCastFailed(WorldPacket packet)
     {
         uint spellId = packet.ReadUInt32();
         var status = packet.ReadUInt8();
@@ -327,8 +328,8 @@ public partial class WorldClient
         SendPacketToClient(spell);
     }
 
-    [PacketHandler(Opcode.SMSG_PET_CAST_FAILED, ClientVersionBuild.V2_0_1_6180)]
-    void HandlePetCastFailedTBC(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PET_CAST_FAILED, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandlePetCastFailedTBC(WorldPacket packet)
     {
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             packet.ReadUInt8(); // cast count
@@ -367,9 +368,9 @@ public partial class WorldClient
     // failure for either path — without this, SMSG_SPELL_FAILURE was being silently
     // dropped, leaving the client's cast-state UI hung waiting for a never-arriving
     // success/fail and accumulating in the suspect window for `reason=7` disconnects.
-    [PacketHandler(Opcode.SMSG_SPELL_FAILURE)]
-    [PacketHandler(Opcode.SMSG_SPELL_FAILED_OTHER)]
-    void HandleSpellFailedOther(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_FAILURE)]
+    [HandlesSmsg(Opcode.SMSG_SPELL_FAILED_OTHER)]
+    internal void HandleSpellFailedOther(WorldPacket packet)
     {
         WowGuid128 casterUnit;
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
@@ -428,8 +429,8 @@ public partial class WorldClient
         SendPacketToClient(spell2);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_START)]
-    void HandleSpellStart(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_START)]
+    internal void HandleSpellStart(WorldPacket packet)
     {
         if (GetSession().GameState.CurrentMapId == null)
             return;
@@ -560,8 +561,8 @@ public partial class WorldClient
         World.Logging.SpellLogMessages.ItemCooldownSynthesized(_melSpellLog, itemId, modernSpellId, cooldownMs);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_GO)]
-    void HandleSpellGo(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_GO)]
+    internal void HandleSpellGo(WorldPacket packet)
     {
         if (GetSession().GameState.CurrentMapId == null)
             return;
@@ -954,8 +955,8 @@ public partial class WorldClient
         return dbdata;
     }
 
-    [PacketHandler(Opcode.SMSG_CANCEL_AUTO_REPEAT)]
-    void HandleCancelAutoRepeat(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CANCEL_AUTO_REPEAT)]
+    internal void HandleCancelAutoRepeat(WorldPacket packet)
     {
         // Clear the auto-repeat cast tracking
         GetSession().GameState.CurrentClientAutoRepeatCast = null;
@@ -968,8 +969,8 @@ public partial class WorldClient
         SendPacketToClient(cancel);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_COOLDOWN)]
-    void HandleSpellCooldown(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_COOLDOWN)]
+    internal void HandleSpellCooldown(WorldPacket packet)
     {
         SpellCooldownPkt cooldown = new();
         try
@@ -999,8 +1000,8 @@ public partial class WorldClient
         SendPacketToClient(cooldown);
     }
 
-    [PacketHandler(Opcode.SMSG_COOLDOWN_EVENT)]
-    void HandleCooldownEvent(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_COOLDOWN_EVENT)]
+    internal void HandleCooldownEvent(WorldPacket packet)
     {
         CooldownEvent cooldown = new();
         cooldown.SpellID = packet.ReadUInt32();
@@ -1009,8 +1010,8 @@ public partial class WorldClient
         SendPacketToClient(cooldown);
     }
 
-    [PacketHandler(Opcode.SMSG_CLEAR_COOLDOWN)]
-    void HandleClearCooldown(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CLEAR_COOLDOWN)]
+    internal void HandleClearCooldown(WorldPacket packet)
     {
         ClearCooldown cooldown = new();
         cooldown.SpellID = packet.ReadUInt32();
@@ -1019,16 +1020,16 @@ public partial class WorldClient
         SendPacketToClient(cooldown);
     }
 
-    [PacketHandler(Opcode.SMSG_COOLDOWN_CHEAT)]
-    void HandleCooldownCheat(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_COOLDOWN_CHEAT)]
+    internal void HandleCooldownCheat(WorldPacket packet)
     {
         CooldownCheat cooldown = new();
         cooldown.Guid = packet.ReadGuid().To128(GetSession().GameState);
         SendPacketToClient(cooldown);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_NON_MELEE_DAMAGE_LOG)]
-    void HandleSpellNonMeleeDamageLog(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_NON_MELEE_DAMAGE_LOG)]
+    internal void HandleSpellNonMeleeDamageLog(WorldPacket packet)
     {
         SpellNonMeleeDamageLog spell = new();
         spell.TargetGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -1105,8 +1106,8 @@ public partial class WorldClient
         SendPacketToClient(spell);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_HEAL_LOG)]
-    void HandleSpellHealLog(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_HEAL_LOG)]
+    internal void HandleSpellHealLog(WorldPacket packet)
     {
         SpellHealLog spell = new();
         spell.TargetGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -1136,8 +1137,8 @@ public partial class WorldClient
         SendPacketToClient(spell);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_PERIODIC_AURA_LOG)]
-    void HandleSpellPeriodicAuraLog(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_PERIODIC_AURA_LOG)]
+    internal void HandleSpellPeriodicAuraLog(WorldPacket packet)
     {
         SpellPeriodicAuraLog spell = new();
         spell.TargetGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -1221,8 +1222,8 @@ public partial class WorldClient
         SendPacketToClient(spell);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_ENERGIZE_LOG)]
-    void HandleSpellEnergizeLog(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_ENERGIZE_LOG)]
+    internal void HandleSpellEnergizeLog(WorldPacket packet)
     {
         SpellEnergizeLog spell = new();
         spell.TargetGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -1233,8 +1234,8 @@ public partial class WorldClient
         SendPacketToClient(spell);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_DELAYED)]
-    void HandleSpellDelayed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_DELAYED)]
+    internal void HandleSpellDelayed(WorldPacket packet)
     {
         SpellDelayed delay = new();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
@@ -1245,8 +1246,8 @@ public partial class WorldClient
         SendPacketToClient(delay);
     }
 
-    [PacketHandler(Opcode.MSG_CHANNEL_START)]
-    void HandleSpellChannelStart(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_CHANNEL_START)]
+    internal void HandleSpellChannelStart(WorldPacket packet)
     {
         SpellChannelStart channel = new();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
@@ -1259,8 +1260,8 @@ public partial class WorldClient
         SendPacketToClient(channel);
     }
 
-    [PacketHandler(Opcode.MSG_CHANNEL_UPDATE)]
-    void HandleSpellChannelUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_CHANNEL_UPDATE)]
+    internal void HandleSpellChannelUpdate(WorldPacket packet)
     {
         SpellChannelUpdate channel = new();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
@@ -1271,8 +1272,8 @@ public partial class WorldClient
         SendPacketToClient(channel);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_DAMAGE_SHIELD)]
-    void HandleSpellDamageShield(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_DAMAGE_SHIELD)]
+    internal void HandleSpellDamageShield(WorldPacket packet)
     {
         SpellDamageShield spell = new();
         spell.VictimGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -1297,8 +1298,8 @@ public partial class WorldClient
         SendPacketToClient(spell);
     }
 
-    [PacketHandler(Opcode.SMSG_ENVIRONMENTAL_DAMAGE_LOG)]
-    void HandleEnvironmentalDamageLog(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ENVIRONMENTAL_DAMAGE_LOG)]
+    internal void HandleEnvironmentalDamageLog(WorldPacket packet)
     {
         EnvironmentalDamageLog damage = new();
         damage.Victim = packet.ReadGuid().To128(GetSession().GameState);
@@ -1309,8 +1310,8 @@ public partial class WorldClient
         SendPacketToClient(damage);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_INSTAKILL_LOG)]
-    void HandleSpellInstakillLog(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_INSTAKILL_LOG)]
+    internal void HandleSpellInstakillLog(WorldPacket packet)
     {
         SpellInstakillLog spell = new();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
@@ -1324,8 +1325,8 @@ public partial class WorldClient
         SendPacketToClient(spell);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_DISPELL_LOG)]
-    void HandleSpellDispellLog(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_DISPELL_LOG)]
+    internal void HandleSpellDispellLog(WorldPacket packet)
     {
         SpellDispellLog spell = new();
         spell.TargetGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -1389,8 +1390,8 @@ public partial class WorldClient
         SendPacketToClient(spell);
     }
 
-    [PacketHandler(Opcode.SMSG_PLAY_SPELL_VISUAL)]
-    void HandlePlaySpellVisualKit(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PLAY_SPELL_VISUAL)]
+    internal void HandlePlaySpellVisualKit(WorldPacket packet)
     {
         PlaySpellVisualKit spell = new();
         spell.Unit = packet.ReadGuid().To128(GetSession().GameState);
@@ -1398,8 +1399,8 @@ public partial class WorldClient
         SendPacketToClient(spell);
     }
 
-    [PacketHandler(Opcode.SMSG_UPDATE_AURA_DURATION)]
-    void HandleUpdateAuraDuration(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_UPDATE_AURA_DURATION)]
+    internal void HandleUpdateAuraDuration(WorldPacket packet)
     {
         byte slot = packet.ReadUInt8();
         int duration = packet.ReadInt32();
@@ -1432,9 +1433,9 @@ public partial class WorldClient
         SendPacketToClient(update);
     }
 
-    [PacketHandler(Opcode.SMSG_SET_EXTRA_AURA_INFO)]
-    [PacketHandler(Opcode.SMSG_SET_EXTRA_AURA_INFO_NEED_UPDATE)]
-    void HandleSetExtraAuraInfo(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SET_EXTRA_AURA_INFO)]
+    [HandlesSmsg(Opcode.SMSG_SET_EXTRA_AURA_INFO_NEED_UPDATE)]
+    internal void HandleSetExtraAuraInfo(WorldPacket packet)
     {
         WowGuid128 guid = packet.ReadPackedGuid().To128(GetSession().GameState);
         if (!packet.CanRead())
@@ -1476,8 +1477,8 @@ public partial class WorldClient
         SendPacketToClient(update);
     }
 
-    [PacketHandler(Opcode.SMSG_CLEAR_EXTRA_AURA_INFO)]
-    void HandleClearExtraAuraInfo(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CLEAR_EXTRA_AURA_INFO)]
+    internal void HandleClearExtraAuraInfo(WorldPacket packet)
     {
         // This TBC opcode clears aura duration info for a target.
         // The modern client doesn't use this mechanism - it uses update fields instead.
@@ -1506,9 +1507,9 @@ public partial class WorldClient
     // divergence (SMSG_ATTACK_START + empty AURA_UPDATE_ALL on the player) that
     // produces an immediate `CMSG_LOG_DISCONNECT reason=7` — observed in
     // hermes-20260501_004716.log line 1395.
-    [PacketHandler(Opcode.SMSG_AURA_UPDATE)]
-    [PacketHandler(Opcode.SMSG_AURA_UPDATE_ALL)]
-    void HandleAuraUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_AURA_UPDATE)]
+    [HandlesSmsg(Opcode.SMSG_AURA_UPDATE_ALL)]
+    internal void HandleAuraUpdate(WorldPacket packet)
     {
         bool isAll = packet.GetUniversalOpcode(false) == Opcode.SMSG_AURA_UPDATE_ALL;
         uint incomingBytes = packet.GetSize();
@@ -1675,8 +1676,8 @@ public partial class WorldClient
 
     // Legacy 3.3.5a SMSG_HEALTH_UPDATE wire format: PackedGuid + uint32 health.
     // Modern V3_4_3 expects: PackedGuid128 + int64 health.
-    [PacketHandler(Opcode.SMSG_HEALTH_UPDATE)]
-    void HandleHealthUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_HEALTH_UPDATE)]
+    internal void HandleHealthUpdate(WorldPacket packet)
     {
         WowGuid128 guid = packet.ReadPackedGuid().To128(GetSession().GameState);
         uint health = packet.ReadUInt32();
@@ -1694,8 +1695,8 @@ public partial class WorldClient
     // The `type` byte is forwarded as-is — the V3_4_3 client interprets it as the
     // global PowerType enum, same as legacy (verified in HermesProxy-WOTLK fork
     // WorldClient.cs:5500-5510 which works for warrior rage).
-    [PacketHandler(Opcode.SMSG_POWER_UPDATE)]
-    void HandlePowerUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_POWER_UPDATE)]
+    internal void HandlePowerUpdate(WorldPacket packet)
     {
         WowGuid128 guid = packet.ReadPackedGuid().To128(GetSession().GameState);
         byte powerType = packet.ReadUInt8();
@@ -1726,8 +1727,8 @@ public partial class WorldClient
     // path. We only mutate the cached RuneState here so the next CREATE block reflects
     // authoritative state on zone change / mount.
 
-    [PacketHandler(Opcode.SMSG_RESYNC_RUNES)]
-    void HandleResyncRunes(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_RESYNC_RUNES)]
+    internal void HandleResyncRunes(WorldPacket packet)
     {
         var runeState = GetSession().GameState.RuneState;
         if (runeState == null)
@@ -1743,8 +1744,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_CONVERT_RUNE)]
-    void HandleConvertRune(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CONVERT_RUNE)]
+    internal void HandleConvertRune(WorldPacket packet)
     {
         var runeState = GetSession().GameState.RuneState;
         if (runeState == null)
@@ -1756,8 +1757,8 @@ public partial class WorldClient
             runeState.RuneTypes[index] = newType;
     }
 
-    [PacketHandler(Opcode.SMSG_ADD_RUNE_POWER)]
-    void HandleAddRunePower(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ADD_RUNE_POWER)]
+    internal void HandleAddRunePower(WorldPacket packet)
     {
         var runeState = GetSession().GameState.RuneState;
         if (runeState == null)
@@ -1789,8 +1790,8 @@ public partial class WorldClient
     }
 
 
-    [PacketHandler(Opcode.SMSG_RESURRECT_REQUEST)]
-    void HandleResurrectRequest(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_RESURRECT_REQUEST)]
+    internal void HandleResurrectRequest(WorldPacket packet)
     {
         ResurrectRequest revive = new();
         revive.CasterGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -1802,8 +1803,8 @@ public partial class WorldClient
         SendPacketToClient(revive);
     }
 
-    [PacketHandler(Opcode.SMSG_TOTEM_CREATED)]
-    void HandleTotemCreated(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_TOTEM_CREATED)]
+    internal void HandleTotemCreated(WorldPacket packet)
     {
         TotemCreated totem = new();
         totem.Slot = packet.ReadUInt8();
@@ -1813,9 +1814,9 @@ public partial class WorldClient
         SendPacketToClient(totem);
     }
 
-    [PacketHandler(Opcode.SMSG_SET_FLAT_SPELL_MODIFIER)]
-    [PacketHandler(Opcode.SMSG_SET_PCT_SPELL_MODIFIER)]
-    void HandleSetSpellModifier(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SET_FLAT_SPELL_MODIFIER)]
+    [HandlesSmsg(Opcode.SMSG_SET_PCT_SPELL_MODIFIER)]
+    internal void HandleSetSpellModifier(WorldPacket packet)
     {
         byte classIndex = packet.ReadUInt8();
         byte modIndex = packet.ReadUInt8();
@@ -1912,8 +1913,8 @@ public partial class WorldClient
         SendPacketToClient(update);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_EXECUTE_LOG)]
-    void HandleSpellExecuteLog(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_EXECUTE_LOG)]
+    internal void HandleSpellExecuteLog(WorldPacket packet)
     {
         var session = GetSession().GameState;
         SpellExecuteLog log = new();
@@ -2008,8 +2009,8 @@ public partial class WorldClient
         SendPacketToClient(log);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_MISS_LOG)]
-    void HandleSpellMissLog(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_MISS_LOG)]
+    internal void HandleSpellMissLog(WorldPacket packet)
     {
         var session = GetSession().GameState;
         SpellMissLog log = new();
@@ -2034,8 +2035,8 @@ public partial class WorldClient
         SendPacketToClient(log);
     }
 
-    [PacketHandler(Opcode.SMSG_DISPEL_FAILED)]
-    void HandleDispelFailed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DISPEL_FAILED)]
+    internal void HandleDispelFailed(WorldPacket packet)
     {
         var session = GetSession().GameState;
         DispelFailed failed = new();
@@ -2047,8 +2048,8 @@ public partial class WorldClient
         SendPacketToClient(failed);
     }
 
-    [PacketHandler(Opcode.SMSG_SPELL_STEAL_LOG)]
-    void HandleSpellStealLog(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPELL_STEAL_LOG)]
+    internal void HandleSpellStealLog(WorldPacket packet)
     {
         var session = GetSession().GameState;
         SpellDispellLog spell = new();

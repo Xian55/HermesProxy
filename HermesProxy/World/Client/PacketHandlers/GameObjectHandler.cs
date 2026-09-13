@@ -1,5 +1,6 @@
 ﻿using Framework;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -10,8 +11,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_GAME_OBJECT_DESPAWN)]
-    void HandleGameObjectDespawn(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GAME_OBJECT_DESPAWN)]
+    internal void HandleGameObjectDespawn(WorldPacket packet)
     {
         WowGuid64 guid = packet.ReadGuid();
         GameObjectDespawn despawn = new GameObjectDespawn();
@@ -28,8 +29,8 @@ public partial class WorldClient
     // Legacy 3.3.5a and modern carry the same five fields in the same order, so this is a
     // straight guid widening. Verified against a native 3.4.3 capture of a siege vehicle
     // hitting a Strand of the Ancients gate.
-    [PacketHandler(Opcode.SMSG_DESTRUCTIBLE_BUILDING_DAMAGE)]
-    void HandleDestructibleBuildingDamage(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DESTRUCTIBLE_BUILDING_DAMAGE)]
+    internal void HandleDestructibleBuildingDamage(WorldPacket packet)
     {
         DestructibleBuildingDamage damage = new DestructibleBuildingDamage();
         damage.Target = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -40,16 +41,16 @@ public partial class WorldClient
         SendPacketToClient(damage);
     }
 
-    [PacketHandler(Opcode.SMSG_GAME_OBJECT_RESET_STATE)]
-    void HandleGameObjectResetState(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GAME_OBJECT_RESET_STATE)]
+    internal void HandleGameObjectResetState(WorldPacket packet)
     {
         GameObjectResetState reset = new GameObjectResetState();
         reset.ObjectGUID = packet.ReadGuid().To128(GetSession().GameState);
         SendPacketToClient(reset);
     }
 
-    [PacketHandler(Opcode.SMSG_GAME_OBJECT_CUSTOM_ANIM)]
-    void HandleGameObjectCustomAnim(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GAME_OBJECT_CUSTOM_ANIM)]
+    internal void HandleGameObjectCustomAnim(WorldPacket packet)
     {
         GameObjectCustomAnim anim = new GameObjectCustomAnim();
         anim.ObjectGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -57,15 +58,15 @@ public partial class WorldClient
         SendPacketToClient(anim);
     }
 
-    [PacketHandler(Opcode.SMSG_FISH_NOT_HOOKED)]
-    void HandleFishNotHooked(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_FISH_NOT_HOOKED)]
+    internal void HandleFishNotHooked(WorldPacket packet)
     {
         FishNotHooked fish = new FishNotHooked();
         SendPacketToClient(fish);
     }
 
-    [PacketHandler(Opcode.SMSG_FISH_ESCAPED)]
-    void HandleFishEscaped(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_FISH_ESCAPED)]
+    internal void HandleFishEscaped(WorldPacket packet)
     {
         FishEscaped fish = new FishEscaped();
         SendPacketToClient(fish);

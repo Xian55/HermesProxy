@@ -1,6 +1,7 @@
 ﻿using Framework;
 using Framework.GameMath;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -11,8 +12,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_GOSSIP_MESSAGE)]
-    void HandleGossipmessage(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GOSSIP_MESSAGE)]
+    internal void HandleGossipmessage(WorldPacket packet)
     {
         GossipMessagePkt gossip = new GossipMessagePkt();
         gossip.GossipGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -88,15 +89,15 @@ public partial class WorldClient
         SendPacketToClient(gossip);
     }
 
-    [PacketHandler(Opcode.SMSG_GOSSIP_COMPLETE)]
-    void HandleGossipComplete(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GOSSIP_COMPLETE)]
+    internal void HandleGossipComplete(WorldPacket packet)
     {
         GossipComplete gossip = new GossipComplete();
         SendPacketToClient(gossip);
     }
 
-    [PacketHandler(Opcode.SMSG_GOSSIP_POI)]
-    void HandleGossipPoi(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GOSSIP_POI)]
+    internal void HandleGossipPoi(WorldPacket packet)
     {
         GossipPOI poi = new();
         poi.Flags = packet.ReadUInt32();
@@ -108,8 +109,8 @@ public partial class WorldClient
         SendPacketToClient(poi);
     }
 
-    [PacketHandler(Opcode.SMSG_BINDER_CONFIRM)]
-    void HandleBinderConfirm(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BINDER_CONFIRM)]
+    internal void HandleBinderConfirm(WorldPacket packet)
     {
         BinderConfirm confirm = new BinderConfirm();
         confirm.Guid = packet.ReadGuid().To128(GetSession().GameState);
@@ -122,8 +123,8 @@ public partial class WorldClient
     // Cheap era-ubiquitous item; change freely.
     private const uint PlaceholderVendorItemId = 6948; // Hearthstone
 
-    [PacketHandler(Opcode.SMSG_VENDOR_INVENTORY)]
-    void HandleVendorInventory(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_VENDOR_INVENTORY)]
+    internal void HandleVendorInventory(WorldPacket packet)
     {
         VendorInventory vendor = new VendorInventory();
         vendor.VendorGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -172,8 +173,8 @@ public partial class WorldClient
         SendPacketToClient(vendor);
     }
 
-    [PacketHandler(Opcode.SMSG_SHOW_BANK)]
-    void HandleShowBank(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SHOW_BANK)]
+    internal void HandleShowBank(WorldPacket packet)
     {
         ShowBank bank = new ShowBank();
         bank.Guid = packet.ReadGuid().To128(GetSession().GameState);
@@ -181,8 +182,8 @@ public partial class WorldClient
         SendPacketToClient(bank);
     }
 
-    [PacketHandler(Opcode.SMSG_TRAINER_LIST)]
-    void HandleTrainerList(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_TRAINER_LIST)]
+    internal void HandleTrainerList(WorldPacket packet)
     {
         TrainerList trainer = new TrainerList();
         trainer.TrainerGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -225,8 +226,8 @@ public partial class WorldClient
         SendPacketToClient(trainer);
     }
 
-    [PacketHandler(Opcode.SMSG_TRAINER_BUY_FAILED)]
-    void HandleTrainerBuyFailed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_TRAINER_BUY_FAILED)]
+    internal void HandleTrainerBuyFailed(WorldPacket packet)
     {
         TrainerBuyFailed buy = new();
         buy.TrainerGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -237,8 +238,8 @@ public partial class WorldClient
         SendPacketToClient(chat);
     }
 
-    [PacketHandler(Opcode.MSG_TALENT_WIPE_CONFIRM)]
-    void HandleTalentWipeConfirm(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_TALENT_WIPE_CONFIRM)]
+    internal void HandleTalentWipeConfirm(WorldPacket packet)
     {
         RespecWipeConfirm respec = new();
         respec.TrainerGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -246,8 +247,8 @@ public partial class WorldClient
         SendPacketToClient(respec);
     }
 
-    [PacketHandler(Opcode.SMSG_SPIRIT_HEALER_CONFIRM)]
-    void HandleSpiritHealerConfirm(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPIRIT_HEALER_CONFIRM)]
+    internal void HandleSpiritHealerConfirm(WorldPacket packet)
     {
         SpiritHealerConfirm confirm = new SpiritHealerConfirm();
         confirm.Guid = packet.ReadGuid().To128(GetSession().GameState);

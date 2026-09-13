@@ -1,5 +1,6 @@
-using Framework.Logging;
+﻿using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
@@ -28,22 +29,22 @@ public partial class WorldClient
             DateTimeOffset.UtcNow.ToUnixTimeSeconds());
     }
 
-    [PacketHandler(Opcode.SMSG_LFG_DISABLED)]
-    void HandleLFGDisabled(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LFG_DISABLED)]
+    internal void HandleLFGDisabled(WorldPacket packet)
     {
         SendPacketToClient(new LFGDisabled());
     }
 
-    [PacketHandler(Opcode.SMSG_LFG_OFFER_CONTINUE)]
-    void HandleLFGOfferContinue(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LFG_OFFER_CONTINUE)]
+    internal void HandleLFGOfferContinue(WorldPacket packet)
     {
         LFGOfferContinue offer = new LFGOfferContinue();
         offer.Slot = packet.ReadUInt32();
         SendPacketToClient(offer);
     }
 
-    [PacketHandler(Opcode.SMSG_LFG_JOIN_RESULT)]
-    void HandleLFGJoinResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LFG_JOIN_RESULT)]
+    internal void HandleLFGJoinResult(WorldPacket packet)
     {
         DFJoinResult result = new DFJoinResult();
         result.Ticket = MakeLfgTicket();
@@ -75,14 +76,14 @@ public partial class WorldClient
         SendPacketToClient(result);
     }
 
-    [PacketHandler(Opcode.SMSG_LFG_UPDATE_PLAYER)]
-    void HandleLFGUpdatePlayer(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LFG_UPDATE_PLAYER)]
+    internal void HandleLFGUpdatePlayer(WorldPacket packet)
     {
         WriteUpdateStatus(packet, isParty: false);
     }
 
-    [PacketHandler(Opcode.SMSG_LFG_UPDATE_PARTY)]
-    void HandleLFGUpdateParty(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LFG_UPDATE_PARTY)]
+    internal void HandleLFGUpdateParty(WorldPacket packet)
     {
         WriteUpdateStatus(packet, isParty: true);
     }
@@ -151,8 +152,8 @@ public partial class WorldClient
         SendPacketToClient(status);
     }
 
-    [PacketHandler(Opcode.SMSG_LFG_TELEPORT_DENIED)]
-    void HandleLFGTeleportDenied(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LFG_TELEPORT_DENIED)]
+    internal void HandleLFGTeleportDenied(WorldPacket packet)
     {
         // Legacy sends the reason as a uint32, V3_4_3 wants it in 4 bits; the enum values line
         // up, so this is a straight forward. Previously unhandled, which meant a refused
@@ -163,8 +164,8 @@ public partial class WorldClient
         SendPacketToClient(denied);
     }
 
-    [PacketHandler(Opcode.SMSG_LFG_QUEUE_STATUS)]
-    void HandleLFGQueueStatus(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LFG_QUEUE_STATUS)]
+    internal void HandleLFGQueueStatus(WorldPacket packet)
     {
         DFQueueStatus status = new DFQueueStatus();
         status.Ticket = MakeLfgTicket();
@@ -181,8 +182,8 @@ public partial class WorldClient
         SendPacketToClient(status);
     }
 
-    [PacketHandler(Opcode.SMSG_LFG_PROPOSAL_UPDATE)]
-    void HandleLFGProposalUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LFG_PROPOSAL_UPDATE)]
+    internal void HandleLFGProposalUpdate(WorldPacket packet)
     {
         DFProposalUpdate prop = new DFProposalUpdate();
         prop.Ticket = MakeLfgTicket();
@@ -210,8 +211,8 @@ public partial class WorldClient
         SendPacketToClient(prop);
     }
 
-    [PacketHandler(Opcode.SMSG_LFG_ROLE_CHECK_UPDATE)]
-    void HandleLFGRoleCheckUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LFG_ROLE_CHECK_UPDATE)]
+    internal void HandleLFGRoleCheckUpdate(WorldPacket packet)
     {
         LFGRoleCheckUpdate roleCheck = new LFGRoleCheckUpdate();
         roleCheck.PartyIndex = 0;
@@ -236,8 +237,8 @@ public partial class WorldClient
         SendPacketToClient(roleCheck);
     }
 
-    [PacketHandler(Opcode.SMSG_LFG_ROLE_CHOSEN)]
-    void HandleLFGRoleChosen(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LFG_ROLE_CHOSEN)]
+    internal void HandleLFGRoleChosen(WorldPacket packet)
     {
         var chosen = new RoleChosen();
         chosen.Player = packet.ReadGuid().To128(GetSession().GameState);
@@ -246,8 +247,8 @@ public partial class WorldClient
         SendPacketToClient(chosen);
     }
 
-    [PacketHandler(Opcode.SMSG_LFG_PARTY_INFO)]
-    void HandleLFGPartyInfo(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LFG_PARTY_INFO)]
+    internal void HandleLFGPartyInfo(WorldPacket packet)
     {
         LFGPartyInfo info = new LFGPartyInfo();
         byte playerCount = packet.ReadUInt8();
@@ -293,8 +294,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_LFG_PLAYER_INFO)]
-    void HandleLFGPlayerInfo(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LFG_PLAYER_INFO)]
+    internal void HandleLFGPlayerInfo(WorldPacket packet)
     {
         LFGPlayerInfoPkt info = new LFGPlayerInfoPkt();
 
@@ -400,8 +401,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_LFG_PLAYER_REWARD)]
-    void HandleLFGPlayerReward(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LFG_PLAYER_REWARD)]
+    internal void HandleLFGPlayerReward(WorldPacket packet)
     {
         LFGPlayerReward reward = new LFGPlayerReward();
         reward.QueuedSlot = packet.ReadUInt32();        // rdungeonEntry

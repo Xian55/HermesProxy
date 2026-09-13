@@ -1,4 +1,5 @@
-using HermesProxy.World;
+﻿using HermesProxy.World;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Server.Packets;
@@ -7,8 +8,8 @@ namespace HermesProxy.World.Client;
 
 public partial class WorldClient
 {
-    [PacketHandler(Opcode.SMSG_BATTLEFIELD_MGR_ENTRY_INVITE)]
-    void HandleBattlefieldMgrEntryInvite(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BATTLEFIELD_MGR_ENTRY_INVITE)]
+    internal void HandleBattlefieldMgrEntryInvite(WorldPacket packet)
     {
         uint battleId = packet.ReadUInt32();
         uint zoneId = packet.ReadUInt32();
@@ -30,8 +31,8 @@ public partial class WorldClient
         SendPacketToClient(confirm);
     }
 
-    [PacketHandler(Opcode.SMSG_BATTLEFIELD_MGR_QUEUE_INVITE)]
-    void HandleBattlefieldMgrQueueInvite(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BATTLEFIELD_MGR_QUEUE_INVITE)]
+    internal void HandleBattlefieldMgrQueueInvite(WorldPacket packet)
     {
         uint battleId = packet.ReadUInt32();
         byte warmup = packet.ReadUInt8();
@@ -49,8 +50,8 @@ public partial class WorldClient
         SendPacketToClient(confirm);
     }
 
-    [PacketHandler(Opcode.SMSG_BATTLEFIELD_MGR_QUEUE_REQUEST_RESPONSE)]
-    void HandleBattlefieldMgrQueueRequestResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BATTLEFIELD_MGR_QUEUE_REQUEST_RESPONSE)]
+    internal void HandleBattlefieldMgrQueueRequestResponse(WorldPacket packet)
     {
         uint battleId = packet.ReadUInt32();
         packet.ReadUInt32();
@@ -78,8 +79,8 @@ public partial class WorldClient
         SendPacketToClient(queued);
     }
 
-    [PacketHandler(Opcode.SMSG_BATTLEFIELD_MGR_ENTERING)]
-    void HandleBattlefieldMgrEntering(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BATTLEFIELD_MGR_ENTERING)]
+    internal void HandleBattlefieldMgrEntering(WorldPacket packet)
     {
         uint battleId = packet.ReadUInt32();
         packet.ReadUInt8();
@@ -99,8 +100,8 @@ public partial class WorldClient
         SendPacketToClient(active);
     }
 
-    [PacketHandler(Opcode.SMSG_BATTLEFIELD_MGR_EJECTED)]
-    void HandleBattlefieldMgrEjected(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BATTLEFIELD_MGR_EJECTED)]
+    internal void HandleBattlefieldMgrEjected(WorldPacket packet)
     {
         uint battleId = packet.ReadUInt32();
         byte reason = packet.ReadUInt8();

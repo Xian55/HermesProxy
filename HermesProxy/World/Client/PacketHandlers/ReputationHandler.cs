@@ -1,5 +1,6 @@
 ﻿using Framework;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -10,8 +11,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_INITIALIZE_FACTIONS)]
-    void HandleInitializeFactions(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_INITIALIZE_FACTIONS)]
+    internal void HandleInitializeFactions(WorldPacket packet)
     {
         if (!GetSession().GameState.IsFirstEnterWorld)
             return;
@@ -30,8 +31,8 @@ public partial class WorldClient
             SendPacketToClient(new TimeSyncRequest());
     }
 
-    [PacketHandler(Opcode.SMSG_SET_FACTION_STANDING)]
-    void HandleSetFactionStanding(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SET_FACTION_STANDING)]
+    internal void HandleSetFactionStanding(WorldPacket packet)
     {
         SetFactionStanding standing = new();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_4_0_8089))
@@ -53,8 +54,8 @@ public partial class WorldClient
         SendPacketToClient(standing);
     }
 
-    [PacketHandler(Opcode.SMSG_SET_FORCED_REACTIONS)]
-    void HandleSetForcedReaction(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SET_FORCED_REACTIONS)]
+    internal void HandleSetForcedReaction(WorldPacket packet)
     {
         SetForcedReactions reactions = new();
         var count = packet.ReadInt32();
@@ -68,8 +69,8 @@ public partial class WorldClient
         SendPacketToClient(reactions);
     }
 
-    [PacketHandler(Opcode.SMSG_SET_FACTION_VISIBLE)]
-    void HandleSetFactionVisible(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SET_FACTION_VISIBLE)]
+    internal void HandleSetFactionVisible(WorldPacket packet)
     {
         SetFactionVisible faction = new(true);
         faction.FactionIndex = packet.ReadUInt32();

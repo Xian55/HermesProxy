@@ -1,4 +1,5 @@
 ﻿using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -10,8 +11,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.MSG_AUCTION_HELLO)]
-    void HandleAuctionHello(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_AUCTION_HELLO)]
+    internal void HandleAuctionHello(WorldPacket packet)
     {
         AuctionHelloResponse auction = new AuctionHelloResponse();
         auction.Guid = packet.ReadGuid().To128(GetSession().GameState);
@@ -80,9 +81,9 @@ public partial class WorldClient
         return item;
     }
 
-    [PacketHandler(Opcode.SMSG_AUCTION_LIST_BIDDED_ITEMS_RESULT)]
-    [PacketHandler(Opcode.SMSG_AUCTION_LIST_OWNED_ITEMS_RESULT)]
-    void HandleAuctionListMyItemsResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_AUCTION_LIST_BIDDED_ITEMS_RESULT)]
+    [HandlesSmsg(Opcode.SMSG_AUCTION_LIST_OWNED_ITEMS_RESULT)]
+    internal void HandleAuctionListMyItemsResult(WorldPacket packet)
     {
         AuctionListMyItemsResult auction = new AuctionListMyItemsResult(packet.GetUniversalOpcode(false));
         uint count = packet.ReadUInt32();
@@ -97,8 +98,8 @@ public partial class WorldClient
         SendPacketToClient(auction);
     }
 
-    [PacketHandler(Opcode.SMSG_AUCTION_LIST_ITEMS_RESULT)]
-    void HandleAuctionListItemsResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_AUCTION_LIST_ITEMS_RESULT)]
+    internal void HandleAuctionListItemsResult(WorldPacket packet)
     {
         AuctionListItemsResult auction = new AuctionListItemsResult();
         uint count = packet.ReadUInt32();
@@ -114,8 +115,8 @@ public partial class WorldClient
         SendPacketToClient(auction);
     }
 
-    [PacketHandler(Opcode.SMSG_AUCTION_COMMAND_RESULT)]
-    void HandleAuctionCommandResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_AUCTION_COMMAND_RESULT)]
+    internal void HandleAuctionCommandResult(WorldPacket packet)
     {
         AuctionCommandResult auction = new AuctionCommandResult();
         auction.AuctionID = packet.ReadUInt32();
@@ -153,8 +154,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_AUCTION_OWNER_NOTIFICATION)]
-    void HandleAuctionOwnerNotification(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_AUCTION_OWNER_NOTIFICATION)]
+    internal void HandleAuctionOwnerNotification(WorldPacket packet)
     {
         AuctionOwnerNotification info = new AuctionOwnerNotification();
         info.AuctionID = packet.ReadUInt32();
@@ -191,8 +192,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_AUCTION_BIDDER_NOTIFICATION)]
-    void HandleAuctionBidderNotification(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_AUCTION_BIDDER_NOTIFICATION)]
+    internal void HandleAuctionBidderNotification(WorldPacket packet)
     {
         AuctionBidderNotification info = new AuctionBidderNotification();
         uint auctionHouseId = packet.ReadUInt32();

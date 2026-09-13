@@ -1,5 +1,6 @@
-using HermesProxy.Enums;
+﻿using HermesProxy.Enums;
 using HermesProxy.World;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
 
@@ -9,8 +10,8 @@ public partial class WorldClient
 {
     const int EquipmentSetSlots = 19;
 
-    [PacketHandler(Opcode.SMSG_LOAD_EQUIPMENT_SET)]
-    void HandleLoadEquipmentSet(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOAD_EQUIPMENT_SET)]
+    internal void HandleLoadEquipmentSet(WorldPacket packet)
     {
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
             return;
@@ -44,8 +45,8 @@ public partial class WorldClient
         SendPacketToClient(load);
     }
 
-    [PacketHandler(Opcode.SMSG_EQUIPMENT_SET_ID)]
-    void HandleEquipmentSetId(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_EQUIPMENT_SET_ID)]
+    internal void HandleEquipmentSetId(WorldPacket packet)
     {
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
             return;
@@ -57,8 +58,8 @@ public partial class WorldClient
         SendPacketToClient(id);
     }
 
-    [PacketHandler(Opcode.SMSG_USE_EQUIPMENT_SET_RESULT)]
-    void HandleUseEquipmentSetResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_USE_EQUIPMENT_SET_RESULT)]
+    internal void HandleUseEquipmentSetResult(WorldPacket packet)
     {
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
             return;

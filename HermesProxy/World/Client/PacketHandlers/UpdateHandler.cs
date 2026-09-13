@@ -3,6 +3,7 @@
 using Framework.GameMath;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
@@ -97,8 +98,8 @@ public partial class WorldClient
     }
 
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_DESTROY_OBJECT)]
-    void HandleDestroyObject(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DESTROY_OBJECT)]
+    internal void HandleDestroyObject(WorldPacket packet)
     {
         WowGuid128 guid = packet.ReadGuid().To128(GetSession().GameState);
         if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
@@ -184,8 +185,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_COMPRESSED_UPDATE_OBJECT)]
-    void HandleCompressedUpdateObject(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_COMPRESSED_UPDATE_OBJECT)]
+    internal void HandleCompressedUpdateObject(WorldPacket packet)
     {
         using (var packet2 = packet.Inflate(packet.ReadInt32()))
         {
@@ -288,8 +289,8 @@ public partial class WorldClient
         _ => false,
     };
 
-    [PacketHandler(Opcode.SMSG_UPDATE_OBJECT)]
-    void HandleUpdateObject(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_UPDATE_OBJECT)]
+    internal void HandleUpdateObject(WorldPacket packet)
     {
         var count = packet.ReadUInt32();
         PrintString($"Updates Count = {count}");

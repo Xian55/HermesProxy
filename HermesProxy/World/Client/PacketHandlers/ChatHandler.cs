@@ -1,6 +1,7 @@
 ﻿using Framework;
 using HermesProxy.Enums;
 using HermesProxy.World.Chat;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -14,8 +15,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_CHANNEL_NOTIFY)]
-    void HandleChannelNotify(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CHANNEL_NOTIFY)]
+    internal void HandleChannelNotify(WorldPacket packet)
     {
         ChatNotify type = (ChatNotify)packet.ReadUInt8();
 
@@ -134,8 +135,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_CHANNEL_LIST)]
-    void HandleChannelList(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CHANNEL_LIST)]
+    internal void HandleChannelList(WorldPacket packet)
     {
         ChannelListResponse list = new ChannelListResponse();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
@@ -156,8 +157,8 @@ public partial class WorldClient
         SendPacketToClient(list);
     }
 
-    [PacketHandler(Opcode.SMSG_CHAT, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
-    void HandleServerChatMessageVanilla(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CHAT, RemovedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleServerChatMessageVanilla(WorldPacket packet)
     {
         ChatMessageTypeVanilla chatType = (ChatMessageTypeVanilla)packet.ReadUInt8();
         uint language = packet.ReadUInt32();
@@ -243,9 +244,9 @@ public partial class WorldClient
         SendPacketToClient(chat);
     }
 
-    [PacketHandler(Opcode.SMSG_CHAT, ClientVersionBuild.V2_0_1_6180)]
-    [PacketHandler(Opcode.SMSG_GM_MESSAGECHAT, ClientVersionBuild.V2_0_1_6180)]
-    void HandleServerChatMessageWotLK(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CHAT, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    [HandlesSmsg(Opcode.SMSG_GM_MESSAGECHAT, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleServerChatMessageWotLK(WorldPacket packet)
     {
         ChatMessageTypeWotLK chatType = (ChatMessageTypeWotLK)packet.ReadUInt8();
         uint language = packet.ReadUInt32();
@@ -554,8 +555,8 @@ public partial class WorldClient
         SendPacket(packet);
     }
 
-    [PacketHandler(Opcode.SMSG_EMOTE)]
-    void HandleEmote(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_EMOTE)]
+    internal void HandleEmote(WorldPacket packet)
     {
         EmoteMessage emote = new EmoteMessage();
         emote.EmoteID = packet.ReadUInt32();
@@ -563,8 +564,8 @@ public partial class WorldClient
         SendPacketToClient(emote);
     }
 
-    [PacketHandler(Opcode.SMSG_TEXT_EMOTE)]
-    void HandleTextEmote(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_TEXT_EMOTE)]
+    internal void HandleTextEmote(WorldPacket packet)
     {
         STextEmote emote = new STextEmote();
         emote.SourceGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -577,24 +578,24 @@ public partial class WorldClient
         SendPacketToClient(emote);
     }
 
-    [PacketHandler(Opcode.SMSG_PRINT_NOTIFICATION)]
-    void HandlePrintNotification(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PRINT_NOTIFICATION)]
+    internal void HandlePrintNotification(WorldPacket packet)
     {
         PrintNotification notify = new PrintNotification();
         notify.NotifyText = packet.ReadCString();
         SendPacketToClient(notify);
     }
 
-    [PacketHandler(Opcode.SMSG_CHAT_PLAYER_NOTFOUND)]
-    void HandleChatPlayerNotFound(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CHAT_PLAYER_NOTFOUND)]
+    internal void HandleChatPlayerNotFound(WorldPacket packet)
     {
         ChatPlayerNotfound error = new ChatPlayerNotfound();
         error.Name = packet.ReadCString();
         SendPacketToClient(error);
     }
 
-    [PacketHandler(Opcode.SMSG_DEFENSE_MESSAGE)]
-    void HandleDefenseMessage(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DEFENSE_MESSAGE)]
+    internal void HandleDefenseMessage(WorldPacket packet)
     {
         DefenseMessage message = new DefenseMessage();
         message.ZoneID = packet.ReadUInt32();
@@ -603,8 +604,8 @@ public partial class WorldClient
         SendPacketToClient(message);
     }
 
-    [PacketHandler(Opcode.SMSG_CHAT_SERVER_MESSAGE)]
-    void HandleChatServerMessage(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CHAT_SERVER_MESSAGE)]
+    internal void HandleChatServerMessage(WorldPacket packet)
     {
         ChatServerMessage message = new ChatServerMessage();
         message.MessageID = packet.ReadInt32();

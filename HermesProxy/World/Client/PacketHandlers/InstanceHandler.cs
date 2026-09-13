@@ -1,4 +1,5 @@
 ﻿using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -17,8 +18,8 @@ public partial class WorldClient
     /// the trailing flags as bits. Without this the warning never reached the client, so the
     /// client never sent CMSG_INSTANCE_LOCK_RESPONSE and the server sat on a pending bind.
     /// </summary>
-    [PacketHandler(Opcode.SMSG_INSTANCE_LOCK_WARNING_QUERY)]
-    void HandleInstanceLockWarningQuery(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_INSTANCE_LOCK_WARNING_QUERY)]
+    internal void HandleInstanceLockWarningQuery(WorldPacket packet)
     {
         PendingRaidLock pending = new PendingRaidLock();
         pending.TimeUntilLock = (int)packet.ReadUInt32();
@@ -28,32 +29,32 @@ public partial class WorldClient
         SendPacketToClient(pending);
     }
 
-    [PacketHandler(Opcode.SMSG_UPDATE_INSTANCE_OWNERSHIP)]
-    void HandleUpdateInstanceOwnership(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_UPDATE_INSTANCE_OWNERSHIP)]
+    internal void HandleUpdateInstanceOwnership(WorldPacket packet)
     {
         UpdateInstanceOwnership instance = new UpdateInstanceOwnership();
         instance.IOwnInstance = packet.ReadUInt32();
         SendPacketToClient(instance);
     }
 
-    [PacketHandler(Opcode.SMSG_UPDATE_LAST_INSTANCE)]
-    void HandleUpdateLastInstance(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_UPDATE_LAST_INSTANCE)]
+    internal void HandleUpdateLastInstance(WorldPacket packet)
     {
         UpdateLastInstance last = new();
         last.MapID = packet.ReadUInt32();
         SendPacketToClient(last);
     }
 
-    [PacketHandler(Opcode.SMSG_INSTANCE_RESET)]
-    void HandleInstanceReset(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_INSTANCE_RESET)]
+    internal void HandleInstanceReset(WorldPacket packet)
     {
         InstanceReset reset = new InstanceReset();
         reset.MapID = packet.ReadUInt32();
         SendPacketToClient(reset);
     }
 
-    [PacketHandler(Opcode.SMSG_INSTANCE_RESET_FAILED)]
-    void HandleInstanceResetFailed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_INSTANCE_RESET_FAILED)]
+    internal void HandleInstanceResetFailed(WorldPacket packet)
     {
         InstanceResetFailed reset = new InstanceResetFailed();
         reset.ResetFailedReason = (ResetFailedReason)packet.ReadUInt32();
@@ -61,16 +62,16 @@ public partial class WorldClient
         SendPacketToClient(reset);
     }
 
-    [PacketHandler(Opcode.SMSG_RESET_FAILED_NOTIFY)]
-    void HandleResetFailedNotify(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_RESET_FAILED_NOTIFY)]
+    internal void HandleResetFailedNotify(WorldPacket packet)
     {
         ResetFailedNotify reset = new ResetFailedNotify();
         packet.ReadUInt32(); // Map ID
         SendPacketToClient(reset);
     }
 
-    [PacketHandler(Opcode.SMSG_RAID_INSTANCE_INFO)]
-    void HandleRaidInstanceInfo(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_RAID_INSTANCE_INFO)]
+    internal void HandleRaidInstanceInfo(WorldPacket packet)
     {
         RaidInstanceInfo infos = new RaidInstanceInfo();
         int count = packet.ReadInt32();
@@ -109,16 +110,16 @@ public partial class WorldClient
         SendPacketToClient(infos);
     }
 
-    [PacketHandler(Opcode.SMSG_INSTANCE_SAVE_CREATED)]
-    void HandleInstanceSaveCreated(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_INSTANCE_SAVE_CREATED)]
+    internal void HandleInstanceSaveCreated(WorldPacket packet)
     {
         InstanceSaveCreated save = new InstanceSaveCreated();
         save.Gm = packet.ReadUInt32() != 0;
         SendPacketToClient(save);
     }
 
-    [PacketHandler(Opcode.SMSG_RAID_GROUP_ONLY)]
-    void HandleRaidGroupOnly(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_RAID_GROUP_ONLY)]
+    internal void HandleRaidGroupOnly(WorldPacket packet)
     {
         RaidGroupOnly save = new RaidGroupOnly();
         save.Delay = packet.ReadInt32();
@@ -126,8 +127,8 @@ public partial class WorldClient
         SendPacketToClient(save);
     }
 
-    [PacketHandler(Opcode.SMSG_RAID_INSTANCE_MESSAGE)]
-    void HandleRaidInstanceMessage(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_RAID_INSTANCE_MESSAGE)]
+    internal void HandleRaidInstanceMessage(WorldPacket packet)
     {
         RaidInstanceMessage instance = new RaidInstanceMessage();
         instance.Type = (InstanceResetWarningType)packet.ReadUInt32();

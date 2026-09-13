@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -6,6 +6,7 @@ using HermesProxy;
 using HermesProxy.Enums;
 using HermesProxy.World;
 using HermesProxy.World.Client;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
@@ -70,6 +71,15 @@ public class PacketHandlerRegistrationTests
             "The attribute most likely slipped onto the wrong declaration.");
     }
 
+    /// <summary>
+    /// The update-object opcodes must stay handled by *some* registry.
+    /// </summary>
+    /// <remarks>
+    /// Unions both, because a handler that converts to [HandlesSmsg] drops out of the reflective
+    /// query entirely - so checking only that side would have quietly stopped covering anything
+    /// as the migration progressed. It did not go quiet here: converting the legacy handlers
+    /// emptied the reflective set and this failed, which is the behaviour worth keeping.
+    /// </remarks>
     [Fact]
     public void UpdateObjectOpcodesAreHandled()
     {
@@ -77,6 +87,12 @@ public class PacketHandlerRegistrationTests
             .SelectMany(m => m.GetCustomAttributes<PacketHandlerAttribute>())
             .Select(a => a.Opcode)
             .ToHashSet();
+
+        handled.UnionWith(
+            typeof(WorldClient)
+                .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                .SelectMany(m => m.GetCustomAttributes<HandlesSmsgAttribute>())
+                .Select(a => a.Opcode));
 
         Assert.Contains(Opcode.SMSG_UPDATE_OBJECT, handled);
         Assert.Contains(Opcode.SMSG_COMPRESSED_UPDATE_OBJECT, handled);

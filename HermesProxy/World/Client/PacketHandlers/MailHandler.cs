@@ -1,4 +1,5 @@
 ﻿using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -11,16 +12,16 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_NOTIFY_RECEIVED_MAIL)]
-    void HandleNotifyReceivedMail(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_NOTIFY_RECEIVED_MAIL)]
+    internal void HandleNotifyReceivedMail(WorldPacket packet)
     {
         NotifyReceivedMail mail = new NotifyReceivedMail();
         mail.Delay = packet.ReadFloat();
         SendPacketToClient(mail);
     }
 
-    [PacketHandler(Opcode.MSG_QUERY_NEXT_MAIL_TIME)]
-    void HandleQueryNextMailTime(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_QUERY_NEXT_MAIL_TIME)]
+    internal void HandleQueryNextMailTime(WorldPacket packet)
     {
         MailQueryNextTimeResult result = new MailQueryNextTimeResult();
         result.NextMailTime = packet.ReadFloat();
@@ -54,8 +55,8 @@ public partial class WorldClient
         SendPacketToClient(result);
     }
 
-    [PacketHandler(Opcode.SMSG_MAIL_LIST_RESULT)]
-    void HandleMailListResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_MAIL_LIST_RESULT)]
+    internal void HandleMailListResult(WorldPacket packet)
     {
         MailListResult result = new MailListResult();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
@@ -161,8 +162,8 @@ public partial class WorldClient
             GetSession().GameState.PendingMailListPacket = result;
     }
 
-    [PacketHandler(Opcode.SMSG_QUERY_ITEM_TEXT_RESPONSE)]
-    void HandleQueryItemTextResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUERY_ITEM_TEXT_RESPONSE)]
+    internal void HandleQueryItemTextResponse(WorldPacket packet)
     {
         // 3.3.0 moved letter bodies from the item_text table onto the item itself, and the
         // packet changed with it: a leading "no text" byte, the item GUID, then the string.
@@ -257,8 +258,8 @@ public partial class WorldClient
         return mailItem;
     }
 
-    [PacketHandler(Opcode.SMSG_MAIL_COMMAND_RESULT)]
-    void HandleMailCommandResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_MAIL_COMMAND_RESULT)]
+    internal void HandleMailCommandResult(WorldPacket packet)
     {
         MailCommandResult mail = new MailCommandResult();
         mail.MailID = packet.ReadUInt32();

@@ -1,5 +1,6 @@
 ﻿using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
@@ -14,8 +15,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_PARTY_COMMAND_RESULT)]
-    void HandlePartyCommandResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PARTY_COMMAND_RESULT)]
+    internal void HandlePartyCommandResult(WorldPacket packet)
     {
         PartyCommandResult party = new PartyCommandResult();
         party.Command = (byte)packet.ReadUInt32();
@@ -30,22 +31,22 @@ public partial class WorldClient
         SendPacketToClient(party);
     }
 
-    [PacketHandler(Opcode.SMSG_GROUP_DECLINE)]
-    void HandleGroupDecline(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GROUP_DECLINE)]
+    internal void HandleGroupDecline(WorldPacket packet)
     {
         GroupDecline party = new GroupDecline();
         party.Name = packet.ReadCString();
         SendPacketToClient(party);
     }
 
-    [PacketHandler(Opcode.SMSG_GROUP_DESTROYED)]
-    void HandleGroupDestroyed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GROUP_DESTROYED)]
+    internal void HandleGroupDestroyed(WorldPacket packet)
     {
         SendPacketToClient(new GroupDestroyed());
     }
 
-    [PacketHandler(Opcode.SMSG_PARTY_INVITE)]
-    void HandleGroupInvite(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PARTY_INVITE)]
+    internal void HandleGroupInvite(WorldPacket packet)
     {
         PartyInvite party = new PartyInvite();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
@@ -75,8 +76,8 @@ public partial class WorldClient
         SendPacketToClient(party);
     }
 
-    [PacketHandler(Opcode.SMSG_GROUP_LIST, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
-    void HandleGroupListVanilla(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GROUP_LIST, RemovedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleGroupListVanilla(WorldPacket packet)
     {
         GetSession().GameState.MasterLootCandidates = null;
         GetSession().GameState.LastMasterLootSentTarget = default;
@@ -175,8 +176,8 @@ public partial class WorldClient
         SendPacketToClient(party);
     }
 
-    [PacketHandler(Opcode.SMSG_GROUP_LIST, ClientVersionBuild.V2_0_1_6180)]
-    void HandleGroupListTBC(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GROUP_LIST, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleGroupListTBC(WorldPacket packet)
     {
         GetSession().GameState.MasterLootCandidates = null;
         GetSession().GameState.LastMasterLootSentTarget = default;
@@ -447,15 +448,15 @@ public partial class WorldClient
         SendPacketToClient(status);
     }
 
-    [PacketHandler(Opcode.SMSG_GROUP_UNINVITE)]
-    void HandleGroupUninvite(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GROUP_UNINVITE)]
+    internal void HandleGroupUninvite(WorldPacket packet)
     {
         GroupUninvite party = new GroupUninvite();
         SendPacketToClient(party);
     }
 
-    [PacketHandler(Opcode.SMSG_GROUP_NEW_LEADER)]
-    void HandleGroupNewLeader(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GROUP_NEW_LEADER)]
+    internal void HandleGroupNewLeader(WorldPacket packet)
     {
         GroupNewLeader party = new GroupNewLeader();
         party.Name = packet.ReadCString();
@@ -463,8 +464,8 @@ public partial class WorldClient
         SendPacketToClient(party);
     }
 
-    [PacketHandler(Opcode.MSG_RAID_READY_CHECK, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
-    void HandleRaidReadyCheckVanilla(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_RAID_READY_CHECK, RemovedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleRaidReadyCheckVanilla(WorldPacket packet)
     {
         if (!packet.CanRead())
         {
@@ -498,8 +499,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.MSG_RAID_READY_CHECK, ClientVersionBuild.V2_0_1_6180)]
-    void HandleRaidReadyCheck(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_RAID_READY_CHECK, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleRaidReadyCheck(WorldPacket packet)
     {
         ReadyCheckStarted ready = new ReadyCheckStarted();
         ready.InitiatorGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -513,8 +514,8 @@ public partial class WorldClient
         ArmReadyCheckDeadline(ready.Duration);
     }
 
-    [PacketHandler(Opcode.MSG_RAID_READY_CHECK_CONFIRM, ClientVersionBuild.V2_0_1_6180)]
-    void HandleRaidReadyCheckConfirm(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_RAID_READY_CHECK_CONFIRM, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleRaidReadyCheckConfirm(WorldPacket packet)
     {
         ReadyCheckResponse ready = new ReadyCheckResponse();
         ready.Player = packet.ReadGuid().To128(GetSession().GameState);
@@ -534,8 +535,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.MSG_RAID_READY_CHECK_FINISHED, ClientVersionBuild.V2_0_1_6180)]
-    void HandleRaidReadyCheckFinished(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_RAID_READY_CHECK_FINISHED, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleRaidReadyCheckFinished(WorldPacket packet)
     {
         GetSession().GameState.GroupReadyCheckResponses = 0;
         StopReadyCheckDeadline();
@@ -626,8 +627,8 @@ public partial class WorldClient
         SendPacket(packet);
     }
 
-    [PacketHandler(Opcode.MSG_RAID_TARGET_UPDATE)]
-    void HandleRaidTargetUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_RAID_TARGET_UPDATE)]
+    internal void HandleRaidTargetUpdate(WorldPacket packet)
     {
         bool isFullUpdate = packet.ReadBool();
         if (isFullUpdate)
@@ -658,8 +659,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_SUMMON_REQUEST)]
-    void HandleSummonRequest(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SUMMON_REQUEST)]
+    internal void HandleSummonRequest(WorldPacket packet)
     {
         SummonRequest summon = new SummonRequest();
         summon.SummonerGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -671,8 +672,8 @@ public partial class WorldClient
 
     uint _requestBgPlayerPosCounter = 0;
 
-    [PacketHandler(Opcode.SMSG_PARTY_MEMBER_PARTIAL_STATE, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
-    void HandlePartyMemberStats(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PARTY_MEMBER_PARTIAL_STATE, RemovedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandlePartyMemberStats(WorldPacket packet)
     {
         if (GetSession().GameState.CurrentMapId == (uint)BattlegroundMapID.WarsongGulch &&
            (GetSession().GameState.HasWsgAllyFlagCarrier || GetSession().GameState.HasWsgHordeFlagCarrier))
@@ -873,8 +874,8 @@ public partial class WorldClient
         SendPacketToClient(state);
     }
 
-    [PacketHandler(Opcode.SMSG_PARTY_MEMBER_PARTIAL_STATE, ClientVersionBuild.V2_0_1_6180)]
-    void HandlePartyMemberStatsTbc(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PARTY_MEMBER_PARTIAL_STATE, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandlePartyMemberStatsTbc(WorldPacket packet)
     {
         if (GetSession().GameState.CurrentMapId == (uint)BattlegroundMapID.WarsongGulch &&
            (GetSession().GameState.HasWsgAllyFlagCarrier || GetSession().GameState.HasWsgHordeFlagCarrier))
@@ -1169,8 +1170,8 @@ public partial class WorldClient
         return true;
     }
 
-    [PacketHandler(Opcode.SMSG_PARTY_MEMBER_FULL_STATE, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
-    void HandlePartyMemberStatsFull(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PARTY_MEMBER_FULL_STATE, RemovedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandlePartyMemberStatsFull(WorldPacket packet)
     {
         if (GetSession().GameState.CurrentMapId == (uint)BattlegroundMapID.WarsongGulch &&
            (GetSession().GameState.HasWsgAllyFlagCarrier || GetSession().GameState.HasWsgHordeFlagCarrier))
@@ -1380,8 +1381,8 @@ public partial class WorldClient
         SendPacketToClient(state);
     }
 
-    [PacketHandler(Opcode.SMSG_PARTY_MEMBER_FULL_STATE, ClientVersionBuild.V2_0_1_6180)]
-    void HandlePartyMemberStatsFullTBC(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PARTY_MEMBER_FULL_STATE, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandlePartyMemberStatsFullTBC(WorldPacket packet)
     {
         if (GetSession().GameState.CurrentMapId == (uint)BattlegroundMapID.WarsongGulch &&
            (GetSession().GameState.HasWsgAllyFlagCarrier || GetSession().GameState.HasWsgHordeFlagCarrier))
@@ -1564,8 +1565,8 @@ public partial class WorldClient
         return state;
     }
 
-    [PacketHandler(Opcode.MSG_MINIMAP_PING)]
-    void HandleMinimapPing(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_MINIMAP_PING)]
+    internal void HandleMinimapPing(WorldPacket packet)
     {
         MinimapPing ping = new MinimapPing();
         ping.SenderGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -1573,8 +1574,8 @@ public partial class WorldClient
         SendPacketToClient(ping);
     }
 
-    [PacketHandler(Opcode.MSG_RANDOM_ROLL)]
-    void HandleRandomRoll(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_RANDOM_ROLL)]
+    internal void HandleRandomRoll(WorldPacket packet)
     {
         RandomRoll roll = new RandomRoll();
         roll.Min = packet.ReadInt32();

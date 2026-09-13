@@ -1,5 +1,6 @@
-using Framework.Util;
+﻿using Framework.Util;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
 
@@ -13,8 +14,8 @@ public partial class WorldClient
     // AchievementPackets.{h,cpp}. Version-gated to V3_0_2+ so V1_14/V2_5 fall
     // through unchanged.
 
-    [PacketHandler(Opcode.SMSG_ALL_ACHIEVEMENT_DATA)]
-    void HandleAllAchievementData(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ALL_ACHIEVEMENT_DATA)]
+    internal void HandleAllAchievementData(WorldPacket packet)
     {
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             return;
@@ -70,8 +71,8 @@ public partial class WorldClient
         SendPacketToClient(data);
     }
 
-    [PacketHandler(Opcode.SMSG_CRITERIA_UPDATE)]
-    void HandleCriteriaUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CRITERIA_UPDATE)]
+    internal void HandleCriteriaUpdate(WorldPacket packet)
     {
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             return;
@@ -100,8 +101,8 @@ public partial class WorldClient
         SendPacketToClient(update);
     }
 
-    [PacketHandler(Opcode.SMSG_CRITERIA_DELETED)]
-    void HandleCriteriaDeleted(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CRITERIA_DELETED)]
+    internal void HandleCriteriaDeleted(WorldPacket packet)
     {
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             return;
@@ -109,8 +110,8 @@ public partial class WorldClient
         SendPacketToClient(new CriteriaDeletedPkt { CriteriaID = packet.ReadUInt32() });
     }
 
-    [PacketHandler(Opcode.SMSG_ACHIEVEMENT_EARNED)]
-    void HandleAchievementEarned(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ACHIEVEMENT_EARNED)]
+    internal void HandleAchievementEarned(WorldPacket packet)
     {
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             return;

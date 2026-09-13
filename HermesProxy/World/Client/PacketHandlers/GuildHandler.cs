@@ -1,5 +1,6 @@
-using Framework.Logging;
+﻿using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
@@ -13,8 +14,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_GUILD_COMMAND_RESULT)]
-    void HandleGuildCommandResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GUILD_COMMAND_RESULT)]
+    internal void HandleGuildCommandResult(WorldPacket packet)
     {
         GuildCommandResult result = new();
         result.Command = (GuildCommandType)packet.ReadUInt32();
@@ -23,8 +24,8 @@ public partial class WorldClient
         SendPacketToClient(result);
     }
 
-    [PacketHandler(Opcode.MSG_GUILD_PERMISSIONS)]
-    void HandleGuildPermissions(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_GUILD_PERMISSIONS)]
+    internal void HandleGuildPermissions(WorldPacket packet)
     {
         // Guild::SendPermissions unsubscribes us from bank delta updates every time it
         // runs — deliberately, as AzerothCore's "only reliable way to handle /reload".
@@ -48,8 +49,8 @@ public partial class WorldClient
         SendPacketToClient(result);
     }
 
-    [PacketHandler(Opcode.SMSG_GUILD_EVENT)]
-    void HandleGuildEvent(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GUILD_EVENT)]
+    internal void HandleGuildEvent(WorldPacket packet)
     {
         GuildEventType eventType = (GuildEventType)packet.ReadUInt8();
 
@@ -222,8 +223,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_QUERY_GUILD_INFO_RESPONSE)]
-    void HandleQueryGuildInfoResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUERY_GUILD_INFO_RESPONSE)]
+    internal void HandleQueryGuildInfoResponse(WorldPacket packet)
     {
         QueryGuildInfoResponse guild = new();
         uint guildId = packet.ReadUInt32();
@@ -262,8 +263,8 @@ public partial class WorldClient
         SendPacketToClient(guild);
     }
 
-    [PacketHandler(Opcode.SMSG_GUILD_INFO)]
-    void HandleGuildInfo(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GUILD_INFO)]
+    internal void HandleGuildInfo(WorldPacket packet)
     {
         packet.ReadCString(); // Guild Name
 
@@ -292,8 +293,8 @@ public partial class WorldClient
         GetSession().GameState.CurrentGuildNumAccounts = packet.ReadUInt32();
     }
 
-    [PacketHandler(Opcode.SMSG_GUILD_ROSTER)]
-    void HandleGuildRoster(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GUILD_ROSTER)]
+    internal void HandleGuildRoster(WorldPacket packet)
     {
         GuildRoster guild = new();
         var membersCount = packet.ReadUInt32();
@@ -370,8 +371,8 @@ public partial class WorldClient
         SendPacketToClient(guild);
     }
 
-    [PacketHandler(Opcode.SMSG_GUILD_INVITE)]
-    void HandleGuildInvite(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GUILD_INVITE)]
+    internal void HandleGuildInvite(WorldPacket packet)
     {
         GuildInvite invite = new();
         invite.InviterName = packet.ReadCString();
@@ -382,24 +383,24 @@ public partial class WorldClient
         SendPacketToClient(invite);
     }
 
-    [PacketHandler(Opcode.MSG_TABARDVENDOR_ACTIVATE)]
-    void HandleTabardVendorActivate(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_TABARDVENDOR_ACTIVATE)]
+    internal void HandleTabardVendorActivate(WorldPacket packet)
     {
         PlayerTabardVendorActivate activate = new();
         activate.DesignerGUID = packet.ReadGuid().To128(GetSession().GameState);
         SendPacketToClient(activate);
     }
 
-    [PacketHandler(Opcode.MSG_SAVE_GUILD_EMBLEM)]
-    void HandleSaveGuildEmblem(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_SAVE_GUILD_EMBLEM)]
+    internal void HandleSaveGuildEmblem(WorldPacket packet)
     {
         PlayerSaveGuildEmblem emblem = new();
         emblem.Error = (GuildEmblemError)packet.ReadUInt32();
         SendPacketToClient(emblem);
     }
 
-    [PacketHandler(Opcode.SMSG_GUILD_INVITE_DECLINED)]
-    void HandleGuildInviteDeclined(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GUILD_INVITE_DECLINED)]
+    internal void HandleGuildInviteDeclined(WorldPacket packet)
     {
         GuildInviteDeclined invite = new();
         invite.InviterName = packet.ReadCString();
@@ -407,8 +408,8 @@ public partial class WorldClient
         SendPacketToClient(invite);
     }
 
-    [PacketHandler(Opcode.SMSG_GUILD_BANK_QUERY_RESULTS)]
-    void HandleGuildBankQueryResults(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_GUILD_BANK_QUERY_RESULTS)]
+    internal void HandleGuildBankQueryResults(WorldPacket packet)
     {
         GuildBankQueryResults result = new();
         result.Money = packet.ReadUInt64();
@@ -492,8 +493,8 @@ public partial class WorldClient
         SendPacketToClient(result);
     }
 
-    [PacketHandler(Opcode.MSG_QUERY_GUILD_BANK_TEXT)]
-    void HandleQueryGuildBankText(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_QUERY_GUILD_BANK_TEXT)]
+    internal void HandleQueryGuildBankText(WorldPacket packet)
     {
         GuildBankTextQueryResult result = new();
         result.Tab = packet.ReadUInt8();
@@ -501,8 +502,8 @@ public partial class WorldClient
         SendPacketToClient(result);
     }
 
-    [PacketHandler(Opcode.MSG_GUILD_BANK_LOG_QUERY)]
-    void HandleGuildBankLongQuery(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_GUILD_BANK_LOG_QUERY)]
+    internal void HandleGuildBankLongQuery(WorldPacket packet)
     {
         GuildBankLogQueryResults result = new();
         result.Tab = packet.ReadUInt8();
@@ -547,8 +548,8 @@ public partial class WorldClient
         SendPacketToClient(result);
     }
 
-    [PacketHandler(Opcode.MSG_GUILD_BANK_MONEY_WITHDRAWN)]
-    void HandleGuildBankMoneyWithdrawn(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_GUILD_BANK_MONEY_WITHDRAWN)]
+    internal void HandleGuildBankMoneyWithdrawn(WorldPacket packet)
     {
         GuildBankRemainingWithdrawMoney result = new();
         result.RemainingWithdrawMoney = packet.ReadUInt32();

@@ -688,7 +688,7 @@ public partial class WorldClient
                 var generated = GeneratedSmsgDispatch.Get(universalOpcode);
                 if (generated != null)
                 {
-                    HandleGeneratedPacket(generated, packet, universalOpcode);
+                    HandleGeneratedLegacyPacket(generated, packet, universalOpcode);
                 }
                 else if (_packetHandlers.TryGetValue(universalOpcode, out var handler))
                 {
@@ -745,6 +745,43 @@ public partial class WorldClient
     /// not disposed here: on this side the caller owns the buffer, and the reflective handlers it
     /// sits beside do not dispose either.
     /// </summary>
+    /// <summary>
+    /// Invokes a generated legacy thunk, which calls the handler still living on this instance.
+    /// </summary>
+    /// <remarks>
+    /// The legacy table carries a different thunk shape from the modern one: these handlers parse
+    /// inline off the WorldPacket rather than through a codec, so the thunk takes the client and
+    /// the packet. The error handling is the same as the reflective path it replaces - a throwing
+    /// handler must not escape into the read loop, which would tear down the world connection,
+    /// and the packet is already fully read off the socket so dropping it cannot desync the
+    /// stream.
+    /// </remarks>
+    private unsafe void HandleGeneratedLegacyPacket(
+        delegate*<WorldClient, WorldPacket, void> thunk,
+        WorldPacket packet,
+        Opcode universalOpcode)
+    {
+        try
+        {
+            thunk(this, packet);
+        }
+        catch (UnmappedOpcodeException unmapped)
+        {
+            Log.Print(LogType.Warn,
+                $"C P<S | Handling {universalOpcode} ({packet.GetOpcode()}): {unmapped.Message}");
+        }
+        catch (Exception handlerException)
+        {
+            byte[] raw = packet.GetData();
+            int size = (int)packet.GetSize();
+            int hexLen = System.Math.Min(1024, System.Math.Min(size, raw.Length));
+            string body = hexLen > 0 ? System.BitConverter.ToString(raw, 0, hexLen) : "<empty>";
+            Log.Print(LogType.Error,
+                $"C P<S | Unhandled exception in handler for {universalOpcode} ({packet.GetOpcode()}) " +
+                $"[size={size} dumped={hexLen}]{System.Environment.NewLine}bytes={body}{System.Environment.NewLine}{handlerException}");
+        }
+    }
+
     private unsafe void HandleGeneratedPacket(
         delegate*<ref SpanPacketReader, in SessionContext, void> thunk,
         WorldPacket packet,

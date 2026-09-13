@@ -1,6 +1,7 @@
 ﻿using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -13,8 +14,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_BATTLEFIELD_LIST, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
-    void HandleBattlefieldListVanilla(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BATTLEFIELD_LIST, RemovedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleBattlefieldListVanilla(WorldPacket packet)
     {
         BattlefieldList bglist = new BattlefieldList();
         bglist.BattlemasterGuid = packet.ReadGuid().To128(GetSession().GameState);
@@ -30,8 +31,8 @@ public partial class WorldClient
         SendPacketToClient(bglist);
     }
 
-    [PacketHandler(Opcode.SMSG_BATTLEFIELD_LIST, ClientVersionBuild.V2_0_1_6180, ClientVersionBuild.V3_0_2_9056)]
-    void HandleBattlefieldListTBC(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BATTLEFIELD_LIST, AddedIn = ClientVersionBuild.V2_0_1_6180, RemovedIn = ClientVersionBuild.V3_0_2_9056)]
+    internal void HandleBattlefieldListTBC(WorldPacket packet)
     {
         BattlefieldList bglist = new BattlefieldList();
         bglist.BattlemasterGuid = packet.ReadGuid().To128(GetSession().GameState);
@@ -47,8 +48,8 @@ public partial class WorldClient
         SendPacketToClient(bglist);
     }
 
-    [PacketHandler(Opcode.SMSG_BATTLEFIELD_LIST, ClientVersionBuild.V3_0_2_9056)]
-    void HandleBattlefieldListWotLK(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BATTLEFIELD_LIST, AddedIn = ClientVersionBuild.V3_0_2_9056)]
+    internal void HandleBattlefieldListWotLK(WorldPacket packet)
     {
         BattlefieldList bglist = new BattlefieldList();
         bglist.BattlemasterGuid = packet.ReadGuid().To128(GetSession().GameState);
@@ -83,8 +84,8 @@ public partial class WorldClient
         SendPacketToClient(bglist);
     }
 
-    [PacketHandler(Opcode.SMSG_BATTLEFIELD_STATUS, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
-    void HandleBattlefieldStatusVanilla(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BATTLEFIELD_STATUS, RemovedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleBattlefieldStatusVanilla(WorldPacket packet)
     {
         BattlefieldStatusHeader hdr = new BattlefieldStatusHeader();
         hdr.Ticket.Id = 1 + packet.ReadUInt32(); // Queue Slot
@@ -175,8 +176,8 @@ public partial class WorldClient
         GetSession().GameState.StoreBattleFieldQueueType(hdr.Ticket.Id, mapId);
     }
 
-    [PacketHandler(Opcode.SMSG_BATTLEFIELD_STATUS, ClientVersionBuild.V2_0_1_6180)]
-    void HandleBattlefieldStatusTBC(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BATTLEFIELD_STATUS, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleBattlefieldStatusTBC(WorldPacket packet)
     {
         BattlefieldStatusHeader hdr = new BattlefieldStatusHeader();
         hdr.Ticket.Id = 1 + packet.ReadUInt32(); // Queue Slot
@@ -269,8 +270,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.MSG_PVP_LOG_DATA, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
-    void HandlePvPLogDataVanilla(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_PVP_LOG_DATA, RemovedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandlePvPLogDataVanilla(WorldPacket packet)
     {
         PVPMatchStatisticsMessage pvp = new PVPMatchStatisticsMessage();
         if (packet.ReadBool()) // Has Winner
@@ -299,8 +300,8 @@ public partial class WorldClient
         SendPacketToClient(pvp);
     }
 
-    [PacketHandler(Opcode.MSG_PVP_LOG_DATA, ClientVersionBuild.V2_0_1_6180)]
-    void HandlePvPLogDataTBC(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_PVP_LOG_DATA, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandlePvPLogDataTBC(WorldPacket packet)
     {
         PVPMatchStatisticsMessage pvp = new PVPMatchStatisticsMessage();
         if (packet.ReadBool()) // Has Arena Teams
@@ -398,8 +399,8 @@ public partial class WorldClient
         return position;
     }
 
-    [PacketHandler(Opcode.MSG_BATTLEGROUND_PLAYER_POSITIONS, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
-    void HandleBattlegroundPlayerPositionsVanilla(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_BATTLEGROUND_PLAYER_POSITIONS, RemovedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleBattlegroundPlayerPositionsVanilla(WorldPacket packet)
     {
         GetSession().GameState.FlagCarrierGuids.Clear();
         BattlegroundPlayerPositions bglist = new BattlegroundPlayerPositions();
@@ -431,8 +432,8 @@ public partial class WorldClient
         SendPacketToClient(bglist);
     }
 
-    [PacketHandler(Opcode.MSG_BATTLEGROUND_PLAYER_POSITIONS, ClientVersionBuild.V2_0_1_6180)]
-    void HandleBattlegroundPlayerPositionsTBC(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_BATTLEGROUND_PLAYER_POSITIONS, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleBattlegroundPlayerPositionsTBC(WorldPacket packet)
     {
         BattlegroundPlayerPositions bglist = new BattlegroundPlayerPositions();
         uint teamMembersCount = packet.ReadUInt32();
@@ -466,8 +467,8 @@ public partial class WorldClient
     // Legacy 0x2E8 is SMSG_GROUP_JOINED_BATTLEGROUND (int32 result). The 3.3.5
     // table names it SMSG_BATTLEFIELD_STATUS_QUEUED. Rated join-as-group failures
     // only send this packet, so dropping it made Join as Group look like a no-op.
-    [PacketHandler(Opcode.SMSG_BATTLEFIELD_STATUS_QUEUED)]
-    void HandleGroupJoinedBattleground(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BATTLEFIELD_STATUS_QUEUED)]
+    internal void HandleGroupJoinedBattleground(WorldPacket packet)
     {
         int result = packet.ReadInt32();
         WowGuid128? playerGuid = null;
@@ -504,17 +505,17 @@ public partial class WorldClient
         SendPacketToClient(failed);
     }
 
-    [PacketHandler(Opcode.SMSG_BATTLEGROUND_PLAYER_JOINED)]
-    [PacketHandler(Opcode.SMSG_BATTLEGROUND_PLAYER_LEFT)]
-    void HandleBattlegroundPlayerLeftOrJoined(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BATTLEGROUND_PLAYER_JOINED)]
+    [HandlesSmsg(Opcode.SMSG_BATTLEGROUND_PLAYER_LEFT)]
+    internal void HandleBattlegroundPlayerLeftOrJoined(WorldPacket packet)
     {
         BattlegroundPlayerLeftOrJoined player = new BattlegroundPlayerLeftOrJoined(packet.GetUniversalOpcode(false));
         player.Guid = packet.ReadGuid().To128(GetSession().GameState);
         SendPacketToClient(player);
     }
 
-    [PacketHandler(Opcode.SMSG_AREA_SPIRIT_HEALER_TIME)]
-    void HandleAreaSpiritHealerTime(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_AREA_SPIRIT_HEALER_TIME)]
+    internal void HandleAreaSpiritHealerTime(WorldPacket packet)
     {
         AreaSpiritHealerTime healer = new AreaSpiritHealerTime();
         healer.HealerGuid = packet.ReadGuid().To128(GetSession().GameState);
@@ -522,8 +523,8 @@ public partial class WorldClient
         SendPacketToClient(healer);
     }
 
-    [PacketHandler(Opcode.SMSG_PVP_CREDIT)]
-    void HandlePvPCredit(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PVP_CREDIT)]
+    internal void HandlePvPCredit(WorldPacket packet)
     {
         PvPCredit credit = new PvPCredit();
         credit.OriginalHonor = packet.ReadInt32();
@@ -532,8 +533,8 @@ public partial class WorldClient
         SendPacketToClient(credit);
     }
 
-    [PacketHandler(Opcode.SMSG_PLAYER_SKINNED)]
-    void HandlePlayerSkinned(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PLAYER_SKINNED)]
+    internal void HandlePlayerSkinned(WorldPacket packet)
     {
         PlayerSkinned skinned = new PlayerSkinned();
         if (packet.CanRead())

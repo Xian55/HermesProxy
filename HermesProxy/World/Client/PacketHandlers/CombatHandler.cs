@@ -1,5 +1,6 @@
-using Framework;
+﻿using Framework;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -10,8 +11,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_ATTACK_START)]
-    void HandleAttackStart(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ATTACK_START)]
+    internal void HandleAttackStart(WorldPacket packet)
     {
         SAttackStart attack = new();
         attack.Attacker = packet.ReadGuid().To128(GetSession().GameState);
@@ -23,32 +24,32 @@ public partial class WorldClient
         SendPacketToClient(attack);
     }
 
-    [PacketHandler(Opcode.SMSG_DISMOUNT)]
-    void HandleDismount(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DISMOUNT)]
+    internal void HandleDismount(WorldPacket packet)
     {
         Dismount dismount = new();
         dismount.Guid = packet.ReadPackedGuid().To128(GetSession().GameState);
         SendPacketToClient(dismount);
     }
 
-    [PacketHandler(Opcode.SMSG_BREAK_TARGET)]
-    void HandleBreakTarget(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BREAK_TARGET)]
+    internal void HandleBreakTarget(WorldPacket packet)
     {
         BreakTarget pkt = new();
         pkt.UnitGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
         SendPacketToClient(pkt);
     }
 
-    [PacketHandler(Opcode.SMSG_CLEAR_TARGET)]
-    void HandleClearTarget(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CLEAR_TARGET)]
+    internal void HandleClearTarget(WorldPacket packet)
     {
         ClearTarget pkt = new();
         pkt.Guid = packet.ReadGuid().To128(GetSession().GameState);
         SendPacketToClient(pkt);
     }
 
-    [PacketHandler(Opcode.SMSG_ATTACK_STOP)]
-    void HandleAttackStop(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ATTACK_STOP)]
+    internal void HandleAttackStop(WorldPacket packet)
     {
         SAttackStop attack = new();
         attack.Attacker = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -79,8 +80,8 @@ public partial class WorldClient
 
         SendPacketToClient(attack);
     }
-    [PacketHandler(Opcode.SMSG_ATTACKER_STATE_UPDATE)]
-    void HandleAttackerStateUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ATTACKER_STATE_UPDATE)]
+    internal void HandleAttackerStateUpdate(WorldPacket packet)
     {
         AttackerStateUpdate attack = new();
         uint hitInfo = packet.ReadUInt32();
@@ -155,36 +156,36 @@ public partial class WorldClient
 
         SendPacketToClient(attack);
     }
-    [PacketHandler(Opcode.SMSG_ATTACKSWING_NOTINRANGE)]
-    void HandleAttackSwingNotInRange(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ATTACKSWING_NOTINRANGE)]
+    internal void HandleAttackSwingNotInRange(WorldPacket packet)
     {
         AttackSwingError attack = new();
         attack.Reason = AttackSwingErr.NotInRange;
         SendPacketToClient(attack);
     }
-    [PacketHandler(Opcode.SMSG_ATTACKSWING_BADFACING)]
-    void HandleAttackSwingBadFacing(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ATTACKSWING_BADFACING)]
+    internal void HandleAttackSwingBadFacing(WorldPacket packet)
     {
         AttackSwingError attack = new();
         attack.Reason = AttackSwingErr.BadFacing;
         SendPacketToClient(attack);
     }
-    [PacketHandler(Opcode.SMSG_ATTACKSWING_DEADTARGET)]
-    void HandleAttackSwingDeadTarget(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ATTACKSWING_DEADTARGET)]
+    internal void HandleAttackSwingDeadTarget(WorldPacket packet)
     {
         AttackSwingError attack = new();
         attack.Reason = AttackSwingErr.DeadTarget;
         SendPacketToClient(attack);
     }
-    [PacketHandler(Opcode.SMSG_ATTACKSWING_CANT_ATTACK)]
-    void HandleAttackSwingCantAttack(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ATTACKSWING_CANT_ATTACK)]
+    internal void HandleAttackSwingCantAttack(WorldPacket packet)
     {
         AttackSwingError attack = new();
         attack.Reason = AttackSwingErr.CantAttack;
         SendPacketToClient(attack);
     }
-    [PacketHandler(Opcode.SMSG_CANCEL_COMBAT)]
-    void HandleCancelCombat(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CANCEL_COMBAT)]
+    internal void HandleCancelCombat(WorldPacket packet)
     {
         GetSession().GameState.CurrentAttackTarget = default;
         GetSession().GameState.WaitingForAttackStart = false;
@@ -192,16 +193,16 @@ public partial class WorldClient
         CancelCombat combat = new();
         SendPacketToClient(combat);
     }
-    [PacketHandler(Opcode.SMSG_AI_REACTION)]
-    void HandleAIReaction(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_AI_REACTION)]
+    internal void HandleAIReaction(WorldPacket packet)
     {
         AIReaction reaction = new();
         reaction.UnitGUID = packet.ReadGuid().To128(GetSession().GameState);
         reaction.Reaction = packet.ReadUInt32();
         SendPacketToClient(reaction);
     }
-    [PacketHandler(Opcode.SMSG_PARTY_KILL_LOG)]
-    void HandlePartyKillLog(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PARTY_KILL_LOG)]
+    internal void HandlePartyKillLog(WorldPacket packet)
     {
         PartyKillLog log = new();
         log.Player = packet.ReadGuid().To128(GetSession().GameState);
@@ -218,8 +219,8 @@ public partial class WorldClient
     // count field is garbled (e.g. truncated legacy packet read mid-stream).
     private const int ThreatListSanityCap = 256;
 
-    [PacketHandler(Opcode.SMSG_THREAT_UPDATE)]
-    void HandleThreatUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_THREAT_UPDATE)]
+    internal void HandleThreatUpdate(WorldPacket packet)
     {
         // Wire shape (PackedGuid128 + int32 count + (PackedGuid128 + int64) * count)
         // verified against V3_4_3.54261 native sniffs only. V1_14 / V2_5 modern clients
@@ -246,8 +247,8 @@ public partial class WorldClient
         SendPacketToClient(update);
     }
 
-    [PacketHandler(Opcode.SMSG_HIGHEST_THREAT_UPDATE)]
-    void HandleHighestThreatUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_HIGHEST_THREAT_UPDATE)]
+    internal void HandleHighestThreatUpdate(WorldPacket packet)
     {
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
             return;
@@ -271,8 +272,8 @@ public partial class WorldClient
         SendPacketToClient(update);
     }
 
-    [PacketHandler(Opcode.SMSG_THREAT_REMOVE)]
-    void HandleThreatRemove(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_THREAT_REMOVE)]
+    internal void HandleThreatRemove(WorldPacket packet)
     {
         ThreatRemove threat = new();
         threat.UnitGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -280,8 +281,8 @@ public partial class WorldClient
         SendPacketToClient(threat);
     }
 
-    [PacketHandler(Opcode.SMSG_THREAT_CLEAR)]
-    void HandleThreatClear(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_THREAT_CLEAR)]
+    internal void HandleThreatClear(WorldPacket packet)
     {
         ThreatClear threat = new();
         threat.GUID = packet.ReadPackedGuid().To128(GetSession().GameState);

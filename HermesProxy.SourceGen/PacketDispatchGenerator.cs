@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -44,6 +44,14 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
 {
     private const string CmsgAttributeFullName = "HermesProxy.World.Dispatch.HandlesCmsgAttribute";
     private const string SmsgAttributeFullName = "HermesProxy.World.Dispatch.HandlesSmsgAttribute";
+
+    // The legacy side keeps its handlers as instance methods on WorldClient that read straight
+    // off a WorldPacket. Converting 444 of those to record structs and codecs would rewrite
+    // ~18,500 lines of translation logic for a path whose per-packet cost is already a dictionary
+    // hash and a delegate invoke - so the SMSG table carries this second thunk shape instead, and
+    // conversion there is an attribute with no body change.
+    private const string WorldClientFullName = "HermesProxy.World.Client.WorldClient";
+    private const string WorldPacketFullName = "HermesProxy.World.WorldPacket";
     private const string CodecAttributeFullName = "HermesProxy.World.Dispatch.PacketCodecAttribute";
 
     private const string DispatchNamespace = "HermesProxy.World.Dispatch";
@@ -93,11 +101,11 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(cmsg.Combine(codecs), static (ctx, pair) =>
             EmitTable(ctx, pair.Left, pair.Right, "GeneratedCmsgDispatch", ModernVersionFullName,
-                      "modern client → proxy (CMSG)"));
+                      "modern client → proxy (CMSG)", legacyShape: false));
 
         context.RegisterSourceOutput(smsg.Combine(codecs), static (ctx, pair) =>
             EmitTable(ctx, pair.Left, pair.Right, "GeneratedSmsgDispatch", LegacyVersionFullName,
-                      "legacy emulator → proxy (SMSG)"));
+                      "legacy emulator → proxy (SMSG)", legacyShape: true));
     }
 
     /// Codecs that declare a build range. A packet with none of these keeps the convention
@@ -166,9 +174,20 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
         string methodName = method.ContainingType.ToDisplayString() + "." + method.Name;
         Location location = method.Locations.FirstOrDefault() ?? Location.None;
 
-        string? shapeError = ValidateShape(method, out bool takesOpcode, out INamedTypeSymbol? packetType);
+        bool legacyShape = ctx.Attributes.Length > 0
+            && ctx.Attributes[0].AttributeClass?.ToDisplayString() == SmsgAttributeFullName;
+
+        string? shapeError = legacyShape
+            ? ValidateLegacyShape(method)
+            : ValidateShape(method, out _, out _);
+
+        bool takesOpcode = false;
+        INamedTypeSymbol? packetType = null;
+        if (!legacyShape)
+            ValidateShape(method, out takesOpcode, out packetType);
+
         string? codecName = null;
-        if (shapeError is null && packetType is not null)
+        if (!legacyShape && shapeError is null && packetType is not null)
             codecName = ResolveCodec(ctx.SemanticModel.Compilation, packetType);
 
         foreach (var attr in ctx.Attributes)
@@ -185,6 +204,7 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
                 PacketTypeFullName: packetType?.ToDisplayString(),
                 CodecFullName: codecName,
                 TakesOpcode: takesOpcode,
+                MethodName: method.Name,
                 AddedIn: NamedBuild(attr, "AddedIn"),
                 RemovedIn: NamedBuild(attr, "RemovedIn"),
                 ShapeError: shapeError,
@@ -229,6 +249,34 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
         var last = ps[ps.Length - 1];
         if (last.RefKind != RefKind.In || last.Type.ToDisplayString() != $"{DispatchNamespace}.SessionContext")
             return "the last parameter must be 'in SessionContext'";
+
+        return null;
+    }
+
+    /// <summary>
+    /// The legacy shape: <c>void HandleX(WorldPacket)</c> on WorldClient, exactly as the
+    /// reflective registrar required.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately the same contract the registrar enforced at runtime - instance method, one
+    /// WorldPacket parameter - so adding the attribute to an existing handler is the whole
+    /// conversion. The checks the registrar used to make by logging at startup are made here by
+    /// the compiler instead.
+    /// </remarks>
+    private static string? ValidateLegacyShape(IMethodSymbol method)
+    {
+        if (method.IsStatic)
+            return "it is static; legacy SMSG handlers are instance methods on WorldClient";
+        if (!method.ReturnsVoid)
+            return "it does not return void";
+        if (method.ContainingType.ToDisplayString() != WorldClientFullName)
+            return $"it is not declared on {WorldClientFullName}";
+
+        var ps = method.Parameters;
+        if (ps.Length != 1)
+            return $"it takes {ps.Length} parameters, expected one WorldPacket";
+        if (ps[0].RefKind != RefKind.None || ps[0].Type.ToDisplayString() != WorldPacketFullName)
+            return "its parameter must be a by-value WorldPacket";
 
         return null;
     }
@@ -304,7 +352,8 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
         ImmutableArray<CodecModel> codecs,
         string className,
         string versionClass,
-        string directionDescription)
+        string directionDescription,
+        bool legacyShape)
     {
         // Ranged codecs, indexed by the packet they read.
         var rangedByPacket = new Dictionary<string, List<CodecModel>>(StringComparer.Ordinal);
@@ -321,6 +370,14 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
             if (h.ShapeError is not null)
             {
                 ctx.ReportDiagnostic(Diagnostic.Create(BadSignature, h.Location, h.MethodDisplay, h.ShapeError));
+                continue;
+            }
+
+            // Legacy handlers read straight off the WorldPacket, so there is no packet type to
+            // find a codec for and none of the codec machinery below applies to them.
+            if (legacyShape)
+            {
+                usable.Add(h);
                 continue;
             }
 
@@ -383,18 +440,17 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
         sb.AppendLine("{");
         sb.AppendLine("    /// <summary>Indexed by (uint)Opcode. A null slot means the opcode is still handled");
         sb.AppendLine("    /// by the reflective registry, so the dispatch site falls through to it.</summary>");
-        sb.Append("    private static readonly delegate*<ref ").Append(ReaderFullName)
-          .Append(", in ").Append(ContextFullName).AppendLine(", void>[] _table = BuildTable();");
+        sb.Append("    private static readonly ").Append(DelegateType(legacyShape)).AppendLine("[] _table = BuildTable();");
         sb.AppendLine();
         sb.AppendLine("    /// <summary>Opcodes this table owns. The reflective registrar skips these, and a test");
         sb.AppendLine("    /// asserts the two registries stay disjoint.</summary>");
         sb.Append("    internal static readonly global::System.Collections.Frozen.FrozenSet<")
           .Append(OpcodeFullName).AppendLine("> ClaimedOpcodes = BuildClaimed();");
         sb.AppendLine();
-        EmitGet(sb);
+        EmitGet(sb, legacyShape);
         EmitEnsureInitialized(sb, className);
-        EmitThunks(sb, usable);
-        EmitBuildTable(sb, usable, versionClass);
+        EmitThunks(sb, usable, legacyShape);
+        EmitBuildTable(sb, usable, versionClass, legacyShape);
         EmitBuildClaimed(sb, usable);
         sb.AppendLine("}");
 
@@ -450,13 +506,19 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
         }
     }
 
-    private static void EmitGet(StringBuilder sb)
+    /// <summary>The function-pointer type a table's slots hold.</summary>
+    private static string DelegateType(bool legacyShape)
+        => legacyShape
+            ? $"delegate*<global::{WorldClientFullName}, global::{WorldPacketFullName}, void>"
+            : $"delegate*<ref {ReaderFullName}, in {ContextFullName}, void>";
+
+    private static void EmitGet(StringBuilder sb, bool legacyShape)
     {
         sb.AppendLine("    /// <summary>The thunk for <paramref name=\"opcode\"/>, or null when unconverted.</summary>");
         sb.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(");
         sb.AppendLine("        global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
-        sb.Append("    internal static delegate*<ref ").Append(ReaderFullName)
-          .Append(", in ").Append(ContextFullName).Append(", void> Get(").Append(OpcodeFullName).AppendLine(" opcode)");
+        sb.Append("    internal static ").Append(DelegateType(legacyShape))
+          .Append(" Get(").Append(OpcodeFullName).AppendLine(" opcode)");
         sb.AppendLine("    {");
         sb.AppendLine("        var table = _table;");
         sb.AppendLine("        uint index = (uint)opcode;");
@@ -484,7 +546,7 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
         sb.AppendLine();
     }
 
-    private static void EmitThunks(StringBuilder sb, List<HandlerModel> usable)
+    private static void EmitThunks(StringBuilder sb, List<HandlerModel> usable, bool legacyShape)
     {
         if (usable.Count == 0)
         {
@@ -496,6 +558,21 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
 
         foreach (var h in usable)
         {
+            if (legacyShape)
+            {
+                // No codec and no packet object: the handler still parses inline off the
+                // WorldPacket exactly as it did under the reflective registry. All this replaces
+                // is the dictionary lookup and the delegate that reached it.
+                sb.Append("    private static void ").Append(ThunkName(h))
+                  .Append("(global::").Append(WorldClientFullName).Append(" client, global::")
+                  .Append(WorldPacketFullName).AppendLine(" packet)");
+                sb.AppendLine("    {");
+                sb.Append("        client.").Append(h.MethodName).AppendLine("(packet);");
+                sb.AppendLine("    }");
+                sb.AppendLine();
+                continue;
+            }
+
             sb.Append("    private static void ").Append(ThunkName(h))
               .Append("(ref ").Append(ReaderFullName).Append(" reader, in ").Append(ContextFullName).AppendLine(" ctx)");
             sb.AppendLine("    {");
@@ -509,18 +586,16 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
         }
     }
 
-    private static void EmitBuildTable(StringBuilder sb, List<HandlerModel> usable, string versionClass)
+    private static void EmitBuildTable(StringBuilder sb, List<HandlerModel> usable, string versionClass, bool legacyShape)
     {
-        sb.Append("    private static delegate*<ref ").Append(ReaderFullName)
-          .Append(", in ").Append(ContextFullName).AppendLine(", void>[] BuildTable()");
+        sb.Append("    private static ").Append(DelegateType(legacyShape)).AppendLine("[] BuildTable()");
         sb.AppendLine("    {");
 
         if (usable.Count == 0)
         {
             // Array.Empty<T>() is unavailable: a function pointer type cannot be a generic
             // type argument. A zero-length array is equivalent here and allocates once.
-            sb.Append("        return new delegate*<ref ").Append(ReaderFullName)
-              .Append(", in ").Append(ContextFullName).AppendLine(", void>[0];");
+            sb.Append("        return new ").Append(DelegateType(legacyShape)).AppendLine("[0];");
             sb.AppendLine("    }");
             sb.AppendLine();
             return;
@@ -528,8 +603,7 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
 
         // Sized to the highest opcode actually claimed, not the highest that exists: a table sized
         // to the whole enum would be mostly null and touched cold on every dispatch.
-        sb.Append("        var table = new delegate*<ref ").Append(ReaderFullName)
-          .Append(", in ").Append(ContextFullName).AppendLine(", void>[MaxClaimedOpcode + 1];");
+        sb.Append("        var table = new ").Append(DelegateType(legacyShape)).AppendLine("[MaxClaimedOpcode + 1];");
         sb.AppendLine();
 
         foreach (var group in usable.GroupBy(h => h.OpcodeName, StringComparer.Ordinal))
@@ -692,6 +766,7 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
         bool TakesOpcode,
         string? AddedIn,
         string? RemovedIn,
+        string MethodName,
         string? ShapeError,
         Location Location)
     {

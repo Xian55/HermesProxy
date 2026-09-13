@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -178,10 +178,17 @@ public class DispatchRegistryTests
         AssertAllClaimedResolve(GeneratedSmsgDispatch.ClaimedOpcodes, isModern: false);
     }
 
+    /// <remarks>
+    /// The two tables no longer share a thunk type - the legacy one carries
+    /// <c>(WorldClient, WorldPacket)</c> so its handlers can stay instance methods parsing inline
+    /// - so the null check cannot be written as one conditional over both.
+    /// </remarks>
     private static unsafe void AssertAllClaimedResolve(IReadOnlyCollection<Opcode> claimed, bool isModern)
     {
         var unresolved = claimed
-            .Where(o => (isModern ? GeneratedCmsgDispatch.Get(o) : GeneratedSmsgDispatch.Get(o)) == null)
+            .Where(o => isModern
+                ? GeneratedCmsgDispatch.Get(o) == null
+                : GeneratedSmsgDispatch.Get(o) == null)
             .Select(o => o.ToString())
             .ToList();
 

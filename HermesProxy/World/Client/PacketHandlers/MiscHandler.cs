@@ -1,5 +1,6 @@
 ﻿using Framework;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -10,8 +11,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_PONG)]
-    void HandlePingResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PONG)]
+    internal void HandlePingResponse(WorldPacket packet)
     {
         uint serial = packet.ReadUInt32();
         if ((serial & 0x80000000) != 0)
@@ -19,8 +20,8 @@ public partial class WorldClient
         SendPacketToClient(new Pong(serial));
     }
 
-    [PacketHandler(Opcode.SMSG_TUTORIAL_FLAGS)]
-    void HandleTutorialFlags(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_TUTORIAL_FLAGS)]
+    internal void HandleTutorialFlags(WorldPacket packet)
     {
         TutorialFlags tutorials = new TutorialFlags();
         for (byte i = 0; i < (byte)Tutorials.Max; ++i)
@@ -28,8 +29,8 @@ public partial class WorldClient
         SendPacketToClient(tutorials);
     }
 
-    [PacketHandler(Opcode.SMSG_ACCOUNT_DATA_TIMES)]
-    void HandleAccountDataTimes(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ACCOUNT_DATA_TIMES)]
+    internal void HandleAccountDataTimes(WorldPacket packet)
     {
         GetSession().RealmSocket.SendAccountDataTimes();
 
@@ -43,8 +44,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_BIND_POINT_UPDATE)]
-    void HandleBindPointUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BIND_POINT_UPDATE)]
+    internal void HandleBindPointUpdate(WorldPacket packet)
     {
         BindPointUpdate point = new BindPointUpdate();
         point.BindPosition = packet.ReadVector3();
@@ -53,8 +54,8 @@ public partial class WorldClient
         SendPacketToClient(point);
     }
 
-    [PacketHandler(Opcode.SMSG_PLAYER_BOUND)]
-    void HandlePlayerBound(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PLAYER_BOUND)]
+    internal void HandlePlayerBound(WorldPacket packet)
     {
         PlayerBound bound = new PlayerBound();
         bound.BinderGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -62,8 +63,8 @@ public partial class WorldClient
         SendPacketToClient(bound);
     }
 
-    [PacketHandler(Opcode.SMSG_DEATH_RELEASE_LOC)]
-    void HandleDeathReleaseLoc(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DEATH_RELEASE_LOC)]
+    internal void HandleDeathReleaseLoc(WorldPacket packet)
     {
         DeathReleaseLoc death = new();
         death.MapID = packet.ReadInt32();
@@ -71,32 +72,32 @@ public partial class WorldClient
         SendPacketToClient(death);
     }
 
-    [PacketHandler(Opcode.SMSG_PRE_RESSURECT)]
-    void HandlePreRessurect(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PRE_RESSURECT)]
+    internal void HandlePreRessurect(WorldPacket packet)
     {
         PreRessurect pre = new();
         pre.PlayerGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
         SendPacketToClient(pre);
     }
 
-    [PacketHandler(Opcode.SMSG_CORPSE_RECLAIM_DELAY)]
-    void HandleCorpseReclaimDelay(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_CORPSE_RECLAIM_DELAY)]
+    internal void HandleCorpseReclaimDelay(WorldPacket packet)
     {
         CorpseReclaimDelay delay = new CorpseReclaimDelay();
         delay.Remaining = packet.ReadUInt32();
         SendPacketToClient(delay);
     }
 
-    [PacketHandler(Opcode.SMSG_TIME_SYNC_REQUEST)]
-    void HandleTimeSyncRequest(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_TIME_SYNC_REQUEST)]
+    internal void HandleTimeSyncRequest(WorldPacket packet)
     {
         TimeSyncRequest sync = new TimeSyncRequest();
         sync.SequenceIndex = packet.ReadUInt32();
         SendPacketToClient(sync);
     }
 
-    [PacketHandler(Opcode.SMSG_WEATHER)]
-    void HandleWeather(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_WEATHER)]
+    internal void HandleWeather(WorldPacket packet)
     {
         WeatherPkt weather = new WeatherPkt();
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
@@ -118,8 +119,8 @@ public partial class WorldClient
         SendPacketToClient(new StartLightningStorm());
     }
 
-    [PacketHandler(Opcode.SMSG_LOGIN_SET_TIME_SPEED)]
-    void HandleLoginSetTimeSpeed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_LOGIN_SET_TIME_SPEED)]
+    internal void HandleLoginSetTimeSpeed(WorldPacket packet)
     {
         if (!GetSession().GameState.IsFirstEnterWorld)
             return;
@@ -136,8 +137,8 @@ public partial class WorldClient
         SendPacketToClient(login);
     }
 
-    [PacketHandler(Opcode.SMSG_AREA_TRIGGER_MESSAGE)]
-    void HandleAreaTriggerMessage(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_AREA_TRIGGER_MESSAGE)]
+    internal void HandleAreaTriggerMessage(WorldPacket packet)
     {
         uint length = packet.ReadUInt32();
         string message = packet.ReadString(length);
@@ -155,8 +156,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.MSG_CORPSE_QUERY)]
-    void HandleCorpseQuery(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_CORPSE_QUERY)]
+    internal void HandleCorpseQuery(WorldPacket packet)
     {
         CorpseLocation corpse = new()
         {
@@ -181,16 +182,16 @@ public partial class WorldClient
         SendPacketToClient(corpse);
     }
 
-    [PacketHandler(Opcode.SMSG_STAND_STATE_UPDATE)]
-    void HandleStandStateUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_STAND_STATE_UPDATE)]
+    internal void HandleStandStateUpdate(WorldPacket packet)
     {
         StandStateUpdate state = new();
         state.StandState = packet.ReadUInt8();
         SendPacketToClient(state);
     }
 
-    [PacketHandler(Opcode.SMSG_EXPLORATION_EXPERIENCE)]
-    void HandleExplorationExperience(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_EXPLORATION_EXPERIENCE)]
+    internal void HandleExplorationExperience(WorldPacket packet)
     {
         ExplorationExperience explore = new();
         explore.AreaID = packet.ReadUInt32();
@@ -198,16 +199,16 @@ public partial class WorldClient
         SendPacketToClient(explore);
     }
 
-    [PacketHandler(Opcode.SMSG_PLAY_MUSIC)]
-    void HandlePlayMusic(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PLAY_MUSIC)]
+    internal void HandlePlayMusic(WorldPacket packet)
     {
         PlayMusic music = new();
         music.SoundEntryID = packet.ReadUInt32();
         SendPacketToClient(music);
     }
 
-    [PacketHandler(Opcode.SMSG_PLAY_SOUND)]
-    void HandlePlaySound(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PLAY_SOUND)]
+    internal void HandlePlaySound(WorldPacket packet)
     {
         PlaySound sound = new();
         sound.SoundEntryID = packet.ReadUInt32();
@@ -215,8 +216,8 @@ public partial class WorldClient
         SendPacketToClient(sound);
     }
 
-    [PacketHandler(Opcode.SMSG_PLAY_OBJECT_SOUND)]
-    void HandlePlayObjectSound(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PLAY_OBJECT_SOUND)]
+    internal void HandlePlayObjectSound(WorldPacket packet)
     {
         PlayObjectSound sound = new();
         sound.SoundEntryID = packet.ReadUInt32();
@@ -225,24 +226,24 @@ public partial class WorldClient
         SendPacketToClient(sound);
     }
 
-    [PacketHandler(Opcode.SMSG_TRIGGER_CINEMATIC)]
-    void HandleTriggerCinematic(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_TRIGGER_CINEMATIC)]
+    internal void HandleTriggerCinematic(WorldPacket packet)
     {
         TriggerCinematic cinematic = new();
         cinematic.CinematicID = packet.ReadUInt32();
         SendPacketToClient(cinematic);
     }
 
-    [PacketHandler(Opcode.SMSG_SPECIAL_MOUNT_ANIM)]
-    void HandleSpecialMountAnim(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SPECIAL_MOUNT_ANIM)]
+    internal void HandleSpecialMountAnim(WorldPacket packet)
     {
         SpecialMountAnim mount = new();
         mount.UnitGUID = packet.ReadGuid().To128(GetSession().GameState);
         SendPacketToClient(mount);
     }
 
-    [PacketHandler(Opcode.SMSG_START_MIRROR_TIMER)]
-    void HandleStartMirrorTimer(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_START_MIRROR_TIMER)]
+    internal void HandleStartMirrorTimer(WorldPacket packet)
     {
         StartMirrorTimer timer = new();
         timer.Timer = (MirrorTimerType)packet.ReadUInt32();
@@ -254,8 +255,8 @@ public partial class WorldClient
         SendPacketToClient(timer);
     }
 
-    [PacketHandler(Opcode.SMSG_PAUSE_MIRROR_TIMER)]
-    void HandlePauseMirrorTimer(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PAUSE_MIRROR_TIMER)]
+    internal void HandlePauseMirrorTimer(WorldPacket packet)
     {
         PauseMirrorTimer timer = new();
         timer.Timer = (MirrorTimerType)packet.ReadUInt32();
@@ -263,16 +264,16 @@ public partial class WorldClient
         SendPacketToClient(timer);
     }
 
-    [PacketHandler(Opcode.SMSG_STOP_MIRROR_TIMER)]
-    void HandleStopMirrorTimer(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_STOP_MIRROR_TIMER)]
+    internal void HandleStopMirrorTimer(WorldPacket packet)
     {
         StopMirrorTimer timer = new();
         timer.Timer = (MirrorTimerType)packet.ReadUInt32();
         SendPacketToClient(timer);
     }
 
-    [PacketHandler(Opcode.SMSG_INVALIDATE_PLAYER)]
-    void HandleInvalidatePlayer(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_INVALIDATE_PLAYER)]
+    internal void HandleInvalidatePlayer(WorldPacket packet)
     {
         InvalidatePlayer invalidate = new();
         invalidate.Guid = packet.ReadGuid().To128(GetSession().GameState);
@@ -282,16 +283,16 @@ public partial class WorldClient
             GetSession().GameState.CachedPlayers.Remove(invalidate.Guid);
     }
 
-    [PacketHandler(Opcode.SMSG_ZONE_UNDER_ATTACK)]
-    void HandleZoneUnderAttack(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ZONE_UNDER_ATTACK)]
+    internal void HandleZoneUnderAttack(WorldPacket packet)
     {
         ZoneUnderAttack zone = new();
         zone.AreaID = packet.ReadInt32();
         SendPacketToClient(zone);
     }
 
-    [PacketHandler(Opcode.MSG_SET_DUNGEON_DIFFICULTY)]
-    void HandleSetDungeonDifficulty(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_SET_DUNGEON_DIFFICULTY)]
+    internal void HandleSetDungeonDifficulty(WorldPacket packet)
     {
         DungeonDifficultySet difficulty = new();
         int difficultyId = packet.ReadInt32();
@@ -339,8 +340,8 @@ public partial class WorldClient
         SendPacketToClient(refreshed);
     }
 
-    [PacketHandler(Opcode.MSG_SET_RAID_DIFFICULTY)]
-    void HandleSetRaidDifficulty(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_SET_RAID_DIFFICULTY)]
+    internal void HandleSetRaidDifficulty(WorldPacket packet)
     {
         RaidDifficultySet difficulty = new();
         byte legacyRaidMode = (byte)packet.ReadUInt32();

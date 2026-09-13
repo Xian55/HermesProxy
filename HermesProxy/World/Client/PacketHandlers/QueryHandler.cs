@@ -1,6 +1,7 @@
 ﻿using Framework;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -14,8 +15,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_QUERY_TIME_RESPONSE)]
-    void HandleQueryTimeResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUERY_TIME_RESPONSE)]
+    internal void HandleQueryTimeResponse(WorldPacket packet)
     {
         QueryTimeResponse response = new QueryTimeResponse();
         response.CurrentTime = packet.ReadInt32();
@@ -23,8 +24,8 @@ public partial class WorldClient
             packet.ReadInt32(); // Next Daily Quest Reset Time
         SendPacketToClient(response);
     }
-    [PacketHandler(Opcode.SMSG_QUERY_QUEST_INFO_RESPONSE)]
-    void HandleQueryQuestInfoResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUERY_QUEST_INFO_RESPONSE)]
+    internal void HandleQueryQuestInfoResponse(WorldPacket packet)
     {
         QueryQuestInfoResponse response = new QueryQuestInfoResponse();
         var id = packet.ReadEntry();
@@ -299,8 +300,8 @@ public partial class WorldClient
         ResyncItemQuestCredits();
     }
 
-    [PacketHandler(Opcode.SMSG_QUERY_CREATURE_RESPONSE)]
-    void HandleQueryCreatureResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUERY_CREATURE_RESPONSE)]
+    internal void HandleQueryCreatureResponse(WorldPacket packet)
     {
         QueryCreatureResponse response = new QueryCreatureResponse();
         var id = packet.ReadEntry();
@@ -393,8 +394,8 @@ public partial class WorldClient
 
         SendPacketToClient(response);
     }
-    [PacketHandler(Opcode.SMSG_QUERY_GAME_OBJECT_RESPONSE)]
-    void HandleQueryGameObjectResposne(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUERY_GAME_OBJECT_RESPONSE)]
+    internal void HandleQueryGameObjectResposne(WorldPacket packet)
     {
         QueryGameObjectResponse response = new QueryGameObjectResponse();
         var id = packet.ReadEntry();
@@ -470,8 +471,8 @@ public partial class WorldClient
 
         SendPacketToClient(response);
     }
-    [PacketHandler(Opcode.SMSG_QUERY_PAGE_TEXT_RESPONSE)]
-    void HandleQueryPageTextResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUERY_PAGE_TEXT_RESPONSE)]
+    internal void HandleQueryPageTextResponse(WorldPacket packet)
     {
         QueryPageTextResponse response = new QueryPageTextResponse();
         response.PageTextID = packet.ReadUInt32();
@@ -483,8 +484,8 @@ public partial class WorldClient
         response.Pages.Add(page);
         SendPacketToClient(response);
     }
-    [PacketHandler(Opcode.SMSG_QUERY_NPC_TEXT_RESPONSE)]
-    void HandleQueryNpcTextResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUERY_NPC_TEXT_RESPONSE)]
+    internal void HandleQueryNpcTextResponse(WorldPacket packet)
     {
         QueryNPCTextResponse response = new QueryNPCTextResponse();
         var id = packet.ReadEntry();
@@ -525,8 +526,8 @@ public partial class WorldClient
         SendPacketToClient(response);
     }
 
-    [PacketHandler(Opcode.SMSG_ITEM_QUERY_SINGLE_RESPONSE)]
-    void HandleItemQueryResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ITEM_QUERY_SINGLE_RESPONSE)]
+    internal void HandleItemQueryResponse(WorldPacket packet)
     {
         var entry = packet.ReadEntry();
         if (entry.Value)
@@ -957,8 +958,8 @@ public partial class WorldClient
             SendPacketToClient(reply);
     }
 
-    [PacketHandler(Opcode.SMSG_QUERY_PET_NAME_RESPONSE)]
-    void HandleQueryPetNameResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUERY_PET_NAME_RESPONSE)]
+    internal void HandleQueryPetNameResponse(WorldPacket packet)
     {
         uint petNumber = packet.ReadUInt32();
         WowGuid128 guid = GetSession().GameState.GetPetGuidByNumber(petNumber);
@@ -995,8 +996,8 @@ public partial class WorldClient
         }
         SendPacketToClient(response);
     }
-    [PacketHandler(Opcode.SMSG_ITEM_NAME_QUERY_RESPONSE)]
-    void HandleItemNameQueryResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ITEM_NAME_QUERY_RESPONSE)]
+    internal void HandleItemNameQueryResponse(WorldPacket packet)
     {
         uint entry = packet.ReadUInt32();
         string name = packet.ReadCString();
@@ -1004,8 +1005,8 @@ public partial class WorldClient
             packet.ReadUInt32(); // Inventory Type
         GameData.StoreItemName(entry, name);
     }
-    [PacketHandler(Opcode.SMSG_WHO)]
-    void HandleWhoResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_WHO)]
+    internal void HandleWhoResponse(WorldPacket packet)
     {
         WhoResponsePkt response = new WhoResponsePkt();
         response.RequestID = GetSession().GameState.LastWhoRequestId;

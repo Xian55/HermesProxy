@@ -1,5 +1,6 @@
 ﻿using Framework;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -10,8 +11,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_TAXI_NODE_STATUS)]
-    void HandleTaxiNodeStatus(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_TAXI_NODE_STATUS)]
+    internal void HandleTaxiNodeStatus(WorldPacket packet)
     {
         TaxiNodeStatusPkt taxi = new();
         taxi.FlightMaster = packet.ReadGuid().To128(GetSession().GameState);
@@ -19,8 +20,8 @@ public partial class WorldClient
         taxi.Status = learned ? TaxiNodeStatus.Learned : TaxiNodeStatus.Unlearned;
         SendPacketToClient(taxi);
     }
-    [PacketHandler(Opcode.SMSG_SHOW_TAXI_NODES)]
-    void HandleShowTaxiNodes(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SHOW_TAXI_NODES)]
+    internal void HandleShowTaxiNodes(WorldPacket packet)
     {
         uint playerFlags = GetSession().GameState.GetLegacyFieldValueUInt32(GetSession().GameState.CurrentPlayerGuid, PlayerField.PLAYER_FLAGS);
         if (playerFlags.HasAnyFlag(PlayerFlags.GM))
@@ -47,14 +48,14 @@ public partial class WorldClient
         GetSession().GameState.UsableTaxiNodes = taxi.CanUseNodes; // save for CMSG_ACTIVATE_TAXI_EXPRESS
         SendPacketToClient(taxi);
     }
-    [PacketHandler(Opcode.SMSG_NEW_TAXI_PATH)]
-    void HandleNewTaxiPath(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_NEW_TAXI_PATH)]
+    internal void HandleNewTaxiPath(WorldPacket packet)
     {
         NewTaxiPath taxi = new();
         SendPacketToClient(taxi);
     }
-    [PacketHandler(Opcode.SMSG_ACTIVATE_TAXI_REPLY)]
-    void HandleActivateTaxiReply(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ACTIVATE_TAXI_REPLY)]
+    internal void HandleActivateTaxiReply(WorldPacket packet)
     {
         ActivateTaxiReply reply = (ActivateTaxiReply)packet.ReadUInt32();
         // Ok status needs to be sent after the monster move packet.

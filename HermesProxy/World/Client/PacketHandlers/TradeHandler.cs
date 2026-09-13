@@ -1,6 +1,7 @@
 ﻿using Framework;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
@@ -13,8 +14,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_TRADE_STATUS)]
-    void HandleTradeStatus(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_TRADE_STATUS)]
+    internal void HandleTradeStatus(WorldPacket packet)
     {
         TradeStatusPkt trade = new();
         trade.Status = (TradeStatus)packet.ReadUInt32();
@@ -69,8 +70,8 @@ public partial class WorldClient
         SendPacketToClient(trade);
     }
 
-    [PacketHandler(Opcode.SMSG_TRADE_STATUS_EXTENDED)]
-    void HandleTradeStatusExtended(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_TRADE_STATUS_EXTENDED)]
+    internal void HandleTradeStatusExtended(WorldPacket packet)
     {
         var tradeSession = GetSession().GameState.CurrentTrade;
         if (tradeSession == null)

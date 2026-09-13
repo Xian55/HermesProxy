@@ -1,5 +1,6 @@
 ﻿using Framework;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
@@ -12,8 +13,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_QUEST_GIVER_QUEST_DETAILS)]
-    void HandleQuestGiverQuestDetails(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_GIVER_QUEST_DETAILS)]
+    internal void HandleQuestGiverQuestDetails(WorldPacket packet)
     {
         QuestGiverQuestDetails quest = new();
         quest.QuestGiverGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -135,8 +136,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_QUEST_GIVER_STATUS)]
-    void HandleQuestGiverStatus(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_GIVER_STATUS)]
+    internal void HandleQuestGiverStatus(WorldPacket packet)
     {
         QuestGiverStatusPkt response = new QuestGiverStatusPkt();
         response.QuestGiver.Guid = packet.ReadGuid().To128(GetSession().GameState);
@@ -148,8 +149,8 @@ public partial class WorldClient
         SendPacketToClient(response);
     }
 
-    [PacketHandler(Opcode.SMSG_QUEST_GIVER_STATUS_MULTIPLE)]
-    void HandleQuestGiverStatusMultple(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_GIVER_STATUS_MULTIPLE)]
+    internal void HandleQuestGiverStatusMultple(WorldPacket packet)
     {
         QuestGiverStatusMultiple response = new QuestGiverStatusMultiple();
         int count = packet.ReadInt32();
@@ -169,8 +170,8 @@ public partial class WorldClient
         SendPacketToClient(response);
     }
 
-    [PacketHandler(Opcode.SMSG_QUEST_GIVER_QUEST_LIST_MESSAGE)]
-    void HandleQuestGiverQuestListMessage(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_GIVER_QUEST_LIST_MESSAGE)]
+    internal void HandleQuestGiverQuestListMessage(WorldPacket packet)
     {
         QuestGiverQuestListMessage quests = new QuestGiverQuestListMessage();
         quests.QuestGiverGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -272,8 +273,8 @@ public partial class WorldClient
         state.JustLeftGossipForDetails = true;
     }
 
-    [PacketHandler(Opcode.SMSG_QUEST_GIVER_REQUEST_ITEMS)]
-    void HandleQuestGiverRequestItems(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_GIVER_REQUEST_ITEMS)]
+    internal void HandleQuestGiverRequestItems(WorldPacket packet)
     {
         QuestGiverRequestItems quest = new QuestGiverRequestItems();
         quest.QuestGiverGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -344,8 +345,8 @@ public partial class WorldClient
         return true;
     }
 
-    [PacketHandler(Opcode.SMSG_QUEST_GIVER_OFFER_REWARD_MESSAGE)]
-    void HandleQuestGiverOfferRewardMessage(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_GIVER_OFFER_REWARD_MESSAGE)]
+    internal void HandleQuestGiverOfferRewardMessage(WorldPacket packet)
     {
         QuestGiverOfferRewardMessage quest = new QuestGiverOfferRewardMessage();
         quest.QuestData.QuestGiverGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -395,8 +396,8 @@ public partial class WorldClient
         SendPacketToClient(quest);
     }
 
-    [PacketHandler(Opcode.SMSG_QUEST_GIVER_QUEST_COMPLETE)]
-    void HandleQuestGiverQuestComplete(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_GIVER_QUEST_COMPLETE)]
+    internal void HandleQuestGiverQuestComplete(WorldPacket packet)
     {
         QuestGiverQuestComplete quest = new QuestGiverQuestComplete();
         quest.QuestID = packet.ReadUInt32();
@@ -480,8 +481,8 @@ public partial class WorldClient
         SendPacketToClient(toast);
     }
 
-    [PacketHandler(Opcode.SMSG_QUEST_GIVER_QUEST_FAILED)]
-    void HandleQuestGiverQuestFailed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_GIVER_QUEST_FAILED)]
+    internal void HandleQuestGiverQuestFailed(WorldPacket packet)
     {
         QuestGiverQuestFailed quest = new QuestGiverQuestFailed();
         quest.QuestID = packet.ReadUInt32();
@@ -489,8 +490,8 @@ public partial class WorldClient
         SendPacketToClient(quest);
     }
 
-    [PacketHandler(Opcode.SMSG_QUEST_GIVER_INVALID_QUEST)]
-    void HandleQuestGiverInvalidQuest(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_GIVER_INVALID_QUEST)]
+    internal void HandleQuestGiverInvalidQuest(WorldPacket packet)
     {
         QuestGiverInvalidQuest quest = new QuestGiverInvalidQuest();
         quest.Reason = (QuestFailedReasons)packet.ReadUInt32();
@@ -499,18 +500,18 @@ public partial class WorldClient
         SendPacketToClient(quest);
     }
 
-    [PacketHandler(Opcode.SMSG_QUEST_UPDATE_COMPLETE)]
-    [PacketHandler(Opcode.SMSG_QUEST_UPDATE_FAILED)]
-    [PacketHandler(Opcode.SMSG_QUEST_UPDATE_FAILED_TIMER)]
-    void HandleQuestUpdateStatus(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_UPDATE_COMPLETE)]
+    [HandlesSmsg(Opcode.SMSG_QUEST_UPDATE_FAILED)]
+    [HandlesSmsg(Opcode.SMSG_QUEST_UPDATE_FAILED_TIMER)]
+    internal void HandleQuestUpdateStatus(WorldPacket packet)
     {
         QuestUpdateStatus quest = new QuestUpdateStatus(packet.GetUniversalOpcode(false));
         quest.QuestID = packet.ReadUInt32();
         SendPacketToClient(quest);
     }
 
-    [PacketHandler(Opcode.SMSG_QUEST_UPDATE_ADD_ITEM)]
-    void HandleQuestUpdateAddItem(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_UPDATE_ADD_ITEM)]
+    internal void HandleQuestUpdateAddItem(WorldPacket packet)
     {
         // 3.3.5a client counts quest items from bags. AzerothCore even sends this
         // packet empty. 3.4.3 needs SMSG_QUEST_UPDATE_ADD_CREDIT (type Item).
@@ -627,8 +628,8 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_QUEST_UPDATE_ADD_KILL)]
-    void HandleQuestUpdateAddKill(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_UPDATE_ADD_KILL)]
+    internal void HandleQuestUpdateAddKill(WorldPacket packet)
     {
         QuestUpdateAddCredit credit = new QuestUpdateAddCredit();
         credit.QuestID = packet.ReadUInt32();
@@ -643,8 +644,8 @@ public partial class WorldClient
         SendPacketToClient(credit);
     }
 
-    [PacketHandler(Opcode.SMSG_QUEST_CONFIRM_ACCEPT)]
-    void HandleQuestConfirmAccept(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_CONFIRM_ACCEPT)]
+    internal void HandleQuestConfirmAccept(WorldPacket packet)
     {
         QuestConfirmAccept quest = new QuestConfirmAccept();
         quest.QuestID = packet.ReadUInt32();
@@ -653,8 +654,8 @@ public partial class WorldClient
         SendPacketToClient(quest);
     }
 
-    [PacketHandler(Opcode.MSG_QUEST_PUSH_RESULT)]
-    void HandleQuestPushResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_QUEST_PUSH_RESULT)]
+    internal void HandleQuestPushResult(WorldPacket packet)
     {
         QuestPushResult quest = new QuestPushResult();
         quest.SenderGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -662,8 +663,8 @@ public partial class WorldClient
         SendPacketToClient(quest);
     }
 
-    [PacketHandler(Opcode.SMSG_QUEST_POI_QUERY_RESPONSE)]
-    void HandleQuestPOIQueryResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_QUEST_POI_QUERY_RESPONSE)]
+    internal void HandleQuestPOIQueryResponse(WorldPacket packet)
     {
         // Legacy 3.3.5a wire layout (mangos-wotlk QueryHandler.cpp:526):
         //   uint32 count

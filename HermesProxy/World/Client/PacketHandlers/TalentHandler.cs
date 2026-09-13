@@ -1,5 +1,6 @@
-using Framework.Logging;
+﻿using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
 using System.Collections.Generic;
@@ -25,8 +26,8 @@ public partial class WorldClient
     // V3_4_3 only: translate to modern SMSG_UPDATE_TALENT_DATA (TC TalentPackets.cpp:100-132).
     // For older clients, the legacy packet is a no-op for now (V1_14/V2_5 paths don't
     // exercise this opcode against a 3.3.5a backend in the supported topology).
-    [PacketHandler(Opcode.SMSG_UPDATE_TALENT_DATA)]
-    void HandleTalentsInfoUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_UPDATE_TALENT_DATA)]
+    internal void HandleTalentsInfoUpdate(WorldPacket packet)
     {
         bool isPet = packet.ReadUInt8() != 0;
         if (isPet)

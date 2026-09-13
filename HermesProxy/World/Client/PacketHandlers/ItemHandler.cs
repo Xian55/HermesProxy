@@ -1,5 +1,6 @@
 ﻿using System;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
 
@@ -8,16 +9,16 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_SET_PROFICIENCY)]
-    void HandleSetProficiency(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SET_PROFICIENCY)]
+    internal void HandleSetProficiency(WorldPacket packet)
     {
         SetProficiency proficiency = new SetProficiency();
         proficiency.ProficiencyClass = packet.ReadUInt8();
         proficiency.ProficiencyMask = packet.ReadUInt32();
         SendPacketToClient(proficiency);
     }
-    [PacketHandler(Opcode.SMSG_BUY_SUCCEEDED)]
-    void HandleBuySucceeded(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BUY_SUCCEEDED)]
+    internal void HandleBuySucceeded(WorldPacket packet)
     {
         BuySucceeded buy = new BuySucceeded();
         buy.VendorGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -26,8 +27,8 @@ public partial class WorldClient
         buy.QuantityBought = packet.ReadUInt32();
         SendPacketToClient(buy);
     }
-    [PacketHandler(Opcode.SMSG_ITEM_PUSH_RESULT)]
-    void HandleItemPushResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ITEM_PUSH_RESULT)]
+    internal void HandleItemPushResult(WorldPacket packet)
     {
         ItemPushResult item = new ItemPushResult();
         item.PlayerGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -88,23 +89,23 @@ public partial class WorldClient
         if (item.Item.ItemID != 0)
             SendItemQuestCredit(item.Item.ItemID);
     }
-    [PacketHandler(Opcode.SMSG_READ_ITEM_RESULT_OK)]
-    void HandleReadItemResultOk(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_READ_ITEM_RESULT_OK)]
+    internal void HandleReadItemResultOk(WorldPacket packet)
     {
         ReadItemResultOK read = new ReadItemResultOK();
         read.ItemGUID = packet.ReadGuid().To128(GetSession().GameState);
         SendPacketToClient(read);
     }
-    [PacketHandler(Opcode.SMSG_READ_ITEM_RESULT_FAILED)]
-    void HandleReadItemResultFailed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_READ_ITEM_RESULT_FAILED)]
+    internal void HandleReadItemResultFailed(WorldPacket packet)
     {
         ReadItemResultFailed read = new ReadItemResultFailed();
         read.ItemGUID = packet.ReadGuid().To128(GetSession().GameState);
         read.Subcode = 2;
         SendPacketToClient(read);
     }
-    [PacketHandler(Opcode.SMSG_BUY_FAILED)]
-    void HandleBuyFailed(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_BUY_FAILED)]
+    internal void HandleBuyFailed(WorldPacket packet)
     {
         BuyFailed fail = new BuyFailed();
         fail.VendorGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -112,8 +113,8 @@ public partial class WorldClient
         fail.Reason = (BuyResult)packet.ReadUInt8();
         SendPacketToClient(fail);
     }
-    [PacketHandler(Opcode.SMSG_INVENTORY_CHANGE_FAILURE, ClientVersionBuild.Zero, ClientVersionBuild.V2_0_1_6180)]
-    void HandleInventoryChangeFailureVanilla(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_INVENTORY_CHANGE_FAILURE, RemovedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleInventoryChangeFailureVanilla(WorldPacket packet)
     {
         InventoryChangeFailure failure = new();
         failure.BagResult = LegacyVersion.ConvertInventoryResult(packet.ReadUInt8());
@@ -139,8 +140,8 @@ public partial class WorldClient
             Server.Systems.SpellSystem.SendCastRequestFailed(in GetSession().InstanceSocket.SessionContext, pendingCast!, false);
         }
     }
-    [PacketHandler(Opcode.SMSG_INVENTORY_CHANGE_FAILURE, ClientVersionBuild.V2_0_1_6180)]
-    void HandleInventoryChangeFailure(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_INVENTORY_CHANGE_FAILURE, AddedIn = ClientVersionBuild.V2_0_1_6180)]
+    internal void HandleInventoryChangeFailure(WorldPacket packet)
     {
         InventoryChangeFailure failure = new();
         failure.BagResult = LegacyVersion.ConvertInventoryResult(packet.ReadUInt8());
@@ -176,15 +177,15 @@ public partial class WorldClient
             Server.Systems.SpellSystem.SendCastRequestFailed(in GetSession().InstanceSocket.SessionContext, pendingCast!, false);
         }
     }
-    [PacketHandler(Opcode.SMSG_DURABILITY_DAMAGE_DEATH)]
-    void HandleDurabilityDamageDeath(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DURABILITY_DAMAGE_DEATH)]
+    internal void HandleDurabilityDamageDeath(WorldPacket packet)
     {
         DurabilityDamageDeath death = new DurabilityDamageDeath();
         death.Percent = 10;
         SendPacketToClient(death);
     }
-    [PacketHandler(Opcode.SMSG_ITEM_COOLDOWN)]
-    void HandleItemCooldown(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ITEM_COOLDOWN)]
+    internal void HandleItemCooldown(WorldPacket packet)
     {
         ItemCooldown item = new ItemCooldown();
         item.ItemGuid = packet.ReadGuid().To128(GetSession().GameState);
@@ -210,8 +211,8 @@ public partial class WorldClient
         }
         SendPacketToClient(item);
     }
-    [PacketHandler(Opcode.SMSG_SELL_RESPONSE)]
-    void HandleSellResponse(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SELL_RESPONSE)]
+    internal void HandleSellResponse(WorldPacket packet)
     {
         SellResponse sell = new SellResponse();
         sell.VendorGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -225,8 +226,8 @@ public partial class WorldClient
     // with SMSG_SOCKET_GEMS_SUCCESS), so nothing is forwarded — this refreshes the gem
     // cache that the V3_4_3 ItemData Gems dynamic field reads from, keeping it correct
     // even if the item's Values update omits the socket enchant slots.
-    [PacketHandler(Opcode.SMSG_SOCKET_GEMS)]
-    void HandleSocketGemsResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_SOCKET_GEMS)]
+    internal void HandleSocketGemsResult(WorldPacket packet)
     {
         var gameState = GetSession().GameState;
         WowGuid128 itemGuid = packet.ReadGuid().To128(gameState);
@@ -242,8 +243,8 @@ public partial class WorldClient
         gameState.SaveGemsForItem(itemGuid, gems);
     }
 
-    [PacketHandler(Opcode.SMSG_ITEM_ENCHANT_TIME_UPDATE)]
-    void HandleItemEnchantTimeUpdate(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ITEM_ENCHANT_TIME_UPDATE)]
+    internal void HandleItemEnchantTimeUpdate(WorldPacket packet)
     {
         ItemEnchantTimeUpdate enchant = new ItemEnchantTimeUpdate();
         enchant.ItemGuid = packet.ReadGuid().To128(GetSession().GameState);
@@ -263,8 +264,8 @@ public partial class WorldClient
     // The previous implementation guessed the guid by scanning equipped slots for a matching
     // entry (wrong item whenever the player owns two of the same entry) and left EnchantSlot
     // at a hardcoded 1 (TEMP) regardless of the real slot.
-    [PacketHandler(Opcode.SMSG_ENCHANTMENT_LOG)]
-    void HandleEnchantmentLog(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_ENCHANTMENT_LOG)]
+    internal void HandleEnchantmentLog(WorldPacket packet)
     {
         var gameState = GetSession().GameState;
 

@@ -1,5 +1,6 @@
 ﻿using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -11,8 +12,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_PET_SPELLS_MESSAGE)]
-    void HandlePetSpellsMessage(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PET_SPELLS_MESSAGE)]
+    internal void HandlePetSpellsMessage(WorldPacket packet)
     {
         WowGuid64 guid = packet.ReadGuid();
         GetSession().GameState.CurrentPetGuid = guid.To128(GetSession().GameState);
@@ -166,8 +167,8 @@ public partial class WorldClient
         SendPacketToClient(spells);
     }
 
-    [PacketHandler(Opcode.SMSG_PET_ACTION_SOUND)]
-    void HandlePetActionSound(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PET_ACTION_SOUND)]
+    internal void HandlePetActionSound(WorldPacket packet)
     {
         PetActionSound sound = new PetActionSound();
         sound.UnitGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -175,16 +176,16 @@ public partial class WorldClient
         SendPacketToClient(sound);
     }
 
-    [PacketHandler(Opcode.SMSG_PET_BROKEN)]
-    void HandlePetBroken(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PET_BROKEN)]
+    internal void HandlePetBroken(WorldPacket packet)
     {
         PrintNotification notify = new PrintNotification();
         notify.NotifyText = "Your pet has run away";
         SendPacketToClient(notify);
     }
 
-    [PacketHandler(Opcode.SMSG_PET_UNLEARN_CONFIRM)]
-    void HandlePetUnlearnConfirm(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PET_UNLEARN_CONFIRM)]
+    internal void HandlePetUnlearnConfirm(WorldPacket packet)
     {
         RespecWipeConfirm respec = new RespecWipeConfirm();
         respec.TrainerGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -193,8 +194,8 @@ public partial class WorldClient
         SendPacketToClient(respec);
     }
 
-    [PacketHandler(Opcode.MSG_LIST_STABLED_PETS)]
-    void HandleListStabledPets(WorldPacket packet)
+    [HandlesSmsg(Opcode.MSG_LIST_STABLED_PETS)]
+    internal void HandleListStabledPets(WorldPacket packet)
     {
         PetGuids pets = new PetGuids();
         var updateFields = GetSession().GameState.GetCachedObjectFieldsLegacy(GetSession().GameState.CurrentPlayerGuid);
@@ -306,8 +307,8 @@ public partial class WorldClient
         return update;
     }
 
-    [PacketHandler(Opcode.SMSG_PET_STABLE_RESULT)]
-    void HandlePetStableResult(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PET_STABLE_RESULT)]
+    internal void HandlePetStableResult(WorldPacket packet)
     {
         PetStableResult stable = new PetStableResult();
         stable.Result = packet.ReadUInt8();
@@ -327,16 +328,16 @@ public partial class WorldClient
         }
     }
 
-    [PacketHandler(Opcode.SMSG_PET_TAME_FAILURE)]
-    void HandlePetTameFailure(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PET_TAME_FAILURE)]
+    internal void HandlePetTameFailure(WorldPacket packet)
     {
         PetTameFailure tameFailure = new PetTameFailure();
         tameFailure.Reason = packet.ReadUInt8();
         SendPacketToClient(tameFailure);
     }
 
-    [PacketHandler(Opcode.SMSG_PET_LEARNED_SPELLS)]
-    void HandlePetLearnedSpells(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PET_LEARNED_SPELLS)]
+    internal void HandlePetLearnedSpells(WorldPacket packet)
     {
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
             return;
@@ -346,8 +347,8 @@ public partial class WorldClient
         SendPacketToClient(learned);
     }
 
-    [PacketHandler(Opcode.SMSG_PET_UNLEARNED_SPELLS)]
-    void HandlePetUnlearnedSpells(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_PET_UNLEARNED_SPELLS)]
+    internal void HandlePetUnlearnedSpells(WorldPacket packet)
     {
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
             return;

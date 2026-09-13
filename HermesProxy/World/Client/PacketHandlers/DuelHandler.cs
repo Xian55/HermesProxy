@@ -1,4 +1,5 @@
 ﻿using HermesProxy.Enums;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
@@ -10,8 +11,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
-    [PacketHandler(Opcode.SMSG_DUEL_REQUESTED)]
-    void HandleDuelRequested(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DUEL_REQUESTED)]
+    internal void HandleDuelRequested(WorldPacket packet)
     {
         DuelRequested duel = new DuelRequested();
         duel.ArbiterGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -20,24 +21,24 @@ public partial class WorldClient
         SendPacketToClient(duel);
     }
 
-    [PacketHandler(Opcode.SMSG_DUEL_COUNTDOWN)]
-    void HandleDuelCountdown(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DUEL_COUNTDOWN)]
+    internal void HandleDuelCountdown(WorldPacket packet)
     {
         DuelCountdown duel = new DuelCountdown();
         duel.Countdown = packet.ReadUInt32();
         SendPacketToClient(duel);
     }
 
-    [PacketHandler(Opcode.SMSG_DUEL_COMPLETE)]
-    void HandleDuelComplete(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DUEL_COMPLETE)]
+    internal void HandleDuelComplete(WorldPacket packet)
     {
         DuelComplete duel = new DuelComplete();
         duel.Started = packet.ReadBool();
         SendPacketToClient(duel);
     }
 
-    [PacketHandler(Opcode.SMSG_DUEL_WINNER)]
-    void HandleDuelWinner(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DUEL_WINNER)]
+    internal void HandleDuelWinner(WorldPacket packet)
     {
         DuelWinner duel = new DuelWinner();
         duel.Fled = packet.ReadBool();
@@ -48,15 +49,15 @@ public partial class WorldClient
         SendPacketToClient(duel);
     }
 
-    [PacketHandler(Opcode.SMSG_DUEL_IN_BOUNDS)]
-    void HandleDuelInBounds(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DUEL_IN_BOUNDS)]
+    internal void HandleDuelInBounds(WorldPacket packet)
     {
         DuelInBounds duel = new DuelInBounds();
         SendPacketToClient(duel);
     }
 
-    [PacketHandler(Opcode.SMSG_DUEL_OUT_OF_BOUNDS)]
-    void HandleDuelOutOfBounds(WorldPacket packet)
+    [HandlesSmsg(Opcode.SMSG_DUEL_OUT_OF_BOUNDS)]
+    internal void HandleDuelOutOfBounds(WorldPacket packet)
     {
         DuelOutOfBounds duel = new DuelOutOfBounds();
         SendPacketToClient(duel);
