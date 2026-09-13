@@ -3533,4 +3533,72 @@ internal static class FrozenPackets
                 TaintedBy.Read(p);
         }
     }
+
+/// Frozen verbatim from <c>BattleGroundPackets.cs</c>.
+    internal sealed class BattlemasterJoin
+    {
+        public void Read(WorldPacket p)
+        {
+            long queueId = p.ReadInt64();
+            BattlefieldListId = (uint)(queueId & ~0x1F10000000000000);
+            Roles = p.ReadUInt8();
+            BlacklistMap[0] = p.ReadInt32();
+            BlacklistMap[1] = p.ReadInt32();
+            BattlemasterGuid = p.ReadPackedGuid128();
+            Verification = p.ReadInt32();
+            BattlefieldInstanceID = p.ReadInt32();
+            JoinAsGroup = p.HasBit();
+
+        }
+
+        public uint BattlefieldListId;
+        public byte Roles;
+        public int[] BlacklistMap = new int[2];
+        public WowGuid128 BattlemasterGuid;
+        public int Verification;
+        public int BattlefieldInstanceID;
+        public bool JoinAsGroup;
+    }
+
+    /// Frozen verbatim from <c>BattleGroundPackets.cs</c>.
+    internal sealed class BattlefieldListRequest
+    {
+        public void Read(WorldPacket p)
+        {
+            ListID = p.ReadInt32();
+        }
+
+        public int ListID;
+    }
+
+    /// Frozen verbatim from <c>BattleGroundPackets.cs</c>.
+    internal sealed class BattlefieldPort
+    {
+        public void Read(WorldPacket p)
+        {
+            Ticket.Read(p);
+            AcceptedInvite = p.HasBit();
+        }
+
+        public RideTicket Ticket = new();
+        public bool AcceptedInvite;
+    }
+
+    /// Frozen verbatim from <c>BattleGroundPackets.cs</c>.
+    internal sealed class RequestBattlefieldStatus
+    {
+        public void Read(WorldPacket p) { }
+    }
+
+    /// Frozen verbatim from <c>BattleGroundPackets.cs</c>.
+    internal sealed class PVPLogDataRequest
+    {
+        public void Read(WorldPacket p) { }
+    }
+
+    /// Frozen verbatim from <c>BattleGroundPackets.cs</c>.
+    internal sealed class BattlefieldLeave
+    {
+        public void Read(WorldPacket p) { }
+    }
 }
