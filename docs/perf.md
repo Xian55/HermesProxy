@@ -1,4 +1,4 @@
-# Performance Optimizations
+﻿# Performance Optimizations
 
 HermesProxy has been extensively optimized to minimize latency and memory allocations in packet handling hot paths.
 
@@ -91,6 +91,84 @@ allocation and the per-session startup scan, not throughput; see the baseline ta
 where the bytes actually are.
 
 Numbers quoted in a PR should come from the Mac mini M4, not this host.
+
+### Mac mini M4, 2026-09-13 — all 384 opcodes converted
+
+Same benchmark on the quiet box, after the whole modern reflection table emptied. `*_Generated`
+is new: it adds the generated table's real lookup and an indirect call on top of the same codec
+work `*_Codec` measures. Neither arm runs the system handler, which needs a live session and
+sockets - so the pair is comparable to each other, not to production end to end.
+
+| Method | Mean | Allocated |
+|---|---:|---:|
+| `BuyBackItem_Activator` | 125.36 ns | 368 B |
+| `BuyBackItem_Direct` | 36.82 ns | 112 B |
+| **`BuyBackItem_Codec`** | **1.94 ns** | **0 B** |
+| **`BuyBackItem_Generated`** | **3.51 ns** | **0 B** |
+| `SetActionButton_Activator` | 117.63 ns | 352 B |
+| `SetActionButton_Codec` | below measurement | 0 B |
+| `AttackSwing_Activator` | 122.31 ns | 360 B |
+| `AttackSwing_Codec` | 1.79 ns | 0 B |
+| `Whisper_Activator` | 163.65 ns | 552 B |
+| `Whisper_Direct` | 72.47 ns | 296 B |
+| `Whisper_Codec` | 125.41 ns | 168 B |
+
+~36x on latency and the whole per-packet allocation gone, on value-type packets.
+
+Three things the table says that the headline does not:
+
+- **The dispatch indirection costs ~1.6 ns** (3.51 vs 1.94). The plan predicted `*_Generated`
+  would land within noise of the codec and said that if it did not, the thunk was not inlining
+  and that was a finding. It is a finding, and it is also irrelevant next to the 125 ns it
+  replaces - but it is not free, and the table is ~118 KB so a cold lookup is not an L1 hit.
+- **`Whisper_Codec` is slower than `Whisper_Direct`** (125 ns vs 72 ns) while still allocating
+  less (168 B vs 296 B). The one arm where the converted path loses on latency. Its error bar is
+  +/-74 ns, so this may be noise rather than a regression, but it is unresolved and a longer run
+  should settle it before anyone quotes the 36x as universal.
+- **`SetActionButton_Codec` measured as exactly zero** and BenchmarkDotNet flagged it as
+  indistinguishable from an empty method. That is the JIT eliding the work, not a real number.
+  Read it as "too fast to measure".
+
+### Live run, Arathi Basin with bots, 2026-09-13 (`hermes-20260913_053412.log`)
+
+Same shape as the 2026-09-02 baseline run 5 - login, queue, one full Arathi Basin against
+playerbots - read at the same 15-minute cumulative mark so the two are comparable.
+
+Client to server, the path this work converted:
+
+| | baseline 2026-09-02 | 2026-09-13 |
+|---|---:|---:|
+| total allocated | 92.55 MB | **9.13 MB** |
+| packets | 5,052 | 6,379 |
+| per packet | 18.3 KB | **1.5 KB** |
+
+| opcode | baseline avg / max | now avg / max |
+|---|---:|---:|
+| `CMSG_MOVE_SET_FACING_HEARTBEAT` | 27,863 B / 394,304 | 866 B / 1,424 |
+| `CMSG_MOVE_STOP_STRAFE` | 18,158 B / 394,120 | 869 B / 1,144 |
+| `CMSG_MOVE_SET_PITCH` | 32,293 B / 394,120 | 875 B / 1,288 |
+| `CMSG_TIME_SYNC_RESPONSE` | 813 B | 330 B |
+
+Server to client, which this work did **not** touch, at a matched packet rate: the baseline's
+busiest window was 620 pkt/s at 1.5 MB/s and 23 gen0/min; this run held 0.28-0.50 MB/s and
+4-8 gen0/min while peaking at 757 pkt/s. That belongs to the update-path work (PR #272, #246,
+#286), not to dispatch.
+
+**What the 12x does and does not show.** The dispatch conversion removes the ClientPacket and
+WorldPacket objects - about 360 B per packet, which is what the micro-benchmark measures. It
+cannot account for 27,863 -> 866. What actually disappeared is the recurring ~384 KB
+`ArrayPool` bucket spike that the baseline flagged as open question 4, which was landing on
+whichever packet was in flight and was most of that 92.55 MB. The leading candidate is the
+legacy-send disposal fix landed the same day - returning pooled buffers at the send site
+instead of via `~ByteBuffer` is exactly what stops bucket misses - but this is one run against
+a baseline a year of other work separates it from, and the two were not isolated. Treat the
+360 B/packet as attributable and the rest as unattributed until someone runs the A/B.
+
+Not everything improved. The heap sits at 118 MB against the baseline's 92 MB, with no
+explanation offered here. `CMSG_CHAT_MESSAGE_SAY` still carries the 286,984 B spike - 22% of
+all client-to-server allocation across 81 packets - and `CMSG_PLAYER_LOGIN` is still 2.36 MB in
+one shot. Both are larger levers than anything left in dispatch.
+
 
 ---
 

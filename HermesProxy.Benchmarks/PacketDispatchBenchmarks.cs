@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using BenchmarkDotNet.Attributes;
 using Framework.IO;
 using HermesProxy.Enums;
 using HermesProxy.World;
+using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
 
@@ -183,6 +184,42 @@ public class PacketDispatchBenchmarks
         BuyBackItemCodec.Read(ref r, out var packet);
         s_sink = packet.Slot + (uint)packet.VendorGUID.Low;
         return s_sink;
+    }
+
+    /// <summary>
+    /// What production actually executes: the generated table's bounds check, load and indirect
+    /// call, on top of the same codec work <see cref="BuyBackItem_Codec"/> measures.
+    /// </summary>
+    /// <remarks>
+    /// The lookup is the real one - <c>GeneratedCmsgDispatch.Get</c> against the real table - but
+    /// the call lands on a local thunk of identical signature rather than the generated one,
+    /// because the generated thunk goes on to invoke the system handler and that needs a live
+    /// session and sockets. The excluded part is exactly what <see cref="BuyBackItem_Codec"/>
+    /// excludes too, so the pair is comparable and the gap between them is the dispatch overhead
+    /// this design was chosen for. If that gap is not close to zero, the thunk is not inlining and
+    /// that is a finding in itself.
+    /// </remarks>
+    [Benchmark]
+    public unsafe uint BuyBackItem_Generated()
+    {
+        var fn = GeneratedCmsgDispatch.Get(Opcode.CMSG_BUY_BACK_ITEM);
+        if (fn == null)
+            throw new InvalidOperationException("CMSG_BUY_BACK_ITEM is not in the generated table.");
+
+        var r = new SpanPacketReader(_buyBackItem.AsSpan(2));
+        // Through a function pointer, not by name - an inlined direct call would measure the
+        // wrong thing. The target is the local thunk rather than fn for the reason in the remarks.
+        delegate*<ref SpanPacketReader, in SessionContext, void> call = &BuyBackItemThunk;
+        call(ref r, in s_ctx);
+        return s_sink;
+    }
+
+    private static SessionContext s_ctx;
+
+    private static void BuyBackItemThunk(ref SpanPacketReader r, in SessionContext ctx)
+    {
+        BuyBackItemCodec.Read(ref r, out var packet);
+        s_sink = packet.Slot + (uint)packet.VendorGUID.Low;
     }
 
     // ---- SetActionButton: three small integers ----
