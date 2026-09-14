@@ -3,6 +3,7 @@ using Framework.IO;
 using HermesProxy;
 using HermesProxy.Enums;
 using HermesProxy.World;
+using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
 using Xunit;
 using Frozen = HermesProxy.Tests.World.Dispatch.Reference.FrozenPackets;
@@ -191,33 +192,6 @@ public class GroupCodecEquivalenceTests
         Assert.Equal(o.Remaining(), r.Remaining);
     }
 
-    [Fact]
-    public void ChangeSubGroup_Matches()
-    {
-        var (o, f) = Build(w => { w.WritePackedGuid128(Guid); w.WriteInt8(-1); w.WriteUInt8(3); });
-        var e = new Frozen.ChangeSubGroup(); e.Read(o);
-        var r = ReaderOver(f); ChangeSubGroupCodec.Read(ref r, out var a);
-        Assert.Equal(e.TargetGUID, a.TargetGUID);
-        Assert.Equal(e.PartyIndex, a.PartyIndex);
-        Assert.Equal(e.NewSubGroup, a.NewSubGroup);
-        Assert.Equal((byte)3, a.NewSubGroup);
-        Assert.Equal(o.Remaining(), r.Remaining);
-    }
-
-    /// Two GUIDs read back to back; transposing them swaps the wrong pair of players.
-    [Fact]
-    public void SwapSubGroups_Matches()
-    {
-        var (o, f) = Build(w => { w.WriteInt8(-1); w.WritePackedGuid128(Guid); w.WritePackedGuid128(Guid2); });
-        var e = new Frozen.SwapSubGroups(); e.Read(o);
-        var r = ReaderOver(f); SwapSubGroupsCodec.Read(ref r, out var a);
-        Assert.Equal(e.FirstTarget, a.FirstTarget);
-        Assert.Equal(e.SecondTarget, a.SecondTarget);
-        Assert.Equal(Guid, a.FirstTarget);
-        Assert.Equal(Guid2, a.SecondTarget);
-        Assert.Equal(o.Remaining(), r.Remaining);
-    }
-
     // ---- ranged: pre-WotLK side, proven against the oracle ----
 
     [Theory]
@@ -329,6 +303,33 @@ public class GroupCodecEquivalenceTests
         Assert.Equal(e.ChangedUnit, a.ChangedUnit);
         Assert.Equal(e.Role, a.Role);
         Assert.Equal(role, a.Role);
+        Assert.Equal(o.Remaining(), r.Remaining);
+    }
+
+    [Fact]
+    public void ChangeSubGroup_PreWotLK_MatchesOracle()
+    {
+        var (o, f) = Build(w => { w.WritePackedGuid128(Guid); w.WriteInt8(-1); w.WriteUInt8(3); });
+        var e = new Frozen.ChangeSubGroup(); e.Read(o);
+        var r = ReaderOver(f); ChangeSubGroupCodecPreWotLKClassic.Read(ref r, out var a);
+        Assert.Equal(e.TargetGUID, a.TargetGUID);
+        Assert.Equal(e.PartyIndex, a.PartyIndex);
+        Assert.Equal(e.NewSubGroup, a.NewSubGroup);
+        Assert.Equal((byte)3, a.NewSubGroup);
+        Assert.Equal(o.Remaining(), r.Remaining);
+    }
+
+    /// Two GUIDs read back to back; transposing them swaps the wrong pair of players.
+    [Fact]
+    public void SwapSubGroups_PreWotLK_MatchesOracle()
+    {
+        var (o, f) = Build(w => { w.WriteInt8(-1); w.WritePackedGuid128(Guid); w.WritePackedGuid128(Guid2); });
+        var e = new Frozen.SwapSubGroups(); e.Read(o);
+        var r = ReaderOver(f); SwapSubGroupsCodecPreWotLKClassic.Read(ref r, out var a);
+        Assert.Equal(e.FirstTarget, a.FirstTarget);
+        Assert.Equal(e.SecondTarget, a.SecondTarget);
+        Assert.Equal(Guid, a.FirstTarget);
+        Assert.Equal(Guid2, a.SecondTarget);
         Assert.Equal(o.Remaining(), r.Remaining);
     }
 
@@ -470,4 +471,62 @@ public class GroupCodecEquivalenceTests
         Assert.Equal(role, a.Role);
         Assert.Equal(0, r.Remaining);
     }
+
+    /// <summary>
+    /// The bit trails NewSubGroup here, where every other V3_4_3 party packet leads with it. Read
+    /// with the pre-WotLK layout, NewSubGroup comes back as the bit byte: group 1 whenever no
+    /// PartyIndex follows.
+    /// </summary>
+    [Theory]
+    [InlineData(false, (byte)4)]
+    [InlineData(true, (byte)7)]
+    public void ChangeSubGroup_WotLKClassic_ReadsIndexBitAfterSubGroup(bool hasPartyIndex, byte newSubGroup)
+    {
+        var (_, f) = Build(w =>
+        {
+            w.WritePackedGuid128(Guid);
+            w.WriteUInt8(newSubGroup);
+            w.WriteBit(hasPartyIndex);
+            if (hasPartyIndex)
+                w.WriteInt8(1);
+        });
+
+        var r = ReaderOver(f); ChangeSubGroupCodecWotLKClassic.Read(ref r, out var a);
+        Assert.Equal(Guid, a.TargetGUID);
+        Assert.Equal(newSubGroup, a.NewSubGroup);
+        Assert.Equal(hasPartyIndex ? (sbyte)1 : (sbyte)0, a.PartyIndex);
+        Assert.Equal(0, r.Remaining);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SwapSubGroups_WotLKClassic_ReadsBitThenGuidsThenIndex(bool hasPartyIndex)
+    {
+        var (_, f) = Build(w =>
+        {
+            w.WriteBit(hasPartyIndex);
+            w.WritePackedGuid128(Guid);
+            w.WritePackedGuid128(Guid2);
+            if (hasPartyIndex)
+                w.WriteInt8(1);
+        });
+
+        var r = ReaderOver(f); SwapSubGroupsCodecWotLKClassic.Read(ref r, out var a);
+        Assert.Equal(Guid, a.FirstTarget);
+        Assert.Equal(Guid2, a.SecondTarget);
+        Assert.Equal(hasPartyIndex ? (sbyte)1 : (sbyte)0, a.PartyIndex);
+        Assert.Equal(0, r.Remaining);
+    }
+
+    /// <summary>
+    /// The opcodes were once mapped under their native names, CMSG_CHANGE_SUB_GROUP and
+    /// CMSG_SWAP_SUB_GROUPS, which no handler claims — so a raid subgroup drag was named in the log
+    /// and still dropped. They must resolve to the names GroupSystem registers.
+    /// </summary>
+    [Theory]
+    [InlineData(13903u, Opcode.CMSG_GROUP_CHANGE_SUB_GROUP)]
+    [InlineData(13904u, Opcode.CMSG_GROUP_SWAP_SUB_GROUP)]
+    public void SubGroupOpcodes_WotLKClassic_ResolveToTheHandledNames(uint wire, Opcode expected)
+        => Assert.Equal(expected, Opcodes.GetUniversalOpcode(wire, ClientVersionBuild.V3_4_3_54261));
 }

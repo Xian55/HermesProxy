@@ -30,7 +30,7 @@ the proxy has no reason to translate.
 | `V1_14_1_40688` | 692 | 378 | 314 |
 | `V2_5_2_39570` | 691 | 379 | 312 |
 | `V2_5_3_41750` | 694 | 380 | 314 |
-| `V3_4_3_54261` | 448 | 378 | 70 |
+| `V3_4_3_54261` | 448 | 380 | 68 |
 
 ### Server to proxy (SMSG), by emulator build
 
@@ -86,7 +86,7 @@ Each of these has more than one codec, chosen by build range at table-build time
 anyone adding a client this is the short list worth checking first: a layout that already
 changed once is the most likely to have changed again.
 
-21 packets across 42 codecs.
+23 packets across 46 codecs.
 
 | packet | codec | axis | added in | removed in |
 |---|---|---|---|---|
@@ -94,6 +94,8 @@ changed once is the most likely to have changed again.
 | `AuctionListItems` | `AuctionListItemsCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `BuyItem` | `BuyItemCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `BuyItem` | `BuyItemCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `ChangeSubGroup` | `ChangeSubGroupCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
+| `ChangeSubGroup` | `ChangeSubGroupCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `ChatMessage` | `ChatMessageCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `ChatMessage` | `ChatMessageCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `ChatMessageAFK` | `ChatMessageAFKCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
@@ -132,6 +134,8 @@ changed once is the most likely to have changed again.
 | `SetEveryoneIsAssistant` | `SetEveryoneIsAssistantCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `SetRole` | `SetRoleCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `SetRole` | `SetRoleCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `SwapSubGroups` | `SwapSubGroupsCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
+| `SwapSubGroups` | `SwapSubGroupsCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 
 ## 4. Exact-equality version checks — the new-client work list
 

@@ -313,7 +313,27 @@ public static class RequestPartyMemberStatsCodec
     }
 }
 
-public static class ChangeSubGroupCodec
+[PacketCodec(typeof(ChangeSubGroup), AddedIn = ClientVersionBuild.V3_4_3_54261)]
+public static class ChangeSubGroupCodecWotLKClassic
+{
+    public static void Read(ref SpanPacketReader r, out ChangeSubGroup packet)
+    {
+        // The one party packet whose HasPartyIndex bit trails the fixed fields instead of leading
+        // them. The pre-WotLK reader takes NewSubGroup as PartyIndex and the bit byte as
+        // NewSubGroup, which is zero whenever no PartyIndex follows, so every drag lands in group 1.
+        WowGuid128 targetGuid = r.ReadPackedGuid128();
+        byte newSubGroup = r.ReadUInt8();
+
+        sbyte partyIndex = 0;
+        if (r.HasBit())
+            partyIndex = r.ReadInt8();
+
+        packet = new ChangeSubGroup(targetGuid, partyIndex, newSubGroup);
+    }
+}
+
+[PacketCodec(typeof(ChangeSubGroup), RemovedIn = ClientVersionBuild.V3_4_3_54261)]
+public static class ChangeSubGroupCodecPreWotLKClassic
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Read(ref SpanPacketReader r, out ChangeSubGroup packet)
@@ -325,7 +345,25 @@ public static class ChangeSubGroupCodec
     }
 }
 
-public static class SwapSubGroupsCodec
+[PacketCodec(typeof(SwapSubGroups), AddedIn = ClientVersionBuild.V3_4_3_54261)]
+public static class SwapSubGroupsCodecWotLKClassic
+{
+    public static void Read(ref SpanPacketReader r, out SwapSubGroups packet)
+    {
+        bool hasPartyIndex = r.HasBit();
+        WowGuid128 firstTarget = r.ReadPackedGuid128();
+        WowGuid128 secondTarget = r.ReadPackedGuid128();
+
+        sbyte partyIndex = 0;
+        if (hasPartyIndex)
+            partyIndex = r.ReadInt8();
+
+        packet = new SwapSubGroups(partyIndex, firstTarget, secondTarget);
+    }
+}
+
+[PacketCodec(typeof(SwapSubGroups), RemovedIn = ClientVersionBuild.V3_4_3_54261)]
+public static class SwapSubGroupsCodecPreWotLKClassic
 {
     public static void Read(ref SpanPacketReader r, out SwapSubGroups packet)
     {
