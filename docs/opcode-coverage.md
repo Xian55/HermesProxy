@@ -30,7 +30,7 @@ the proxy has no reason to translate.
 | `V1_14_1_40688` | 692 | 378 | 314 |
 | `V2_5_2_39570` | 691 | 379 | 312 |
 | `V2_5_3_41750` | 694 | 380 | 314 |
-| `V3_4_3_54261` | 448 | 377 | 71 |
+| `V3_4_3_54261` | 448 | 378 | 70 |
 
 ### Server to proxy (SMSG), by emulator build
 
@@ -147,9 +147,9 @@ Each needs a judgement call against the client or WowPacketParser.
 
 Counts per file rather than line numbers, so unrelated edits do not churn this file.
 
-206 sites across 53 files.
+207 sites across 53 files.
 
-### `ModernVersion.Build` compared by equality — 206 sites
+### `ModernVersion.Build` compared by equality — 207 sites
 
 | file | build compared | sites |
 |---|---|---:|
@@ -162,9 +162,9 @@ Counts per file rather than line numbers, so unrelated edits do not churn this f
 | `HermesProxy/World/Client/PacketHandlers/SpellHandler.cs` | `V3_4_3_54261` | 7 |
 | `HermesProxy/World/Client/PacketHandlers/PetHandler.cs` | `V3_4_3_54261` | 6 |
 | `HermesProxy/World/Client/PacketHandlers/QueryHandler.cs` | `V3_4_3_54261` | 6 |
+| `HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs` | `V3_4_3_54261` | 5 |
 | `HermesProxy/World/Server/Packets/GroupPackets.cs` | `V3_4_3_54261` | 5 |
 | `HermesProxy/World/Server/Packets/MailPackets.cs` | `V3_4_3_54261` | 5 |
-| `HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs` | `V3_4_3_54261` | 4 |
 | `HermesProxy/World/Client/PacketHandlers/QuestHandler.cs` | `V3_4_3_54261` | 4 |
 | `HermesProxy/World/Server/Packets/BattleGroundPackets.cs` | `V3_4_3_54261` | 4 |
 | `HermesProxy/World/Server/Packets/GuildPackets.cs` | `V3_4_3_54261` | 4 |

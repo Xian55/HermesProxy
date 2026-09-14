@@ -125,6 +125,20 @@ internal static partial class WorldClientLogMessages
         ulong Money);
 
     [LoggerMessage(
+        EventId = 223,
+        Level = LogLevel.Debug,
+        Message = "Inspect honour for guid low {GuidLow}: rank={Rank} todayHK={TodayHK} yesterdayHK={YesterdayHK} lifetimeHK={LifetimeHK}")]
+    public static partial void InspectHonor(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        ulong GuidLow,
+        byte Rank,
+        ushort TodayHK,
+        ushort YesterdayHK,
+        uint LifetimeHK);
+
+    [LoggerMessage(
         EventId = 211,
         Level = LogLevel.Debug,
         Message = "Inspect talents unspent={Unspent} specs={Specs} active={Active} talents={Talents}")]

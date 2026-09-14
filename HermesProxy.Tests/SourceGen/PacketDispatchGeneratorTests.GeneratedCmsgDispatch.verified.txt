@@ -2016,6 +2016,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.MiscSystem.HandleRequestConquestFormulaConstants(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleInspectHonorStats_CMSG_REQUEST_HONOR_STATS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.InspectCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CharacterSystem.HandleInspectHonorStats(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleRequestLFGListBlacklist_CMSG_REQUEST_LFG_LIST_BLACKLIST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
@@ -2953,6 +2959,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_ACCOUNT_DATA] = &Thunk_HermesProxy_World_Server_Systems_ClientConfigSystem_HandleRequestAccountData_CMSG_REQUEST_ACCOUNT_DATA;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_BATTLEFIELD_STATUS] = &Thunk_HermesProxy_World_Server_Systems_BattlegroundSystem_HandleRequestBattlefieldStatus_CMSG_REQUEST_BATTLEFIELD_STATUS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleRequestConquestFormulaConstants_CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_HONOR_STATS] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleInspectHonorStats_CMSG_REQUEST_HONOR_STATS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_LFG_LIST_BLACKLIST] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleRequestLFGListBlacklist_CMSG_REQUEST_LFG_LIST_BLACKLIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_PARTY_MEMBER_STATS] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleRequestPartyMemberStats_CMSG_REQUEST_PARTY_MEMBER_STATS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_PET_INFO] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleRequestPetInfo_CMSG_REQUEST_PET_INFO;
@@ -3363,6 +3370,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_ACCOUNT_DATA,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_BATTLEFIELD_STATUS,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS,
+            global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_HONOR_STATS,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_LFG_LIST_BLACKLIST,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_PARTY_MEMBER_STATS,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_PET_INFO,

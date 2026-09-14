@@ -818,6 +818,32 @@ public partial class WorldClient
         uint yesterdayHonor = packet.ReadUInt32();
         uint lifetimeHonorableKills = packet.ReadUInt32();
 
+        // V3_4_3 answers CMSG_REQUEST_HONOR_STATS with its own 42-byte payload, not the TBC one.
+        // Layout taken from the 3.4.3 server's InspectHonorStatsResult::Write and byte-checked
+        // against a native 47-byte capture. The counters a 3.3.5a backend cannot supply
+        // (dishonorable kills, weekly splits, standing) stay zero rather than being guessed.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        {
+            InspectHonorStatsResultWotLKClassic honor = new InspectHonorStatsResultWotLKClassic();
+            honor.PlayerGUID = playerGuid;
+            // Left at zero on purpose. A 3.3.5a server fills this byte with honour points
+            // truncated to 8 bits (AzerothCore: uint8(GetHonorPoints())), not a rank - forwarding it
+            // showed values like 185 and 7. The PvP rank it names ended with TBC, and the native
+            // 3.4.3 capture carries 0 here.
+            honor.TodayHK = todayHonorableKills;
+            honor.YesterdayHK = yesterdayHonorableKills;
+            honor.LifeTimeHK = lifetimeHonorableKills;
+            honor.YesterdayHonor = yesterdayHonor;
+            honor.ThisWeekHonor = todayHonor;
+            SendPacketToClient(honor);
+
+            if (_melLog.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+                WorldClientLogMessages.InspectHonor(_melLog, _sourceFile, _netDirRecv,
+                    playerGuid.Low, lifetimeHighestRank, todayHonorableKills,
+                    yesterdayHonorableKills, lifetimeHonorableKills);
+            return;
+        }
+
         if (ModernVersion.ExpansionVersion == 1)
         {
             InspectHonorStatsResultClassic inspect = new InspectHonorStatsResultClassic();

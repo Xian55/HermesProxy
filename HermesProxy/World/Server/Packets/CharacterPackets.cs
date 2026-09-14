@@ -1374,6 +1374,98 @@ public class InspectHonorStatsResultClassic : ServerPacket, ISpanWritable
     public byte RankProgress;
 }
 
+/// <summary>
+/// V3_4_3 layout for <c>SMSG_INSPECT_HONOR_STATS</c>, byte-verified against a native capture.
+/// </summary>
+/// <remarks>
+/// Distinct from <see cref="InspectHonorStatsResultTBC"/>, which writes 30 payload bytes where
+/// this client expects 42 — eight uint16 counters and six uint32 totals rather than four and five.
+/// Sending the TBC shape here made the client read past the end and allocate on a garbage length
+/// until it died, so the two layouts must stay separate.
+/// <para>
+/// Field order from the 3.4.3 server's <c>InspectHonorStatsResult::Write</c>, confirmed against a
+/// 47-byte capture: a 5-byte packed GUID then 42 bytes of payload. Dishonorable-kill and weekly
+/// counters have no source on a 3.3.5a backend and stay zero.
+/// </para>
+/// </remarks>
+public class InspectHonorStatsResultWotLKClassic : ServerPacket, ISpanWritable
+{
+    public InspectHonorStatsResultWotLKClassic() : base(Opcode.SMSG_INSPECT_HONOR_STATS) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(PlayerGUID);
+        _worldPacket.WriteUInt8(LifetimeMaxRank);
+
+        _worldPacket.WriteUInt16(TodayHK);
+        _worldPacket.WriteUInt16(TodayDK);
+        _worldPacket.WriteUInt16(YesterdayHK);
+        _worldPacket.WriteUInt16(YesterdayDK);
+        _worldPacket.WriteUInt16(LastWeekHK);
+        _worldPacket.WriteUInt16(LastWeekDK);
+        _worldPacket.WriteUInt16(ThisWeekHK);
+        _worldPacket.WriteUInt16(ThisWeekDK);
+
+        _worldPacket.WriteUInt32(LifeTimeHK);
+        _worldPacket.WriteUInt32(LifeTimeDK);
+
+        _worldPacket.WriteUInt32(YesterdayHonor);
+        _worldPacket.WriteUInt32(LastWeekHonor);
+        _worldPacket.WriteUInt32(ThisWeekHonor);
+
+        _worldPacket.WriteUInt32(Standing);
+        _worldPacket.WriteUInt8(RankProgress);
+    }
+
+    // GUID + byte + 8 ushorts + 6 uints + byte. Fixed layout, no collections, so it never overflows.
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 42;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(PlayerGUID.Low, PlayerGUID.High);
+        writer.WriteUInt8(LifetimeMaxRank);
+
+        writer.WriteUInt16(TodayHK);
+        writer.WriteUInt16(TodayDK);
+        writer.WriteUInt16(YesterdayHK);
+        writer.WriteUInt16(YesterdayDK);
+        writer.WriteUInt16(LastWeekHK);
+        writer.WriteUInt16(LastWeekDK);
+        writer.WriteUInt16(ThisWeekHK);
+        writer.WriteUInt16(ThisWeekDK);
+
+        writer.WriteUInt32(LifeTimeHK);
+        writer.WriteUInt32(LifeTimeDK);
+
+        writer.WriteUInt32(YesterdayHonor);
+        writer.WriteUInt32(LastWeekHonor);
+        writer.WriteUInt32(ThisWeekHonor);
+
+        writer.WriteUInt32(Standing);
+        writer.WriteUInt8(RankProgress);
+        return writer.Position;
+    }
+
+    public WowGuid128 PlayerGUID;
+    public byte LifetimeMaxRank;
+    public ushort TodayHK;
+    public ushort TodayDK;
+    public ushort YesterdayHK;
+    public ushort YesterdayDK;
+    public ushort LastWeekHK;
+    public ushort LastWeekDK;
+    public ushort ThisWeekHK;
+    public ushort ThisWeekDK;
+    public uint LifeTimeHK;
+    public uint LifeTimeDK;
+    public uint YesterdayHonor;
+    public uint LastWeekHonor;
+    public uint ThisWeekHonor;
+    public uint Standing;
+    public byte RankProgress;
+}
+
 public class InspectHonorStatsResultTBC : ServerPacket, ISpanWritable
 {
     public InspectHonorStatsResultTBC() : base(Opcode.SMSG_INSPECT_HONOR_STATS) { }

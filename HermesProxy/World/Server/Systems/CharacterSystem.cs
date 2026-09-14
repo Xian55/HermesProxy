@@ -419,7 +419,14 @@ public static class CharacterSystem
         ctx.SendPacketToServer(packet);
     }
 
+    /// <remarks>
+    /// V3_4_3 renamed this to <c>CMSG_REQUEST_HONOR_STATS</c> (0x317E) from
+    /// <c>CMSG_INSPECT_HONOR_STATS</c> (0x317) — same request, same single-GUID body. A native
+    /// 3.4.3 server answers it with <c>SMSG_INSPECT_HONOR_STATS</c> and only it; the client sends it
+    /// when the inspect PvP tab opens, so there is nothing to request ahead of that.
+    /// </remarks>
     [HandlesCmsg(Opcode.CMSG_INSPECT_HONOR_STATS)]
+    [HandlesCmsg(Opcode.CMSG_REQUEST_HONOR_STATS)]
     public static void HandleInspectHonorStats(in Inspect inspect, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.MSG_INSPECT_HONOR_STATS);
