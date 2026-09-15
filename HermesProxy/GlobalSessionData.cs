@@ -4,6 +4,7 @@ using HermesProxy.World;
 using HermesProxy.World.Client;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
 using System.Collections.Concurrent;
@@ -1968,6 +1969,12 @@ public class GlobalSessionData
     // an IOptions<T> getter chain on every send/recv.
     public PacketLogContext PacketLogContext { get; }
 
+    /// <summary>Packets to the modern client, sent now or held. See World/Outbox/CLAUDE.md.</summary>
+    public ClientOutbox ToClient { get; }
+
+    /// <summary>Packets to the legacy server, sent now or held. See World/Outbox/CLAUDE.md.</summary>
+    public ServerOutbox ToServer { get; }
+
     public GlobalSessionData(
         ClientOptions clientOptions,
         LegacyServerOptions legacyServerOptions,
@@ -1983,6 +1990,19 @@ public class GlobalSessionData
         PacketLogContext = new PacketLogContext(diagnosticsOptions.PacketsLog, clientOptions.ClientBuild);
 
         RealmManager = new RealmManager(clientOptions, networkOptions);
+        ToClient = new ClientOutbox(new SessionClientWire(this));
+        ToServer = new ServerOutbox(new SessionServerWire(this));
+        GameState = GameSessionData.CreateNewGameSessionData(this);
+    }
+
+    /// <summary>
+    /// Starts a fresh GameState. Holds tied to the old one are dropped first: a held packet that
+    /// refers to the previous character must not reach the client after the switch.
+    /// </summary>
+    public void ReplaceGameState()
+    {
+        ToClient.Discard(OutboxScope.GameState);
+        ToServer.Discard(OutboxScope.GameState);
         GameState = GameSessionData.CreateNewGameSessionData(this);
     }
     
@@ -2072,7 +2092,9 @@ public class GlobalSessionData
             InstanceSocket = null!;
         }
 
-        GameState = GameSessionData.CreateNewGameSessionData(this);
+        ToClient.Discard(OutboxScope.Session);
+        ToServer.Discard(OutboxScope.Session);
+        ReplaceGameState();
     }
 
     public void SendHermesTextMessage(string message, bool isError = false)

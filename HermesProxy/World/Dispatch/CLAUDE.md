@@ -91,6 +91,8 @@ None of them can see a codec that reads the right fields in the wrong order. Tha
 - **Forwarders keep the old instance-member names** (`GetSession()`, `SendPacketToServer`,
   `SendPacketToClient`, `SendPacket`), so moving a handler body only means prefixing calls with
   `ctx.` instead of rewriting them.
+- **`ctx.ToClient` / `ctx.ToServer`** are the session's outboxes, for sending now or holding a
+  packet until something happens. See [World/Outbox/CLAUDE.md](../Outbox/CLAUDE.md).
 - **Resolve the world client per call** through the session. It attaches after the modern socket
   binds, so a reference captured at bind time is null for the whole login window.
 - `ctx.Socket` is null on the legacy path. `ctx.IsBound` is false until the socket has bound a

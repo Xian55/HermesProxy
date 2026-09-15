@@ -78,3 +78,10 @@ Modern Client <---TCP-----> WorldServer ──┘                   WorldClient 
 - **WorldServer** — accepts modern client game connections
 - **WorldClient** — connects to legacy emulator world server
 - Packets are translated bidirectionally between modern and legacy opcodes
+- **Delaying or reordering a packet** goes through the session's outboxes, `ctx.ToClient` /
+  `ctx.ToServer`. Never add a new pending queue or a `Thread.Sleep`. See
+  [HermesProxy/World/Outbox/CLAUDE.md](HermesProxy/World/Outbox/CLAUDE.md).
+- **Threading today:** the realm socket, the instance socket, the legacy receive loop and the timers
+  all run handlers concurrently against the same session. Cross-socket send order comes only from
+  synchronous writes on the calling thread. Don't introduce a per-socket send queue (see the outbox
+  handbook for the reverted attempt).

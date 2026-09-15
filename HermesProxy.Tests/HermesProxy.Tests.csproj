@@ -15,6 +15,7 @@
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Moq" />
     <PackageReference Include="Verify.XunitV3" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <!-- Syntax-only parse of the vendored WowPacketParser handler in UpdateFieldWppConformanceTests. -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>

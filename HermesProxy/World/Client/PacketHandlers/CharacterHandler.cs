@@ -567,7 +567,7 @@ public partial class WorldClient
         LogoutComplete logout = new LogoutComplete();
         SendPacketToClient(logout);
 
-        GetSession().GameState = GameSessionData.CreateNewGameSessionData(GetSession());
+        GetSession().ReplaceGameState();
         GetSession().InstanceSocket.CloseSocket();
         GetSession().InstanceSocket = null!;
     }

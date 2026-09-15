@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using HermesProxy.World.Client;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server;
 
 namespace HermesProxy.World.Dispatch;
@@ -106,4 +107,21 @@ public readonly struct SessionContext
     /// <summary>Send on the socket this packet arrived on. Mirrors <c>WorldSocket.SendPacket</c>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SendPacket(ServerPacket packet) => Socket!.SendPacket(packet);
+
+    /// <summary>
+    /// Packets to the modern client: sent now, or held until an event, a gate or a deadline.
+    /// See <c>World/Outbox/CLAUDE.md</c> for which call fits which situation.
+    /// </summary>
+    public ClientOutbox ToClient
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Session.ToClient;
+    }
+
+    /// <summary>Packets to the legacy server: sent now, or held. See <c>World/Outbox/CLAUDE.md</c>.</summary>
+    public ServerOutbox ToServer
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Session.ToServer;
+    }
 }

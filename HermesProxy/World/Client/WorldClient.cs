@@ -19,6 +19,7 @@ using Framework.Networking;
 using HermesProxy.World.Server;
 using System.Diagnostics;
 using HermesProxy.World.Logging;
+using HermesProxy.World.Outbox;
 
 namespace HermesProxy.World.Client;
 
@@ -185,6 +186,8 @@ public partial class WorldClient
         // Anything still waiting on an opcode that will now never arrive would otherwise reach
         // the pool only via finalization, which is the case this class is least likely to notice.
         DiscardDelayedPacketsToServer();
+        GetSession().ToServer.Discard(OutboxScope.LegacyConnection);
+        GetSession().ToClient.Discard(OutboxScope.LegacyConnection);
 
         // Unhook before closing so the receive loop does not treat this as an
         // unexpected drop and call OnDisconnect (that nulls AuthClient, which

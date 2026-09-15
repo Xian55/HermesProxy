@@ -6,6 +6,10 @@ and a `SessionContext`, then does one of two things:
   `ctx.SendPacketToServer`.
 - **Answers the modern client itself:** calls `ctx.SendPacketToClient` or `ctx.SendPacket`.
 
+If a packet has to wait for something, such as another packet, the player entering the world, data
+arriving or a delay, hold it through `ctx.ToClient` / `ctx.ToServer` ([World/Outbox/CLAUDE.md](../../Outbox/CLAUDE.md)).
+Don't add a `Pending*` field or a `Thread.Sleep`.
+
 The packet was decoded by a codec in `World/Server/Packets/Codecs`. Wiring, handler shapes and
 generator diagnostics are covered in [World/Dispatch/CLAUDE.md](../../Dispatch/CLAUDE.md). See the
 root [CLAUDE.md](../../../../CLAUDE.md) for solution-wide conventions.
