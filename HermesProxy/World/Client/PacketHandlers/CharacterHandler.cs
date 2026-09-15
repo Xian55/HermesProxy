@@ -79,12 +79,9 @@ public partial class WorldClient
             GetSession().GameState.StorePlayerGuildId(char1.Guid, guildId);
             char1.GuildGuid = guildId != 0 ? WowGuid128.Create(HighGuidType703.Guild, guildId) : WowGuid128.Empty;
             char1.Flags = (CharacterFlags)packet.ReadUInt32();
-            // Attempt 2 (per _charenum_diff_report.md): TC sends Flags=0 for ALL
-            // chars (verified across all 4 chars in TC capture). cMangos sets the
-            // Declined bit (0x02000000) on all chars by default. Strip it here to
-            // match TC's wire pattern. Combined with the ListPosition=0 change
-            // above — neither change individually unblocked rendering this evening.
-            char1.Flags &= ~CharacterFlags.Declined;
+            // Preserve Declined: legacy servers set it when declined names exist
+            // OR the feature is disabled. Clearing it makes ruRU clients request
+            // unnecessary name cases before entering the world.
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 char1.Flags2 = packet.ReadUInt32(); // Customization Flags
