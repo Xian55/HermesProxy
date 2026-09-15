@@ -187,14 +187,94 @@ public class ProxyMetricsTests
 
         var summary = metrics.GetSummary();
 
-        Assert.Contains("Client -> Server (top 1 by p99 latency)", summary);
+        Assert.Contains("Client -> Server (top 1 by max latency this interval", summary);
         Assert.Contains("Client -> Server (top 1 by allocated bytes", summary);
-        Assert.Contains("Server -> Client (top 1 by p99 latency)", summary);
+        Assert.Contains("Server -> Client (top 1 by max latency this interval", summary);
         // Zero bytes recorded on this side, so no allocation table.
         Assert.DoesNotContain("Server -> Client (top 1 by allocated bytes", summary);
         Assert.Contains("0x1234", summary);
         Assert.Contains("0x5678", summary);
         Assert.Contains("C->S 1 pkts", summary);
+    }
+
+    [Fact]
+    public void SampleWindow_ResetInterval_KeepsLifetimeMaxAndWindow()
+    {
+        var samples = new SampleWindow(5);
+        samples.Add(100);
+        samples.ResetInterval();
+        samples.Add(3);
+        samples.Add(7);
+
+        var stats = samples.GetStats();
+        Assert.Equal(2, stats.IntervalCount);
+        Assert.Equal(7.0, stats.IntervalMax);
+        Assert.Equal(100.0, stats.Max);
+        Assert.Equal(3, stats.Count);
+        Assert.Equal(3, stats.TotalCount);
+    }
+
+    [Fact]
+    public void SampleWindow_IntervalWithNoSamples_ReportsZero()
+    {
+        var samples = new SampleWindow(5);
+        samples.Add(42);
+        samples.ResetInterval();
+
+        var stats = samples.GetStats();
+        Assert.Equal(0, stats.IntervalCount);
+        Assert.Equal(0.0, stats.IntervalMax);
+        Assert.Equal(42.0, stats.Max);
+    }
+
+    [Fact]
+    public void GetSummary_ClosesInterval_LoginSpikeDoesNotMaskLaterMax()
+    {
+        var metrics = new ProxyMetrics();
+        metrics.RecordServerToClientLatency(0x1234, 135.0); // login burst
+        metrics.GetSummary();
+
+        metrics.RecordServerToClientLatency(0x1234, 4.0);
+        metrics.RecordServerToClientLatency(0x1234, 9.0);
+
+        var stats = metrics.GetServerToClientStats(0x1234);
+        Assert.NotNull(stats);
+        Assert.Equal(9.0, stats.Value.Latency.IntervalMax);
+        Assert.Equal(2, stats.Value.Latency.IntervalCount);
+        Assert.Equal(135.0, stats.Value.Latency.Max);
+    }
+
+    [Fact]
+    public void GetStats_WithoutReset_LeavesIntervalOpen()
+    {
+        var metrics = new ProxyMetrics();
+        metrics.RecordClientToServerLatency(0x1234, 5.0);
+
+        metrics.GetClientToServerStats();
+        metrics.RecordClientToServerLatency(0x1234, 1.0);
+
+        var stats = metrics.GetClientToServerStats(0x1234);
+        Assert.NotNull(stats);
+        Assert.Equal(2, stats.Value.Latency.IntervalCount);
+        Assert.Equal(5.0, stats.Value.Latency.IntervalMax);
+    }
+
+    [Fact]
+    public void GetSummary_LatencyTable_OmitsOpcodesIdleThisInterval_RanksByIntervalMax()
+    {
+        var metrics = new ProxyMetrics();
+        metrics.RecordServerToClientLatency(0x1111, 500.0); // one-off, previous interval
+        metrics.RecordServerToClientLatency(0x2222, 1.0);
+        metrics.GetSummary();
+
+        metrics.RecordServerToClientLatency(0x2222, 2.0);
+        metrics.RecordServerToClientLatency(0x3333, 30.0);
+
+        var summary = metrics.GetSummary(opcodeResolver: static op => $"OP_{op:X4}");
+
+        Assert.Contains("Server -> Client (top 2 by max latency this interval", summary);
+        Assert.DoesNotContain("OP_1111", summary);
+        Assert.True(summary.IndexOf("OP_3333", StringComparison.Ordinal) < summary.IndexOf("OP_2222", StringComparison.Ordinal));
     }
 
     [Fact]

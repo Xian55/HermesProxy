@@ -35,6 +35,21 @@ internal sealed class LegacyServerOptionsValidator : IValidateOptions<LegacyServ
     private static bool IsValidPort(int port) => port > IPEndPoint.MinPort && port < IPEndPoint.MaxPort;
 }
 
+internal sealed class DiagnosticsOptionsValidator : IValidateOptions<DiagnosticsOptions>
+{
+    internal const int MinMetricsIntervalSeconds = 1;
+    internal const int MaxMetricsIntervalSeconds = 3600;
+
+    public ValidateOptionsResult Validate(string? name, DiagnosticsOptions options)
+    {
+        if (options.MetricsIntervalSeconds is < MinMetricsIntervalSeconds or > MaxMetricsIntervalSeconds)
+            return ValidateOptionsResult.Fail(
+                $"{nameof(DiagnosticsOptions)}.{nameof(DiagnosticsOptions.MetricsIntervalSeconds)} ({options.MetricsIntervalSeconds}) out of allowed range ({MinMetricsIntervalSeconds}-{MaxMetricsIntervalSeconds})");
+
+        return ValidateOptionsResult.Success;
+    }
+}
+
 internal sealed class ProxyNetworkOptionsValidator : IValidateOptions<ProxyNetworkOptions>
 {
     public ValidateOptionsResult Validate(string? name, ProxyNetworkOptions options)

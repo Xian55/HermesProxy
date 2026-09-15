@@ -47,7 +47,7 @@ dotnet run --project HermesProxy -c <Debug|Release> -- \
   --set Log.Packet.MinimumLevel=<Debug|Information> \
   --set Log.Server.MinimumLevel=<Verbose|Information> \
   --set Log.Console.MinimumLevel=<Verbose|Information> \
-  [--metrics]
+  [--metrics | --metrics-interval <N>]
 ```
 
 The `--` separator before app args is required so `dotnet run` doesn't try to parse `--set`. The script always inserts it.
@@ -70,6 +70,7 @@ The `--` separator before app args is required so `dotnet run` doesn't try to pa
 | `-ClientBuild` | `V3_4_3_54261` | |
 | `-ServerBuild` | `V3_3_5a_12340` | |
 | `-Metrics` | (off) | Adds `--metrics` flag, enables `Framework/Metrics/ProxyMetrics.cs` per-opcode latency + allocated bytes and a GC delta line every 60s |
+| `-MetricsInterval` | (off) | Adds `--metrics-interval <N>`: metrics on, summary every N seconds (1-3600). Rates, GC line and the `Int`/`IntMax` columns cover one interval |
 | `-NoBuild` | (off) | Adds `--no-build` to `dotnet run` |
 | `-DryRun` | (off) | Print the command and exit without running |
 
