@@ -23,6 +23,7 @@ dotnet run --project HermesProxy -- --metrics
 | `--set Key=Value` | Override config values (repeatable) |
 | `--no-version-check` | Skip update check on startup |
 | `--metrics` | Per-opcode latency + allocated-bytes metrics and a GC delta line every 60 s |
+| `--metrics-interval <seconds>` | Metrics on, summary every `<seconds>` (1-3600). Rates, GC line and the `Int`/`IntMax` columns cover one interval; `Max`/`Total`/allocation tables are since startup |
 
 ## Directories
 

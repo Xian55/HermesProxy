@@ -18,6 +18,7 @@ param(
     [string]$ClientBuild = 'V3_4_3_54261',
     [string]$ServerBuild = 'V3_3_5a_12340',
     [switch]$Metrics,
+    [int]$MetricsInterval = 0,
     [switch]$NoBuild,
     [switch]$DryRun
 )
@@ -151,7 +152,8 @@ Add-Set -Key 'Log.Packet.MinimumLevel'     -Value $logLevelPacket
 Add-Set -Key 'Log.Server.MinimumLevel'     -Value $logLevelHigh
 Add-Set -Key 'Log.Console.MinimumLevel'    -Value $logLevelHigh
 
-if ($Metrics) { $appArgs += '--metrics' }
+if ($MetricsInterval -gt 0) { $appArgs += @('--metrics-interval', "$MetricsInterval") }
+elseif ($Metrics) { $appArgs += '--metrics' }
 
 # ---- Environment overlay (Mode B) -------------------------------------------
 

@@ -129,6 +129,7 @@ public class Program
         builder.Services.AddSingleton<IValidateOptions<ClientOptions>, ClientOptionsValidator>();
         builder.Services.AddSingleton<IValidateOptions<LegacyServerOptions>, LegacyServerOptionsValidator>();
         builder.Services.AddSingleton<IValidateOptions<ProxyNetworkOptions>, ProxyNetworkOptionsValidator>();
+        builder.Services.AddSingleton<IValidateOptions<DiagnosticsOptions>, DiagnosticsOptionsValidator>();
 
         builder.Services.AddSingleton<LoginServiceManager>();
         builder.Services.AddSingleton<SocketManager<BnetTcpSession>>();
@@ -186,6 +187,8 @@ public class Program
     /// 1. Extracts and removes the `--config PATH` pair (returned via out param).
     /// 2. Rewrites bare `--metrics` / `--no-version-check` flags into Section:Key=Value pairs
     ///    that AddCommandLine understands. `--no-version-check` inverts to EnableVersionCheck=false.
+    ///    `--metrics-interval SECONDS` sets the summary interval and turns metrics on, since the
+    ///    interval means nothing without them.
     /// 3. Translates legacy `--set KEY=VALUE` pairs into `--Section:Key=VALUE` via LegacySetKeyMap
     ///    so muscle-memory commands from the pre-migration CLI keep working.
     /// Everything else passes through untouched for native `--Section:Key=Value` syntax.
@@ -209,6 +212,13 @@ public class Program
                     continue;
                 case "--metrics":
                     output.Add($"--{nameof(DiagnosticsOptions)}:{nameof(DiagnosticsOptions.EnableMetrics)}=true");
+                    continue;
+                case "--metrics-interval":
+                    if (i + 1 >= rawArgs.Length || !int.TryParse(rawArgs[i + 1], NumberStyles.None, CultureInfo.InvariantCulture, out int intervalSeconds))
+                        throw new ArgumentException("--metrics-interval requires a whole number of seconds");
+                    i++;
+                    output.Add($"--{nameof(DiagnosticsOptions)}:{nameof(DiagnosticsOptions.EnableMetrics)}=true");
+                    output.Add($"--{nameof(DiagnosticsOptions)}:{nameof(DiagnosticsOptions.MetricsIntervalSeconds)}={intervalSeconds}");
                     continue;
                 case "--no-version-check":
                     output.Add($"--{nameof(DiagnosticsOptions)}:{nameof(DiagnosticsOptions.EnableVersionCheck)}=false");
