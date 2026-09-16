@@ -54,7 +54,11 @@ public partial class WorldClient
     {
         SAttackStop attack = new();
         attack.Attacker = packet.ReadPackedGuid().To128(GetSession().GameState);
-        WowGuid64 victim64 = packet.ReadPackedGuid();
+        // AzerothCore's refusal path writes the attacker and stops there, so the victim can be
+        // absent. ByteBuffer reads straight out of the pooled backing array without checking the
+        // length, so an unguarded read invents a victim guid from whatever the last packet left
+        // behind — forwarded to the client and compared against the current target below.
+        WowGuid64 victim64 = packet.CanRead() ? packet.ReadPackedGuid() : default;
         attack.Victim = victim64.To128(GetSession().GameState);
         // V3_4_3 backends (e.g. AzerothCore) can emit a short SMSG_ATTACKSTOP without the
         // trailing "now dead" uint32; guard the read so it doesn't kill the WorldClient

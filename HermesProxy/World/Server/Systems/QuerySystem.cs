@@ -89,6 +89,9 @@ public static class QuerySystem
         // entry slot now carries creature_template.entry post-fix, so we reverse-resolve.
         var legacy = ctx.GetSession().GameState.GetLegacyPetGuid(queryName.UnitGUID);
         uint petNumber = legacy?.GetEntry() ?? queryName.UnitGUID.GetEntry();
+        // The response comes back carrying this number and nothing else, so record what it stands
+        // for. Without it a response that lands before the pet's create is unroutable (issue #299).
+        ctx.GetSession().GameState.RegisterPetNameQuery(petNumber, queryName.UnitGUID);
         packet.WriteUInt32(petNumber);
         packet.WriteGuid(legacy ?? queryName.UnitGUID.To64(ctx.GetSession().GameState));
         ctx.SendPacketToServer(packet);

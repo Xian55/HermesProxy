@@ -25,6 +25,7 @@ public class PetGuidResolutionTests
         state.PetRealEntryByLegacyGuid = [];
         state.PetLegacyGuidByModern = [];
         state.PetModernGuidByNumber = [];
+        state.PetNameQueryGuidByNumber = [];
         return state;
     }
 
@@ -72,5 +73,72 @@ public class PetGuidResolutionTests
 
         Assert.Null(state.ResolveStalePetGuid(Stale(1)));
         Assert.Null(state.ResolveStalePetGuid(WowGuid128.Create(HighGuidType703.Creature, 0, PetNumber, 1)));
+    }
+
+    [Fact]
+    public void PetNameQuery_ResolvesBeforeThePetsCreateHasRegisteredIt()
+    {
+        // Issue #299: a relog asks for the pet's name before the pet's create arrives, so
+        // PetModernGuidByNumber is still empty when the response lands. The request's own
+        // registration is what routes it.
+        var state = NewState();
+        state.RegisterPetNameQuery(PetNumber, Stale(327));
+
+        Assert.Equal(Stale(327), state.TakePetNameQueryGuid(PetNumber));
+    }
+
+    [Fact]
+    public void PetNameQuery_NamesTheSpawnAskedAbout_NotTheLastRegisteredOne()
+    {
+        // The registration map holds the last spawn seen for a pet number, so answering from it
+        // after a stable swap names the pet that went away.
+        var state = NewState();
+        Register(state, 327);
+        state.RegisterPetNameQuery(PetNumber, Corrected(328));
+
+        Assert.Equal(Corrected(328), state.TakePetNameQueryGuid(PetNumber));
+        Assert.Equal(Corrected(327), state.GetPetGuidByNumber(PetNumber));
+    }
+
+    [Fact]
+    public void PetNameQuery_IsConsumedOnce()
+    {
+        var state = NewState();
+        state.RegisterPetNameQuery(PetNumber, Stale(327));
+
+        Assert.Equal(Stale(327), state.TakePetNameQueryGuid(PetNumber));
+        Assert.Equal(default, state.TakePetNameQueryGuid(PetNumber));
+    }
+
+    [Fact]
+    public void RegisteredPet_ReverseResolvesToTheLegacyGuidTheServerKnows()
+    {
+        // Attack swings, selections and spell targets used to go out through the plain To64(),
+        // which leaves creature_template.entry in the entry slot. The legacy server keyed the pet
+        // by pet_number and looks units up by the whole guid, so nothing matched and AzerothCore
+        // answered the swing with SMSG_ATTACK_STOP.
+        var state = NewState();
+        Register(state, 327);
+
+        Assert.Equal(PetNumber, Corrected(327).To64(state).GetEntry());
+        Assert.Equal(CreatureEntry, Corrected(327).To64().GetEntry());
+    }
+
+    [Fact]
+    public void UnregisteredPet_ReverseResolvesToThePassThrough()
+    {
+        // TrinityCore-style backends never register (the entry slot already holds the creature
+        // entry), so the pass-through is the right answer there.
+        var state = NewState();
+
+        Assert.Equal(Corrected(327).To64(), Corrected(327).To64(state));
+    }
+
+    [Fact]
+    public void PetNameQuery_UnknownNumber_ResolvesToNothing()
+    {
+        var state = NewState();
+
+        Assert.Equal(default, state.TakePetNameQueryGuid(PetNumber));
     }
 }

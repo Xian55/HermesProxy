@@ -51,7 +51,7 @@ public static class MiscSystem
     public static void HandleSetSelection(in SetSelection selection, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_SELECTION);
-        packet.WriteGuid(selection.TargetGUID.To64());
+        packet.WriteGuid(selection.TargetGUID.To64(ctx.GetSession().GameState));
         ctx.SendPacketToServer(packet);
     }
 

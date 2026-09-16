@@ -165,6 +165,38 @@ public class MeleeAttackOrderTests
     }
 
     [Fact]
+    public void ServerRefusedTheSwing_DoesNotLatchTheTarget()
+    {
+        // AzerothCore answers an attack on a unit it cannot find with SendAttackStop(nullptr), which
+        // carries no victim. Treating that as "a stop for some other target" left the pet latched in
+        // CurrentAttackTarget, so the player could never swing at it again through the proxy.
+        var s = new Session();
+        MeleeAttackOrder.Swing(s.State, s.ToServer, Wolf);
+
+        MeleeAttackOrder.ServerStopped(s.State, s.ToServer, default);
+        Assert.True(s.State.CurrentAttackTarget.IsEmpty());
+
+        MeleeAttackOrder.Swing(s.State, s.ToServer, Wolf);
+        Assert.Equal([SwingOpcode, SwingOpcode], s.Sent);
+    }
+
+    [Fact]
+    public void ServerRefusedTheSwing_AnswersAHeldStop()
+    {
+        // The refusal is also the answer to the swing, so a stop waiting on the gate must go out
+        // rather than sit there until the 2 s timeout.
+        var s = new Session();
+        MeleeAttackOrder.Swing(s.State, s.ToServer, Wolf);
+        MeleeAttackOrder.Stop(s.State, s.ToServer);
+        Assert.Equal([SwingOpcode], s.Sent);
+
+        MeleeAttackOrder.ServerStopped(s.State, s.ToServer, default);
+
+        Assert.Equal([SwingOpcode, StopOpcode], s.Sent);
+        Assert.Equal(0, s.ToServer.PendingCount);
+    }
+
+    [Fact]
     public void CombatCancelled_DropsTheHeldStop_AndReopens()
     {
         var s = new Session();

@@ -3,6 +3,7 @@ using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Outbox;
 using HermesProxy.World.Server.Packets;
@@ -947,10 +948,19 @@ public partial class WorldClient
     internal void HandleQueryPetNameResponse(WorldPacket packet)
     {
         uint petNumber = packet.ReadUInt32();
-        WowGuid128 guid = GetSession().GameState.GetPetGuidByNumber(petNumber);
+        var gameState = GetSession().GameState;
+
+        // Every response answers a request we sent and echoes that request's pet_number, so the
+        // pending registration names the exact guid the client asked about. The create-time
+        // registration is only a fallback: it holds the last spawn seen for the number, which is
+        // not necessarily the spawn being asked about.
+        WowGuid128 guid = gameState.TakePetNameQueryGuid(petNumber);
+        if (guid == default)
+            guid = gameState.GetPetGuidByNumber(petNumber);
+
         if (guid == default)
         {
-            Log.Print(LogType.Error, $"Pet name query response for unknown pet {petNumber}!");
+            WorldClientLogMessages.PetNameResponseUnmatched(_melLog, _sourceFile, _netDirRecv, petNumber);
             return;
         }
 
@@ -959,8 +969,12 @@ public partial class WorldClient
         response.Name = packet.ReadCString();
         if (response.Name.Length == 0)
         {
+            // The legacy server could not find the pet, and says so with an empty name
+            // (AzerothCore and cMaNGOS both answer that way). Native 3.4.3 answers the same case
+            // with Allow=false, so forward it: a dropped answer leaves the client re-asking about
+            // that pet every 25 seconds for the rest of the session.
             response.Allow = false;
-            packet.ReadBytes(7); // 0s
+            SendPacketToClient(response);
             return;
         }
 

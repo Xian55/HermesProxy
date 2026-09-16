@@ -287,4 +287,19 @@ internal static partial class WorldClientLogMessages
         TradeStatus Status,
         string? Player,
         bool HadSession);
+
+    /// <summary>
+    /// A pet name response whose pet_number matches neither a request we sent nor a registered
+    /// pet. Debug rather than Error: the client re-asks about a nameless pet every 25 seconds, so
+    /// an unroutable answer repeats for the rest of the session (issue #299).
+    /// </summary>
+    [LoggerMessage(
+        EventId = 224,
+        Level = LogLevel.Debug,
+        Message = "Pet name response for pet_number {PetNumber} matched no pending query or registered pet.")]
+    public static partial void PetNameResponseUnmatched(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        uint PetNumber);
 }

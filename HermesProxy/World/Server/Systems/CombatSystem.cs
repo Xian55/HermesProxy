@@ -14,7 +14,10 @@ public static class CombatSystem
     public static void HandleAttackSwing(in AttackSwing attack, in SessionContext ctx)
     {
         var session = ctx.GetSession();
-        MeleeAttackOrder.Swing(session.GameState, session.ToServer, attack.Victim.To64());
+        // Session-aware To64: a pet's modern guid carries creature_template.entry, but the legacy
+        // server keyed it by pet_number and looks the unit up by the whole guid. Plain To64 sends
+        // an entry slot no unit matches, and the swing comes back as SMSG_ATTACK_STOP.
+        MeleeAttackOrder.Swing(session.GameState, session.ToServer, attack.Victim.To64(session.GameState));
     }
 
     [HandlesCmsg(Opcode.CMSG_ATTACK_STOP)]

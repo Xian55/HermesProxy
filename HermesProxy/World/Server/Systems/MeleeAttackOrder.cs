@@ -68,8 +68,11 @@ internal static class MeleeAttackOrder
     /// <summary><c>SMSG_ATTACK_STOP</c> for the player.</summary>
     public static void ServerStopped(GameSessionData state, ServerOutbox toServer, WowGuid64 victim)
     {
-        // A stop for a target we already switched away from answers nothing about the new swing.
-        if (!state.CurrentAttackTarget.IsEmpty() && state.CurrentAttackTarget != victim)
+        // A stop with no victim is the server refusing the swing rather than reporting on a target:
+        // AzerothCore answers an unknown attack target that way (SendAttackStop(nullptr) writes only
+        // the attacker). It has to fall through, or the refusal latches CurrentAttackTarget and every
+        // later swing at that unit is dropped below as a repeat of an attack that never started.
+        if (!victim.IsEmpty() && !state.CurrentAttackTarget.IsEmpty() && state.CurrentAttackTarget != victim)
             return;
 
         // Forget the target, or attacking it again would be dropped as a repeat of this attack.

@@ -61,7 +61,8 @@ public static class PetSystem
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_ACTION);
         packet.WriteGuid(act.PetGUID.To64(ctx.GetSession().GameState));
         packet.WriteUInt32(legacyAction);
-        packet.WriteGuid(act.TargetGUID.To64());
+        // The target can itself be a pet, so it needs the same reverse-resolution as PetGUID.
+        packet.WriteGuid(act.TargetGUID.To64(ctx.GetSession().GameState));
         ctx.SendPacketToServer(packet);
     }
 

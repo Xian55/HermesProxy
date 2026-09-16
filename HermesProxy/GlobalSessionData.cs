@@ -506,6 +506,12 @@ public sealed class GameSessionData
     public Dictionary<WowGuid64, uint> PetRealEntryByLegacyGuid = [];
     public Dictionary<WowGuid128, WowGuid64> PetLegacyGuidByModern = [];
     public Dictionary<uint, WowGuid128> PetModernGuidByNumber = [];
+    // SMSG_QUERY_PET_NAME_RESPONSE identifies the pet only by the pet_number the request carried
+    // (AzerothCore, cMaNGOS and VMaNGOS all echo it straight back), and every response answers a
+    // request we sent. Remembering which modern guid each outgoing number stood for is what makes
+    // the response routable even when the pet's create has not registered that number yet, which
+    // is every pet on a fresh GameState (issue #299).
+    public Dictionary<uint, WowGuid128> PetNameQueryGuidByNumber = [];
     // GUIDs for which we've successfully forwarded a modern CreateObject to the V3_4_3
     // client. Used by the Values-update filter so we don't ship deltas for objects the
     // client doesn't have in its world model — those would round-trip as
@@ -1664,6 +1670,26 @@ public sealed class GameSessionData
             PetRealEntryByLegacyGuid[legacyGuid] = realEntry;
             PetLegacyGuidByModern[modernGuid] = legacyGuid;
             PetModernGuidByNumber[petNumber] = modernGuid;
+        }
+    }
+
+    public void RegisterPetNameQuery(uint petNumber, WowGuid128 modernGuid)
+    {
+        AssertObjectCacheOwner();
+        lock (ObjectCacheLock)
+        {
+            PetNameQueryGuidByNumber[petNumber] = modernGuid;
+        }
+    }
+
+    // Consumes the registration. The client re-asks (and so re-registers) for as long as it still
+    // needs the name, so keeping answered entries would only grow the map.
+    public WowGuid128 TakePetNameQueryGuid(uint petNumber)
+    {
+        AssertObjectCacheOwner();
+        lock (ObjectCacheLock)
+        {
+            return PetNameQueryGuidByNumber.Remove(petNumber, out var guid) ? guid : default;
         }
     }
 

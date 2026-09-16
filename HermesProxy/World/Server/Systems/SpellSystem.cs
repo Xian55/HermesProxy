@@ -242,7 +242,7 @@ public static class SpellSystem
         packet.WriteUInt32(cast.Cast.SpellID);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             packet.WriteUInt8((byte)cast.Cast.SendCastFlags);
-        WriteSpellTargets(cast.Cast.Target, targetFlags, packet);
+        WriteSpellTargets(cast.Cast.Target, targetFlags, packet, ctx.GetSession().GameState);
         WriteClientCastFlagsTrailer(cast.Cast.SendCastFlags, cast.Cast.MissileTrajectory, packet);
         ctx.SendPacketToServer(packet);
     }
@@ -304,7 +304,7 @@ public static class SpellSystem
             packet.WriteUInt8((byte)use.Cast.SendCastFlags);
         }
         SpellCastTargetFlags targetFlags = ConvertSpellTargetFlags(use.Cast.Target);
-        WriteSpellTargets(use.Cast.Target, targetFlags, packet);
+        WriteSpellTargets(use.Cast.Target, targetFlags, packet, ctx.GetSession().GameState);
         WriteClientCastFlagsTrailer(use.Cast.SendCastFlags, use.Cast.MissileTrajectory, packet);
         ctx.SendPacketToServer(packet);
     }
@@ -384,7 +384,7 @@ public static class SpellSystem
         ctx.SendPacketToServer(packet);
     }
 
-    static void WriteSpellTargets(SpellTargetData target, SpellCastTargetFlags targetFlags, WorldPacket packet)
+    static void WriteSpellTargets(SpellTargetData target, SpellCastTargetFlags targetFlags, WorldPacket packet, GameSessionData state)
     {
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
             packet.WriteUInt16((ushort)targetFlags);
@@ -393,7 +393,12 @@ public static class SpellSystem
 
         if (targetFlags.HasAnyFlag(SpellCastTargetFlags.Unit | SpellCastTargetFlags.CorpseEnemy | SpellCastTargetFlags.GameObject |
             SpellCastTargetFlags.CorpseAlly | SpellCastTargetFlags.UnitMinipet))
-            packet.WritePackedGuid(target.Unit.To64());
+        {
+            // Session-aware: a pet's modern guid carries creature_template.entry while the legacy
+            // server keyed the unit by pet_number, so a plain To64 names no unit and the cast is
+            // rejected as an unknown target.
+            packet.WritePackedGuid(target.Unit.To64(state));
+        }
 
         // Check if the user wants to target the "Will not be traded" slot
         if (targetFlags.HasFlag(SpellCastTargetFlags.TradeItem) && target.Item == WowGuid128.Create(HighGuidType703.Uniq, 10))
@@ -474,7 +479,7 @@ public static class SpellSystem
         {
             World.Logging.SpellLogMessages.LegacyCastForwarded(
                 _melSpellServerLog, cast.SpellID, spellId,
-                (uint)cast.Target.Flags, (uint)targetFlags, cast.Target.Unit.To64().GetLowValue());
+                (uint)cast.Target.Flags, (uint)targetFlags, cast.Target.Unit.To64(ctx.GetSession().GameState).GetLowValue());
         }
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CAST_SPELL);
@@ -493,7 +498,7 @@ public static class SpellSystem
             packet.WriteUInt32(spellId);
             packet.WriteUInt8((byte)cast.SendCastFlags);
         }
-        WriteSpellTargets(cast.Target, targetFlags, packet);
+        WriteSpellTargets(cast.Target, targetFlags, packet, ctx.GetSession().GameState);
         WriteClientCastFlagsTrailer(cast.SendCastFlags, cast.MissileTrajectory, packet);
         ctx.SendPacketToServer(packet);
     }
@@ -536,7 +541,7 @@ public static class SpellSystem
         packet.WriteUInt32(0); // glyphIndex — Misc[0] is the toy item id on CMSG_USE_TOY
         packet.WriteUInt8((byte)cast.SendCastFlags);
         SpellCastTargetFlags targetFlags = ConvertSpellTargetFlags(cast.Target);
-        WriteSpellTargets(cast.Target, targetFlags, packet);
+        WriteSpellTargets(cast.Target, targetFlags, packet, ctx.GetSession().GameState);
         WriteClientCastFlagsTrailer(cast.SendCastFlags, cast.MissileTrajectory, packet);
         ctx.SendPacketToServer(packet);
     }

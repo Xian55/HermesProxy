@@ -286,7 +286,7 @@ public static class ChatSystem
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SEND_TEXT_EMOTE);
         packet.WriteInt32(emote.EmoteID);
         packet.WriteInt32(emote.SoundIndex);
-        packet.WriteGuid(emote.Target.To64());
+        packet.WriteGuid(emote.Target.To64(ctx.GetSession().GameState));
         ctx.SendPacketToServer(packet);
     }
 
