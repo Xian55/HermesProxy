@@ -2238,6 +2238,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.GroupSystem.HandleSetPartyLeader(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleSetPlayerDeclinedNames_CMSG_SET_PLAYER_DECLINED_NAMES(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.SetPlayerDeclinedNamesCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CharacterSystem.HandleSetPlayerDeclinedNames(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleSetPvP_CMSG_SET_PVP(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.SetPvPCodec.Read(ref reader, out var packet);
@@ -3024,6 +3030,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_FACTION_NOT_AT_WAR] = &Thunk_HermesProxy_World_Server_Systems_ReputationSystem_HandleSetFactionNotAtWar_CMSG_SET_FACTION_NOT_AT_WAR;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_LOOT_METHOD] = &Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleSetLootMethod_CMSG_SET_LOOT_METHOD;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_PARTY_LEADER] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleSetPartyLeader_CMSG_SET_PARTY_LEADER;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_PLAYER_DECLINED_NAMES] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleSetPlayerDeclinedNames_CMSG_SET_PLAYER_DECLINED_NAMES;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_PVP] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleSetPvP_CMSG_SET_PVP;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_RAID_DIFFICULTY] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleSetRaidDifficulty_CMSG_SET_RAID_DIFFICULTY;
         {
@@ -3425,6 +3432,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_FACTION_NOT_AT_WAR,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_LOOT_METHOD,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_PARTY_LEADER,
+            global::HermesProxy.World.Enums.Opcode.CMSG_SET_PLAYER_DECLINED_NAMES,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_PVP,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_RAID_DIFFICULTY,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_ROLE,

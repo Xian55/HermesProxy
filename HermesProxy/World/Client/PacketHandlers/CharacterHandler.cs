@@ -904,6 +904,17 @@ public partial class WorldClient
         SendPacketToClient(rename);
     }
 
+    // Result codes are the same two values on both eras, so this is a GUID width change and
+    // nothing else. The client will not leave the "updating character" spinner without it.
+    [HandlesSmsg(Opcode.SMSG_SET_PLAYER_DECLINED_NAMES_RESULT)]
+    internal void HandleSetPlayerDeclinedNamesResult(WorldPacket packet)
+    {
+        SetPlayerDeclinedNamesResult declined = new();
+        declined.ResultCode = packet.ReadInt32();
+        declined.Player = packet.ReadGuid().To128(GetSession().GameState);
+        SendPacketToClient(declined);
+    }
+
     // Synthesizes the canonical (MapId, ZoneId, Position) for a freshly-created
     // character when the legacy backend (e.g. cMangos) returns ZoneId=0/MapId=0
     // in SMSG_ENUM_CHARACTERS_RESULT. Without this, the V3_4_3 client rejects

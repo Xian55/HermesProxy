@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Framework.Constants;
 using Framework.IO;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
@@ -247,5 +249,25 @@ public static class CharacterRenameRequestCodec
         WowGuid128 guid = r.ReadPackedGuid128();
         string newName = r.ReadString(r.ReadBits<uint>(6));
         packet = new CharacterRenameRequest(guid, newName);
+    }
+}
+
+public static class SetPlayerDeclinedNamesCodec
+{
+    public static void Read(ref SpanPacketReader r, out SetPlayerDeclinedNames packet)
+    {
+        WowGuid128 player = r.ReadPackedGuid128();
+
+        // All five lengths precede all five strings — the client packs the bit fields together
+        // rather than interleaving them, so the loops cannot be merged.
+        Span<byte> lengths = stackalloc byte[GameLimits.MaxDeclinedNameCases];
+        for (int i = 0; i < GameLimits.MaxDeclinedNameCases; i++)
+            lengths[i] = r.ReadBits<byte>(7);
+
+        var names = new string[GameLimits.MaxDeclinedNameCases];
+        for (int i = 0; i < GameLimits.MaxDeclinedNameCases; i++)
+            names[i] = r.ReadString(lengths[i]);
+
+        packet = new SetPlayerDeclinedNames(player, names);
     }
 }

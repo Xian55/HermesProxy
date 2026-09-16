@@ -85,4 +85,14 @@ public static class GameLimits
     /// Maximum byte size for a chat message in UTF-8, worst case (255 chars * 2 bytes).
     /// </summary>
     public const int MaxChatMessageBytes = MaxChatMessageChars * 2;
+
+    /// <summary>
+    /// Number of grammatical cases a Russian client submits alongside a character name.
+    /// </summary>
+    /// <remarks>
+    /// Fixed at five on every build that has the feature — the count is not on the wire, both
+    /// sides just agree on it. Russian declines nouns through six cases; the nominative is the
+    /// character name itself, so only the remaining five travel.
+    /// </remarks>
+    public const int MaxDeclinedNameCases = 5;
 }

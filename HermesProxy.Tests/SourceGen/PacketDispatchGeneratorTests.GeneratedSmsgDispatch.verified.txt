@@ -1977,6 +1977,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleSetSpellModifier(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleSetPlayerDeclinedNamesResult_SMSG_SET_PLAYER_DECLINED_NAMES_RESULT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleSetPlayerDeclinedNamesResult(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleSetProficiency_SMSG_SET_PROFICIENCY(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleSetProficiency(packet);
@@ -2711,6 +2716,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SET_FLAT_SPELL_MODIFIER] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetSpellModifier_SMSG_SET_FLAT_SPELL_MODIFIER;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SET_FORCED_REACTIONS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetForcedReaction_SMSG_SET_FORCED_REACTIONS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SET_PCT_SPELL_MODIFIER] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetSpellModifier_SMSG_SET_PCT_SPELL_MODIFIER;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SET_PLAYER_DECLINED_NAMES_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetPlayerDeclinedNamesResult_SMSG_SET_PLAYER_DECLINED_NAMES_RESULT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SET_PROFICIENCY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetProficiency_SMSG_SET_PROFICIENCY;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SHOW_BANK] = &Thunk_HermesProxy_World_Client_WorldClient_HandleShowBank_SMSG_SHOW_BANK;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SHOW_TAXI_NODES] = &Thunk_HermesProxy_World_Client_WorldClient_HandleShowTaxiNodes_SMSG_SHOW_TAXI_NODES;
@@ -3152,6 +3158,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_SET_FLAT_SPELL_MODIFIER,
             global::HermesProxy.World.Enums.Opcode.SMSG_SET_FORCED_REACTIONS,
             global::HermesProxy.World.Enums.Opcode.SMSG_SET_PCT_SPELL_MODIFIER,
+            global::HermesProxy.World.Enums.Opcode.SMSG_SET_PLAYER_DECLINED_NAMES_RESULT,
             global::HermesProxy.World.Enums.Opcode.SMSG_SET_PROFICIENCY,
             global::HermesProxy.World.Enums.Opcode.SMSG_SHOW_BANK,
             global::HermesProxy.World.Enums.Opcode.SMSG_SHOW_TAXI_NODES,

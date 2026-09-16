@@ -471,6 +471,61 @@ public static class CharacterSystem
         ctx.SendPacketToServer(packet);
     }
 
+    /// <summary>
+    /// Forwards the five grammatical cases a Russian client submits for one of its characters.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The client only asks for these when the legacy server left <c>CharacterFlags.Declined</c>
+    /// clear in the character enumeration, which every backend does when the feature is on and
+    /// the character has no cases stored yet. Until the flags were passed through untouched the
+    /// question could not arise, so this path is new rather than previously broken.
+    /// </para>
+    /// <para>
+    /// Both known backends answer every rejection with a result packet, and the client keeps its
+    /// "updating character" spinner up until one arrives — so every early return here has to
+    /// produce one itself rather than dropping the submission.
+    /// </para>
+    /// </remarks>
+    [HandlesCmsg(Opcode.CMSG_SET_PLAYER_DECLINED_NAMES)]
+    public static void HandleSetPlayerDeclinedNames(in SetPlayerDeclinedNames declined, in SessionContext ctx)
+    {
+        // Vanilla predates the feature: the opcode is absent from the 1.12.1 table, and an
+        // unmapped name resolves to 0, which would put a nonsense opcode on the wire.
+        if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
+        {
+            SendDeclinedNamesResult(DeclinedNameResult.Error, declined.Player, ctx);
+            return;
+        }
+
+        // The legacy server compares this against its own copy and rejects the submission when
+        // the two differ. The modern packet does not carry it, so it comes from the cache the
+        // character enumeration filled; an empty name means we have no character by that GUID
+        // and the round trip can only end in the same rejection.
+        string name = ctx.GetSession().GameState.GetPlayerName(declined.Player);
+        if (string.IsNullOrEmpty(name))
+        {
+            SendDeclinedNamesResult(DeclinedNameResult.Error, declined.Player, ctx);
+            return;
+        }
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_PLAYER_DECLINED_NAMES);
+        packet.WriteGuid(declined.Player.To64());
+        packet.WriteCString(name);
+        for (int i = 0; i < declined.Names.Length; i++)
+            packet.WriteCString(declined.Names[i]);
+        ctx.SendPacketToServer(packet);
+    }
+
+    private static void SendDeclinedNamesResult(DeclinedNameResult result, WowGuid128 player, in SessionContext ctx)
+    {
+        ctx.SendPacketToClient(new SetPlayerDeclinedNamesResult
+        {
+            ResultCode = (int)result,
+            Player = player
+        });
+    }
+
     private static string DescribeActionButtonSlot(byte idx) => idx switch
     {
         < 12  => $"MainBar btn{idx + 1}",

@@ -1684,3 +1684,28 @@ public class CharacterRenameResult : ServerPacket, ISpanWritable
     public byte Result = 0;
     public WowGuid128 Guid;
 }
+
+/// <summary>
+/// The five grammatical cases a Russian client submits for one of its characters.
+/// </summary>
+/// <remarks>
+/// The modern packet carries only the GUID and the cases; the legacy server additionally wants
+/// the character's current name, which it compares against its own copy before accepting. That
+/// name comes out of the session's player cache on the way through — see
+/// <c>CharacterSystem.HandleSetPlayerDeclinedNames</c>.
+/// </remarks>
+public readonly record struct SetPlayerDeclinedNames(WowGuid128 Player, string[] Names);
+
+public class SetPlayerDeclinedNamesResult : ServerPacket
+{
+    public SetPlayerDeclinedNamesResult() : base(Opcode.SMSG_SET_PLAYER_DECLINED_NAMES_RESULT) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt32(ResultCode);
+        _worldPacket.WritePackedGuid128(Player);
+    }
+
+    public int ResultCode;
+    public WowGuid128 Player;
+}
