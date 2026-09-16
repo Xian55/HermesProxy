@@ -58,8 +58,18 @@ public partial class WorldClient
     internal void HandleActivateTaxiReply(WorldPacket packet)
     {
         ActivateTaxiReply reply = (ActivateTaxiReply)packet.ReadUInt32();
-        // Ok status needs to be sent after the monster move packet.
-        if (reply != ActivateTaxiReply.Ok)
+
+        // V1_14 / V2_5 hold the Ok back until HandleMonsterMove has replayed the taxi-start
+        // sequence, which ends by sending this reply itself.
+        //
+        // V3_4_3 sends it straight through instead, because that is what a native 3.4.3 server
+        // does: Player::ActivateTaxiPathTo calls SendActivateTaxiReply(ERR_TAXIOK) and only then
+        // SendDoFlight, so the reply precedes SMSG_ON_MONSTER_MOVE on the wire. Confirmed against a
+        // Wrathion capture (2026-09-16): reply, collision height, spline, Values — and no
+        // SMSG_CONTROL_UPDATE anywhere in the session. Sending it here also means a taxi activation
+        // is always resolved, so IsWaitingForTaxiStart can never go stale waiting for a spline
+        // whose flags the proxy failed to recognise (#301).
+        if (reply != ActivateTaxiReply.Ok || ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
         {
             ActivateTaxiReplyPkt taxi = new();
             taxi.Reply = reply;

@@ -1708,14 +1708,16 @@ public partial class WorldClient
                     monsterMove.TransportGuid = moveInfo.TransportGuid;
                 monsterMove.TransportSeat = moveInfo.TransportSeat;
 
-                bool hasTaxiFlightFlags;
+                bool isFlyingSpline;
+                bool isSmoothSpline;
                 monsterMove.SplineFlags = SplineFlagModern.None;
                 monsterMove.SplineType = SplineTypeModern.None;
                 if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 {
                     SplineFlagWotLK splineFlags = (SplineFlagWotLK)packet.ReadUInt32();
                     monsterMove.SplineFlags = splineFlags.CastFlags<SplineFlagModern>();
-                    hasTaxiFlightFlags = splineFlags == (SplineFlagWotLK.WalkMode | SplineFlagWotLK.Flying);
+                    isFlyingSpline = SplineFlagTranslation.IsServerFlight(splineFlags);
+                    isSmoothSpline = SplineFlagTranslation.IsSmoothPath(splineFlags);
 
                     if (splineFlags.HasAnyFlag(SplineFlagWotLK.FinalTarget))
                     {
@@ -1738,7 +1740,8 @@ public partial class WorldClient
                 {
                     SplineFlagTBC splineFlags = (SplineFlagTBC)packet.ReadUInt32();
                     monsterMove.SplineFlags = splineFlags.CastFlags<SplineFlagModern>();
-                    hasTaxiFlightFlags = splineFlags == (SplineFlagTBC.Runmode | SplineFlagTBC.Flying);
+                    isFlyingSpline = SplineFlagTranslation.IsServerFlight(splineFlags);
+                    isSmoothSpline = SplineFlagTranslation.IsSmoothPath(splineFlags);
 
                     if (splineFlags.HasAnyFlag(SplineFlagTBC.FinalTarget))
                     {
@@ -1761,7 +1764,8 @@ public partial class WorldClient
                 {
                     SplineFlagVanilla splineFlags = (SplineFlagVanilla)packet.ReadUInt32();
                     monsterMove.SplineFlags = splineFlags.CastFlags<SplineFlagModern>();
-                    hasTaxiFlightFlags = splineFlags == (SplineFlagVanilla.Runmode | SplineFlagVanilla.Flying);
+                    isFlyingSpline = SplineFlagTranslation.IsServerFlight(splineFlags);
+                    isSmoothSpline = SplineFlagTranslation.IsSmoothPath(splineFlags);
 
                     if (splineFlags.HasAnyFlag(SplineFlagVanilla.FinalTarget))
                     {
@@ -1781,7 +1785,17 @@ public partial class WorldClient
                     }
                 }
 
-                if (hasTaxiFlightFlags && guid.IsPlayer() &&
+                // Same smooth-path translation as MovementHandler.HandleMonsterMove.
+                if (isSmoothSpline)
+                    monsterMove.SplineFlags |= SplineFlagModern.CatmullRom;
+
+                // V3_4_3 excluded for the same reason as the taxi branch in
+                // MovementHandler.HandleMonsterMove: a native 3.4.3 taxi spline carries
+                // Flying|Catmullrom|CanSwim|UncompressedPath and nothing else, so the translated
+                // flags are already the right shape and this decoration would only add flags the
+                // 3.4.3 client lists under Mask_Unused.
+                if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261 &&
+                    isFlyingSpline && guid.IsPlayer() &&
                     flags.HasAnyFlag(UpdateFlag.Self))
                 {
                     // Same modern Classic decoration as MovementHandler.HandleMonsterMove — universal
@@ -2951,6 +2965,7 @@ public partial class WorldClient
                     control.HasControl = true;
                     SendPacketToClient(control);
                     GetSession().GameState.IsInTaxiFlight = false;
+                    GetSession().GameState.IsWaitingForTaxiStart = false;
                 }
             }
             int UNIT_FIELD_FLAGS_2 = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_FLAGS_2);

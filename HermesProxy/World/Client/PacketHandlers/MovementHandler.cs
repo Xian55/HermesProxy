@@ -113,14 +113,22 @@ public partial class WorldClient
     {
         WowGuid128 guid = packet.ReadPackedGuid().To128(GetSession().GameState);
 
-        if (GetSession().GameState.IsInTaxiFlight &&
-            GetSession().GameState.CurrentPlayerGuid == guid)
+        if (GetSession().GameState.CurrentPlayerGuid == guid)
         {
-            ControlUpdate control = new ControlUpdate();
-            control.Guid = guid;
-            control.HasControl = true;
-            SendPacketToClient(control);
-            GetSession().GameState.IsInTaxiFlight = false;
+            if (GetSession().GameState.IsInTaxiFlight)
+            {
+                ControlUpdate control = new ControlUpdate();
+                control.Guid = guid;
+                control.HasControl = true;
+                SendPacketToClient(control);
+                GetSession().GameState.IsInTaxiFlight = false;
+            }
+
+            // A taxi start that never materialised cannot arrive after the player has been moved
+            // somewhere else. Leaving the flag set turns the next server-driven flying spline for
+            // this player into a bogus taxi start, complete with two stop splines and a
+            // CONTROL_UPDATE that takes control away for good.
+            GetSession().GameState.IsWaitingForTaxiStart = false;
         }
 
         MoveTeleport teleport = new MoveTeleport();
@@ -229,6 +237,8 @@ public partial class WorldClient
         teleport.Orientation = packet.ReadFloat();
         teleport.Reason = 4;
         GetSession().GameState.IsFirstEnterWorld = false;
+        // Same reasoning as HandleMoveTeleportAck: a map change ends any pending taxi start.
+        GetSession().GameState.IsWaitingForTaxiStart = false;
 
         if (GetSession().GameState.IsWaitingForNewWorld)
         {
@@ -498,14 +508,14 @@ public partial class WorldClient
         bool hasAnimTier;
         bool hasTrajectory;
         bool hasCatmullRom;
-        bool hasTaxiFlightFlags;
+        bool isFlyingSpline;
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
             var splineFlags = (SplineFlagVanilla)packet.ReadUInt32();
             hasAnimTier = false;
             hasTrajectory = false;
-            hasCatmullRom = splineFlags.HasAnyFlag(SplineFlagVanilla.Flying);
-            hasTaxiFlightFlags = splineFlags == (SplineFlagVanilla.Runmode | SplineFlagVanilla.Flying);
+            hasCatmullRom = SplineFlagTranslation.IsSmoothPath(splineFlags);
+            isFlyingSpline = SplineFlagTranslation.IsServerFlight(splineFlags);
 
             if (splineFlags == SplineFlagVanilla.Runmode) // Default spline flags used by Vanilla and TBC servers
             {
@@ -527,8 +537,8 @@ public partial class WorldClient
             var splineFlags = (SplineFlagTBC)packet.ReadUInt32();
             hasAnimTier = false;
             hasTrajectory = false;
-            hasCatmullRom = splineFlags.HasAnyFlag(SplineFlagTBC.Flying);
-            hasTaxiFlightFlags = splineFlags == (SplineFlagTBC.Runmode | SplineFlagTBC.Flying);
+            hasCatmullRom = SplineFlagTranslation.IsSmoothPath(splineFlags);
+            isFlyingSpline = SplineFlagTranslation.IsServerFlight(splineFlags);
 
             if (splineFlags == SplineFlagTBC.Runmode) // Default spline flags used by Vanilla and TBC servers
             {
@@ -548,8 +558,8 @@ public partial class WorldClient
             var splineFlags = (SplineFlagWotLK)packet.ReadUInt32();
             hasAnimTier = splineFlags.HasAnyFlag(SplineFlagWotLK.AnimationTier);
             hasTrajectory = splineFlags.HasAnyFlag(SplineFlagWotLK.Trajectory);
-            hasCatmullRom = splineFlags.HasAnyFlag(SplineFlagWotLK.Flying | SplineFlagWotLK.CatmullRom);
-            hasTaxiFlightFlags = splineFlags == (SplineFlagWotLK.WalkMode | SplineFlagWotLK.Flying);
+            hasCatmullRom = SplineFlagTranslation.IsSmoothPath(splineFlags);
+            isFlyingSpline = SplineFlagTranslation.IsServerFlight(splineFlags);
             moveSpline.SplineFlags = splineFlags.CastFlags<SplineFlagModern>();
         }
 
@@ -576,7 +586,10 @@ public partial class WorldClient
                 Vector3 vec = packet.ReadVector3();
                 moveSpline.SplinePoints.Add(vec);
             }
-            moveSpline.SplineFlags |= SplineFlagModern.UncompressedPath;
+            // CatmullRom is what makes the modern client interpolate the path instead of flying
+            // straight at each waypoint and snapping its facing on arrival — see
+            // SplineFlagTranslation.
+            moveSpline.SplineFlags |= SplineFlagModern.UncompressedPath | SplineFlagModern.CatmullRom;
         }
         else
         {
@@ -597,7 +610,20 @@ public partial class WorldClient
             }
         }
 
-        bool isTaxiFlight = (hasTaxiFlightFlags &&
+        // A taxi start is any server-driven flying spline for the player while a taxi activation is
+        // outstanding, or right after the player create, which is how a flight resumed at login
+        // arrives. SplineFlagTranslation explains why the flag test is a Flying probe and not the
+        // exact `WalkMode | Flying` match it used to be.
+        //
+        // V3_4_3 is excluded because the sequence below is not what a 3.4.3 server sends. A native
+        // capture of a full flight (Wrathion, 2026-09-16) contains no stop splines and not one
+        // SMSG_CONTROL_UPDATE: the client is put under server control by UNIT_FIELD_FLAGS gaining
+        // DisableMove|TaxiFlight, which AzerothCore and TrinityCore both set and the proxy already
+        // forwards, and released when those bits clear at landing. Forwarding the spline as-is is
+        // also what already happens on AzerothCore today, where flights work — the exact-match flag
+        // test never fired there, which is how #301 was found.
+        bool isTaxiFlight = (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261 &&
+                             isFlyingSpline &&
                             (GetSession().GameState.IsWaitingForTaxiStart ||
                              Math.Abs(packet.GetReceivedTime() - GetSession().GameState.CurrentPlayerCreateTime) <= 1000) &&
                              GetSession().GameState.CurrentPlayerGuid == guid);
