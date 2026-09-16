@@ -4,6 +4,7 @@ using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server.Packets;
 using System;
 
@@ -11,6 +12,47 @@ namespace HermesProxy.World.Client;
 
 public partial class WorldClient
 {
+    /// <summary>
+    /// A speed change aimed at the player's own guid, held until the client has the player object.
+    /// </summary>
+    /// <remarks>
+    /// Same window as the held player Values (issue #300), one packet class further out. The server
+    /// applies the mount's speed while the player's create is still waiting on item templates; the
+    /// client cannot apply a speed change for an object it does not have, drops it, and nothing
+    /// re-sends it — so a character who logged in mounted rode at walking speed. The dropped
+    /// packet is visible in a capture as the one SMSG_MOVE_SET_RUN_SPEED with no
+    /// CMSG_MOVE_FORCE_RUN_SPEED_CHANGE_ACK behind it.
+    /// </remarks>
+    private static readonly HoldKey PlayerMoveSpeedKey = new(HoldKeyKind.PlayerMoveSpeed);
+
+    // Discarded rather than released on timeout: a speed for a guid the client never got is
+    // answered with nothing at best, and the create it belongs to is long gone.
+    private static readonly HoldOptions PlayerMoveSpeedHold = new(
+        Timeout: TimeSpan.FromSeconds(20),
+        OnTimeout: OutboxTimeoutAction.Discard,
+        Key: PlayerMoveSpeedKey);
+
+    /// <summary>
+    /// Sends a movement packet aimed at <paramref name="moverGuid"/>, or holds it when that is the
+    /// player and the client does not have the player object yet.
+    /// </summary>
+    void SendPlayerMovementPacket(ServerPacket packet, WowGuid128 moverGuid)
+    {
+        var session = GetSession();
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261 ||
+            moverGuid != session.GameState.CurrentPlayerGuid ||
+            session.GameState.ClientKnownGuids.Contains(moverGuid))
+        {
+            SendPacketToClient(packet);
+            return;
+        }
+
+        World.Logging.ObjectLifecycleLogMessages.PlayerMovementHeld(
+            _melObjLifeClient, moverGuid.Low, moverGuid.High,
+            packet.GetUniversalOpcode().ToString(), "player-create-pending");
+        session.ToClient.When(OutboxEvent.GuidKnown(moverGuid), packet, PlayerMoveSpeedHold);
+    }
+
     // Handlers for SMSG opcodes coming the legacy world server
     [HandlesSmsg(Opcode.MSG_MOVE_START_FORWARD)]
     [HandlesSmsg(Opcode.MSG_MOVE_START_BACKWARD)]
@@ -252,11 +294,15 @@ public partial class WorldClient
             // which come straight back as CMSG_OBJECT_UPDATE_FAILED. Observed as a player
             // Values sent in the gap between the teleport and the re-create.
             // Pet batches held for the old map's player would otherwise go out after the new map's
-            // player create, ahead of the server's fresh creates for the same pets.
+            // player create, ahead of the server's fresh creates for the same pets. Player Values
+            // held for the old map go the same way: the server re-sends the player's whole state
+            // in the new map's create, so a delta read against the old one is stale.
             if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
             {
                 GetSession().GameState.ClientKnownGuids.Clear();
                 GetSession().ToClient.Cancel(HeldPetUpdateBatch.Key);
+                GetSession().ToClient.Cancel(HeldPlayerValues.Key);
+                GetSession().ToClient.Cancel(PlayerMoveSpeedKey);
             }
 
             SendPacketToClient(teleport);
@@ -334,7 +380,7 @@ public partial class WorldClient
         }
 
         speed.Speed = packet.ReadFloat();
-        SendPacketToClient(speed);
+        SendPlayerMovementPacket(speed, speed.MoverGUID);
 
         // Convenience in vanilla to use SwimSpeed as FlySpeed
         if (universalOpcode is Opcode.SMSG_MOVE_SET_SWIM_SPEED
@@ -346,7 +392,7 @@ public partial class WorldClient
             flySpeed.MoverGUID = speed.MoverGUID;
             flySpeed.MoveCounter = speed.MoveCounter;
             flySpeed.Speed = speed.Speed;
-            SendPacketToClient(flySpeed);
+            SendPlayerMovementPacket(flySpeed, flySpeed.MoverGUID);
         }
     }
 

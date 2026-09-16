@@ -74,4 +74,19 @@ internal static partial class ObjectLifecycleLogMessages
         Message = "[ObjLife] corpse recreate skipped guidLow={GuidLow} guidHigh={GuidHigh} reason={Reason}")]
     public static partial void CorpseRecreateSkipped(
         ILogger logger, ulong guidLow, ulong guidHigh, string reason);
+
+    [LoggerMessage(
+        EventId = 908,
+        Level = LogLevel.Trace,
+        Message = "[ObjLife] player values held guidLow={GuidLow} guidHigh={GuidHigh} entries={Entries} reason={Reason}")]
+    public static partial void PlayerValuesHeld(
+        ILogger logger, ulong guidLow, ulong guidHigh, int entries, string reason);
+
+    [LoggerMessage(
+        EventId = 909,
+        Level = LogLevel.Trace,
+        Message = "[ObjLife] player movement held guidLow={GuidLow} guidHigh={GuidHigh} opcode={Opcode} reason={Reason}")]
+    public static partial void PlayerMovementHeld(
+        ILogger logger, ulong guidLow, ulong guidHigh, string opcode, string reason);
+
 }

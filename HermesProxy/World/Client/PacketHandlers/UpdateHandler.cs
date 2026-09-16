@@ -123,6 +123,37 @@ public partial class WorldClient
             Key: Key);
     }
 
+    /// <summary>
+    /// A V3_4_3 <c>SMSG_UPDATE_OBJECT</c> carrying only the player's own Values, which arrived while
+    /// the client did not have the player object yet: at login its create is still held for item
+    /// templates (issue #34), and at a teleport the client is between <c>SMSG_NEW_WORLD</c> and the
+    /// re-create. These used to be stripped, which lost whatever state they carried — a new
+    /// warrior's Battle Stance, so the client showed the empty non-stance action bar, and a
+    /// mounted login's MountDisplayID, so the character rode nothing (issue #300).
+    /// </summary>
+    private sealed record HeldPlayerValues(UpdateObject UpdateObject)
+    {
+        public static readonly HoldKey Key = new(HoldKeyKind.PlayerValuesBatch);
+
+        // Longer than the deferred player batch's 10 s, so a create that only goes out on that
+        // timeout still gets its Values. Discarded rather than released when it expires: Values
+        // for a guid the client never received come straight back as CMSG_OBJECT_UPDATE_FAILED.
+        public static readonly HoldOptions Hold = new(
+            Timeout: TimeSpan.FromSeconds(20),
+            OnTimeout: OutboxTimeoutAction.Discard,
+            Key: Key);
+    }
+
+    /// <summary>Takes every held player-Values batch, oldest first, so the caller can send them itself.</summary>
+    private static List<UpdateObject> ClaimHeldPlayerValues(GlobalSessionData session)
+    {
+        List<UpdateObject> batches = [];
+        while (session.ToClient.Peek<HeldPlayerValues>(HeldPlayerValues.Key) is { } held &&
+               session.ToClient.Claim(HeldPlayerValues.Key, held))
+            batches.Add(held.UpdateObject);
+        return batches;
+    }
+
     /// <summary>Takes every held pet batch, oldest first, so the caller can send them itself.</summary>
     private static List<UpdateObject> ClaimHeldPetUpdateBatches(GlobalSessionData session)
     {
@@ -862,6 +893,37 @@ public partial class WorldClient
     }
 
     /// <summary>
+    /// Sends the packet carrying the player's own Values, or holds it until the client has the
+    /// player object. <see cref="UpdateObject.FilterV3_4_3Values"/> deliberately does not strip
+    /// these for an unknown guid, so this is the one place that decides what happens to an update
+    /// that lands while the player's create is still on its way (issue #300).
+    /// </summary>
+    void SendPlayerValuesUpdate(UpdateObject playerValues)
+    {
+        var session = GetSession();
+        WowGuid128 playerGuid = session.GameState.CurrentPlayerGuid;
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261 ||
+            session.GameState.ClientKnownGuids.Contains(playerGuid))
+        {
+            SendPacketToClient(playerValues);
+            return;
+        }
+
+        // Released by the GuidKnown notify at the end of this method's own batch path and by
+        // QueryHandler.FlushDeferredUpdate, both of which run after the create has been sent.
+        // Several of these can pile up during one hold; they share a key and the outbox releases
+        // them in registration order, so the client sees them in the order the server sent them.
+        World.Logging.ObjectLifecycleLogMessages.PlayerValuesHeld(
+            _melObjLifeClient, playerGuid.Low, playerGuid.High, playerValues.ObjectUpdates.Count,
+            "player-create-pending");
+        session.ToClient.When(
+            OutboxEvent.GuidKnown(playerGuid),
+            new HeldPlayerValues(playerValues),
+            held => SendPacketToClient(held.UpdateObject),
+            HeldPlayerValues.Hold);
+    }
+
+    /// <summary>
     /// The half of <see cref="HandleUpdateObject"/> after the batch is read and any hold decided:
     /// filters, splits and sends it, then whatever has to follow it. Also sends a held pet batch.
     /// </summary>
@@ -1030,7 +1092,7 @@ public partial class WorldClient
         {
             UpdateObject playerUpdateObject = new UpdateObject(GetSession().GameState);
             playerUpdateObject.ObjectUpdates.AddRange(playerValuesUpdates);
-            SendPacketToClient(playerUpdateObject);
+            SendPlayerValuesUpdate(playerUpdateObject);
         }
 
         foreach (var auraUpdate in auraUpdates)

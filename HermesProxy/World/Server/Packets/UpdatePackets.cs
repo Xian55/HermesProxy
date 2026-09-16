@@ -613,9 +613,13 @@ public class UpdateObject : ServerPacket
     private static readonly Microsoft.Extensions.Logging.ILogger _melObjLife =
         Framework.Logging.Log.CreateMelLogger(Framework.Logging.Log.CategoryServer);
 
+    // ModernVersion.Build is fixed for the test process (V1_14_2), so the V3_4_3 arm is reached
+    // through this hook, the same escape hatch ArenaPackets uses. Null in production.
+    internal static bool? ForceV343ForTests;
+
     public static int FilterV3_4_3Values(UpdateObject obj, GameSessionData gameState)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!(ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261))
             return 0;
 
         int beforeCount = obj.ObjectUpdates.Count;
@@ -644,7 +648,14 @@ public class UpdateObject : ServerPacket
         {
             if (u.Type != UpdateTypeModern.Values)
                 return false;
-            if (!known.Contains(u.Guid))
+            // The player's own Values are the one exception: at login the player's create can
+            // still be held for item templates (issue #34), and at a teleport the client is
+            // between SMSG_NEW_WORLD and the re-create. An update landing in either window
+            // carries real state — the stance a warrior logs in with, a mount's display id —
+            // and dropping it left the client with an empty action bar and no mount under the
+            // character (issue #300). SendUpdateBatch splits these out and holds them until the
+            // client has the player, so none of them reaches the wire ahead of the create.
+            if (!known.Contains(u.Guid) && u.Guid != gameState.CurrentPlayerGuid)
             {
                 valuesUnknownStripped++;
                 World.Logging.ObjectLifecycleLogMessages.ValuesStripped(

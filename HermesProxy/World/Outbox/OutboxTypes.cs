@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using HermesProxy.World.Enums;
 
 namespace HermesProxy.World.Outbox;
@@ -119,6 +119,10 @@ public enum HoldKeyKind : ushort
     MailList = 9,
     /// <summary>A <c>CMSG_ATTACK_STOP</c> held until the server answers the swing before it.</summary>
     AttackStop = 10,
+    /// <summary>V3_4_3 Values for the player's own guid, held until the client has the player.</summary>
+    PlayerValuesBatch = 11,
+    /// <summary>V3_4_3 speed changes aimed at the player, held until the client has the player.</summary>
+    PlayerMoveSpeed = 12,
 }
 
 /// <summary>How a hold behaves while it waits.</summary>

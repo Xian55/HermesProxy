@@ -694,6 +694,22 @@ public partial class WorldClient
             entry.UpdateObject.OutOfRangeGuids.Count != 0)
             SendPacketToClient(entry.UpdateObject);
 
+        // Player Values that landed while this batch was held (issue #300): the stance a warrior
+        // logs in with, a mount's display id. They are claimed and sent inline rather than left to
+        // the GuidKnown notify, which would only run them after this method returns — a nested
+        // release appends to the running release run — and so after the world-ready handshake
+        // below. Claimed in registration order, and only ever after the create above.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && session.ToClient.HasPending)
+        {
+            foreach (var playerValues in ClaimHeldPlayerValues(session))
+            {
+                if (Log.IsTraceEnabled)
+                    Log.Print(LogType.Trace,
+                        $"[PlayerEnterTrace] deferred-flush released {playerValues.ObjectUpdates.Count} held player Values update(s)");
+                SendPacketToClient(playerValues);
+            }
+        }
+
         // After the merged player+pet batch shipped, synthesize a follow-up
         // Values update for the pet carrying its server-populated stats
         // (Stats[5], AttackPower, MinDamage/MaxDamage, Resistances, BaseHealth).
@@ -880,6 +896,15 @@ public partial class WorldClient
                     Log.Print(LogType.Trace,
                         $"[PlayerEnterTrace] deferred-flush post-CreateObject SMSG_UPDATE_ACTION_BUTTONS resent LAST ({modern.ActionButtons.Count} legacy entries, Reason=0)");
                 }
+
+                // Everything else still waiting for the client to have the player goes out now:
+                // the speed changes held in HandleMoveForceSpeedChange (a mounted login's run
+                // speed) and the toy box sync. GuidKnown is otherwise only raised at the end of
+                // the next update batch, which on a quiet login is a second of riding a mount at
+                // walking speed. Nested inside a continuation this appends to the running release
+                // run, so it lands after the handshake above rather than interleaving with it.
+                if (session.ToClient.HasPending)
+                    session.ToClient.Notify(OutboxEvent.GuidKnown(currentPlayerGuid));
             }
         }
     }
