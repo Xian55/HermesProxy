@@ -42,6 +42,14 @@ public partial class BnetServices
             return BattlenetRpcErrorCode.BadLocale;
         }
 
+        // Launcher login supplies the REST-issued ticket in the initial Logon request.
+        // Use the same expiry/ban/session checks as the interactive web login flow.
+        if (logonRequest.CachedWebCredentials.Length != 0)
+            return HandleVerifyWebCredentials(new VerifyWebCredentialsRequest
+            {
+                WebCredentials = logonRequest.CachedWebCredentials
+            });
+
         var endpoint = LoginServiceManager.Instance.GetAddressForClient(GetRemoteIpEndPoint().Address);
 
         ChallengeExternalRequest externalChallenge = new();
