@@ -2453,6 +2453,20 @@ public partial class WorldClient
         return GetSession().GameState.GetLegacyFieldValueUInt32(GetSession().GameState.CurrentPlayerGuid, field);
     }
 
+    // Flags this block did not touch still have to survive an OR: an item that is only being
+    // moved sends no ITEM_FIELD_FLAGS, so the last known value comes from the legacy cache.
+    private uint GetCurrentItemFlags(WowGuid128 guid, ObjectUpdate updateData, int flagsField)
+    {
+        if (updateData.ItemData.Flags is uint pending)
+            return pending;
+
+        if (flagsField < 0)
+            return 0;
+
+        var cached = GetSession().GameState.GetCachedObjectFieldsLegacy(guid);
+        return cached != null && cached.TryGetValue(flagsField, out var field) ? field.UInt32Value : 0u;
+    }
+
     private void StoreObjectUpdateInternal(ref WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData)
     {
         // Object Fields
@@ -2553,16 +2567,30 @@ public partial class WorldClient
                 updateData.ItemData.Flags = updates[ITEM_FIELD_FLAGS].UInt32Value;
             }
 
+            // 3.3.0 moved the letter body onto the item and dropped this field. Before that it
+            // is the only key to the server's item_text table, and the modern client has no such
+            // field: it asks for a body by item GUID, so QuerySystem needs the pairing. Readable
+            // is what makes the client offer the read at all - it is the one flag a 3.4.3 server
+            // sets on a letter (TC HandleMailCreateTextItem), and pre-3.3.0 cores set none.
+            int ITEM_FIELD_ITEM_TEXT_ID = LegacyVersion.GetUpdateField(ItemField.ITEM_FIELD_ITEM_TEXT_ID);
+            if (ITEM_FIELD_ITEM_TEXT_ID >= 0 && updateMaskArray[ITEM_FIELD_ITEM_TEXT_ID])
+            {
+                uint itemTextId = updates[ITEM_FIELD_ITEM_TEXT_ID].UInt32Value;
+                if (itemTextId != 0)
+                {
+                    GetSession().GameState.ItemTextIds[guid] = itemTextId;
+                    updateData.ItemData.Flags = GetCurrentItemFlags(guid, updateData, ITEM_FIELD_FLAGS)
+                        | (uint)ItemFieldFlag.Readable;
+                }
+            }
+
             if (ModernVersion.ExpansionVersion >= 3)
             {
                 int entry = updateData.ObjectData.EntryID
                     ?? (int)GetSession().GameState.GetItemId(guid);
                 if (entry != 0 && GameData.Heirlooms.Contains(entry))
                 {
-                    uint baseFlags = updateData.ItemData.Flags
-                        ?? (ITEM_FIELD_FLAGS >= 0
-                            ? (GetSession().GameState.GetCachedObjectFieldsLegacy(guid)?[ITEM_FIELD_FLAGS].UInt32Value ?? 0u)
-                            : 0u);
+                    uint baseFlags = GetCurrentItemFlags(guid, updateData, ITEM_FIELD_FLAGS);
                     updateData.ItemData.Flags = baseFlags | (uint)ItemFieldFlag.Soulbound | (uint)ItemFieldFlag.Child;
                 }
             }

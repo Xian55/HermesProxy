@@ -450,6 +450,10 @@ public sealed class GameSessionData
     public Dictionary<uint, uint> RealSpellToLearnSpell = [];
     public Dictionary<uint, ArenaTeamData> ArenaTeams = [];
     public Dictionary<uint, string> ItemTexts = [];
+    // Pre-3.3.0 legacy keys a letter body by item_text id and carries that id on the item;
+    // the modern client only ever asks by item GUID. Both directions of that translation.
+    public Dictionary<WowGuid128, uint> ItemTextIds = [];
+    public Dictionary<uint, List<WowGuid128>> PendingItemTextQueries = [];
     public Dictionary<uint, uint> BattleFieldQueueTypes = [];
     public Dictionary<uint, byte> BattleFieldQueueArenaTypes = [];
     public Dictionary<uint, byte> BattleFieldQueueBracketIds = [];

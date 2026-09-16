@@ -4,6 +4,7 @@ using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server.Packets;
 
 namespace HermesProxy.World.Server.Systems;
@@ -17,17 +18,61 @@ public static class QuerySystem
     // query the item's body text. The opcode was mapped on both sides and the response was
     // already handled, but nothing forwarded the request, so the letter never opened.
     // Legacy took a uint32 item_text id before 3.3.0 and an item GUID from 3.3.0 on; the
-    // modern client only ever sends a GUID, so this bridge is 3.3.0+ only. On older cores
-    // the body still arrives through the mail-list path in MailHandler.
+    // modern client only ever sends a GUID, so older cores need the id looked up first.
     [HandlesCmsg(Opcode.CMSG_ITEM_TEXT_QUERY)]
     public static void HandleItemTextQuery(in ItemTextQuery query, in SessionContext ctx)
     {
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
+        {
+            HandleLegacyItemTextQuery(query.Id, ctx);
             return;
+        }
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_ITEM_TEXT_QUERY);
         packet.WriteGuid(query.Id.To64());
         ctx.SendPacketToServer(packet);
+    }
+
+    // The id lives on the item as ITEM_FIELD_ITEM_TEXT_ID, which UpdateHandler remembers against
+    // the GUID. A mail list already pulls the bodies of its own letters, so the text is often
+    // cached before the copy is ever right-clicked.
+    private static void HandleLegacyItemTextQuery(WowGuid128 itemGuid, in SessionContext ctx)
+    {
+        var gameState = ctx.GameState;
+        if (!gameState.ItemTextIds.TryGetValue(itemGuid, out uint itemTextId))
+        {
+            // Answering anyway: the client keeps the reading frame open until it hears back.
+            ctx.SendPacketToClient(new QueryItemTextResponse { Id = itemGuid });
+            return;
+        }
+
+        if (gameState.ItemTexts.TryGetValue(itemTextId, out string? cachedText))
+        {
+            SendItemText(itemGuid, cachedText, ctx.ToClient);
+            return;
+        }
+
+        if (!gameState.PendingItemTextQueries.TryGetValue(itemTextId, out var waiting))
+            gameState.PendingItemTextQueries[itemTextId] = waiting = [];
+        if (!waiting.Contains(itemGuid))
+            waiting.Add(itemGuid);
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_ITEM_TEXT_QUERY);
+        packet.WriteUInt32(itemTextId);
+        packet.WriteInt32(0); // mail id, unused by the server
+        packet.WriteUInt32(0); // unk
+        ctx.SendPacketToServer(packet);
+    }
+
+    // Legacy answers an unknown id with an empty string, which the modern Valid bit spells out.
+    internal static void SendItemText(WowGuid128 itemGuid, string text, ClientOutbox toClient)
+    {
+        toClient.Send(new QueryItemTextResponse
+        {
+            Id = itemGuid,
+            Valid = text.Length != 0,
+            Text = text,
+        });
     }
 
     [HandlesCmsg(Opcode.CMSG_QUERY_QUEST_INFO)]

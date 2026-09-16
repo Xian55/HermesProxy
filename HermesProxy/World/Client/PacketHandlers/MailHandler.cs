@@ -4,6 +4,7 @@ using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Outbox;
 using HermesProxy.World.Server.Packets;
+using HermesProxy.World.Server.Systems;
 using System;
 using System.Collections.Generic;
 using static HermesProxy.World.Server.Packets.MailQueryNextTimeResult;
@@ -201,10 +202,15 @@ public partial class WorldClient
         uint itemTextId = packet.ReadUInt32();
         string text = packet.ReadCString();
 
-        if (GetSession().GameState.ItemTexts.ContainsKey(itemTextId))
-            GetSession().GameState.ItemTexts[itemTextId] = text;
-        else
-            GetSession().GameState.ItemTexts.Add(itemTextId, text);
+        GetSession().GameState.ItemTexts[itemTextId] = text;
+
+        // A letter copied out of the mailbox is read through this same id, one CMSG_ITEM_TEXT_QUERY
+        // per item GUID that QuerySystem could not answer from the cache.
+        if (GetSession().GameState.PendingItemTextQueries.Remove(itemTextId, out var waiting))
+        {
+            foreach (var itemGuid in waiting)
+                QuerySystem.SendItemText(itemGuid, text, GetSession().ToClient);
+        }
 
         GetSession().ToClient.Notify(OutboxEvent.ItemText(itemTextId));
     }
