@@ -753,36 +753,11 @@ public class UpdateObject : ServerPacket
                     if (go.ParentRotation[i].HasValue) return false;
         }
 
-        var unit = u.UnitData;
-        if (unit != null)
-        {
-            if (unit.Health.HasValue || unit.MaxHealth.HasValue || unit.DisplayID.HasValue) return false;
-            if (unit.Charm != null || unit.Summon != null || unit.CharmedBy != null) return false;
-            if (unit.SummonedBy != null || unit.CreatedBy != null || unit.Target != null) return false;
-            if (unit.Critter != null || unit.BattlePetCompanionGUID != null) return false;
-            if (unit.ChannelData != null || unit.ChannelObject != null) return false;
-            if (unit.RaceId.HasValue || unit.ClassId.HasValue || unit.SexId.HasValue) return false;
-            if (unit.Level.HasValue || unit.EffectiveLevel.HasValue || unit.DisplayPower.HasValue) return false;
-            if (unit.FactionTemplate.HasValue || unit.Flags.HasValue || unit.Flags2.HasValue || unit.Flags3.HasValue) return false;
-            if (unit.AuraState.HasValue) return false;
-            if (unit.BoundingRadius.HasValue || unit.CombatReach.HasValue) return false;
-            if (unit.NativeDisplayID.HasValue || unit.MountDisplayID.HasValue) return false;
-            if (unit.HoverHeight.HasValue || unit.GuildGUID != null) return false;
-            if (unit.MinDamage.HasValue || unit.MaxDamage.HasValue) return false;
-            if (unit.StandState.HasValue || unit.AnimTier.HasValue) return false;
-            if (unit.AttackPower.HasValue || unit.RangedAttackPower.HasValue) return false;
-            if (unit.BaseMana.HasValue || unit.BaseHealth.HasValue) return false;
-            for (int i = 0; i < unit.NpcFlags.Length; i++)
-                if (unit.NpcFlags[i].HasValue && unit.NpcFlags[i] != 0) return false;
-            for (int i = 0; i < unit.Power.Length; i++)
-                if (unit.Power[i].HasValue) return false;
-            for (int i = 0; i < unit.MaxPower.Length; i++)
-                if (unit.MaxPower[i].HasValue) return false;
-            for (int i = 0; i < unit.Stats.Length; i++)
-                if (unit.Stats[i].HasValue) return false;
-            for (int i = 0; i < 7; i++)
-                if (unit.Resistances[i].HasValue) return false;
-        }
+        // UnitData answers for itself. The list that used to live here covered 47 of its 116
+        // fields, so a delta carrying only one of the other 69 was called empty and dropped —
+        // ShapeshiftForm among them, which is the warrior stance of issue #300.
+        if (u.UnitData != null && u.UnitData.HasAnyValue()) return false;
+
         var player = u.PlayerData;
         if (player != null)
         {

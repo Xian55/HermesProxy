@@ -186,4 +186,92 @@ public class UnitData
 
     // Dynamic Fields
     public WowGuid128? ChannelObject;
+
+    /// <summary>
+    /// True when any field in this block has been written.
+    /// </summary>
+    /// <remarks>
+    /// The V3_4_3 Values filter drops a delta that says nothing — cMangos emits those as
+    /// bookkeeping and the client answers the resulting 13-byte body with
+    /// CMSG_OBJECT_UPDATE_FAILED — so this has to answer for every field. It lived in
+    /// UpdatePackets.IsEmptyValuesDelta as a hand-picked list of 47, and the 69 fields that list
+    /// left out were dropped whenever they arrived on their own: ShapeshiftForm, so a warrior who
+    /// logged in in Battle Stance got the empty non-stance action bar (issue #300), and with it
+    /// SheatheState, EmoteState, ComboTarget, the pet fields and every haste and attack-power mod.
+    /// UnitDataProbeTests walks the field list by reflection so a field added later cannot be
+    /// left out again.
+    /// </remarks>
+    public bool HasAnyValue()
+    {
+        // The fields a real delta most often carries, so the common case returns on the
+        // first branches instead of walking the whole block.
+        if (Health.HasValue || MaxHealth.HasValue || DisplayID.HasValue) return true;
+        if (Flags.HasValue || Flags2.HasValue || Flags3.HasValue) return true;
+        if (AuraState.HasValue || Level.HasValue || FactionTemplate.HasValue) return true;
+
+        if (Charm.HasValue || Summon.HasValue || Critter.HasValue) return true;
+        if (CharmedBy.HasValue || SummonedBy.HasValue || CreatedBy.HasValue) return true;
+        if (DemonCreator.HasValue || LookAtControllerTarget.HasValue || Target.HasValue) return true;
+        if (BattlePetCompanionGUID.HasValue || BattlePetDBID.HasValue || ChannelData.HasValue) return true;
+        if (SummonedByHomeRealm.HasValue || RaceId.HasValue || ClassId.HasValue) return true;
+        if (PlayerClassId.HasValue || SexId.HasValue || DisplayPower.HasValue) return true;
+        if (OverrideDisplayPowerID.HasValue || EffectiveLevel.HasValue || ContentTuningID.HasValue) return true;
+        if (ScalingLevelMin.HasValue || ScalingLevelMax.HasValue || ScalingLevelDelta.HasValue) return true;
+        if (ScalingFactionGroup.HasValue || ScalingHealthItemLevelCurveID.HasValue || ScalingDamageItemLevelCurveID.HasValue) return true;
+        if (RangedAttackRoundBaseTime.HasValue || BoundingRadius.HasValue || CombatReach.HasValue) return true;
+        if (DisplayScale.HasValue || NativeDisplayID.HasValue || NativeXDisplayScale.HasValue) return true;
+        if (MountDisplayID.HasValue || MinDamage.HasValue || MaxDamage.HasValue) return true;
+        if (MinOffHandDamage.HasValue || MaxOffHandDamage.HasValue || StandState.HasValue) return true;
+        if (PetLoyaltyIndex.HasValue || VisFlags.HasValue || AnimTier.HasValue) return true;
+        if (PetNumber.HasValue || PetNameTimestamp.HasValue || PetExperience.HasValue) return true;
+        if (PetNextLevelExperience.HasValue || ModCastSpeed.HasValue || ModCastHaste.HasValue) return true;
+        if (ModHaste.HasValue || ModRangedHaste.HasValue || ModHasteRegen.HasValue) return true;
+        if (ModTimeRate.HasValue || CreatedBySpell.HasValue || EmoteState.HasValue) return true;
+        if (TrainingPointsUsed.HasValue || TrainingPointsTotal.HasValue || BaseMana.HasValue) return true;
+        if (BaseHealth.HasValue || SheatheState.HasValue || PvpFlags.HasValue) return true;
+        if (PetFlags.HasValue || ShapeshiftForm.HasValue || AttackPower.HasValue) return true;
+        if (AttackPowerModPos.HasValue || AttackPowerModNeg.HasValue || AttackPowerMultiplier.HasValue) return true;
+        if (RangedAttackPower.HasValue || RangedAttackPowerModPos.HasValue || RangedAttackPowerModNeg.HasValue) return true;
+        if (RangedAttackPowerMultiplier.HasValue || AttackSpeedAura.HasValue || Lifesteal.HasValue) return true;
+        if (MinRangedDamage.HasValue || MaxRangedDamage.HasValue || MaxHealthModifier.HasValue) return true;
+        if (HoverHeight.HasValue || MinItemLevelCutoff.HasValue || MinItemLevel.HasValue) return true;
+        if (MaxItemLevel.HasValue || WildBattlePetLevel.HasValue || BattlePetCompanionNameTimestamp.HasValue) return true;
+        if (InteractSpellID.HasValue || StateSpellVisualID.HasValue || StateAnimID.HasValue) return true;
+        if (StateAnimKitID.HasValue || StateWorldEffectsID.HasValue || ScaleDuration.HasValue) return true;
+        if (LooksLikeMountID.HasValue || LooksLikeCreatureID.HasValue || LookAtControllerID.HasValue) return true;
+        if (GuildGUID.HasValue || ComboTarget.HasValue || ChannelObject.HasValue) return true;
+
+        for (int i = 0; i < Power.Length; i++)
+            if (Power[i].HasValue) return true;
+        for (int i = 0; i < MaxPower.Length; i++)
+            if (MaxPower[i].HasValue) return true;
+        for (int i = 0; i < ModPowerRegen.Length; i++)
+            if (ModPowerRegen[i].HasValue) return true;
+        for (int i = 0; i < VirtualItems.Length; i++)
+            if (VirtualItems[i].HasValue) return true;
+        for (int i = 0; i < AttackRoundBaseTime.Length; i++)
+            if (AttackRoundBaseTime[i].HasValue) return true;
+        // A zero NpcFlags slot is the server clearing a flag it never set. The probe has always
+        // read that as nothing to say, and the flood it guards against is made of exactly those.
+        for (int i = 0; i < NpcFlags.Length; i++)
+            if (NpcFlags[i].HasValue && NpcFlags[i] != 0) return true;
+        for (int i = 0; i < Stats.Length; i++)
+            if (Stats[i].HasValue) return true;
+        for (int i = 0; i < StatPosBuff.Length; i++)
+            if (StatPosBuff[i].HasValue) return true;
+        for (int i = 0; i < StatNegBuff.Length; i++)
+            if (StatNegBuff[i].HasValue) return true;
+        for (int i = 0; i < Resistances.Length; i++)
+            if (Resistances[i].HasValue) return true;
+        for (int i = 0; i < ResistanceBuffModsPositive.Length; i++)
+            if (ResistanceBuffModsPositive[i].HasValue) return true;
+        for (int i = 0; i < ResistanceBuffModsNegative.Length; i++)
+            if (ResistanceBuffModsNegative[i].HasValue) return true;
+        for (int i = 0; i < PowerCostModifier.Length; i++)
+            if (PowerCostModifier[i].HasValue) return true;
+        for (int i = 0; i < PowerCostMultiplier.Length; i++)
+            if (PowerCostMultiplier[i].HasValue) return true;
+
+        return false;
+    }
 }
