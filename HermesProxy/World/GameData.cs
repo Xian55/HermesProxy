@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -63,6 +64,14 @@ public static partial class GameData
     // triggers; the Classic clients ship the post-Cataclysm DB2 while legacy cores kept the
     // WotLK ids. Data-driven via CSV/AreaTriggerRemap*.csv — adding a remap needs no code.
     public static FrozenDictionary<uint, uint> AreaTriggerModernToLegacy = FrozenDictionary<uint, uint>.Empty;
+    // Legacy area triggers the modern client cannot send at all, keyed by map. Cataclysm did not
+    // only renumber Eye of the Storm's tower triggers, it moved them ~18 yd and dropped the WotLK
+    // rows, so no id translation can work: the legacy server re-checks the player against its own
+    // AreaTrigger.dbc position and rejects anything sent from the modern spot. The proxy watches
+    // the player's movement instead and fires the legacy id when they actually stand on it.
+    // Data-driven via CSV/AreaTriggerProximity*.csv — adding a trigger needs no code.
+    public static FrozenDictionary<uint, ProximityAreaTrigger[]> AreaTriggerProximityByMap
+        = FrozenDictionary<uint, ProximityAreaTrigger[]>.Empty;
     public static FrozenDictionary<uint, ChatChannel> ChatChannels = FrozenDictionary<uint, ChatChannel>.Empty;
     public static Dictionary<uint, Dictionary<uint, byte>> ItemEffects = [];
     // Maps a legacy (1.12) spell id to its modern client spell id, populated when an item-effect
@@ -681,6 +690,7 @@ public static partial class GameData
             LoadItemSpellsData,
             LoadItemDisplayIdToFileDataId,
             LoadAreaTriggerRemap,
+            LoadAreaTriggerProximity,
             LoadBattlegrounds,
             LoadCurrencyTypes,
             LoadChatChannels,
@@ -1236,6 +1246,59 @@ public static partial class GameData
             dict[modernId] = legacyId;
         }
         AreaTriggerModernToLegacy = dict.ToFrozenDictionary();
+    }
+
+    public static void LoadAreaTriggerProximity()
+    {
+        AreaTriggerProximityByMap = ParseAreaTriggerProximity(
+            Path.Combine("CSV", $"AreaTriggerProximity{ModernVersion.ExpansionVersion}.csv"));
+    }
+
+    /// <summary>
+    /// Reads one AreaTriggerProximity CSV. Split from <see cref="LoadAreaTriggerProximity"/> so a
+    /// test can read the expansion-3 file without the process being built for that expansion.
+    /// </summary>
+    public static FrozenDictionary<uint, ProximityAreaTrigger[]> ParseAreaTriggerProximity(string path)
+    {
+        if (!File.Exists(path))
+            return FrozenDictionary<uint, ProximityAreaTrigger[]>.Empty;
+
+        using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+        var byMap = new Dictionary<uint, List<ProximityAreaTrigger>>();
+
+        foreach (var row in reader)
+        {
+            if (!uint.TryParse(row[0].Span, out uint legacyId) ||
+                !uint.TryParse(row[1].Span, out uint mapId) ||
+                !float.TryParse(row[2].Span, NumberStyles.Float, CultureInfo.InvariantCulture, out float x) ||
+                !float.TryParse(row[3].Span, NumberStyles.Float, CultureInfo.InvariantCulture, out float y) ||
+                !float.TryParse(row[4].Span, NumberStyles.Float, CultureInfo.InvariantCulture, out float z) ||
+                !float.TryParse(row[5].Span, NumberStyles.Float, CultureInfo.InvariantCulture, out float radius) ||
+                legacyId == 0 || radius <= 0)
+            {
+                Log.Print(LogType.Error,
+                    $"LoadAreaTriggerProximity: malformed row in {path}, skipping.");
+                continue;
+            }
+
+            if (!byMap.TryGetValue(mapId, out var list))
+                byMap[mapId] = list = [];
+            list.Add(new ProximityAreaTrigger(legacyId, mapId, x, y, z, radius * radius));
+        }
+
+        // The per-map array is indexed by a 32-bit "currently inside" mask on the session.
+        var result = new Dictionary<uint, ProximityAreaTrigger[]>(byMap.Count);
+        foreach (var (mapId, list) in byMap)
+        {
+            if (list.Count > 32)
+            {
+                Log.Print(LogType.Error,
+                    $"LoadAreaTriggerProximity: map {mapId} has {list.Count} triggers, only the first 32 are used.");
+                list.RemoveRange(32, list.Count - 32);
+            }
+            result[mapId] = [.. list];
+        }
+        return result.ToFrozenDictionary();
     }
 
     public static void LoadBattlegrounds()

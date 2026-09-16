@@ -152,6 +152,14 @@ public sealed class GameSessionData
     // offset instead of an absolute position, so the position needs different handling.
     public uint TransferPendingShipEntry;
     public uint LastEnteredAreaTrigger;
+
+    // Proximity area triggers for CurrentMapId, resolved lazily on the movement path so a map
+    // change needs no extra hook. ProximityTriggersMapId is the map the array was resolved for;
+    // ProximityTriggersInsideMask has one bit per entry, set while the player stands inside it,
+    // so each entry fires once per entry rather than once per movement packet.
+    public ProximityAreaTrigger[]? ProximityTriggers;
+    public uint ProximityTriggersMapId;
+    public uint ProximityTriggersInsideMask;
     public uint LastDispellSpellId;
     public string LeftChannelName = "";
     public bool IsPassingOnLoot;

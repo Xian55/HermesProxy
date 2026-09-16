@@ -142,6 +142,74 @@ public static class MovementSystem
             packet.WritePackedGuid(movement.Guid.To64());
         moveInfo.WriteMovementInfoLegacy(packet);
         ctx.SendPacketToServer(packet);
+
+        CheckProximityAreaTriggers(moveInfo.Position, gameState, ctx);
+    }
+
+    /// <summary>
+    /// Fires the legacy area triggers the modern client cannot send, once the player's own position
+    /// enters one.
+    /// </summary>
+    /// <remarks>
+    /// Cataclysm gave Eye of the Storm's towers new trigger rows ~18 yd from the WotLK ones and
+    /// dropped the old rows from the client, so a 3.4.3 client never sends the ids
+    /// <c>BattlegroundEY::HandleAreaTrigger</c> gates flag captures on. Translating the id is not
+    /// enough either: the legacy server re-checks the player against its own AreaTrigger.dbc
+    /// position first (<c>WorldSession::HandleAreaTriggerOpcode</c>) and drops anything sent from
+    /// 18 yd away. Sending it from the movement path instead means the player really is standing
+    /// inside the radius the server is about to test.
+    /// <para>
+    /// Runs after the movement packet so the server has already applied the position this decision
+    /// was made on.
+    /// </para>
+    /// </remarks>
+    private static void CheckProximityAreaTriggers(in Vector3 position, GameSessionData gameState, in SessionContext ctx)
+    {
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+            return;
+
+        if (gameState.CurrentMapId is not uint mapId)
+            return;
+
+        // Resolved lazily rather than on a map-change hook: an empty array is cached for maps with
+        // no triggers, so the dictionary is touched once per map rather than once per packet.
+        if (gameState.ProximityTriggers is null || gameState.ProximityTriggersMapId != mapId)
+        {
+            gameState.ProximityTriggers = GameData.AreaTriggerProximityByMap.TryGetValue(mapId, out var forMap)
+                ? forMap
+                : [];
+            gameState.ProximityTriggersMapId = mapId;
+            gameState.ProximityTriggersInsideMask = 0;
+        }
+
+        var triggers = gameState.ProximityTriggers;
+        if (triggers.Length == 0)
+            return;
+
+        uint insideMask = gameState.ProximityTriggersInsideMask;
+        for (int i = 0; i < triggers.Length; i++)
+        {
+            ref readonly var trigger = ref triggers[i];
+            float dx = position.X - trigger.X;
+            float dy = position.Y - trigger.Y;
+            float dz = position.Z - trigger.Z;
+            bool inside = (dx * dx) + (dy * dy) + (dz * dz) <= trigger.RadiusSquared;
+
+            uint bit = 1u << i;
+            bool wasInside = (insideMask & bit) != 0;
+            if (inside == wasInside)
+                continue;
+
+            insideMask ^= bit;
+            if (!inside)
+                continue;
+
+            gameState.LastEnteredAreaTrigger = trigger.LegacyId;
+            WorldPacket triggerPacket = new WorldPacket(Opcode.CMSG_AREA_TRIGGER);
+            triggerPacket.WriteUInt32(trigger.LegacyId);
+            ctx.SendPacketToServer(triggerPacket);
+        }
+        gameState.ProximityTriggersInsideMask = insideMask;
     }
 
     [HandlesCmsg(Opcode.CMSG_MOVE_TELEPORT_ACK)]
