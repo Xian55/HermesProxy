@@ -74,11 +74,15 @@ public class SessionExecutorTests
         using var executor = new SessionExecutor("test");
         using var ownerInside = new ManualResetEventSlim();
         using var letOwnerFinish = new ManualResetEventSlim();
-        var ran = new List<string>();
+        using var otherFinished = new ManualResetEventSlim();
+        // Appended on the executor thread and read on this one, so it cannot be a List: an
+        // assertion that enumerates one mid-Add throws "Collection was modified", which is what
+        // this test did on a loaded CI runner while passing every time on a quiet dev box.
+        var ran = new ConcurrentQueue<string>();
 
         var owner = Task.Run(() => executor.Post(_ =>
         {
-            ran.Add("owner");
+            ran.Enqueue("owner");
             ownerInside.Set();
             letOwnerFinish.Wait();
         }));
@@ -88,18 +92,25 @@ public class SessionExecutorTests
         bool posterReturnedFirst = false;
         var poster = Task.Run(() =>
         {
-            executor.Post(_ => ran.Add("other"));
+            executor.Post(_ =>
+            {
+                ran.Enqueue("other");
+                otherFinished.Set();
+            });
             posterReturnedFirst = !letOwnerFinish.IsSet;
         });
 
         Assert.True(poster.Wait(TimeSpan.FromSeconds(5)));
         Assert.True(posterReturnedFirst);
-        Assert.Equal(["owner"], ran);
+        Assert.Equal<string>(["owner"], ran);
 
         letOwnerFinish.Set();
         Assert.True(owner.Wait(TimeSpan.FromSeconds(5)));
-        SpinWait.SpinUntil(() => executor.QueueDepth == 0, TimeSpan.FromSeconds(5));
-        Assert.Equal(["owner", "other"], ran);
+        // Wait for the callback to finish rather than merely to leave the queue. QueueDepth
+        // reaches zero when the item is dequeued, which is before its body has appended
+        // anything — that gap is the race, and SpinWait on it is what made this flaky.
+        Assert.True(otherFinished.Wait(TimeSpan.FromSeconds(5)));
+        Assert.Equal<string>(["owner", "other"], ran);
     }
 
     [Fact]
