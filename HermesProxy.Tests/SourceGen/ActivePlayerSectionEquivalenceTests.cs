@@ -140,9 +140,9 @@ public class ActivePlayerSectionEquivalenceTests
         }) };
         yield return new object[] { "explored-zones", (Action<ActivePlayerData, GameSessionData>)((a, _) =>
         {
-            a.ExploredZones[0] = 0xDEADBEEFCAFEBABEuL;
-            a.ExploredZones[100] = 0x1234567890ABCDEFuL;
-            a.ExploredZones[239] = 0xFFFFFFFFFFFFFFFFuL;
+            a.EnsureExploredZones()[0] = 0xDEADBEEFCAFEBABEuL;
+            a.EnsureExploredZones()[100] = 0x1234567890ABCDEFuL;
+            a.EnsureExploredZones()[239] = 0xFFFFFFFFFFFFFFFFuL;
         }) };
         yield return new object[] { "rest-info-full", (Action<ActivePlayerData, GameSessionData>)((a, _) =>
         {
@@ -188,9 +188,9 @@ public class ActivePlayerSectionEquivalenceTests
         }) };
         yield return new object[] { "quest-completed", (Action<ActivePlayerData, GameSessionData>)((a, _) =>
         {
-            a.QuestCompleted[0] = 0xFFuL;
-            a.QuestCompleted[500] = 0xAB00uL;
-            a.QuestCompleted[874] = 0x1uL;
+            a.EnsureQuestCompleted()[0] = 0xFFuL;
+            a.EnsureQuestCompleted()[500] = 0xAB00uL;
+            a.EnsureQuestCompleted()[874] = 0x1uL;
         }) };
         yield return new object[] { "glyphs-dirty", (Action<ActivePlayerData, GameSessionData>)((a, gs) =>
         {
@@ -209,9 +209,9 @@ public class ActivePlayerSectionEquivalenceTests
         yield return new object[] { "skill-rank-up", (Action<ActivePlayerData, GameSessionData>)((a, _) =>
         {
             a.Skill = new SkillInfo();
-            a.Skill.SkillLineID[0] = 164;
-            a.Skill.SkillRank[0] = 100;
-            a.Skill.SkillMaxRank[0] = 225;
+            a.EnsureSkill().SkillLineID[0] = 164;
+            a.EnsureSkill().SkillRank[0] = 100;
+            a.EnsureSkill().SkillMaxRank[0] = 225;
         }) };
         yield return new object[] { "all-features-mixed", (Action<ActivePlayerData, GameSessionData>)((a, gs) =>
         {
@@ -221,7 +221,7 @@ public class ActivePlayerSectionEquivalenceTests
             a.HonorNextLevel = 1000;
             a.KnownTitles[0] = 0x1u;
             a.ProfessionSkillLine[0] = 164;
-            a.ExploredZones[10] = 0xFFFFuL;
+            a.EnsureExploredZones()[10] = 0xFFFFuL;
             a.CombatRatings[5] = 75;
             a.SpellCritPercentage[2] = 5f;
             a.RestInfo[0] = new RestInfo { Threshold = 50u, StateID = 1u };
@@ -269,7 +269,7 @@ public class ActivePlayerSectionEquivalenceTests
         var guid = WowGuid128.Create(HighGuidType703.Player, 1);
         var builder = MakeBuilder(guid, session, out var update);
 
-        update.ActivePlayerData!.PackSlots[0] = WowGuid128.Create(HighGuidType703.Item, 42);
+        update.ActivePlayerData!.EnsurePackSlots()[0] = WowGuid128.Create(HighGuidType703.Item, 42);
         // No scalar field set. Without HasAnyPredicate on InvSlots mask mutator,
         // HasAny returns false → ActivePlayer Values update skipped → modern client
         // never receives bag refresh.
@@ -927,7 +927,7 @@ public class ActivePlayerSectionEquivalenceTests
 
         // bit 299 (parent 298): ExploredZones[240] (UInt64). Live property exists; TODO per-element read.
         for (int l = 0; l < 240; l++)
-            data.WriteUInt64(active.ExploredZones[l].GetValueOrDefault());
+            data.WriteUInt64(active.ExploredZones?[l].GetValueOrDefault() ?? 0uL);
 
         // bits 540-541 (parent 539): RestInfo[2] nested struct {Threshold:UInt32, StateID:UInt8}.
         // StateID defaults to 1 when unset. RestInfo elements populated for current player.
@@ -1157,10 +1157,10 @@ public class ActivePlayerSectionEquivalenceTests
         yield return new object[] { "skill-lines", (Action<ActivePlayerData, GameSessionData>)((a, _) =>
         {
             a.Skill = new SkillInfo();
-            a.Skill.SkillLineID[0] = 164;
-            a.Skill.SkillRank[0] = 100;
-            a.Skill.SkillMaxRank[0] = 225;
-            a.Skill.SkillStep[1] = 2;
+            a.EnsureSkill().SkillLineID[0] = 164;
+            a.EnsureSkill().SkillRank[0] = 100;
+            a.EnsureSkill().SkillMaxRank[0] = 225;
+            a.EnsureSkill().SkillStep[1] = 2;
         }) };
         yield return new object[] { "interleaved-damage-groups", (Action<ActivePlayerData, GameSessionData>)((a, _) =>
         {
@@ -1187,12 +1187,12 @@ public class ActivePlayerSectionEquivalenceTests
         yield return new object[] { "inv-slots", (Action<ActivePlayerData, GameSessionData>)((a, _) =>
         {
             // InvSlots is [23]; modern 0-18 read it directly and modern 30-33 read 19-22.
-            a.InvSlots[0] = WowGuid128.Create(HighGuidType703.Item, 11);
-            a.InvSlots[18] = WowGuid128.Create(HighGuidType703.Item, 22);
-            a.InvSlots[19] = WowGuid128.Create(HighGuidType703.Item, 33);
+            a.EnsureInvSlots()[0] = WowGuid128.Create(HighGuidType703.Item, 11);
+            a.EnsureInvSlots()[18] = WowGuid128.Create(HighGuidType703.Item, 22);
+            a.EnsureInvSlots()[19] = WowGuid128.Create(HighGuidType703.Item, 33);
             // PackSlots feeds modern 35-58.
-            a.PackSlots[0] = WowGuid128.Create(HighGuidType703.Item, 44);
-            a.PackSlots[23] = WowGuid128.Create(HighGuidType703.Item, 55);
+            a.EnsurePackSlots()[0] = WowGuid128.Create(HighGuidType703.Item, 44);
+            a.EnsurePackSlots()[23] = WowGuid128.Create(HighGuidType703.Item, 55);
         }) };
         yield return new object[] { "glyphs-and-pet", (Action<ActivePlayerData, GameSessionData>)((a, gs) =>
         {
@@ -1204,7 +1204,7 @@ public class ActivePlayerSectionEquivalenceTests
         }) };
         yield return new object[] { "explored-zones-and-ratings", (Action<ActivePlayerData, GameSessionData>)((a, _) =>
         {
-            a.ExploredZones[10] = 0xFFFFuL;
+            a.EnsureExploredZones()[10] = 0xFFFFuL;
             a.CombatRatings[5] = 75;
             a.ProfessionSkillLine[0] = 164;
         }) };

@@ -501,7 +501,7 @@ public partial class WorldClient
 
                     if (updateData.Guid == GetSession().GameState.CurrentPlayerGuid)
                     {
-                        GetSession().GameState.CurrentPlayerStorage.CompletedQuests.WriteAllCompletedIntoArray(updateData.EnsureActivePlayerData().QuestCompleted);
+                        GetSession().GameState.CurrentPlayerStorage.CompletedQuests.WriteAllCompletedIntoArray(updateData.EnsureActivePlayerData());
                         HermesProxy.World.Server.CollectionSync.StampSummonedBattlePet(updateData, GetSession().GameState);
                     }
 
@@ -3468,7 +3468,7 @@ public partial class WorldClient
                     if (updateMaskArray[PLAYER_FIELD_INV_SLOT_HEAD + i * 2])
                     {
                         var slotGuid = GetSlotGuidValue(updates, PLAYER_FIELD_INV_SLOT_HEAD + i * 2);
-                        updateData.EnsureActivePlayerData().InvSlots[i] = slotGuid;
+                        updateData.EnsureActivePlayerData().EnsureInvSlots()[i] = slotGuid;
                         GetSession().GameState.InventoryChangedSinceQuestResync = true;
                         if (tracePlayer)
                             UpdateHandlerLogMessages.OwnerInvSlot(
@@ -3483,7 +3483,7 @@ public partial class WorldClient
                 {
                     if (updateMaskArray[PLAYER_FIELD_PACK_SLOT_1 + i * 2])
                     {
-                        updateData.EnsureActivePlayerData().PackSlots[i] = GetSlotGuidValue(updates, PLAYER_FIELD_PACK_SLOT_1 + i * 2);
+                        updateData.EnsureActivePlayerData().EnsurePackSlots()[i] = GetSlotGuidValue(updates, PLAYER_FIELD_PACK_SLOT_1 + i * 2);
                         GetSession().GameState.InventoryChangedSinceQuestResync = true;
                     }
                 }
@@ -3510,7 +3510,7 @@ public partial class WorldClient
                 for (int i = 0; i < bankSlots; i++)
                 {
                     if (updateMaskArray[PLAYER_FIELD_BANK_SLOT_1 + i * 2])
-                        updateData.EnsureActivePlayerData().BankSlots[i] = GetSlotGuidValue(updates, PLAYER_FIELD_BANK_SLOT_1 + i * 2);
+                        updateData.EnsureActivePlayerData().EnsureBankSlots()[i] = GetSlotGuidValue(updates, PLAYER_FIELD_BANK_SLOT_1 + i * 2);
                 }
             }
             int PLAYER_FIELD_BANKBAG_SLOT_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_BANKBAG_SLOT_1);
@@ -3520,7 +3520,7 @@ public partial class WorldClient
                 for (int i = 0; i < bankBagSlots; i++)
                 {
                     if (updateMaskArray[PLAYER_FIELD_BANKBAG_SLOT_1 + i * 2])
-                        updateData.EnsureActivePlayerData().BankBagSlots[i] = GetSlotGuidValue(updates, PLAYER_FIELD_BANKBAG_SLOT_1 + i * 2);
+                        updateData.EnsureActivePlayerData().EnsureBankBagSlots()[i] = GetSlotGuidValue(updates, PLAYER_FIELD_BANKBAG_SLOT_1 + i * 2);
                 }
             }
             int PLAYER_FIELD_VENDORBUYBACK_SLOT_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_VENDORBUYBACK_SLOT_1);
@@ -3529,7 +3529,7 @@ public partial class WorldClient
                 for (int i = 0; i < 12; i++)
                 {
                     if (updateMaskArray[PLAYER_FIELD_VENDORBUYBACK_SLOT_1 + i * 2])
-                        updateData.EnsureActivePlayerData().BuyBackSlots[i] = GetSlotGuidValue(updates, PLAYER_FIELD_VENDORBUYBACK_SLOT_1 + i * 2);
+                        updateData.EnsureActivePlayerData().EnsureBuyBackSlots()[i] = GetSlotGuidValue(updates, PLAYER_FIELD_VENDORBUYBACK_SLOT_1 + i * 2);
                 }
             }
             int PLAYER_FIELD_KEYRING_SLOT_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_KEYRING_SLOT_1);
@@ -3538,7 +3538,7 @@ public partial class WorldClient
                 for (int i = 0; i < 32; i++)
                 {
                     if (updateMaskArray[PLAYER_FIELD_KEYRING_SLOT_1 + i * 2])
-                        updateData.EnsureActivePlayerData().KeyringSlots[i] = GetSlotGuidValue(updates, PLAYER_FIELD_KEYRING_SLOT_1 + i * 2);
+                        updateData.EnsureActivePlayerData().EnsureKeyringSlots()[i] = GetSlotGuidValue(updates, PLAYER_FIELD_KEYRING_SLOT_1 + i * 2);
                 }
             }
 
@@ -3710,20 +3710,20 @@ public partial class WorldClient
                     int idIndex = PLAYER_SKILL_INFO_1_1 + i * 3;
                     if (updateMaskArray[idIndex])
                     {
-                        updateData.EnsureActivePlayerData().Skill.SkillLineID[i] = (ushort)(updates[idIndex].UInt32Value & 0xFFFF);
-                        updateData.EnsureActivePlayerData().Skill.SkillStep[i] = (ushort)((updates[idIndex].UInt32Value >> 16) & 0xFFFF);
+                        updateData.EnsureActivePlayerData().EnsureSkill().SkillLineID[i] = (ushort)(updates[idIndex].UInt32Value & 0xFFFF);
+                        updateData.EnsureActivePlayerData().EnsureSkill().SkillStep[i] = (ushort)((updates[idIndex].UInt32Value >> 16) & 0xFFFF);
             }
                     int valueIndex = idIndex + 1;
                     if (updateMaskArray[valueIndex])
                     {
-                        updateData.EnsureActivePlayerData().Skill.SkillRank[i] = (ushort)(updates[valueIndex].UInt32Value & 0xFFFF);
-                        updateData.EnsureActivePlayerData().Skill.SkillMaxRank[i] = (ushort)((updates[valueIndex].UInt32Value >> 16) & 0xFFFF);
+                        updateData.EnsureActivePlayerData().EnsureSkill().SkillRank[i] = (ushort)(updates[valueIndex].UInt32Value & 0xFFFF);
+                        updateData.EnsureActivePlayerData().EnsureSkill().SkillMaxRank[i] = (ushort)((updates[valueIndex].UInt32Value >> 16) & 0xFFFF);
                     }
                     int bonusIndex = valueIndex + 1;
                     if (updateMaskArray[bonusIndex])
                     {
-                        updateData.EnsureActivePlayerData().Skill.SkillTempBonus[i] = (short)(updates[bonusIndex].Int32Value & 0xFFFF);
-                        updateData.EnsureActivePlayerData().Skill.SkillPermBonus[i] = (ushort)((updates[bonusIndex].UInt32Value >> 16) & 0xFFFF);
+                        updateData.EnsureActivePlayerData().EnsureSkill().SkillTempBonus[i] = (short)(updates[bonusIndex].Int32Value & 0xFFFF);
+                        updateData.EnsureActivePlayerData().EnsureSkill().SkillPermBonus[i] = (ushort)((updates[bonusIndex].UInt32Value >> 16) & 0xFFFF);
                     }
                 }
             }
@@ -3869,11 +3869,11 @@ public partial class WorldClient
                     {
                         if ((i & 1) != 0)
                         {
-                            ulong oldValue = updateData.EnsureActivePlayerData().ExploredZones[i / 2] != null ? (ulong)updateData.EnsureActivePlayerData().ExploredZones[i / 2]! : 0;
-                            updateData.EnsureActivePlayerData().ExploredZones[i / 2] = oldValue | ((ulong)updates[PLAYER_EXPLORED_ZONES_1 + i].UInt32Value << 32);
+                            ulong oldValue = updateData.EnsureActivePlayerData().EnsureExploredZones()[i / 2] != null ? (ulong)updateData.EnsureActivePlayerData().EnsureExploredZones()[i / 2]! : 0;
+                            updateData.EnsureActivePlayerData().EnsureExploredZones()[i / 2] = oldValue | ((ulong)updates[PLAYER_EXPLORED_ZONES_1 + i].UInt32Value << 32);
                         }
                         else
-                            updateData.EnsureActivePlayerData().ExploredZones[i / 2] = updates[PLAYER_EXPLORED_ZONES_1 + i].UInt32Value;
+                            updateData.EnsureActivePlayerData().EnsureExploredZones()[i / 2] = updates[PLAYER_EXPLORED_ZONES_1 + i].UInt32Value;
                     }
                 }
             }

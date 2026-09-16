@@ -1466,7 +1466,7 @@ public partial class ObjectUpdateBuilder
 
     internal static bool HasAnySkillChanged(SkillInfo s)
     {
-        for (int i = 0; i < 256; i++)
+        for (int i = 0; i < SkillInfo.MaxSkills; i++)
         {
             if (s.SkillLineID[i].HasValue) return true;
             if (s.SkillRank[i].HasValue) return true;
@@ -1497,7 +1497,7 @@ public partial class ObjectUpdateBuilder
         var skillBlocks = new StackBitMask(skillBlockBuf);
 
         bool anyChanged = false;
-        for (int i = 0; i < 256; i++)
+        for (int i = 0; i < SkillInfo.MaxSkills; i++)
         {
             if (s.SkillLineID[i].HasValue) { skillBlocks.SetBit(1 + i); anyChanged = true; }
             if (s.SkillStep[i].HasValue) { skillBlocks.SetBit(257 + i); anyChanged = true; }
@@ -1536,7 +1536,7 @@ public partial class ObjectUpdateBuilder
         if ((skillBlocks[0] & 1) == 0)
             return;
 
-        for (int i = 0; i < 256; i++)
+        for (int i = 0; i < SkillInfo.MaxSkills; i++)
         {
             if (skillBlocks.IsBitSet(1 + i))
                 data.WriteUInt16(s.SkillLineID[i]!.Value);

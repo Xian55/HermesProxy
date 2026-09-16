@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 
 namespace HermesProxy.World.Server;
@@ -165,18 +166,27 @@ public class CompletedQuestTracker
             _cachedQuestCompleted[idx] &= ~(((ulong)1) << bitIdx);
         
         ObjectUpdate updateData = new ObjectUpdate(Session.GameState.CurrentPlayerGuid, UpdateTypeModern.Values, Session);
-        updateData.EnsureActivePlayerData().QuestCompleted[idx] = _cachedQuestCompleted[idx];
+        updateData.EnsureActivePlayerData().EnsureQuestCompleted()[idx] = _cachedQuestCompleted[idx];
 
         UpdateObject updatePacket = new UpdateObject(Session.GameState);
         updatePacket.ObjectUpdates.Add(updateData);
         Session.WorldClient!.SendPacketToClient(updatePacket);
     }
 
-    public void WriteAllCompletedIntoArray(ulong?[] dest)
+    /// <summary>
+    /// Stamps the whole set onto a login update. Takes the owner block rather than its array so a
+    /// character with nothing completed never materialises the 14 KB <c>QuestCompleted[875]</c> —
+    /// which is every character on a backend that cannot report quest history in the first place.
+    /// </summary>
+    public void WriteAllCompletedIntoArray(ActivePlayerData dest)
     {
+        if (_cachedQuestCompleted.Count == 0)
+            return;
+
+        ulong?[] questCompleted = dest.EnsureQuestCompleted();
         foreach (var kv in _cachedQuestCompleted)
         {
-            dest[kv.Key] = kv.Value;
+            questCompleted[kv.Key] = kv.Value;
         }
     }
 }

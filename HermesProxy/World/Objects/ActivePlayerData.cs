@@ -8,13 +8,17 @@ namespace HermesProxy.World.Objects;
 
 public class SkillInfo
 {
-    public ushort?[] SkillLineID = new ushort?[256];
-    public ushort?[] SkillStep = new ushort?[256];
-    public ushort?[] SkillRank = new ushort?[256];
-    public ushort?[] SkillStartingRank = new ushort?[256];
-    public ushort?[] SkillMaxRank = new ushort?[256];
-    public short?[] SkillTempBonus = new short?[256];
-    public ushort?[] SkillPermBonus = new ushort?[256];
+    /// <summary>Skill slots in the client's descriptor. Every one of the seven parallel
+    /// arrays below is this long, and the builders walk all of them by index.</summary>
+    public const int MaxSkills = 256;
+
+    public ushort?[] SkillLineID = new ushort?[MaxSkills];
+    public ushort?[] SkillStep = new ushort?[MaxSkills];
+    public ushort?[] SkillRank = new ushort?[MaxSkills];
+    public ushort?[] SkillStartingRank = new ushort?[MaxSkills];
+    public ushort?[] SkillMaxRank = new ushort?[MaxSkills];
+    public short?[] SkillTempBonus = new short?[MaxSkills];
+    public ushort?[] SkillPermBonus = new ushort?[MaxSkills];
 }
 public class RestInfo
 {
@@ -55,12 +59,32 @@ public class PVPInfo
 }
 public class ActivePlayerData
 {
-    public WowGuid128?[] InvSlots = new WowGuid128?[23]; // equipped gear and bags
-    public WowGuid128?[] PackSlots = new WowGuid128?[24]; // main bag 16 default + 8 vulpera racial
-    public WowGuid128?[] BankSlots = new WowGuid128?[28]; // only 24 in vanilla
-    public WowGuid128?[] BankBagSlots = new WowGuid128?[7]; // only 6 in vanilla
-    public WowGuid128?[] BuyBackSlots = new WowGuid128?[12];
-    public WowGuid128?[] KeyringSlots = new WowGuid128?[32];
+    /// <summary>Explored-zone bitmask words. 240 x 64 bits.</summary>
+    public const int ExploredZoneWords = 240;
+
+    /// <summary>InvSlots length in the client's descriptor. equipped gear and bags</summary>
+    public const int InvSlotCount = 23;
+    /// <summary>PackSlots length in the client's descriptor. main bag 16 default + 8 vulpera racial</summary>
+    public const int PackSlotCount = 24;
+    /// <summary>BankSlots length in the client's descriptor. only 24 in vanilla</summary>
+    public const int BankSlotCount = 28;
+    /// <summary>BankBagSlots length in the client's descriptor. only 6 in vanilla</summary>
+    public const int BankBagSlotCount = 7;
+    /// <summary>BuyBackSlots length in the client's descriptor.</summary>
+    public const int BuyBackSlotCount = 12;
+    /// <summary>KeyringSlots length in the client's descriptor.</summary>
+    public const int KeyringSlotCount = 32;
+
+    /// <summary>Completed-quest bitmask words. The descriptor field is 1750 uint32s, so 875
+    /// uint64s = 56,000 quest bits — indexed by QuestV2.UniqueBitFlag, not by quest id.</summary>
+    public const int QuestCompletedWords = 875;
+
+    public WowGuid128?[]? InvSlots; // equipped gear and bags
+    public WowGuid128?[]? PackSlots; // main bag 16 default + 8 vulpera racial
+    public WowGuid128?[]? BankSlots; // only 24 in vanilla
+    public WowGuid128?[]? BankBagSlots; // only 6 in vanilla
+    public WowGuid128?[]? BuyBackSlots;
+    public WowGuid128?[]? KeyringSlots;
     public WowGuid128? FarsightObject;
     public WowGuid128? ComboTarget;
     public WowGuid128? SummonedBattlePetGUID;
@@ -73,7 +97,7 @@ public class ActivePlayerData
     public int? XP;
     public int? NextLevelXP;
     public int? TrialXP;
-    public SkillInfo Skill = new SkillInfo();
+    public SkillInfo? Skill;
     public int? CharacterPoints;
     public int? MaxTalentTiers;
     public uint? TrackCreatureMask;
@@ -100,7 +124,7 @@ public class ActivePlayerData
     public float? VersatilityBonus;
     public float? PvpPowerDamage;
     public float? PvpPowerHealing;
-    public ulong?[] ExploredZones = new ulong?[240];
+    public ulong?[]? ExploredZones;
     public RestInfo[] RestInfo = new RestInfo[2];
     public int?[] ModDamageDonePos = new int?[7];
     public int?[] ModDamageDoneNeg= new int?[7];
@@ -162,7 +186,7 @@ public class ActivePlayerData
     public uint? OverrideZonePVPType;
     public uint?[] BagSlotFlags { get; } = new uint?[4];
     public uint?[] BankBagSlotFlags { get; } = new uint?[7];
-    public ulong?[] QuestCompleted { get; } = new ulong?[875]; // Field has sizeof 1750 uints => 875 ulongs
+    public ulong?[]? QuestCompleted; // Field has sizeof 1750 uints => 875 ulongs
     public int? Honor;
     public int? HonorNextLevel;
     public uint? PvPTierMaxFromWins;
@@ -175,4 +199,27 @@ public class ActivePlayerData
     public List<uint> SelfResSpells = null!;
     public bool HasDailyQuestsUpdate;
     public List<int>? Toys;
+
+    // These three are 25,224 of the ~29,720 bytes of arrays this class used to allocate up
+    // front, and a delta that touches one scalar owner field needs none of them. They follow
+    // the EnsureActivePlayerData/EnsureContainerData pattern: write sites call Ensure*, read
+    // sites keep testing the field for null, so "never written" stays distinguishable from
+    // "written as empty" — which is what the builders' emit gates key off.
+    public SkillInfo EnsureSkill() => Skill ??= new SkillInfo();
+
+    public ulong?[] EnsureExploredZones() => ExploredZones ??= new ulong?[ExploredZoneWords];
+
+    public ulong?[] EnsureQuestCompleted() => QuestCompleted ??= new ulong?[QuestCompletedWords];
+
+    public WowGuid128?[] EnsureInvSlots() => InvSlots ??= new WowGuid128?[InvSlotCount];
+
+    public WowGuid128?[] EnsurePackSlots() => PackSlots ??= new WowGuid128?[PackSlotCount];
+
+    public WowGuid128?[] EnsureBankSlots() => BankSlots ??= new WowGuid128?[BankSlotCount];
+
+    public WowGuid128?[] EnsureBankBagSlots() => BankBagSlots ??= new WowGuid128?[BankBagSlotCount];
+
+    public WowGuid128?[] EnsureBuyBackSlots() => BuyBackSlots ??= new WowGuid128?[BuyBackSlotCount];
+
+    public WowGuid128?[] EnsureKeyringSlots() => KeyringSlots ??= new WowGuid128?[KeyringSlotCount];
 }

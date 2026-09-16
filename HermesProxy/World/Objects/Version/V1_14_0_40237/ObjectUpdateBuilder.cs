@@ -1190,47 +1190,53 @@ public class ObjectUpdateBuilder
         ActivePlayerData? activeData = m_updateData.ActivePlayerData;
         if (activeData != null && m_objectType == Enums.ObjectTypeBCC.ActivePlayer)
         {
-            for (int i = 0; i < 23; i++)
+            WowGuid128?[]? invSlots = activeData.InvSlots;
+            for (int i = 0; invSlots != null && i < ActivePlayerData.InvSlotCount; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD;
                 int sizePerEntry = 4;
-                if (activeData.InvSlots[i] != null)
-                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, activeData.InvSlots[i]!.Value);
+                if (invSlots[i] != null)
+                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, invSlots[i]!.Value);
             }
-            for (int i = 0; i < 24; i++)
+            WowGuid128?[]? packSlots = activeData.PackSlots;
+            for (int i = 0; packSlots != null && i < ActivePlayerData.PackSlotCount; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.ItemStart * 4;
                 int sizePerEntry = 4;
-                if (activeData.PackSlots[i] != null)
-                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, activeData.PackSlots[i]!.Value);
+                if (packSlots[i] != null)
+                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, packSlots[i]!.Value);
             }
-            for (int i = 0; i < 28; i++)
+            WowGuid128?[]? bankSlots = activeData.BankSlots;
+            for (int i = 0; bankSlots != null && i < ActivePlayerData.BankSlotCount; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.BankItemStart * 4;
                 int sizePerEntry = 4;
-                if (activeData.BankSlots[i] != null)
-                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, activeData.BankSlots[i]!.Value);
+                if (bankSlots[i] != null)
+                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, bankSlots[i]!.Value);
             }
-            for (int i = 0; i < 7; i++)
+            WowGuid128?[]? bankBagSlots = activeData.BankBagSlots;
+            for (int i = 0; bankBagSlots != null && i < ActivePlayerData.BankBagSlotCount; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.BankBagStart * 4;
                 int sizePerEntry = 4;
-                if (activeData.BankBagSlots[i] != null)
-                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, activeData.BankBagSlots[i]!.Value);
+                if (bankBagSlots[i] != null)
+                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, bankBagSlots[i]!.Value);
             }
-            for (int i = 0; i < 12; i++)
+            WowGuid128?[]? buyBackSlots = activeData.BuyBackSlots;
+            for (int i = 0; buyBackSlots != null && i < ActivePlayerData.BuyBackSlotCount; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.BuyBackStart * 4;
                 int sizePerEntry = 4;
-                if (activeData.BuyBackSlots[i] != null)
-                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, activeData.BuyBackSlots[i]!.Value);
+                if (buyBackSlots[i] != null)
+                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, buyBackSlots[i]!.Value);
             }
-            for (int i = 0; i < 32; i++)
+            WowGuid128?[]? keyringSlots = activeData.KeyringSlots;
+            for (int i = 0; keyringSlots != null && i < ActivePlayerData.KeyringSlotCount; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.KeyringStart * 4;
                 int sizePerEntry = 4;
-                if (activeData.KeyringSlots[i] != null)
-                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, activeData.KeyringSlots[i]!.Value);
+                if (keyringSlots[i] != null)
+                    m_fields.SetUpdateField(startIndex + i * sizePerEntry, keyringSlots[i]!.Value);
             }
             if (activeData.FarsightObject != null)
                 m_fields.SetUpdateField(ActivePlayerField.ACTIVE_PLAYER_FIELD_FARSIGHT, activeData.FarsightObject.Value);
@@ -1252,42 +1258,43 @@ public class ObjectUpdateBuilder
                 m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_NEXT_LEVEL_XP, (int)activeData.NextLevelXP);
             if (activeData.TrialXP != null)
                 m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_TRIAL_XP, (int)activeData.TrialXP);
-            for (int i = 0; i < 256; i++)
+            SkillInfo? skill = activeData.Skill;
+            for (int i = 0; skill != null && i < SkillInfo.MaxSkills; i++)
             {
-                if (activeData.Skill.SkillLineID[i] != null)
+                if (skill.SkillLineID[i] != null)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID;
-                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillLineID[i]!, (byte)(i & 1));
+                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)skill.SkillLineID[i]!, (byte)(i & 1));
                 }
-                if (activeData.Skill.SkillStep[i] != null)
+                if (skill.SkillStep[i] != null)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID + 128;
-                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillStep[i]!, (byte)(i & 1));
+                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)skill.SkillStep[i]!, (byte)(i & 1));
                 }
-                if (activeData.Skill.SkillRank[i] != null)
+                if (skill.SkillRank[i] != null)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID + 128 + 128;
-                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillRank[i]!, (byte)(i & 1));
+                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)skill.SkillRank[i]!, (byte)(i & 1));
                 }
-                if (activeData.Skill.SkillStartingRank[i] != null)
+                if (skill.SkillStartingRank[i] != null)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID + 128 + 128 + 128;
-                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillStartingRank[i]!, (byte)(i & 1));
+                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)skill.SkillStartingRank[i]!, (byte)(i & 1));
                 }
-                if (activeData.Skill.SkillMaxRank[i] != null)
+                if (skill.SkillMaxRank[i] != null)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID + 128 + 128 + 128 + 128;
-                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillMaxRank[i]!, (byte)(i & 1));
+                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)skill.SkillMaxRank[i]!, (byte)(i & 1));
                 }
-                if (activeData.Skill.SkillTempBonus[i] != null)
+                if (skill.SkillTempBonus[i] != null)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID + 128 + 128 + 128 + 128 + 128;
-                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillTempBonus[i]!, (byte)(i & 1));
+                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)skill.SkillTempBonus[i]!, (byte)(i & 1));
                 }
-                if (activeData.Skill.SkillPermBonus[i] != null)
+                if (skill.SkillPermBonus[i] != null)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID + 128 + 128 + 128 + 128 + 128 + 128;
-                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillPermBonus[i]!, (byte)(i & 1));
+                    m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)skill.SkillPermBonus[i]!, (byte)(i & 1));
                 }
             }
             if (activeData.CharacterPoints != null)
@@ -1350,11 +1357,12 @@ public class ObjectUpdateBuilder
                 m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_PVP_POWER_DAMAGE, (float)activeData.PvpPowerDamage);
             if (activeData.PvpPowerHealing != null)
                 m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_PVP_POWER_HEALING, (float)activeData.PvpPowerHealing);
-            for (int i = 0; i < 240; i++)
+            ulong?[]? exploredZones = activeData.ExploredZones;
+            for (int i = 0; exploredZones != null && i < ActivePlayerData.ExploredZoneWords; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_EXPLORED_ZONES;
-                if (activeData.ExploredZones[i] != null)
-                    m_fields.SetUpdateField<ulong>(startIndex + i * 2, (ulong)activeData.ExploredZones[i]!);
+                if (exploredZones[i] != null)
+                    m_fields.SetUpdateField<ulong>(startIndex + i * 2, (ulong)exploredZones[i]!);
             }
             for (int i = 0; i < 2; i++)
             {
@@ -1564,11 +1572,12 @@ public class ObjectUpdateBuilder
                 if (activeData.BankBagSlotFlags[i] != null)
                     m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.BankBagSlotFlags[i]!);
             }
-            for (int i = 0; i < activeData.QuestCompleted.Length; i++)
+            ulong?[]? questCompleted = activeData.QuestCompleted;
+            for (int i = 0; questCompleted != null && i < questCompleted.Length; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_QUEST_COMPLETED;
-                if (activeData.QuestCompleted[i] != null)
-                    m_fields.SetUpdateField<ulong>(startIndex + i * 2, (ulong)activeData.QuestCompleted[i]!);
+                if (questCompleted[i] != null)
+                    m_fields.SetUpdateField<ulong>(startIndex + i * 2, (ulong)questCompleted[i]!);
             }
             if (activeData.Honor != null)
                 m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_HONOR, (int)activeData.Honor);

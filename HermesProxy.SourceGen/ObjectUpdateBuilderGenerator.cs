@@ -873,13 +873,18 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
 
         if (f.ArrayCount > 0 && f.ArrayMode == ArrayMode.PerElement)
         {
-            // Per-element bits at Bit..Bit+ArrayCount-1.
+            // Per-element bits at Bit..Bit+ArrayCount-1. The null test is hoisted rather
+            // than repeated per element: QuestCompleted[875] alone emitted 875 copies of
+            // it, 1,751 of the V3_4_3 builder's 4,351 lines, and every one is a field
+            // load plus a branch on a path that runs per owner-block update.
+            sb.Append("        if (src.").Append(f.SourceProperty).AppendLine(" != null)");
+            sb.AppendLine("        {");
             for (int i = 0; i < f.ArrayCount; i++)
             {
-                sb.Append("        if (src.").Append(f.SourceProperty)
-                  .Append(" != null && ").Append(ArrayElementPresence(f, i))
+                sb.Append("            if (").Append(ArrayElementPresence(f, i))
                   .Append(") mask |= (1u << ").Append(f.Bit + i).Append(")").Append(parentGate).AppendLine(";");
             }
+            sb.AppendLine("        }");
             return;
         }
 
@@ -1146,13 +1151,16 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
 
         if (f.ArrayCount > 0 && f.ArrayMode == ArrayMode.PerElement)
         {
+            // Null test hoisted out of the loop — see EmitFlatMaskBits for why.
+            sb.Append("        if (src.").Append(f.SourceProperty).AppendLine(" != null)");
+            sb.AppendLine("        {");
             for (int i = 0; i < f.ArrayCount; i++)
             {
-                sb.Append("        if (src.").Append(f.SourceProperty)
-                  .Append(" != null && ").Append(ArrayElementPresence(f, i))
+                sb.Append("            if (").Append(ArrayElementPresence(f, i))
                   .Append(") { ").Append(parentSetter)
                   .Append("blocks.SetBit(").Append(f.Bit + i).AppendLine("); }");
             }
+            sb.AppendLine("        }");
             return;
         }
 
