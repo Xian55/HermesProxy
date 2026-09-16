@@ -47,6 +47,13 @@ public partial class AuthClient
         return ih.GetHashAndReset();
     }
 
+    /// <summary>
+    /// How long a login or a reconnect waits for the legacy auth server's answer before telling the
+    /// modern client the login failed. Long enough to cover a slow or busy server, short enough that
+    /// a dead one doesn't hold the thread that is serving this player.
+    /// </summary>
+    internal static readonly TimeSpan LoginTimeout = TimeSpan.FromSeconds(30);
+
     GlobalSessionData _globalSession;
     Socket _clientSocket = null!;
     TaskCompletionSource<AuthResult> _response = null!;
@@ -95,9 +102,7 @@ public partial class AuthClient
             _response.SetResult(AuthResult.FAIL_INTERNAL_ERROR);
         }
 
-        _response.Task.ConfigureAwait(false).GetAwaiter().GetResult();
-
-        return _response.Task.Result;
+        return AwaitResponse();
     }
 
     public AuthResult Reconnect()
@@ -121,9 +126,24 @@ public partial class AuthClient
             _response.SetResult(AuthResult.FAIL_INTERNAL_ERROR);
         }
 
-        _response.Task.ConfigureAwait(false).GetAwaiter().GetResult();
+        return AwaitResponse();
+    }
 
-        return _response.Task.Result;
+    /// <summary>
+    /// Waits for the legacy auth server's verdict. The caller is the BNet REST thread handling the
+    /// client's login, and a server that accepts the connection and then says nothing used to hold
+    /// it for the lifetime of the process.
+    /// </summary>
+    private AuthResult AwaitResponse()
+    {
+        if (_response.Task.Wait(LoginTimeout))
+            return _response.Task.Result;
+
+        AuthClientLogMessages.LoginTimedOut(_melNet, _sourceFile, _netDirP2S,
+            _globalSession.LegacyServerOptions.Address, _globalSession.LegacyServerOptions.Port,
+            LoginTimeout.TotalSeconds);
+        Disconnect();
+        return AuthResult.FAIL_INTERNAL_ERROR;
     }
 
     private void SetAuthResponse(AuthResult response)

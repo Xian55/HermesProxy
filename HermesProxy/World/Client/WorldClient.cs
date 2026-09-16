@@ -19,6 +19,7 @@ using Framework.Networking;
 using HermesProxy.World.Server;
 using System.Diagnostics;
 using HermesProxy.World.Logging;
+using HermesProxy.World.Outbox;
 
 namespace HermesProxy.World.Client;
 
@@ -64,9 +65,18 @@ public partial class WorldClient
     uint _keepAlivePingSerial;
     const int KeepAliveIntervalMs = 30_000;
 
-    // packet order is not always the same as new client, sometimes we need to delay packet until another one
-    Dictionary<Opcode, List<WorldPacket>> _delayedPacketsToServer = null!;
-    Dictionary<Opcode, List<ServerPacket>> _delayedPacketsToClient = null!;
+    // One delegate for the life of the connection, so posting a packet to the executor allocates
+    // nothing per packet.
+    private Action<object?>? _handlePacketOnOwnerCache;
+    private Action<object?> HandlePacketOnOwnerDelegate => _handlePacketOnOwnerCache ??= HandlePacketOnOwner;
+
+    /// <summary>
+    /// How long <see cref="ConnectToWorldServer"/> waits for the legacy world server to accept and
+    /// finish its handshake before giving the modern client an authentication failure. Generous,
+    /// because a loaded server can be slow to answer; bounded, because the caller is a socket
+    /// thread and the alternative is waiting for ever.
+    /// </summary>
+    internal static readonly TimeSpan WorldServerHandshakeTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Last <c>SMSG_AUTH_RESPONSE</c> code the legacy world server sent, or <c>null</c> if the
@@ -123,8 +133,6 @@ public partial class WorldClient
         _username = globalSession.Username;
         _isSuccessful = null;
         LastAuthResult = null;
-        _delayedPacketsToServer = new Dictionary<Opcode, List<WorldPacket>>();
-        _delayedPacketsToClient = new Dictionary<Opcode, List<ServerPacket>>();
 
         WorldClientLogMessages.ConnectingToWorldServer(_melNet, _sourceFile, _netDirNone);
         try
@@ -132,6 +140,10 @@ public partial class WorldClient
             var ip = NetworkUtils.ResolveOrDirectIPv4(realm.ExternalAddress);
             WorldClientLogMessages.WorldServerResolved(_melNet, _sourceFile, _netDirNone, realm.ExternalAddress, realm.Port, ip.ToString());
             _clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            // This connection is idle whenever the player is, so without probes a legacy server
+            // whose machine disappears leaves ReceiveLoop waiting on a socket that will never
+            // answer, and the session never tears down.
+            NetworkUtils.EnableKeepAlive(_clientSocket, idleSeconds: 30, intervalSeconds: 5, retryCount: 3);
             // Connect to the specified host.
             var endPoint = new IPEndPoint(ip, realm.Port);
             _clientSocket.BeginConnect(endPoint, ConnectCallback, null);
@@ -142,12 +154,35 @@ public partial class WorldClient
             _isSuccessful = false;
         }
 
+        // Covers the TCP connect and the legacy handshake behind it. A server that accepts and
+        // then says nothing used to hold this thread — the modern client's realm socket thread —
+        // for as long as it stayed up.
+        long deadline = Environment.TickCount64 + (long)WorldServerHandshakeTimeout.TotalMilliseconds;
         while (_isSuccessful == null)
         {
+            if (Environment.TickCount64 >= deadline)
+            {
+                Log.Print(LogType.Error,
+                    $"Legacy world server {realm.ExternalAddress}:{realm.Port} did not complete the handshake within {WorldServerHandshakeTimeout.TotalSeconds:F0} s");
+                _isSuccessful = false;
+                CloseClientSocket();
+                break;
+            }
+
             Thread.Sleep(1);
         }
 
         return (bool)_isSuccessful;
+    }
+
+    private void CloseClientSocket()
+    {
+        try
+        {
+            _clientSocket?.Close();
+        }
+        catch (SocketException) { }
+        catch (ObjectDisposedException) { }
     }
 
     public bool IsAuthenticated()
@@ -182,9 +217,9 @@ public partial class WorldClient
         StopKeepAliveTimer();
         StopReadyCheckDeadline();
 
-        // Anything still waiting on an opcode that will now never arrive would otherwise reach
-        // the pool only via finalization, which is the case this class is least likely to notice.
-        DiscardDelayedPacketsToServer();
+        // Holds waiting on this connection's packets will never be released now.
+        GetSession().ToServer.Discard(OutboxScope.LegacyConnection);
+        GetSession().ToClient.Discard(OutboxScope.LegacyConnection);
 
         // Unhook before closing so the receive loop does not treat this as an
         // unexpected drop and call OnDisconnect (that nulls AuthClient, which
@@ -202,11 +237,6 @@ public partial class WorldClient
     public bool IsConnected()
     {
         return _clientSocket != null && _clientSocket.Connected;
-    }
-
-    public void SetNoDelay(bool enable)
-    {
-        _clientSocket?.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, enable);
     }
 
     public uint GetQueuePosition()
@@ -350,10 +380,10 @@ public partial class WorldClient
                         return;
                     }
 
-                    using WorldPacket packet = new WorldPacket(buffer, (int)packetSize, isPooled: true);
+                    WorldPacket packet = new WorldPacket(buffer, (int)packetSize, isPooled: true);
                     packetOwnsBuffer = true;
                     packet.SetReceiveTime(Environment.TickCount);
-                    HandlePacket(packet);
+                    DispatchPacket(packet);
                 }
                 finally
                 {
@@ -442,162 +472,14 @@ public partial class WorldClient
         }
     }
 
-    public void SendPacketToClient(ServerPacket packet, Opcode delayUntilOpcode = Opcode.MSG_NULL_ACTION)
-    {
-        Opcode opcode = packet.GetUniversalOpcode();
-        if (delayUntilOpcode != Opcode.MSG_NULL_ACTION)
-        {
-            if (_delayedPacketsToClient.ContainsKey(delayUntilOpcode))
-                _delayedPacketsToClient[delayUntilOpcode].Add(packet);
-            else
-            {
-                List<ServerPacket> packets = new List<ServerPacket>();
-                packets.Add(packet);
-                _delayedPacketsToClient.Add(delayUntilOpcode, packets);
-            }
-            return;
-        }
+    /// <summary>
+    /// Proxy to modern client. Routed by the packet's connection type through the session's
+    /// client outbox, which parks it if that socket is not attached yet.
+    /// </summary>
+    public void SendPacketToClient(ServerPacket packet) => GetSession().ToClient.Send(packet);
 
-        SendPacketToClientDirect(packet);
-        SendDelayedPacketsToClientOnOpcode(opcode);
-    }
-
-    private void SendPacketToClientDirect(ServerPacket packet)
-    {
-        var gameState = GetSession().GameState;
-        var pendingPackets = gameState.PendingUninstancedPackets;
-        var pendingLock = gameState.PendingUninstancedPacketsLock;
-        if (packet.GetConnection() == ConnectionType.Realm)
-        {
-            // First login: RealmSocket is null until ENTER_ENCRYPTED_MODE_ACK.
-            // Change-realm: it still points at the old closed socket. Treat a
-            // dead socket like null so TUTORIAL_FLAGS queues instead of landing
-            // on the old connection and calling OnDisconnect.
-            var realmSocket = GetSession().RealmSocket;
-            if (realmSocket == null || !realmSocket.IsOpen())
-            {
-                lock (gameState.PendingRealmPacketsLock)
-                {
-                    realmSocket = GetSession().RealmSocket;
-                    if (realmSocket == null || !realmSocket.IsOpen())
-                    {
-                        gameState.PendingRealmPackets.Enqueue(packet);
-                        Log.PrintNet(LogType.Warn, LogNetDir.P2C, $"Can't send opcode {packet.GetUniversalOpcode()} ({packet.GetOpcode()}) before RealmSocket ready! Queue");
-                        return;
-                    }
-                }
-            }
-
-            realmSocket.SendPacket(packet);
-        }
-        else
-        {
-            if (GetSession().InstanceSocket == null &&
-               !gameState.IsConnectedToInstance)
-            {
-                lock (pendingLock)
-                {
-                    if (GetSession().InstanceSocket == null &&
-                        !gameState.IsConnectedToInstance)
-                    {
-                        pendingPackets.Enqueue(packet);
-                        Log.PrintNet(LogType.Warn, LogNetDir.P2C, $"Can't send opcode {packet.GetUniversalOpcode()} ({packet.GetOpcode()}) before entering world! Queue");
-                        return;
-                    }
-                }
-            }
-
-            // Block these packets until connected to instance. Bounded: an unbounded spin
-            // here deadlocks the legacy read loop for the rest of the session if the client
-            // never completes the instance handshake (or if OnDisconnect clears the socket).
-            const int instanceWaitTimeoutMs = 30000;
-            int waitedMs = 0;
-            while (GetSession().InstanceSocket == null)
-            {
-                if (waitedMs >= instanceWaitTimeoutMs)
-                {
-                    Log.PrintNet(LogType.Error, LogNetDir.P2C,
-                        $"Gave up waiting {instanceWaitTimeoutMs}ms for the instance connection; dropping {packet.GetUniversalOpcode()} ({packet.GetOpcode()}).");
-                    return;
-                }
-
-                Log.PrintNet(LogType.Network, LogNetDir.P2C, $"Waiting to send {packet.GetUniversalOpcode()} ({packet.GetOpcode()}).");
-                System.Threading.Thread.Sleep(200);
-                waitedMs += 200;
-            }
-
-            var socket = GetSession().InstanceSocket;
-            if (pendingPackets.Count > 0)
-            {
-                lock (pendingLock)
-                {
-                    while (pendingPackets.TryDequeue(out var oldPacket))
-                    {
-                        socket.SendPacket(oldPacket);
-                    }
-                }
-            }
-
-            socket.SendPacket(packet);
-        }
-    }
-
-    public void SendPacketToServer(WorldPacket packet, Opcode delayUntilOpcode = Opcode.MSG_NULL_ACTION)
-    {
-        Opcode opcode = packet.GetUniversalOpcode(false);
-        if (delayUntilOpcode != Opcode.MSG_NULL_ACTION)
-        {
-            if (_delayedPacketsToServer.ContainsKey(delayUntilOpcode))
-                _delayedPacketsToServer[delayUntilOpcode].Add(packet);
-            else
-            {
-                List<WorldPacket> packets = new List<WorldPacket>();
-                packets.Add(packet);
-                _delayedPacketsToServer.Add(delayUntilOpcode, packets);
-            }
-            return;
-        }
-
-        SendPacket(packet);
-        SendDelayedPacketsToServerOnOpcode(opcode);
-    }
-
-    /// <summary>Drops packets queued behind an opcode that is no longer coming.</summary>
-    private void DiscardDelayedPacketsToServer()
-    {
-        foreach (var queued in _delayedPacketsToServer.Values)
-        {
-            foreach (var packet in queued)
-                packet.Dispose();
-        }
-        _delayedPacketsToServer.Clear();
-    }
-
-    private void SendDelayedPacketsToServerOnOpcode(Opcode opcode)
-    {
-        if (_delayedPacketsToServer.ContainsKey(opcode))
-        {
-            List<WorldPacket> packets = _delayedPacketsToServer[opcode];
-            for (int i = packets.Count - 1; i >= 0; i--)
-            {
-                SendPacket(packets[i]);
-                packets.RemoveAt(i);
-            }
-        }
-    }
-
-    private void SendDelayedPacketsToClientOnOpcode(Opcode opcode)
-    {
-        if (_delayedPacketsToClient.ContainsKey(opcode))
-        {
-            List<ServerPacket> packets = _delayedPacketsToClient[opcode];
-            for (int i = packets.Count - 1; i >= 0; i--)
-            {
-                SendPacketToClientDirect(packets[i]);
-                packets.RemoveAt(i);
-            }
-        }
-    }
+    /// <summary>Proxy to legacy server, now. To hold a packet back, use the session's ToServer outbox.</summary>
+    public void SendPacketToServer(WorldPacket packet) => SendPacket(packet);
 
     // Opcodes the legacy server may legitimately send before SMSG_AUTH_RESPONSE
     // that we don't translate. Without this allow-list the default arm below
@@ -611,6 +493,35 @@ public partial class WorldClient
         // flip _isSuccessful to false and abort an otherwise healthy handshake.
         return op == Opcode.SMSG_WARDEN_DATA
             || op == Opcode.SMSG_CACHE_VERSION;
+    }
+
+    /// <summary>
+    /// Hands one legacy packet to the session's owner thread, and with it the pooled buffer: the
+    /// receive loop must not return that buffer while a queued handler still has to read it.
+    /// </summary>
+    /// <remarks>
+    /// The handshake is the exception and runs where it arrived. <see cref="SendAuthResponse"/>
+    /// turns encryption on immediately after writing CMSG_AUTH_SESSION, and the thread that would
+    /// otherwise own the session is the realm socket's, parked in
+    /// <see cref="ConnectToWorldServer"/> waiting for exactly this reply — posting it there would
+    /// deadlock until the handshake timeout.
+    /// </remarks>
+    private void DispatchPacket(WorldPacket packet)
+    {
+        if (_isSuccessful == null || _globalSession == null)
+        {
+            using (packet)
+                HandlePacket(packet);
+            return;
+        }
+
+        _globalSession.Executor.Post(HandlePacketOnOwnerDelegate, packet);
+    }
+
+    private void HandlePacketOnOwner(object? state)
+    {
+        using var packet = (WorldPacket)state!;
+        HandlePacket(packet);
     }
 
     private unsafe void HandlePacket(WorldPacket packet)
@@ -697,24 +608,19 @@ public partial class WorldClient
             HermesProxy.Server.Metrics.RecordServerToClient(universalOpcode, Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds, allocated);
         }
 
-        SendDelayedPacketsToServerOnOpcode(universalOpcode);
+        GetSession().OnLegacyPacketHandled(universalOpcode);
     }
 
-    /// <summary>
-    /// Runs a generated thunk with the same swallow-and-log the reflective arm has. The packet is
-    /// not disposed here: on this side the caller owns the buffer, and the reflective handlers it
-    /// sits beside do not dispose either.
-    /// </summary>
     /// <summary>
     /// Invokes a generated legacy thunk, which calls the handler still living on this instance.
     /// </summary>
     /// <remarks>
     /// The legacy table carries a different thunk shape from the modern one: these handlers parse
     /// inline off the WorldPacket rather than through a codec, so the thunk takes the client and
-    /// the packet. The error handling is the same as the reflective path it replaces - a throwing
+    /// the packet. The error handling is the same as the reflective path it replaced - a throwing
     /// handler must not escape into the read loop, which would tear down the world connection,
     /// and the packet is already fully read off the socket so dropping it cannot desync the
-    /// stream.
+    /// stream. The packet is not disposed here: on this side the caller owns the buffer.
     /// </remarks>
     private unsafe void HandleGeneratedLegacyPacket(
         delegate*<WorldClient, WorldPacket, void> thunk,
@@ -926,8 +832,18 @@ public partial class WorldClient
 
     private void SendKeepAlivePing(object? state)
     {
-        uint serial = Interlocked.Increment(ref _keepAlivePingSerial);
-        SendPing(serial | 0x80000000, 0);
+        // Through the executor like any other work: a ping written from the timer thread would
+        // interleave with whatever the owner is sending.
+        var session = _globalSession;
+        if (session == null)
+            return;
+
+        session.Executor.Post(static client =>
+        {
+            var self = (WorldClient)client!;
+            uint serial = Interlocked.Increment(ref self._keepAlivePingSerial);
+            self.SendPing(serial | 0x80000000, 0);
+        }, this);
     }
 
 }

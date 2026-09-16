@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using HermesProxy.World.Client;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server;
 
 namespace HermesProxy.World.Dispatch;
@@ -75,35 +76,49 @@ public readonly struct SessionContext
     public GameSessionData GameState
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Session.GameState;
+        get
+        {
+            // Debug builds only, and compiled out entirely in Release: catches a thread reaching
+            // session state while the executor's owner is mid-packet.
+            Session.Executor.AssertOwner("GameState");
+            return Session.GameState;
+        }
     }
 
     /// <summary>
-    /// Proxy to legacy emulator. Mirrors <c>WorldSocket.SendPacketToServer</c>, including its
-    /// behaviour when the legacy connection is gone — dropping with an error beats throwing
-    /// inside a handler.
-    /// </summary>
-    public void SendPacketToServer(WorldPacket packet, Opcode delayUntilOpcode = Opcode.MSG_NULL_ACTION)
-    {
-        WorldClient? client = Session.WorldClient;
-        if (client != null)
-            client.SendPacketToServer(packet, delayUntilOpcode);
-        else
-            Framework.Logging.Log.Print(Framework.Logging.LogType.Error,
-                $"Attempt to send opcode {packet.GetUniversalOpcode(false)} ({packet.GetOpcode()}) while WorldClient is disconnected!");
-    }
-
-    /// <summary>
-    /// Proxy to modern client, routed by connection type. Mirrors
-    /// <c>WorldClient.SendPacketToClient</c>. Resolved from the session on every call rather than
-    /// from <see cref="Client"/>, for the same reason <see cref="SendPacketToServer"/> is: the
-    /// world client is attached to the session after the modern socket binds it.
+    /// Proxy to legacy emulator, now. Goes through the session's server outbox, which drops the
+    /// packet with a warning when the legacy connection is gone: dropping beats throwing inside
+    /// a handler. To hold a packet back, use <see cref="ToServer"/>.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SendPacketToClient(ServerPacket packet, Opcode delayUntilOpcode = Opcode.MSG_NULL_ACTION)
-        => (Client ?? Session.WorldClient)!.SendPacketToClient(packet, delayUntilOpcode);
+    public void SendPacketToServer(WorldPacket packet) => Session.ToServer.Send(packet);
+
+    /// <summary>
+    /// Proxy to modern client, routed by the packet's connection type through the session's client
+    /// outbox, which parks it until that socket is attached. To hold a packet back, use
+    /// <see cref="ToClient"/>.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void SendPacketToClient(ServerPacket packet) => Session.ToClient.Send(packet);
 
     /// <summary>Send on the socket this packet arrived on. Mirrors <c>WorldSocket.SendPacket</c>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SendPacket(ServerPacket packet) => Socket!.SendPacket(packet);
+
+    /// <summary>
+    /// Packets to the modern client: sent now, or held until an event, a gate or a deadline.
+    /// See <c>World/Outbox/CLAUDE.md</c> for which call fits which situation.
+    /// </summary>
+    public ClientOutbox ToClient
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Session.ToClient;
+    }
+
+    /// <summary>Packets to the legacy server: sent now, or held. See <c>World/Outbox/CLAUDE.md</c>.</summary>
+    public ServerOutbox ToServer
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Session.ToServer;
+    }
 }

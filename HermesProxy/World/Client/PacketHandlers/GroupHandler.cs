@@ -575,6 +575,18 @@ public partial class WorldClient
 
     private void OnReadyCheckDeadline(object? state)
     {
+        // The body reads and writes GameState, so it belongs to the session's owner, not to the
+        // timer thread.
+        var session = _globalSession;
+        if (session == null)
+            return;
+
+        // A ready check happens a few times an hour, so the closure here costs nothing worth saving.
+        session.Executor.Post(due => RunReadyCheckDeadline(due), state);
+    }
+
+    private void RunReadyCheckDeadline(object? state)
+    {
         StopReadyCheckDeadline();
 
         // An escaped exception on a timer thread has no handler above it and would take

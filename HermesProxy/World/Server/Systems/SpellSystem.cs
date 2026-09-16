@@ -21,11 +21,11 @@ namespace HermesProxy.World.Server.Systems;
 /// <c>verify-handler-port.py</c> diffs each one against the original.
 /// </para>
 /// <para>
-/// Three members here are called from outside this file and moved anyway, because one
-/// implementation beats a copy on each side of the migration: <c>SendCastRequestFailed</c> (the
-/// legacy item handler abandons a pending cast through it), and <c>ForwardKnownSpellCast</c> and
-/// <c>UseInventoryItem</c> (<c>ToyHandler</c>, still on the reflective path). They take the context
-/// explicitly; <c>WorldSocket.SessionContext</c> exists so the legacy side can supply one.
+/// Three members here are called from outside this file, and live here so there is one
+/// implementation rather than a copy per caller: <c>SendCastRequestFailed</c> (the legacy item and
+/// spell handlers abandon a pending cast through it), and <c>ForwardKnownSpellCast</c> and
+/// <c>UseInventoryItem</c> (<c>ToySystem</c>). They take the context explicitly;
+/// <c>WorldSocket.SessionContext</c> exists so the legacy side can supply one.
 /// </para>
 /// </remarks>
 public static class SpellSystem

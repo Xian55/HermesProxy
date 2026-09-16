@@ -6,6 +6,13 @@ public sealed class DiagnosticsOptions
 
     public bool EnableMetrics { get; set; }
 
+    /// <summary>
+    /// Seconds between metrics summaries, and the length of the interval the summary's
+    /// per-interval columns (packet rates, GC delta, IntMax) cover. Short intervals isolate a
+    /// burst from the quiet traffic around it; long ones keep the log small.
+    /// </summary>
+    public int MetricsIntervalSeconds { get; set; } = 60;
+
     public bool EnableVersionCheck { get; set; } = true;
 
     /// <summary>

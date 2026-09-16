@@ -203,22 +203,12 @@ internal static partial class WorldSocketLogMessages
 
     [LoggerMessage(
         EventId = 120,
-        Level = LogLevel.Debug,
-        Message = "Forwarded {Sent} CMSG_GUILD_RANK for {Received} CMSG_GUILD_SET_RANK_PERMISSIONS from one burst")]
-    public static partial void GuildRankPermissionsCoalesced(
-        ILogger logger,
-        string SourceFile,
-        string NetDir,
-        int Received,
-        int Sent);
-
-    [LoggerMessage(
-        EventId = 121,
         Level = LogLevel.Error,
-        Message = "Forwarding coalesced guild rank permissions failed")]
-    public static partial void GuildRankPermissionsFlushFailed(
+        Message = "AuctionSellItem: split item never reached its bag slot within {TimeoutSeconds} s; not posting the remaining {Remaining} item(s)")]
+    public static partial void AuctionSplitNeverFilled(
         ILogger logger,
         string SourceFile,
         string NetDir,
-        System.Exception exception);
+        double TimeoutSeconds,
+        int Remaining);
 }

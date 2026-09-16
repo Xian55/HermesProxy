@@ -7,7 +7,10 @@ with a bug, which is worse than having no test at all. This lifts them mechanica
 
 Run it BEFORE converting a packet, while the class still exists:
 
-    python freeze-oracles.py QueryQuestInfo QueryCreature ... >> FrozenClientPackets.g.cs
+    python freeze-oracles.py QueryQuestInfo QueryCreature ...
+
+and paste the output inside the `FrozenPackets` class in FrozenPackets.g.cs, before its closing
+brace - it is already indented for that. Appending with `>>` would land it outside the class.
 
 It rewrites only what it must: drop the ClientPacket base and its constructor, and turn
 `public override void Read()` into `public void Read(WorldPacket p)` with `_worldPacket` renamed

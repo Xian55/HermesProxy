@@ -3,6 +3,7 @@ using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
 using System;
 
@@ -32,15 +33,15 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_ACCOUNT_DATA_TIMES)]
     internal void HandleAccountDataTimes(WorldPacket packet)
     {
-        GetSession().RealmSocket.SendAccountDataTimes();
+        SendPacketToClient(WorldSocket.BuildAccountDataTimes(GetSession()));
 
         // These packets don't exist in Vanilla and we must send them here.
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
-            GetSession().RealmSocket.SendFeatureSystemStatus();
-            GetSession().RealmSocket.SendMotd();
-            GetSession().RealmSocket.SendSetTimeZoneInformation();
-            GetSession().RealmSocket.SendSeasonInfo();
+            SendPacketToClient(WorldSocket.BuildFeatureSystemStatus(GetSession()));
+            SendPacketToClient(new MOTD());
+            SendPacketToClient(WorldSocket.BuildSetTimeZoneInformation());
+            SendPacketToClient(WorldSocket.BuildSeasonInfo());
         }
     }
 

@@ -4,6 +4,7 @@ using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
 using System;
@@ -346,6 +347,8 @@ public partial class WorldClient
         SendPacketToClient(verify);
 
         GetSession().GameState.IsInWorld = true;
+        // Name queries the client made at character select go out now.
+        GetSession().ToServer.SetGate(OutboxGate.InWorld, open: true);
 
         bool isModernWotLK = ModernVersion.ExpansionVersion >= 3;
 
@@ -460,6 +463,7 @@ public partial class WorldClient
         SendPacketToClient(failed);
 
         GetSession().GameState.IsInWorld = false;
+        GetSession().ToServer.SetGate(OutboxGate.InWorld, open: false);
     }
 
     [HandlesSmsg(Opcode.SMSG_UPDATE_ACTION_BUTTONS)]
@@ -564,7 +568,8 @@ public partial class WorldClient
         LogoutComplete logout = new LogoutComplete();
         SendPacketToClient(logout);
 
-        GetSession().GameState = GameSessionData.CreateNewGameSessionData(GetSession());
+        GetSession().ReplaceGameState();
+        GetSession().ToClient.Detach(Framework.Constants.ConnectionType.Instance);
         GetSession().InstanceSocket.CloseSocket();
         GetSession().InstanceSocket = null!;
     }

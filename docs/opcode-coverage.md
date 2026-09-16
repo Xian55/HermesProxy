@@ -151,9 +151,9 @@ Each needs a judgement call against the client or WowPacketParser.
 
 Counts per file rather than line numbers, so unrelated edits do not churn this file.
 
-207 sites across 53 files.
+209 sites across 53 files.
 
-### `ModernVersion.Build` compared by equality — 207 sites
+### `ModernVersion.Build` compared by equality — 209 sites
 
 | file | build compared | sites |
 |---|---|---:|
@@ -162,9 +162,9 @@ Counts per file rather than line numbers, so unrelated edits do not churn this f
 | `HermesProxy/World/GameData.cs` | `V3_4_3_54261` | 15 |
 | `HermesProxy/World/Server/Packets/SpellPackets.cs` | `V3_4_3_54261` | 15 |
 | `HermesProxy/World/Objects/MovementInfo.cs` | `V3_4_3_54261` | 12 |
+| `HermesProxy/World/Client/PacketHandlers/PetHandler.cs` | `V3_4_3_54261` | 8 |
 | `HermesProxy/World/Server/Packets/QuestPackets.cs` | `V3_4_3_54261` | 8 |
 | `HermesProxy/World/Client/PacketHandlers/SpellHandler.cs` | `V3_4_3_54261` | 7 |
-| `HermesProxy/World/Client/PacketHandlers/PetHandler.cs` | `V3_4_3_54261` | 6 |
 | `HermesProxy/World/Client/PacketHandlers/QueryHandler.cs` | `V3_4_3_54261` | 6 |
 | `HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs` | `V3_4_3_54261` | 5 |
 | `HermesProxy/World/Server/Packets/GroupPackets.cs` | `V3_4_3_54261` | 5 |

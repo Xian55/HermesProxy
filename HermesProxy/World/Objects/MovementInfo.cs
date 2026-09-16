@@ -645,9 +645,10 @@ public sealed class MovementInfo
     // Generated mechanically from the WorldPacket versions above, not retyped: the only edits are
     // the parameter type and passing `data` on by ref. Two implementations of one wire layout is
     // the same hand-sync hazard docs/version-shape-dispatch.md calls out for Write()/WriteToSpan(),
-    // so MovementInfoReaderEquivalenceTests runs both over the same bytes and compares every field
-    // and the final position. The WorldPacket pair survives only for SpellCastRequest, the last
-    // unconverted caller; delete both when it converts.
+    // so MovementReaderEquivalenceTests runs both over the same bytes and compares every field
+    // and the final position. The WorldPacket version has no production caller left: only
+    // SpellCastRequest.Read(WorldPacket) uses it, as the oracle in SpellCodecEquivalenceTests.
+    // Delete it once that test moves to a frozen copy.
 
     public void ReadMovementInfoModern(ref SpanPacketReader data)
     {

@@ -12,17 +12,17 @@ namespace HermesProxy.Tests.SourceGen;
 /// <remarks>
 /// <para>
 /// These pin the <i>shape</i> of the generated dispatch — the table type, the lookup, the
-/// coexistence fallback, the claimed-opcode set — so that a slice which converts a handful of
-/// opcodes shows up as a handful of added thunks and table slots, and nothing else. The value is
+/// null-slot contract, the claimed-opcode set — so that a change which adds or ranges a handful of
+/// handlers shows up as a handful of added thunks and table slots, and nothing else. The value is
 /// in the diff being small and readable: this is generated code that runs on every inbound
 /// packet, and a change to its framing is far easier to review here than to reason about from
 /// the attributes.
 /// </para>
 /// <para>
-/// At slice 1 both tables are empty by design — no system carries <c>[HandlesCmsg]</c> or
-/// <c>[HandlesSmsg]</c> yet, so every opcode still falls through to the reflective registry and
-/// behaviour is provably unchanged. That empty table is the baseline every later slice is read
-/// against.
+/// Read removed lines first. A handler that disappears — typically because a <c>*System.cs</c> was
+/// rewritten rather than merged into — still builds and passes every other test, because the
+/// generator finds handlers by attribute and nothing names them. Its thunk vanishing here is the
+/// only signal.
 /// </para>
 /// <para>
 /// Accepting a change: confirm the diff contains only what you meant, with

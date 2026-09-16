@@ -6,7 +6,11 @@ Shared library providing core networking, cryptography, packet I/O, protocol buf
 
 - **`SpanPacketReader` / `SpanPacketWriter`** — `ref struct`, zero-allocation packet serialization over `Span<byte>`
 - **`ByteBuffer`** — pooled legacy-compatible read/write buffer (uses `ArrayPool<byte>`)
-- **`SocketBase`** — abstract async TCP networking base class
+- **`SocketBase`** — abstract async TCP networking base class. Reads are async; `AsyncWrite` is a
+  blocking send, bounded by a 30 s `SendTimeout` — a peer that stops reading would otherwise pin the
+  sending thread. A timed-out send has lost the frame boundary, so the socket is closed rather than
+  retried. Every socket also gets TCP keep-alive (`NetworkUtils.EnableKeepAlive`), so a peer whose
+  machine disappears surfaces within ~90 s instead of after TCP's own retransmit limit.
 
 ## Directories
 

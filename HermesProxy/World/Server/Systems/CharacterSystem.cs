@@ -9,6 +9,7 @@ using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server.Packets;
 
 namespace HermesProxy.World.Server.Systems;
@@ -150,12 +151,19 @@ public static class CharacterSystem
             ctx.GetSession().GameState.CurrentMapId = loadingScreenNotify.MapID;
     }
 
+    // The legacy server ignores name queries from a session that hasn't entered the world, and the
+    // client asks for names at character select. Hold them until the player is in the world; one
+    // still waiting after five minutes belongs to a character select the player walked away from.
+    // A change of realm drops them with the connection they were meant for.
+    private static readonly HoldOptions NameQueryHold = new(
+        Timeout: TimeSpan.FromMinutes(5), OnTimeout: OutboxTimeoutAction.Discard, Scope: OutboxScope.LegacyConnection);
+
     [HandlesCmsg(Opcode.CMSG_QUERY_PLAYER_NAME)]
     public static void HandleNameQueryRequest(in QueryPlayerName queryPlayerName, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_NAME_QUERY);
         packet.WriteGuid(queryPlayerName.Player.To64());
-        ctx.SendPacketToServer(packet, ctx.GetSession().GameState.IsInWorld ? Opcode.MSG_NULL_ACTION : Opcode.SMSG_LOGIN_VERIFY_WORLD);
+        ctx.ToServer.When(OutboxGate.InWorld, packet, NameQueryHold);
     }
 
     [HandlesCmsg(Opcode.CMSG_QUERY_PLAYER_NAMES)]
@@ -165,7 +173,7 @@ public static class CharacterSystem
         {
             WorldPacket packet = new WorldPacket(Opcode.CMSG_NAME_QUERY);
             packet.WriteGuid(guid.To64());
-            ctx.SendPacketToServer(packet, ctx.GetSession().GameState.IsInWorld ? Opcode.MSG_NULL_ACTION : Opcode.SMSG_LOGIN_VERIFY_WORLD);
+            ctx.ToServer.When(OutboxGate.InWorld, packet, NameQueryHold);
         }
     }
 
@@ -234,7 +242,7 @@ public static class CharacterSystem
             $"[Login] entering world as '{ownCharacter.Name}' ({ownCharacter.RaceId} {ownCharacter.ClassId} lvl {ownCharacter.Level}) " +
             $"guid={playerLogin.Guid} realm='{realm.Name}': state published, opening instance connection");
         ctx.Socket!.SendConnectToInstance(ConnectToSerial.WorldAttempt1);
-        ctx.GetSession().GameState.IsConnectedToInstance = true;
+        ctx.ToClient.BeginInstanceConnect();
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PLAYER_LOGIN);
         packet.WriteGuid(playerLogin.Guid.To64());

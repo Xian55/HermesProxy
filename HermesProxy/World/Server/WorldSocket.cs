@@ -409,7 +409,10 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
                     // queue instead of writing to this closing connection.
                     GetSession().WorldClient?.Disconnect();
                     if (GetSession().RealmSocket == this)
+                    {
                         GetSession().RealmSocket = null!;
+                        GetSession().ToClient.Detach(ConnectionType.Realm);
+                    }
                 }
                 if (GetSession().ModernSniff != null)
                 {
@@ -419,8 +422,12 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
                 break;
             case Opcode.CMSG_ENABLE_NAGLE:
+                // Only the socket the client asked on, as native does (TC WorldSocket.cpp). The
+                // proxy's own link to the legacy server stays no-delay: legacy clients never asked
+                // for Nagle, and there is no opcode to turn it back off, so copying the request there
+                // delayed every small CMSG for the rest of the connection. With 300 ms of added lag
+                // the in-game latency read ~1100 ms against ~600 ms of real round trip.
                 SetNoDelay(false);
-                GetSession()?.WorldClient?.SetNoDelay(false);
                 break;
             case Opcode.CMSG_CONNECT_TO_FAILED:
                 ConnectToFailed connectToFailed = new(packet);
@@ -434,12 +441,39 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
                 SendServerTimeOffset();
                 break;
             default:
-                HandlePacket(packet);
+                DispatchPacket(packet);
                 break;
         }
 
         return ReadDataHandlerResult.Ok;
     }
+
+    /// <summary>
+    /// Hands one client packet to the session's owner thread. The packet owns its buffer —
+    /// <see cref="ReadHeader"/> sizes a fresh one per frame — so the socket can read the next frame
+    /// while this one is still being handled.
+    /// </summary>
+    /// <remarks>
+    /// The connection-level opcodes above stay on the socket thread: they run before a session
+    /// exists, or they turn encryption on, which has to happen before the next frame is decrypted
+    /// here.
+    /// </remarks>
+    private void DispatchPacket(WorldPacket packet)
+    {
+        if (_globalSession == null)
+        {
+            HandlePacket(packet);
+            return;
+        }
+
+        _globalSession.Executor.Post(HandlePacketOnOwnerDelegate, packet);
+    }
+
+    private Action<object?>? _handlePacketOnOwnerCache;
+
+    // Built once per socket, so posting a packet allocates nothing.
+    private Action<object?> HandlePacketOnOwnerDelegate =>
+        _handlePacketOnOwnerCache ??= state => HandlePacket((WorldPacket)state!);
 
     public unsafe void HandlePacket(WorldPacket packet)
     {
@@ -531,10 +565,10 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             $"head={hex}{Environment.NewLine}{e}");
     }
 
-    private void SendPacketToServer(WorldPacket packet, Opcode delayUntilOpcode = Opcode.MSG_NULL_ACTION)
+    private void SendPacketToServer(WorldPacket packet)
     {
         if (GetSession().WorldClient != null)
-            GetSession().WorldClient!.SendPacketToServer(packet, delayUntilOpcode);
+            GetSession().WorldClient!.SendPacketToServer(packet);
         else
             Log.Print(LogType.Error, $"Attempt to send opcode {packet.GetUniversalOpcode(false)} ({packet.GetOpcode()}) while WorldClient is disconnected!");
     }
@@ -549,9 +583,15 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             if (session != null)
             {
                 if (session.RealmSocket == this)
+                {
                     session.RealmSocket = null!;
+                    session.ToClient.Detach(ConnectionType.Realm);
+                }
                 else if (session.InstanceSocket == this)
+                {
                     session.InstanceSocket = null!;
+                    session.ToClient.Detach(ConnectionType.Instance);
+                }
             }
             // Nothing will write this packet now, so nothing will return the buffer its
             // constructor rented. Hand it back here rather than leaving it to finalization.
@@ -705,14 +745,6 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             return false;
 
         return true;
-    }
-
-    public override void OnClose()
-    {
-        // A rank edit still inside its coalescing window goes out now rather than being lost.
-        System.Threading.Interlocked.Exchange(ref _rankPermissionsTimer, null)?.Dispose();
-        FlushRankPermissions();
-        base.OnClose();
     }
 
     void HandleSendAuthSession()
@@ -1020,7 +1052,20 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
     void HandleEnterEncryptedModeAck()
     {
+        // Inline, and only this: the next frame on this socket is decrypted by this same thread, so
+        // the crypt has to be live before this method returns.
         _worldCrypt.Initialize(_encryptKey);
+
+        // The rest binds the socket to the session and sends the login burst, which is session work.
+        // Posting it also puts the park drain on the owner instead of a socket thread.
+        if (_globalSession is { } session)
+            session.Executor.Post(static self => ((WorldSocket)self!).FinishEnterEncryptedMode(), this);
+        else
+            FinishEnterEncryptedMode();
+    }
+
+    private void FinishEnterEncryptedMode()
+    {
         if (_connectType == ConnectionType.Realm)
         {
             var worldClient = GetSession().WorldClient;
@@ -1040,23 +1085,18 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             GetSession().AccountDataMgr = new AccountDataManager(GetSession().Username, GetSession().RealmManager.GetRealm(_realmId)!.Name);
             GetSession().RealmSocket = this;
 
-            // Flush any Realm-destined packets the legacy WorldClient queued before this
-            // socket was ready. See WorldClient.SendPacketToClientDirect for the producer.
-            var gameState = GetSession().GameState;
-            if (gameState.PendingRealmPackets.Count > 0)
-            {
-                lock (gameState.PendingRealmPacketsLock)
-                {
-                    while (gameState.PendingRealmPackets.TryDequeue(out var queuedPacket))
-                        SendPacket(queuedPacket);
-                }
-            }
+            // After the login burst above, so packets the legacy server sent before this socket
+            // existed (SMSG_TUTORIAL_FLAGS and friends) reach the client in the order they came.
+            GetSession().ToClient.Attach(ConnectionType.Realm);
         }
         else
         {
             Log.Print(LogType.Server, "Client has connected to the instance server.");
             SendPacket(new ResumeComms(ConnectionType.Instance));
             GetSession().InstanceSocket = this;
+            // ResumeComms must be the first packet on this socket, so nothing parked may go
+            // out ahead of it.
+            GetSession().ToClient.Attach(ConnectionType.Instance);
         }
     }
 
@@ -1226,14 +1266,19 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             SendPacket(new WaitQueueFinish());
     }
 
-    public void SendSetTimeZoneInformation()
+    public void SendSetTimeZoneInformation() => SendPacket(BuildSetTimeZoneInformation());
+
+    // The Build* methods below are static so legacy handlers can send these through the session's
+    // client outbox, which parks them while the realm socket is absent, instead of calling
+    // RealmSocket directly and throwing when it is null (change realm).
+    internal static SetTimeZoneInformation BuildSetTimeZoneInformation()
     {
         // @todo: replace dummy values
         SetTimeZoneInformation packet = new();
         packet.ServerTimeTZ = "Europe/Paris";
         packet.GameTimeTZ = "Europe/Paris";
 
-        SendPacket(packet);//enabled it
+        return packet;
     }
 
     public void SendFeatureSystemStatusGlueScreen()
@@ -1263,7 +1308,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         SendPacket(features);
     }
 
-    public void SendFeatureSystemStatus()
+    internal static FeatureSystemStatus BuildFeatureSystemStatus(GlobalSessionData session)
     {
         FeatureSystemStatus features = new();
         features.ComplaintStatus = 2;
@@ -1313,7 +1358,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         features.QuickJoinConfig.ThrottleDfBestPriority = 80;
 
         features.Squelch.IsSquelched = false;
-        features.Squelch.BnetAccountGuid = WowGuid128.Create(HighGuidType703.BNetAccount, GetSession().AccountInfo.Id);
+        features.Squelch.BnetAccountGuid = WowGuid128.Create(HighGuidType703.BNetAccount, session.AccountInfo.Id);
         features.Squelch.GuildGuid = WowGuid128.Empty;
 
         features.EuropaTicketSystemStatus.TicketsEnabled = true;
@@ -1325,10 +1370,10 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         features.EuropaTicketSystemStatus.ThrottleState.PerMilliseconds = 60000;
         features.EuropaTicketSystemStatus.ThrottleState.TryCount = 1;
         features.EuropaTicketSystemStatus.ThrottleState.LastResetTimeBeforeNow = 10627480;
-        SendPacket(features);
+        return features;
     }
 
-    public void SendSeasonInfo()
+    internal static SeasonInfo BuildSeasonInfo()
     {
         SeasonInfo seasonInfo = new();
         if (LegacyVersion.ExpansionVersion > 1 &&
@@ -1337,13 +1382,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             seasonInfo.CurrentSeason = 2;
             seasonInfo.PreviousSeason = 1;
         }
-        SendPacket(seasonInfo);
-    }
-
-    public void SendMotd()
-    {
-        MOTD motd = new();
-        SendPacket(motd);
+        return seasonInfo;
     }
 
     public void SendClientCacheVersion(uint version)
@@ -1394,20 +1433,14 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         SendPacket(new Pong(ping.Serial));
     }
 
-    public void SendAccountDataTimes()
+    /// <summary>
+    /// Loads the player's account data and builds the timestamps packet. A realm-socket packet
+    /// by type, so sending it through the client outbox lands it on the realm socket.
+    /// </summary>
+    internal static AccountDataTimes BuildAccountDataTimes(GlobalSessionData session)
     {
-        // Was a Trace.Assert. Account data belongs on the realm socket; if this ever runs
-        // on the instance socket the packet would go to the wrong connection, but that is
-        // still not worth aborting the process from a socket callback.
-        if (_connectType != ConnectionType.Realm)
-        {
-            Log.Print(LogType.Error,
-                $"SendAccountDataTimes called on a {_connectType} socket, expected {ConnectionType.Realm}. Skipping.");
-            return;
-        }
-
-        WowGuid128 guid = GetSession().GameState.CurrentPlayerGuid;
-        GetSession().AccountDataMgr.LoadAllData(guid);
+        WowGuid128 guid = session.GameState.CurrentPlayerGuid;
+        session.AccountDataMgr.LoadAllData(guid);
 
         AccountDataTimes accountData = new AccountDataTimes();
         accountData.PlayerGuid = guid;
@@ -1416,7 +1449,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         int count = ModernVersion.GetAccountDataCount();
         accountData.AccountTimes = new long[count];
         for (int i = 0; i < count; i++)
-            accountData.AccountTimes[i] = GetSession().AccountDataMgr.Data[i] != null ? GetSession().AccountDataMgr.Data[i].Timestamp : 0;
+            accountData.AccountTimes[i] = session.AccountDataMgr.Data[i] != null ? session.AccountDataMgr.Data[i].Timestamp : 0;
 
         // Do NOT bump the type-0 timestamp to force a re-request. That was added to
         // deliver synthesised bottomLeftActionBar / rightActionBar CVars, but this
@@ -1428,9 +1461,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         // The setting round-trips on its own: the blob carries it, and the login
         // CreateObject already carries MultiActionBars (bit 0x10 = alwaysShow).
 
-        SendPacket(accountData);
-
-        // Note: do NOT push any unsolicited SMSG_UPDATE_ACCOUNT_DATA from here.
+        // Note: do NOT push any unsolicited SMSG_UPDATE_ACCOUNT_DATA alongside this.
         // - Phase 3 tried pushing every populated slot (1/2/4/7) and regressed
         //   the V3_4_3 client (CMSG_LOG_DISCONNECT reason=7 after combat).
         // - Phase 4/6 tried pushing only synthesised type-0 CVars and the
@@ -1439,6 +1470,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         // Phase 7 moved the action-bar CVar synthesis into the request-response
         // path (ClientConfigHandler.HandleRequestAccountData type=0). See that
         // handler for the V3_4_3 augmentation.
+        return accountData;
     }
 
     public void SendRpcMessage(uint serviceId, OriginalHash service, uint methodId, uint token, BattlenetRpcErrorCode status, IMessage? message)

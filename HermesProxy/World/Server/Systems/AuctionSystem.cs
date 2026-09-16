@@ -1,6 +1,3 @@
-using System.Linq;
-using System.Threading;
-using Framework.Constants;
 using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
@@ -19,8 +16,9 @@ namespace HermesProxy.World.Server.Systems;
 /// <para>
 /// <see cref="HandleAuctionSellItem"/> carries the awkward part of this domain. Servers before
 /// 3.2.2a have no quantity field — they auction the whole item — so selling part of a stack means
-/// splitting it to a temporary bag slot first and auctioning that. The splits are sequenced with
-/// blocking sleeps on the dispatch thread, which predates this conversion and is preserved verbatim.
+/// splitting it to a temporary bag slot first and auctioning that. <see cref="PartialStackAuctionPost"/>
+/// sequences the splits on the server's inventory updates. It used to sleep the dispatch thread,
+/// which froze the client's other packets and would deadlock once one thread owns the session.
 /// </para>
 /// </remarks>
 public static class AuctionSystem
@@ -180,93 +178,17 @@ public static class AuctionSystem
 
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V3_2_2a_10505))
         {
-            var gameState = ctx.GetSession().GameState;
-
             // Pre-3.2.2a servers have no quantity field — they auction the entire item.
-            // If the player wants a partial stack, split UseCount to a temp slot and
-            // auction that instead. The original item keeps the remainder, which is
-            // what the modern client expects (original stack shrinks by UseCount).
-            bool needsSplit = auction.Items.Any(i => i.UseCount > 0 &&
-                i.UseCount < gameState.GetItemStackCount(i.Guid));
-
-            (byte containerSlot, byte slot)? splitSlot = null;
-            if (needsSplit)
-            {
-                splitSlot = gameState.FindEmptyInventorySlot();
-                if (splitSlot == null)
-                {
-                    Log.Print(LogType.Error,
-                        "AuctionSellItem: Cannot split stack — no empty bag slot");
-                }
-            }
-
-            foreach (var item in auction.Items)
-            {
-                WowGuid64 auctionItemGuid = item.Guid.To64();
-
-                if (item.UseCount > 0 && splitSlot != null)
-                {
-                    uint currentStackCount = gameState.GetItemStackCount(item.Guid);
-
-                    if (item.UseCount < currentStackCount)
-                    {
-                        var itemLocation = gameState.FindItemInInventory(item.Guid.To64());
-
-                        if (itemLocation == null)
-                        {
-                            Log.Print(LogType.Error,
-                                "AuctionSellItem: Cannot split stack — item not found in inventory");
-                            continue;
-                        }
-
-                        // Split the desired quantity to the temp slot
-                        WorldPacket splitPacket = new WorldPacket(Opcode.CMSG_SPLIT_ITEM);
-                        splitPacket.WriteUInt8(itemLocation.Value.containerSlot);
-                        splitPacket.WriteUInt8(itemLocation.Value.slot);
-                        splitPacket.WriteUInt8(splitSlot.Value.containerSlot);
-                        splitPacket.WriteUInt8(splitSlot.Value.slot);
-                        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
-                            splitPacket.WriteInt32((int)item.UseCount);
-                        else
-                            splitPacket.WriteUInt8((byte)item.UseCount);
-                        ctx.SendPacketToServer(splitPacket);
-
-                        Thread.Sleep(500);
-
-                        // Read the new item's GUID from the destination slot
-                        auctionItemGuid = gameState.GetInventorySlotItem(
-                            splitSlot.Value.containerSlot, splitSlot.Value.slot);
-
-                        if (auctionItemGuid == WowGuid64.Empty)
-                        {
-                            Log.Print(LogType.Error,
-                                "AuctionSellItem: Split item not found in destination slot");
-                            continue;
-                        }
-                    }
-                }
-
-                WorldPacket packet = new WorldPacket(Opcode.CMSG_AUCTION_SELL_ITEM);
-                packet.WriteGuid(auction.Auctioneer.To64());
-                packet.WriteGuid(auctionItemGuid);
-                packet.WriteUInt32((uint)auction.MinBid);
-                packet.WriteUInt32((uint)auction.BuyoutPrice);
-                packet.WriteUInt32(expireTime);
-                ctx.SendPacketToServer(packet);
-
-                // When splitting for multiple auctions, poll until the server
-                // processes the auction and frees the temp slot for the next split
-                if (splitSlot != null && auction.Items.Count > 1)
-                {
-                    for (int wait = 0; wait < 10; wait++)
-                    {
-                        Thread.Sleep(200);
-                        if (gameState.GetInventorySlotItem(
-                            splitSlot.Value.containerSlot, splitSlot.Value.slot) == WowGuid64.Empty)
-                            break;
-                    }
-                }
-            }
+            // A partial stack is split to a temp slot and that is auctioned instead; the
+            // original item keeps the remainder, which is what the modern client expects.
+            // Each split waits for the server's inventory update, so the post runs as a
+            // sequence of outbox holds rather than sleeps on this thread.
+            var session = ctx.GetSession();
+            new PartialStackAuctionPost(
+                session.ToServer,
+                new SessionAuctionInventory(session),
+                auction.Auctioneer, auction.MinBid, auction.BuyoutPrice, expireTime,
+                [.. auction.Items]).Start();
         }
         else
         {

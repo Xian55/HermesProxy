@@ -64,9 +64,9 @@ internal static partial class ObjectLifecycleLogMessages
     [LoggerMessage(
         EventId = 906,
         Level = LogLevel.Trace,
-        Message = "[ObjLife] corpse destroy deferred guidLow={GuidLow} guidHigh={GuidHigh} pending={Pending}")]
+        Message = "[ObjLife] corpse destroy deferred guidLow={GuidLow} guidHigh={GuidHigh} outboxHolds={OutboxHolds}")]
     public static partial void CorpseDestroyDeferred(
-        ILogger logger, ulong guidLow, ulong guidHigh, int pending);
+        ILogger logger, ulong guidLow, ulong guidHigh, int outboxHolds);
 
     [LoggerMessage(
         EventId = 907,

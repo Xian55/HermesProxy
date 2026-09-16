@@ -4,13 +4,18 @@ Roslyn source generators. They emit code that lands directly on the wire, so a m
 does not throw — it produces a subtly malformed packet that the client silently drops or
 mis-renders. Treat every change as a wire-format change.
 
-## The three generators
+## The four generators
 
 | Generator | Emits | Driven by |
 |---|---|---|
 | `ObjectUpdateBuilderGenerator` | `WriteCreate{Section}Data` / `WriteUpdate{Section}Data` / `HasAny{Section}FieldSet` on the per-version `ObjectUpdateBuilder` | `[DescriptorSection]` enums in `World/Enums/<build>/*Field.cs` |
 | `OpcodeTableGenerator` | Opcode lookup tables | per-version `Opcode.cs` enums |
 | `UpdateFieldTableGenerator` | Legacy update-field tables | per-version update-field enums |
+| `PacketDispatchGenerator` | `GeneratedCmsgDispatch` / `GeneratedSmsgDispatch` function-pointer tables | `[HandlesCmsg]` / `[HandlesSmsg]` / `[PacketCodec]` — see `HermesProxy/World/Dispatch/CLAUDE.md` |
+
+This handbook covers the descriptor generator. The dispatch generator's contract, diagnostics
+(HPSG004–007) and snapshot rules are in the `World/Dispatch` and `HermesProxy.Tests/World/Dispatch`
+handbooks.
 
 Generated output lands in `HermesProxy/obj/Generated/HermesProxy.SourceGen/...`. Read it when
 debugging — it is the actual code that runs, and diffing it is usually faster than reasoning

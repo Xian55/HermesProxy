@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Net;
@@ -72,7 +73,7 @@ internal sealed class ProxyHostedService : BackgroundService
         Log.Print(LogType.Server, "Starting Hermes Proxy...");
         Server.LogVersion();
         if (Server.MetricsEnabled)
-            Log.Print(LogType.Server, "Latency metrics collection enabled");
+            Log.Print(LogType.Server, $"Latency metrics collection enabled, summary every {_diagnosticsOptions.Value.MetricsIntervalSeconds} s");
         Log.Start();
 
         if (Environment.CurrentDirectory != Path.GetDirectoryName(AppContext.BaseDirectory))
@@ -127,23 +128,34 @@ internal sealed class ProxyHostedService : BackgroundService
 
         try
         {
-            int metricsLogCounter = 0;
-            const int metricsLogIntervalSeconds = 60;
-            const int loopIntervalSeconds = 10;
+            // The loop also polls the listeners, so it wakes at least every 10 s. Waking at the
+            // summary deadline rather than on a fixed tick keeps an interval such as 15 s from
+            // stretching to the next multiple of the tick.
+            var listenerPollInterval = TimeSpan.FromSeconds(10);
+            var metricsInterval = TimeSpan.FromSeconds(_diagnosticsOptions.Value.MetricsIntervalSeconds);
+            long lastMetricsTimestamp = Stopwatch.GetTimestamp();
             const int displayMetricCount = 20;
 
             while (!stoppingToken.IsCancellationRequested &&
                    (_bnetSocketManager.IsListening || _restSocketManager.IsListening
                     || _realmSocketManager.IsListening || _worldSocketManager.IsListening))
             {
-                await Task.Delay(TimeSpan.FromSeconds(loopIntervalSeconds), stoppingToken);
+                var delay = listenerPollInterval;
+                if (Server.MetricsEnabled)
+                {
+                    var untilSummary = metricsInterval - Stopwatch.GetElapsedTime(lastMetricsTimestamp);
+                    if (untilSummary < delay)
+                        delay = untilSummary > TimeSpan.Zero ? untilSummary : TimeSpan.Zero;
+                }
+                await Task.Delay(delay, stoppingToken);
 
                 if (Server.MetricsEnabled)
                 {
-                    metricsLogCounter += loopIntervalSeconds;
-                    if (metricsLogCounter >= metricsLogIntervalSeconds)
+                    if (Stopwatch.GetElapsedTime(lastMetricsTimestamp) >= metricsInterval)
                     {
-                        metricsLogCounter = 0;
+                        // Measured from now rather than from the missed deadline, so a stalled
+                        // loop doesn't fire back-to-back summaries to catch up.
+                        lastMetricsTimestamp = Stopwatch.GetTimestamp();
 
                         // The GC line goes out even on an idle proxy so a baseline run has a
                         // continuous allocation/collection series to line up against packet bursts.
@@ -162,6 +174,11 @@ internal sealed class ProxyHostedService : BackgroundService
                         {
                             Log.Print(LogType.Server, gc.ToSummaryLine());
                         }
+
+                        // How long packets waited for their session's owner thread. Flat here means
+                        // single-owner dispatch is costing the client nothing.
+                        if (World.Session.SessionExecutor.SummaryLine() is { } executorLine)
+                            Log.Print(LogType.Server, executorLine);
                     }
                 }
             }

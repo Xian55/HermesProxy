@@ -3,6 +3,7 @@ using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
 using System;
 
@@ -14,7 +15,7 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_FEATURE_SYSTEM_STATUS)]
     internal void HandleFeatureSystemStatus(WorldPacket packet)
     {
-        GetSession().RealmSocket.SendFeatureSystemStatus();
+        SendPacketToClient(WorldSocket.BuildFeatureSystemStatus(GetSession()));
     }
 
     // Handlers for SMSG opcodes coming the legacy world server
@@ -30,8 +31,8 @@ public partial class WorldClient
         // These packets don't exist in old clients (for vanilla servers we send them after account data times along with others).
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
-            GetSession().RealmSocket.SendSetTimeZoneInformation();
-            GetSession().RealmSocket.SendSeasonInfo();
+            SendPacketToClient(WorldSocket.BuildSetTimeZoneInformation());
+            SendPacketToClient(WorldSocket.BuildSeasonInfo());
         }
     }
 }

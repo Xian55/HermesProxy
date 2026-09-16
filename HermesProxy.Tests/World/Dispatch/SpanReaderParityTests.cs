@@ -7,10 +7,10 @@ using Xunit;
 namespace HermesProxy.Tests.World.Dispatch;
 
 /// <summary>
-/// SpanPacketReader has no production call sites yet — the write side shipped, the read side
-/// did not. Before packet bodies are converted onto it, every read they use has to agree with
-/// the ByteBuffer/WorldPacket member it replaces, in value and in final position. ByteBuffer
-/// is the oracle here; it is what ships today.
+/// Every SpanPacketReader primitive the codecs use has to agree with the ByteBuffer/WorldPacket
+/// member it replaced, in value and in final position. ByteBuffer is the oracle here: it is what
+/// the pre-conversion ClientPacket readers used, and what the legacy SMSG handlers still read
+/// through. A new primitive on SpanPacketReader needs a case here before a codec relies on it.
 /// </summary>
 public class SpanReaderParityTests
 {

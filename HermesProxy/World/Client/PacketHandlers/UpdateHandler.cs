@@ -7,6 +7,7 @@ using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
 using System;
@@ -97,6 +98,41 @@ public partial class WorldClient
         target[3] = 1f;
     }
 
+    // A V3_4_3 corpse destroy waits for the end of the next update batch; a create for the same
+    // corpse in that batch cancels both (ShouldSkipV343CorpseRecreate). The timeout only matters
+    // if no update batch follows at all.
+    private static readonly HoldOptions CorpseDestroyHold = new(
+        Timeout: TimeSpan.FromSeconds(5),
+        OnTimeout: OutboxTimeoutAction.Release);
+
+    private static HoldKey CorpseDestroyKey(WowGuid128 guid) => new(HoldKeyKind.CorpseDestroy, guid.Low, guid.High);
+
+    /// <summary>
+    /// A V3_4_3 update batch with a pet create, held until the client has the player object. Goes
+    /// out on its own when the player becomes known, or is claimed by the player's deferred batch
+    /// (<see cref="FlushDeferredUpdate"/>) and merged into it.
+    /// </summary>
+    private sealed record HeldPetUpdateBatch(UpdateObject UpdateObject, List<AuraUpdate> AuraUpdates)
+    {
+        public static readonly HoldKey Key = new(HoldKeyKind.PetUpdateBatch);
+
+        // Longer than the deferred player batch's timeout, so that batch claims these first.
+        public static readonly HoldOptions Hold = new(
+            Timeout: TimeSpan.FromSeconds(20),
+            OnTimeout: OutboxTimeoutAction.Release,
+            Key: Key);
+    }
+
+    /// <summary>Takes every held pet batch, oldest first, so the caller can send them itself.</summary>
+    private static List<UpdateObject> ClaimHeldPetUpdateBatches(GlobalSessionData session)
+    {
+        List<UpdateObject> batches = [];
+        while (session.ToClient.Peek<HeldPetUpdateBatch>(HeldPetUpdateBatch.Key) is { } held &&
+               session.ToClient.Claim(HeldPetUpdateBatch.Key, held))
+            batches.Add(held.UpdateObject);
+        return batches;
+    }
+
     // Handlers for SMSG opcodes coming the legacy world server
     [HandlesSmsg(Opcode.SMSG_DESTROY_OBJECT)]
     internal void HandleDestroyObject(WorldPacket packet)
@@ -105,10 +141,16 @@ public partial class WorldClient
         if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
             && guid.GetHighType() == HighGuidType.Corpse)
         {
-            GetSession().GameState.DeferredCorpseDestroys.Add(guid);
+            var toClient = GetSession().ToClient;
+            var key = CorpseDestroyKey(guid);
+            // A second destroy for the same corpse replaces the first, so the client gets one.
+            toClient.Cancel(key);
+            toClient.When(OutboxEvent.Signal(OutboxSignal.UpdateBatchEnd),
+                () => FlushDeferredCorpseDestroy(guid),
+                CorpseDestroyHold with { Key = key });
             World.Logging.ObjectLifecycleLogMessages.CorpseDestroyDeferred(
                 _melObjLifeClient, guid.Low, guid.High,
-                GetSession().GameState.DeferredCorpseDestroys.Count);
+                toClient.PendingCount);
             return;
         }
 
@@ -145,7 +187,7 @@ public partial class WorldClient
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261
             || guid.GetHighType() != HighGuidType.Corpse)
             return false;
-        if (GetSession().GameState.DeferredCorpseDestroys.Remove(guid))
+        if (GetSession().ToClient.Cancel(CorpseDestroyKey(guid)))
         {
             World.Logging.ObjectLifecycleLogMessages.CorpseRecreateSkipped(
                 _melObjLifeClient, guid.Low, guid.High, "paired-with-deferred-destroy");
@@ -160,29 +202,20 @@ public partial class WorldClient
         return false;
     }
 
-    void FlushDeferredCorpseDestroys()
+    void FlushDeferredCorpseDestroy(WowGuid128 guid)
     {
-        var pending = GetSession().GameState.DeferredCorpseDestroys;
-        if (pending.Count == 0)
-            return;
-
-        var toFlush = pending.ToArray();
-        pending.Clear();
-        foreach (var guid in toFlush)
+        lock (GetSession().GameState.ObjectCacheLock)
         {
-            lock (GetSession().GameState.ObjectCacheLock)
-            {
-                GetSession().GameState.ObjectCacheLegacy.Remove(guid);
-                GetSession().GameState.ObjectCacheModern.Remove(guid);
-            }
-            GetSession().GameState.LastAuraCasterOnTarget.Remove(guid);
-            bool wasKnown = GetSession().GameState.ClientKnownGuids.Remove(guid);
-            World.Logging.ObjectLifecycleLogMessages.KnownGuidRemoved(
-                _melObjLifeClient, guid.Low, guid.High, "deferred-corpse-destroy", wasKnown);
-            UpdateObject destroy = new UpdateObject(GetSession().GameState);
-            destroy.DestroyedGuids.Add(guid);
-            SendPacketToClient(destroy);
+            GetSession().GameState.ObjectCacheLegacy.Remove(guid);
+            GetSession().GameState.ObjectCacheModern.Remove(guid);
         }
+        GetSession().GameState.LastAuraCasterOnTarget.Remove(guid);
+        bool wasKnown = GetSession().GameState.ClientKnownGuids.Remove(guid);
+        World.Logging.ObjectLifecycleLogMessages.KnownGuidRemoved(
+            _melObjLifeClient, guid.Low, guid.High, "deferred-corpse-destroy", wasKnown);
+        UpdateObject destroy = new UpdateObject(GetSession().GameState);
+        destroy.DestroyedGuids.Add(guid);
+        SendPacketToClient(destroy);
     }
 
     [HandlesSmsg(Opcode.SMSG_COMPRESSED_UPDATE_OBJECT)]
@@ -788,43 +821,54 @@ public partial class WorldClient
                 SendPacketToServer(reqPacket);
             }
 
-            var pending = new PendingObjectUpdate
-            {
-                UpdateObject = updateObject,
-                AuraUpdates = auraUpdates,
-                WaitingForItemIds = deferredFor,
-            };
-            var session = GetSession();
-            lock (session.GameState.DeferredObjectUpdatesLock)
-                session.GameState.DeferredObjectUpdates.Add(pending);
+            var pending = new DeferredObjectUpdate(updateObject, auraUpdates);
+            var itemTemplates = new OutboxEvent[deferredFor.Count];
+            int n = 0;
+            foreach (uint itemId in deferredFor)
+                itemTemplates[n++] = OutboxEvent.ItemTemplate(itemId);
 
-            // Release path: every SMSG_ITEM_QUERY_SINGLE_RESPONSE (valid or
-            // invalid) calls FlushDeferredUpdatesFor on its entry id. If the
-            // legacy server stops answering entirely, the connection-level
-            // TCP timeout tears the session down — the queue is per-session
-            // so it's GC'd along with the rest of the state.
+            // Released once every SMSG_ITEM_QUERY_SINGLE_RESPONSE (valid or invalid)
+            // is in. A server that never answers one gets the batch sent anyway after
+            // the timeout: a player missing an item's look beats a loading screen.
+            GetSession().ToClient.WhenAll(itemTemplates, () => FlushDeferredUpdate(pending), DeferredObjectUpdateHold);
             return;
         }
 
         // V3_4_3-only: hold pet CreateObject batches when the player isn't yet known
-        // to the client (i.e. player's CreateObject is still in DeferredObjectUpdates
-        // waiting on item hotfixes). The V3_4_3 client requires the player object to
+        // to the client (i.e. player's CreateObject is still deferred waiting on item
+        // hotfixes, or hasn't arrived yet). The V3_4_3 client requires the player object to
         // exist BEFORE a child pet arrives — otherwise the pet's SummonedBy back-ref
         // can't bind and the pet UI (portrait, action bar) never renders. Held pet
         // batches are merged into the player's deferred batch in QueryHandler
-        // .FlushDeferredUpdatesFor so they ship atomically alongside the player.
+        // .FlushDeferredUpdate so they ship atomically alongside the player; when the
+        // player's batch was not deferred, they go out on their own right after it.
+        // A batch carrying the player's own create is never held: nothing would release it.
         if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+            activePlayerUpdateIndex < 0 &&
             ContainsPetCreateObject(updateObject) &&
             !GetSession().GameState.ClientKnownGuids.Contains(GetSession().GameState.CurrentPlayerGuid))
         {
             Log.Print(LogType.Trace,
                 $"[PetHoldTrace] holding pet update batch ({updateObject.ObjectUpdates.Count} obj(s)) — player CreateObject not yet delivered");
-            GetSession().GameState.PendingPetUpdateBatches.Add(updateObject);
+            GetSession().ToClient.When(
+                OutboxEvent.GuidKnown(GetSession().GameState.CurrentPlayerGuid),
+                new HeldPetUpdateBatch(updateObject, auraUpdates),
+                held => SendUpdateBatch(held.UpdateObject, held.AuraUpdates),
+                HeldPetUpdateBatch.Hold);
             return;
         }
 
+        SendUpdateBatch(updateObject, auraUpdates);
+    }
+
+    /// <summary>
+    /// The half of <see cref="HandleUpdateObject"/> after the batch is read and any hold decided:
+    /// filters, splits and sends it, then whatever has to follow it. Also sends a held pet batch.
+    /// </summary>
+    void SendUpdateBatch(UpdateObject updateObject, List<AuraUpdate> auraUpdates)
+    {
         // Re-resolve pet-pointing UnitData fields. Mirrors the
-        // QueryHandler.FlushDeferredUpdatesFor call so non-deferred batches also
+        // QueryHandler.FlushDeferredUpdate call so non-deferred batches also
         // get the player.Summon → realEntry rebind. No-op on TC native repacks.
         UpdateObject.ReseatStalePetGuids(updateObject, GetSession().GameState);
 
@@ -861,8 +905,9 @@ public partial class WorldClient
             {
                 updateObject.ObjectUpdates.RemoveAll(u =>
                     u.Type == UpdateTypeModern.Values && u.Guid == playerGuidForSplit);
-                Log.Print(LogType.Trace,
-                    $"[UpdateObjectTrace] V3_4_3 split: deferring {playerValuesUpdates.Count} player Values update(s) to a follow-up SMSG_UPDATE_OBJECT");
+                if (Log.IsTraceEnabled)
+                    Log.Print(LogType.Trace,
+                        $"[UpdateObjectTrace] V3_4_3 split: deferring {playerValuesUpdates.Count} player Values update(s) to a follow-up SMSG_UPDATE_OBJECT");
             }
         }
 
@@ -893,8 +938,9 @@ public partial class WorldClient
                 }
                 updateObject.ObjectUpdates.RemoveAll(u =>
                     u.Type == UpdateTypeModern.CreateObject1 || u.Type == UpdateTypeModern.CreateObject2);
-                Log.Print(LogType.Trace,
-                    $"[UpdateObjectTrace] V3_4_3 CreateObject split: extracted {createsToSplit.Count} Creates to per-packet sends (avoid client OOM on multi-Create batches)");
+                if (Log.IsTraceEnabled)
+                    Log.Print(LogType.Trace,
+                        $"[UpdateObjectTrace] V3_4_3 CreateObject split: extracted {createsToSplit.Count} Creates to per-packet sends (avoid client OOM on multi-Create batches)");
             }
         }
 
@@ -911,7 +957,7 @@ public partial class WorldClient
             int transportCreates = TransportCreateOrdering.CountTransports(createsToSplit, u => u.Guid);
             createsToSplit = TransportCreateOrdering.TransportsFirst(createsToSplit, u => u.Guid);
 
-            if (transportCreates != 0)
+            if (transportCreates != 0 && Log.IsTraceEnabled)
                 Log.Print(LogType.Trace,
                     $"[UpdateObjectTrace] V3_4_3 CreateObject split: hoisted {transportCreates} transport create(s) ahead of {createsToSplit.Count - transportCreates} other create(s)");
 
@@ -933,10 +979,11 @@ public partial class WorldClient
         // CreateObject for that pet, flush the cached spells with the corrected
         // PetGUID (the pet was registered during ReadCreateObjectBlock, so
         // legacyGuid.To128 now resolves correctly).
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && GetSession().ToClient.HasPending)
         {
-            var pendingSpells = GetSession().GameState.PendingPetSpells;
-            var pendingLegacy = GetSession().GameState.PendingPetSpellsLegacyGuid;
+            var heldSpells = GetSession().ToClient.Peek<HeldPetSpells>(HeldPetSpells.Key);
+            var pendingSpells = heldSpells?.Spells;
+            var pendingLegacy = heldSpells?.LegacyGuid;
             if (pendingSpells != null && pendingLegacy.HasValue)
             {
                 WowGuid128 correctedPetGuid = pendingLegacy.Value.To128(GetSession().GameState);
@@ -963,7 +1010,7 @@ public partial class WorldClient
                         }
                     }
                 }
-                if (petWasCreatedInBatch)
+                if (petWasCreatedInBatch && GetSession().ToClient.Claim(HeldPetSpells.Key, heldSpells!))
                 {
                     var stalePetGuid = pendingSpells.PetGUID;
                     pendingSpells.PetGUID = correctedPetGuid;
@@ -975,8 +1022,6 @@ public partial class WorldClient
                     Log.Print(LogType.Trace,
                         $"[PetSpellsFlush] sending cached SMSG_PET_SPELLS_MESSAGE — stale={stalePetGuid} corrected={correctedPetGuid}");
                     SendPacketToClient(pendingSpells);
-                    GetSession().GameState.PendingPetSpells = null;
-                    GetSession().GameState.PendingPetSpellsLegacyGuid = null;
                 }
             }
         }
@@ -1017,12 +1062,13 @@ public partial class WorldClient
                 }
             }
 
-            // Unconditional trace at end-of-batch so we can see whether the player
-            // CreateObject is reaching this code path at all.
-            Log.Print(LogType.Trace,
-                $"[PlayerEnterTrace] batch end: objectsRemainingAfterWrite={objectsAfterFilter} " +
-                $"playerCreateMatched={playerCreateInBatch} playerGuid={currentPlayerGuid} " +
-                $"types=[{string.Join(",", updateObject.ObjectUpdates.Select(o => $"{o.Guid.Low}:{o.Type}"))}]");
+            // Trace at end-of-batch so we can see whether the player CreateObject is
+            // reaching this code path at all. Gated: it runs on every batch.
+            if (Log.IsTraceEnabled)
+                Log.Print(LogType.Trace,
+                    $"[PlayerEnterTrace] batch end: objectsRemainingAfterWrite={objectsAfterFilter} " +
+                    $"playerCreateMatched={playerCreateInBatch} playerGuid={currentPlayerGuid} " +
+                    $"types=[{string.Join(",", updateObject.ObjectUpdates.Select(o => $"{o.Guid.Low}:{o.Type}"))}]");
 
             if (playerCreateInBatch)
             {
@@ -1032,26 +1078,20 @@ public partial class WorldClient
                     $"[PlayerEnterTrace] post-CreateObject AURA_UPDATE_ALL sent for player guid={currentPlayerGuid} populatedAuras={playerAuraSync.Auras.Count}");
             }
 
-            // The Toy Box lives on ActivePlayerData, so CollectionSync publishes it as a
-            // Values delta on the player guid. Anything the collection sync tried to send
-            // before the player create was deferred (see CollectionSync.SendToys); replay it
-            // once the client has the player object. This deliberately does not hang off
-            // playerCreateInBatch: the player's CreateObject is usually split out into its own
-            // per-create packet above, so by the time we get here it is no longer in
-            // updateObject.ObjectUpdates and that flag reads false on most logins.
-            // ClientKnownGuids is the durable signal — FilterV3_4_3Values registers the guid
-            // whichever packet carried the create.
-            if (GetSession().GameState.PendingToysSync &&
+            // Releases what waits for the client to have the player object: the toy box sync
+            // (CollectionSync.SendToys) and pet batches held above. Raised at every batch end
+            // while the player is known, not once, so a hold registered late still goes out.
+            // This deliberately does not hang off playerCreateInBatch: the player's CreateObject
+            // is usually split out into its own per-create packet above, so by the time we get
+            // here it is no longer in updateObject.ObjectUpdates and that flag reads false on
+            // most logins. ClientKnownGuids is the durable signal — FilterV3_4_3Values
+            // registers the guid whichever packet carried the create.
+            if (GetSession().ToClient.HasPending &&
                 GetSession().GameState.ClientKnownGuids.Contains(currentPlayerGuid))
             {
-                GetSession().GameState.PendingToysSync = false;
-                World.Logging.ObjectLifecycleLogMessages.ToysFlushed(
-                    _melObjLifeClient, currentPlayerGuid.Low, currentPlayerGuid.High);
-                World.Server.CollectionSync.RefreshUsableToys(GetSession());
+                GetSession().ToClient.Notify(OutboxEvent.GuidKnown(currentPlayerGuid));
             }
         }
-
-        FlushDeferredCorpseDestroys();
     }
 
     public void ReadNearObjectsBlock(WorldPacket packet, object index)
@@ -2243,6 +2283,9 @@ public partial class WorldClient
         AfterStoreObjectUpdateHook(guid, objectType, updateMaskArray, updates, auraUpdate, powerUpdate, isCreate, updateData, actuallyChangedValuesMaskArray);
     }
 
+    private static readonly HoldOptions CollisionHeightHold = new(
+        Timeout: TimeSpan.FromSeconds(5), OnTimeout: OutboxTimeoutAction.Release);
+
     private void AfterStoreObjectUpdateHook(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData, BitArray changedValuesMask)
     {
         if (objectType == ObjectType.Player || objectType == ObjectType.ActivePlayer)
@@ -2300,7 +2343,8 @@ public partial class WorldClient
                     Reason = reason,
                     MountDisplayID = (uint) mountDisplayId,
                 };
-                SendPacketToClient(height, Opcode.SMSG_UPDATE_OBJECT);
+                // After the batch whose Values changed the mount or scale has reached the client.
+                GetSession().ToClient.AfterBatch(height, CollisionHeightHold);
             }
         }
     }

@@ -9,12 +9,12 @@ namespace HermesProxy.World.Dispatch;
 
 internal static unsafe class GeneratedSmsgDispatch
 {
-    /// <summary>Indexed by (uint)Opcode. A null slot means the opcode is still handled
-    /// by the reflective registry, so the dispatch site falls through to it.</summary>
+    /// <summary>Indexed by (uint)Opcode. A null slot means no handler covers the opcode for
+    /// the running build; the dispatch site logs it and drops the packet.</summary>
     private static readonly delegate*<global::HermesProxy.World.Client.WorldClient, global::HermesProxy.World.WorldPacket, void>[] _table = BuildTable();
 
-    /// <summary>Opcodes this table owns. The reflective registrar skips these, and a test
-    /// asserts the two registries stay disjoint.</summary>
+    /// <summary>Opcodes this table owns. DispatchRegistryTests asserts each resolves to a
+    /// thunk and that the count never falls below what was converted.</summary>
     internal static readonly global::System.Collections.Frozen.FrozenSet<global::HermesProxy.World.Enums.Opcode> ClaimedOpcodes = BuildClaimed();
 
     /// <summary>The thunk for <paramref name="opcode"/>, or null when unconverted.</summary>

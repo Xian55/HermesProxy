@@ -138,4 +138,13 @@ internal static partial class AuthClientLogMessages
         string SourceFile,
         string NetDir,
         ushort Count);
+
+    [LoggerMessage(EventId = 316, Level = LogLevel.Error, Message = "Auth server {Address}:{Port} did not answer within {Seconds} s")]
+    public static partial void LoginTimedOut(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        string Address,
+        int Port,
+        double Seconds);
 }

@@ -9,18 +9,19 @@ namespace HermesProxy.World.Dispatch;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The range is <b>literal attribute data</b>, never a predicate. The older
-/// <see cref="PacketHandlerAttribute"/> calls <c>LegacyVersion.InVersion(...)</c> inside its own
-/// constructor, which a source generator cannot see through — it would have to execute the
+/// The range is <b>literal attribute data</b>, never a predicate. The reflection-era
+/// <c>PacketHandlerAttribute</c> this replaced called <c>LegacyVersion.InVersion(...)</c> inside
+/// its own constructor, which a source generator cannot see through — it would have to execute the
 /// attribute to learn the opcode. Storing <see cref="AddedIn"/> / <see cref="RemovedIn"/> as
 /// constants lets the generator read the range off the symbol and emit the selection as code,
 /// resolved once at table build instead of per <c>WorldSocket</c> construction.
 /// </para>
 /// <para>
-/// There are no ranged CMSG sites today. The properties exist because adding a client is
-/// currently unbounded on this axis: the modern side has no way at all to say "this handler is
-/// for builds ≥ X", so every per-build difference has to hide inside a handler body. See
-/// <c>docs/version-shape-dispatch.md</c> and issue #202.
+/// No CMSG handler is ranged today. Per-build differences on the modern side are layout
+/// differences, and those are ranged on the codec with <see cref="PacketCodecAttribute"/>, so one
+/// handler body serves every build. A handler range is for the day a build needs different
+/// <i>behaviour</i>, not just a different reader. See <c>docs/version-shape-dispatch.md</c> and
+/// issue #202.
 /// </para>
 /// </remarks>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = false)]

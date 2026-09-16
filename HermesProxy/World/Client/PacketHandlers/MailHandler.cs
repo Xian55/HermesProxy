@@ -2,6 +2,7 @@
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server.Packets;
 using System;
 using System.Collections.Generic;
@@ -67,6 +68,7 @@ public partial class WorldClient
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V3_2_0_10192))
             result.TotalNumRecords = count;
 
+        List<OutboxEvent>? missingTexts = null;
         for (var i = 0; i < count; ++i)
         {
             MailListEntry mail = new MailListEntry();
@@ -100,7 +102,7 @@ public partial class WorldClient
                 mail.ItemTextId = packet.ReadUInt32();
                 if (mail.ItemTextId != 0 && !GetSession().GameState.ItemTexts.ContainsKey(mail.ItemTextId))
                 {
-                    GetSession().GameState.RequestedItemTextIds.Add(mail.ItemTextId);
+                    (missingTexts ??= []).Add(OutboxEvent.ItemText(mail.ItemTextId));
                     WorldPacket query = new WorldPacket(Opcode.CMSG_ITEM_TEXT_QUERY);
                     query.WriteUInt32(mail.ItemTextId);
                     query.WriteInt32((int)mail.MailID);
@@ -149,17 +151,31 @@ public partial class WorldClient
             result.Mails.Add(mail);
         }
 
-        if (GetSession().GameState.RequestedItemTextIds.Count == 0)
-        {
-            foreach (var mail in result.Mails)
-            {
-                if (mail.ItemTextId != 0)
-                    mail.Body = GetSession().GameState.ItemTexts[mail.ItemTextId];
-            }
-            SendPacketToClient(result);
-        }
+        // Only the newest list matters: the client shows one mailbox.
+        var toClient = GetSession().ToClient;
+        toClient.Cancel(MailListKey);
+        if (missingTexts == null)
+            SendMailList(result);
         else
-            GetSession().GameState.PendingMailListPacket = result;
+            toClient.WhenAll([.. missingTexts], () => SendMailList(result), MailListHold);
+    }
+
+    private static readonly HoldKey MailListKey = new(HoldKeyKind.MailList);
+
+    // A server that never answers a text query still gets the list shown, with those bodies empty.
+    private static readonly HoldOptions MailListHold = new(
+        Timeout: TimeSpan.FromSeconds(5),
+        OnTimeout: OutboxTimeoutAction.Release,
+        Key: MailListKey);
+
+    void SendMailList(MailListResult result)
+    {
+        foreach (var mail in result.Mails)
+        {
+            if (mail.ItemTextId != 0 && GetSession().GameState.ItemTexts.TryGetValue(mail.ItemTextId, out var body))
+                mail.Body = body;
+        }
+        SendPacketToClient(result);
     }
 
     [HandlesSmsg(Opcode.SMSG_QUERY_ITEM_TEXT_RESPONSE)]
@@ -190,20 +206,7 @@ public partial class WorldClient
         else
             GetSession().GameState.ItemTexts.Add(itemTextId, text);
 
-        if (GetSession().GameState.RequestedItemTextIds.Contains(itemTextId))
-            GetSession().GameState.RequestedItemTextIds.Remove(itemTextId);
-
-        if (GetSession().GameState.PendingMailListPacket != null &&
-            GetSession().GameState.RequestedItemTextIds.Count == 0)
-        {
-            MailListResult result = GetSession().GameState.PendingMailListPacket!;
-            foreach (var mail in result.Mails)
-            {
-                if (mail.ItemTextId != 0)
-                    mail.Body = GetSession().GameState.ItemTexts[mail.ItemTextId]!;
-            }
-            SendPacketToClient(result);
-        }
+        GetSession().ToClient.Notify(OutboxEvent.ItemText(itemTextId));
     }
 
     MailAttachedItem ReadMailItem(WorldPacket packet)

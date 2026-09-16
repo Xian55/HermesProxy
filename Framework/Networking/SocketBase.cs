@@ -45,9 +45,22 @@ public abstract class SocketBase : ISocket, IDisposable
 
     public delegate void SocketReadCallback(SocketAsyncEventArgs args);
 
+    /// <summary>
+    /// How long a blocking send may sit unacknowledged before the connection is given up on.
+    /// A client that has stopped reading — stalled, suspended, gone without a FIN — otherwise
+    /// pins the sending thread for as long as it likes, and with one instance serving many
+    /// players those threads are the pool's.
+    /// </summary>
+    public static readonly TimeSpan SendTimeout = TimeSpan.FromSeconds(30);
+
     protected SocketBase(Socket socket)
     {
         _socket = socket;
+        _socket.SendTimeout = (int)SendTimeout.TotalMilliseconds;
+        // A client whose machine goes away without closing the connection leaves a session that
+        // holds its game state for as long as the process runs. The client's own pings don't help:
+        // nothing here checks that they keep arriving.
+        NetworkUtils.EnableKeepAlive(socket, idleSeconds: 60, intervalSeconds: 10, retryCount: 3);
         _remoteIPEndPoint = _socket.RemoteEndPoint as IPEndPoint;
 
         _callbackBuffer = ArrayPool<byte>.Shared.Rent(BufferSize);
@@ -60,6 +73,9 @@ public abstract class SocketBase : ISocket, IDisposable
         receiveSocketAsyncEventArgs.SetBuffer(_asyncBuffer, 0, BufferSize);
         receiveSocketAsyncEventArgs.Completed += (sender, args) => ProcessReadAsync(args);
     }
+
+    /// <summary>Shortens the send deadline, so a test for a stalled peer doesn't take 30 seconds.</summary>
+    internal void SetSendTimeout(TimeSpan timeout) => _socket.SendTimeout = (int)timeout.TotalMilliseconds;
 
     public virtual void Dispose()
     {
@@ -144,7 +160,19 @@ public abstract class SocketBase : ISocket, IDisposable
         if (!IsOpen())
             return;
 
-        _socket.Send(data);
+        try
+        {
+            _socket.Send(data);
+        }
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.TimedOut)
+        {
+            // A timed-out send has already put an unknown number of bytes on the wire, so the
+            // frame boundary is lost and nothing further can be written to this peer. Close it
+            // and let the session tear down the way any other dropped connection does.
+            Log.Print(LogType.Network,
+                $"Send to {GetRemoteIpAddress()} timed out after {SendTimeout.TotalSeconds:F0} s; closing the connection");
+            CloseSocket();
+        }
     }
 
     public void CloseSocket()

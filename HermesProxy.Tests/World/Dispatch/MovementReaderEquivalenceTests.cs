@@ -24,8 +24,10 @@ namespace HermesProxy.Tests.World.Dispatch;
 /// </para>
 /// <para>
 /// The span version was generated mechanically from the WorldPacket one, so they start identical.
-/// This is what keeps them that way. The WorldPacket pair exists only for <c>SpellCastRequest</c>,
-/// the last unconverted caller — when it converts, delete both and this test with them.
+/// This is what keeps them that way. No production code calls the WorldPacket version any more:
+/// its last caller is <c>SpellCastRequest.Read(WorldPacket)</c>, which survives only as the oracle
+/// in <c>SpellCodecEquivalenceTests</c>. Once that test moves to a frozen copy, delete both
+/// WorldPacket readers and this test with them.
 /// </para>
 /// </remarks>
 public class MovementReaderEquivalenceTests

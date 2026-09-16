@@ -20,15 +20,16 @@ namespace HermesProxy.SourceGen;
 /// process.
 /// </para>
 /// <para>
-/// A null slot means "not converted yet" and is what lets the generated table and the old
-/// reflective one coexist while handlers migrate: the dispatch site falls through to the
-/// reflective path on null, so an unconverted opcode behaves exactly as before.
+/// A null slot means no handler covers that opcode for the running build, and the dispatch site
+/// logs "No handler for opcode" and drops the packet. During the migration a null slot meant
+/// "not converted yet" and fell through to the reflective registries; those were deleted once
+/// every handler carried an attribute, so there is no second path any more.
 /// </para>
 /// <para>
 /// <b>Why a function-pointer array and not a switch.</b> A switch over ~800 sparse opcodes lowers
 /// to a binary-search tree plus bucketed jump tables, in one method body the JIT must compile as a
 /// unit on the first packet. The array is one bounds check, one load, one <c>calli</c> — and a null
-/// slot gives the coexistence fallback for free. <c>delegate*[]</c> holds unmanaged pointers, so
+/// slot is a free "unhandled" test. <c>delegate*[]</c> holds unmanaged pointers, so
 /// the GC never traces the elements.
 /// </para>
 /// <para>
@@ -438,12 +439,12 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
         sb.AppendLine();
         sb.AppendLine($"internal static unsafe class {className}");
         sb.AppendLine("{");
-        sb.AppendLine("    /// <summary>Indexed by (uint)Opcode. A null slot means the opcode is still handled");
-        sb.AppendLine("    /// by the reflective registry, so the dispatch site falls through to it.</summary>");
+        sb.AppendLine("    /// <summary>Indexed by (uint)Opcode. A null slot means no handler covers the opcode for");
+        sb.AppendLine("    /// the running build; the dispatch site logs it and drops the packet.</summary>");
         sb.Append("    private static readonly ").Append(DelegateType(legacyShape)).AppendLine("[] _table = BuildTable();");
         sb.AppendLine();
-        sb.AppendLine("    /// <summary>Opcodes this table owns. The reflective registrar skips these, and a test");
-        sb.AppendLine("    /// asserts the two registries stay disjoint.</summary>");
+        sb.AppendLine("    /// <summary>Opcodes this table owns. DispatchRegistryTests asserts each resolves to a");
+        sb.AppendLine("    /// thunk and that the count never falls below what was converted.</summary>");
         sb.Append("    internal static readonly global::System.Collections.Frozen.FrozenSet<")
           .Append(OpcodeFullName).AppendLine("> ClaimedOpcodes = BuildClaimed();");
         sb.AppendLine();
@@ -550,8 +551,8 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
     {
         if (usable.Count == 0)
         {
-            sb.AppendLine("    // No systems carry the attribute yet — the table is empty and every opcode");
-            sb.AppendLine("    // falls through to the reflective registry.");
+            sb.AppendLine("    // No systems carry the attribute — the table is empty and every opcode is");
+            sb.AppendLine("    // unhandled.");
             sb.AppendLine();
             return;
         }

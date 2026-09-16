@@ -4,6 +4,7 @@ using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
 using System;
@@ -15,6 +16,12 @@ namespace HermesProxy.World.Client;
 
 public partial class WorldClient
 {
+    // The client applies cooldown history only after SMSG_SEND_UNLEARN_SPELLS, which the handler
+    // below sends itself on vanilla and the legacy server sends on later builds. A backend that
+    // never sends it still gets the cooldowns, late.
+    private static readonly HoldOptions SpellHistoryHold = new(
+        Timeout: TimeSpan.FromSeconds(5), OnTimeout: OutboxTimeoutAction.Release);
+
     // Handlers for SMSG opcodes coming the legacy world server
     [HandlesSmsg(Opcode.SMSG_SEND_KNOWN_SPELLS)]
     internal void HandleSendKnownSpells(WorldPacket packet)
@@ -100,7 +107,7 @@ public partial class WorldClient
                 histories.Entries.Add(history);
             }
             if (histories.Entries.Count > 0)
-                SendPacketToClient(histories, Opcode.SMSG_SEND_UNLEARN_SPELLS);
+                GetSession().ToClient.After(Opcode.SMSG_SEND_UNLEARN_SPELLS, histories, SpellHistoryHold);
         }
 
         // These packets don't exist in Vanilla.
@@ -461,8 +468,12 @@ public partial class WorldClient
             // Clear non-started casts and send failures for them
             // (keeps the started cast so SPELL_GO can dequeue it)
             var failedCasts = GetSession().GameState.ClearNonStartedNormalCasts();
-            foreach (var failed in failedCasts)
-                Server.Systems.SpellSystem.SendCastRequestFailed(in GetSession().InstanceSocket.SessionContext, failed, false);
+            // The instance socket is gone after logout; the casts are moot then.
+            if (GetSession().InstanceSocket is { } instanceSocket)
+            {
+                foreach (var failed in failedCasts)
+                    Server.Systems.SpellSystem.SendCastRequestFailed(in instanceSocket.SessionContext, failed, false);
+            }
         }
         else if (GetSession().GameState.CurrentPetGuid == spell.Cast.CasterUnit &&
                  GetSession().GameState.TryMarkPendingPetCastStarted((uint)spell.Cast.SpellID, out var pendingPetCast))
@@ -479,8 +490,11 @@ public partial class WorldClient
 
             // Clear non-started pet casts and send failures for them
             var failedPetCasts = GetSession().GameState.ClearNonStartedPetCasts();
-            foreach (var failed in failedPetCasts)
-                Server.Systems.SpellSystem.SendCastRequestFailed(in GetSession().InstanceSocket.SessionContext, failed, true);
+            if (GetSession().InstanceSocket is { } instanceSocket)
+            {
+                foreach (var failed in failedPetCasts)
+                    Server.Systems.SpellSystem.SendCastRequestFailed(in instanceSocket.SessionContext, failed, true);
+            }
         }
 
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))

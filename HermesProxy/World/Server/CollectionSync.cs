@@ -3,7 +3,9 @@ using HermesProxy.Enums;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server.Packets;
+using System;
 using System.Collections.Generic;
 
 namespace HermesProxy.World.Server;
@@ -101,6 +103,15 @@ public static class CollectionSync
     private static readonly Microsoft.Extensions.Logging.ILogger _melObjLife =
         Framework.Logging.Log.CreateMelLogger(Framework.Logging.Log.CategoryServer);
 
+    private static readonly HoldKey ToysSyncKey = new(HoldKeyKind.ToysSync);
+
+    // Released at the end of the batch that gives the client the player. A sync still waiting after
+    // the timeout re-checks: it sends if the player is known by then and waits again otherwise.
+    private static readonly HoldOptions ToysSyncHold = new(
+        Timeout: TimeSpan.FromSeconds(60),
+        OnTimeout: OutboxTimeoutAction.Release,
+        Key: ToysSyncKey);
+
     public static void SendToys(GlobalSessionData session)
     {
         var state = session.GameState;
@@ -120,7 +131,15 @@ public static class CollectionSync
         if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
             && !state.ClientKnownGuids.Contains(state.CurrentPlayerGuid))
         {
-            state.PendingToysSync = true;
+            // The release reads the toy state it sends then, so one waiting sync covers every
+            // request made meanwhile.
+            session.ToClient.Cancel(ToysSyncKey);
+            session.ToClient.When(OutboxEvent.GuidKnown(state.CurrentPlayerGuid), () =>
+            {
+                World.Logging.ObjectLifecycleLogMessages.ToysFlushed(
+                    _melObjLife, state.CurrentPlayerGuid.Low, state.CurrentPlayerGuid.High);
+                RefreshUsableToys(session);
+            }, ToysSyncHold);
             World.Logging.ObjectLifecycleLogMessages.ToysDeferred(
                 _melObjLife, state.CurrentPlayerGuid.Low, state.CurrentPlayerGuid.High);
             return;

@@ -132,9 +132,9 @@ public class DispatchRegistryTests
     [Fact]
     public void ConvertedOpcodesOnlyEverGrow()
     {
-        // A converted opcode must never quietly fall back to the reflective path: that would be
-        // a silent regression to the allocating dispatch, with no test failing. Every opcode the
-        // generated table claims has to resolve to a real thunk.
+        // There is no fallback registry, so a claimed opcode whose slot is null would be dropped
+        // at runtime with only a "No handler" log line. Every opcode the generated table claims
+        // has to resolve to a real thunk.
         AssertAllClaimedResolve(GeneratedCmsgDispatch.ClaimedOpcodes, isModern: true);
         AssertAllClaimedResolve(GeneratedSmsgDispatch.ClaimedOpcodes, isModern: false);
     }

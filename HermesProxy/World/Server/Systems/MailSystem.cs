@@ -5,6 +5,7 @@ using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server.Packets;
 
 namespace HermesProxy.World.Server.Systems;
@@ -95,7 +96,7 @@ public static class MailSystem
         ctx.SendPacketToServer(packet);
     }
 
-    static void BuildSendMail(in SessionContext ctx, in SendMail mail, long sendMoney, long cod,
+    static WorldPacket BuildSendMail(in SendMail mail, long sendMoney, long cod,
         List<MailAttachment> attachments)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SEND_MAIL);
@@ -127,8 +128,13 @@ public static class MailSystem
         packet.WriteUInt32((uint)cod);
         packet.WriteUInt64(0); // unk
         packet.WriteUInt8(0); // unk
-        ctx.SendPacketToServer(packet);
+        return packet;
     }
+
+    // Vanilla servers kick a player who sends mail too quickly. The split path used to sleep the
+    // socket thread between mails, which also froze every other packet from the client.
+    private static readonly TimeSpan VanillaMailInterval = TimeSpan.FromMilliseconds(500);
+    private static readonly HoldKey VanillaMailLane = new(HoldKeyKind.MailAntiflood);
 
     /// <remarks>
     /// The vanilla split path divided <c>SendMoney</c> and <c>Cod</c> in place on the packet before
@@ -140,7 +146,7 @@ public static class MailSystem
     {
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180) ||
             mail.Attachments.Count <= 1)
-            BuildSendMail(in ctx, in mail, mail.SendMoney, mail.Cod, mail.Attachments);
+            ctx.SendPacketToServer(BuildSendMail(in mail, mail.SendMoney, mail.Cod, mail.Attachments));
         else
         {
             // only 1 item can be attached in vanilla
@@ -149,10 +155,12 @@ public static class MailSystem
             long cod = mail.Cod / mail.Attachments.Count;
             foreach (var item in mail.Attachments)
             {
-                List<MailAttachment> attachments = new List<MailAttachment>();
-                attachments.Add(item);
-                BuildSendMail(in ctx, in mail, sendMoney, cod, attachments);
-                System.Threading.Thread.Sleep(500); // prevent triggering antiflood on server
+                List<MailAttachment> attachments = [item];
+                // The first goes out now, the rest one interval apart. Other packets from the
+                // client are not held behind them.
+                ctx.ToServer.Paced(VanillaMailLane, VanillaMailInterval,
+                    BuildSendMail(in mail, sendMoney, cod, attachments),
+                    new HoldOptions(Scope: OutboxScope.LegacyConnection));
             }
         }
     }

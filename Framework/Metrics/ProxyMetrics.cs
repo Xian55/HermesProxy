@@ -121,8 +121,10 @@ public sealed class ProxyMetrics
 
     /// <summary>
     /// Formatted summary: packet rates since the previous summary, the GC delta when
-    /// supplied, then per direction the top-N opcodes by p99 latency (with allocation
-    /// columns) and the top-N by total allocated bytes.
+    /// supplied, then per direction the top-N opcodes by the largest latency seen since the
+    /// previous summary (with allocation columns) and the top-N by total allocated bytes.
+    /// Intended for one periodic caller: it closes the interval, so the next summary's
+    /// interval columns start from zero.
     /// </summary>
     public string GetSummary(int topN = 10, Func<int, string>? opcodeResolver = null, GcDelta? gc = null)
     {
@@ -138,8 +140,8 @@ public sealed class ProxyMetrics
         _lastSummaryClientToServer = c2sTotal;
         _lastSummaryServerToClient = s2cTotal;
 
-        var c2sStats = GetClientToServerStats();
-        var s2cStats = GetServerToClientStats();
+        var c2sStats = TakeIntervalStats(_clientToServer);
+        var s2cStats = TakeIntervalStats(_serverToClient);
 
         var sb = new StringBuilder();
         sb.AppendLine($"Proxy Metrics (Uptime: {Uptime:hh\\:mm\\:ss}) | C->S {c2sTotal} pkts ({c2sRate:F1}/s) | S->C {s2cTotal} pkts ({s2cRate:F1}/s)");
@@ -155,20 +157,30 @@ public sealed class ProxyMetrics
         return sb.ToString();
     }
 
+    private static Dictionary<int, OpcodeStats> TakeIntervalStats(ConcurrentDictionary<int, OpcodeSamples> samples)
+        => samples.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.GetStats(resetInterval: true));
+
+    // Ranked by the interval max, not the windowed p99: lifetime Max keeps the login burst's
+    // spike forever and a rare stall barely moves p99, so either ordering hid the one slow
+    // packet in an otherwise quiet minute. Opcodes idle this interval are left out, which also
+    // drops the one-off login opcodes that would otherwise sit at the top of every table.
     private static void AppendLatencyTable(StringBuilder sb, string direction, Dictionary<int, OpcodeStats> stats, int topN, Func<int, string> resolver)
     {
-        var rows = stats.OrderByDescending(x => x.Value.Latency.P99).Take(topN).ToList();
+        var rows = stats.Where(x => x.Value.Latency.IntervalCount > 0)
+                        .OrderByDescending(x => x.Value.Latency.IntervalMax)
+                        .Take(topN)
+                        .ToList();
         if (rows.Count == 0)
             return;
 
-        sb.AppendLine($"{direction} (top {rows.Count} by p99 latency):");
-        sb.AppendLine($"  {"Opcode",-40} {"Window",7} {"Total",9} {"Min",9} {"Avg",9} {"P50",9} {"P95",9} {"P99",9} {"Max",9} | {"AvgB",7} {"MaxB",8} {"TotalKB",9}");
-        sb.AppendLine($"  {new string('-', 40)} {new string('-', 7)} {new string('-', 9)} {new string('-', 9)} {new string('-', 9)} {new string('-', 9)} {new string('-', 9)} {new string('-', 9)} {new string('-', 9)} | {new string('-', 7)} {new string('-', 8)} {new string('-', 9)}");
+        sb.AppendLine($"{direction} (top {rows.Count} by max latency this interval; percentiles over the last {MaxSamplesPerOpcode} samples):");
+        sb.AppendLine($"  {"Opcode",-40} {"Int",7} {"Window",7} {"Total",9} {"Min",9} {"Avg",9} {"P50",9} {"P95",9} {"P99",9} {"IntMax",9} {"Max",9} | {"AvgB",7} {"MaxB",8} {"TotalKB",9}");
+        sb.AppendLine($"  {new string('-', 40)} {new string('-', 7)} {new string('-', 7)} {new string('-', 9)} {new string('-', 9)} {new string('-', 9)} {new string('-', 9)} {new string('-', 9)} {new string('-', 9)} {new string('-', 9)} {new string('-', 9)} | {new string('-', 7)} {new string('-', 8)} {new string('-', 9)}");
         foreach (var (opcode, s) in rows)
         {
             var l = s.Latency;
             var a = s.Allocation;
-            sb.AppendLine($"  {Truncate(resolver(opcode), 40),-40} {l.Count,7} {l.TotalCount,9} {l.Min,8:F3}ms {l.Average,8:F3}ms {l.P50,8:F3}ms {l.P95,8:F3}ms {l.P99,8:F3}ms {l.Max,8:F3}ms | {a.Average,7:F0} {a.Max,8:F0} {a.TotalSum / 1024.0,9:F1}");
+            sb.AppendLine($"  {Truncate(resolver(opcode), 40),-40} {l.IntervalCount,7} {l.Count,7} {l.TotalCount,9} {l.Min,8:F3}ms {l.Average,8:F3}ms {l.P50,8:F3}ms {l.P95,8:F3}ms {l.P99,8:F3}ms {l.IntervalMax,8:F3}ms {l.Max,8:F3}ms | {a.Average,7:F0} {a.Max,8:F0} {a.TotalSum / 1024.0,9:F1}");
         }
         sb.AppendLine();
     }
@@ -235,11 +247,21 @@ public sealed class OpcodeSamples
         }
     }
 
-    public OpcodeStats GetStats()
+    /// <param name="resetInterval">
+    /// Close the interval after reading it, so both windows' interval columns restart at zero
+    /// under the same lock as the read and no sample falls between the two.
+    /// </param>
+    public OpcodeStats GetStats(bool resetInterval = false)
     {
         lock (_lock)
         {
-            return new OpcodeStats(_latency.GetStats(), _allocation.GetStats());
+            var stats = new OpcodeStats(_latency.GetStats(), _allocation.GetStats());
+            if (resetInterval)
+            {
+                _latency.ResetInterval();
+                _allocation.ResetInterval();
+            }
+            return stats;
         }
     }
 }
@@ -258,6 +280,8 @@ public sealed class SampleWindow
     private double _max = double.MinValue;
     private long _totalCount;
     private double _totalSum;
+    private long _intervalCount;
+    private double _intervalMax;
 
     public SampleWindow(int maxSamples)
     {
@@ -285,6 +309,16 @@ public sealed class SampleWindow
 
         _totalCount++;
         _totalSum += value;
+
+        if (_intervalCount == 0 || value > _intervalMax) _intervalMax = value;
+        _intervalCount++;
+    }
+
+    /// <summary>Starts a new interval; the lifetime and windowed figures are untouched.</summary>
+    public void ResetInterval()
+    {
+        _intervalCount = 0;
+        _intervalMax = 0;
     }
 
     public SampleStats GetStats()
@@ -307,6 +341,8 @@ public sealed class SampleWindow
             P50 = GetPercentile(sorted, 0.50),
             P95 = GetPercentile(sorted, 0.95),
             P99 = GetPercentile(sorted, 0.99),
+            IntervalCount = _intervalCount,
+            IntervalMax = _intervalMax,
         };
     }
 
@@ -344,9 +380,13 @@ public struct SampleStats
     public double P50;
     public double P95;
     public double P99;
+    /// <summary>Samples recorded since the interval was last reset.</summary>
+    public long IntervalCount;
+    /// <summary>Largest sample since the interval was last reset; 0 when <see cref="IntervalCount"/> is 0.</summary>
+    public double IntervalMax;
 
     public override string ToString()
-        => $"Count={Count}, Total={TotalCount}, Min={Min:F3}, Avg={Average:F3}, P50={P50:F3}, P95={P95:F3}, P99={P99:F3}, Max={Max:F3}";
+        => $"Count={Count}, Total={TotalCount}, Min={Min:F3}, Avg={Average:F3}, P50={P50:F3}, P95={P95:F3}, P99={P99:F3}, Max={Max:F3}, IntervalCount={IntervalCount}, IntervalMax={IntervalMax:F3}";
 }
 
 public readonly record struct OpcodeStats(SampleStats Latency, SampleStats Allocation);

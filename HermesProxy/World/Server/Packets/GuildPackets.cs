@@ -809,8 +809,9 @@ public class GuildInviteDeclined : ServerPacket, ISpanWritable
 /// The two per-tab arrays are <see cref="GuildBankTabLimits"/> inline arrays rather than
 /// <c>uint[]</c>, so the packet is a flat 72-byte value with nothing on the heap. That also
 /// matters for correctness here and not only for allocation: this is the one CMSG the proxy
-/// *stores* — <c>LatestPerKeyCoalescer</c> holds the newest per rank for 100 ms — and a value
-/// type is copied into that store, where a reference to a pooled array would not be.
+/// *stores* — the outbox's <c>Coalesce</c> hold keeps the newest per rank for 100 ms, captured
+/// in its release — and a value type is copied into that capture, where a reference to a pooled
+/// array would not be.
 /// </remarks>
 public readonly record struct GuildSetRankPermissions(
     uint RankID,

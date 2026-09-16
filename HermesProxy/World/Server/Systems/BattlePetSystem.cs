@@ -18,10 +18,9 @@ public static class BattlePetSystem
     /// </summary>
     /// <remarks>
     /// Was a private instance helper on <c>WorldSocket</c>, shared by the battle-pet and toy
-    /// handlers. It only ever needed the session, so it becomes a static that both the converted
-    /// systems and the handlers still on the reflective path can call — one implementation rather
-    /// than a copy on each side of the migration. It lands here because this is where it ends up
-    /// once the battle-pet domain finishes converting.
+    /// handlers. It only ever needed the session, so it became a static that
+    /// <see cref="BattlePetSystem"/> and <see cref="ToySystem"/> both call — one implementation
+    /// rather than a copy in each.
     /// </remarks>
     public static CollectionFavorites EnsureCollectionFavorites(GlobalSessionData session)
     {

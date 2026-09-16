@@ -116,7 +116,12 @@ public static class GroupSystem
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CONVERT_RAID);
         // wotlk_classic TC reads a single bit: true = ConvertToRaid, false = ConvertToGroup.
         // Without this bit the server reads past EOF, defaults to "raid", and "Convert to Party" silently no-ops.
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_4_3_54261))
+        //
+        // By expansion and patch, not by build number: raw builds are only ordered within one
+        // branch, and V3_4_3_54261 is a Classic build while a 3.3.5a server is a Retail one. The
+        // comparison happened to give the right answer for both, but it asserts in Debug builds —
+        // which is how it was found, when converting a party to a raid killed the proxy.
+        if (LegacyVersion.ExpansionVersion == 3 && LegacyVersion.MajorVersion >= 4)
         {
             packet.WriteBit(raid.Raid);
             packet.FlushBits();

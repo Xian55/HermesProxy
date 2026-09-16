@@ -1,11 +1,13 @@
-﻿using HermesProxy.Auth;
+using HermesProxy.Auth;
 using HermesProxy.Configuration.Options;
 using HermesProxy.World;
 using HermesProxy.World.Client;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
+using HermesProxy.World.Session;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -46,13 +48,6 @@ public sealed class TradeSession
 
     public uint ClientStateIndex = 1; // incremented for every update on our side
     public uint ServerStateIndex = 1; // incremented by any trade action
-}
-
-public sealed class PendingObjectUpdate
-{
-    public required UpdateObject UpdateObject;
-    public required List<AuraUpdate> AuraUpdates;
-    public required HashSet<uint> WaitingForItemIds;
 }
 
 // Death Knight rune snapshot. Allocated only for DK players on V3_4_3, where
@@ -121,6 +116,13 @@ public sealed class GameSessionData
     // (e.g. ObjectUpdateBuilder) that need helpers on GlobalSessionData like
     // GetBnetAccountGuidForPlayer without threading the session through every call.
     public GlobalSessionData GlobalSession = null!;
+
+    /// <summary>
+    /// Debug-only: the object cache should now be touched only by the session's owner thread. A
+    /// playtest that never fires this is the evidence for deleting <see cref="ObjectCacheLock"/>.
+    /// </summary>
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void AssertObjectCacheOwner() => GlobalSession?.Executor.AssertOwner("object cache");
     public bool HasWsgHordeFlagCarrier;
     public bool HasWsgAllyFlagCarrier;
     public bool ChannelDisplayList;
@@ -131,15 +133,6 @@ public sealed class GameSessionData
     public bool IsWaitingForNewWorld;
     public bool IsWaitingForWorldPortAck;
     public bool IsFirstEnterWorld;
-    public bool IsConnectedToInstance;
-    public Queue<ServerPacket> PendingUninstancedPackets = new(); // Here packets are queued while IsConnectedToInstance = false;
-    public readonly Lock PendingUninstancedPacketsLock = new();
-    // Realm-destined packets queued while RealmSocket is null (modern client's BNet→Realm
-    // handoff hasn't completed yet but the legacy server is already sending early-session
-    // packets like SMSG_TUTORIAL_FLAGS). Flushed in WorldSocket.HandleEnterEncryptedModeAck
-    // when RealmSocket is assigned.
-    public Queue<ServerPacket> PendingRealmPackets = new();
-    public readonly Lock PendingRealmPacketsLock = new();
     public bool IsInWorld;
     // Purchased stable slots, learned from legacy MSG_LIST_STABLED_PETS. V3_4_3 keeps this
     // in ActivePlayerData, and the client greys out every slot it thinks is unpurchased,
@@ -329,9 +322,7 @@ public sealed class GameSessionData
     }
     public uint LastWhoRequestId;
     public WowGuid128 CurrentPetGuid;
-    public WowGuid64 CurrentAttackTarget;        // active CMSG_ATTACK_SWING victim, cleared on ATTACK_STOP/CANCEL_COMBAT
-    public bool WaitingForAttackStart;           // true between CMSG_ATTACK_SWING and SMSG_ATTACK_START
-    public bool DeferredAttackStop;              // CMSG_ATTACK_STOP received while waiting for SMSG_ATTACK_START
+    public WowGuid64 CurrentAttackTarget;        // active CMSG_ATTACK_SWING victim; see MeleeAttackOrder
     public uint[] CurrentArenaTeamIds = new uint[3];
     // Personal rated standing per arena bracket, mirrored from the legacy arena-team player
     // fields. The 3.4.3 client asks for this with CMSG_REQUEST_RATED_PVP_INFO every time the PvP
@@ -450,8 +441,6 @@ public sealed class GameSessionData
     public Dictionary<uint, uint> ItemBuyCount = [];
     public Dictionary<uint, uint> RealSpellToLearnSpell = [];
     public Dictionary<uint, ArenaTeamData> ArenaTeams = [];
-    public World.Server.Packets.MailListResult? PendingMailListPacket;
-    public HashSet<uint> RequestedItemTextIds = [];
     public Dictionary<uint, string> ItemTexts = [];
     public Dictionary<uint, uint> BattleFieldQueueTypes = [];
     public Dictionary<uint, byte> BattleFieldQueueArenaTypes = [];
@@ -514,16 +503,6 @@ public sealed class GameSessionData
     // client doesn't have in its world model — those would round-trip as
     // CMSG_OBJECT_UPDATE_FAILED rejections (e.g. Transports we filter at create time).
     public HashSet<WowGuid128> ClientKnownGuids = [];
-    // Hold corpse DESTROY until the next UPDATE_OBJECT; a same-guid create cancels both.
-    public HashSet<WowGuid128> DeferredCorpseDestroys = [];
-    // V3_4_3-only: set when CollectionSync.SendToys was asked to publish the Toy Box
-    // while the player's CreateObject had not yet reached the client. The Toys list
-    // lives on ActivePlayerData, so it ships as a Values delta on the player guid —
-    // and the client discards (and CMSG_OBJECT_UPDATE_FAILED's) any Values for an
-    // object it does not know yet, which on login leaves it unable to instantiate
-    // further objects until a zone change rebuilds the grid. UpdateHandler flushes
-    // this once the player CreateObject has actually been forwarded.
-    public bool PendingToysSync;
     public Dictionary<WowGuid128, ArenaTeamInspectData[]> PlayerArenaTeams = [];
     public HashSet<string> AddonPrefixes = [];
     public Dictionary<byte, Dictionary<byte, int>> FlatSpellMods = [];
@@ -544,13 +523,6 @@ public sealed class GameSessionData
     public bool TradeJustCompleted;
     public HashSet<uint> RequestedItemHotfixes = [];
     public HashSet<uint> RequestedItemSparseHotfixes = [];
-
-    // SMSG_UPDATE_OBJECT batches that contain a player CreateObject whose
-    // VisibleItems reference item templates not yet cached. Held back until
-    // the matching ItemModifiedAppearance hotfixes are emitted, so the modern
-    // client renders the player dressed instead of naked. See issue #34.
-    public List<PendingObjectUpdate> DeferredObjectUpdates = [];
-    public Lock DeferredObjectUpdatesLock = new();
 
     // Cache of the last SMSG_INIT_WORLD_STATES we sent to the modern client. TC reference
     // re-emits INIT_WORLD_STATES AFTER the player CreateObject (#146 in World_login_parsed.txt),
@@ -1669,6 +1641,7 @@ public sealed class GameSessionData
     }
     public WowGuid128 GetPetGuidByNumber(uint petNumber)
     {
+        AssertObjectCacheOwner();
         lock (ObjectCacheLock)
         {
             return PetModernGuidByNumber.TryGetValue(petNumber, out var guid) ? guid : default;
@@ -1677,6 +1650,7 @@ public sealed class GameSessionData
 
     public void RegisterPet(WowGuid64 legacyGuid, WowGuid128 modernGuid, uint realEntry, uint petNumber)
     {
+        AssertObjectCacheOwner();
         lock (ObjectCacheLock)
         {
             PetRealEntryByLegacyGuid[legacyGuid] = realEntry;
@@ -1687,6 +1661,7 @@ public sealed class GameSessionData
 
     public uint? GetPetRealEntryFromLegacy(WowGuid64 legacyGuid)
     {
+        AssertObjectCacheOwner();
         lock (ObjectCacheLock)
         {
             return PetRealEntryByLegacyGuid.TryGetValue(legacyGuid, out var entry) ? entry : null;
@@ -1695,6 +1670,7 @@ public sealed class GameSessionData
 
     public WowGuid64? GetLegacyPetGuid(WowGuid128 modernGuid)
     {
+        AssertObjectCacheOwner();
         lock (ObjectCacheLock)
         {
             return PetLegacyGuidByModern.TryGetValue(modernGuid, out var legacy) ? legacy : null;
@@ -1704,43 +1680,30 @@ public sealed class GameSessionData
     // Re-resolve a possibly-stale modern Pet GUID (entry=pet_number, because the .To128
     // translation ran before RegisterPet had populated the map) to the corrected modern
     // Pet GUID (entry=creature_template.entry). PetModernGuidByNumber maps pet_number →
-    // corrected GUID. Returns null if not a Pet GUID or the pet isn't registered (TC
-    // native repacks where realEntry is encoded directly — lookup by realEntry returns
-    // nothing, leaving the field unchanged).
+    // the last registered GUID for that pet. Returns null if not a Pet GUID, the pet isn't
+    // registered, or the GUID is already correct.
+    //
+    // Only the entry comes from the registration. A pet keeps its number across spawns but
+    // gets a new counter each time it is summoned or taken out of the stable, so the
+    // registered GUID can belong to the previous spawn. Taking it whole pointed the player's
+    // Summon at the spawn that had just gone into the stable: the new pet's model appeared
+    // but its unit frame never bound.
     public WowGuid128? ResolveStalePetGuid(WowGuid128 stale)
     {
         if (stale.GetHighType() != HighGuidType.Pet) return null;
+        uint realEntry;
+        AssertObjectCacheOwner();
         lock (ObjectCacheLock)
         {
-            return PetModernGuidByNumber.TryGetValue(stale.GetEntry(), out var corrected)
-                ? corrected
-                : null;
+            if (!PetModernGuidByNumber.TryGetValue(stale.GetEntry(), out var registered))
+                return null;
+            realEntry = registered.GetEntry();
         }
+
+        var corrected = WowGuid128.Create(HighGuidType703.Pet, 0, realEntry, stale.GetCounter());
+        return corrected == stale ? null : corrected;
     }
 
-    // Buffer for SMSG_PET_SPELLS_MESSAGE that arrives before its pet's CreateObject
-    // has been delivered to the modern client. cmangos sends the spells message
-    // FIRST (forwarded immediately) then the pet's CreateObject in a follow-up
-    // SMSG_COMPRESSED_UPDATE_OBJECT. The legacy pet GUID's entry slot is pet_number,
-    // and at parse-time RegisterPet hasn't fired yet — so .To128 falls back to
-    // pet_number instead of creature_template.entry. The spells message ends up
-    // with PetGUID=(entry=pet_number) but the pet's later CreateObject ships with
-    // PetGUID=(entry=realEntry). The V3_4_3 client sees these as two different
-    // GUIDs and never binds the pet UI. Hold the parsed message here, then once
-    // the pet CreateObject is in ClientKnownGuids (post-RegisterPet), re-translate
-    // PetGUID and forward. No-op when pet is already known (TC backends, second
-    // tame on the same login, pet already in client world).
-    public PetSpells? PendingPetSpells;
-    public WowGuid64? PendingPetSpellsLegacyGuid;
-
-    // SMSG_UPDATE_OBJECT batches that contain a Pet CreateObject but arrived while the
-    // player CreateObject was still in the DeferredObjectUpdates queue (waiting on item
-    // hotfixes). The V3_4_3 client needs the player object to exist in its world model
-    // BEFORE a child pet arrives, otherwise the pet's SummonedBy back-reference can't
-    // bind and the pet UI (portrait, action bar) never renders. Merged into the player's
-    // deferred batch in QueryHandler.FlushDeferredUpdatesFor so they ship in a single
-    // SMSG_UPDATE_OBJECT alongside the player. No-op when not V3_4_3.
-    public List<UpdateObject> PendingPetUpdateBatches = [];
     public void StoreOriginalObjectType(WowGuid128 guid, ObjectType type)
     {
         OriginalObjectTypes[guid] = type;
@@ -1876,6 +1839,7 @@ public sealed class GameSessionData
 
     public Dictionary<int, UpdateField>? GetCachedObjectFieldsLegacy(WowGuid128 guid)
     {
+        AssertObjectCacheOwner();
         lock (ObjectCacheLock)
         {
             ObjectCacheLegacy.TryGetValue(guid, out var dict);
@@ -1885,6 +1849,7 @@ public sealed class GameSessionData
 
     public UpdateFieldsArray? GetCachedObjectFieldsModern(WowGuid128 guid)
     {
+        AssertObjectCacheOwner();
         lock (ObjectCacheLock)
         {
             ObjectCacheModern.TryGetValue(guid, out var array);
@@ -1968,6 +1933,18 @@ public class GlobalSessionData
     // an IOptions<T> getter chain on every send/recv.
     public PacketLogContext PacketLogContext { get; }
 
+    /// <summary>Packets to the modern client, sent now or held. See World/Outbox/CLAUDE.md.</summary>
+    public ClientOutbox ToClient { get; }
+
+    /// <summary>Packets to the legacy server, sent now or held. See World/Outbox/CLAUDE.md.</summary>
+    public ServerOutbox ToServer { get; }
+
+    /// <summary>
+    /// The one thread at a time that runs this session's work. Packet handlers, timer callbacks and
+    /// teardown are posted here rather than run wherever they arrived. See World/Session/CLAUDE.md.
+    /// </summary>
+    public SessionExecutor Executor { get; }
+
     public GlobalSessionData(
         ClientOptions clientOptions,
         LegacyServerOptions legacyServerOptions,
@@ -1983,7 +1960,49 @@ public class GlobalSessionData
         PacketLogContext = new PacketLogContext(diagnosticsOptions.PacketsLog, clientOptions.ClientBuild);
 
         RealmManager = new RealmManager(clientOptions, networkOptions);
+        Executor = new SessionExecutor(nameof(GlobalSessionData));
+        ToClient = new ClientOutbox(new SessionClientWire(this));
+        ToServer = new ServerOutbox(new SessionServerWire(this));
+        // Deadlines are session work: they run on the owner, not on the timer thread.
+        ToClient.RunDeadlinesOn(Executor);
+        ToServer.RunDeadlinesOn(Executor);
+        ToServer.SetGate(OutboxGate.SwingAnswered, open: true);
         GameState = GameSessionData.CreateNewGameSessionData(this);
+    }
+
+    /// <summary>
+    /// Starts a fresh GameState. Holds tied to the old one are dropped first: a held packet that
+    /// refers to the previous character must not reach the client after the switch.
+    /// </summary>
+    public void ReplaceGameState()
+    {
+        ToClient.Discard(OutboxScope.GameState);
+        ToServer.Discard(OutboxScope.GameState);
+        // Parked packets were built from the old state too, and the new one starts outside the world.
+        ToClient.DiscardParked();
+        ToClient.SetGate(OutboxGate.InWorld, open: false);
+        ToServer.SetGate(OutboxGate.InWorld, open: false);
+        // The new character has swung at nothing, and Discard(Session) closes every gate.
+        ToServer.SetGate(OutboxGate.SwingAnswered, open: true);
+        GameState = GameSessionData.CreateNewGameSessionData(this);
+    }
+
+    /// <summary>
+    /// Runs after each legacy packet's handler: releases holds waiting for this opcode, closes the
+    /// update batch if it was one, and acts on deadlines that must run on this thread.
+    /// </summary>
+    public void OnLegacyPacketHandled(Opcode opcode)
+    {
+        ToServer.Notify(OutboxEvent.OpcodeHandled(opcode));
+        ToClient.Notify(OutboxEvent.OpcodeHandled(opcode));
+        if (opcode is Opcode.SMSG_UPDATE_OBJECT or Opcode.SMSG_COMPRESSED_UPDATE_OBJECT)
+        {
+            ToClient.Notify(OutboxEvent.Signal(OutboxSignal.UpdateBatchEnd));
+            ToServer.Notify(OutboxEvent.Signal(OutboxSignal.UpdateBatchEnd));
+        }
+        ToClient.Tick();
+        ToServer.Tick();
+        ToClient.TickParks();
     }
     
     public void StoreGuildRankNames(uint guildId, List<string> ranks)
@@ -2072,7 +2091,11 @@ public class GlobalSessionData
             InstanceSocket = null!;
         }
 
-        GameState = GameSessionData.CreateNewGameSessionData(this);
+        ToClient.Detach(Framework.Constants.ConnectionType.Realm);
+        ToClient.Detach(Framework.Constants.ConnectionType.Instance);
+        ToClient.Discard(OutboxScope.Session);
+        ToServer.Discard(OutboxScope.Session);
+        ReplaceGameState();
     }
 
     public void SendHermesTextMessage(string message, bool isError = false)

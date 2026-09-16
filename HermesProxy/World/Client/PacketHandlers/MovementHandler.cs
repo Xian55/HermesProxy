@@ -241,8 +241,13 @@ public partial class WorldClient
             // Values filter would then forward deltas for objects the client no longer has,
             // which come straight back as CMSG_OBJECT_UPDATE_FAILED. Observed as a player
             // Values sent in the gap between the teleport and the re-create.
+            // Pet batches held for the old map's player would otherwise go out after the new map's
+            // player create, ahead of the server's fresh creates for the same pets.
             if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            {
                 GetSession().GameState.ClientKnownGuids.Clear();
+                GetSession().ToClient.Cancel(HeldPetUpdateBatch.Key);
+            }
 
             SendPacketToClient(teleport);
             if (teleport.MapID > 1)

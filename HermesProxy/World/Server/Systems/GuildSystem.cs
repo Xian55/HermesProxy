@@ -6,6 +6,7 @@ using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server.Packets;
 
 namespace HermesProxy.World.Server.Systems;
@@ -19,12 +20,9 @@ namespace HermesProxy.World.Server.Systems;
 /// <c>verify-handler-port.py</c> diffs each one against the original.
 /// </para>
 /// <para>
-/// Two things stay on <c>WorldSocket</c> because they are socket lifetime state rather than
-/// translation: the rank-permissions coalescer and its timer, which <c>OnClose</c> also drains.
-/// <see cref="HandleGuildSetRankPermissions"/> reaches them through
-/// <c>ctx.Socket.OfferRankPermissions</c>. <c>CMSG_TABARD_VENDOR_ACTIVATE</c> also stays behind,
-/// because it shares <c>InteractWithNPC</c> with five handlers in three other files and that type
-/// converts in one piece or not at all.
+/// <see cref="HandleGuildSetRankPermissions"/> coalesces rank edits through the session's server
+/// outbox rather than a coalescer and timer on <c>WorldSocket</c>. The outbox belongs to the
+/// session, so a pending edit outlives the modern socket and needs no flush when the socket closes.
 /// </para>
 /// </remarks>
 public static class GuildSystem
@@ -149,17 +147,29 @@ public static class GuildSystem
             return;
         }
 
-        // The coalescer and its timer are socket state — OnClose drains them — so the arming lives
-        // on WorldSocket and this is the one call that reaches back into it. Issue #283.
-        ctx.Socket!.OfferRankPermissions(in rank);
+        // One Apply in the 3.4.3 guild control panel sends a CMSG_GUILD_SET_RANK_PERMISSIONS per
+        // changed setting, all in the same millisecond and each carrying the rank's complete state:
+        // a native Wrathion capture shows five for one Apply. A 3.3.5a client sends one
+        // CMSG_GUILD_RANK, and AzerothCore kicks after three in one second (antidos_opcode_policies,
+        // opcode 561). Only the last of a burst matters, so forward the newest per rank once the
+        // burst is over. The copy is what the release captures; the release builds a legacy
+        // packet from it and reads no session state, so the timer thread may run it. Issue #283.
+        var newest = rank;
+        var session = ctx.GetSession();
+        ctx.ToServer.Coalesce(
+            new HoldKey(HoldKeyKind.GuildRankPermissions, rank.RankID),
+            RankPermissionsCoalesceWindow,
+            () => session.ToServer.Send(BuildLegacyGuildRank(newest)),
+            new HoldOptions(RunOnTimer: true, Scope: OutboxScope.LegacyConnection));
     }
+
+    private static readonly TimeSpan RankPermissionsCoalesceWindow = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
     /// Rewrites one rank's complete state as the single 3.3.5a-era CMSG_GUILD_RANK.
     /// </summary>
     /// <remarks>
-    /// Also called from <c>WorldSocket.FlushRankPermissions</c>, on a timer thread, once per rank
-    /// in a coalesced burst.
+    /// Also runs from the outbox timer, once per rank at the end of a coalesced burst.
     /// </remarks>
     internal static WorldPacket BuildLegacyGuildRank(GuildSetRankPermissions rank)
     {

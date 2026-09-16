@@ -4,6 +4,7 @@ using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
+using HermesProxy.World.Server.Systems;
 using System;
 
 namespace HermesProxy.World.Client;
@@ -19,7 +20,7 @@ public partial class WorldClient
         attack.Victim = packet.ReadGuid().To128(GetSession().GameState);
 
         if (attack.Attacker == GetSession().GameState.CurrentPlayerGuid)
-            GetSession().GameState.WaitingForAttackStart = false;
+            MeleeAttackOrder.SwingAnswered(GetSession().ToServer);
 
         SendPacketToClient(attack);
     }
@@ -53,7 +54,8 @@ public partial class WorldClient
     {
         SAttackStop attack = new();
         attack.Attacker = packet.ReadPackedGuid().To128(GetSession().GameState);
-        attack.Victim = packet.ReadPackedGuid().To128(GetSession().GameState);
+        WowGuid64 victim64 = packet.ReadPackedGuid();
+        attack.Victim = victim64.To128(GetSession().GameState);
         // V3_4_3 backends (e.g. AzerothCore) can emit a short SMSG_ATTACKSTOP without the
         // trailing "now dead" uint32; guard the read so it doesn't kill the WorldClient
         // receive loop (issue #102). Gated to V3_4_3 so V1_14/V2_5 keep the original
@@ -65,18 +67,7 @@ public partial class WorldClient
 
         var state = GetSession().GameState;
         if (attack.Attacker == state.CurrentPlayerGuid)
-        {
-            // If the client wanted to stop and we deferred it, now flush it
-            if (state.DeferredAttackStop)
-            {
-                state.DeferredAttackStop = false;
-                state.CurrentAttackTarget = default;
-                WorldPacket stopPacket = new WorldPacket(Opcode.CMSG_ATTACK_STOP);
-                SendPacketToServer(stopPacket, Opcode.MSG_NULL_ACTION);
-            }
-            // If CurrentAttackTarget is set but no deferred stop, we're switching targets —
-            // don't clear the attack target, the new SWING already set it
-        }
+            MeleeAttackOrder.ServerStopped(state, GetSession().ToServer, victim64);
 
         SendPacketToClient(attack);
     }
@@ -156,11 +147,13 @@ public partial class WorldClient
 
         SendPacketToClient(attack);
     }
+    // A swing error is the server's answer to the swing too, so a stop held behind it can go.
     [HandlesSmsg(Opcode.SMSG_ATTACKSWING_NOTINRANGE)]
     internal void HandleAttackSwingNotInRange(WorldPacket packet)
     {
         AttackSwingError attack = new();
         attack.Reason = AttackSwingErr.NotInRange;
+        MeleeAttackOrder.SwingAnswered(GetSession().ToServer);
         SendPacketToClient(attack);
     }
     [HandlesSmsg(Opcode.SMSG_ATTACKSWING_BADFACING)]
@@ -168,6 +161,7 @@ public partial class WorldClient
     {
         AttackSwingError attack = new();
         attack.Reason = AttackSwingErr.BadFacing;
+        MeleeAttackOrder.SwingAnswered(GetSession().ToServer);
         SendPacketToClient(attack);
     }
     [HandlesSmsg(Opcode.SMSG_ATTACKSWING_DEADTARGET)]
@@ -175,6 +169,7 @@ public partial class WorldClient
     {
         AttackSwingError attack = new();
         attack.Reason = AttackSwingErr.DeadTarget;
+        MeleeAttackOrder.SwingAnswered(GetSession().ToServer);
         SendPacketToClient(attack);
     }
     [HandlesSmsg(Opcode.SMSG_ATTACKSWING_CANT_ATTACK)]
@@ -182,14 +177,13 @@ public partial class WorldClient
     {
         AttackSwingError attack = new();
         attack.Reason = AttackSwingErr.CantAttack;
+        MeleeAttackOrder.SwingAnswered(GetSession().ToServer);
         SendPacketToClient(attack);
     }
     [HandlesSmsg(Opcode.SMSG_CANCEL_COMBAT)]
     internal void HandleCancelCombat(WorldPacket packet)
     {
-        GetSession().GameState.CurrentAttackTarget = default;
-        GetSession().GameState.WaitingForAttackStart = false;
-        GetSession().GameState.DeferredAttackStop = false;
+        MeleeAttackOrder.CombatCancelled(GetSession().GameState, GetSession().ToServer);
         CancelCombat combat = new();
         SendPacketToClient(combat);
     }
