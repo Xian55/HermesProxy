@@ -300,6 +300,8 @@ public partial class WorldClient
             if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
             {
                 GetSession().GameState.ClientKnownGuids.Clear();
+                GetSession().GameState.ClientHasPlayerObject = false;
+                GetSession().GameState.ClientHasPetObject = false;
                 GetSession().ToClient.Cancel(HeldPetUpdateBatch.Key);
                 GetSession().ToClient.Cancel(HeldPlayerValues.Key);
                 GetSession().ToClient.Cancel(PlayerMoveSpeedKey);

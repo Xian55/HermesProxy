@@ -636,6 +636,10 @@ public class UpdateObject : ServerPacket
             {
                 known.Add(u.Guid);
                 createKept++;
+                if (u.Guid == gameState.CurrentPlayerGuid)
+                    gameState.ClientHasPlayerObject = true;
+                else if (u.Guid == gameState.CurrentPetGuid)
+                    gameState.ClientHasPetObject = true;
                 World.Logging.ObjectLifecycleLogMessages.CreateRegistered(
                     _melObjLife, u.Guid.Low, u.Guid.High, u.Type.ToString());
             }

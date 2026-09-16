@@ -15,7 +15,7 @@ namespace HermesProxy.World.Logging;
 /// history with the Low value.
 ///
 /// All Trace level, so they cost nothing unless Log.Server.MinimumLevel=Verbose (which
-/// test-loop2.ps1 sets). EventId 900-909 is reserved for this file.
+/// test-loop2.ps1 sets). EventId 900-919 is reserved for this file.
 /// </summary>
 internal static partial class ObjectLifecycleLogMessages
 {
@@ -89,4 +89,17 @@ internal static partial class ObjectLifecycleLogMessages
     public static partial void PlayerMovementHeld(
         ILogger logger, ulong guidLow, ulong guidHigh, string opcode, string reason);
 
+    [LoggerMessage(
+        EventId = 910,
+        Level = LogLevel.Trace,
+        Message = "[ObjLife] sent while client has no player object opcode={Opcode} playerLow={PlayerLow}")]
+    public static partial void SentWhileClientHasNoPlayer(
+        ILogger logger, string opcode, ulong playerLow);
+
+    [LoggerMessage(
+        EventId = 911,
+        Level = LogLevel.Trace,
+        Message = "[ObjLife] sent while client has no pet object opcode={Opcode} petLow={PetLow} sinceSummonMs={SinceSummonMs}")]
+    public static partial void SentWhileClientHasNoPet(
+        ILogger logger, string opcode, ulong petLow, long sinceSummonMs);
 }

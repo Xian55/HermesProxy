@@ -573,6 +573,54 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             Log.Print(LogType.Error, $"Attempt to send opcode {packet.GetUniversalOpcode(false)} ({packet.GetOpcode()}) while WorldClient is disconnected!");
     }
 
+    /// <summary>How long after a pet guid changes the no-pet-object window stays interesting.</summary>
+    private const long PetSummonWindowMs = 10_000;
+
+    private static readonly Microsoft.Extensions.Logging.ILogger _melNoPlayerYet =
+        Log.CreateMelLogger(Log.CategoryServer);
+
+    /// <summary>
+    /// Records a packet written to the client while it has no player object. Diagnostic only:
+    /// Trace-gated, so the guid test and the opcode name cost nothing unless Verbose is on.
+    /// </summary>
+    private void LogIfClientHasNoPlayerObject(ServerPacket packet)
+    {
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+            return;
+        if (!_melNoPlayerYet.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Trace))
+            return;
+
+        var session = GetSession();
+        var state = session?.GameState;
+        if (state == null)
+            return;
+
+        // Reading the flags rather than ClientKnownGuids: the set is mutated on the legacy thread
+        // and this runs on a socket thread.
+        if (!state.ClientHasPlayerObject && !state.CurrentPlayerGuid.IsEmpty())
+        {
+            World.Logging.ObjectLifecycleLogMessages.SentWhileClientHasNoPlayer(
+                _melNoPlayerYet, packet.GetUniversalOpcode().ToString(), state.CurrentPlayerGuid.Low);
+            return;
+        }
+
+        // The pet's own window. The login case is already covered by the player check above -- the
+        // pet's create is held with the player's -- so this is the mid-session summon, where the
+        // guid the client is missing is the pet's. That is the window the pet path already fights
+        // with three separate hand-rolled holds (HeldPetUpdateBatch, HeldPetSpells, the Summon
+        // reseat), which is why it is worth watching directly.
+        if (state.ClientHasPetObject || state.CurrentPetGuid.IsEmpty())
+            return;
+
+        // Bounded: a pet guid whose create never arrives would otherwise log every later packet.
+        long sinceSummon = Environment.TickCount64 - state.PetGuidSetAt;
+        if (sinceSummon > PetSummonWindowMs)
+            return;
+
+        World.Logging.ObjectLifecycleLogMessages.SentWhileClientHasNoPet(
+            _melNoPlayerYet, packet.GetUniversalOpcode().ToString(), state.CurrentPetGuid.Low, sinceSummon);
+    }
+
     // C<P S: Sends data to modern client
     public void SendPacket(ServerPacket packet)
     {
@@ -598,6 +646,16 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             packet.Discard();
             return;
         }
+
+        // A packet that reaches the client before the client has its own player object is
+        // silently discarded -- no error, no ack, nothing in any log. Two bugs of exactly that
+        // shape were found months apart by a player noticing a symptom (issue #300: the player's
+        // own Values, then a mounted login's run speed). Declaring a dependency has always been
+        // opt-in per call site, both here and in the _delayedPacketsToClient map this replaced,
+        // so an undeclared one is invisible by construction. This names them instead of waiting
+        // for the third. The window -- the item-template hold at login, the SMSG_NEW_WORLD gap at
+        // a teleport -- opens once per login, so the list is short.
+        LogIfClientHasNoPlayerObject(packet);
 
         packet.WritePacketData();
 

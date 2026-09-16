@@ -33,6 +33,11 @@ public partial class WorldClient
         WowGuid64 guid = packet.ReadGuid();
         WowGuid128 barOwnerBefore = GetSession().GameState.CurrentPetGuid;
         GetSession().GameState.CurrentPetGuid = guid.To128(GetSession().GameState);
+        // Reopens the summon window the no-pet-object diagnostic watches. On the legacy thread,
+        // so ClientKnownGuids is safe to read here -- the socket thread reads only the flag.
+        GetSession().GameState.ClientHasPetObject =
+            GetSession().GameState.ClientKnownGuids.Contains(GetSession().GameState.CurrentPetGuid);
+        GetSession().GameState.PetGuidSetAt = Environment.TickCount64;
         GetSession().GameState.ClearPendingPetCasts();
 
         // Equal to "Clear spells" pre cataclysm

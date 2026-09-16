@@ -1,4 +1,4 @@
-using HermesProxy.Auth;
+﻿using HermesProxy.Auth;
 using HermesProxy.Configuration.Options;
 using HermesProxy.World;
 using HermesProxy.World.Client;
@@ -521,6 +521,28 @@ public sealed class GameSessionData
     // client doesn't have in its world model — those would round-trip as
     // CMSG_OBJECT_UPDATE_FAILED rejections (e.g. Transports we filter at create time).
     public HashSet<WowGuid128> ClientKnownGuids = [];
+
+    /// <summary>
+    /// Whether the client has been given its own player object. Mirrors
+    /// <c>ClientKnownGuids.Contains(CurrentPlayerGuid)</c>, but readable from a socket thread: the
+    /// set is mutated on the legacy thread and enumerating it from another is not safe. Set when
+    /// the player's create is registered, cleared when the client's world is torn down.
+    /// </summary>
+    public volatile bool ClientHasPlayerObject;
+
+    /// <summary>
+    /// Whether the client has been given the object for <see cref="CurrentPetGuid"/>. Same reason
+    /// as <see cref="ClientHasPlayerObject"/>: readable from a socket thread.
+    /// </summary>
+    public volatile bool ClientHasPetObject;
+
+    /// <summary>
+    /// <see cref="Environment.TickCount64"/> when <see cref="CurrentPetGuid"/> last changed, so the
+    /// diagnostic that watches the summon window can stop after it. Without a bound, a pet guid
+    /// whose create never arrives -- a charm that ended, a dismiss the proxy did not see -- would
+    /// make every later packet log a line.
+    /// </summary>
+    public long PetGuidSetAt;
     public Dictionary<WowGuid128, ArenaTeamInspectData[]> PlayerArenaTeams = [];
     public HashSet<string> AddonPrefixes = [];
     public Dictionary<byte, Dictionary<byte, int>> FlatSpellMods = [];

@@ -198,6 +198,7 @@ public partial class WorldClient
         // comes back it arrives as a fresh CreateObject, which re-adds it.
 
         bool wasKnown = GetSession().GameState.ClientKnownGuids.Remove(guid);
+        ForgetPetObjectIfLost(guid, wasKnown);
         World.Logging.ObjectLifecycleLogMessages.KnownGuidRemoved(
             _melObjLifeClient, guid.Low, guid.High, "destroy-object", wasKnown);
 
@@ -242,6 +243,7 @@ public partial class WorldClient
         }
         GetSession().GameState.LastAuraCasterOnTarget.Remove(guid);
         bool wasKnown = GetSession().GameState.ClientKnownGuids.Remove(guid);
+        ForgetPetObjectIfLost(guid, wasKnown);
         World.Logging.ObjectLifecycleLogMessages.KnownGuidRemoved(
             _melObjLifeClient, guid.Low, guid.High, "deferred-corpse-destroy", wasKnown);
         UpdateObject destroy = new UpdateObject(GetSession().GameState);
@@ -1218,9 +1220,20 @@ public partial class WorldClient
             // Out-of-range is a destroy as far as the client is concerned — same reasoning
             // as HandleDestroyObject above.
             bool wasKnown = GetSession().GameState.ClientKnownGuids.Remove(guid);
+            ForgetPetObjectIfLost(guid, wasKnown);
             World.Logging.ObjectLifecycleLogMessages.KnownGuidRemoved(
                 _melObjLifeClient, guid.Low, guid.High, "out-of-range", wasKnown);
         }
+    }
+
+    /// <summary>
+    /// Closes the window the no-pet-object diagnostic watches when the client loses the pet's
+    /// object, so a later summon of the same guid starts from "not known" again.
+    /// </summary>
+    private void ForgetPetObjectIfLost(WowGuid128 guid, bool wasKnown)
+    {
+        if (wasKnown && guid == GetSession().GameState.CurrentPetGuid)
+            GetSession().GameState.ClientHasPetObject = false;
     }
 
     private static bool ContainsPetCreateObject(UpdateObject obj)
