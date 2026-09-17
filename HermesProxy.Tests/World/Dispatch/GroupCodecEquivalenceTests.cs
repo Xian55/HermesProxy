@@ -156,32 +156,6 @@ public class GroupCodecEquivalenceTests
     }
 
     [Fact]
-    public void MinimapPingClient_Matches()
-    {
-        var (o, f) = Build(w => { w.WriteVector2(new Vector2(1234.5f, -678.25f)); w.WriteInt8(-1); });
-        var e = new Frozen.MinimapPingClient(); e.Read(o);
-        var r = ReaderOver(f); MinimapPingClientCodec.Read(ref r, out var a);
-        Assert.Equal(e.Position, a.Position);
-        Assert.Equal(e.PartyIndex, a.PartyIndex);
-        Assert.Equal(new Vector2(1234.5f, -678.25f), a.Position);
-        Assert.Equal(o.Remaining(), r.Remaining);
-    }
-
-    [Theory]
-    [InlineData(1, 100)]
-    [InlineData(int.MinValue, int.MaxValue)]
-    public void RandomRollClient_Matches(int min, int max)
-    {
-        var (o, f) = Build(w => { w.WriteInt32(min); w.WriteInt32(max); w.WriteUInt8(0); });
-        var e = new Frozen.RandomRollClient(); e.Read(o);
-        var r = ReaderOver(f); RandomRollClientCodec.Read(ref r, out var a);
-        Assert.Equal(e.Min, a.Min);
-        Assert.Equal(e.Max, a.Max);
-        Assert.Equal(e.PartyIndex, a.PartyIndex);
-        Assert.Equal(o.Remaining(), r.Remaining);
-    }
-
-    [Fact]
     public void RequestPartyMemberStats_Matches()
     {
         var (o, f) = Build(w => { w.WriteUInt8(0); w.WritePackedGuid128(Guid); });
@@ -193,6 +167,32 @@ public class GroupCodecEquivalenceTests
     }
 
     // ---- ranged: pre-WotLK side, proven against the oracle ----
+
+    [Fact]
+    public void MinimapPingClient_PreWotLK_MatchesOracle()
+    {
+        var (o, f) = Build(w => { w.WriteVector2(new Vector2(1234.5f, -678.25f)); w.WriteInt8(-1); });
+        var e = new Frozen.MinimapPingClient(); e.Read(o);
+        var r = ReaderOver(f); MinimapPingClientCodecPreWotLKClassic.Read(ref r, out var a);
+        Assert.Equal(e.Position, a.Position);
+        Assert.Equal(e.PartyIndex, a.PartyIndex);
+        Assert.Equal(new Vector2(1234.5f, -678.25f), a.Position);
+        Assert.Equal(o.Remaining(), r.Remaining);
+    }
+
+    [Theory]
+    [InlineData(1, 100)]
+    [InlineData(int.MinValue, int.MaxValue)]
+    public void RandomRollClient_PreWotLK_MatchesOracle(int min, int max)
+    {
+        var (o, f) = Build(w => { w.WriteInt32(min); w.WriteInt32(max); w.WriteUInt8(0); });
+        var e = new Frozen.RandomRollClient(); e.Read(o);
+        var r = ReaderOver(f); RandomRollClientCodecPreWotLKClassic.Read(ref r, out var a);
+        Assert.Equal(e.Min, a.Min);
+        Assert.Equal(e.Max, a.Max);
+        Assert.Equal(e.PartyIndex, a.PartyIndex);
+        Assert.Equal(o.Remaining(), r.Remaining);
+    }
 
     [Theory]
     [InlineData(true, null)]
@@ -516,6 +516,72 @@ public class GroupCodecEquivalenceTests
         Assert.Equal(Guid, a.FirstTarget);
         Assert.Equal(Guid2, a.SecondTarget);
         Assert.Equal(hasPartyIndex ? (sbyte)1 : (sbyte)0, a.PartyIndex);
+        Assert.Equal(0, r.Remaining);
+    }
+
+    /// <summary>
+    /// Issue #318. The bytes are lifted from the reporter's own capture of <c>/roll 100</c>:
+    /// <c>00 01 00 00 00 64 00 00 00</c> — a clear HasPartyIndex bit byte, Min = 1, Max = 100. The
+    /// pre-WotLK reader took the bit byte as Min's low byte, so the proxy forwarded a roll of
+    /// 256-25600 and the client was told it had rolled a number in that range.
+    /// </summary>
+    [Theory]
+    [InlineData(new byte[] { 0x00, 0x01, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00 }, 1, 100)]
+    [InlineData(new byte[] { 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00 }, 1, 1)]
+    public void RandomRollClient_WotLKClassic_ReadsCapturedBytes(byte[] body, int expectedMin, int expectedMax)
+    {
+        byte[] framed = new byte[body.Length + 2];
+        body.CopyTo(framed, 2);
+
+        var r = ReaderOver(framed);
+        RandomRollClientCodecWotLKClassic.Read(ref r, out var a);
+        Assert.Equal(expectedMin, a.Min);
+        Assert.Equal(expectedMax, a.Max);
+        Assert.Equal((byte)0, a.PartyIndex);
+        Assert.Equal(0, r.Remaining);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RandomRollClient_WotLKClassic_ReadsTheOptionalIndex(bool hasPartyIndex)
+    {
+        var (_, f) = Build(w =>
+        {
+            w.WriteBit(hasPartyIndex);
+            w.WriteInt32(1);
+            w.WriteInt32(100);
+            if (hasPartyIndex)
+                w.WriteUInt8(2);
+        });
+
+        var r = ReaderOver(f); RandomRollClientCodecWotLKClassic.Read(ref r, out var a);
+        Assert.Equal(1, a.Min);
+        Assert.Equal(100, a.Max);
+        Assert.Equal(hasPartyIndex ? (byte)2 : (byte)0, a.PartyIndex);
+        Assert.Equal(0, r.Remaining);
+    }
+
+    /// <summary>
+    /// Same miss as RandomRollClient: the bit byte became the low byte of PositionX, which moved
+    /// the ping by a wide margin rather than dropping it, so it read as a coordinate bug.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MinimapPingClient_WotLKClassic_ReadsBitThenCoordinates(bool hasPartyIndex)
+    {
+        var (_, f) = Build(w =>
+        {
+            w.WriteBit(hasPartyIndex);
+            w.WriteVector2(new Vector2(1234.5f, -678.25f));
+            if (hasPartyIndex)
+                w.WriteInt8(2);
+        });
+
+        var r = ReaderOver(f); MinimapPingClientCodecWotLKClassic.Read(ref r, out var a);
+        Assert.Equal(new Vector2(1234.5f, -678.25f), a.Position);
+        Assert.Equal(hasPartyIndex ? (sbyte)2 : (sbyte)0, a.PartyIndex);
         Assert.Equal(0, r.Remaining);
     }
 

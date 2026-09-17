@@ -1290,9 +1290,15 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.GuildSystem.HandleSplitItemToGuildBank(in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleMinimapPing_CMSG_MINIMAP_PING(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleMinimapPing_CMSG_MINIMAP_PING_MinimapPingClientCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
-        global::HermesProxy.World.Server.Packets.MinimapPingClientCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Packets.MinimapPingClientCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.GroupSystem.HandleMinimapPing(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleMinimapPing_CMSG_MINIMAP_PING_MinimapPingClientCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MinimapPingClientCodecWotLKClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.GroupSystem.HandleMinimapPing(in packet, in ctx);
     }
 
@@ -1956,9 +1962,15 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.QuestSystem.HandleQuestPushResult(in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleRandomRoll_CMSG_RANDOM_ROLL(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleRandomRoll_CMSG_RANDOM_ROLL_RandomRollClientCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
-        global::HermesProxy.World.Server.Packets.RandomRollClientCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Packets.RandomRollClientCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.GroupSystem.HandleRandomRoll(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleRandomRoll_CMSG_RANDOM_ROLL_RandomRollClientCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.RandomRollClientCodecWotLKClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.GroupSystem.HandleRandomRoll(in packet, in ctx);
     }
 
@@ -2852,7 +2864,12 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MERGE_GUILD_BANK_ITEM_WITH_GUILD_BANK_ITEM] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleMoveGuildBankItem_CMSG_MERGE_GUILD_BANK_ITEM_WITH_GUILD_BANK_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MERGE_GUILD_BANK_ITEM_WITH_ITEM] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleMergeGuildBankItemWithItem_CMSG_MERGE_GUILD_BANK_ITEM_WITH_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MERGE_ITEM_WITH_GUILD_BANK_ITEM] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleSplitItemToGuildBank_CMSG_MERGE_ITEM_WITH_GUILD_BANK_ITEM;
-        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MINIMAP_PING] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleMinimapPing_CMSG_MINIMAP_PING;
+        {
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MINIMAP_PING] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleMinimapPing_CMSG_MINIMAP_PING_MinimapPingClientCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MINIMAP_PING] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleMinimapPing_CMSG_MINIMAP_PING_MinimapPingClientCodecWotLKClassic;
+        }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOUNT_SET_FAVORITE] = &Thunk_HermesProxy_World_Server_Systems_BattlePetSystem_HandleMountSetFavorite_CMSG_MOUNT_SET_FAVORITE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOUNT_SPECIAL_ANIM] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleMountSpecialAnim_CMSG_MOUNT_SPECIAL_ANIM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_CHANGE_TRANSPORT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_CHANGE_TRANSPORT;
@@ -2971,7 +2988,12 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_LOG_REMOVE_QUEST] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestLogRemoveQuest_CMSG_QUEST_LOG_REMOVE_QUEST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_POI_QUERY] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestPOIQuery_CMSG_QUEST_POI_QUERY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_PUSH_RESULT] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestPushResult_CMSG_QUEST_PUSH_RESULT;
-        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_RANDOM_ROLL] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleRandomRoll_CMSG_RANDOM_ROLL;
+        {
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_RANDOM_ROLL] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleRandomRoll_CMSG_RANDOM_ROLL_RandomRollClientCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_RANDOM_ROLL] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleRandomRoll_CMSG_RANDOM_ROLL_RandomRollClientCodecWotLKClassic;
+        }
         {
             if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_READY_CHECK_RESPONSE] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleReadyCheckResponse_CMSG_READY_CHECK_RESPONSE_ReadyCheckResponseClientCodecPreWotLKClassic;

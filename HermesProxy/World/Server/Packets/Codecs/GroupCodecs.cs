@@ -8,16 +8,23 @@ namespace HermesProxy.World.Server.Packets;
 
 // Party and raid CMSG codecs.
 //
-// This is the densest version-variance in the inbound set: seven of these eighteen packets had a
-// `ModernVersion.Build == V3_4_3_54261` branch inside one Read, more than the whole chat family.
-// V3_4_3 moved the optional-field bits to the front — PartyIndex became a bit plus an optional
-// byte instead of a mandatory one — so the two layouts disagree from the first byte, not just in
-// the tail. Each is now a ranged pair, decided once when the table is built.
+// This is the densest version-variance in the inbound set: nine of these eighteen packets need a
+// V3_4_3-specific layout, more than the whole chat family. V3_4_3 moved the optional-field bits to
+// the front — PartyIndex became a bit plus an optional byte instead of a mandatory one — so the two
+// layouts disagree from the first byte, not just in the tail. Each is now a ranged pair, decided
+// once when the table is built.
 //
 // The hard-won detail is ReadyCheckResponseClient, and its comment moves with it: reading
 // PartyIndex first consumed the bit byte and then took the MSB of the always-zero index byte as
 // IsReady, so every ready check answered "not ready". Splitting the layouts is what makes that
 // unrepresentable rather than fixed-in-place.
+//
+// RandomRollClient and MinimapPingClient were missed by that first sweep because their index byte
+// is not the leading field, so nothing crashed and nothing read past the end — the values were
+// simply one byte out. Where the mandatory index byte *is* first (UpdateRaidTarget, SetPartyLeader,
+// RequestPartyMemberStats) it happens to swallow the bit byte and land every later field at the
+// right offset, which is why those stay single codecs: only their PartyIndex is junk, and no
+// handler forwards it.
 
 // ---- invite ----
 
@@ -279,7 +286,27 @@ public static class SummonResponseCodec
     }
 }
 
-public static class MinimapPingClientCodec
+[PacketCodec(typeof(MinimapPingClient), AddedIn = ClientVersionBuild.V3_4_3_54261)]
+public static class MinimapPingClientCodecWotLKClassic
+{
+    public static void Read(ref SpanPacketReader r, out MinimapPingClient packet)
+    {
+        // A HasPartyIndex bit first, then the coordinates, then the optional index byte. Reading
+        // the Vector2 straight away took the bit byte as the low byte of PositionX, so every ping
+        // landed at a garbage spot on the minimap.
+        bool hasPartyIndex = r.HasBit();
+        Vector2 position = r.ReadVector2();
+
+        sbyte partyIndex = 0;
+        if (hasPartyIndex)
+            partyIndex = r.ReadInt8();
+
+        packet = new MinimapPingClient(position, partyIndex);
+    }
+}
+
+[PacketCodec(typeof(MinimapPingClient), RemovedIn = ClientVersionBuild.V3_4_3_54261)]
+public static class MinimapPingClientCodecPreWotLKClassic
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Read(ref SpanPacketReader r, out MinimapPingClient packet)
@@ -290,7 +317,29 @@ public static class MinimapPingClientCodec
     }
 }
 
-public static class RandomRollClientCodec
+[PacketCodec(typeof(RandomRollClient), AddedIn = ClientVersionBuild.V3_4_3_54261)]
+public static class RandomRollClientCodecWotLKClassic
+{
+    public static void Read(ref SpanPacketReader r, out RandomRollClient packet)
+    {
+        // A HasPartyIndex bit first, then Min and Max, then the optional index byte. Reading Min
+        // straight away took the bit byte as its low byte and shifted the rest one byte along, so
+        // `/roll 100` reached the legacy server as a roll of 256-25600 and came back as a result
+        // in that range (issue #318). Captured bytes for `/roll 100`: 00 01 00 00 00 64 00 00 00.
+        bool hasPartyIndex = r.HasBit();
+        int min = r.ReadInt32();
+        int max = r.ReadInt32();
+
+        byte partyIndex = 0;
+        if (hasPartyIndex)
+            partyIndex = r.ReadUInt8();
+
+        packet = new RandomRollClient(min, max, partyIndex);
+    }
+}
+
+[PacketCodec(typeof(RandomRollClient), RemovedIn = ClientVersionBuild.V3_4_3_54261)]
+public static class RandomRollClientCodecPreWotLKClassic
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Read(ref SpanPacketReader r, out RandomRollClient packet)

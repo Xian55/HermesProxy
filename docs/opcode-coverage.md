@@ -86,7 +86,7 @@ Each of these has more than one codec, chosen by build range at table-build time
 anyone adding a client this is the short list worth checking first: a layout that already
 changed once is the most likely to have changed again.
 
-23 packets across 46 codecs.
+25 packets across 50 codecs.
 
 | packet | codec | axis | added in | removed in |
 |---|---|---|---|---|
@@ -122,10 +122,14 @@ changed once is the most likely to have changed again.
 | `MailTakeItem` | `MailTakeItemCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `MailTakeMoney` | `MailTakeMoneyCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `MailTakeMoney` | `MailTakeMoneyCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `MinimapPingClient` | `MinimapPingClientCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
+| `MinimapPingClient` | `MinimapPingClientCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `PartyInviteResponse` | `PartyInviteResponseCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `PartyInviteResponse` | `PartyInviteResponseCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `PartyUninvite` | `PartyUninviteCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `PartyUninvite` | `PartyUninviteCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `RandomRollClient` | `RandomRollClientCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
+| `RandomRollClient` | `RandomRollClientCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `ReadyCheckResponseClient` | `ReadyCheckResponseClientCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `ReadyCheckResponseClient` | `ReadyCheckResponseClientCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `SetAssistantLeader` | `SetAssistantLeaderCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
