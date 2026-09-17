@@ -2867,10 +2867,10 @@ public partial class ObjectUpdateBuilder
         if (blocks.IsBitSet(614)) WriteUpdateActivePlayerPvpInfo(data, src.PvpInfo!, 6);
     }
 
-    internal bool HasAnyActivePlayerFieldSet()
+    internal static bool HasAnyActivePlayerFieldSet(HermesProxy.World.Server.Packets.ObjectUpdate updateData, HermesProxy.GameSessionData gameState)
     {
-        var src = _updateData.ActivePlayerData;
-        if (_gameState.ActiveGlyphsDirty) return true;
+        var src = updateData.ActivePlayerData;
+        if (gameState.ActiveGlyphsDirty) return true;
         if (src == null) return false;
         if (HermesProxy.World.Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.HasAnyInvSlotMapped(src)) return true;
         if (HermesProxy.World.Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.HasAnyKnownTitle(src.KnownTitles)) return true;
@@ -2988,6 +2988,8 @@ public partial class ObjectUpdateBuilder
         return false;
     }
 
+    internal bool HasAnyActivePlayerFieldSet() => HasAnyActivePlayerFieldSet(_updateData, _gameState);
+
     internal void WriteCreateContainerData(HermesProxy.World.WorldPacket data)
     {
         var src = _updateData.ContainerData ?? new HermesProxy.World.Objects.ContainerData();
@@ -3088,14 +3090,16 @@ public partial class ObjectUpdateBuilder
         if (blocks.IsBitSet(38)) data.WritePackedGuid128(src.Slots![35]!.Value);
     }
 
-    internal bool HasAnyContainerFieldSet()
+    internal static bool HasAnyContainerFieldSet(HermesProxy.World.Server.Packets.ObjectUpdate updateData, HermesProxy.GameSessionData gameState)
     {
-        var src = _updateData.ContainerData;
+        var src = updateData.ContainerData;
         if (src == null) return false;
         if (src.Slots != null) for (int i = 0; i < 36; i++) if (src.Slots[i] != null) return true;
         if (src.NumSlots.HasValue) return true;
         return false;
     }
+
+    internal bool HasAnyContainerFieldSet() => HasAnyContainerFieldSet(_updateData, _gameState);
 
     internal void WriteCreateCorpseData(HermesProxy.World.WorldPacket data)
     {
@@ -3187,9 +3191,9 @@ public partial class ObjectUpdateBuilder
         if ((mask & (1u << 31)) != 0) data.WriteUInt32(src.Items![18]!.Value);
     }
 
-    internal bool HasAnyCorpseFieldSet()
+    internal static bool HasAnyCorpseFieldSet(HermesProxy.World.Server.Packets.ObjectUpdate updateData, HermesProxy.GameSessionData gameState)
     {
-        var src = _updateData.CorpseData;
+        var src = updateData.CorpseData;
         if (src == null) return false;
         if (src.DynamicFlags.HasValue) return true;
         if (src.Owner != null) return true;
@@ -3204,6 +3208,8 @@ public partial class ObjectUpdateBuilder
         if (src.FactionTemplate.HasValue) return true;
         return false;
     }
+
+    internal bool HasAnyCorpseFieldSet() => HasAnyCorpseFieldSet(_updateData, _gameState);
 
     internal void WriteCreateDynamicObjectData(HermesProxy.World.WorldPacket data)
     {
@@ -3238,9 +3244,9 @@ public partial class ObjectUpdateBuilder
         if (src.CastTime.HasValue) data.WriteUInt32(src.CastTime.Value);
     }
 
-    internal bool HasAnyDynamicObjectFieldSet()
+    internal static bool HasAnyDynamicObjectFieldSet(HermesProxy.World.Server.Packets.ObjectUpdate updateData, HermesProxy.GameSessionData gameState)
     {
-        var src = _updateData.DynamicObjectData;
+        var src = updateData.DynamicObjectData;
         if (src == null) return false;
         if (src.Caster != null) return true;
         if (src.Type.HasValue) return true;
@@ -3250,6 +3256,8 @@ public partial class ObjectUpdateBuilder
         if (src.CastTime.HasValue) return true;
         return false;
     }
+
+    internal bool HasAnyDynamicObjectFieldSet() => HasAnyDynamicObjectFieldSet(_updateData, _gameState);
 
     internal void WriteCreateGameObjectData(HermesProxy.World.WorldPacket data)
     {
@@ -3326,9 +3334,9 @@ public partial class ObjectUpdateBuilder
         if (src.CustomParam.HasValue) data.WriteUInt32(src.CustomParam.Value);
     }
 
-    internal bool HasAnyGameObjectFieldSet()
+    internal static bool HasAnyGameObjectFieldSet(HermesProxy.World.Server.Packets.ObjectUpdate updateData, HermesProxy.GameSessionData gameState)
     {
-        var src = _updateData.GameObjectData;
+        var src = updateData.GameObjectData;
         if (src == null) return false;
         if (src.DisplayID.HasValue) return true;
         if (src.SpellVisualID.HasValue) return true;
@@ -3348,6 +3356,8 @@ public partial class ObjectUpdateBuilder
         if (src.CustomParam.HasValue) return true;
         return false;
     }
+
+    internal bool HasAnyGameObjectFieldSet() => HasAnyGameObjectFieldSet(_updateData, _gameState);
 
     internal void WriteCreateItemData(HermesProxy.World.WorldPacket data)
     {
@@ -3505,9 +3515,9 @@ public partial class ObjectUpdateBuilder
         if (blocks.IsBitSet(42)) WriteEnchantmentUpdate(data, src.Enchantment!, 12);
     }
 
-    internal bool HasAnyItemFieldSet()
+    internal static bool HasAnyItemFieldSet(HermesProxy.World.Server.Packets.ObjectUpdate updateData, HermesProxy.GameSessionData gameState)
     {
-        var src = _updateData.ItemData;
+        var src = updateData.ItemData;
         if (src == null) return false;
         if (src.Owner != null) return true;
         if (src.ContainedIn != null) return true;
@@ -3529,6 +3539,8 @@ public partial class ObjectUpdateBuilder
         if (src.HasGemsUpdate) return true;
         return false;
     }
+
+    internal bool HasAnyItemFieldSet() => HasAnyItemFieldSet(_updateData, _gameState);
 
     internal void WriteCreateObjectData(HermesProxy.World.WorldPacket data)
     {
@@ -3554,15 +3566,17 @@ public partial class ObjectUpdateBuilder
         if (src.Scale.HasValue) data.WriteFloat(src.Scale.Value);
     }
 
-    internal bool HasAnyObjectFieldSet()
+    internal static bool HasAnyObjectFieldSet(HermesProxy.World.Server.Packets.ObjectUpdate updateData, HermesProxy.GameSessionData gameState)
     {
-        var src = _updateData.ObjectData;
+        var src = updateData.ObjectData;
         if (src == null) return false;
         if (src.EntryID.HasValue) return true;
         if (src.DynamicFlags.HasValue) return true;
         if (src.Scale.HasValue) return true;
         return false;
     }
+
+    internal bool HasAnyObjectFieldSet() => HasAnyObjectFieldSet(_updateData, _gameState);
 
     internal void WriteCreatePlayerData(HermesProxy.World.WorldPacket data)
     {
@@ -3789,9 +3803,9 @@ public partial class ObjectUpdateBuilder
         if (blocks.IsBitSet(80)) WriteUpdatePlayerVisibleItem(data, src.VisibleItems!, 18);
     }
 
-    internal bool HasAnyPlayerFieldSet()
+    internal static bool HasAnyPlayerFieldSet(HermesProxy.World.Server.Packets.ObjectUpdate updateData, HermesProxy.GameSessionData gameState)
     {
-        var src = _updateData.PlayerData;
+        var src = updateData.PlayerData;
         if (src == null) return false;
         if (src.DuelArbiter != null) return true;
         if (src.WowAccount != null) return true;
@@ -3861,6 +3875,8 @@ public partial class ObjectUpdateBuilder
         if (src.VisibleItems != null && src.VisibleItems[18].HasValue) return true;
         return false;
     }
+
+    internal bool HasAnyPlayerFieldSet() => HasAnyPlayerFieldSet(_updateData, _gameState);
 
     internal void WriteCreateUnitData(HermesProxy.World.WorldPacket data)
     {
@@ -4355,9 +4371,9 @@ public partial class ObjectUpdateBuilder
         if (blocks.IsBitSet(212)) WriteUpdateUnitResistanceBuffModsGroup(data, ref blocks, src);
     }
 
-    internal bool HasAnyUnitFieldSet()
+    internal static bool HasAnyUnitFieldSet(HermesProxy.World.Server.Packets.ObjectUpdate updateData, HermesProxy.GameSessionData gameState)
     {
-        var src = _updateData.UnitData;
+        var src = updateData.UnitData;
         if (src == null) return false;
         if (src.Health.HasValue) return true;
         if (src.MaxHealth.HasValue) return true;
@@ -4462,4 +4478,6 @@ public partial class ObjectUpdateBuilder
         if (src.ResistanceBuffModsNegative != null) for (int i = 0; i < 7; i++) if (src.ResistanceBuffModsNegative[i].HasValue) return true;
         return false;
     }
+
+    internal bool HasAnyUnitFieldSet() => HasAnyUnitFieldSet(_updateData, _gameState);
 }

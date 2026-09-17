@@ -29,6 +29,7 @@ namespace HermesProxy.Tests.World.Server;
 /// through <c>UpdateObject.ForceV343ForTests</c>.
 /// </para>
 /// </remarks>
+[Collection("V343ValuesFilter")]
 public class PlayerValuesDuringLoginHoldTests
 {
     private static readonly WowGuid128 Player = WowGuid128.Create(HighGuidType703.Player, 4020);

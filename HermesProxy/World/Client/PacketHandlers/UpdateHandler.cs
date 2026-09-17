@@ -407,24 +407,24 @@ public partial class WorldClient
                         var o = updateData.ObjectData;
                         var pd = updateData.PlayerData;
                         var a = updateData.ActivePlayerData;
-                        bool unitHasAnyField = u != null && (
-                            u.Health.HasValue || u.MaxHealth.HasValue || u.DisplayID.HasValue ||
-                            u.Level.HasValue || u.Flags.HasValue || u.AuraState.HasValue ||
-                            u.Charm != null || u.Summon != null || u.Target != null ||
-                            AnyHasValue(u.Power) || AnyHasValue(u.MaxPower) || AnyHasValue(u.Stats));
-                        bool playerHasAnyField = pd != null && (
-                            pd.PlayerFlags.HasValue || pd.NativeSex.HasValue ||
-                            pd.GuildRankID.HasValue || pd.HonorLevel.HasValue ||
-                            pd.DuelArbiter != null || pd.WowAccount != null);
-                        bool activeHasAnyField = a != null && (
-                            a.Coinage.HasValue || a.XP.HasValue || a.NextLevelXP.HasValue ||
-                            ActivePlayerHasAnySlot(a));
+                        // The generated V3_4_3 descriptor predicates, which are also what the
+                        // Values filter and the update writer use. These flags exist to answer
+                        // "will this delta transmit?", so anything else here is a wrong answer
+                        // wearing the right name: they were three hand-written field lists, and
+                        // PlayerData's covered six of its fields with QuestLog not among them.
+                        // That printed playerAnyField=false for a live quest-accept and sent the
+                        // 2026-09-12 investigation looking at ActivePlayerData for two days.
+                        var gs = GetSession().GameState;
+                        bool objectHasAnyField = Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.HasAnyObjectFieldSet(updateData, gs);
+                        bool unitHasAnyField = Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.HasAnyUnitFieldSet(updateData, gs);
+                        bool playerHasAnyField = Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.HasAnyPlayerFieldSet(updateData, gs);
+                        bool activeHasAnyField = Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.HasAnyActivePlayerFieldSet(updateData, gs);
 
                         UpdateHandlerLogMessages.ValuesUpdateIn(
                             _melUpdateValues, i, guid.Low, guid.High,
                             oldGuid.GetHighGuidTypeLegacy(), oldGuid.GetEntry(), oldGuid.GetCounter(),
-                            guid == GetSession().GameState.CurrentPlayerGuid,
-                            o != null && (o.EntryID.HasValue || o.DynamicFlags.HasValue || o.Scale.HasValue),
+                            guid == gs.CurrentPlayerGuid,
+                            objectHasAnyField,
                             u != null, unitHasAnyField, u?.Health, u?.MaxHealth, u?.Flags ?? 0,
                             pd != null, playerHasAnyField,
                             a != null, activeHasAnyField,
@@ -433,36 +433,6 @@ public partial class WorldClient
 
                     // The span getters fall back to a shared all-null sentinel, so a span is never
                     // null — "was this array sent" means "does any slot hold a value".
-                    static bool AnyHasValue<T>(ReadOnlySpan<T?> span) where T : struct
-                    {
-                        foreach (var v in span)
-                            if (v.HasValue) return true;
-                        return false;
-                    }
-
-                    static bool ActivePlayerHasAnySlot(ActivePlayerData a)
-                    {
-                        if (a.InvSlots != null)
-                            for (int i = 0; i < a.InvSlots.Length; i++)
-                                if (a.InvSlots[i] != null) return true;
-                        if (a.PackSlots != null)
-                            for (int i = 0; i < a.PackSlots.Length; i++)
-                                if (a.PackSlots[i] != null) return true;
-                        if (a.BankSlots != null)
-                            for (int i = 0; i < a.BankSlots.Length; i++)
-                                if (a.BankSlots[i] != null) return true;
-                        if (a.BankBagSlots != null)
-                            for (int i = 0; i < a.BankBagSlots.Length; i++)
-                                if (a.BankBagSlots[i] != null) return true;
-                        if (a.BuyBackSlots != null)
-                            for (int i = 0; i < a.BuyBackSlots.Length; i++)
-                                if (a.BuyBackSlots[i] != null) return true;
-                        if (a.KeyringSlots != null)
-                            for (int i = 0; i < a.KeyringSlots.Length; i++)
-                                if (a.KeyringSlots[i] != null) return true;
-                        return false;
-                    }
-
                     if (powerUpdate.Powers.Count != 0)
                         SendPacketToClient(powerUpdate);
 

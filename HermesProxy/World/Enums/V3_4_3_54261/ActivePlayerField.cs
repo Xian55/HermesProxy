@@ -481,12 +481,18 @@ public enum ActivePlayerField
         HasAnyPredicate = "HermesProxy.World.Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.HasAnyInvSlotMapped(src)")]
     ACTIVEPLAYER_INVSLOTS_MASK_MUTATOR,
 
-    // GlyphsDirty: captures + clears _gameState.ActiveGlyphsDirty. When true, sets
-    // 1512 + 1513-1518 + 1519-1524 in one shot. Body writes in matching CustomField.
+    // GlyphsDirty: the mutator body captures + clears the session's ActiveGlyphsDirty.
+    // When true, sets 1512 + 1513-1518 + 1519-1524 in one shot. Body writes in matching
+    // CustomField.
     // HasAnyPredicate: dirty flag must trigger Values update (glyph/spec swap case).
+    // It reads `gameState`, not `_gameState`: the predicate is inlined into the generated
+    // static HasAnyActivePlayerFieldSet(updateData, gameState), which the Values filter
+    // calls without a builder. The mutator body is an instance method and still says
+    // _gameState. Name a predicate's source after the static's parameters or the
+    // generated file will not compile.
     [DescriptorMaskMutator(
         nameof(HermesProxy.World.Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.ApplyActivePlayerGlyphsMaskMutator),
-        HasAnyPredicate = "_gameState.ActiveGlyphsDirty")]
+        HasAnyPredicate = "gameState.ActiveGlyphsDirty")]
     ACTIVEPLAYER_GLYPHS_MASK_MUTATOR,
 
     // ===========================================================================

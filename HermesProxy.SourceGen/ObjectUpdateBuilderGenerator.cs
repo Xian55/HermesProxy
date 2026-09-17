@@ -42,6 +42,8 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
     private const string BuilderNamespacePrefix = "HermesProxy.World.Objects.Version.";
     private const string WorldPacketFullName = "HermesProxy.World.WorldPacket";
     private const string StackBitMaskFullName = "Framework.Util.StackBitMask";
+    private const string ObjectUpdateFullName = "HermesProxy.World.Server.Packets.ObjectUpdate";
+    private const string GameSessionDataFullName = "HermesProxy.GameSessionData";
 
     private static readonly DiagnosticDescriptor HPSG003_UnknownSourceProperty = new(
         id: "HPSG003",
@@ -50,6 +52,51 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
         category: "HermesProxy.SourceGen",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
+
+    // Predicate strings are inlined into HasAny{Section}FieldSet, which is emitted as a static
+    // over (updateData, gameState) so the V3_4_3 Values filter can ask it whether a delta is
+    // worth sending before a builder exists. A predicate naming an instance member compiles in
+    // the instance writer and then fails as CS0103 inside obj/Generated, at a line nobody wrote.
+    // This says it at the enum member instead, with the identifiers that are in scope.
+    private static readonly DiagnosticDescriptor HPSG008_PredicateUsesInstanceMember = new(
+        id: "HPSG008",
+        title: "Descriptor predicate references an instance member",
+        messageFormat: "{0} on '{1}' references instance member '{2}'; the predicate is inlined into a static HasAny*FieldSet — use 'src', 'updateData', 'gameState', or a fully-qualified static helper",
+        category: "HermesProxy.SourceGen",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    /// <summary>
+    /// Reports any <c>_</c>-prefixed identifier in a predicate string. Every builder field is
+    /// underscore-prefixed per the project's naming rule, and nothing in scope inside the static
+    /// is, so the prefix separates the two exactly without parsing the expression.
+    /// </summary>
+    private static void ValidatePredicate(string? predicate, string propertyName, IFieldSymbol member, GeneratorModel model)
+    {
+        if (string.IsNullOrEmpty(predicate))
+            return;
+
+        for (int i = 0; i < predicate!.Length; i++)
+        {
+            if (predicate[i] != '_')
+                continue;
+            // Only a leading underscore starts an identifier; one inside a name (my_field) does not.
+            if (i > 0 && (char.IsLetterOrDigit(predicate[i - 1]) || predicate[i - 1] == '_'))
+                continue;
+
+            int end = i + 1;
+            while (end < predicate.Length && (char.IsLetterOrDigit(predicate[end]) || predicate[end] == '_'))
+                end++;
+
+            model.Diagnostics.Add(Diagnostic.Create(
+                HPSG008_PredicateUsesInstanceMember,
+                member.Locations.FirstOrDefault() ?? Location.None,
+                propertyName,
+                member.Name,
+                predicate.Substring(i, end - i)));
+            return;
+        }
+    }
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -216,7 +263,7 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
                 else if (maskMutatorAttr is not null
                       && SymbolEqualityComparer.Default.Equals(attrData.AttributeClass, maskMutatorAttr))
                 {
-                    var mm = ReadMaskMutator(attrData);
+                    var mm = ReadMaskMutator(attrData, member, model);
                     if (mm is not null) members.Add(MemberEntry.FromMaskMutator(member.Name, mm));
                 }
                 else if (updatePostFlushAttr is not null
@@ -301,7 +348,7 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
         return new UpdateBitsPreambleEntry(value.Value, bitCount.Value);
     }
 
-    private static MaskMutatorEntry? ReadMaskMutator(AttributeData attrData)
+    private static MaskMutatorEntry? ReadMaskMutator(AttributeData attrData, IFieldSymbol member, GeneratorModel model)
     {
         if (attrData.ConstructorArguments.Length < 1)
             return null;
@@ -316,6 +363,7 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
                 case "HasAnyPredicate": hasAnyPredicate = named.Value.Value as string; break;
             }
         }
+        ValidatePredicate(hasAnyPredicate, "HasAnyPredicate", member, model);
         return new MaskMutatorEntry(customWriter!, hasAnyPredicate);
     }
 
@@ -470,6 +518,10 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
             return null;
         }
 
+        // CustomPredicate is inlined into the update writer (an instance method) *and* into the
+        // static HasAny*FieldSet, so it is bound by the stricter of the two scopes.
+        ValidatePredicate(customPredicate, "CustomPredicate", member, model);
+
         return new UpdateFieldEntry(
             sourceProperty: sourceProperty!,
             type: (DescriptorType)typeOrdinal.Value,
@@ -620,10 +672,12 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
         }
     }
 
-    private static string DataAccessor(SectionEntry section) =>
+    private static string DataAccessor(SectionEntry section) => DataAccessor(section, "_updateData");
+
+    private static string DataAccessor(SectionEntry section, string receiver) =>
         // Convention: data class lives at HermesProxy.World.Objects.{TypeName}; the matching
         // field on ObjectUpdate is the type name unchanged (e.g. GameObjectData).
-        "_updateData." + section.DataType.Name;
+        receiver + "." + section.DataType.Name;
 
     private static void EmitCreate(StringBuilder sb, SectionEntry section)
     {
@@ -1306,9 +1360,17 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
 
     private static void EmitHasAny(StringBuilder sb, SectionEntry section)
     {
-        sb.Append("    internal bool HasAny").Append(section.SectionName).AppendLine("FieldSet()");
+        // Emitted as a static over (updateData, gameState) with a thin instance forwarder.
+        // The static is what the V3_4_3 Values filter calls: it has to answer "would the
+        // writer put anything on the wire for this delta?" before a builder exists, and the
+        // only honest answer is the writer's own predicate. A second, hand-written answer is
+        // what issue #235 is about — seven features were lost one at a time to an allow-list
+        // that drifted from this file.
+        sb.Append("    internal static bool HasAny").Append(section.SectionName).Append("FieldSet(")
+          .Append(ObjectUpdateFullName).Append(" updateData, ")
+          .Append(GameSessionDataFullName).AppendLine(" gameState)");
         sb.AppendLine("    {");
-        sb.Append("        var src = ").Append(DataAccessor(section)).AppendLine(";");
+        sb.Append("        var src = ").Append(DataAccessor(section, "updateData")).AppendLine(";");
         // MaskMutator HasAnyPredicate: covers bits set by mutators that aren't tied
         // to any declared UpdateField presence check (e.g. ActivePlayer InvSlots fan
         // from GetModernInvSlot, GlyphsDirty from _gameState). Without these the
@@ -1386,6 +1448,9 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
         }
         sb.AppendLine("        return false;");
         sb.AppendLine("    }");
+        sb.AppendLine();
+        sb.Append("    internal bool HasAny").Append(section.SectionName).Append("FieldSet() => HasAny")
+          .Append(section.SectionName).AppendLine("FieldSet(_updateData, _gameState);");
     }
 
     private static string WriteMethodNameFor(DescriptorType type) => type switch

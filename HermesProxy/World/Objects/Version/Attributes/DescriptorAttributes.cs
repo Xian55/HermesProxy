@@ -415,8 +415,19 @@ public sealed class DescriptorMaskMutatorAttribute : Attribute
     /// Required when the mutator sets bits that aren't covered by any
     /// <see cref="DescriptorUpdateFieldAttribute"/>'s default presence check —
     /// otherwise loot/bag-pickup / glyph-dirty / etc. silently skip the Values update.
-    /// Has access to <c>src</c> (the section's data) and instance members
-    /// (<c>_gameState</c>, etc.).
+    /// <para>
+    /// <c>HasAny{Section}FieldSet</c> is emitted as a static over
+    /// <c>(ObjectUpdate updateData, GameSessionData gameState)</c> — the V3_4_3 Values filter
+    /// asks it whether a delta is worth sending before any builder exists — with a thin
+    /// instance forwarder beside it. So a predicate may name <c>src</c> (the section's data),
+    /// <c>updateData</c>, <c>gameState</c> or a static helper, but not an instance member:
+    /// <c>_gameState</c> compiles in the mutator body and not here.
+    /// </para>
+    /// <para>
+    /// A predicate that never mentions <c>src</c> is emitted before the <c>src == null</c>
+    /// guard, so session-sourced state still fires when the section object was never
+    /// materialised.
+    /// </para>
     /// </summary>
     public string? HasAnyPredicate { get; set; }
 }

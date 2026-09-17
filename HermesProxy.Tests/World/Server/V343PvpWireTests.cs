@@ -21,6 +21,7 @@ namespace HermesProxy.Tests.World.Server;
 /// <c>PvpWire.ForceV343ForTests</c>, the same escape hatch <c>LootRollWire</c> uses.
 /// </para>
 /// </remarks>
+[Collection("V343ValuesFilter")]
 public class V343PvpWireTests
 {
     private static byte[] SpanBytes(ServerPacket packet)

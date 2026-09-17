@@ -35,7 +35,17 @@ public partial class ObjectUpdateBuilder
     {
         _updateData = updateData;
         _gameState = gameState;
+        _objectType = ResolveObjectType(updateData, gameState);
+        _realObjectType = _objectType;
+        _objectTypeMask = TypeMaskFor(_objectType);
+    }
 
+    /// <summary>
+    /// The object type this update writes as. Static so the V3_4_3 Values filter can ask the
+    /// same question without building a builder — see <see cref="HasAnyValuesDelta"/>.
+    /// </summary>
+    internal static ObjectTypeBCC ResolveObjectType(ObjectUpdate updateData, GameSessionData gameState)
+    {
         var objectType = updateData.Guid.GetObjectType();
         if (updateData.CreateData != null)
         {
@@ -43,7 +53,7 @@ public partial class ObjectUpdateBuilder
             if (updateData.CreateData.ThisIsYou)
                 objectType = ObjectType.ActivePlayer;
         }
-        else if (_gameState.OriginalObjectTypes.TryGetValue(updateData.Guid, out var cachedType))
+        else if (gameState.OriginalObjectTypes.TryGetValue(updateData.Guid, out var cachedType))
         {
             // Values updates: GUID-derived type can't distinguish Container vs Item
             // (both share HighGuid.Item) or ActivePlayer vs Player. Prefer the type
@@ -51,23 +61,27 @@ public partial class ObjectUpdateBuilder
             // the Container bit in _objectTypeMask and route to WriteUpdateContainerData.
             objectType = cachedType;
         }
-        if (objectType == ObjectType.Player && _gameState.CurrentPlayerGuid == updateData.Guid)
+        if (objectType == ObjectType.Player && gameState.CurrentPlayerGuid == updateData.Guid)
             objectType = ObjectType.ActivePlayer;
 
-        _objectType = ObjectTypeConverter.ConvertToBCC(objectType);
-        _realObjectType = _objectType;
-        _objectTypeMask = ObjectTypeMask.Object;
-        switch (_objectType)
+        return ObjectTypeConverter.ConvertToBCC(objectType);
+    }
+
+    internal static ObjectTypeMask TypeMaskFor(ObjectTypeBCC objectType)
+    {
+        var mask = ObjectTypeMask.Object;
+        switch (objectType)
         {
-            case ObjectTypeBCC.Item:          _objectTypeMask |= ObjectTypeMask.Item; break;
-            case ObjectTypeBCC.Container:     _objectTypeMask |= ObjectTypeMask.Item | ObjectTypeMask.Container; break;
-            case ObjectTypeBCC.Unit:          _objectTypeMask |= ObjectTypeMask.Unit; break;
-            case ObjectTypeBCC.Player:        _objectTypeMask |= ObjectTypeMask.Unit | ObjectTypeMask.Player; break;
-            case ObjectTypeBCC.ActivePlayer:  _objectTypeMask |= ObjectTypeMask.Unit | ObjectTypeMask.Player | ObjectTypeMask.ActivePlayer; break;
-            case ObjectTypeBCC.GameObject:    _objectTypeMask |= ObjectTypeMask.GameObject; break;
-            case ObjectTypeBCC.DynamicObject: _objectTypeMask |= ObjectTypeMask.DynamicObject; break;
-            case ObjectTypeBCC.Corpse:        _objectTypeMask |= ObjectTypeMask.Corpse; break;
+            case ObjectTypeBCC.Item:          mask |= ObjectTypeMask.Item; break;
+            case ObjectTypeBCC.Container:     mask |= ObjectTypeMask.Item | ObjectTypeMask.Container; break;
+            case ObjectTypeBCC.Unit:          mask |= ObjectTypeMask.Unit; break;
+            case ObjectTypeBCC.Player:        mask |= ObjectTypeMask.Unit | ObjectTypeMask.Player; break;
+            case ObjectTypeBCC.ActivePlayer:  mask |= ObjectTypeMask.Unit | ObjectTypeMask.Player | ObjectTypeMask.ActivePlayer; break;
+            case ObjectTypeBCC.GameObject:    mask |= ObjectTypeMask.GameObject; break;
+            case ObjectTypeBCC.DynamicObject: mask |= ObjectTypeMask.DynamicObject; break;
+            case ObjectTypeBCC.Corpse:        mask |= ObjectTypeMask.Corpse; break;
         }
+        return mask;
     }
 
     private bool IsOwner =>
@@ -1638,26 +1652,7 @@ public partial class ObjectUpdateBuilder
     // methods and the HasAny*FieldSet predicates below.
     private void WriteValuesUpdate(WorldPacket data)
     {
-        uint changedMask = 0u;
-        bool hasObjectChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Object) && HasAnyObjectFieldSet();
-        bool hasUnitChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Unit) && _updateData.UnitData != null && HasAnyUnitFieldSet();
-        bool hasItemChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Item) && HasAnyItemFieldSet();
-        bool hasContainerChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Container) && _updateData.ContainerData != null && HasAnyContainerFieldSet();
-        bool hasActivePlayerChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.ActivePlayer) && HasAnyActivePlayerFieldSet();
-        bool hasPlayerChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Player) && HasAnyPlayerFieldSet();
-        bool hasGameObjectChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.GameObject) && _updateData.GameObjectData != null && HasAnyGameObjectFieldSet();
-        bool hasDynamicObjectChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.DynamicObject) && _updateData.DynamicObjectData != null && HasAnyDynamicObjectFieldSet();
-        bool hasCorpseChanges = _objectTypeMask.HasAnyFlag(ObjectTypeMask.Corpse) && _updateData.CorpseData != null && HasAnyCorpseFieldSet();
-
-        if (hasObjectChanges) changedMask |= 1;
-        if (hasItemChanges) changedMask |= 2;
-        if (hasContainerChanges) changedMask |= 0x04;
-        if (hasUnitChanges) changedMask |= 0x20;
-        if (hasPlayerChanges) changedMask |= 0x40;
-        if (hasActivePlayerChanges) changedMask |= 0x80;
-        if (hasGameObjectChanges) changedMask |= 0x100;
-        if (hasDynamicObjectChanges) changedMask |= 0x200;
-        if (hasCorpseChanges) changedMask |= 0x400;
+        uint changedMask = ComputeValuesChangedMask(_updateData, _gameState, _objectTypeMask);
 
         // Safety: if changedMask is 0, nothing to write — emit empty mask so the
         // outer wire format stays valid. Filter at QueryHandler/UpdateHandler will
@@ -1669,15 +1664,79 @@ public partial class ObjectUpdateBuilder
         }
 
         data.WriteUInt32(changedMask);
-        if (hasObjectChanges) WriteUpdateObjectData(data);
-        if (hasItemChanges) WriteUpdateItemData(data);
-        if (hasContainerChanges) WriteUpdateContainerData(data);
-        if (hasUnitChanges) WriteUpdateUnitData(data);
-        if (hasPlayerChanges) WriteUpdatePlayerData(data);
-        if (hasActivePlayerChanges) WriteUpdateActivePlayerData(data);
-        if (hasGameObjectChanges) WriteUpdateGameObjectData(data);
-        if (hasDynamicObjectChanges) WriteUpdateDynamicObjectData(data);
-        if (hasCorpseChanges) WriteUpdateCorpseData(data);
+        if ((changedMask & ValuesMaskObject) != 0) WriteUpdateObjectData(data);
+        if ((changedMask & ValuesMaskItem) != 0) WriteUpdateItemData(data);
+        if ((changedMask & ValuesMaskContainer) != 0) WriteUpdateContainerData(data);
+        if ((changedMask & ValuesMaskUnit) != 0) WriteUpdateUnitData(data);
+        if ((changedMask & ValuesMaskPlayer) != 0) WriteUpdatePlayerData(data);
+        if ((changedMask & ValuesMaskActivePlayer) != 0) WriteUpdateActivePlayerData(data);
+        if ((changedMask & ValuesMaskGameObject) != 0) WriteUpdateGameObjectData(data);
+        if ((changedMask & ValuesMaskDynamicObject) != 0) WriteUpdateDynamicObjectData(data);
+        if ((changedMask & ValuesMaskCorpse) != 0) WriteUpdateCorpseData(data);
+    }
+
+    private const uint ValuesMaskObject = 0x001;
+    private const uint ValuesMaskItem = 0x002;
+    private const uint ValuesMaskContainer = 0x004;
+    private const uint ValuesMaskUnit = 0x020;
+    private const uint ValuesMaskPlayer = 0x040;
+    private const uint ValuesMaskActivePlayer = 0x080;
+    private const uint ValuesMaskGameObject = 0x100;
+    private const uint ValuesMaskDynamicObject = 0x200;
+    private const uint ValuesMaskCorpse = 0x400;
+
+    /// <summary>
+    /// The changedMask <see cref="WriteValuesUpdate"/> is about to write: one bit per section
+    /// that has something to say. Static, and the only implementation — the V3_4_3 Values
+    /// filter decides whether a delta is worth sending by asking this, so the filter cannot
+    /// disagree with the writer about what "empty" means.
+    /// </summary>
+    internal static uint ComputeValuesChangedMask(ObjectUpdate updateData, GameSessionData gameState, ObjectTypeMask typeMask)
+    {
+        uint changedMask = 0u;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.Object) && HasAnyObjectFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskObject;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.Item) && HasAnyItemFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskItem;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.Container) && updateData.ContainerData != null && HasAnyContainerFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskContainer;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.Unit) && updateData.UnitData != null && HasAnyUnitFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskUnit;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.Player) && HasAnyPlayerFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskPlayer;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.ActivePlayer) && HasAnyActivePlayerFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskActivePlayer;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.GameObject) && updateData.GameObjectData != null && HasAnyGameObjectFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskGameObject;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.DynamicObject) && updateData.DynamicObjectData != null && HasAnyDynamicObjectFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskDynamicObject;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.Corpse) && updateData.CorpseData != null && HasAnyCorpseFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskCorpse;
+        return changedMask;
+    }
+
+    /// <summary>
+    /// True when a Values update for this object would put at least one field on the wire.
+    /// </summary>
+    /// <remarks>
+    /// The V3_4_3 Values filter drops a delta that says nothing: cMangos emits those as
+    /// bookkeeping and the client answers the resulting 13-byte body with
+    /// CMSG_OBJECT_UPDATE_FAILED. Deciding that used to mean a second, hand-written field
+    /// list in <c>UpdatePackets.IsEmptyValuesDelta</c>, which covered a fraction of the
+    /// descriptor tree and went stale every time a field was added — quest completion, the
+    /// quest log, stable slots, action bars, bag contents, durability and corpse sparkle were
+    /// each lost to it in turn (issue #235). Asking the writer removes the second list: a
+    /// field reaches the wire and the filter at the same moment, because it is one predicate.
+    /// <para>
+    /// Allocation-free by design — it runs per Values entry on every batch, so it resolves
+    /// the type mask itself rather than constructing a builder that the send path will build
+    /// again a moment later.
+    /// </para>
+    /// </remarks>
+    public static bool HasAnyValuesDelta(ObjectUpdate updateData, GameSessionData gameState)
+    {
+        var typeMask = TypeMaskFor(ResolveObjectType(updateData, gameState));
+        return ComputeValuesChangedMask(updateData, gameState, typeMask) != 0;
     }
 
     // HasAnyContainerFieldSet emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator.

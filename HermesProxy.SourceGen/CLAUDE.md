@@ -94,8 +94,19 @@ namespace rename a one-line change.
 
 ## Diagnostics
 
-`HPSG003` fires when a `SourceProperty` names a member the section's `DataType` does not have,
-and the field is skipped. That is the only structural check.
+`HPSG003` (warning) fires when a `SourceProperty` names a member the section's `DataType` does
+not have, and the field is skipped.
+
+`HPSG008` (error) fires when a `CustomPredicate` or `HasAnyPredicate` names an instance member.
+`HasAny{Section}FieldSet` is emitted as a **static** over `(updateData, gameState)` — the V3_4_3
+Values filter calls it before any builder exists — with a thin instance forwarder beside it, so
+`src`, `updateData`, `gameState` and fully-qualified statics are in scope and `_gameState` is
+not. Without the check that failure surfaces as `CS0103` inside `obj/Generated`, at a line
+nobody wrote; the check reports it at the enum member, with the identifiers that work. Note the
+constraint is stricter than it looks: `CustomPredicate` is inlined into the instance update
+writer *as well*, so it would compile there and break only in the static.
+
+Those are the only structural checks. `HPSG004`–`HPSG007` belong to the dispatch generator.
 
 There is no diagnostic for the failure mode that actually costs a debugging session: a field in
 the *wrong position*. Nothing in the generator knows the wire layout, so nothing can. That is
@@ -281,9 +292,20 @@ All nine object sections a WotLK backend actually sends are wired on both paths.
 DynamicObject were the last two, and wiring them was not just a refactor — neither had an Update
 path and their Values deltas were being parsed and then dropped.
 
-If you wire another section, remember the third step: it needs a probe in `IsEmptyValuesDelta`
-(`World/Server/Packets/UpdatePackets.cs`), or its single-field deltas are filtered as "empty"
-before the builder ever runs.
+Wiring a section used to have a third step that was easy to miss: a matching probe in a
+hand-written `IsEmptyValuesDelta` in `World/Server/Packets/UpdatePackets.cs`, without which the
+section's single-field deltas were filtered as "empty" before the builder ever ran. That list is
+gone (issue #235). The V3_4_3 filter now calls
+`V3_4_3_54261.ObjectUpdateBuilder.HasAnyValuesDelta`, which runs `ComputeValuesChangedMask` —
+the same predicates, the same type-mask gating and the same code path `WriteValuesUpdate` uses —
+so a section that is wired here is filtered correctly the moment it is wired, and there is
+nothing to keep in step.
+
+One consequence worth knowing: a field on a data class with **no** descriptor entry now makes a
+delta count as empty. That is correct — the writer has no slot to put it in, so forwarding it
+ships a bare zero `changedMask`, which is the malformed body the filter exists to stop — but it
+means "populated in `UpdateHandler`" and "reaches the client" are the same question again, and
+the answer to both is whether the field is declared here.
 
 ## Not yet wired
 

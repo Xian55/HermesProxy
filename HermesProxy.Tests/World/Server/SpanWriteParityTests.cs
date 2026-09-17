@@ -15,6 +15,7 @@ namespace HermesProxy.Tests.World.Server;
 /// Packets are built from default field values, so this pins fixed layout and empty
 /// collections rather than every populated shape.
 /// </summary>
+[Collection("V343ValuesFilter")]
 public class SpanWriteParityTests
 {
     private static readonly Assembly ProxyAssembly = typeof(ServerPacket).Assembly;
