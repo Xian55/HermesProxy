@@ -869,7 +869,7 @@ public sealed class GameSessionData
     {
         uint total = 0;
 
-        for (int i = World.Enums.Vanilla.InventorySlots.ItemStart; i < World.Enums.Vanilla.InventorySlots.ItemEnd; i++)
+        for (int i = 0; i < World.Enums.Vanilla.InventorySlots.ItemEnd; i++)
         {
             var itemGuid64 = GetInventorySlotItem(i);
             if (itemGuid64 == WowGuid64.Empty)
@@ -879,6 +879,8 @@ public sealed class GameSessionData
             if (GetItemId(itemGuid128) == itemId)
                 total += GetItemStackCount(itemGuid128);
         }
+
+        total += CountKeyringAndTokenItems(itemId);
 
         int containerSlotField = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_FIELD_SLOT_1);
         int numSlotsField = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_FIELD_NUM_SLOTS);
@@ -949,8 +951,79 @@ public sealed class GameSessionData
         return counts;
     }
 
-    // One pass over equipped slots and bags. Callers that need counts for several
-    // item ids at once must use this instead of GetItemCountInInventory per id.
+    // Keys (item class 13) and currency-like items never reach a bag, so the bag sweep below
+    // reports 0 for them. The backend counts them: AzerothCore/TrinityCore Player::GetItemCount
+    // sweeps KEYRING_SLOT_START..CURRENCYTOKEN_SLOT_END next to the bags. Without this the proxy
+    // contradicted a backend that had already called a key-collect quest completable, and forced
+    // SMSG_QUEST_GIVER_REQUEST_ITEMS to StatusIncomplete (issue #322).
+    private const int KeyringSlotCount = 32;
+    private const int CurrencyTokenSlotCount = 32;
+
+    private uint CountKeyringAndTokenItems(uint itemId)
+    {
+        var updates = GetCachedObjectFieldsLegacy(CurrentPlayerGuid);
+        if (updates == null)
+            return 0;
+
+        uint total = 0;
+        total += CountBlock(LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_KEYRING_SLOT_1), KeyringSlotCount);
+        total += CountBlock(LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_CURRENCYTOKEN_SLOT_1), CurrencyTokenSlotCount);
+        return total;
+
+        uint CountBlock(int fieldIndex, int slotCount)
+        {
+            if (fieldIndex < 0)
+                return 0;
+
+            uint blockTotal = 0;
+            for (int slot = 0; slot < slotCount; slot++)
+            {
+                var guid64 = updates.GetGuidValue(fieldIndex + slot * 2);
+                if (guid64 == WowGuid64.Empty)
+                    continue;
+
+                var guid128 = guid64.To128(this);
+                if (GetItemId(guid128) == itemId)
+                    blockTotal += GetItemStackCount(guid128);
+            }
+            return blockTotal;
+        }
+    }
+
+    private void AddKeyringAndTokenItems(Dictionary<uint, uint> counts)
+    {
+        var updates = GetCachedObjectFieldsLegacy(CurrentPlayerGuid);
+        if (updates == null)
+            return;
+
+        AddBlock(LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_KEYRING_SLOT_1), KeyringSlotCount);
+        AddBlock(LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_CURRENCYTOKEN_SLOT_1), CurrencyTokenSlotCount);
+
+        void AddBlock(int fieldIndex, int slotCount)
+        {
+            if (fieldIndex < 0)
+                return;
+
+            for (int slot = 0; slot < slotCount; slot++)
+            {
+                var guid64 = updates.GetGuidValue(fieldIndex + slot * 2);
+                if (guid64 == WowGuid64.Empty)
+                    continue;
+
+                var guid128 = guid64.To128(this);
+                uint id = GetItemId(guid128);
+                if (id == 0)
+                    continue;
+
+                counts.TryGetValue(id, out uint have);
+                counts[id] = have + GetItemStackCount(guid128);
+            }
+        }
+    }
+
+    // One pass over equipped slots, bags and the keyring/currency-token blocks. Callers that
+    // need counts for several item ids at once must use this instead of GetItemCountInInventory
+    // per id.
     public Dictionary<uint, uint> GetInventoryItemCounts()
     {
         Dictionary<uint, uint> counts = new();
@@ -966,8 +1039,10 @@ public sealed class GameSessionData
             counts[id] = have + GetItemStackCount(guid128);
         }
 
-        for (int i = World.Enums.Vanilla.InventorySlots.ItemStart; i < World.Enums.Vanilla.InventorySlots.ItemEnd; i++)
+        for (int i = 0; i < World.Enums.Vanilla.InventorySlots.ItemEnd; i++)
             Add(GetInventorySlotItem(i));
+
+        AddKeyringAndTokenItems(counts);
 
         int containerSlotField = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_FIELD_SLOT_1);
         int numSlotsField = LegacyVersion.GetUpdateField(ContainerField.CONTAINER_FIELD_NUM_SLOTS);
