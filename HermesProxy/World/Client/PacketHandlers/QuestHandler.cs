@@ -1,5 +1,4 @@
-﻿using Framework;
-using HermesProxy.Enums;
+﻿using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
@@ -568,8 +567,7 @@ public partial class WorldClient
         sentCredits[key] = count;
         GetSession().GameState.RememberObjectiveCount(questId, QuestObjectiveType.Item, (int)itemId, (short)count);
 
-        Framework.Logging.Log.Print(Framework.Logging.LogType.Server,
-            $"[QuestItemCredit] quest={questId} item={itemId} have={have}/{required}");
+        QuestLogMessages.QuestItemCredit(_melLog, questId, itemId, have, required);
         SendPacketToClient(new QuestUpdateAddCredit
         {
             QuestID = questId,

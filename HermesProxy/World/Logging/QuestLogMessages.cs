@@ -40,4 +40,11 @@ internal static partial class QuestLogMessages
     public static partial void QuestGiverStatusMultipleEntry(
         ILogger logger, string path, int index, ulong guidLow, ulong guidHigh, uint entry,
         QuestGiverStatusModern status, uint encoded);
+
+    [LoggerMessage(
+        EventId = 1603,
+        Level = LogLevel.Information,
+        Message = "[QuestItemCredit] quest={QuestId} item={ItemId} have={Have}/{Required}")]
+    public static partial void QuestItemCredit(
+        ILogger logger, uint questId, uint itemId, uint have, ushort required);
 }
