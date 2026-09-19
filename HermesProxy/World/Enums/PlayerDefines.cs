@@ -403,8 +403,9 @@ public struct RuneCooldowns
     public const int Miss = 1500;     // cooldown applied on runes when the spell misses
 }
 
+// uint-backed: see NPCFlagsVanilla for why bit 31 must not be a sign bit here.
 [Flags]
-enum PlayerFlagsLegacy
+enum PlayerFlagsLegacy : uint
 {
     None                = 0x00000000,
     GroupLeader         = 0x00000001,

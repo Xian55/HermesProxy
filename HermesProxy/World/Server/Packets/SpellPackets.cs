@@ -1104,11 +1104,15 @@ public class SpellFailedOther : ServerPacket, ISpanWritable
 
 public class SpellStart : ServerPacket
 {
-    public SpellCastData Cast;
+    /// <summary>
+    /// Set by whoever builds the packet, which is every caller. Building one here as well cost a
+    /// second <see cref="SpellCastData"/> — five lists, a target and a heal prediction — that was
+    /// thrown away on the next line.
+    /// </summary>
+    public SpellCastData Cast = null!;
 
     public SpellStart() : base(Opcode.SMSG_SPELL_START, ConnectionType.Instance)
     {
-        Cast = new SpellCastData();
     }
 
     public override void Write()
@@ -1131,7 +1135,8 @@ class SpellGo : ServerPacket
         _worldPacket.FlushBits();
     }
 
-    public SpellCastData Cast = new();
+    /// <summary>Set by whoever builds the packet — see <see cref="SpellStart.Cast"/>.</summary>
+    public SpellCastData Cast = null!;
     public SpellCastLogData LogData = null!;
 }
 

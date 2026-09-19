@@ -11,6 +11,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The handler harness the tests use, so a benchmark and its correctness test drive the same packets. -->
+    <Compile Include="..\HermesProxy.Tests\Support\LegacyHandlerHarness.cs" Link="Support\LegacyHandlerHarness.cs" />
+    <Compile Include="..\HermesProxy.Tests\Support\HandlerScenarios.cs" Link="Support\HandlerScenarios.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\HermesProxy\HermesProxy.csproj" />
     <ProjectReference Include="..\Framework\Framework.csproj" />
   </ItemGroup>

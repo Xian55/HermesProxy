@@ -355,6 +355,38 @@ public partial class WorldClient
         _ => false,
     };
 
+    // A Values or create block needs somewhere to put the auras and powers it carries before it
+    // knows whether it carries any, and on a 3.3.5a backend it almost never does: auras arrive
+    // through SMSG_AURA_UPDATE (the legacy field block has no UNIT_FIELD_AURA at all), and powers
+    // are only forwarded for the player and their pet. So one of each is reused from block to
+    // block and handed over only when a block has filled it, at which point the next block builds
+    // a fresh one. A packet whose blocks are read one at a time on the session owner is the only
+    // reader, and the scratch is released before the filled packet is sent, so nothing downstream
+    // can be holding the instance that gets reused.
+    private AuraUpdate? _blockAuraUpdate;
+    private PowerUpdate? _blockPowerUpdate;
+
+    private AuraUpdate RentBlockAuraUpdate(WowGuid128 guid, bool updateAll)
+    {
+        if (_blockAuraUpdate is not { } reused)
+            return _blockAuraUpdate = new AuraUpdate(guid, updateAll);
+
+        reused.UnitGUID = guid;
+        reused.UpdateAll = updateAll;
+        reused.Auras.Clear();
+        return reused;
+    }
+
+    private PowerUpdate RentBlockPowerUpdate(WowGuid128 guid)
+    {
+        if (_blockPowerUpdate is not { } reused)
+            return _blockPowerUpdate = new PowerUpdate(guid);
+
+        reused.Guid = guid;
+        reused.Powers.Clear();
+        return reused;
+    }
+
     [HandlesSmsg(Opcode.SMSG_UPDATE_OBJECT)]
     internal void HandleUpdateObject(WorldPacket packet)
     {
@@ -383,8 +415,8 @@ public partial class WorldClient
                     PrintString($"Guid = {guid.ToString()}", i);
 
                     ObjectUpdate updateData = new ObjectUpdate(guid, UpdateTypeModern.Values, GetSession());
-                    AuraUpdate auraUpdate = new AuraUpdate(guid, false);
-                    PowerUpdate powerUpdate = new PowerUpdate(guid);
+                    AuraUpdate auraUpdate = RentBlockAuraUpdate(guid, false);
+                    PowerUpdate powerUpdate = RentBlockPowerUpdate(guid);
                     ReadValuesUpdateBlock(packet, ref guid, updateData, auraUpdate, powerUpdate, i);
 
                     // Bag contents and stack counts arrive as Item/Container Values
@@ -435,7 +467,10 @@ public partial class WorldClient
                     // The span getters fall back to a shared all-null sentinel, so a span is never
                     // null — "was this array sent" means "does any slot hold a value".
                     if (powerUpdate.Powers.Count != 0)
+                    {
+                        _blockPowerUpdate = null;
                         SendPacketToClient(powerUpdate);
+                    }
 
                     // ItemContainer (cmangos's non-standard 0x4700 high-guid for equipped/
                     // container items) Values updates flow through unchanged. The matching
@@ -446,7 +481,10 @@ public partial class WorldClient
 
                     updateObject.ObjectUpdates.Add(updateData);
                     if (auraUpdate.Auras.Count != 0)
+                    {
+                        _blockAuraUpdate = null;
                         auraUpdates.Add(auraUpdate);
+                    }
                     break;
                 }
                 case UpdateTypeLegacy.Movement:
@@ -487,7 +525,7 @@ public partial class WorldClient
                     }
 
                     ObjectUpdate updateData = new ObjectUpdate(guid, UpdateTypeModern.CreateObject1, GetSession());
-                    AuraUpdate auraUpdate = new AuraUpdate(guid, true);
+                    AuraUpdate auraUpdate = RentBlockAuraUpdate(guid, true);
                     ReadCreateObjectBlock(packet, ref guid, updateData, auraUpdate, i);
                     HermesProxy.World.Server.CollectionSync.StampCompanionCreature(updateData, GetSession(), oldGuid);
 
@@ -570,7 +608,10 @@ public partial class WorldClient
                         {
                             updateObject.ObjectUpdates.Add(updateData);
                             if (auraUpdate.Auras.Count != 0)
+                            {
+                                _blockAuraUpdate = null;
                                 auraUpdates.Add(auraUpdate);
+                            }
                         }
                     }
                     else
@@ -590,7 +631,7 @@ public partial class WorldClient
                     PrintString($"Guid = {guid.ToString()}", i);
 
                     ObjectUpdate updateData = new ObjectUpdate(guid, UpdateTypeModern.CreateObject2, GetSession());
-                    AuraUpdate auraUpdate = new AuraUpdate(guid, true);
+                    AuraUpdate auraUpdate = RentBlockAuraUpdate(guid, true);
                     ReadCreateObjectBlock(packet, ref guid, updateData, auraUpdate, i);
                     HermesProxy.World.Server.CollectionSync.StampCompanionCreature(updateData, GetSession(), oldGuid);
 
@@ -650,7 +691,10 @@ public partial class WorldClient
                         {
                             updateObject.ObjectUpdates.Add(updateData);
                             if (auraUpdate.Auras.Count != 0)
+                            {
+                                _blockAuraUpdate = null;
                                 auraUpdates.Add(auraUpdate);
+                            }
                         }
                     }
                     else

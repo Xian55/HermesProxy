@@ -62,6 +62,17 @@ public class CastFlagsGenericTests
         AssertSame<GameObjectDynamicFlagsLegacy, GameObjectDynamicFlagsModern>();
     }
 
+    /// <summary>
+    /// Bit 31 is negative as an int. While these two were int-backed, a legacy value with it set
+    /// threw OverflowException instead of translating the bits the target does have.
+    /// </summary>
+    [Fact]
+    public void LegacyNpcAndPlayerFlags_WithBit31Set_MapTheirNamedBits()
+    {
+        Assert.Equal(NPCFlags.Vendor, unchecked((NPCFlagsVanilla)0x80000004u).CastFlags<NPCFlagsVanilla, NPCFlags>());
+        Assert.Equal(PlayerFlags.AFK, unchecked((PlayerFlagsLegacy)0x80000002u).CastFlags<PlayerFlagsLegacy, PlayerFlags>());
+    }
+
     [Fact]
     public void AfterWarmUp_AllocatesNothing()
     {
