@@ -14,6 +14,16 @@ public struct UnitChannel
     }
 }
 
+/// <summary>
+/// The two NPC-flag slots, stored inside <see cref="UnitData"/>. An inline array so a span over it
+/// reads and writes the object's own memory, with no array to allocate.
+/// </summary>
+[System.Runtime.CompilerServices.InlineArray(2)]
+public struct NpcFlagsStorage
+{
+    private uint? _slot0;
+}
+
 public struct VisibleItem
 {
     public int ItemID;
@@ -66,9 +76,13 @@ public class UnitData
     public byte? VisFlags;
     public byte? AnimTier;
     public float? ModCastSpeed;
-    private uint?[]? _npcFlags;
-    public ReadOnlySpan<uint?> NpcFlags => _npcFlags ?? _emptyUInt2;
-    public uint?[] EnsureNpcFlags() => _npcFlags ??= new uint?[2];
+    // Inline rather than a lazily allocated array like its neighbours: AzerothCore sends
+    // UNIT_NPC_FLAGS in 100% of unit and player Values blocks, so the array was allocated for
+    // nearly every block (~5 MB over an Alterac Valley). Sixteen bytes in the object beat a
+    // 40-byte array plus its reference whenever the field is set more often than it is skipped.
+    private NpcFlagsStorage _npcFlags;
+    public ReadOnlySpan<uint?> NpcFlags => _npcFlags;
+    public Span<uint?> EnsureNpcFlags() => _npcFlags;
 
     private UnitDataCold? _cold;
     private UnitDataCold Cold => _cold ??= new UnitDataCold();

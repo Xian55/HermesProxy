@@ -21,7 +21,6 @@ using Framework.Logging;
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Client;
 using HermesProxy.World.Logging;
@@ -399,11 +398,13 @@ public class WorldPacket : ByteBuffer
             return LegacyVersion.GetUniversalOpcode(GetOpcode());
     }
 
-    public long GetReceivedTime() { return m_receivedTime; }
-    public void SetReceiveTime(long receivedTime) { m_receivedTime = receivedTime; }
+    public int GetReceivedTime() { return m_receivedTime; }
+    public void SetReceiveTime(int receivedTime) { m_receivedTime = receivedTime; }
 
     uint opcode;
-    long m_receivedTime;
+    // An Environment.TickCount, which is an int and wraps every ~25 days. Held as a long, it cost
+    // this object eight bytes (and, with the alignment, sixteen) for no extra range.
+    int m_receivedTime;
 }
 
 /// <summary>

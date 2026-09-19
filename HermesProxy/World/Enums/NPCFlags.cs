@@ -6,8 +6,11 @@ using System.Threading.Tasks;
 
 namespace HermesProxy.World.Enums;
 
+// uint-backed like every other legacy flag enum: as an int, a value with bit 31 set is negative,
+// and the checked conversion in CastFlags threw OverflowException out of the whole update packet
+// rather than translating the bits the modern enum does have.
 [Flags]
-public enum NPCFlagsVanilla
+public enum NPCFlagsVanilla : uint
 {
     None                  = 0x00000000,
     Gossip                = 0x00000001,       // 100%

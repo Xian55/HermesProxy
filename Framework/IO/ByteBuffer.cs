@@ -19,7 +19,6 @@ using Framework.GameMath;
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.IO;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -40,14 +39,9 @@ public class ByteBuffer : IDisposable
     private byte _bitPosition = 8;
     private byte _bitValue;
 
-    private MemoryStream? _compatStream;
-
     public ByteBuffer()
     {
-        // No rental until the first write, so a buffer that is never written never holds an array
-        // for the finalizer to hand back. Finalization itself is left registered: suppressing it
-        // here and re-registering on the first write cost two runtime calls on every packet that
-        // does write, and the finalizer is already a no-op without a rental.
+        // No rental until the first write, so a buffer that is never written never holds an array.
         _buffer = [];
         _position = 0;
         _length = 0;
@@ -75,18 +69,18 @@ public class ByteBuffer : IDisposable
         _isWriteMode = false;
     }
 
-    ~ByteBuffer()
-    {
-        Dispose(false);
-    }
-
+    /// <summary>
+    /// Returns the pooled buffer, if this instance rented one.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately no finalizer. A type with one cannot use the runtime's fast allocation path and
+    /// is registered with the finalization queue as it is built, which measured ~4x the cost of the
+    /// object itself — paid by every packet in both directions, and every one of them is disposed.
+    /// A rental that does miss its Dispose is simply collected like any other array; ArrayPool
+    /// allocates a replacement. That is also the safer failure: the finalizer could hand a buffer
+    /// back to the pool while a read-mode <see cref="GetData"/> caller still held it.
+    /// </remarks>
     public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    private void Dispose(bool disposing)
     {
         if (_disposed) return;
         _disposed = true;
@@ -96,9 +90,6 @@ public class ByteBuffer : IDisposable
             ArrayPool<byte>.Shared.Return(_buffer);
             _buffer = null!;
         }
-
-        if (disposing)
-            _compatStream?.Dispose();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1030,32 +1021,12 @@ public class ByteBuffer : IDisposable
         return (uint)_length;
     }
 
-    [Obsolete("Use GetData() instead. This creates a MemoryStream copy for compatibility.")]
-    public Stream GetCurrentStream()
-    {
-        if (_compatStream == null)
-        {
-            if (_isWriteMode)
-            {
-                FlushBits();
-                _compatStream = new MemoryStream(_buffer, 0, _length);
-            }
-            else
-            {
-                _compatStream = new MemoryStream(_buffer, 0, _length);
-            }
-        }
-        return _compatStream;
-    }
-
     public void Clear()
     {
         _bitPosition = 8;
         _bitValue = 0;
         _position = 0;
         _length = 0;
-        _compatStream?.Dispose();
-        _compatStream = null;
         // Keep the existing buffer for reuse
     }
 
