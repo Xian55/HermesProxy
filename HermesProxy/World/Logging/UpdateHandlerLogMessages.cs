@@ -91,4 +91,16 @@ internal static partial class UpdateHandlerLogMessages
         ILogger logger, ulong guidLow, ulong guidHigh, int? entry, uint legacyRaw, uint effectiveLegacyRaw,
         GameObjectDynamicFlagsLegacy flags, uint modernLow, uint preservedHigh, uint oldValue, string oldDynSource,
         uint finalDyn);
+
+    /// <summary>
+    /// The object type is logged as its numeric value: this fires for types outside the set the
+    /// writers know, where the enum may have no name to render.
+    /// </summary>
+    [LoggerMessage(
+        EventId = 1207,
+        Level = LogLevel.Warning,
+        Message = "Dropped a {BlockType} block for guidLow={GuidLow} guidHigh={GuidHigh}: object type {ObjectType} " +
+                  "is not one the update writer can build.")]
+    public static partial void UnwritableObjectTypeDropped(
+        ILogger logger, string blockType, ulong guidLow, ulong guidHigh, int objectType);
 }
