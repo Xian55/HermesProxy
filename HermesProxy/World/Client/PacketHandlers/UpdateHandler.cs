@@ -366,6 +366,33 @@ public partial class WorldClient
     private AuraUpdate? _blockAuraUpdate;
     private PowerUpdate? _blockPowerUpdate;
 
+    /// <summary>
+    /// Adds a translated block to the batch, unless no writer could build it.
+    /// </summary>
+    /// <remarks>
+    /// Both <c>ObjectUpdateBuilder</c>s resolve the type the same way — the create block's own
+    /// type, otherwise the guid's — and their constructors throw on anything outside the set
+    /// below. A guid whose high we do not map comes back from <c>GetObjectType</c> as
+    /// <see cref="ObjectType.Object"/>, so such a block used to travel all the way to
+    /// <c>WritePacketData</c> and throw there: at send time, inside the outbox, after the batch
+    /// had already been split and partly written. Dropping the one block here costs the rest of
+    /// the batch nothing.
+    /// </remarks>
+    private bool AddUpdateIfWritable(UpdateObject updateObject, ObjectUpdate updateData, string blockType)
+    {
+        ObjectType type = updateData.CreateData?.ObjectType ?? updateData.Guid.GetObjectType();
+        if (type is not (ObjectType.Item or ObjectType.Container or ObjectType.Unit or ObjectType.Player
+            or ObjectType.ActivePlayer or ObjectType.GameObject or ObjectType.DynamicObject or ObjectType.Corpse))
+        {
+            UpdateHandlerLogMessages.UnwritableObjectTypeDropped(
+                _melUpdateValues, blockType, updateData.Guid.Low, updateData.Guid.High, (int)type);
+            return false;
+        }
+
+        updateObject.ObjectUpdates.Add(updateData);
+        return true;
+    }
+
     private AuraUpdate RentBlockAuraUpdate(WowGuid128 guid, bool updateAll)
     {
         if (_blockAuraUpdate is not { } reused)
@@ -479,8 +506,8 @@ public partial class WorldClient
                     // The HighGuid mapping (ItemContainer → Item, HighGuid.FromLegacy) ensures
                     // To128() produces a normal Item-typed guid.
 
-                    updateObject.ObjectUpdates.Add(updateData);
-                    if (auraUpdate.Auras.Count != 0)
+                    if (AddUpdateIfWritable(updateObject, updateData, "Values") &&
+                        auraUpdate.Auras.Count != 0)
                     {
                         _blockAuraUpdate = null;
                         auraUpdates.Add(auraUpdate);
@@ -606,8 +633,8 @@ public partial class WorldClient
 
                         if (!filtered)
                         {
-                            updateObject.ObjectUpdates.Add(updateData);
-                            if (auraUpdate.Auras.Count != 0)
+                            if (AddUpdateIfWritable(updateObject, updateData, "CreateObject") &&
+                                auraUpdate.Auras.Count != 0)
                             {
                                 _blockAuraUpdate = null;
                                 auraUpdates.Add(auraUpdate);
@@ -689,8 +716,8 @@ public partial class WorldClient
 
                         if (!filtered)
                         {
-                            updateObject.ObjectUpdates.Add(updateData);
-                            if (auraUpdate.Auras.Count != 0)
+                            if (AddUpdateIfWritable(updateObject, updateData, "CreateObject") &&
+                                auraUpdate.Auras.Count != 0)
                             {
                                 _blockAuraUpdate = null;
                                 auraUpdates.Add(auraUpdate);
@@ -1419,25 +1446,32 @@ public partial class WorldClient
                     break;
             }
         }
-        // A delta's mask stops at the highest word that changed. For a known object, widen it to
-        // the object's whole field range so every index the loop below reads is in bounds; a
-        // missing-create block keeps its own length, as before.
-        int maskLength = maskBits;
-        if (!missingCreateObject)
+        // A delta's mask stops at the highest word that changed, while the ~200 reads below index
+        // it by field id, so it is widened to the object's whole field range. Widening only ever
+        // adds false bits (see FillUpdateMask), which is what a field the packet did not carry
+        // reads as anyway — but without it, a mask that stops short throws
+        // ArgumentOutOfRangeException out of HandleUpdateObject and loses every block in the
+        // packet. This used to cover only objects with a cached create, so a Values block for a
+        // guid we have no create for still had the whole set.
+        int objectFieldEnd = type switch
         {
-            int objectFieldEnd = type switch
-            {
-                ObjectType.Item => LegacyVersion.GetUpdateField(ItemField.ITEM_END),
-                ObjectType.Container => LegacyVersion.GetUpdateField(ContainerField.CONTAINER_END),
-                ObjectType.Unit => LegacyVersion.GetUpdateField(UnitField.UNIT_END),
-                ObjectType.Player => LegacyVersion.GetUpdateField(PlayerField.PLAYER_END),
-                ObjectType.GameObject => LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_END),
-                ObjectType.DynamicObject => LegacyVersion.GetUpdateField(DynamicObjectField.DYNAMICOBJECT_END),
-                ObjectType.Corpse => LegacyVersion.GetUpdateField(CorpseField.CORPSE_END),
-                _ => 0,
-            };
-            maskLength = Math.Max(maskBits, objectFieldEnd);
-        }
+            ObjectType.Item => LegacyVersion.GetUpdateField(ItemField.ITEM_END),
+            ObjectType.Container => LegacyVersion.GetUpdateField(ContainerField.CONTAINER_END),
+            ObjectType.Unit => LegacyVersion.GetUpdateField(UnitField.UNIT_END),
+            ObjectType.Player => LegacyVersion.GetUpdateField(PlayerField.PLAYER_END),
+            // The block above can infer ActivePlayer from the mask size, and its own fields sit
+            // past PLAYER_END.
+            ObjectType.ActivePlayer => LegacyVersion.GetUpdateField(ActivePlayerField.ACTIVE_PLAYER_END),
+            ObjectType.GameObject => LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_END),
+            ObjectType.DynamicObject => LegacyVersion.GetUpdateField(DynamicObjectField.DYNAMICOBJECT_END),
+            ObjectType.Corpse => LegacyVersion.GetUpdateField(CorpseField.CORPSE_END),
+            _ => 0,
+        };
+        // Floored at the object section, which every type carries and which the reads below start
+        // with: a guid whose high we do not map comes back as ObjectType.Object (or AreaTrigger)
+        // from GetObjectType, and those would otherwise fall through the switch to no widening at
+        // all — including for a mask of zero words, where even OBJECT_FIELD_GUID is out of range.
+        int maskLength = Math.Max(maskBits, Math.Max(objectFieldEnd, LegacyVersion.GetUpdateField(ObjectField.OBJECT_END)));
 
         var mask = _updateMaskScratch;
         FillUpdateMask(mask, maskWords, maskLength);
@@ -2418,6 +2452,22 @@ public partial class WorldClient
     private static readonly HoldOptions CollisionHeightHold = new(
         Timeout: TimeSpan.FromSeconds(5), OnTimeout: OutboxTimeoutAction.Release);
 
+    /// <summary>
+    /// Whether this block carried a new value for <paramref name="field"/>.
+    /// </summary>
+    /// <remarks>
+    /// Unlike the update mask, the changed-values mask is only as long as the mask words the packet
+    /// actually carried — the write-back that fills it skips anything past that length, so a read
+    /// past it has to agree rather than throw. TrinityCore, AzerothCore and cMaNGOS all size a
+    /// Values block's mask to the whole object (<c>UpdateMask::SetCount(m_valuesCount)</c>), which
+    /// is why the indexes below have always been in range; a backend that stopped at the highest
+    /// changed word instead would have taken an ArgumentOutOfRangeException out of
+    /// <see cref="HandleUpdateObject"/> and lost every block in the packet, not just this one.
+    /// A field the mask does not reach cannot have changed in this block.
+    /// </remarks>
+    private static bool Changed(BitArray changedValuesMask, int field)
+        => field >= 0 && field < changedValuesMask.Count && changedValuesMask.Get(field);
+
     private void AfterStoreObjectUpdateHook(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData, BitArray changedValuesMask)
     {
         if (objectType == ObjectType.Player || objectType == ObjectType.ActivePlayer)
@@ -2427,7 +2477,9 @@ public partial class WorldClient
             int OBJECT_FIELD_SCALE_X = LegacyVersion.GetUpdateField(ObjectField.OBJECT_FIELD_SCALE_X);
             if (UNIT_FIELD_NATIVEDISPLAYID >= 0 && UNIT_FIELD_MOUNTDISPLAYID >= 0 && OBJECT_FIELD_SCALE_X >= 0)
             {
-                if (!changedValuesMask.Get(UNIT_FIELD_NATIVEDISPLAYID) && !changedValuesMask.Get(UNIT_FIELD_MOUNTDISPLAYID) && !changedValuesMask.Get(OBJECT_FIELD_SCALE_X))
+                if (!Changed(changedValuesMask, UNIT_FIELD_NATIVEDISPLAYID) &&
+                    !Changed(changedValuesMask, UNIT_FIELD_MOUNTDISPLAYID) &&
+                    !Changed(changedValuesMask, OBJECT_FIELD_SCALE_X))
                     return; // No need for an update
 
                 int nativeDisplayId = Session.GameState.GetLegacyFieldValueInt32(guid, UnitField.UNIT_FIELD_DISPLAYID);
@@ -2463,7 +2515,7 @@ public partial class WorldClient
 
                 var displayScale = regularNativeDisplaySize * scale;
 
-                var reason = changedValuesMask.Get(UNIT_FIELD_MOUNTDISPLAYID)
+                var reason = Changed(changedValuesMask, UNIT_FIELD_MOUNTDISPLAYID)
                     ? MoveSetCollisionHeight.UpdateCollisionHeightReason.Mount
                     : MoveSetCollisionHeight.UpdateCollisionHeightReason.Force;
 

@@ -733,8 +733,14 @@ public sealed class GameSessionData
         if (updates == null)
             return 0;
 
-        uint itemId = updates[OBJECT_FIELD_ENTRY].UInt32Value;
-        return GameData.GetItemEffectSlot(itemId, spellId);
+        // TryGetValue, not the indexer: these are the fields some block actually carried for this
+        // guid, so an item we only ever saw a Values update for has no entry to read. The indexer
+        // threw KeyNotFoundException, and one caller sits in the update translator, where that
+        // costs the whole packet.
+        if (!updates.TryGetValue(OBJECT_FIELD_ENTRY, out var entryField))
+            return 0;
+
+        return GameData.GetItemEffectSlot(entryField.UInt32Value, spellId);
     }
     /// <summary>
     /// If the modern client sent a spell id that the legacy server doesn't know for this item
@@ -799,8 +805,8 @@ public sealed class GameSessionData
         if (updates == null)
             return 0;
 
-        uint itemId = updates[OBJECT_FIELD_ENTRY].UInt32Value;
-        return itemId;
+        // See GetItemSpellSlot: the cached field set only holds what a block carried.
+        return updates.TryGetValue(OBJECT_FIELD_ENTRY, out var entryField) ? entryField.UInt32Value : 0;
     }
     public void SetFlatSpellMod(byte spellMod, byte spellMask, int amount)
     {
