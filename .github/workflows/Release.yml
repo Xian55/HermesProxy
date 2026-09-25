@@ -1,7 +1,12 @@
 name: Release
 
 on:
-  pull_request:
+  # pull_request_target, not pull_request: for a PR from a fork, pull_request gets a read-only
+  # token whatever `permissions:` says, so the release step failed with HTTP 403 (PR #328).
+  # pull_request_target runs with this repo's token. That is safe here only because every job
+  # is gated on merged == true and checks out master, which the PR is already part of; never
+  # add a checkout of the PR head (github.event.pull_request.head.*) to this workflow.
+  pull_request_target:
     types: [closed]
     branches: [master]
   workflow_dispatch:
@@ -20,6 +25,11 @@ on:
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
+
+# The repository default hands every job a write token. Only `release` needs one, and asks for
+# it itself; the jobs that build and test get read access.
+permissions:
+  contents: read
 
 env:
   # Multi-SDK: 10.0.x covers master (targets net10.0). The pinned 11.0
@@ -228,7 +238,9 @@ jobs:
   verify:
     needs: [version, test, build]
     runs-on: ubuntu-latest
-    if: always()
+    # always() so a failed test or build is reported here, but only for a real release: without
+    # the gate this also ran, and failed, whenever a PR was closed without merging.
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true)
     steps:
       - name: Check test result
         if: needs.test.result != 'success'
