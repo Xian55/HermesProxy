@@ -9,6 +9,7 @@ using Framework.Logging;
 using Framework.Realm;
 using Google.Protobuf;
 using System;
+using System.Collections.Generic;
 using BNetServer.Networking;
 
 namespace BNetServer.Services;
@@ -63,8 +64,17 @@ public partial class BnetServices
     [Service(ServiceRequirement.Unauthorized, OriginalHash.AuthenticationService, 7)]
     BattlenetRpcErrorCode HandleVerifyWebCredentials(VerifyWebCredentialsRequest verifyWebCredentialsRequest)
     {
-        if (!BnetSessionTicketStorage.SessionsByTicket.TryGetValue(verifyWebCredentialsRequest.WebCredentials.ToStringUtf8(), out var tmpSession))
+        string ticket = verifyWebCredentialsRequest.WebCredentials.ToStringUtf8();
+        if (!BnetSessionTicketStorage.SessionsByTicket.TryGetValue(ticket, out var tmpSession))
             return BattlenetRpcErrorCode.Denied;
+
+        // OnDisconnect forgets the ticket, but a logon can race that teardown. Without its legacy
+        // login the session would pass here and only fail later, at world auth.
+        if (tmpSession.AuthClient == null)
+        {
+            BnetSessionTicketStorage.SessionsByTicket.TryRemove(KeyValuePair.Create(ticket, tmpSession));
+            return BattlenetRpcErrorCode.Denied;
+        }
 
         tmpSession.AccountInfo = new AccountInfo(tmpSession.Username);
 

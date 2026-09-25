@@ -7,6 +7,7 @@ using Bgs.Protocol.Authentication.V1;
 using BNetServer;
 using Framework.Constants;
 using Google.Protobuf;
+using HermesProxy.Configuration.Options;
 using Xunit;
 using static HermesProxy.Tests.BnetServer.BnetSessionHarness;
 
@@ -48,6 +49,7 @@ public class LauncherLoginTests
         // This test exercises only BNet authentication, without starting a legacy socket.
         var login = (GlobalSessionData)RuntimeHelpers.GetUninitializedObject(typeof(GlobalSessionData));
         login.Username = "SYNTHETIC";
+        login.AuthClient = new(login); // OnDisconnect clears it, so its presence marks a live session
         BnetSessionTicketStorage.SessionsByTicket[ticket] = login;
         try
         {
@@ -81,5 +83,46 @@ public class LauncherLoginTests
             await session.ProcessCurrentBuffer();
             Assert.Equal(BattlenetRpcErrorCode.BadPlatform, Assert.Single(session.Replies).Status);
         });
+    }
+
+    [Fact]
+    public async Task TicketOfTornDownSession_IsDeniedAndForgotten()
+    {
+        string ticket = "synthetic-" + Guid.NewGuid();
+        // No AuthClient, as OnDisconnect leaves it: the logon raced the teardown.
+        var login = (GlobalSessionData)RuntimeHelpers.GetUninitializedObject(typeof(GlobalSessionData));
+        login.Username = "SYNTHETIC";
+        BnetSessionTicketStorage.SessionsByTicket[ticket] = login;
+        try
+        {
+            await WithSession(async session =>
+            {
+                AppendLogon(session, Request(ticket));
+                await session.ProcessCurrentBuffer();
+                Assert.Equal(BattlenetRpcErrorCode.Denied, Assert.Single(session.Replies).Status);
+            });
+            Assert.False(BnetSessionTicketStorage.SessionsByTicket.ContainsKey(ticket));
+        }
+        finally { BnetSessionTicketStorage.SessionsByTicket.TryRemove(ticket, out _); }
+    }
+
+    [Fact]
+    public void OnDisconnect_ForgetsTheSessionsTicket()
+    {
+        string ticket = "synthetic-" + Guid.NewGuid();
+        var login = new GlobalSessionData(new ClientOptions(), new LegacyServerOptions(),
+            new ProxyNetworkOptions(), new DiagnosticsOptions { PacketsLog = false }, new ThrottlingOptions());
+        login.LoginTicket = ticket;
+        BnetSessionTicketStorage.SessionsByTicket[ticket] = login;
+        try
+        {
+            login.OnDisconnect();
+            Assert.False(BnetSessionTicketStorage.SessionsByTicket.ContainsKey(ticket));
+        }
+        finally
+        {
+            BnetSessionTicketStorage.SessionsByTicket.TryRemove(ticket, out _);
+            login.Executor.Dispose();
+        }
     }
 }
