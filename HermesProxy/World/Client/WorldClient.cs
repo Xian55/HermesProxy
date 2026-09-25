@@ -101,7 +101,7 @@ public partial class WorldClient
     private void WriteLegacySniff(WorldPacket packet, bool isFromClient)
     {
         var session = _globalSession;
-        if (session == null)
+        if (session == null || !session.DiagnosticsOptions.PacketsLog)
             return;
 
         var sniff = SniffFile.EnsureOpen(ref session.LegacySniff, "legacy", (ushort)LegacyVersion.Build);

@@ -2216,6 +2216,10 @@ public class GlobalSessionData
             AuthClient.Disconnect();
             AuthClient = null!;
         }
+        // The ticket stood for the legacy login just dropped. Left behind, a launcher or a
+        // reconnecting client could log in to this dead session with it.
+        if (LoginTicket != null)
+            BNetServer.BnetSessionTicketStorage.SessionsByTicket.TryRemove(KeyValuePair.Create(LoginTicket, this));
         if (WorldClient != null)
         {
             WorldClient.Disconnect();
