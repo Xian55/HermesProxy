@@ -650,9 +650,10 @@ public class UpdateObject : ServerPacket
             {
                 known.Add(u.Guid);
                 createKept++;
-                if (u.Guid == gameState.CurrentPlayerGuid)
-                    gameState.ClientHasPlayerObject = true;
-                else if (u.Guid == gameState.CurrentPetGuid)
+                // The player's delivery flag is set by the sending path, after its
+                // CreateObject has been handed to the client outbox. Setting it here
+                // lets a concurrent Values batch bypass the pre-create hold.
+                if (u.Guid == gameState.CurrentPetGuid)
                     gameState.ClientHasPetObject = true;
                 World.Logging.ObjectLifecycleLogMessages.CreateRegistered(
                     _melObjLife, u.Guid.Low, u.Guid.High, u.Type);

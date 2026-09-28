@@ -155,13 +155,13 @@ Each needs a judgement call against the client or WowPacketParser.
 
 Counts per file rather than line numbers, so unrelated edits do not churn this file.
 
-217 sites across 55 files.
+218 sites across 55 files.
 
-### `ModernVersion.Build` compared by equality — 217 sites
+### `ModernVersion.Build` compared by equality — 218 sites
 
 | file | build compared | sites |
 |---|---|---:|
-| `HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs` | `V3_4_3_54261` | 21 |
+| `HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs` | `V3_4_3_54261` | 22 |
 | `HermesProxy/World/Server/Packets/NPCPackets.cs` | `V3_4_3_54261` | 16 |
 | `HermesProxy/World/GameData.cs` | `V3_4_3_54261` | 15 |
 | `HermesProxy/World/Server/Packets/SpellPackets.cs` | `V3_4_3_54261` | 15 |
