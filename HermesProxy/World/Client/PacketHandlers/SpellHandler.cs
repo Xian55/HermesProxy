@@ -664,7 +664,7 @@ public partial class WorldClient
         }
 
         ApplyV343NativeCastPolicy(spell.Cast, isSpellGo: true);
-        SendPacketToClient(spell);
+        SendGuidSubjectPacket(spell, spell.Cast.CasterUnit);
 
         if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
             && GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit
@@ -1718,7 +1718,7 @@ public partial class WorldClient
 
         PowerUpdate update = new PowerUpdate(guid);
         update.Powers.Add(new PowerUpdatePower(power, powerType));
-        SendPacketToClient(update);
+        SendGuidSubjectPacket(update, guid);
         World.Logging.SpellLogMessages.PowerUpdate(_melSpellLog, guid.Low, (PowerType)powerType, power);
 
         // Cache RunicPower for the local player so SpellGo can embed a RemainingPower
