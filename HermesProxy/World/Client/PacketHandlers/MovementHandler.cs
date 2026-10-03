@@ -97,10 +97,29 @@ public partial class WorldClient
         moveUpdate.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
         moveUpdate.MoveInfo = new();
         moveUpdate.MoveInfo.ReadMovementInfoLegacy(packet, GetSession().GameState);
+        if (IsSplineDrivenMove(moveUpdate.MoveInfo.Flags, ModernVersion.Build))
+            return;
         moveUpdate.MoveInfo.Flags = (uint)(((MovementFlagWotLK)moveUpdate.MoveInfo.Flags).CastFlags<MovementFlagWotLK, MovementFlagModern>());
         moveUpdate.MoveInfo.ValidateMovementInfo();
         SendPacketToClient(moveUpdate);
     }
+
+    /// <summary>
+    /// Whether a legacy MSG_MOVE_* reports a unit the server is moving along a spline, which a
+    /// V3_4_3 client must not receive as a <see cref="MoveUpdate"/>.
+    /// </summary>
+    /// <remarks>
+    /// AzerothCore playerbots send a MSG_MOVE_HEARTBEAT flagged SplineEnabled about every 440 ms
+    /// for a bot that is running a spline, which a 3.3.5 client tolerates. The modern movement
+    /// flags have no such bit, so the translated packet reads as client-driven movement: the
+    /// client abandons the spline it got from SMSG_ON_MONSTER_MOVE, snaps to the heartbeat
+    /// position and extrapolates until the next spline pulls it back (issue #339). A native 3.4.3
+    /// server ignores movement from a mover whose spline is still running, so its client never
+    /// sees the combination, and the spline already carries the position.
+    /// </remarks>
+    internal static bool IsSplineDrivenMove(uint legacyFlags, ClientVersionBuild modernBuild) =>
+        modernBuild == ClientVersionBuild.V3_4_3_54261 &&
+        legacyFlags.HasAnyFlag((uint)MovementFlagWotLK.SplineEnabled);
 
     [HandlesSmsg(Opcode.MSG_MOVE_KNOCK_BACK)]
     internal void HandleMoveKnockBack(WorldPacket packet)
