@@ -123,6 +123,8 @@ public enum HoldKeyKind : ushort
     PlayerValuesBatch = 11,
     /// <summary>V3_4_3 speed changes aimed at the player, held until the client has the player.</summary>
     PlayerMoveSpeed = 12,
+    /// <summary>V3_4_3 packets whose subject is the player, held until its create is queued.</summary>
+    PlayerGuidSubject = 13,
 }
 
 /// <summary>How a hold behaves while it waits.</summary>

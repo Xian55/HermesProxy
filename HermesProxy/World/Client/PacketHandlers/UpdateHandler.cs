@@ -956,7 +956,7 @@ public partial class WorldClient
         var session = GetSession();
         WowGuid128 playerGuid = session.GameState.CurrentPlayerGuid;
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261 ||
-            session.GameState.ClientKnownGuids.Contains(playerGuid))
+            session.GameState.ClientHasPlayerObject)
         {
             SendPacketToClient(playerValues);
             return;
@@ -974,6 +974,23 @@ public partial class WorldClient
             new HeldPlayerValues(playerValues),
             held => SendPacketToClient(held.UpdateObject),
             HeldPlayerValues.Hold);
+    }
+
+    private void MarkPlayerCreateQueued(UpdateObject packet)
+    {
+        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+            return;
+
+        WowGuid128 playerGuid = GetSession().GameState.CurrentPlayerGuid;
+        foreach (var update in packet.ObjectUpdates)
+        {
+            if (update.Guid == playerGuid && update.CreateData != null &&
+                (update.Type == UpdateTypeModern.CreateObject1 || update.Type == UpdateTypeModern.CreateObject2))
+            {
+                GetSession().GameState.ClientHasPlayerObject = true;
+                return;
+            }
+        }
     }
 
     /// <summary>
@@ -1033,7 +1050,7 @@ public partial class WorldClient
         // batch at 3632 bytes survives). Splitting keeps each packet's per-object
         // allocation bounded; total wire bytes are unchanged. Creates ship first so
         // any same-tick Values updates the client receives next reference already-
-        // known guids (FilterV3_4_3Values already populated ClientKnownGuids).
+        // created guids.
         List<ObjectUpdate>? createsToSplit = null;
         if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
         {
@@ -1081,13 +1098,17 @@ public partial class WorldClient
                 UpdateObject perCreate = new UpdateObject(GetSession().GameState);
                 perCreate.ObjectUpdates.Add(create);
                 SendPacketToClient(perCreate);
+                MarkPlayerCreateQueued(perCreate);
             }
         }
 
         if (updateObject.ObjectUpdates.Count != 0 ||
             updateObject.DestroyedGuids.Count != 0 ||
             updateObject.OutOfRangeGuids.Count != 0)
+        {
             SendPacketToClient(updateObject);
+            MarkPlayerCreateQueued(updateObject);
+        }
 
         // V3_4_3-only: if a SMSG_PET_SPELLS_MESSAGE was held back because its pet
         // wasn't in ClientKnownGuids yet, and the batch we just sent contained a
@@ -1195,14 +1216,15 @@ public partial class WorldClient
 
             // Releases what waits for the client to have the player object: the toy box sync
             // (CollectionSync.SendToys) and pet batches held above. Raised at every batch end
-            // while the player is known, not once, so a hold registered late still goes out.
+            // after the player's create was queued, not once, so a hold registered late
+            // still goes out.
             // This deliberately does not hang off playerCreateInBatch: the player's CreateObject
             // is usually split out into its own per-create packet above, so by the time we get
             // here it is no longer in updateObject.ObjectUpdates and that flag reads false on
-            // most logins. ClientKnownGuids is the durable signal — FilterV3_4_3Values
-            // registers the guid whichever packet carried the create.
+            // most logins. ClientHasPlayerObject is marked only after the create has been
+            // passed to the outbox; FilterV3_4_3Values marks ClientKnownGuids earlier.
             if (GetSession().ToClient.HasPending &&
-                GetSession().GameState.ClientKnownGuids.Contains(currentPlayerGuid))
+                GetSession().GameState.ClientHasPlayerObject)
             {
                 GetSession().ToClient.Notify(OutboxEvent.GuidKnown(currentPlayerGuid));
             }
@@ -2543,8 +2565,15 @@ public partial class WorldClient
                     Reason = reason,
                     MountDisplayID = (uint) mountDisplayId,
                 };
-                // After the batch whose Values changed the mount or scale has reached the client.
-                GetSession().ToClient.AfterBatch(height, CollisionHeightHold);
+                // At login the player's create can itself be deferred for item hotfixes.
+                // AfterBatch would release at the end of the current Values batch, before
+                // that create. Once the player exists, retain the normal batch ordering.
+                if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+                    guid == GetSession().GameState.CurrentPlayerGuid &&
+                    !GetSession().GameState.ClientHasPlayerObject)
+                    GetSession().ToClient.When(OutboxEvent.GuidKnown(guid), height, PlayerGuidSubjectHold);
+                else
+                    GetSession().ToClient.AfterBatch(height, CollisionHeightHold);
             }
         }
     }

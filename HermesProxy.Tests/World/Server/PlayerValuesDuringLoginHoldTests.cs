@@ -87,6 +87,37 @@ public class PlayerValuesDuringLoginHoldTests
         });
     }
 
+    [Fact]
+    public void AfterTeleport_SeeingAPlayerCreateDoesNotMarkItDeliveredBeforeTheSend()
+    {
+        WithV343(() =>
+        {
+            var state = SessionWithPlayer();
+            state.ClientKnownGuids.Add(Player);
+            state.ClientHasPlayerObject = true;
+
+            // SMSG_NEW_WORLD clears the old map's client object model.
+            state.ClientKnownGuids.Clear();
+            state.ClientHasPlayerObject = false;
+
+            var values = new UpdateObject(state);
+            var stance = Values(Player, u => u.UnitData.ShapeshiftForm = 17);
+            values.ObjectUpdates.Add(stance);
+            UpdateObject.FilterV3_4_3Values(values, state);
+            Assert.Contains(stance, values.ObjectUpdates);
+            Assert.False(state.ClientHasPlayerObject);
+
+            var create = new UpdateObject(state);
+            create.ObjectUpdates.Add(new ObjectUpdate(Player, UpdateTypeModern.CreateObject1, null!));
+            UpdateObject.FilterV3_4_3Values(create, state);
+
+            // The known set still allows a same-batch Values delta, but it is not the
+            // delivery signal used by SendPlayerValuesUpdate's hold.
+            Assert.Contains(Player, state.ClientKnownGuids);
+            Assert.False(state.ClientHasPlayerObject);
+        });
+    }
+
     /// <summary>The second symptom in the issue: a mounted login's MountDisplayID.</summary>
     [Fact]
     public void PlayerMountDisplay_ForAGuidTheClientDoesNotHaveYet_IsKept()

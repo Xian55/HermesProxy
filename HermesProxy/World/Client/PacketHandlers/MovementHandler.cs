@@ -33,6 +33,30 @@ public partial class WorldClient
         OnTimeout: OutboxTimeoutAction.Discard,
         Key: PlayerMoveSpeedKey);
 
+    private static readonly HoldKey PlayerGuidSubjectKey = new(HoldKeyKind.PlayerGuidSubject);
+    private static readonly HoldOptions PlayerGuidSubjectHold = new(
+        Timeout: TimeSpan.FromSeconds(20),
+        OnTimeout: OutboxTimeoutAction.Discard,
+        Key: PlayerGuidSubjectKey);
+
+    internal static bool? ForceV343GuidSubjectHoldForTests;
+
+    /// <summary>Keep a packet about the player behind its pending CreateObject.</summary>
+    internal void SendGuidSubjectPacket(ServerPacket packet, WowGuid128 subjectGuid)
+    {
+        var session = GetSession();
+        if (!(ForceV343GuidSubjectHoldForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261) ||
+            subjectGuid.IsEmpty() ||
+            subjectGuid != session.GameState.CurrentPlayerGuid ||
+            session.GameState.ClientHasPlayerObject)
+        {
+            SendPacketToClient(packet);
+            return;
+        }
+
+        session.ToClient.When(OutboxEvent.GuidKnown(subjectGuid), packet, PlayerGuidSubjectHold);
+    }
+
     /// <summary>
     /// Sends a movement packet aimed at <paramref name="moverGuid"/>, or holds it when that is the
     /// player and the client does not have the player object yet.
@@ -42,7 +66,7 @@ public partial class WorldClient
         var session = GetSession();
         if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261 ||
             moverGuid != session.GameState.CurrentPlayerGuid ||
-            session.GameState.ClientKnownGuids.Contains(moverGuid))
+            session.GameState.ClientHasPlayerObject)
         {
             SendPacketToClient(packet);
             return;
@@ -325,6 +349,7 @@ public partial class WorldClient
                 GetSession().ToClient.Cancel(HeldPetUpdateBatch.Key);
                 GetSession().ToClient.Cancel(HeldPlayerValues.Key);
                 GetSession().ToClient.Cancel(PlayerMoveSpeedKey);
+                GetSession().ToClient.Cancel(PlayerGuidSubjectKey);
             }
 
             SendPacketToClient(teleport);
@@ -545,7 +570,7 @@ public partial class WorldClient
         MoveSetFlag flag = new MoveSetFlag(packet.GetUniversalOpcode(false));
         flag.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
         flag.MoveCounter = packet.ReadUInt32();
-        SendPacketToClient(flag);
+        SendGuidSubjectPacket(flag, flag.MoverGUID);
     }
 
     [HandlesSmsg(Opcode.SMSG_COMPRESSED_MOVES)]
