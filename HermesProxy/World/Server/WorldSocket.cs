@@ -850,7 +850,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             return hmac.Digest!.Compare(authSession.Digest);
         }
 
-        if (GetSession().OS != "Wn64" && GetSession().OS != "Mc64" && GetSession().OS != "MacA" /*TODO what is windows arm?*/)
+        if (GetSession().OS != "Wn64" && GetSession().OS != "Mc64" && GetSession().OS != "MacA" && GetSession().OS != "WinA")
         {
             Log.Print(LogType.Error, $"WorldSocket.HandleAuthSession: Unknown OS for account: {GetSession().GameAccountInfo.Id} ('{authSession.RealmJoinTicket}') address: {address}");
             CloseSocket();
