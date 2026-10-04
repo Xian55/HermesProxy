@@ -856,7 +856,7 @@ public class SpanPacketRoundTripTests
 public class MovementInfoSpanTests
 {
     [Fact]
-    public void WriteMovementInfoModernToSpan_Simple_ProducesOutput()
+    public void ModernMovementCodecWrite_Simple_ProducesOutput()
     {
         var moveInfo = new MovementInfo
         {
@@ -873,16 +873,16 @@ public class MovementInfoSpanTests
 
         var guid = new WowGuid128(0x123456789ABCDEF0, 0xFEDCBA9876543210);
 
-        Span<byte> span = stackalloc byte[MovementInfo.MaxMovementInfoSize];
-        int bytesWritten = moveInfo.WriteMovementInfoModernToSpan(span, guid.Low, guid.High);
+        Span<byte> span = stackalloc byte[ModernMovementCodec.MaxSize];
+        int bytesWritten = ModernMovementCodec.Write(span, guid, in moveInfo);
 
         // Should write at least GUID + basic movement data
         Assert.True(bytesWritten > 0);
-        Assert.True(bytesWritten <= MovementInfo.MaxMovementInfoSize);
+        Assert.True(bytesWritten <= ModernMovementCodec.MaxSize);
     }
 
     [Fact]
-    public void WriteMovementInfoModernToSpan_WithTransport_ProducesLargerOutput()
+    public void ModernMovementCodecWrite_WithTransport_ProducesLargerOutput()
     {
         var moveInfoWithoutTransport = new MovementInfo
         {
@@ -898,27 +898,30 @@ public class MovementInfoSpanTests
             MoveTime = 12345,
             Position = new Vector3(100.5f, 200.5f, 300.5f),
             Orientation = 1.5f,
-            TransportGuid = new WowGuid128(0x1111111111111111, 0x2222222222222222),
-            TransportOffset = new Vector3(1.0f, 2.0f, 3.0f),
-            TransportOrientation = 0.5f,
-            TransportSeat = 0,
-            TransportTime = 1000
+            Transport = new TransportInfo
+            {
+                Guid = new WowGuid128(0x1111111111111111, 0x2222222222222222),
+                Offset = new Vector3(1.0f, 2.0f, 3.0f),
+                Orientation = 0.5f,
+                Seat = 0,
+                Time = 1000
+            }
         };
 
         var guid = new WowGuid128(0xAAAABBBBCCCCDDDD, 0xEEEEFFFF00001111);
 
-        Span<byte> span1 = stackalloc byte[MovementInfo.MaxMovementInfoSize];
-        int bytesWithoutTransport = moveInfoWithoutTransport.WriteMovementInfoModernToSpan(span1, guid.Low, guid.High);
+        Span<byte> span1 = stackalloc byte[ModernMovementCodec.MaxSize];
+        int bytesWithoutTransport = ModernMovementCodec.Write(span1, guid, in moveInfoWithoutTransport);
 
-        Span<byte> span2 = stackalloc byte[MovementInfo.MaxMovementInfoSize];
-        int bytesWithTransport = moveInfoWithTransport.WriteMovementInfoModernToSpan(span2, guid.Low, guid.High);
+        Span<byte> span2 = stackalloc byte[ModernMovementCodec.MaxSize];
+        int bytesWithTransport = ModernMovementCodec.Write(span2, guid, in moveInfoWithTransport);
 
         // Transport data should make the packet larger
         Assert.True(bytesWithTransport > bytesWithoutTransport);
     }
 
     [Fact]
-    public void WriteMovementInfoModernToSpan_WithFall_ProducesLargerOutput()
+    public void ModernMovementCodecWrite_WithFall_ProducesLargerOutput()
     {
         var moveInfoWithoutFall = new MovementInfo
         {
@@ -930,7 +933,7 @@ public class MovementInfoSpanTests
 
         var moveInfoWithFall = new MovementInfo
         {
-            Flags = (uint)MovementFlagModern.Falling,
+            Flags = MovementFlagModern.Falling,
             MoveTime = 99999,
             Position = new Vector3(10.0f, 20.0f, 30.0f),
             Orientation = 0.0f,
@@ -943,23 +946,23 @@ public class MovementInfoSpanTests
 
         var guid = new WowGuid128(0x0000000000000001, 0x0000000000000000);
 
-        Span<byte> span1 = stackalloc byte[MovementInfo.MaxMovementInfoSize];
-        int bytesWithoutFall = moveInfoWithoutFall.WriteMovementInfoModernToSpan(span1, guid.Low, guid.High);
+        Span<byte> span1 = stackalloc byte[ModernMovementCodec.MaxSize];
+        int bytesWithoutFall = ModernMovementCodec.Write(span1, guid, in moveInfoWithoutFall);
 
-        Span<byte> span2 = stackalloc byte[MovementInfo.MaxMovementInfoSize];
-        int bytesWithFall = moveInfoWithFall.WriteMovementInfoModernToSpan(span2, guid.Low, guid.High);
+        Span<byte> span2 = stackalloc byte[ModernMovementCodec.MaxSize];
+        int bytesWithFall = ModernMovementCodec.Write(span2, guid, in moveInfoWithFall);
 
         // Fall data should make the packet larger
         Assert.True(bytesWithFall > bytesWithoutFall);
     }
 
     [Fact]
-    public void WriteMovementInfoModernToSpan_MaxSize_IsAdequate()
+    public void ModernMovementCodecWrite_MaxSize_IsAdequate()
     {
         // Create a maximally complex movement info
         var moveInfo = new MovementInfo
         {
-            Flags = (uint)MovementFlagModern.Falling,
+            Flags = MovementFlagModern.Falling,
             FlagsExtra = 0xFFFFFFFF,
             FlagsExtra2 = 0xFFFFFFFF,
             MoveTime = 0xFFFFFFFF,
@@ -968,12 +971,15 @@ public class MovementInfoSpanTests
             SwimPitch = float.MaxValue,
             SplineElevation = float.MaxValue,
             HasSplineData = true,
-            TransportGuid = new WowGuid128(ulong.MaxValue, ulong.MaxValue),
-            TransportOffset = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue),
-            TransportOrientation = float.MaxValue,
-            TransportSeat = sbyte.MaxValue,
-            TransportTime = uint.MaxValue,
-            VehicleId = uint.MaxValue,
+            Transport = new TransportInfo
+            {
+                Guid = new WowGuid128(ulong.MaxValue, ulong.MaxValue),
+                Offset = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue),
+                Orientation = float.MaxValue,
+                Seat = sbyte.MaxValue,
+                Time = uint.MaxValue,
+                VehicleId = uint.MaxValue
+            },
             FallTime = uint.MaxValue,
             JumpVerticalSpeed = float.MaxValue,
             JumpSinAngle = float.MaxValue,
@@ -984,15 +990,15 @@ public class MovementInfoSpanTests
         var guid = new WowGuid128(ulong.MaxValue, ulong.MaxValue);
 
         // Should not throw due to buffer overflow
-        Span<byte> span = stackalloc byte[MovementInfo.MaxMovementInfoSize];
-        int bytesWritten = moveInfo.WriteMovementInfoModernToSpan(span, guid.Low, guid.High);
+        Span<byte> span = stackalloc byte[ModernMovementCodec.MaxSize];
+        int bytesWritten = ModernMovementCodec.Write(span, guid, in moveInfo);
 
         Assert.True(bytesWritten > 0);
-        Assert.True(bytesWritten <= MovementInfo.MaxMovementInfoSize);
+        Assert.True(bytesWritten <= ModernMovementCodec.MaxSize);
     }
 
     [Fact]
-    public void WriteMovementInfoModernToSpan_DifferentGuids_ProduceDifferentOutput()
+    public void ModernMovementCodecWrite_DifferentGuids_ProduceDifferentOutput()
     {
         var moveInfo = new MovementInfo
         {
@@ -1005,11 +1011,11 @@ public class MovementInfoSpanTests
         var guid1 = new WowGuid128(0x0000000000000001, 0x0000000000000000);
         var guid2 = new WowGuid128(0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF);
 
-        Span<byte> span1 = stackalloc byte[MovementInfo.MaxMovementInfoSize];
-        int bytes1 = moveInfo.WriteMovementInfoModernToSpan(span1, guid1.Low, guid1.High);
+        Span<byte> span1 = stackalloc byte[ModernMovementCodec.MaxSize];
+        int bytes1 = ModernMovementCodec.Write(span1, guid1, in moveInfo);
 
-        Span<byte> span2 = stackalloc byte[MovementInfo.MaxMovementInfoSize];
-        int bytes2 = moveInfo.WriteMovementInfoModernToSpan(span2, guid2.Low, guid2.High);
+        Span<byte> span2 = stackalloc byte[ModernMovementCodec.MaxSize];
+        int bytes2 = ModernMovementCodec.Write(span2, guid2, in moveInfo);
 
         // Different GUIDs should produce different output
         // (at minimum the packed GUID bytes will differ)

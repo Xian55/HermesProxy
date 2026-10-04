@@ -21,10 +21,8 @@ namespace HermesProxy.World.Server.Systems;
 /// parameter rather than being read back off the packet. <c>verify-handler-port.py</c> diffs each
 /// one against the original.
 /// <para>
-/// <c>MovementInfo</c> stays a class here. It is a mutable builder for the *outbound* direction —
-/// 46 sites populate one field-by-field while assembling a packet for the client — so making it a
-/// value type is outbound work. The packet structs hold a reference to it, which means the one
-/// MovementInfo allocation per movement packet survives this slice; everything around it does not.
+/// Since then the movement block moved behind <c>LegacyMovementCodec.Write</c>, which replaced
+/// <c>MovementInfo.WriteMovementInfoLegacy</c> call for call.
 /// </para>
 /// </remarks>
 public static class MovementSystem
@@ -118,7 +116,7 @@ public static class MovementSystem
         // client does, and that is what the backend's Strand of the Ancients boarding relies
         // on. Log the moment that changes -- boarding, leaving -- with the world position and
         // the deck offset side by side. Not every packet: a rider sends a dozen a second.
-        var moveInfo = movement.MoveInfo;
+        ref readonly MovementInfo moveInfo = ref movement.MoveInfo;
         var gameState = ctx.GetSession().GameState;
         if (moveInfo.TransportGuid != gameState.LastReportedTransportGuid)
         {
@@ -126,12 +124,13 @@ public static class MovementSystem
             {
                 // Both halves: a HighGuid::Transport guid keeps its identity in High and
                 // has Low = 0, so Low alone reads as "0 -> 0" on AzerothCore.
+                TransportInfo transport = moveInfo.Transport ?? new TransportInfo();
                 TransportLogMessages.ClientTransportChanged(_melTransportRider, universalOpcode.ToString(),
                     gameState.LastReportedTransportGuid.Low, gameState.LastReportedTransportGuid.High,
-                    moveInfo.TransportGuid.Low, moveInfo.TransportGuid.High,
+                    transport.Guid.Low, transport.Guid.High,
                     moveInfo.StandingOnGameObjectGuid.Low,
-                    moveInfo.TransportOffset.X, moveInfo.TransportOffset.Y, moveInfo.TransportOffset.Z,
-                    moveInfo.TransportOrientation, moveInfo.TransportSeat,
+                    transport.Offset.X, transport.Offset.Y, transport.Offset.Z,
+                    transport.Orientation, transport.Seat,
                     moveInfo.Position.X, moveInfo.Position.Y, moveInfo.Position.Z);
             }
             gameState.LastReportedTransportGuid = moveInfo.TransportGuid;
@@ -140,7 +139,7 @@ public static class MovementSystem
         WorldPacket packet = new WorldPacket(legacyOpcode);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(movement.Guid.To64());
-        moveInfo.WriteMovementInfoLegacy(packet);
+        LegacyMovementCodec.Write(packet, in moveInfo);
         ctx.SendPacketToServer(packet);
 
         CheckProximityAreaTriggers(moveInfo.Position, gameState, ctx);
@@ -255,7 +254,7 @@ public static class MovementSystem
         else
             packet.WriteGuid(speed.MoverGUID.To64());
         packet.WriteUInt32(speed.Ack.MoveCounter);
-        speed.Ack.MoveInfo.WriteMovementInfoLegacy(packet);
+        LegacyMovementCodec.Write(packet, speed.Ack.MoveInfo);
         packet.WriteFloat(speed.Speed);
         ctx.SendPacketToServer(packet);
     }
@@ -272,8 +271,8 @@ public static class MovementSystem
         else
             packet.WriteGuid(movementAck.MoverGUID.To64());
         packet.WriteUInt32(movementAck.Ack.MoveCounter);
-        movementAck.Ack.MoveInfo.WriteMovementInfoLegacy(packet);
-        packet.WriteInt32(movementAck.Ack.MoveInfo.Flags.HasAnyFlag((uint)(GetFlagForAckOpcode(opcode))) ? 1 : 0);
+        LegacyMovementCodec.Write(packet, movementAck.Ack.MoveInfo);
+        packet.WriteInt32(movementAck.Ack.MoveInfo.Flags.HasAnyFlag(GetFlagForAckOpcode(opcode)) ? 1 : 0);
         ctx.SendPacketToServer(packet);
     }
 
@@ -290,7 +289,7 @@ public static class MovementSystem
         else
             packet.WriteGuid(movementAck.MoverGUID.To64());
         packet.WriteUInt32(movementAck.Ack.MoveCounter);
-        movementAck.Ack.MoveInfo.WriteMovementInfoLegacy(packet);
+        LegacyMovementCodec.Write(packet, movementAck.Ack.MoveInfo);
         ctx.SendPacketToServer(packet);
     }
 
@@ -325,7 +324,7 @@ public static class MovementSystem
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MOVE_SPLINE_DONE);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(movement.Guid.To64());
-        movement.MoveInfo.WriteMovementInfoLegacy(packet);
+        LegacyMovementCodec.Write(packet, movement.MoveInfo);
         packet.WriteInt32(movement.SplineID);
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
             packet.WriteFloat(0); // Spline Type

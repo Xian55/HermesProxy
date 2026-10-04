@@ -13,7 +13,7 @@ namespace HermesProxy.World.Server.Packets;
 // does dispatch only.
 //
 // `out` rather than a return value: for a two-field struct it makes no difference, but packets like
-// ClientPlayerMovement carry a ~180-byte MovementInfo where return-value optimisation is not
+// ClientPlayerMovement carry a 136-byte MovementInfo where return-value optimisation is not
 // guaranteed, and one shape for all of them is worth more than a per-packet judgement call.
 
 public static class AttackSwingCodec

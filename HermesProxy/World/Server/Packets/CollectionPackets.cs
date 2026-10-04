@@ -133,8 +133,8 @@ public readonly record struct ToyClearFanfare(uint ItemID);
 public readonly record struct AddToy(WowGuid128 Guid);
 
 /// <remarks>
-/// Holds <see cref="SpellCastRequest"/> by reference for the same reason CastSpell does: it carries
-/// a mutable MovementInfo the outbound path fills in field by field.
+/// Holds <see cref="SpellCastRequest"/> by reference for the same reason CastSpell does: it nests
+/// lists.
 /// </remarks>
 public readonly record struct UseToy(SpellCastRequest Cast)
 {

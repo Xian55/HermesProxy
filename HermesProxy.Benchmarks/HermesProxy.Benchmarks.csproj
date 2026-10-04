@@ -14,6 +14,8 @@
     <!-- The handler harness the tests use, so a benchmark and its correctness test drive the same packets. -->
     <Compile Include="..\HermesProxy.Tests\Support\LegacyHandlerHarness.cs" Link="Support\LegacyHandlerHarness.cs" />
     <Compile Include="..\HermesProxy.Tests\Support\HandlerScenarios.cs" Link="Support\HandlerScenarios.cs" />
+    <Compile Include="..\HermesProxy.Tests\Support\MovementWire.cs" Link="Support\MovementWire.cs" />
+    <Compile Include="..\HermesProxy.Tests\Support\MovementScenarios.cs" Link="Support\MovementScenarios.cs" />
   </ItemGroup>
 
   <ItemGroup>

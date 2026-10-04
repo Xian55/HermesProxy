@@ -204,6 +204,18 @@ public static class VersionChecker
         int secondUnderscore = span.IndexOf('_');
         return byte.Parse(span[..secondUnderscore]);
     }
+
+    internal static byte GetMinorPatchVersion(ClientVersionBuild version)
+    {
+        ReadOnlySpan<char> span = version.ToString().AsSpan();
+        span = span[(span.IndexOf('_') + 1)..];
+        span = span[(span.IndexOf('_') + 1)..];
+        var segment = span[..span.IndexOf('_')];
+        // Strip trailing non-digit patch-letter (e.g. 'a' in "5a" for WotLK 3.3.5a)
+        while (segment.Length > 0 && !char.IsDigit(segment[^1]))
+            segment = segment[..^1];
+        return byte.Parse(segment);
+    }
 }
 public class UpdateFieldInfo
 {

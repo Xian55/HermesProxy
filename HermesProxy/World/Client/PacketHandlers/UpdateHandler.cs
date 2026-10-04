@@ -618,7 +618,7 @@ public partial class WorldClient
                                 RequestGameObjectLockTemplate(
                                     (uint)(updateData.ObjectData.EntryID ?? 0),
                                     updateData.GameObjectData?.TypeID);
-                                var rot = updateData.CreateData?.MoveInfo?.Rotation;
+                                Quaternion? rot = updateData.CreateData?.MoveInfo != null ? updateData.CreateData.Rotation : null;
                                 UpdateHandlerLogMessages.GameObjectCreate(_melUpdateValues, "CreateObject1",
                                     guid.Low, guid.High, updateData.ObjectData.EntryID,
                                     updateData.GameObjectData?.TypeID, updateData.GameObjectData?.State,
@@ -701,7 +701,7 @@ public partial class WorldClient
                                 RequestGameObjectLockTemplate(
                                     (uint)(updateData.ObjectData.EntryID ?? 0),
                                     updateData.GameObjectData?.TypeID);
-                                var rot = updateData.CreateData?.MoveInfo?.Rotation;
+                                Quaternion? rot = updateData.CreateData?.MoveInfo != null ? updateData.CreateData.Rotation : null;
                                 UpdateHandlerLogMessages.GameObjectCreate(_melUpdateValues, "CreateObject2",
                                     guid.Low, guid.High, updateData.ObjectData.EntryID,
                                     updateData.GameObjectData?.TypeID, updateData.GameObjectData?.State,
@@ -1817,6 +1817,12 @@ public partial class WorldClient
     void ReadMovementUpdateBlock(WorldPacket packet, WowGuid128 guid, ObjectUpdate? updateData, int index)
     {
         MovementInfo? moveInfo = null;
+        MovementSpeeds speeds = default;
+        bool playHoverAnim = false;
+        uint transportPathTimer = 0;
+        uint vehicleId = 0;
+        float vehicleOrientation = 0f;
+        Quaternion? rotation = null;
 
         UpdateFlag flags;
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
@@ -1844,37 +1850,39 @@ public partial class WorldClient
 
         if (flags.HasAnyFlag(UpdateFlag.Living))
         {
-            moveInfo = new MovementInfo();
-            moveInfo.ReadMovementInfoLegacy(packet, GetSession().GameState);
-            var moveFlags = moveInfo.Flags;
+            LegacyMovementCodec.Read(packet, GetSession().GameState, out MovementInfo living, out LegacyMovementExtras legacy);
+            moveInfo = living;
+            MovementFlagWotLK moveFlags = legacy.Flags;
+            playHoverAnim = legacy.FixedZ;
 
-            moveInfo.WalkSpeed = packet.ReadFloat();
-            moveInfo.RunSpeed = packet.ReadFloat();
-            moveInfo.RunBackSpeed = packet.ReadFloat();
-            moveInfo.SwimSpeed = packet.ReadFloat();
-            moveInfo.SwimBackSpeed = packet.ReadFloat();
+            speeds.Walk = packet.ReadFloat();
+            speeds.Run = packet.ReadFloat();
+            speeds.RunBack = packet.ReadFloat();
+            speeds.Swim = packet.ReadFloat();
+            speeds.SwimBack = packet.ReadFloat();
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             {
-                moveInfo.FlightSpeed = packet.ReadFloat();
-                moveInfo.FlightBackSpeed = packet.ReadFloat();
+                speeds.Flight = packet.ReadFloat();
+                speeds.FlightBack = packet.ReadFloat();
             }
             else
             { // Convenience in vanilla to use SwimSpeed as FlySpeed
-                moveInfo.FlightSpeed = moveInfo.SwimSpeed;
-                moveInfo.FlightBackSpeed = moveInfo.SwimBackSpeed;
+                speeds.Flight = speeds.Swim;
+                speeds.FlightBack = speeds.SwimBack;
             }
-            moveInfo.TurnRate = packet.ReadFloat();
+            speeds.TurnRate = packet.ReadFloat();
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-                moveInfo.PitchRate = packet.ReadFloat();
+                speeds.PitchRate = packet.ReadFloat();
 
-            if (moveFlags.HasAnyFlag((uint)MovementFlagWotLK.SplineEnabled))
+            if (moveFlags.HasAnyFlag(MovementFlagWotLK.SplineEnabled))
             {
-                moveInfo.HasSplineData = true;
+                living.HasSplineData = true;
+                moveInfo = living;
                 ServerSideMovement monsterMove = new ServerSideMovement();
 
-                if (moveInfo.TransportGuid != default)
-                    monsterMove.TransportGuid = moveInfo.TransportGuid;
-                monsterMove.TransportSeat = moveInfo.TransportSeat;
+                if (living.TransportGuid != default)
+                    monsterMove.TransportGuid = living.TransportGuid;
+                monsterMove.TransportSeat = living.Transport?.Seat ?? -1;
 
                 bool isFlyingSpline;
                 bool isSmoothSpline;
@@ -1895,7 +1903,7 @@ public partial class WorldClient
                     else if (splineFlags.HasAnyFlag(SplineFlagWotLK.FinalOrientation))
                     {
                         monsterMove.FinalOrientation = packet.ReadFloat();
-                        MovementInfo.ClampOrientation(ref monsterMove.FinalOrientation);
+                        MovementSanitizer.ClampOrientation(ref monsterMove.FinalOrientation);
                         monsterMove.SplineType = SplineTypeModern.FacingAngle;
                     }
                     else if (splineFlags.HasAnyFlag(SplineFlagWotLK.FinalPoint))
@@ -1919,7 +1927,7 @@ public partial class WorldClient
                     else if (splineFlags.HasAnyFlag(SplineFlagTBC.FinalOrientation))
                     {
                         monsterMove.FinalOrientation = packet.ReadFloat();
-                        MovementInfo.ClampOrientation(ref monsterMove.FinalOrientation);
+                        MovementSanitizer.ClampOrientation(ref monsterMove.FinalOrientation);
                         monsterMove.SplineType = SplineTypeModern.FacingAngle;
                     }
                     else if (splineFlags.HasAnyFlag(SplineFlagTBC.FinalPoint))
@@ -1943,7 +1951,7 @@ public partial class WorldClient
                     else if (splineFlags.HasAnyFlag(SplineFlagVanilla.FinalOrientation))
                     {
                         monsterMove.FinalOrientation = packet.ReadFloat();
-                        MovementInfo.ClampOrientation(ref monsterMove.FinalOrientation);
+                        MovementSanitizer.ClampOrientation(ref monsterMove.FinalOrientation);
                         monsterMove.SplineType = SplineTypeModern.FacingAngle;
                     }
                     else if (splineFlags.HasAnyFlag(SplineFlagVanilla.FinalPoint))
@@ -2012,22 +2020,24 @@ public partial class WorldClient
         {
             if (flags.HasAnyFlag(UpdateFlag.GOPosition))
             {
-                moveInfo = new MovementInfo();
-                moveInfo.TransportGuid = packet.ReadPackedGuid().To128(GetSession().GameState);
+                WowGuid128 transportGuid = packet.ReadPackedGuid().To128(GetSession().GameState);
+                Vector3 position = packet.ReadVector3();
+                Vector3 transportOffset = packet.ReadVector3();
+                float orientation = packet.ReadFloat();
+                packet.ReadFloat(); // corpse orientation
 
-                moveInfo.Position = packet.ReadVector3();
-                moveInfo.TransportOffset = packet.ReadVector3();
-
-                moveInfo.Orientation = packet.ReadFloat();
-                moveInfo.TransportOrientation = moveInfo.Orientation;
-
-                moveInfo.CorpseOrientation = packet.ReadFloat();
+                moveInfo = new MovementInfo
+                {
+                    Position = position,
+                    Orientation = orientation,
+                    Transport = new TransportInfo { Guid = transportGuid, Offset = transportOffset, Orientation = orientation },
+                };
             }
             else if (flags.HasAnyFlag(UpdateFlag.StationaryObject))
             {
-                moveInfo = new MovementInfo();
-                moveInfo.Position = packet.ReadVector3();
-                moveInfo.Orientation = packet.ReadFloat();
+                Vector3 position = packet.ReadVector3();
+                float orientation = packet.ReadFloat();
+                moveInfo = new MovementInfo { Position = position, Orientation = orientation };
             }
         }
 
@@ -2045,51 +2055,55 @@ public partial class WorldClient
         }
 
         if (flags.HasAnyFlag(UpdateFlag.Transport))
-        {
-            uint transportPathTimer = packet.ReadUInt32();
-            if (moveInfo != null)
-                moveInfo.TransportPathTimer = transportPathTimer;
-        }
+            transportPathTimer = packet.ReadUInt32();
 
         if (flags.HasAnyFlag(UpdateFlag.Vehicle))
         {
-            uint vehicleId = packet.ReadUInt32();
-            float vehicleOrientation = packet.ReadFloat();
-            if (moveInfo != null)
+            vehicleId = packet.ReadUInt32();
+            vehicleOrientation = packet.ReadFloat();
+            // The object's own vehicle id also goes out as its transport block's VehicleRecID,
+            // which is meant to name the vehicle it rides. Wrong for a vehicle that is itself a
+            // passenger, but it is what every client has been sent so far; kept until a capture
+            // of a native server settles what belongs there.
+            if (moveInfo is { Transport: { } ridden } riding)
             {
-                moveInfo.VehicleId = vehicleId;
-                moveInfo.VehicleOrientation = vehicleOrientation;
+                ridden.VehicleId = vehicleId;
+                riding.Transport = ridden;
+                moveInfo = riding;
             }
         }
 
         if (flags.HasAnyFlag(UpdateFlag.GORotation))
-        {
-            var rotation = packet.ReadPackedQuaternion();
-            if (moveInfo != null)
-                moveInfo.Rotation = rotation;
-        }
+            rotation = packet.ReadPackedQuaternion();
 
         // Only when the object claims to be riding something — this is the state that
         // decides whether a passenger ends up on the deck or on the ground.
-        if (updateData != null && moveInfo != null && moveInfo.TransportGuid != default)
+        if (updateData != null && moveInfo is { Transport: { } passenger } && passenger.Guid != default)
         {
             // Gated: clientKnowsTransport is a set probe passed as an argument.
             if (_melGoFields.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Trace))
             {
                 TransportLogMessages.PassengerCreate(
                     _melGoFields, guid.Low,
-                    moveInfo.TransportGuid.Low, moveInfo.TransportGuid.High,
-                    GetSession().GameState.ClientKnownGuids.Contains(moveInfo.TransportGuid),
-                    moveInfo.TransportOffset.X, moveInfo.TransportOffset.Y, moveInfo.TransportOffset.Z,
-                    moveInfo.TransportSeat);
+                    passenger.Guid.Low, passenger.Guid.High,
+                    GetSession().GameState.ClientKnownGuids.Contains(passenger.Guid),
+                    passenger.Offset.X, passenger.Offset.Y, passenger.Offset.Z,
+                    passenger.Seat);
             }
         }
 
-        if (updateData != null && moveInfo != null)
+        if (updateData != null && moveInfo is { } read)
         {
-            moveInfo.Flags = (uint)(((MovementFlagWotLK)moveInfo.Flags).CastFlags<MovementFlagWotLK, MovementFlagModern>());
-            moveInfo.ValidateMovementInfo();
-            updateData.CreateData.MoveInfo = moveInfo;
+            MovementSanitizer.Sanitize(ref read);
+            var create = updateData.CreateData;
+            create.MoveInfo = read;
+            create.Speeds = speeds;
+            create.PlayHoverAnim = playHoverAnim;
+            create.TransportPathTimer = transportPathTimer;
+            create.VehicleId = vehicleId;
+            create.VehicleOrientation = vehicleOrientation;
+            if (rotation is { } sentRotation)
+                create.Rotation = sentRotation;
         }
     }
 
@@ -4578,7 +4592,7 @@ public partial class WorldClient
             // Classic re-release legacy enums (V1_14, V2_5, V3_3_5a) renamed the
             // 4-float rotation field to GAMEOBJECT_PARENTROTATION but the wire
             // offset and semantics are identical. Without this fallback we never
-            // read rotation from cmangos / TC335 / AzerothCore — MoveInfo.Rotation
+            // read rotation from cmangos / TC335 / AzerothCore — CreateData.Rotation
             // stays at its initialized identity (or worse, default zeros under the
             // pre-Identity default), which the V3_4_3 client treats as an invalid
             // quaternion and rejects with CMSG_OBJECT_UPDATE_FAILED for the whole
@@ -4657,21 +4671,21 @@ public partial class WorldClient
 
             if (GAMEOBJECT_ROTATION >= 0 && updateData.CreateData != null && updateData.CreateData.MoveInfo != null)
             {
-                var liveRotation = updateData.CreateData.MoveInfo.Rotation;
+                var liveRotation = updateData.CreateData.Rotation;
                 int rotationMask = 0;
                 for (int i = 0; i < 4; i++)
                 {
                     if (updateMaskArray[GAMEOBJECT_ROTATION + i])
                     {
-                        updateData.CreateData.MoveInfo.Rotation[i] = updates[GAMEOBJECT_ROTATION + i].FloatValue;
+                        updateData.CreateData.Rotation[i] = updates[GAMEOBJECT_ROTATION + i].FloatValue;
                         rotationMask |= 1 << i;
                     }
                 }
                 // Sanitize: if the server sent all-zero rotation, snap to identity
                 // so the client doesn't reject a non-unit quaternion.
-                var r = updateData.CreateData.MoveInfo.Rotation;
+                var r = updateData.CreateData.Rotation;
                 if (r.X == 0f && r.Y == 0f && r.Z == 0f && r.W == 0f)
-                    updateData.CreateData.MoveInfo.Rotation = Quaternion.Identity;
+                    updateData.CreateData.Rotation = Quaternion.Identity;
 
                 // V3_4_3 split rotation into two distinct fields:
                 //   1. GameObjectData.ParentRotation — the stored placement quaternion
@@ -4685,7 +4699,7 @@ public partial class WorldClient
                 // is desynced for some entries — runeforge faces 34° instead of 304°).
                 if (ModernVersion.ExpansionVersion >= 3)
                 {
-                    var rot = updateData.CreateData.MoveInfo.Rotation;
+                    var rot = updateData.CreateData.Rotation;
                     // Destructible buildings do not carry a rotation here at all — the client
                     // reinterprets this field as a DestructibleModelData id. Their facing rides
                     // in the live rotation block instead. See SetDestructibleParentRotation and
@@ -4750,8 +4764,8 @@ public partial class WorldClient
                             parentRotation[0] ?? 0f, parentRotation[1] ?? 0f,
                             parentRotation[2] ?? 0f, parentRotation[3] ?? 0f);
 
-                    float ori = updateData.CreateData.MoveInfo.Orientation;
-                    updateData.CreateData.MoveInfo.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, ori);
+                    float ori = updateData.CreateData.MoveInfo.Value.Orientation;
+                    updateData.CreateData.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, ori);
                 }
 
                 // Fix for invalid movement of Deeprun Tram, some carts were going through the wall (in the opposite direction)
@@ -4786,9 +4800,9 @@ public partial class WorldClient
                         case tramNorthWestmost:
                         case tramNorthEastmost:
                         {
-                            var rot = updateData.CreateData.MoveInfo.Rotation.AsEulerAngles();
+                            var rot = updateData.CreateData.Rotation.AsEulerAngles();
                             rot.Yaw *= -1; // Rotate the cart content by 180°, so players who stand on the left side of the cart are actually on the left side
-                            updateData.CreateData.MoveInfo.Rotation = rot.AsQuaternion();
+                            updateData.CreateData.Rotation = rot.AsQuaternion();
                             break;
                         }
                     }

@@ -452,35 +452,6 @@ internal static class FrozenPackets
         public string ChannelName = string.Empty;
     }
 
-    /// Frozen copy of <c>MovementAck.Read</c>, which the conversion deleted once its holders
-    /// moved to codecs. The oracle has to keep reading the pre-conversion way.
-    internal struct MovementAck
-    {
-        public void Read(WorldPacket p)
-        {
-            MoveInfo = new();
-            MoveInfo.ReadMovementInfoModern(p);
-            MoveCounter = p.ReadUInt32();
-        }
-
-        public MovementInfo MoveInfo;
-        public uint MoveCounter;
-    }
-
-    /// Frozen verbatim from <c>MovementPackets.cs</c>.
-    internal sealed class ClientPlayerMovement
-    {
-        public void Read(WorldPacket p)
-        {
-            Guid = p.ReadPackedGuid128(); ;
-            MoveInfo = new MovementInfo();
-            MoveInfo.ReadMovementInfoModern(p);
-        }
-
-        public WowGuid128 Guid;
-        public MovementInfo MoveInfo = null!;
-    }
-
     /// Frozen verbatim from <c>MovementPackets.cs</c>.
     internal sealed class MoveTeleportAck
     {
@@ -503,53 +474,6 @@ internal static class FrozenPackets
     }
 
     /// Frozen verbatim from <c>MovementPackets.cs</c>.
-    internal sealed class MovementSpeedAck
-    {
-        public void Read(WorldPacket p)
-        {
-            MoverGUID = p.ReadPackedGuid128();
-            Ack.Read(p);
-            Speed = p.ReadFloat();
-        }
-
-        public WowGuid128 MoverGUID;
-        public MovementAck Ack;
-        public float Speed;
-    }
-
-    /// Frozen verbatim from <c>MovementPackets.cs</c>.
-    internal sealed class MovementAckMessage
-    {
-        public void Read(WorldPacket p)
-        {
-            MoverGUID = p.ReadPackedGuid128();
-            Ack.Read(p);
-        }
-
-        public WowGuid128 MoverGUID;
-        public MovementAck Ack;
-    }
-
-    /// Frozen verbatim from <c>MovementPackets.cs</c>.
-    internal sealed class MoveSetCollisionHeightAck
-    {
-        public void Read(WorldPacket p)
-        {
-            MoverGUID = p.ReadPackedGuid128();
-            Ack.Read(p);
-            Height = p.ReadFloat();
-            MountDisplayID = p.ReadUInt32();
-            Reason = p.ReadUInt8();
-        }
-
-        public WowGuid128 MoverGUID;
-        public MovementAck Ack;
-        public float Height;
-        public uint MountDisplayID;
-        public byte Reason;
-    }
-
-    /// Frozen verbatim from <c>MovementPackets.cs</c>.
     internal sealed class SetActiveMover
     {
         public void Read(WorldPacket p)
@@ -569,22 +493,6 @@ internal static class FrozenPackets
         }
 
         public uint Ticks;
-    }
-
-    /// Frozen verbatim from <c>MovementPackets.cs</c>.
-    internal sealed class MoveSplineDone
-    {
-        public void Read(WorldPacket p)
-        {
-            Guid = p.ReadPackedGuid128();
-            MoveInfo = new();
-            MoveInfo.ReadMovementInfoModern(p);
-            SplineID = p.ReadInt32();
-        }
-
-        public WowGuid128 Guid;
-        public MovementInfo MoveInfo = null!;
-        public int SplineID;
     }
 
     /// Frozen verbatim from <c>MovementPackets.cs</c>.

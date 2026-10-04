@@ -28,10 +28,11 @@ internal sealed class LegacyHandlerHarness
     public GlobalSessionData Session { get; }
     public WorldClient Client { get; }
     public SinkClientWire ClientWire { get; }
-    public SinkServerWire ServerWire { get; } = new();
+    public SinkServerWire ServerWire { get; }
 
-    public LegacyHandlerHarness(bool recordClientPackets)
+    public LegacyHandlerHarness(bool recordClientPackets, bool recordServerPackets = false)
     {
+        ServerWire = new SinkServerWire(recordServerPackets);
         Session = new GlobalSessionData(
             new ClientOptions(),
             new LegacyServerOptions(),
@@ -120,12 +121,17 @@ internal sealed class SinkClientWire(bool record) : IClientWire
     }
 }
 
-internal sealed class SinkServerWire : IServerWire
+internal readonly record struct SentServerPacket(uint Opcode, byte[] Bytes);
+
+internal sealed class SinkServerWire(bool record = false) : IServerWire
 {
+    public List<SentServerPacket> Sent { get; } = [];
     public int Count { get; private set; }
 
     public void Write(WorldPacket packet)
     {
+        if (record)
+            Sent.Add(new SentServerPacket(packet.GetOpcode(), packet.GetDataSpan().ToArray()));
         Count++;
         packet.Dispose();
     }

@@ -34,13 +34,24 @@ namespace HermesProxy.World.Server.Packets;
 public class CreateObjectData
 {
     public ObjectType ObjectType;
-    public MovementInfo MoveInfo = null!;
+    /// <summary>Null for an object with no position: an item, or a broken create.</summary>
+    public MovementInfo? MoveInfo;
+    public MovementSpeeds Speeds;
     public ServerSideMovement MoveSpline = null!;
     public bool NoBirthAnim;
     public bool EnablePortals;
     public bool PlayHoverAnim;
     public bool ThisIsYou;
     public WowGuid128? AutoAttackVictim;
+    public uint VehicleId;
+    public float VehicleOrientation;
+    public uint TransportPathTimer; // only set for transports
+    // System.Numerics.Quaternion's default (0,0,0,0) is a non-unit quaternion that
+    // the V3_4_3 client rejects on Transport/GameObject CreateObject. Initializing
+    // to Identity (0,0,0,1) gives a valid baseline for objects whose legacy server
+    // doesn't send a rotation field; the PARENTROTATION read in the GameObject
+    // branch of the create overwrites it when the server does send one.
+    public Quaternion Rotation = Quaternion.Identity;
 }
 public class ObjectUpdate
 {
@@ -284,8 +295,8 @@ public class ObjectUpdate
             // A re-create keeps whatever sail is already under way (see below).
             known = new SynthesizedTransport(
                 TransportStopFrame ?? known.StopFrame,
-                CreateData!.MoveInfo.Position,
-                CreateData.MoveInfo.Orientation,
+                CreateData!.MoveInfo!.Value.Position,
+                CreateData.MoveInfo.Value.Orientation,
                 known.SailDeadline,
                 known.SailTargetState);
         }
@@ -349,7 +360,7 @@ public class ObjectUpdate
             }
             else
             {
-                GameObjectData.Level = (int)CreateData!.MoveInfo.TransportPathTimer;
+                GameObjectData.Level = (int)CreateData!.TransportPathTimer;
             }
         }
         else if (state is ModernTransportStateActive or ModernTransportStateStopped)
@@ -389,34 +400,36 @@ public class ObjectUpdate
         if (CreateData == null)
             return;
 
-        if (CreateData.MoveInfo != null)
+        if (CreateData.MoveInfo is { } moveInfo)
         {
-            if (CreateData.MoveInfo.WalkSpeed == 0)
-                CreateData.MoveInfo.WalkSpeed = 2.5f;
-            if (CreateData.MoveInfo.RunSpeed == 0)
-                CreateData.MoveInfo.RunSpeed = 7;
-            if (CreateData.MoveInfo.RunBackSpeed == 0)
-                CreateData.MoveInfo.RunBackSpeed = 4.5f;
-            if (CreateData.MoveInfo.SwimSpeed == 0)
-                CreateData.MoveInfo.SwimSpeed = 4.722222f;
-            if (CreateData.MoveInfo.SwimBackSpeed == 0)
-                CreateData.MoveInfo.SwimBackSpeed = 2.5f;
-            if (CreateData.MoveInfo.FlightSpeed == 0)
-                CreateData.MoveInfo.FlightSpeed = 7;
-            if (CreateData.MoveInfo.FlightBackSpeed == 0)
-                CreateData.MoveInfo.FlightBackSpeed = 4.5f;
-            if (CreateData.MoveInfo.TurnRate == 0)
-                CreateData.MoveInfo.TurnRate = 3.141594f;
-            if (CreateData.MoveInfo.PitchRate == 0)
-                CreateData.MoveInfo.PitchRate = CreateData.MoveInfo.TurnRate;
-            if (CreateData.MoveInfo.Flags.HasAnyFlag((uint)MovementFlagModern.WalkMode) && (CreateData.MoveSpline != null))
-                CreateData.MoveInfo.Flags &= ~(uint)MovementFlagModern.WalkMode;
+            ref MovementSpeeds speeds = ref CreateData.Speeds;
+            if (speeds.Walk == 0)
+                speeds.Walk = 2.5f;
+            if (speeds.Run == 0)
+                speeds.Run = 7;
+            if (speeds.RunBack == 0)
+                speeds.RunBack = 4.5f;
+            if (speeds.Swim == 0)
+                speeds.Swim = 4.722222f;
+            if (speeds.SwimBack == 0)
+                speeds.SwimBack = 2.5f;
+            if (speeds.Flight == 0)
+                speeds.Flight = 7;
+            if (speeds.FlightBack == 0)
+                speeds.FlightBack = 4.5f;
+            if (speeds.TurnRate == 0)
+                speeds.TurnRate = 3.141594f;
+            if (speeds.PitchRate == 0)
+                speeds.PitchRate = speeds.TurnRate;
+            if (moveInfo.Flags.HasAnyFlag(MovementFlagModern.WalkMode) && (CreateData.MoveSpline != null))
+                moveInfo.Flags &= ~MovementFlagModern.WalkMode;
             // CreateObject MoveInfo placeholder. `FlagsExtra = 512` is PreventChangePitch (0x200).
             // Required by all modern Classic clients (V1_14 / V2_5 / V3_4_3) so legacy-server-spawned
             // creatures render — without it creatures spawn invisible while combat events still fire.
             // Issue #74 reopen confirmed V1_14 needs it too.
-            if (CreateData.MoveInfo.FlagsExtra == 0)
-                CreateData.MoveInfo.FlagsExtra = 512;
+            if (moveInfo.FlagsExtra == 0)
+                moveInfo.FlagsExtra = 512;
+            CreateData.MoveInfo = moveInfo;
         }
         if (CreateData.MoveSpline != null)
         {
@@ -458,7 +471,7 @@ public class ObjectUpdate
 
             if (Guid.GetHighType() == HighGuidType.Transport)
             {
-                var transportTimer = CreateData.MoveInfo!.TransportPathTimer;
+                var transportTimer = CreateData.TransportPathTimer;
                 // A 3.3.5a backend puts the real loop period in GAMEOBJECT_LEVEL
                 // (AzerothCore Transport.h:81), which is authoritative. The CSV is the
                 // fallback for backends that leave the field unset.
@@ -481,8 +494,8 @@ public class ObjectUpdate
                     $"[Transport] guid={Guid} entry={ObjectData.EntryID} typeID={GameObjectData.TypeID} " +
                     $"pathProgress={transportTimer} period={period} level={GameObjectData.Level} " +
                     $"dynFlags=0x{(ObjectData.DynamicFlags ?? 0):X8} goFlags={GameObjectData.Flags} " +
-                    $"pos=({CreateData.MoveInfo!.Position.X:F1},{CreateData.MoveInfo.Position.Y:F1},{CreateData.MoveInfo.Position.Z:F1}) " +
-                    $"o={CreateData.MoveInfo.Orientation:F3}");
+                    $"pos=({CreateData.MoveInfo!.Value.Position.X:F1},{CreateData.MoveInfo.Value.Position.Y:F1},{CreateData.MoveInfo.Value.Position.Z:F1}) " +
+                    $"o={CreateData.MoveInfo.Value.Orientation:F3}");
             }
         }
         if (CorpseData != null)

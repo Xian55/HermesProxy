@@ -93,14 +93,17 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.MSG_MOVE_WATER_WALK)]
     internal void HandleMovementMessages(WorldPacket packet)
     {
-        MoveUpdate moveUpdate = new MoveUpdate();
-        moveUpdate.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
-        moveUpdate.MoveInfo = new();
-        moveUpdate.MoveInfo.ReadMovementInfoLegacy(packet, GetSession().GameState);
-        if (IsSplineDrivenMove(moveUpdate.MoveInfo.Flags, ModernVersion.Build))
+        var gameState = GetSession().GameState;
+        WowGuid128 mover = packet.ReadPackedGuid().To128(gameState);
+        // Looked at before the block is read, and only where there is anything to drop: a dropped
+        // heartbeat then costs no decode, and a forwarded one is read straight into its packet.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            && IsSplineDrivenMove((uint)LegacyMovementCodec.PeekFlags(packet), ModernVersion.Build))
             return;
-        moveUpdate.MoveInfo.Flags = (uint)(((MovementFlagWotLK)moveUpdate.MoveInfo.Flags).CastFlags<MovementFlagWotLK, MovementFlagModern>());
-        moveUpdate.MoveInfo.ValidateMovementInfo();
+
+        MoveUpdate moveUpdate = new MoveUpdate();
+        moveUpdate.MoverGUID = mover;
+        LegacyMovementCodec.ReadForClient(packet, gameState, out moveUpdate.MoveInfo);
         SendPacketToClient(moveUpdate);
     }
 
@@ -126,14 +129,11 @@ public partial class WorldClient
     {
         MoveUpdateKnockBack knockback = new MoveUpdateKnockBack();
         knockback.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
-        knockback.MoveInfo = new();
-        knockback.MoveInfo.ReadMovementInfoLegacy(packet, GetSession().GameState);
-        knockback.MoveInfo.Flags = (uint)(((MovementFlagWotLK)knockback.MoveInfo.Flags).CastFlags<MovementFlagWotLK, MovementFlagModern>());
+        LegacyMovementCodec.ReadForClient(packet, GetSession().GameState, out knockback.MoveInfo);
         knockback.MoveInfo.JumpSinAngle = packet.ReadFloat();
         knockback.MoveInfo.JumpCosAngle = packet.ReadFloat();
         knockback.MoveInfo.JumpHorizontalSpeed = packet.ReadFloat();
         knockback.MoveInfo.JumpVerticalSpeed = packet.ReadFloat();
-        knockback.MoveInfo.ValidateMovementInfo();
         SendPacketToClient(knockback);
     }
 
@@ -196,18 +196,15 @@ public partial class WorldClient
         MoveTeleport teleport = new MoveTeleport();
         teleport.MoverGUID = guid;
         teleport.MoveCounter = packet.ReadUInt32();
-        MovementInfo moveInfo = new();
-        moveInfo.ReadMovementInfoLegacy(packet, GetSession().GameState);
-        moveInfo.Flags = (uint)(((MovementFlagWotLK)moveInfo.Flags).CastFlags<MovementFlagWotLK, MovementFlagModern>());
-        moveInfo.ValidateMovementInfo();
+        LegacyMovementCodec.ReadForClient(packet, GetSession().GameState, out MovementInfo moveInfo);
         // A mover riding something expects deck-relative Pos/Facing, not world coords:
         // Unit::SendTeleportPacket runs the position through CalculatePassengerOffset
         // before filling MoveTeleport. Sending world coords makes the client add them
         // to the transport's own position and strands the player off the map.
-        if (moveInfo.TransportGuid != default)
+        if (moveInfo.Transport is { } ridden && ridden.Guid != default)
         {
-            teleport.Position = moveInfo.TransportOffset;
-            teleport.Orientation = moveInfo.TransportOrientation;
+            teleport.Position = ridden.Offset;
+            teleport.Orientation = ridden.Orientation;
         }
         else
         {
@@ -215,10 +212,10 @@ public partial class WorldClient
             teleport.Orientation = moveInfo.Orientation;
         }
         teleport.TransportGUID = moveInfo.TransportGuid;
-        if (moveInfo.TransportSeat > 0)
+        if (moveInfo.Transport is { Seat: > 0 } seated)
         {
             teleport.Vehicle = new();
-            teleport.Vehicle.VehicleSeatIndex = moveInfo.TransportSeat;
+            teleport.Vehicle.VehicleSeatIndex = seated.Seat;
         }
         SendPacketToClient(teleport);
     }
@@ -481,11 +478,7 @@ public partial class WorldClient
 
         MoveUpdateSpeed speed = new MoveUpdateSpeed(universalOpcode);
         speed.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
-        speed.MoveInfo = new MovementInfo();
-        speed.MoveInfo.ReadMovementInfoLegacy(packet, GetSession().GameState);
-        var newFlags = ((MovementFlagWotLK)speed.MoveInfo.Flags).CastFlags<MovementFlagWotLK, MovementFlagModern>();
-        speed.MoveInfo.Flags = (uint)(newFlags);
-        speed.MoveInfo.ValidateMovementInfo();
+        LegacyMovementCodec.ReadForClient(packet, GetSession().GameState, out speed.MoveInfo);
         speed.Speed = packet.ReadFloat();
         SendPacketToClient(speed);
 
@@ -607,7 +600,7 @@ public partial class WorldClient
             {
                 moveSpline.SplineType = SplineTypeModern.FacingAngle;
                 moveSpline.FinalOrientation = packet.ReadFloat();
-                MovementInfo.ClampOrientation(ref moveSpline.FinalOrientation);
+                MovementSanitizer.ClampOrientation(ref moveSpline.FinalOrientation);
                 break;
             }
             case SplineTypeLegacy.Stop:

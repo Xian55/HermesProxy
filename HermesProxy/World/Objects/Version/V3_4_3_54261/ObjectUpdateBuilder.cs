@@ -151,18 +151,18 @@ public partial class ObjectUpdateBuilder
         _                           => 0,
     };
 
-    private void SetCreateObjectBits()
+    internal void SetCreateObjectBits()
     {
         _createBits = CreateObjectBits.None;
         var create = _updateData.CreateData;
         var moveInfo = create?.MoveInfo;
         var hasMoveInfo = moveInfo != null;
 
-        if (hasMoveInfo && moveInfo!.Hover)
+        if (create is { PlayHoverAnim: true })
             _createBits |= CreateObjectBits.PlayHoverAnim;
         if (hasMoveInfo && _objectTypeMask.HasAnyFlag(ObjectTypeMask.Unit))
             _createBits |= CreateObjectBits.MovementUpdate;
-        if (hasMoveInfo && moveInfo!.TransportGuid != default && _objectType == ObjectTypeBCC.GameObject)
+        if (hasMoveInfo && moveInfo!.Value.TransportGuid != default && _objectType == ObjectTypeBCC.GameObject)
             _createBits |= CreateObjectBits.MovementTransport;
         if (hasMoveInfo && !_objectTypeMask.HasAnyFlag(ObjectTypeMask.Unit))
             _createBits |= CreateObjectBits.Stationary;
@@ -179,7 +179,7 @@ public partial class ObjectUpdateBuilder
             _createBits |= CreateObjectBits.ServerTime;
         if (create != null && create.AutoAttackVictim != null)
             _createBits |= CreateObjectBits.CombatVictim;
-        if (hasMoveInfo && moveInfo!.VehicleId != 0)
+        if (create is { VehicleId: not 0 })
             _createBits |= CreateObjectBits.Vehicle;
         if (hasMoveInfo && _objectType == ObjectTypeBCC.GameObject)
             _createBits |= CreateObjectBits.Rotation;
@@ -198,7 +198,7 @@ public partial class ObjectUpdateBuilder
 
     private bool Has(CreateObjectBits flag) => (_createBits & flag) != 0;
 
-    private void BuildMovementUpdate(WorldPacket data)
+    internal void BuildMovementUpdate(WorldPacket data)
     {
         // Native 3.4.3 ships exactly one stop frame for a type 11 transport (golden capture:
         // PauseTimesCount 1, PauseTimes [60133]). The stop frame is what makes the client
@@ -211,20 +211,12 @@ public partial class ObjectUpdateBuilder
 
         if (Has(CreateObjectBits.MovementUpdate))
         {
-            var moveInfo = _updateData.CreateData.MoveInfo;
+            MovementInfo moveInfo = _updateData.CreateData.MoveInfo.GetValueOrDefault();
             var hasSpline = _updateData.CreateData.MoveSpline != null;
 
-            moveInfo.WriteMovementInfoModern(data, _updateData.Guid);
+            ModernMovementCodec.Write(data, _updateData.Guid, in moveInfo);
 
-            data.WriteFloat(moveInfo.WalkSpeed);
-            data.WriteFloat(moveInfo.RunSpeed);
-            data.WriteFloat(moveInfo.RunBackSpeed);
-            data.WriteFloat(moveInfo.SwimSpeed);
-            data.WriteFloat(moveInfo.SwimBackSpeed);
-            data.WriteFloat(moveInfo.FlightSpeed);
-            data.WriteFloat(moveInfo.FlightBackSpeed);
-            data.WriteFloat(moveInfo.TurnRate);
-            data.WriteFloat(moveInfo.PitchRate);
+            _updateData.CreateData.Speeds.Write(data);
             data.WriteUInt32(0u);
             data.WriteFloat(1f);
             data.WriteFloat(2f);
@@ -254,10 +246,11 @@ public partial class ObjectUpdateBuilder
 
         if (Has(CreateObjectBits.Stationary))
         {
-            data.WriteFloat(_updateData.CreateData.MoveInfo.Position.X);
-            data.WriteFloat(_updateData.CreateData.MoveInfo.Position.Y);
-            data.WriteFloat(_updateData.CreateData.MoveInfo.Position.Z);
-            data.WriteFloat(_updateData.CreateData.MoveInfo.Orientation);
+            MovementInfo stationary = _updateData.CreateData.MoveInfo.GetValueOrDefault();
+            data.WriteFloat(stationary.Position.X);
+            data.WriteFloat(stationary.Position.Y);
+            data.WriteFloat(stationary.Position.Z);
+            data.WriteFloat(stationary.Orientation);
         }
 
         if (Has(CreateObjectBits.CombatVictim))
@@ -276,15 +269,15 @@ public partial class ObjectUpdateBuilder
             // (ObjectUpdate.TransportServerTime): the client seeds the clock it compares
             // GameObjectData.Level against from this field, and the sail deadline written
             // into Level on the ships-start flip is stamped from the same clock.
-            var pathProgress = _updateData.CreateData.MoveInfo.TransportPathTimer;
+            var pathProgress = _updateData.CreateData.TransportPathTimer;
             data.WriteUInt32(_updateData.TransportServerTime
                              ?? (pathProgress != 0 ? pathProgress : (uint)Environment.TickCount));
         }
 
         if (Has(CreateObjectBits.Vehicle))
         {
-            data.WriteUInt32(_updateData.CreateData.MoveInfo.VehicleId);
-            data.WriteFloat(_updateData.CreateData.MoveInfo.VehicleOrientation);
+            data.WriteUInt32(_updateData.CreateData.VehicleId);
+            data.WriteFloat(_updateData.CreateData.VehicleOrientation);
         }
 
         if (Has(CreateObjectBits.AnimKit))
@@ -295,13 +288,13 @@ public partial class ObjectUpdateBuilder
         }
 
         if (Has(CreateObjectBits.Rotation))
-            data.WriteInt64(_updateData.CreateData.MoveInfo.Rotation.GetPackedRotation());
+            data.WriteInt64(_updateData.CreateData.Rotation.GetPackedRotation());
 
         for (int i = 0; i < PauseTimesCount; i++)
             data.WriteUInt32(stopFrame);
 
         if (Has(CreateObjectBits.MovementTransport))
-            _updateData.CreateData.MoveInfo.WriteTransportInfoModern(data);
+            ModernMovementCodec.WriteTransport(data, _updateData.CreateData.MoveInfo.GetValueOrDefault().Transport.GetValueOrDefault());
 
         if (Has(CreateObjectBits.GameObject))
         {

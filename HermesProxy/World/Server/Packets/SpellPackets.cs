@@ -710,9 +710,8 @@ public class ContentTuningParams
 }
 
 /// <param name="Cast">
-/// Stays a class. It nests the target block, two optional-cost lists and a MovementInfo, and
-/// MovementInfo is a mutable builder on the outbound path — the same reason it is still a class
-/// everywhere else. One allocation per cast survives until outbound converts.
+/// Stays a class. It nests the target block, two optional-cost lists and a weight list, which
+/// the reader fills in as it goes. One allocation per cast survives.
 /// </param>
 public readonly record struct CastSpell(SpellCastRequest Cast);
 
@@ -759,18 +758,18 @@ public class SpellCastRequest
         }
 
         SendCastFlags = data.ReadBits<uint>(5);
-        if (data.HasBit())
-            MoveUpdate = new();
+        bool hasMoveUpdate = data.HasBit();
         var weightCount = data.ReadBits<uint>(2);
         // V3_4_1+ bit; not present in V1_14 / V2_5 SpellCastRequest layout.
         if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
             _ = data.HasBit(); // hasCraftingOrderID — bit only, no UInt64 follow-up in 54261
         Target.Read(data);
 
-        if (MoveUpdate != null)
+        if (hasMoveUpdate)
         {
             MoverGUID = data.ReadPackedGuid128();
-            MoveUpdate.ReadMovementInfoModern(data);
+            ModernMovementCodec.Read(data, out MovementInfo moveUpdate);
+            MoveUpdate = moveUpdate;
         }
 
         for (var i = 0; i < weightCount; ++i)
@@ -822,18 +821,18 @@ public class SpellCastRequest
         }
 
         SendCastFlags = data.ReadBits<uint>(5);
-        if (data.HasBit())
-            MoveUpdate = new();
+        bool hasMoveUpdate = data.HasBit();
         var weightCount = data.ReadBits<uint>(2);
         // V3_4_1+ bit; not present in V1_14 / V2_5 SpellCastRequest layout.
         if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
             _ = data.HasBit(); // hasCraftingOrderID — bit only, no UInt64 follow-up in 54261
         Target.Read(ref data);
 
-        if (MoveUpdate != null)
+        if (hasMoveUpdate)
         {
             MoverGUID = data.ReadPackedGuid128();
-            MoveUpdate.ReadMovementInfoModern(ref data);
+            ModernMovementCodec.Read(ref data, out MovementInfo moveUpdate);
+            MoveUpdate = moveUpdate;
         }
 
         for (var i = 0; i < weightCount; ++i)
@@ -854,7 +853,7 @@ public class SpellCastRequest
     public SpellTargetData Target = new();
     public MissileTrajectoryRequest MissileTrajectory;
     public WowGuid128 MoverGUID;
-    public MovementInfo MoveUpdate = null!;
+    public MovementInfo? MoveUpdate;
     public List<SpellWeight> Weight = new();
     public List<SpellOptionalReagent> OptionalReagents = new(3);
     public List<SpellExtraCurrencyCost> OptionalCurrencies = new(5 /*MAX_ITEM_EXT_COST_CURRENCIES*/);

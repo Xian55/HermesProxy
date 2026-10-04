@@ -7,21 +7,16 @@ namespace HermesProxy.World.Server.Packets;
 
 // Movement CMSG codecs — the highest-rate inbound family.
 //
-// MovementInfo stays a class, deliberately. It is not a message payload: 46 sites across
-// UpdateHandler, UpdatePackets and the legacy MovementHandler mutate one field-by-field while
-// *building* an outbound packet, so making it readonly would force the outbound conversion this
-// round defers. The packet structs below hold a reference to it, so the struct itself costs
-// nothing and the one MovementInfo allocation per movement packet survives until outbound lands.
-//
-// MovementAck is already a struct wrapping that reference plus a counter, so it composes by value.
+// The movement block itself is read by ModernMovementCodec (World/Objects), which owns the
+// per-build layout. MovementInfo is a value type, so the packet structs below hold it inline and
+// a movement packet is decoded without an allocation.
 
 public static class MovementAckCodec
 {
     /// <summary>Shared by the ack packets. Mirrors <c>MovementAck.Read</c>.</summary>
     public static void Read(ref SpanPacketReader r, out MovementAck ack)
     {
-        var moveInfo = new MovementInfo();
-        moveInfo.ReadMovementInfoModern(ref r);
+        ModernMovementCodec.Read(ref r, out MovementInfo moveInfo);
         ack = new MovementAck { MoveInfo = moveInfo, MoveCounter = r.ReadUInt32() };
     }
 }
@@ -30,10 +25,8 @@ public static class ClientPlayerMovementCodec
 {
     public static void Read(ref SpanPacketReader r, out ClientPlayerMovement packet)
     {
-        WowGuid128 guid = r.ReadPackedGuid128();
-        var moveInfo = new MovementInfo();
-        moveInfo.ReadMovementInfoModern(ref r);
-        packet = new ClientPlayerMovement(guid, moveInfo);
+        packet.Guid = r.ReadPackedGuid128();
+        ModernMovementCodec.Read(ref r, out packet.MoveInfo);
     }
 }
 
@@ -108,8 +101,7 @@ public static class MoveSplineDoneCodec
     public static void Read(ref SpanPacketReader r, out MoveSplineDone packet)
     {
         WowGuid128 guid = r.ReadPackedGuid128();
-        var moveInfo = new MovementInfo();
-        moveInfo.ReadMovementInfoModern(ref r);
+        ModernMovementCodec.Read(ref r, out MovementInfo moveInfo);
         int splineId = r.ReadInt32();
         packet = new MoveSplineDone(guid, moveInfo, splineId);
     }

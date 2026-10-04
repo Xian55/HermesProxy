@@ -892,9 +892,8 @@ public class QuestGiverOfferReward
 
 /// <param name="Choice">
 /// Stays a class. <c>QuestChoiceItem</c> nests <c>ItemInstance</c>, which the outbound path
-/// builds field-by-field in 30-odd places, so converting it is outbound work — the same reason
-/// <c>MovementInfo</c> is still a class. The struct holds the reference, so one allocation per
-/// reward click survives and nothing else does.
+/// builds field-by-field in 30-odd places, so converting it is outbound work. The struct holds
+/// the reference, so one allocation per reward click survives and nothing else does.
 /// </param>
 public readonly record struct QuestGiverChooseReward(
     WowGuid128 QuestGiverGUID,
