@@ -14,7 +14,7 @@ most of what stands between a codec edit and a playtest. See the project
 | `DispatchRegistryTests.cs` | every claimed opcode resolves to a thunk; every system has a legal shape |
 | `ShapeBOpcodeForwardingTests.cs` | opcodes sharing one shape-B body translate to distinct, correct legacy values |
 | `SpanReaderParityTests.cs` | each `SpanPacketReader` primitive matches its `ByteBuffer` counterpart |
-| `MovementReaderEquivalenceTests.cs` | the `WorldPacket` and span `ReadMovementInfoModern` copies agree |
+| `MovementReaderEquivalenceTests.cs` | the `WorldPacket` overload of `ModernMovementCodec.Read` agrees with the span reader it wraps |
 | `OpcodeCoverageReportTests.cs` | renders `docs/opcode-coverage.md` from the attributes |
 | `Reference/` | frozen oracles and the two port scripts |
 
@@ -52,6 +52,11 @@ Assert.Equal(o.Remaining(), r.Remaining);             // position, not just fiel
 `TestModuleInitializer` sets **`V1_14_2_42597` / `V3_3_5a_12340`**. The per-class static
 constructors that assign a build only when it is `Zero` are leftovers and change nothing. You
 cannot switch builds per test.
+
+A whole run can be pinned to another pair with `HERMES_TEST_LEGACY_BUILD` /
+`HERMES_TEST_MODERN_BUILD`, which is how `../Movement/run-version-matrix.sh` puts the real
+version branches of six pairs under test. Almost nothing outside that folder passes under a
+non-default pair, so use it with a filter.
 
 So a `[PacketCodec]` pair is proven two ways:
 

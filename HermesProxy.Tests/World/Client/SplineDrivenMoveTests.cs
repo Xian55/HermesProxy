@@ -58,6 +58,6 @@ public class SplineDrivenMoveTests
         Assert.Equal(Opcode.SMSG_MOVE_UPDATE, sent.Opcode);
         var update = Assert.IsType<MoveUpdate>(sent.Packet);
         Assert.Equal(guid, update.MoverGUID);
-        Assert.Equal((uint)MovementFlagModern.Forward, update.MoveInfo.Flags);
+        Assert.Equal(MovementFlagModern.Forward, update.MoveInfo.Flags);
     }
 }

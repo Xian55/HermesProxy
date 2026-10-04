@@ -107,10 +107,10 @@ public class SpellCodecEquivalenceTests
 
         if (withMoveUpdate)
         {
-            // WriteMovementInfoModern emits the mover GUID itself, which is the packed GUID the
-            // reader takes as MoverGUID before the movement block proper.
+            // The writer emits the mover GUID itself, which is the packed GUID the reader takes
+            // as MoverGUID before the movement block proper.
             var info = new MovementInfo { MoveTime = 4242, Position = new Vector3(10, 20, 30), Orientation = 1.5f };
-            info.WriteMovementInfoModern(w, Guid);
+            ModernMovementCodec.Write(w, Guid, in info);
         }
 
         for (int i = 0; i < weights; i++)
@@ -175,7 +175,7 @@ public class SpellCodecEquivalenceTests
         Assert.Equal(expected.MoveUpdate == null, actual.MoveUpdate == null);
         Assert.Equal(expected.MoverGUID, actual.MoverGUID);
         if (withMoveUpdate)
-            Assert.Equal(expected.MoveUpdate!.MoveTime, actual.MoveUpdate!.MoveTime);
+            Assert.Equal(expected.MoveUpdate, actual.MoveUpdate);
 
         // The assertion the optional blocks exist for.
         Assert.Equal(o.Remaining(), r.Remaining);

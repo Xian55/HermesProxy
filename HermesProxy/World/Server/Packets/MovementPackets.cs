@@ -27,25 +27,35 @@ using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets;
 
-public readonly record struct ClientPlayerMovement(WowGuid128 Guid, MovementInfo MoveInfo);
+/// <remarks>
+/// Not a positional record like the other inbound packets. A movement block is 136 bytes and this
+/// is the highest-rate packet a client sends, so the codec reads the block straight into
+/// <see cref="MoveInfo"/> rather than building it beside the packet and copying it in, and the
+/// handler takes it by reference. Each of those copies measured about 3 ns on a 60 ns packet.
+/// </remarks>
+public struct ClientPlayerMovement
+{
+    public WowGuid128 Guid;
+    public MovementInfo MoveInfo;
+}
 public class MoveUpdate : ServerPacket, ISpanWritable
 {
     public MoveUpdate() : base(Opcode.SMSG_MOVE_UPDATE, ConnectionType.Instance) { }
 
     public override void Write()
     {
-        MoveInfo.WriteMovementInfoModern(_worldPacket, MoverGUID);
+        ModernMovementCodec.Write(_worldPacket, MoverGUID, in MoveInfo);
     }
 
-    public int MaxSize => MovementInfo.MaxMovementInfoSize;
+    public int MaxSize => ModernMovementCodec.MaxSize;
 
     public int WriteToSpan(Span<byte> buffer)
     {
-        return MoveInfo.WriteMovementInfoModernToSpan(buffer, MoverGUID.Low, MoverGUID.High);
+        return ModernMovementCodec.Write(buffer, MoverGUID, in MoveInfo);
     }
 
     public WowGuid128 MoverGUID;
-    public MovementInfo MoveInfo = null!;
+    public MovementInfo MoveInfo;
 }
 
 public class MonsterMove : ServerPacket, ISpanWritable
@@ -542,22 +552,22 @@ public class MoveUpdateSpeed : ServerPacket, ISpanWritable
 
     public override void Write()
     {
-        MoveInfo.WriteMovementInfoModern(_worldPacket, MoverGUID);
+        ModernMovementCodec.Write(_worldPacket, MoverGUID, in MoveInfo);
         _worldPacket.WriteFloat(Speed);
     }
 
-    public int MaxSize => MovementInfo.MaxMovementInfoSize + 4; // MovementInfo + float
+    public int MaxSize => ModernMovementCodec.MaxSize + 4; // MovementInfo + float
 
     public int WriteToSpan(Span<byte> buffer)
     {
-        int written = MoveInfo.WriteMovementInfoModernToSpan(buffer, MoverGUID.Low, MoverGUID.High);
+        int written = ModernMovementCodec.Write(buffer, MoverGUID, in MoveInfo);
         var writer = new SpanPacketWriter(buffer.Slice(written));
         writer.WriteFloat(Speed);
         return written + writer.Position;
     }
 
     public WowGuid128 MoverGUID;
-    public MovementInfo MoveInfo = null!;
+    public MovementInfo MoveInfo;
     public float Speed = 1.0f;
 }
 
@@ -695,18 +705,18 @@ public class MoveUpdateKnockBack : ServerPacket, ISpanWritable
 
     public override void Write()
     {
-        MoveInfo.WriteMovementInfoModern(_worldPacket, MoverGUID);
+        ModernMovementCodec.Write(_worldPacket, MoverGUID, in MoveInfo);
     }
 
-    public int MaxSize => MovementInfo.MaxMovementInfoSize;
+    public int MaxSize => ModernMovementCodec.MaxSize;
 
     public int WriteToSpan(Span<byte> buffer)
     {
-        return MoveInfo.WriteMovementInfoModernToSpan(buffer, MoverGUID.Low, MoverGUID.High);
+        return ModernMovementCodec.Write(buffer, MoverGUID, in MoveInfo);
     }
 
     public WowGuid128 MoverGUID;
-    public MovementInfo MoveInfo = null!;
+    public MovementInfo MoveInfo;
 }
 
 class SuspendToken : ServerPacket, ISpanWritable

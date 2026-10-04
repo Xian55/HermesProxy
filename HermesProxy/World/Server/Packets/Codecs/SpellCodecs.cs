@@ -10,12 +10,8 @@ namespace HermesProxy.World.Server.Packets;
 //
 // The three casting packets share SpellCastRequest, which is the deepest nested read in the
 // inbound set: a target block with four optional sub-blocks, two optional-cost lists, a weight
-// list, and an optional MovementInfo. It keeps its class form for the same reason MovementInfo
-// does — that MovementInfo is a mutable builder the outbound path fills in field by field — so the
-// packet structs hold a reference and the one allocation per cast survives until outbound lands.
-//
-// Converting these retires the last WorldPacket caller of ReadMovementInfoModern; the two readers
-// and the test pinning them against each other can go once nothing else needs the pair.
+// list, and an optional MovementInfo. It keeps its class form because of the lists, so the packet
+// structs hold a reference and the one allocation per cast survives.
 
 public static class CastSpellCodec
 {

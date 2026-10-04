@@ -1,815 +1,97 @@
-﻿using Framework.GameMath;
-using Framework.IO;
-using Framework.Logging;
-using HermesProxy.Enums;
-using HermesProxy.World.Dispatch;
-using HermesProxy.World.Enums;
-using HermesProxy.World.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using HermesProxy.World.Enums;
 
 namespace HermesProxy.World.Objects;
 
-public sealed class MovementInfo
+/// <summary>
+/// One movement block: where a mover is, how it is moving and what it is riding.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Data only. <see cref="LegacyMovementCodec"/> and <see cref="ModernMovementCodec"/> read and
+/// write it, and <see cref="MovementSanitizer"/> repairs what a legacy server relays. What a
+/// create carries beside its movement block (speeds, rotation, vehicle, path timer) lives on
+/// <c>CreateObjectData</c>.
+/// </para>
+/// <para>
+/// A value type with settable members, so a codec writes each field into its destination as it
+/// reads it. Building one beside the destination and copying it in measured 7 to 8 ns more on a
+/// 60 to 85 ns packet (<c>MovementTranslationBenchmarks</c>), which is why the members are not
+/// init-only. Being a value, a change made through one variable never shows through another.
+/// </para>
+/// <para>
+/// 136 bytes, so pass it by <see langword="in"/> and take it from a codec by
+/// <see langword="out"/>.
+/// </para>
+/// </remarks>
+public record struct MovementInfo
 {
-    public const float DEFAULT_WALK_SPEED = 2.5f;
-    public const float DEFAULT_RUN_SPEED = 7.0f;
-    public const float DEFAULT_RUN_BACK_SPEED = 4.5f;
-    public const float DEFAULT_SWIM_SPEED = 4.72222f;
-    public const float DEFAULT_SWIM_BACK_SPEED = 2.5f;
-    public const float DEFAULT_FLY_SPEED = 7.0f;
-    public const float DEFAULT_FLY_BACK_SPEED = 4.5f;
-    public const float DEFAULT_TURN_RATE = 3.141593f;
-    public const float DEFAULT_PITCH_RATE = 3.141593f;
+    public MovementFlagModern Flags { get; set; }
 
-    public uint Flags;
-    public uint FlagsExtra;
-    public uint FlagsExtra2;
-    public uint MoveTime;
-    public float SwimPitch;
-    public uint FallTime;
-    public float JumpHorizontalSpeed;
-    public float JumpVerticalSpeed;
-    public float JumpCosAngle;
-    public float JumpSinAngle;
-    public float SplineElevation;
-    public bool HasSplineData;
-    public Vector3 Position;
-    public float Orientation;
-    public float CorpseOrientation;
-    public WowGuid128 TransportGuid;
-    public Vector3 TransportOffset;
-    public float TransportOrientation;
-    public uint TransportTime;
-    public uint TransportTime2;
-    public sbyte TransportSeat = -1;
+    /// <summary>
+    /// Passed through untranslated in both directions, so its meaning depends on where the block
+    /// came from: a legacy server's <see cref="MovementFlagExtra"/>, or the modern client's own
+    /// second flag word. The two vocabularies are not the same, which is why a 3.4.3 client is
+    /// never sent a legacy server's (<c>IModernMovementLayout.WritesExtraFlagsAsZero</c>).
+    /// </summary>
+    public uint FlagsExtra { get; set; }
+    public uint FlagsExtra2 { get; set; }
+    public uint MoveTime { get; set; }
+    public Vector3 Position { get; set; }
+    public float Orientation { get; set; }
+    public float SwimPitch { get; set; }
+    public float SplineElevation { get; set; }
+
+    /// <summary>The HasSpline header bit of the modern block. Set by a create that carries a spline.</summary>
+    public bool HasSplineData { get; set; }
+
+    public uint FallTime { get; set; }
+    public float JumpVerticalSpeed { get; set; }
+    public float JumpSinAngle { get; set; }
+    public float JumpCosAngle { get; set; }
+    public float JumpHorizontalSpeed { get; set; }
+
+    /// <summary>
+    /// Null when the block had no transport part. A transport part with an empty guid is kept as
+    /// read, but nothing is written for it: writers go by <see cref="TransportGuid"/>.
+    /// </summary>
+    public TransportInfo? Transport { get; set; }
+
     /// <summary>
     /// V3_4_3 only: the GameObject the client reports standing on, sent alongside -- and
     /// independently of -- the transport block. Read for diagnostics; nothing on the legacy
     /// wire carries it.
     /// </summary>
-    public WowGuid128 StandingOnGameObjectGuid;
-    // System.Numerics.Quaternion's default (0,0,0,0) is a non-unit quaternion that
-    // the V3_4_3 client rejects on Transport/GameObject CreateObject. Initializing
-    // to Identity (0,0,0,1) gives a valid baseline for objects whose legacy server
-    // doesn't send a rotation field; the PARENTROTATION read below in the GameObject
-    // branch overwrites it when the server does send one.
-    public Quaternion Rotation = Quaternion.Identity;
-    public float WalkSpeed;
-    public float RunSpeed;
-    public float RunBackSpeed;
-    public float SwimSpeed;
-    public float SwimBackSpeed;
-    public float FlightSpeed;
-    public float FlightBackSpeed;
-    public float TurnRate;
-    public float PitchRate;
-    public bool Hover;
-    public float VehicleOrientation;
-    public uint VehicleId; // Not exactly related to movement but it is read in ReadMovementUpdateBlock
-    public uint TransportPathTimer; // only set for transports
+    public WowGuid128 StandingOnGameObjectGuid { get; set; }
 
-    public MovementInfo CopyFromMe()
+    /// <summary>What the mover is riding, or empty.</summary>
+    // readonly: without it, a call through an `in` parameter copies the whole block first.
+    public readonly WowGuid128 TransportGuid => Transport.GetValueOrDefault().Guid;
+}
+
+/// <summary>
+/// The transport part of a movement block: what the mover rides and where on it.
+/// </summary>
+public record struct TransportInfo
+{
+    // A struct's field initializers only run through a constructor, so this is what makes
+    // `new TransportInfo { ... }` start from Seat = -1 rather than 0.
+    public TransportInfo()
     {
-        MovementInfo copy = new MovementInfo();
-        copy.Flags = this.Flags;
-        copy.FlagsExtra = this.FlagsExtra;
-        copy.SwimPitch = this.SwimPitch;
-        copy.FallTime = this.FallTime;
-        copy.JumpHorizontalSpeed = this.JumpHorizontalSpeed;
-        copy.JumpVerticalSpeed = this.JumpVerticalSpeed;
-        copy.JumpCosAngle = this.JumpCosAngle;
-        copy.JumpSinAngle = this.JumpSinAngle;
-        copy.SplineElevation = this.SplineElevation;
-        copy.HasSplineData = this.HasSplineData;
-        copy.Position = this.Position;
-        copy.Orientation = this.Orientation;
-        copy.CorpseOrientation = this.CorpseOrientation;
-        copy.TransportGuid = this.TransportGuid;
-        copy.TransportOffset = this.TransportOffset;
-        copy.TransportOrientation = this.TransportOrientation;
-        copy.TransportTime = this.TransportTime;
-        copy.TransportTime2 = this.TransportTime2;
-        copy.TransportSeat = this.TransportSeat;
-        copy.StandingOnGameObjectGuid = this.StandingOnGameObjectGuid;
-        copy.Rotation = this.Rotation;
-        copy.WalkSpeed = this.WalkSpeed;
-        copy.RunSpeed = this.RunSpeed;
-        copy.RunBackSpeed = this.RunBackSpeed;
-        copy.SwimSpeed = this.SwimSpeed;
-        copy.SwimBackSpeed = this.SwimBackSpeed;
-        copy.FlightSpeed = this.FlightSpeed;
-        copy.FlightBackSpeed = this.FlightBackSpeed;
-        copy.TurnRate = this.TurnRate;
-        copy.PitchRate = this.PitchRate;
-        copy.Hover = this.Hover;
-        copy.VehicleId = this.VehicleId;
-        copy.VehicleOrientation = this.VehicleOrientation;
-        copy.TransportPathTimer = this.TransportPathTimer;
-        return copy;
     }
 
-    private static readonly Microsoft.Extensions.Logging.ILogger _melMovement = Log.CreateMelLogger(Log.CategoryServer);
-
-    public void ReadMovementInfoLegacy(WorldPacket packet, GameSessionData gameState)
-    {
-        MovementInfo info = this;
-
-        bool hasPitch;
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-        {
-            MovementFlagWotLK flags = (MovementFlagWotLK)packet.ReadUInt32();
-            info.Flags = (uint)flags;
-            info.FlagsExtra = packet.ReadUInt16();
-            hasPitch = flags.HasAnyFlag(MovementFlagWotLK.Swimming | MovementFlagWotLK.Flying) || info.FlagsExtra.HasAnyFlag((uint)MovementFlagExtra.AlwaysAllowPitching);
-        }
-        else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-        {
-            MovementFlagTBC flags = (MovementFlagTBC)packet.ReadUInt32();
-            info.Flags = (uint)flags.CastFlags<MovementFlagTBC, MovementFlagWotLK>();
-            info.FlagsExtra = packet.ReadUInt8();
-            hasPitch = flags.HasAnyFlag(MovementFlagTBC.Swimming | MovementFlagTBC.Flying2);
-        }
-        else
-        {
-            MovementFlagVanilla flags = (MovementFlagVanilla)packet.ReadUInt32();
-            info.Flags = (uint)flags.CastFlags<MovementFlagVanilla, MovementFlagWotLK>();
-            hasPitch = flags.HasAnyFlag(MovementFlagVanilla.Swimming);
-            Hover = flags.HasAnyFlag(MovementFlagVanilla.FixedZ);
-        }
-
-        info.MoveTime = packet.ReadUInt32();
-
-        info.Position = packet.ReadVector3();
-        info.Orientation = packet.ReadFloat();
-
-        if (info.Flags.HasAnyFlag((uint)MovementFlagWotLK.OnTransport))
-        {
-            if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
-                info.TransportGuid = packet.ReadPackedGuid().To128(gameState);
-            else
-                info.TransportGuid = packet.ReadGuid().To128(gameState);
-
-            info.TransportOffset = packet.ReadVector3();
-            info.TransportOrientation = packet.ReadFloat();
-
-            if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-                info.TransportTime = packet.ReadUInt32();
-
-            if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-                info.TransportSeat = packet.ReadInt8();
-
-            if (info.FlagsExtra.HasAnyFlag((uint)MovementFlagExtra.InterpolateMove))
-                info.TransportTime2 = packet.ReadUInt32();
-        }
-
-        if (hasPitch)
-            info.SwimPitch = packet.ReadFloat();
-
-        info.FallTime = packet.ReadUInt32();
-        if (info.Flags.HasAnyFlag((uint)MovementFlagWotLK.Falling))
-        {
-            info.JumpVerticalSpeed = packet.ReadFloat();
-            info.JumpSinAngle = packet.ReadFloat();
-            info.JumpCosAngle = packet.ReadFloat();
-            info.JumpHorizontalSpeed = packet.ReadFloat();
-        }
-
-        if (info.Flags.HasAnyFlag((uint)MovementFlagWotLK.SplineElevation))
-            info.SplineElevation = packet.ReadFloat();
-    }
-
-    public void WriteMovementInfoLegacy(WorldPacket data)
-    {
-        MovementInfo info = this;
-
-        uint flags;
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-            flags = (uint)(((MovementFlagModern)info.Flags).CastFlags<MovementFlagModern, MovementFlagWotLK>());
-        else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-            flags = (uint)(((MovementFlagModern)info.Flags).CastFlags<MovementFlagModern, MovementFlagTBC>());
-        else
-            flags = (uint)(((MovementFlagModern)info.Flags).CastFlags<MovementFlagModern, MovementFlagVanilla>());
-
-        if (info.TransportGuid != default)
-        {
-            if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-                flags |= (uint)MovementFlagWotLK.OnTransport;
-            else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-                flags |= (uint)MovementFlagTBC.OnTransport;
-            else
-                flags |= (uint)MovementFlagVanilla.OnTransport;
-        }
-        
-        data.WriteUInt32(flags);
-
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-            data.WriteUInt16((ushort)info.FlagsExtra);
-        else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-            data.WriteUInt8((byte)info.FlagsExtra);
-
-        data.WriteUInt32(info.MoveTime);
-        data.WriteVector3(info.Position);
-        data.WriteFloat(info.Orientation);
-
-        bool hasTransport;
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-            hasTransport = flags.HasAnyFlag((uint)MovementFlagWotLK.OnTransport);
-        else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-            hasTransport = flags.HasAnyFlag((uint)MovementFlagTBC.OnTransport);
-        else
-            hasTransport = flags.HasAnyFlag((uint)MovementFlagVanilla.OnTransport);
-
-        if (hasTransport)
-        {
-            if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
-                data.WritePackedGuid(info.TransportGuid.To64());
-            else
-                data.WriteGuid(info.TransportGuid.To64());
-
-            data.WriteVector3(info.TransportOffset);
-            data.WriteFloat(info.TransportOrientation);
-
-            if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-                data.WriteUInt32(info.TransportTime);
-
-            if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-                data.WriteInt8(info.TransportSeat);
-
-            if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056) &&
-                info.FlagsExtra.HasAnyFlag((uint)MovementFlagExtra.InterpolateMove))
-                data.WriteUInt32(info.TransportTime2);
-        }
-
-        bool hasSwimPitch;
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-            hasSwimPitch = flags.HasAnyFlag((uint)(MovementFlagWotLK.Swimming | MovementFlagWotLK.Flying)) || info.FlagsExtra.HasAnyFlag((uint)MovementFlagExtra.AlwaysAllowPitching);
-        else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-            hasSwimPitch = flags.HasAnyFlag((uint)(MovementFlagTBC.Swimming | MovementFlagTBC.Flying2));
-        else
-            hasSwimPitch = flags.HasAnyFlag((uint)MovementFlagVanilla.Swimming);
-
-        if (hasSwimPitch)
-            data.WriteFloat(info.SwimPitch);
-
-        data.WriteUInt32(info.FallTime);
-
-        bool hasFallDirection;
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-            hasFallDirection = flags.HasAnyFlag((uint)MovementFlagWotLK.Falling);
-        else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-            hasFallDirection = flags.HasAnyFlag((uint)MovementFlagTBC.Falling);
-        else
-            hasFallDirection = flags.HasAnyFlag((uint)MovementFlagVanilla.Falling);
-
-        if (hasFallDirection)
-        {
-            data.WriteFloat(info.JumpVerticalSpeed);
-            data.WriteFloat(info.JumpSinAngle);
-            data.WriteFloat(info.JumpCosAngle);
-            data.WriteFloat(info.JumpHorizontalSpeed);
-        }
-
-        bool hasSplineElevation;
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-            hasSplineElevation = flags.HasAnyFlag((uint)MovementFlagWotLK.SplineElevation);
-        else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-            hasSplineElevation = flags.HasAnyFlag((uint)MovementFlagTBC.SplineElevation);
-        else
-            hasSplineElevation = flags.HasAnyFlag((uint)MovementFlagVanilla.SplineElevation);
-
-        if (hasSplineElevation)
-            data.WriteFloat(info.SplineElevation);
-    }
-
-    public void ReadMovementInfoModern(WorldPacket data)
-    {
-        var moveInfo = this;
-
-        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-        {
-            moveInfo.Flags = data.ReadUInt32();
-            moveInfo.FlagsExtra = data.ReadUInt32();
-            moveInfo.FlagsExtra2 = data.ReadUInt32();
-        }
-
-        moveInfo.MoveTime = data.ReadUInt32();
-        moveInfo.Position = data.ReadVector3();
-        moveInfo.Orientation = data.ReadFloat();
-
-        moveInfo.SwimPitch = data.ReadFloat();
-        moveInfo.SplineElevation = data.ReadFloat();
-
-        uint removeMovementForcesCount = data.ReadUInt32();
-
-        uint moveIndex = data.ReadUInt32();
-
-        for (uint i = 0; i < removeMovementForcesCount; ++i)
-        {
-            data.ReadPackedGuid128();
-        }
-
-        // ResetBitReader
-
-        if (!ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-        {
-            moveInfo.Flags = data.ReadBits<uint>(30);
-            moveInfo.FlagsExtra = data.ReadBits<uint>(18);
-        }
-
-        // V3_4_3 client adds two extra header bits (hasStandingOnGameObjectGUID, hasAdvFlying).
-        bool hasStandingOnGameObjectGUID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && data.HasBit();
-        bool hasTransport = data.HasBit();
-        bool hasFall = data.HasBit();
-        bool hasSpline = data.HasBit(); // todo 6.x read this infos
-
-        data.ReadBit(); // HeightChangeFailed
-        data.ReadBit(); // RemoteTimeValid
-        bool hasInertia = ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3) ? data.HasBit() : false;
-        bool hasAdvFlying = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && data.HasBit();
-
-        if (hasTransport)
-            ReadTransportInfoModern(data);
-
-        if (hasStandingOnGameObjectGUID)
-            moveInfo.StandingOnGameObjectGuid = data.ReadPackedGuid128();
-
-        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-        {
-            if (hasInertia)
-            {
-                data.ReadPackedGuid128();
-                data.ReadVector3(); // Force
-                data.ReadUInt32(); // Lifetime
-            }
-        }
-
-        if (hasAdvFlying)
-        {
-            data.ReadFloat(); // forwardVelocity
-            data.ReadFloat(); // upVelocity
-        }
-
-        if (hasFall)
-        {
-            moveInfo.FallTime = data.ReadUInt32();
-            moveInfo.JumpVerticalSpeed = data.ReadFloat();
-
-            // ResetBitReader
-
-            bool hasFallDirection = data.HasBit();
-            if (hasFallDirection)
-            {
-                moveInfo.JumpSinAngle = data.ReadFloat();
-                moveInfo.JumpCosAngle = data.ReadFloat();
-                moveInfo.JumpHorizontalSpeed = data.ReadFloat();
-            }
-        }
-    }
-
-    public void ReadTransportInfoModern(WorldPacket data)
-    {
-        var moveInfo = this;
-        moveInfo.TransportGuid = data.ReadPackedGuid128();
-        moveInfo.TransportOffset = data.ReadVector3();
-        moveInfo.TransportOrientation = data.ReadFloat();
-        moveInfo.TransportSeat = data.ReadInt8();           // VehicleSeatIndex
-        moveInfo.TransportTime = data.ReadUInt32();         // MoveTime
-
-        bool hasPrevTime = data.HasBit();
-        bool hasVehicleId = data.HasBit();
-
-        if (hasPrevTime)
-            moveInfo.TransportTime2 = data.ReadUInt32();    // PrevMoveTime
-
-        if (hasVehicleId)
-            moveInfo.VehicleId = data.ReadUInt32();         // VehicleRecID
-    }
-
-    public void WriteMovementInfoModern(WorldPacket data, WowGuid128 guid)
-    {
-        MovementInfo moveInfo = this;
-        bool hasFallDirection = moveInfo.Flags.HasAnyFlag((uint)(MovementFlagModern.Falling | MovementFlagModern.FallingFar));
-        bool hasFall = hasFallDirection || moveInfo.FallTime != 0;
-
-        data.WritePackedGuid128(guid);                                  // MoverGUID
-
-        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-        {
-            data.WriteUInt32(Flags);
-            // Legacy WotLK MovementFlagExtra (cMangos `info.FlagsExtra`, read as a UInt16)
-            // shares its numeric space with a different modern enum: legacy bit 0x200
-            // (AlwaysAllowPitching) collides with modern V3_4_3 bit 0x200
-            // (VehiclePassengerIsTransitionAllowed). Forwarding cMangos's bits verbatim
-            // tells the client this player is in vehicle-transition state, which stalls
-            // world entry. Zero for V3_4_3 — none of the WotLK extra bits have known
-            // meaningful equivalents in the modern stream for a fresh-login player.
-            uint flagsExtraToWrite = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
-                ? 0u
-                : FlagsExtra;
-            data.WriteUInt32(flagsExtraToWrite);
-            data.WriteUInt32(FlagsExtra2);
-        }
-
-        data.WriteUInt32(moveInfo.MoveTime);                            // MoveTime
-        data.WriteFloat(moveInfo.Position.X);
-        data.WriteFloat(moveInfo.Position.Y);
-        data.WriteFloat(moveInfo.Position.Z);
-        data.WriteFloat(moveInfo.Orientation);
-
-        data.WriteFloat(moveInfo.SwimPitch);                            // Pitch
-        data.WriteFloat(moveInfo.SplineElevation);                      // StepUpStartElevation
-
-        data.WriteUInt32(0);                                            // RemoveForcesIDs.size()
-        data.WriteUInt32(0);                                            // MoveIndex
-
-        //for (public uint i = 0; i < RemoveForcesIDs.Count; ++i)
-        //    *data << ObjectGuid(RemoveForcesIDs);
-
-        if (!ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-        {
-            data.WriteBits(moveInfo.Flags, 30);
-            // Legacy WotLK MovementFlagExtra (cMangos `info.FlagsExtra`, read as a UInt16)
-            // shares its numeric space with a different modern enum: legacy bit 0x200
-            // (AlwaysAllowPitching) collides with modern V3_4_3 bit 0x200
-            // (VehiclePassengerIsTransitionAllowed). Forwarding cMangos's bits verbatim
-            // tells the client this player is in vehicle-transition state, which stalls
-            // world entry. Zero for V3_4_3 — none of the WotLK extra bits have known
-            // meaningful equivalents in the modern stream for a fresh-login player.
-            uint flagsExtraToWrite = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
-                ? 0u
-                : moveInfo.FlagsExtra;
-            data.WriteBits(flagsExtraToWrite, 18);
-        }
-
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-            data.WriteBit(false);                                      // HasStandingOnGameObjectGUID (V3_4_2_50063+)
-        data.WriteBit(moveInfo.TransportGuid != default);              // HasTransport
-        data.WriteBit(hasFall);                                        // HasFall
-        data.WriteBit(HasSplineData);                                  // HasSpline - marks that the unit uses spline movement
-        data.WriteBit(false);                                          // HeightChangeFailed
-        data.WriteBit(false);                                          // RemoteTimeValid
-        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-            data.WriteBit(false);                                      // HasInertia
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-            data.WriteBit(false);                                      // HasAdvFlying (V3_4_1_47014+)
-        // HasDriveStatus is V3_4_4_59817+ ONLY (per WPP V3_4_0_45166 module's
-        // version guard) — V3_4_3_54261 must not write it, otherwise the
-        // 9th bit + padding desyncs the byte stream after FlushBits and the
-        // client silently fails to parse the player CreateObject2.
-        data.FlushBits();
-
-        if (moveInfo.TransportGuid != default)
-            WriteTransportInfoModern(data);
-
-        /*
-        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-        {
-            if (Inertia != null)
-            {
-                data.WritePackedGuid128(Inertia.Guid);
-                data.WriteVector3(Inertia.Force);
-                data.WriteUInt32(Inertia.Lifetime);
-            }
-        }
-        */
-
-        if (hasFall)
-        {
-            data.WriteUInt32(moveInfo.FallTime);                              // Time
-            data.WriteFloat(moveInfo.JumpVerticalSpeed);                      // JumpVelocity
-            data.WriteBit(hasFallDirection);
-            data.FlushBits();
-
-            if (hasFallDirection)
-            {
-                data.WriteFloat(moveInfo.JumpSinAngle);                       // Direction
-                data.WriteFloat(moveInfo.JumpCosAngle);
-                data.WriteFloat(moveInfo.JumpHorizontalSpeed);                // Speed
-            }
-        }
-    }
-    public void WriteTransportInfoModern(WorldPacket data)
-    {
-        MovementInfo moveInfo = this;
-        bool hasPrevTime = false;
-        bool hasVehicleId = moveInfo.VehicleId != 0;
-
-        data.WritePackedGuid128(moveInfo.TransportGuid);
-        data.WriteFloat(moveInfo.TransportOffset.X);
-        data.WriteFloat(moveInfo.TransportOffset.Y);
-        data.WriteFloat(moveInfo.TransportOffset.Z);
-        data.WriteFloat(moveInfo.TransportOrientation);
-        data.WriteInt8(moveInfo.TransportSeat);
-        data.WriteUInt32(moveInfo.TransportTime);
-
-        data.WriteBit(hasPrevTime);
-        data.WriteBit(hasVehicleId);
-        data.FlushBits();
-
-        if (hasPrevTime)
-            data.WriteUInt32(0); // PrevMoveTime
-
-        if (hasVehicleId)
-            data.WriteUInt32(moveInfo.VehicleId);
-    }
+    public WowGuid128 Guid { get; set; }
+    public Vector3 Offset { get; set; }
+    public float Orientation { get; set; }
+    public uint Time { get; set; }
+
+    /// <summary>The legacy block's second time, behind the InterpolateMove extra flag.</summary>
+    public uint PrevTime { get; set; }
 
     /// <summary>
-    /// Maximum size for movement info when written with Span writer.
-    /// Includes: GUID(18) + flags(12) + times/positions(40) + bits(6) + transport(48) + inertia(34) + fall(21) = ~179
-    /// Reduced from 256 to 192 based on actual usage data (54-75 bytes typical, theoretical max ~179)
+    /// -1 for no seat, which is also what a block from an era without seats (before 3.0.2) gets.
     /// </summary>
-    public const int MaxMovementInfoSize = 192;
+    public sbyte Seat { get; set; } = -1;
 
-    /// <summary>
-    /// Writes movement info using SpanPacketWriter for zero-allocation hot path.
-    /// </summary>
-    public int WriteMovementInfoModernToSpan(Span<byte> buffer, ulong guidLow, ulong guidHigh)
-    {
-        MovementInfo moveInfo = this;
-        bool hasFallDirection = moveInfo.Flags.HasAnyFlag((uint)(MovementFlagModern.Falling | MovementFlagModern.FallingFar));
-        bool hasFall = hasFallDirection || moveInfo.FallTime != 0;
-
-        var writer = new SpanPacketWriter(buffer);
-
-        writer.WritePackedGuid128(guidLow, guidHigh);                    // MoverGUID
-
-        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-        {
-            writer.WriteUInt32(Flags);
-            // See WriteMovementInfoModern: legacy MovementFlagExtra 0x200 collides with
-            // modern V3_4_3 VehiclePassengerIsTransitionAllowed. Zero for V3_4_3.
-            uint flagsExtraToWrite = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
-                ? 0u
-                : FlagsExtra;
-            writer.WriteUInt32(flagsExtraToWrite);
-            writer.WriteUInt32(FlagsExtra2);
-        }
-
-        writer.WriteUInt32(moveInfo.MoveTime);                           // MoveTime
-        writer.WriteFloat(moveInfo.Position.X);
-        writer.WriteFloat(moveInfo.Position.Y);
-        writer.WriteFloat(moveInfo.Position.Z);
-        writer.WriteFloat(moveInfo.Orientation);
-
-        writer.WriteFloat(moveInfo.SwimPitch);                           // Pitch
-        writer.WriteFloat(moveInfo.SplineElevation);                     // StepUpStartElevation
-
-        writer.WriteUInt32(0);                                           // RemoveForcesIDs.size()
-        writer.WriteUInt32(0);                                           // MoveIndex
-
-        if (!ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-        {
-            writer.WriteBits(moveInfo.Flags, 30);
-            // See WriteMovementInfoModern: legacy MovementFlagExtra 0x200 collides with
-            // modern V3_4_3 VehiclePassengerIsTransitionAllowed. Zero for V3_4_3.
-            uint flagsExtraToWrite = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
-                ? 0u
-                : moveInfo.FlagsExtra;
-            writer.WriteBits(flagsExtraToWrite, 18);
-        }
-
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-            writer.WriteBit(false);                                      // HasStandingOnGameObjectGUID (V3_4_2_50063+)
-        writer.WriteBit(moveInfo.TransportGuid != default);              // HasTransport
-        writer.WriteBit(hasFall);                                        // HasFall
-        writer.WriteBit(HasSplineData);                                  // HasSpline
-        writer.WriteBit(false);                                          // HeightChangeFailed
-        writer.WriteBit(false);                                          // RemoteTimeValid
-        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-            writer.WriteBit(false);                                      // HasInertia
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-            writer.WriteBit(false);                                      // HasAdvFlying (V3_4_1_47014+)
-        // No HasDriveStatus for V3_4_3_54261 — see WriteMovementInfoModern.
-        writer.FlushBits();
-
-        if (moveInfo.TransportGuid != default)
-            WriteTransportInfoModernToSpan(ref writer);
-
-        // Inertia would go here if needed (9.2.0+)
-
-        if (hasFall)
-        {
-            writer.WriteUInt32(moveInfo.FallTime);                       // Time
-            writer.WriteFloat(moveInfo.JumpVerticalSpeed);               // JumpVelocity
-            writer.WriteBit(hasFallDirection);
-            writer.FlushBits();
-
-            if (hasFallDirection)
-            {
-                writer.WriteFloat(moveInfo.JumpSinAngle);                // Direction
-                writer.WriteFloat(moveInfo.JumpCosAngle);
-                writer.WriteFloat(moveInfo.JumpHorizontalSpeed);         // Speed
-            }
-        }
-
-        return writer.Position;
-    }
-
-    /// <summary>
-    /// Writes transport info using SpanPacketWriter.
-    /// </summary>
-    private void WriteTransportInfoModernToSpan(ref SpanPacketWriter writer)
-    {
-        MovementInfo moveInfo = this;
-        bool hasPrevTime = false;
-        bool hasVehicleId = moveInfo.VehicleId != 0;
-
-        writer.WritePackedGuid128(moveInfo.TransportGuid.Low, moveInfo.TransportGuid.High);
-        writer.WriteFloat(moveInfo.TransportOffset.X);
-        writer.WriteFloat(moveInfo.TransportOffset.Y);
-        writer.WriteFloat(moveInfo.TransportOffset.Z);
-        writer.WriteFloat(moveInfo.TransportOrientation);
-        writer.WriteInt8(moveInfo.TransportSeat);
-        writer.WriteUInt32(moveInfo.TransportTime);
-
-        writer.WriteBit(hasPrevTime);
-        writer.WriteBit(hasVehicleId);
-        writer.FlushBits();
-
-        if (hasPrevTime)
-            writer.WriteUInt32(0); // PrevMoveTime
-
-        if (hasVehicleId)
-            writer.WriteUInt32(moveInfo.VehicleId);
-    }
-
-
-    // ---- span overloads -------------------------------------------------------------------
-    //
-    // Generated mechanically from the WorldPacket versions above, not retyped: the only edits are
-    // the parameter type and passing `data` on by ref. Two implementations of one wire layout is
-    // the same hand-sync hazard docs/version-shape-dispatch.md calls out for Write()/WriteToSpan(),
-    // so MovementReaderEquivalenceTests runs both over the same bytes and compares every field
-    // and the final position. The WorldPacket version has no production caller left: only
-    // SpellCastRequest.Read(WorldPacket) uses it, as the oracle in SpellCodecEquivalenceTests.
-    // Delete it once that test moves to a frozen copy.
-
-    public void ReadMovementInfoModern(ref SpanPacketReader data)
-    {
-        var moveInfo = this;
-
-        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-        {
-            moveInfo.Flags = data.ReadUInt32();
-            moveInfo.FlagsExtra = data.ReadUInt32();
-            moveInfo.FlagsExtra2 = data.ReadUInt32();
-        }
-
-        moveInfo.MoveTime = data.ReadUInt32();
-        moveInfo.Position = data.ReadVector3();
-        moveInfo.Orientation = data.ReadFloat();
-
-        moveInfo.SwimPitch = data.ReadFloat();
-        moveInfo.SplineElevation = data.ReadFloat();
-
-        uint removeMovementForcesCount = data.ReadUInt32();
-
-        uint moveIndex = data.ReadUInt32();
-
-        for (uint i = 0; i < removeMovementForcesCount; ++i)
-        {
-            data.ReadPackedGuid128();
-        }
-
-        // ResetBitReader
-
-        if (!ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-        {
-            moveInfo.Flags = data.ReadBits<uint>(30);
-            moveInfo.FlagsExtra = data.ReadBits<uint>(18);
-        }
-
-        // V3_4_3 client adds two extra header bits (hasStandingOnGameObjectGUID, hasAdvFlying).
-        bool hasStandingOnGameObjectGUID = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && data.HasBit();
-        bool hasTransport = data.HasBit();
-        bool hasFall = data.HasBit();
-        bool hasSpline = data.HasBit(); // todo 6.x read this infos
-
-        data.ReadBit(); // HeightChangeFailed
-        data.ReadBit(); // RemoteTimeValid
-        bool hasInertia = ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3) ? data.HasBit() : false;
-        bool hasAdvFlying = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && data.HasBit();
-
-        if (hasTransport)
-            ReadTransportInfoModern(ref data);
-
-        if (hasStandingOnGameObjectGUID)
-            moveInfo.StandingOnGameObjectGuid = data.ReadPackedGuid128();
-
-        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-        {
-            if (hasInertia)
-            {
-                data.ReadPackedGuid128();
-                data.ReadVector3(); // Force
-                data.ReadUInt32(); // Lifetime
-            }
-        }
-
-        if (hasAdvFlying)
-        {
-            data.ReadFloat(); // forwardVelocity
-            data.ReadFloat(); // upVelocity
-        }
-
-        if (hasFall)
-        {
-            moveInfo.FallTime = data.ReadUInt32();
-            moveInfo.JumpVerticalSpeed = data.ReadFloat();
-
-            // ResetBitReader
-
-            bool hasFallDirection = data.HasBit();
-            if (hasFallDirection)
-            {
-                moveInfo.JumpSinAngle = data.ReadFloat();
-                moveInfo.JumpCosAngle = data.ReadFloat();
-                moveInfo.JumpHorizontalSpeed = data.ReadFloat();
-            }
-        }
-    }
-
-    public void ReadTransportInfoModern(ref SpanPacketReader data)
-    {
-        var moveInfo = this;
-        moveInfo.TransportGuid = data.ReadPackedGuid128();
-        moveInfo.TransportOffset = data.ReadVector3();
-        moveInfo.TransportOrientation = data.ReadFloat();
-        moveInfo.TransportSeat = data.ReadInt8();           // VehicleSeatIndex
-        moveInfo.TransportTime = data.ReadUInt32();         // MoveTime
-
-        bool hasPrevTime = data.HasBit();
-        bool hasVehicleId = data.HasBit();
-
-        if (hasPrevTime)
-            moveInfo.TransportTime2 = data.ReadUInt32();    // PrevMoveTime
-
-        if (hasVehicleId)
-            moveInfo.VehicleId = data.ReadUInt32();         // VehicleRecID
-    }
-
-    public static void ClampOrientation(ref float orientation)
-    {
-        while (orientation < 0)
-            orientation += (float)(Math.PI * 2f);
-        while (orientation > (float)(Math.PI * 2f))
-            orientation -= (float)(Math.PI * 2f);
-    }
-
-    // Must be called only after movement flags are converted to modern enum!
-    public void ValidateMovementInfo()
-    {
-        ClampOrientation(ref Orientation);
-        ClampOrientation(ref TransportOrientation);
-
-        // A local function rather than an Action: the lambda captured this, so every call
-        // allocated a delegate, and this runs for every movement packet from every unit in view.
-        void RemoveViolatingFlags(bool check, MovementFlagModern maskToRemove)
-        {
-            if (check)
-            {
-                MovementLogMessages.ViolatingFlagsRemoved(_melMovement, Flags, FlagsExtra, maskToRemove);
-                Flags.RemoveFlag((uint)maskToRemove);
-            }
-        }
-
-        /*! This must be a packet spoofing attempt. MOVEMENTFLAG_ROOT sent from the client is not valid
-            in conjunction with any of the moving movement flags such as MOVEMENTFLAG_FORWARD.
-            It will freeze clients that receive this player's movement info.
-        */
-        RemoveViolatingFlags(Flags.HasAnyFlag((uint)MovementFlagModern.Root) && Flags.HasAnyFlag((uint)MovementFlagModern.MaskMoving), MovementFlagModern.MaskMoving);
-
-        //! Cannot ascend and descend at the same time
-        RemoveViolatingFlags(Flags.HasAnyFlag((uint)MovementFlagModern.Ascending) && Flags.HasAnyFlag((uint)MovementFlagModern.Descending),
-            MovementFlagModern.Ascending | MovementFlagModern.Descending);
-
-        //! Cannot move left and right at the same time
-        RemoveViolatingFlags(Flags.HasAnyFlag((uint)MovementFlagModern.TurnLeft) && Flags.HasAnyFlag((uint)MovementFlagModern.TurnRight),
-            MovementFlagModern.TurnLeft | MovementFlagModern.TurnRight);
-
-        //! Cannot strafe left and right at the same time
-        RemoveViolatingFlags(Flags.HasAnyFlag((uint)MovementFlagModern.StrafeLeft) && Flags.HasAnyFlag((uint)MovementFlagModern.StrafeRight),
-            MovementFlagModern.StrafeLeft | MovementFlagModern.StrafeRight);
-
-        //! Cannot pitch up and down at the same time
-        RemoveViolatingFlags(Flags.HasAnyFlag((uint)MovementFlagModern.PitchUp) && Flags.HasAnyFlag((uint)MovementFlagModern.PitchDown),
-            MovementFlagModern.PitchUp | MovementFlagModern.PitchDown);
-
-        //! Cannot move forwards and backwards at the same time
-        RemoveViolatingFlags(Flags.HasAnyFlag((uint)MovementFlagModern.Forward) && Flags.HasAnyFlag((uint)MovementFlagModern.Backward),
-            MovementFlagModern.Forward | MovementFlagModern.Backward);
-
-        RemoveViolatingFlags(Flags.HasAnyFlag((uint)(MovementFlagModern.DisableGravity | MovementFlagModern.CanFly)) && Flags.HasAnyFlag((uint)MovementFlagModern.Falling),
-            MovementFlagModern.Falling);
-
-        RemoveViolatingFlags(Flags.HasAnyFlag((uint)MovementFlagModern.SplineElevation) && MathF.Abs(SplineElevation) <= 1e-5f, MovementFlagModern.SplineElevation);
-
-        // Client first checks if spline elevation != 0, then verifies flag presence
-        if (MathF.Abs(SplineElevation) > 1e-5f)
-            Flags.AddFlag((uint)MovementFlagModern.SplineElevation);
-    }
+    /// <summary>VehicleRecID: the vehicle being ridden, not the mover's own.</summary>
+    public uint VehicleId { get; set; }
 }

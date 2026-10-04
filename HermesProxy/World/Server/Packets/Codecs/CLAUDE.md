@@ -38,7 +38,11 @@ public static class FooCodec
   "namespace does not match folder" hint is expected here; do not act on it.
 - **Read each field into a local, then construct.** The reader is stateful, so wire order must be
   statement order. Don't rely on the evaluation order of constructor arguments.
-- **`out`, not a return value**, for every codec. Some packets carry a ~180-byte `MovementInfo`
+  `ClientPlayerMovement` is the one exception: it is a plain struct whose movement block is read
+  straight into its field, because building 136 bytes beside the packet and copying them in was
+  measurable on the highest-rate packet there is. `MovementInfo` itself is filled the same way,
+  field by field, by `ModernMovementCodec`. Don't copy the pattern for anything smaller.
+- **`out`, not a return value**, for every codec. Some packets carry a 136-byte `MovementInfo`
   where return-value optimisation is not guaranteed, and one shape for all is better than
   deciding per packet.
 - **Defaults matter.** A positional record struct defaults to all zero. If the `ClientPacket` it

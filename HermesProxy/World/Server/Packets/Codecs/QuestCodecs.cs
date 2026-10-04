@@ -8,9 +8,9 @@ namespace HermesProxy.World.Server.Packets;
 
 // Quest CMSG codecs.
 //
-// Two of these hold a reference rather than a value, and both for the same reason MovementInfo
-// does: the type they name is a mutable builder on the *outbound* path, so converting it is
-// outbound work this round defers. QuestPOIQuery keeps an int[] because the count is client-chosen,
+// Two of these hold a reference rather than a value, and both for the same reason: the type they
+// name is a mutable builder on the *outbound* path, so converting it is outbound work this round
+// defers. QuestPOIQuery keeps an int[] because the count is client-chosen,
 // and QuestGiverChooseReward keeps QuestChoiceItem, which nests ItemInstance. The structs
 // themselves cost nothing; the one allocation each survives until outbound lands.
 

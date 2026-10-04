@@ -12,23 +12,14 @@ using Xunit;
 namespace HermesProxy.Tests.World.Dispatch;
 
 /// <summary>
-/// Pins the two implementations of the modern movement read against each other.
+/// Pins the two ways into the modern movement read against each other.
 /// </summary>
 /// <remarks>
-/// <para>
-/// <c>MovementInfo</c> now has <c>ReadMovementInfoModern(WorldPacket)</c> and
-/// <c>ReadMovementInfoModern(ref SpanPacketReader)</c>. Two copies of one wire layout is exactly
-/// the hand-sync hazard <c>docs/version-shape-dispatch.md</c> describes for
-/// <c>Write()</c>/<c>WriteToSpan()</c>: a fix applied to one and forgotten in the other shows up
-/// only on whichever path the traffic happens to take, and never throws.
-/// </para>
-/// <para>
-/// The span version was generated mechanically from the WorldPacket one, so they start identical.
-/// This is what keeps them that way. No production code calls the WorldPacket version any more:
-/// its last caller is <c>SpellCastRequest.Read(WorldPacket)</c>, which survives only as the oracle
-/// in <c>SpellCodecEquivalenceTests</c>. Once that test moves to a frozen copy, delete both
-/// WorldPacket readers and this test with them.
-/// </para>
+/// There is one reader, over a span. The <c>WorldPacket</c> overload hands it the packet's
+/// remaining bytes and then skips what it consumed, so what can go wrong is the bookkeeping: the
+/// packet left at a different position than the reader reached, or a bit cache carried across.
+/// Its only caller is <c>SpellCastRequest.Read(WorldPacket)</c>, the oracle in
+/// <c>SpellCodecEquivalenceTests</c>.
 /// </remarks>
 public class MovementReaderEquivalenceTests
 {
@@ -45,7 +36,7 @@ public class MovementReaderEquivalenceTests
     private static byte[] Frame(MovementInfo source, WowGuid128 mover)
     {
         using var w = new WorldPacket(1u);
-        source.WriteMovementInfoModern(w, mover);
+        ModernMovementCodec.Write(w, mover, in source);
         byte[] payload = w.GetData();
         byte[] framed = new byte[payload.Length + 2];
         payload.CopyTo(framed, 2);
@@ -65,21 +56,30 @@ public class MovementReaderEquivalenceTests
 
         if (falling)
         {
-            info.Flags = (uint)MovementFlagModern.Falling;
-            info.FallTime = 777;
-            info.JumpVerticalSpeed = -9.81f;
-            info.JumpSinAngle = 0.5f;
-            info.JumpCosAngle = 0.86f;
-            info.JumpHorizontalSpeed = 7.5f;
+            info = info with
+            {
+                Flags = MovementFlagModern.Falling,
+                FallTime = 777,
+                JumpVerticalSpeed = -9.81f,
+                JumpSinAngle = 0.5f,
+                JumpCosAngle = 0.86f,
+                JumpHorizontalSpeed = 7.5f,
+            };
         }
 
         if (onTransport)
         {
-            info.TransportGuid = new WowGuid128(0xABCDEF, 0x123456);
-            info.TransportOffset = new Vector3(1f, 2f, 3f);
-            info.TransportOrientation = 1.5f;
-            info.TransportSeat = 3;
-            info.TransportTime = 999;
+            info = info with
+            {
+                Transport = new TransportInfo
+                {
+                    Guid = new WowGuid128(0xABCDEF, 0x123456),
+                    Offset = new Vector3(1f, 2f, 3f),
+                    Orientation = 1.5f,
+                    Seat = 3,
+                    Time = 999,
+                },
+            };
         }
 
         return info;
@@ -98,37 +98,16 @@ public class MovementReaderEquivalenceTests
         // WorldPacket path: consume the mover GUID first, exactly as the packet classes did.
         var viaWorldPacket = new WorldPacket(framed);
         viaWorldPacket.ReadPackedGuid128();
-        var expected = new MovementInfo();
-        expected.ReadMovementInfoModern(viaWorldPacket);
+        ModernMovementCodec.Read(viaWorldPacket, out MovementInfo expected);
 
         // Span path: through the same accessor the dispatch site uses.
         var reader = new SpanPacketReader(new WorldPacket(framed).GetRemainingSpan());
         reader.ReadPackedGuid128();
-        var actual = new MovementInfo();
-        actual.ReadMovementInfoModern(ref reader);
+        ModernMovementCodec.Read(ref reader, out MovementInfo actual);
 
-        Assert.Equal(expected.Flags, actual.Flags);
-        Assert.Equal(expected.FlagsExtra, actual.FlagsExtra);
-        Assert.Equal(expected.FlagsExtra2, actual.FlagsExtra2);
-        Assert.Equal(expected.MoveTime, actual.MoveTime);
-        Assert.Equal(expected.Position, actual.Position);
-        Assert.Equal(expected.Orientation, actual.Orientation);
-        Assert.Equal(expected.SwimPitch, actual.SwimPitch);
-        Assert.Equal(expected.SplineElevation, actual.SplineElevation);
-
-        Assert.Equal(expected.FallTime, actual.FallTime);
-        Assert.Equal(expected.JumpVerticalSpeed, actual.JumpVerticalSpeed);
-        Assert.Equal(expected.JumpSinAngle, actual.JumpSinAngle);
-        Assert.Equal(expected.JumpCosAngle, actual.JumpCosAngle);
-        Assert.Equal(expected.JumpHorizontalSpeed, actual.JumpHorizontalSpeed);
-
-        Assert.Equal(expected.TransportGuid, actual.TransportGuid);
-        Assert.Equal(expected.TransportOffset, actual.TransportOffset);
-        Assert.Equal(expected.TransportOrientation, actual.TransportOrientation);
-        Assert.Equal(expected.TransportSeat, actual.TransportSeat);
-        Assert.Equal(expected.TransportTime, actual.TransportTime);
-        Assert.Equal(expected.TransportTime2, actual.TransportTime2);
-        Assert.Equal(expected.VehicleId, actual.VehicleId);
+        Assert.Equal(expected, actual);
+        Assert.Equal(falling, actual.FallTime == 777);
+        Assert.Equal(onTransport, actual.Transport != null);
 
         // Position is what catches a reader that agreed on every field of this fixture but
         // consumed a different number of bytes — fatal in a stream, invisible in isolation.
@@ -136,20 +115,18 @@ public class MovementReaderEquivalenceTests
     }
 
     [Fact]
-    public void TransportSeatDefault_SurvivesAPacketWithNoTransport()
+    public void NoTransportPart_ReadsAsNoTransport()
     {
-        // MovementInfo initialises TransportSeat to -1, not 0. A reader that skipped the
-        // transport block but zeroed the field instead of leaving it would look correct in every
-        // aggregate test and be wrong about "no seat".
+        // Seat 0 is a real seat, so "not riding anything" cannot be a transport part of zeroes:
+        // it has to be no transport part at all.
         byte[] framed = Frame(Sample(falling: false, onTransport: false), default);
 
         var reader = new SpanPacketReader(new WorldPacket(framed).GetRemainingSpan());
         reader.ReadPackedGuid128();
-        var info = new MovementInfo();
-        info.ReadMovementInfoModern(ref reader);
+        ModernMovementCodec.Read(ref reader, out MovementInfo info);
 
-        Assert.Equal(-1, info.TransportSeat);
-        Assert.Equal(Quaternion.Identity, info.Rotation);
+        Assert.Null(info.Transport);
+        Assert.Equal(default, info.TransportGuid);
     }
 
     [Fact]
@@ -162,9 +139,8 @@ public class MovementReaderEquivalenceTests
         ClientPlayerMovementCodec.Read(ref reader, out var packet);
 
         Assert.Equal(mover, packet.Guid);
-        Assert.NotNull(packet.MoveInfo);
         Assert.Equal(123456u, packet.MoveInfo.MoveTime);
-        Assert.Equal(3, packet.MoveInfo.TransportSeat);
+        Assert.Equal((sbyte)3, packet.MoveInfo.Transport!.Value.Seat);
         Assert.Equal(0, reader.Remaining);
     }
 }

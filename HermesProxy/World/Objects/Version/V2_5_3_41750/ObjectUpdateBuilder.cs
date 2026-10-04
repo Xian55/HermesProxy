@@ -136,13 +136,13 @@ public class ObjectUpdateBuilder
         bool isActivePlayer = m_objectType == Enums.ObjectTypeBCC.ActivePlayer;
 
         m_createBits =
-            (moveInfo is { Hover: true }                                        ? CreateObjectBits.PlayHoverAnim     : 0) |
+            (createData is { PlayHoverAnim: true }                              ? CreateObjectBits.PlayHoverAnim     : 0) |
             (moveInfo != null && isUnit                                          ? CreateObjectBits.MovementUpdate    : 0) |
-            (moveInfo != null && moveInfo.TransportGuid != default && isGameObject ? CreateObjectBits.MovementTransport : 0) |
+            (moveInfo != null && moveInfo.Value.TransportGuid != default && isGameObject ? CreateObjectBits.MovementTransport : 0) |
             (moveInfo != null && !isUnit                                         ? CreateObjectBits.Stationary        : 0) |
             (moveInfo != null && m_updateData.Guid.GetHighType() == Enums.HighGuidType.Transport ? CreateObjectBits.ServerTime : 0) |
             (createData?.AutoAttackVictim != null                                ? CreateObjectBits.CombatVictim      : 0) |
-            (moveInfo is { VehicleId: not 0 }                                    ? CreateObjectBits.Vehicle           : 0) |
+            (createData is { VehicleId: not 0 }                                  ? CreateObjectBits.Vehicle           : 0) |
             (moveInfo != null && isGameObject                                    ? CreateObjectBits.Rotation          : 0) |
             (isActivePlayer                                                      ? CreateObjectBits.ThisIsYou | CreateObjectBits.ActivePlayer : 0);
     }
@@ -166,19 +166,11 @@ public class ObjectUpdateBuilder
 
         if (m_createBits.HasFlag(CreateObjectBits.MovementUpdate))
         {
-            MovementInfo moveInfo = m_updateData.CreateData.MoveInfo;
+            MovementInfo moveInfo = m_updateData.CreateData.MoveInfo.GetValueOrDefault();
             bool hasSpline = m_updateData.CreateData.MoveSpline != null;
-            moveInfo.WriteMovementInfoModern(data, m_updateData.Guid);
+            ModernMovementCodec.Write(data, m_updateData.Guid, in moveInfo);
 
-            data.WriteFloat(moveInfo.WalkSpeed);
-            data.WriteFloat(moveInfo.RunSpeed);
-            data.WriteFloat(moveInfo.RunBackSpeed);
-            data.WriteFloat(moveInfo.SwimSpeed);
-            data.WriteFloat(moveInfo.SwimBackSpeed);
-            data.WriteFloat(moveInfo.FlightSpeed);
-            data.WriteFloat(moveInfo.FlightBackSpeed);
-            data.WriteFloat(moveInfo.TurnRate);
-            data.WriteFloat(moveInfo.PitchRate);
+            m_updateData.CreateData.Speeds.Write(data);
 
             //MovementForces movementForces = unit.GetMovementForces();
             //if (movementForces != null)
@@ -208,10 +200,11 @@ public class ObjectUpdateBuilder
 
         if (m_createBits.HasFlag(CreateObjectBits.Stationary))
         {
-            data.WriteFloat(m_updateData.CreateData.MoveInfo.Position.X);
-            data.WriteFloat(m_updateData.CreateData.MoveInfo.Position.Y);
-            data.WriteFloat(m_updateData.CreateData.MoveInfo.Position.Z);
-            data.WriteFloat(m_updateData.CreateData.MoveInfo.Orientation);
+            MovementInfo stationary = m_updateData.CreateData.MoveInfo.GetValueOrDefault();
+            data.WriteFloat(stationary.Position.X);
+            data.WriteFloat(stationary.Position.Y);
+            data.WriteFloat(stationary.Position.Z);
+            data.WriteFloat(stationary.Orientation);
         }
 
         if (m_createBits.HasFlag(CreateObjectBits.CombatVictim))
@@ -224,16 +217,16 @@ public class ObjectUpdateBuilder
                 this causes clients to receive different PathProgress
                 resulting in players seeing the object in a different position
             */
-            if (m_updateData.CreateData.MoveInfo.TransportPathTimer != 0) // ServerTime
-                data.WriteUInt32(m_updateData.CreateData.MoveInfo.TransportPathTimer);
+            if (m_updateData.CreateData.TransportPathTimer != 0) // ServerTime
+                data.WriteUInt32(m_updateData.CreateData.TransportPathTimer);
             else
                 data.WriteUInt32((uint)Time.UnixTime);
         }
 
         if (m_createBits.HasFlag(CreateObjectBits.Vehicle))
         {
-            data.WriteUInt32(m_updateData.CreateData.MoveInfo.VehicleId); // RecID
-            data.WriteFloat(m_updateData.CreateData.MoveInfo.VehicleOrientation); // InitialRawFacing
+            data.WriteUInt32(m_updateData.CreateData.VehicleId); // RecID
+            data.WriteFloat(m_updateData.CreateData.VehicleOrientation); // InitialRawFacing
         }
 
         if (m_createBits.HasFlag(CreateObjectBits.AnimKit))
@@ -244,13 +237,13 @@ public class ObjectUpdateBuilder
         }
 
         if (m_createBits.HasFlag(CreateObjectBits.Rotation))
-            data.WriteInt64(m_updateData.CreateData.MoveInfo.Rotation.GetPackedRotation()); // Rotation
+            data.WriteInt64(m_updateData.CreateData.Rotation.GetPackedRotation()); // Rotation
 
         for (int i = 0; i < PauseTimesCount; ++i)
             data.WriteUInt32(0);
 
         if (m_createBits.HasFlag(CreateObjectBits.MovementTransport))
-            m_updateData.CreateData.MoveInfo.WriteTransportInfoModern(data);
+            ModernMovementCodec.WriteTransport(data, m_updateData.CreateData.MoveInfo.GetValueOrDefault().Transport.GetValueOrDefault());
 
         /*
         if (m_createBits.HasFlag(CreateObjectBits.AreaTrigger))

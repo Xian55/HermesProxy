@@ -34,6 +34,7 @@ dotnet run --project HermesProxy.Benchmarks -c Release -- --list flat
 | `SendPipelineBenchmarks.cs` | `ServerPacket` construct → `WritePacketData` → framed + encrypted wire bytes, per stage |
 | `PackedGuidBenchmarks.cs` | `WorldPacket` vs `PackedGuidHelper` packed-GUID encode/decode |
 | `MovementHandlerPrologueBenchmarks.cs` | `HandlePlayerMove` opcode translation: string/reflection round trip vs the prebuilt map |
+| `MovementTranslationBenchmarks.cs` | Movement translation through the real handlers, both directions: legacy `MSG_MOVE_*`, knock-back and creates to the client; client movement to the legacy server; the modern read and write alone |
 | `UpdateMaskBenchmarks.cs` | V1_14/V2_5 `UpdateFieldsArray` / `DynamicUpdateFieldsArray` write path vs the previous `BitArray`-backed mask (verbatim `Legacy*` copies) |
 | `HighGuidBenchmarks.cs` | `HighGuid` high-guid type lookup and 64↔128 guid conversion vs the previous per-lookup `HighGuid` object (verbatim `Legacy*` copies) |
 | `AllocationHotSpotBenchmarks.cs` | The update-path hot spots from the 2026-09 Alterac Valley allocation traces — `GetUpdateField`, `HasAnyFlag`, update-mask reuse, packed GUIDs, `CastFlags` — each against a verbatim `Legacy*` copy, one baseline per category |
