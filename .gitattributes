@@ -1,0 +1,4 @@
+# Some greetings carry a bare LF inside a quoted field, and the proxy compares them byte
+# for byte with what the legacy server sends. core.autocrlf=true would rewrite those to
+# CRLF on checkout and the rows would stop matching on Windows only.
+HermesProxy/CSV/BroadcastTexts3.csv text eol=lf

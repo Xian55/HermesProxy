@@ -497,11 +497,35 @@ by hand:
   `LOADER_TYPES` re-encodes every narrow column; regenerate that table when a loader's field types
   change.
 
-Known-stale, deliberately not regenerated:
+`BroadcastTexts3.csv` has its own generator, `scripts/build-broadcast-texts-csv.py`, because its
+source is the legacy servers' world databases, not a DB2. The Classic clients ship no
+BroadcastText rows: they ask the proxy for every id and cache the answer. The file maps a greeting
+the server sends to the id the client knows it by, so that the id is the same on every proxy run.
+A greeting that is missing still shows, but on an id `GetBroadcastTextId` allocates in arrival
+order, and a client that cached that id in an earlier run shows the wrong text.
 
-- `BroadcastTexts3.csv` — comes from a 3.3.5a world `broadcast_text` table, not a DB2.
-  `GetBroadcastTextId` allocates a new entry on a miss (`GameData.cs:603`), so a gap degrades
-  rather than breaks.
+```
+python scripts/build-broadcast-texts-csv.py 3 --audit trinity=<dump> azerothcore=<dump> cmangos=<dump>
+python scripts/build-broadcast-texts-csv.py 3 trinity=<dump> azerothcore=<dump> cmangos=<dump>
+```
+
+Each dump holds `npc_text` and `broadcast_text` (plus `npc_text_broadcast_text` for cMaNGOS). The
+report replays the lookup per backend; a greeting that resolved before and no longer does counts
+as `lost`, and the script refuses to write while that is not 0. Regenerated 2026-10-05 from the
+three test backends, the file went from 3,524 rows (a copy of the TBC file) to 9,438:
+
+| Backend | Greetings | Resolved before | Resolved now |
+|---|---|---|---|
+| TrinityCore | 9,599 | 2,806 (29.2%) | 8,801 (91.7%) |
+| AzerothCore | 9,305 | 2,737 (29.4%) | 8,219 (88.3%) |
+| cMaNGOS | 6,885 | 2,988 (43.4%) | 6,029 (87.6%) |
+
+What is left cannot be fixed in the file. The lookup also compares language and emotes, the
+backends disagree on those for the same text, and an id holds one row. Other greetings, the
+default "Hey there, $N. How can I help you?" among them, have no broadcast row at all.
+
+Hand-curated, with no source to regenerate from:
+
 - `MeleeSpells3.csv`, `AutoRepeatSpells3.csv`, `SpellEffectPoints3.csv` — hand-curated behaviour
   lists with no DB2 equivalent.
 
