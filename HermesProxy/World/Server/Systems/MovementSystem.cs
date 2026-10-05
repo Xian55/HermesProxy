@@ -355,4 +355,11 @@ public static class MovementSystem
         WorldPacket packet = new WorldPacket(targetOpcode);
         ctx.SendPacketToServer(packet);
     }
+
+    [HandlesCmsg(Opcode.CMSG_MOVE_SET_VEHICLE_REC_ID_ACK)]
+    public static void HandleMoveSetVehicleRecIDAck(in MoveSetVehicleRecIDAck ack, in SessionContext ctx)
+    {
+        // This acknowledges the proxy's own MoveSetVehicleRecID. The legacy
+        // PLAYER_VEHICLE_DATA broadcast has no sequence index or corresponding ACK.
+    }
 }

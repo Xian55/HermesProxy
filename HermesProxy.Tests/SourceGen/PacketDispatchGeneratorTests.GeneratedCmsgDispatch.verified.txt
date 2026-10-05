@@ -1512,6 +1512,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.MovementSystem.HandlePlayerMove(global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_RUN_MODE, in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveSetVehicleRecIDAck_CMSG_MOVE_SET_VEHICLE_REC_ID_ACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MoveSetVehicleRecIDAckCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleMoveSetVehicleRecIDAck(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_WALK_MODE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ClientPlayerMovementCodec.Read(ref reader, out var packet);
@@ -2905,6 +2911,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_FLY] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_FLY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_PITCH] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_PITCH;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_RUN_MODE] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_RUN_MODE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_VEHICLE_REC_ID_ACK] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveSetVehicleRecIDAck_CMSG_MOVE_SET_VEHICLE_REC_ID_ACK;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_WALK_MODE] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_SET_WALK_MODE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SPLINE_DONE] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleMoveSplineDone_CMSG_MOVE_SPLINE_DONE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_ASCEND] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandlePlayerMove_CMSG_MOVE_START_ASCEND;
@@ -3337,6 +3344,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_FLY,
             global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_PITCH,
             global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_RUN_MODE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_VEHICLE_REC_ID_ACK,
             global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SET_WALK_MODE,
             global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_SPLINE_DONE,
             global::HermesProxy.World.Enums.Opcode.CMSG_MOVE_START_ASCEND,

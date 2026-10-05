@@ -13,6 +13,32 @@ namespace HermesProxy.World.Client;
 
 public partial class WorldClient
 {
+    private uint _playerVehicleSequence;
+
+    [HandlesSmsg(Opcode.SMSG_PLAYER_VEHICLE_DATA)]
+    internal void HandlePlayerVehicleData(WorldPacket packet)
+    {
+        var guid = packet.ReadPackedGuid().To128(GetSession().GameState);
+        uint vehicleId = packet.ReadUInt32();
+
+        // A mounted player acquires its vehicle kit after CreateObject. Without this
+        // update the client cannot resolve passengers' seat indices to attachments.
+        if (guid == GetSession().GameState.CurrentPlayerGuid)
+        {
+            SendPlayerMovementPacket(new MoveSetVehicleRecID
+            {
+                MoverGUID = guid,
+                SequenceIndex = _playerVehicleSequence++,
+                VehicleRecID = vehicleId,
+            }, guid);
+        }
+        SendPlayerMovementPacket(new SetVehicleRecID
+        {
+            VehicleGUID = guid,
+            VehicleRecID = vehicleId,
+        }, guid);
+    }
+
     /// <summary>
     /// A speed change aimed at the player's own guid, held until the client has the player object.
     /// </summary>

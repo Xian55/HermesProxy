@@ -82,6 +82,16 @@ public static class MoveSetCollisionHeightAckCodec
     }
 }
 
+public static class MoveSetVehicleRecIDAckCodec
+{
+    public static void Read(ref SpanPacketReader r, out MoveSetVehicleRecIDAck packet)
+    {
+        WowGuid128 mover = r.ReadPackedGuid128();
+        MovementAckCodec.Read(ref r, out var ack);
+        packet = new MoveSetVehicleRecIDAck(mover, ack, r.ReadUInt32());
+    }
+}
+
 public static class SetActiveMoverCodec
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -1712,6 +1712,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandlePlayerSkinned(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandlePlayerVehicleData_SMSG_PLAYER_VEHICLE_DATA(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandlePlayerVehicleData(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandlePlayMusic_SMSG_PLAY_MUSIC(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandlePlayMusic(packet);
@@ -2668,6 +2673,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAYED_TIME] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlayedTime_SMSG_PLAYED_TIME;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAYER_BOUND] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlayerBound_SMSG_PLAYER_BOUND;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAYER_SKINNED] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlayerSkinned_SMSG_PLAYER_SKINNED;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAYER_VEHICLE_DATA] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlayerVehicleData_SMSG_PLAYER_VEHICLE_DATA;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_MUSIC] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlayMusic_SMSG_PLAY_MUSIC;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_OBJECT_SOUND] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlayObjectSound_SMSG_PLAY_OBJECT_SOUND;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_SOUND] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlaySound_SMSG_PLAY_SOUND;
@@ -3111,6 +3117,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAYED_TIME,
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAYER_BOUND,
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAYER_SKINNED,
+            global::HermesProxy.World.Enums.Opcode.SMSG_PLAYER_VEHICLE_DATA,
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_MUSIC,
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_OBJECT_SOUND,
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_SOUND,
