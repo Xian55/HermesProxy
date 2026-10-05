@@ -24,6 +24,7 @@ public class PlayerVehicleRecordTests
     [InlineData("CMSG_MOVE_SET_VEHICLE_REC_ID_ACK", 0x3A14u)]
     [InlineData("CMSG_RIDE_VEHICLE_INTERACT", 0x323Bu)]
     [InlineData("CMSG_EJECT_PASSENGER", 0x323Cu)]
+    [InlineData("CMSG_REQUEST_VEHICLE_SWITCH_SEAT", 0x323Au)]
     public void WrathClassicVehicleOpcodes_MatchThe343Protocol(string name, uint expected)
         => Assert.Equal(expected, Opcodes.GetOpcodeValueForVersion(name,
             global::HermesProxy.Enums.ClientVersionBuild.V3_4_3_54261));
@@ -275,6 +276,43 @@ public class PlayerVehicleRecordTests
         Assert.Equal(legacyValue, sent.Opcode);
         using var legacy = new WorldPacket(1u);
         legacy.WriteGuid(other);
+        Assert.Equal(legacy.GetData(), sent.Bytes);
+        Assert.Empty(harness.ClientWire.Sent);
+    }
+
+    // Clicking a seat in the indicator. 3.3.5a reads the vehicle guid packed here, and the seat
+    // as a signed byte.
+    [Theory]
+    [InlineData((byte)1)]
+    [InlineData((byte)2)]
+    public unsafe void SeatSwitch_ReachesTheLegacyServerWithItsSeat(byte seat)
+    {
+        Assert.Equal(0x479u, Opcodes.GetOpcodeValueForVersion("CMSG_REQUEST_VEHICLE_SWITCH_SEAT",
+            global::HermesProxy.Enums.ClientVersionBuild.V3_3_5a_12340));
+
+        var harness = new LegacyHandlerHarness(recordClientPackets: true, recordServerPackets: true);
+        harness.SetActivePlayer(new WowGuid64(HighGuidTypeLegacy.Player, 77));
+        var rider = new WowGuid64(HighGuidTypeLegacy.Player, 78);
+
+        using var body = new WorldPacket(1u);
+        body.WritePackedGuid128(rider.To128(harness.Session.GameState));
+        body.WriteUInt8(seat);
+        byte[] payload = body.GetData();
+        byte[] framed = new byte[payload.Length + 2];
+        payload.CopyTo(framed, 2);
+        var reader = new SpanPacketReader(new WorldPacket(framed).GetRemainingSpan());
+
+        var ctx = new SessionContext(harness.Session, socket: null, harness.Client);
+        var handler = GeneratedCmsgDispatch.Get(Opcode.CMSG_REQUEST_VEHICLE_SWITCH_SEAT);
+        Assert.True(handler != null);
+        handler(ref reader, in ctx);
+
+        Assert.Equal(0, reader.Remaining);
+        var sent = Assert.Single(harness.ServerWire.Sent);
+        Assert.Equal(0x479u, sent.Opcode);
+        using var legacy = new WorldPacket(1u);
+        legacy.WritePackedGuid(rider);
+        legacy.WriteInt8((sbyte)seat);
         Assert.Equal(legacy.GetData(), sent.Bytes);
         Assert.Empty(harness.ClientWire.Sent);
     }

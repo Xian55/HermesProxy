@@ -380,6 +380,19 @@ public static class MovementSystem
         ctx.SendPacketToServer(packet);
     }
 
+    [HandlesCmsg(Opcode.CMSG_REQUEST_VEHICLE_SWITCH_SEAT)]
+    public static void HandleRequestVehicleSwitchSeat(in RequestVehicleSwitchSeat request, in SessionContext ctx)
+    {
+        if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V3_0_2_9056))
+            return;
+
+        // Unlike boarding and ejecting, 3.3.5a reads this vehicle guid packed.
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_REQUEST_VEHICLE_SWITCH_SEAT);
+        packet.WritePackedGuid(request.Vehicle.To64());
+        packet.WriteInt8((sbyte)request.SeatIndex);
+        ctx.SendPacketToServer(packet);
+    }
+
     [HandlesCmsg(Opcode.CMSG_MOVE_SET_VEHICLE_REC_ID_ACK)]
     public static void HandleMoveSetVehicleRecIDAck(in MoveSetVehicleRecIDAck ack, in SessionContext ctx)
     {

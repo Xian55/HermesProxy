@@ -148,3 +148,14 @@ public static class EjectPassengerCodec
     public static void Read(ref SpanPacketReader r, out EjectPassenger packet)
         => packet = new EjectPassenger(r.ReadPackedGuid128());
 }
+
+public static class RequestVehicleSwitchSeatCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out RequestVehicleSwitchSeat packet)
+    {
+        WowGuid128 vehicle = r.ReadPackedGuid128();
+        byte seatIndex = r.ReadUInt8();
+        packet = new RequestVehicleSwitchSeat(vehicle, seatIndex);
+    }
+}

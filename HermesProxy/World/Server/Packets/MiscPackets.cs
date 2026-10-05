@@ -917,6 +917,9 @@ public readonly record struct RideVehicleInteract(WowGuid128 Vehicle);
 /// <summary>The vehicle's owner removes whoever sits in one of its seats.</summary>
 public readonly record struct EjectPassenger(WowGuid128 Passenger);
 
+/// <summary>A passenger picks a specific seat, e.g. by clicking it in the seat indicator.</summary>
+public readonly record struct RequestVehicleSwitchSeat(WowGuid128 Vehicle, byte SeatIndex);
+
 public readonly record struct FarSight(bool Enable);
 
 /// <remarks>The handler forwards none of this — 3.3.5a's CMSG_MOUNT_SPECIAL_ANIM has no body at
