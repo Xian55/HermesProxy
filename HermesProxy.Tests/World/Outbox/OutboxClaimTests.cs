@@ -211,6 +211,56 @@ public class OutboxClaimTests
     }
 
     [Fact]
+    public void BroadcastTextReply_WaitsForItsNpcText_AndForNoOther()
+    {
+        // HotfixSystem: a derived BroadcastText id can only be answered once the server has
+        // re-sent the NPC text it belongs to.
+        var outbox = OutboxTestExtensions.InWorld(new RecordingClientWire());
+        List<uint> answered = [];
+
+        outbox.When(OutboxEvent.NpcText(764), () => answered.Add(764));
+        outbox.Notify(OutboxEvent.NpcText(3834));
+        Assert.Empty(answered);
+
+        outbox.Notify(OutboxEvent.NpcText(764));
+        outbox.Notify(OutboxEvent.NpcText(764));
+
+        Assert.Equal([764u], answered);
+        Assert.Equal(0, outbox.PendingCount);
+    }
+
+    [Fact]
+    public void BroadcastTextReply_ServerNeverAnswers_GoesOutAtTheDeadline()
+    {
+        var time = new FakeTimeProvider();
+        var outbox = OutboxTestExtensions.InWorld(new RecordingClientWire(), time);
+        int answered = 0;
+
+        outbox.When(OutboxEvent.NpcText(764), () => answered++, new HoldOptions(Timeout: TimeSpan.FromSeconds(5)));
+        time.Advance(TimeSpan.FromSeconds(5));
+        outbox.Tick();
+        Assert.Equal(1, answered);
+
+        // Its late answer changes nothing.
+        outbox.Notify(OutboxEvent.NpcText(764));
+        Assert.Equal(1, answered);
+    }
+
+    [Fact]
+    public void BroadcastTextReply_PlayerLogsOut_IsDropped()
+    {
+        var outbox = OutboxTestExtensions.InWorld(new RecordingClientWire());
+        int answered = 0;
+        outbox.When(OutboxEvent.NpcText(764), () => answered++);
+
+        outbox.Discard(OutboxScope.GameState);
+        outbox.Notify(OutboxEvent.NpcText(764));
+
+        Assert.Equal(0, answered);
+        Assert.Equal(0, outbox.PendingCount);
+    }
+
+    [Fact]
     public void PlayerKnownRaisedEveryBatch_ReleasesAHoldRegisteredAfterTheFirstRaise()
     {
         // The toy sync can be requested after the batch that made the player known; it goes out at

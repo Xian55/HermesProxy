@@ -11,10 +11,9 @@ reverse index:
 
     greeting text the legacy server sent  ->  the id the client will know it by
 
-Its one job is to give a text the same id on every proxy run. A text that is missing
-gets the next free id (GameData.GetBroadcastTextId), which depends on who talked to
-which NPC first. A client that cached that id during an earlier run then shows the
-wrong greeting.
+Its job is to keep a stock greeting on the id the original data gave it, and to let the
+proxy answer for that id without having seen the text first. A text that is missing still
+gets a stable id, derived from the text itself (World/BroadcastTextRegistry.cs).
 
 BroadcastTexts3.csv was a verbatim copy of the TBC file and matched 29.5% of the
 greetings a stock AzerothCore sends.
@@ -25,8 +24,8 @@ The lookup compares against what arrives in SMSG_NPC_TEXT_UPDATE, which is not t
 `broadcast_text` row as stored:
 
 - TrinityCore, AzerothCore and cMaNGOS all send the other gender's text when one is
-  empty, so male == female on the wire for most rows. The lookup therefore accepts a
-  match on either text, and a row keeps its real, possibly empty, pair.
+  empty, so male == female on the wire for most rows. A row keeps its real, possibly
+  empty, pair, and the lookup fills it the same way before comparing.
 - TrinityCore and AzerothCore take language and emotes from `npc_text`, not from the
   broadcast row. cMaNGOS takes them from the broadcast row when
   `npc_text_broadcast_text` maps the entry, and from `npc_text` otherwise.
@@ -58,10 +57,8 @@ gets it. To dump the tables from a live server:
 `--audit` prints the report and writes nothing. The report replays the proxy's lookup
 against both the committed file and the regenerated one, per source:
 
-    hit    the lookup returns a row that renders the same text
-    wrong  the lookup returns a row with a different text (an earlier id matched on
-           one gender only)
-    miss   no row; the proxy allocates an id
+    hit    a row carries the greeting: the same text for both genders, language, emotes
+    miss   no row; the proxy derives an id from the text
     lost   hit with the committed file, not with the regenerated one. Must be 0.
 """
 
@@ -98,7 +95,7 @@ ESCAPE_RE = re.compile(r"\\(.)|''", re.S)
 MYSQL_ESCAPES = {"n": "\n", "r": "\r", "t": "\t", "0": "\0", "b": "\b", "Z": "\x1a"}
 
 Row = dict[str, "str | None"]
-# (male, female, language, delays, emotes), exactly as GetBroadcastTextId receives them.
+# (male, female, language, delays, emotes), exactly as BroadcastTextRegistry.Resolve receives them.
 Identity = tuple[str, str, int, tuple[int, int, int], tuple[int, int, int]]
 
 
@@ -348,36 +345,23 @@ def as_csv_rows(rows: dict[int, tuple[Identity, Broadcast]]) -> list[list[str]]:
 
 
 class Lookup:
-    """GameData.GetBroadcastTextId: lowest id whose male OR female text matches."""
+    """BroadcastTextRegistry: the lowest id whose wire text, language and emotes all match."""
 
     def __init__(self, csv_rows: list[list[str]]) -> None:
-        self.text: dict[int, tuple[str, str]] = {}
-        self.by_male: dict[tuple, int] = {}
-        self.by_female: dict[tuple, int] = {}
-        for row in sorted(csv_rows, key=lambda r: int(r[0]), reverse=True):
+        self.ids: dict[Identity, int] = {}
+        for row in csv_rows:
             entry = int(row[0])
             emotes = tuple(int(v) for v in row[4:7])
             delays = tuple(int(v) for v in row[7:10])
-            key = (int(row[3]), delays, emotes)
-            self.text[entry] = on_wire(row[1], row[2])
-            # Descending, so the lowest id is the one left standing.
-            self.by_male[(row[1], *key)] = entry
-            self.by_female[(row[2], *key)] = entry
+            identity = (*on_wire(row[1], row[2]), int(row[3]), delays, emotes)
+            if entry < self.ids.get(identity, entry + 1):
+                self.ids[identity] = entry
 
     def find(self, identity: Identity) -> int | None:
-        male, female, *key = identity
-        hits = []
-        if male and (male, *key) in self.by_male:
-            hits.append(self.by_male[(male, *key)])
-        if female and (female, *key) in self.by_female:
-            hits.append(self.by_female[(female, *key)])
-        return min(hits) if hits else None
+        return self.ids.get(identity)
 
     def classify(self, identity: Identity) -> str:
-        entry = self.find(identity)
-        if entry is None:
-            return "miss"
-        return "hit" if self.text[entry] == (identity[0], identity[1]) else "wrong"
+        return "miss" if self.find(identity) is None else "hit"
 
 
 def render(csv_rows: list[list[str]]) -> str:
@@ -438,7 +422,7 @@ def main() -> int:
         print(f"  {count:>6}  {reason}")
 
     new_lookup = Lookup(new_rows)
-    print(f"\nlookup replay{'':<2}{'committed: hit wrong  miss':>30}{'regenerated: hit wrong  miss':>32}{'lost':>6}")
+    print(f"\nlookup replay{'':<2}{'committed: hit  miss':>24}{'regenerated: hit  miss':>26}{'lost':>6}")
     lost_total = 0
     for source in sources:
         before: Counter[str] = Counter()
@@ -452,8 +436,8 @@ def main() -> int:
         lost_total += lost
         print(
             f"{source.label:<14}"
-            f"{before['hit']:>19}{before['wrong']:>6}{before['miss']:>6}"
-            f"{after['hit']:>21}{after['wrong']:>6}{after['miss']:>6}{lost:>6}"
+            f"{before['hit']:>19}{before['miss']:>6}"
+            f"{after['hit']:>21}{after['miss']:>6}{lost:>6}"
         )
 
     old_ids = {row[0]: row for row in old_rows}

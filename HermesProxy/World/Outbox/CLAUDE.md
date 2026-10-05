@@ -72,6 +72,8 @@ migration moves them here one slice at a time. What has moved and what hasn't is
            Signal(UpdateBatchEnd)  same place, after SMSG_(COMPRESSED_)UPDATE_OBJECT
            ItemTemplate(entry) ... QueryHandler.HandleItemQueryResponse, valid or invalid answer
            ItemText(id) .......... MailHandler.HandleQueryItemTextResponse (pre-3.3.0)
+           NpcText(id) ........... QueryHandler.HandleQueryNpcTextResponse, with texts or masked,
+                                   after the response went to the client
            GuidKnown(player) ..... UpdateHandler.SendUpdateBatch end, V3_4_3, at EVERY batch while the
                                    client has the player (so a late hold still goes out next batch)
            Gate InWorld .......... CharacterHandler: opened on SMSG_LOGIN_VERIFY_WORLD,
@@ -142,6 +144,7 @@ they stay domain logic.
 | Send once the legacy server's packet X has been handled | `ToServer.AfterHandled(opcode, p)` | |
 | Wait for a state | `When(OutboxGate.X, p)` plus `SetGate(X, true)` where the state changes | name queries until in world |
 | Wait for several pieces of data | `WhenAll([ItemTemplate(a), ItemTemplate(b)], build)` plus `Notify` as each arrives | player create waiting for item templates; mail list waiting for letter texts |
+| Answer the client after asking the server | `When(NpcText(id), reply)`, **then** send the query | `DBReply` for a derived BroadcastText id (`HotfixSystem`), 5 s, Release |
 | Work that goes out on its own **or** gets folded into something sent first | `When(evt, state, release, new(Key: k))`; the other path does `Peek<T>(k)`, decides, then `Claim(k, state)` and does the work inline | pet batch merged into the player's deferred batch |
 | Work normally picked up by someone else, with a deadline fallback | `Delay(timeout, state, release, new(Key: k))` + `Peek`/`Claim` | pet spell bar claimed when its pet's create goes out |
 | Only the newest request counts | `Cancel(k)`, then register under `k` | mail list, pet spell bar, toy sync |
