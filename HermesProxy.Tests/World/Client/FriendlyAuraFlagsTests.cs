@@ -11,7 +11,8 @@ public class FriendlyAuraFlagsTests
 {
     [Theory]
     // AzerothCore clears Positive for a paladin's aura on an ally: effects only.
-    [InlineData(0x01, true, 0x0102)]
+    // Beneficial, but never Cancelable: it is the other paladin's to cancel.
+    [InlineData(0x01, true, 0x0100)]
     [InlineData(0x01, false, 0x0100)]
     [InlineData(0x11, true, 0x0102)] // ordinary positive/self aura
     [InlineData(0x11, false, 0x0100)]

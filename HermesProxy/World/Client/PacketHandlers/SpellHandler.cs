@@ -1641,18 +1641,17 @@ public partial class WorldClient
         data.Flags = AuraFlagsModern.None;
         data.ActiveFlags = 0u;
 
-        // 3.3.5a suppresses Positive for paladin area auras received from another
-        // caster (AuraApplication::BuildUpdatePacket). Neither polarity bit is set
-        // in that case. Classic needs an explicit beneficial flag; only Negative
-        // identifies a harmful WotLK aura.
-        bool isPositive = !legacyFlags.HasAnyFlag(AuraFlagsWotLK.Negative);
-        if (isPositive) data.Flags |= AuraFlagsModern.Positive;
+        // Polarity comes from the Negative bit alone. AzerothCore clears Positive on a paladin
+        // aura received from another caster (AuraApplication::BuildUpdatePacket), so that aura
+        // arrives with neither bit, and the modern client lists an aura without Positive among
+        // the debuffs. TrinityCore and cMaNGOS always set exactly one of the two.
         // Negative (harmful) bit must be forwarded: the modern client categorizes the aura
         // as a debuff from this flag and applies the stat-penalty visual (red character-sheet
         // numbers, e.g. Resurrection Sickness -%stat). Without it the icon shows (debuff
         // border comes from spell DB2) but the stat reduction never renders red. Native 3.4.3
         // ships Flags=21 (NoCaster|Duration|Negative) for 15007; dropping Negative gave 5.
-        if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.Negative)) data.Flags |= AuraFlagsModern.Negative;
+        bool isNegative = legacyFlags.HasAnyFlag(AuraFlagsWotLK.Negative);
+        data.Flags |= isNegative ? AuraFlagsModern.Negative : AuraFlagsModern.Positive;
         if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.Duration)) data.Flags |= AuraFlagsModern.Duration;
         if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.NoCaster)) data.Flags |= AuraFlagsModern.NoCaster;
         if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.EffectIndex0)) data.ActiveFlags |= 1u;
@@ -1672,8 +1671,11 @@ public partial class WorldClient
         // any positive non-passive buff on themselves regardless of who cast it (PWS from
         // a priest, Mark of the Wild from a druid, etc.). Gate purely on "positive aura
         // landing on the local player" — broader than TC, matches legacy client behavior.
+        // This reads the legacy Positive bit, not the polarity above: the one aura AzerothCore
+        // sends without it is another paladin's, which the player cannot cancel, and
+        // TC wotlk_classic leaves Cancelable off an aura whose owner is not the target.
         bool isOnLocalPlayer = guid == GetSession().GameState.CurrentPlayerGuid;
-        if (isPositive && isOnLocalPlayer)
+        if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.Positive) && isOnLocalPlayer)
             data.Flags |= AuraFlagsModern.Cancelable;
 
         if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.Duration))
