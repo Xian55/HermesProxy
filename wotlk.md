@@ -518,6 +518,11 @@ holds the reply until it arrives (`OutboxEvent.NpcText`); "Clear your cache!" is
 the server no longer has. A row from the file needs none of this, which is the reason to keep
 the file: it can be answered cold.
 
+To check any of this in a client without clicking through it, `scripts/drive-gossip.ps1` opens
+gossip windows and has the client say back what each shows, and
+`scripts/report-gossip-session.py <stamp> [<stamp>...]` reads the ids and texts out of the
+session's sniffs and says whether two runs handed out the same ids.
+
 ```
 python scripts/build-broadcast-texts-csv.py 3 --audit trinity=<dump> azerothcore=<dump> cmangos=<dump>
 python scripts/build-broadcast-texts-csv.py 3 trinity=<dump> azerothcore=<dump> cmangos=<dump>
