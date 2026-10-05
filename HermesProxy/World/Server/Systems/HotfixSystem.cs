@@ -1,10 +1,13 @@
-﻿using Framework.Constants;
+﻿using System;
+
+using Framework.Constants;
 using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server.Packets;
 
 using static HermesProxy.World.GameData;
@@ -18,13 +21,15 @@ namespace HermesProxy.World.Server.Systems;
 /// Neither of these translates a legacy packet. The bulk query answers per record from GameData,
 /// and falls back to asking the legacy server for item data it has not cached yet - which is why
 /// it can forward CMSG_ITEM_QUERY_SINGLE mid-loop and skip that record's reply until the answer
-/// arrives.
+/// arrives. A BroadcastText id derived from a text this process has not seen waits the same way,
+/// for the NPC text of the open gossip window, held through the client outbox.
 /// </remarks>
 public static class HotfixSystem
 {
     [HandlesCmsg(Opcode.CMSG_DB_QUERY_BULK)]
     public static void HandleDbQueryBulk(in DBQueryBulk query, in SessionContext ctx)
     {
+        uint askedNpcText = 0;
         foreach (uint id in query.Queries)
         {
             DBReply reply = new();
@@ -53,33 +58,11 @@ public static class HotfixSystem
 
             if (query.TableHash == DB2Hash.BroadcastText)
             {
-                BroadcastText? bct = GameData.GetBroadcastText(id);
-                if (bct == null)
-                {
-                    bct = new BroadcastText();
-                    bct.Entry = id;
-                    bct.MaleText = "Clear your cache!";
-                    bct.FemaleText = "Clear your cache!";
-                }
+                if (GameData.IsDerivedBroadcastTextId(id) && GameData.GetBroadcastText(id) == null &&
+                    AnswerOnceItsNpcTextIsHere(id, ref askedNpcText, ctx))
+                    continue;
 
-                //Log.PrintNet(LogType.Debug, LogNetDir.P2C, $"Sending broadcast text #{id}");
-                reply.Status = HotfixStatus.Valid;
-                reply.Data.WriteCString(bct.MaleText);
-                reply.Data.WriteCString(bct.FemaleText);
-                reply.Data.WriteUInt32(bct.Entry);
-                reply.Data.WriteUInt32(bct.Language);
-                reply.Data.WriteUInt32(0); // ConditionId
-                reply.Data.WriteUInt16(0); // EmotesId
-                reply.Data.WriteUInt8(0); // Flags
-                reply.Data.WriteUInt32(0); // ChatBubbleDurationMs
-                if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-                    reply.Data.WriteUInt32(0); // VoiceOverPriorityID
-                for (int i = 0; i < 2; ++i)
-                    reply.Data.WriteUInt32(0); // SoundEntriesID
-                for (int i = 0; i < 3; ++i)
-                    reply.Data.WriteUInt16(bct.Emotes[i]);
-                for (int i = 0; i < 3; ++i)
-                    reply.Data.WriteUInt16(bct.EmoteDelays[i]);
+                FillBroadcastTextReply(reply, id);
             }
             else if (query.TableHash == DB2Hash.Item)
             {
@@ -128,6 +111,85 @@ public static class HotfixSystem
 
             ctx.SendPacket(reply);
         }
+    }
+
+    private static void FillBroadcastTextReply(DBReply reply, uint id)
+    {
+        BroadcastText? bct = GameData.GetBroadcastText(id);
+        if (bct == null)
+        {
+            bct = new BroadcastText();
+            bct.Entry = id;
+            bct.MaleText = "Clear your cache!";
+            bct.FemaleText = "Clear your cache!";
+        }
+
+        //Log.PrintNet(LogType.Debug, LogNetDir.P2C, $"Sending broadcast text #{id}");
+        reply.Status = HotfixStatus.Valid;
+        reply.Data.WriteCString(bct.MaleText);
+        reply.Data.WriteCString(bct.FemaleText);
+        reply.Data.WriteUInt32(bct.Entry);
+        reply.Data.WriteUInt32(bct.Language);
+        reply.Data.WriteUInt32(0); // ConditionId
+        reply.Data.WriteUInt16(0); // EmotesId
+        reply.Data.WriteUInt8(0); // Flags
+        reply.Data.WriteUInt32(0); // ChatBubbleDurationMs
+        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
+            reply.Data.WriteUInt32(0); // VoiceOverPriorityID
+        for (int i = 0; i < 2; ++i)
+            reply.Data.WriteUInt32(0); // SoundEntriesID
+        for (int i = 0; i < 3; ++i)
+            reply.Data.WriteUInt16(bct.Emotes[i]);
+        for (int i = 0; i < 3; ++i)
+            reply.Data.WriteUInt16(bct.EmoteDelays[i]);
+    }
+
+    // If the server never answers, the client still gets the reply it would have had at once.
+    private static readonly HoldOptions BroadcastTextHold = new(Timeout: TimeSpan.FromSeconds(5));
+
+    /// <summary>
+    /// Holds the reply for a derived BroadcastText id until the server has re-sent the NPC text it
+    /// belongs to. False when there is nothing to ask, and the caller answers at once.
+    /// </summary>
+    /// <remarks>
+    /// A derived id is a hash of its text, so this process can only answer for a text it has seen.
+    /// The client keeps NPC texts across sessions: after a proxy restart it shows a cached NPC text
+    /// and asks for one of its rows without sending the query that would have carried the text
+    /// here. The gossip window it has open names that NPC text, so the proxy asks for it itself.
+    /// </remarks>
+    private static bool AnswerOnceItsNpcTextIsHere(uint id, ref uint askedNpcText, in SessionContext ctx)
+    {
+        GlobalSessionData session = ctx.GetSession();
+        GossipMessagePkt? gossip = session.GameState.LastGossip;
+        if (gossip == null || gossip.TextID <= 0 || session.WorldClient == null || !session.WorldClient.IsConnected())
+            return false;
+
+        uint npcText = (uint)gossip.TextID;
+        ClientOutbox toClient = ctx.ToClient;
+
+        // Held before the question goes out, so the answer cannot arrive ahead of the hold.
+        toClient.When(OutboxEvent.NpcText(npcText), () => SendBroadcastTextReply(toClient, id), BroadcastTextHold);
+
+        if (askedNpcText != npcText)
+        {
+            askedNpcText = npcText;
+            WorldPacket packet = new WorldPacket(Opcode.CMSG_QUERY_NPC_TEXT);
+            packet.WriteUInt32(npcText);
+            packet.WriteGuid(gossip.GossipGUID.To64());
+            ctx.SendPacketToServer(packet);
+        }
+
+        return true;
+    }
+
+    private static void SendBroadcastTextReply(ClientOutbox toClient, uint id)
+    {
+        DBReply reply = new();
+        reply.RecordID = id;
+        reply.TableHash = DB2Hash.BroadcastText;
+        reply.Timestamp = (uint)Time.UnixTime;
+        FillBroadcastTextReply(reply, id);
+        toClient.Send(reply);
     }
 
     [HandlesCmsg(Opcode.CMSG_HOTFIX_REQUEST)]

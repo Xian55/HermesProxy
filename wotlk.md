@@ -499,10 +499,24 @@ by hand:
 
 `BroadcastTexts3.csv` has its own generator, `scripts/build-broadcast-texts-csv.py`, because its
 source is the legacy servers' world databases, not a DB2. The Classic clients ship no
-BroadcastText rows: they ask the proxy for every id and cache the answer. The file maps a greeting
-the server sends to the id the client knows it by, so that the id is the same on every proxy run.
-A greeting that is missing still shows, but on an id `GetBroadcastTextId` allocates in arrival
-order, and a client that cached that id in an earlier run shows the wrong text.
+BroadcastText rows: they ask the proxy for every id and cache the answer, across sessions. An id
+therefore has to mean the same text on every proxy run, or a client shows what it cached under
+that id last time. The file maps a greeting the server sends to the id the original data gave it.
+
+A greeting the file does not have gets its id from `World/BroadcastTextRegistry.cs`: a hash of
+the text, language and emotes, placed at `0x40000000` and up. That covers translations, a private
+server's own text and rows the file lacks, with nothing to ship and nothing sent unless the client
+asks. It applies to every modern client: 1.14.2, 2.5.3 and 3.4.3 were each checked to request and
+display an id that high. The hash is pinned by `BroadcastTextRegistryTests`, because changing it
+orphans every derived id a client has cached.
+
+A derived id can only be answered for a text this process has seen. The client keeps NPC texts
+across sessions (`Cache/WDB/<locale>/npccache.wdb`), so after a proxy restart it shows a cached
+NPC text and asks for one of its rows without re-sending the query that would have carried the
+text. `HotfixSystem` then asks the server for the NPC text of the open gossip window itself and
+holds the reply until it arrives (`OutboxEvent.NpcText`); "Clear your cache!" is left for a text
+the server no longer has. A row from the file needs none of this, which is the reason to keep
+the file: it can be answered cold.
 
 ```
 python scripts/build-broadcast-texts-csv.py 3 --audit trinity=<dump> azerothcore=<dump> cmangos=<dump>
@@ -516,13 +530,14 @@ three test backends, the file went from 3,524 rows (a copy of the TBC file) to 9
 
 | Backend | Greetings | Resolved before | Resolved now |
 |---|---|---|---|
-| TrinityCore | 9,599 | 2,806 (29.2%) | 8,801 (91.7%) |
-| AzerothCore | 9,305 | 2,737 (29.4%) | 8,219 (88.3%) |
-| cMaNGOS | 6,885 | 2,988 (43.4%) | 6,029 (87.6%) |
+| TrinityCore | 9,599 | 2,806 (29.2%) | 8,802 (91.7%) |
+| AzerothCore | 9,305 | 2,737 (29.4%) | 8,220 (88.3%) |
+| cMaNGOS | 6,885 | 2,988 (43.4%) | 6,030 (87.6%) |
 
-What is left cannot be fixed in the file. The lookup also compares language and emotes, the
-backends disagree on those for the same text, and an id holds one row. Other greetings, the
-default "Hey there, $N. How can I help you?" among them, have no broadcast row at all.
+The rest take a derived id. A row is matched on the whole greeting, both genders' text with
+language and emotes, the backends disagree on emotes for the same text, and an id holds one row.
+Other greetings, the default "Hey there, $N. How can I help you?" among them, have no broadcast
+row at all. On a localized session nothing matches an enUS file, so every greeting is derived.
 
 Hand-curated, with no source to regenerate from:
 

@@ -32,7 +32,8 @@ public static partial class GameData
 
     // From CSV
     public static Dictionary<uint/*Build*/, Dictionary<string /*Platform*/, byte[] /*seed*/>> BuildAuthSeeds = [];
-    public static SortedDictionary<uint, BroadcastText> BroadcastTextStore = [];
+    // Replaced by LoadBroadcastTexts. Empty until then, so a greeting still gets its derived id.
+    private static BroadcastTextRegistry _broadcastTextRegistry = new([]);
     public static FrozenDictionary<uint, uint> ItemDisplayIdStore = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<uint, uint> ItemDisplayIdToFileDataIdStore = FrozenDictionary<uint, uint>.Empty;
     // (itemId, slot) -> baked-in V3_4_3.54261 ItemEffect.RecordID. Populated from
@@ -593,37 +594,17 @@ public static partial class GameData
     }
 
     public static BroadcastText? GetBroadcastText(uint entry)
-    {
-        BroadcastText? data;
-        if (BroadcastTextStore.TryGetValue(entry, out data))
-            return data;
-        return null;
-    }
+        => _broadcastTextRegistry.Get(entry);
+
+    /// <summary>
+    /// True for an id the proxy derived from a greeting's text. Only the text can produce it, so a
+    /// proxy that has not seen that text since it started has no row for the id.
+    /// </summary>
+    public static bool IsDerivedBroadcastTextId(uint entry)
+        => entry >= BroadcastTextRegistry.DerivedIdBase;
 
     public static uint GetBroadcastTextId(string maleText, string femaleText, uint language, ushort[] emoteDelays, ushort[] emotes)
-    {
-        foreach (var itr in BroadcastTextStore)
-        {
-            if (((!String.IsNullOrEmpty(maleText) && itr.Value.MaleText == maleText) ||
-                 (!String.IsNullOrEmpty(femaleText) && itr.Value.FemaleText == femaleText)) &&
-                itr.Value.Language == language &&
-                Enumerable.SequenceEqual(itr.Value.EmoteDelays, emoteDelays) &&
-                Enumerable.SequenceEqual(itr.Value.Emotes, emotes))
-            {
-                return itr.Key;
-            }
-        }
-
-        BroadcastText broadcastText = new();
-        broadcastText.Entry = BroadcastTextStore.Keys.Last() + 1;
-        broadcastText.MaleText = maleText;
-        broadcastText.FemaleText = femaleText;
-        broadcastText.Language = language;
-        broadcastText.EmoteDelays = emoteDelays;
-        broadcastText.Emotes = emotes;
-        BroadcastTextStore.Add(broadcastText.Entry, broadcastText);
-        return broadcastText.Entry;
-    }
+        => _broadcastTextRegistry.Resolve(maleText, femaleText, language, emoteDelays, emotes);
     #endregion
     #region Loading
     private static int EstimateBytesPerField(Type type)
@@ -765,16 +746,10 @@ public static partial class GameData
     {
         var path = Path.Combine("CSV", $"BroadcastTexts{LegacyVersion.ExpansionVersion}.csv");
 
-        if (!File.Exists(path))
-        {
-            // The client ships no BroadcastText rows of its own, so without this file every
-            // greeting takes a session-allocated id in GetBroadcastTextId.
-            // See scripts/build-broadcast-texts-csv.py.
-            return;
-        }
-
-        foreach (BroadcastText broadcastText in ReadBroadcastTexts(path))
-            BroadcastTextStore.Add(broadcastText.Entry, broadcastText);
+        // The client ships no BroadcastText rows of its own. Without the file every greeting
+        // still gets a stable id, derived from its text; with it, a stock greeting keeps the id
+        // the original data gave it. See scripts/build-broadcast-texts-csv.py.
+        _broadcastTextRegistry = new BroadcastTextRegistry(File.Exists(path) ? ReadBroadcastTexts(path) : []);
     }
 
     internal static List<BroadcastText> ReadBroadcastTexts(string path)

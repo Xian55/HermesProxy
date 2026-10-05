@@ -496,6 +496,7 @@ public partial class WorldClient
         {
             response.Allow = false;
             SendPacketToClient(response);
+            GetSession().ToClient.Notify(OutboxEvent.NpcText(response.TextID));
             return;
         }
 
@@ -526,6 +527,10 @@ public partial class WorldClient
         }
 
         SendPacketToClient(response);
+
+        // Every id above now has its row, and the client has the text that names them. A
+        // BroadcastText reply held for this text (HotfixSystem) can go out behind it.
+        GetSession().ToClient.Notify(OutboxEvent.NpcText(response.TextID));
     }
 
     [HandlesSmsg(Opcode.SMSG_ITEM_QUERY_SINGLE_RESPONSE)]

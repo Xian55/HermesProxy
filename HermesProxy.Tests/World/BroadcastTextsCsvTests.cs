@@ -53,4 +53,21 @@ public class BroadcastTextsCsvTests
 
         Assert.StartsWith("Gryphons, eh? Never really cared for the beasts but to each their own.\n", text.MaleText);
     }
+
+    [Fact]
+    public void ShippedTable_EveryEntry_IsBelowTheDerivedRange()
+    {
+        // An id the proxy derives from a text must never be one a row already owns.
+        Assert.DoesNotContain(LoadShipped(), text => text.Entry >= BroadcastTextRegistry.DerivedIdBase);
+    }
+
+    [Fact]
+    public void ShippedTable_ThroughTheRegistry_ResolvesARowByItsWireText()
+    {
+        var shipped = LoadShipped();
+        var row = shipped.Single(text => text.Entry == 2878);
+        BroadcastTextRegistry registry = new(shipped);
+
+        Assert.Equal(2878u, registry.Resolve(row.MaleText, row.FemaleText, row.Language, row.EmoteDelays, row.Emotes));
+    }
 }

@@ -23,6 +23,8 @@ public enum OutboxEventKind : byte
     GuidKnown = 6,
     /// <summary>Internal: a gate opened. Raised by <c>SetGate</c>, never by callers.</summary>
     GateOpened = 7,
+    /// <summary>The legacy server answered for the NPC text with this id, with texts or without.</summary>
+    NpcText = 8,
 }
 
 /// <summary>What a hold waits for. Only used in logs.</summary>
@@ -84,6 +86,7 @@ public readonly record struct OutboxEvent(OutboxEventKind Kind, ulong A, ulong B
     public static OutboxEvent Signal(OutboxSignal signal) => new(OutboxEventKind.Signal, (ulong)signal);
     public static OutboxEvent ItemTemplate(uint entry) => new(OutboxEventKind.ItemTemplate, entry);
     public static OutboxEvent ItemText(uint id) => new(OutboxEventKind.ItemText, id);
+    public static OutboxEvent NpcText(uint id) => new(OutboxEventKind.NpcText, id);
     public static OutboxEvent GuidKnown(WowGuid128 guid) => new(OutboxEventKind.GuidKnown, guid.Low, guid.High);
     internal static OutboxEvent GateOpened(OutboxGate gate) => new(OutboxEventKind.GateOpened, (ulong)gate);
 }
