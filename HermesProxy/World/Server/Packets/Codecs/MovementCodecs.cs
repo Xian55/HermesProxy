@@ -82,6 +82,16 @@ public static class MoveSetCollisionHeightAckCodec
     }
 }
 
+public static class MoveSetVehicleRecIDAckCodec
+{
+    public static void Read(ref SpanPacketReader r, out MoveSetVehicleRecIDAck packet)
+    {
+        WowGuid128 mover = r.ReadPackedGuid128();
+        MovementAckCodec.Read(ref r, out var ack);
+        packet = new MoveSetVehicleRecIDAck(mover, ack, r.ReadUInt32());
+    }
+}
+
 public static class SetActiveMoverCodec
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -123,4 +133,29 @@ public static class RequestVehicleSeatChangeCodec
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Read(ref SpanPacketReader r, out RequestVehicleSeatChange packet)
         => packet = default;
+}
+
+public static class RideVehicleInteractCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out RideVehicleInteract packet)
+        => packet = new RideVehicleInteract(r.ReadPackedGuid128());
+}
+
+public static class EjectPassengerCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out EjectPassenger packet)
+        => packet = new EjectPassenger(r.ReadPackedGuid128());
+}
+
+public static class RequestVehicleSwitchSeatCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out RequestVehicleSwitchSeat packet)
+    {
+        WowGuid128 vehicle = r.ReadPackedGuid128();
+        byte seatIndex = r.ReadUInt8();
+        packet = new RequestVehicleSwitchSeat(vehicle, seatIndex);
+    }
 }

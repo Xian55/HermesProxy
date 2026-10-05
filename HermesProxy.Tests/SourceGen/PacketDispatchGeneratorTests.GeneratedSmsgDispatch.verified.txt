@@ -1582,6 +1582,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleNotifyReceivedMail(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleOnCancelExpectedRideVehicleAura_SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleOnCancelExpectedRideVehicleAura(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleMonsterMove_SMSG_ON_MONSTER_MOVE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleMonsterMove(packet);
@@ -1710,6 +1715,11 @@ internal static unsafe class GeneratedSmsgDispatch
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandlePlayerSkinned_SMSG_PLAYER_SKINNED(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandlePlayerSkinned(packet);
+    }
+
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandlePlayerVehicleData_SMSG_PLAYER_VEHICLE_DATA(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandlePlayerVehicleData(packet);
     }
 
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandlePlayMusic_SMSG_PLAY_MUSIC(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
@@ -2630,6 +2640,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_NEW_TAXI_PATH] = &Thunk_HermesProxy_World_Client_WorldClient_HandleNewTaxiPath_SMSG_NEW_TAXI_PATH;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_NEW_WORLD] = &Thunk_HermesProxy_World_Client_WorldClient_HandleNewWorld_SMSG_NEW_WORLD;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_NOTIFY_RECEIVED_MAIL] = &Thunk_HermesProxy_World_Client_WorldClient_HandleNotifyReceivedMail_SMSG_NOTIFY_RECEIVED_MAIL;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA] = &Thunk_HermesProxy_World_Client_WorldClient_HandleOnCancelExpectedRideVehicleAura_SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_ON_MONSTER_MOVE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMonsterMove_SMSG_ON_MONSTER_MOVE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PARTY_COMMAND_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePartyCommandResult_SMSG_PARTY_COMMAND_RESULT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PARTY_INVITE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGroupInvite_SMSG_PARTY_INVITE;
@@ -2668,6 +2679,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAYED_TIME] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlayedTime_SMSG_PLAYED_TIME;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAYER_BOUND] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlayerBound_SMSG_PLAYER_BOUND;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAYER_SKINNED] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlayerSkinned_SMSG_PLAYER_SKINNED;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAYER_VEHICLE_DATA] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlayerVehicleData_SMSG_PLAYER_VEHICLE_DATA;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_MUSIC] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlayMusic_SMSG_PLAY_MUSIC;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_OBJECT_SOUND] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlayObjectSound_SMSG_PLAY_OBJECT_SOUND;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_SOUND] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlaySound_SMSG_PLAY_SOUND;
@@ -3088,6 +3100,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_NEW_TAXI_PATH,
             global::HermesProxy.World.Enums.Opcode.SMSG_NEW_WORLD,
             global::HermesProxy.World.Enums.Opcode.SMSG_NOTIFY_RECEIVED_MAIL,
+            global::HermesProxy.World.Enums.Opcode.SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA,
             global::HermesProxy.World.Enums.Opcode.SMSG_ON_MONSTER_MOVE,
             global::HermesProxy.World.Enums.Opcode.SMSG_PARTY_COMMAND_RESULT,
             global::HermesProxy.World.Enums.Opcode.SMSG_PARTY_INVITE,
@@ -3111,6 +3124,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAYED_TIME,
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAYER_BOUND,
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAYER_SKINNED,
+            global::HermesProxy.World.Enums.Opcode.SMSG_PLAYER_VEHICLE_DATA,
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_MUSIC,
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_OBJECT_SOUND,
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_SOUND,

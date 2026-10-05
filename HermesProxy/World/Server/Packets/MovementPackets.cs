@@ -618,6 +618,50 @@ public class MoveSetFlag : ServerPacket, ISpanWritable
 
 public readonly record struct MovementAckMessage(WowGuid128 MoverGUID, MovementAck Ack);
 
+public sealed class OnCancelExpectedRideVehicleAura : ServerPacket, ISpanWritable
+{
+    public OnCancelExpectedRideVehicleAura()
+        : base(Opcode.SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA, ConnectionType.Instance) { }
+
+    public override void Write() { }
+
+    public int MaxSize => 0;
+
+    public int WriteToSpan(Span<byte> buffer) => 0;
+}
+
+public sealed class SetVehicleRecID : ServerPacket
+{
+    public SetVehicleRecID() : base(Opcode.SMSG_SET_VEHICLE_REC_ID, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(VehicleGUID);
+        _worldPacket.WriteUInt32(VehicleRecID);
+    }
+
+    public WowGuid128 VehicleGUID;
+    public uint VehicleRecID;
+}
+
+public sealed class MoveSetVehicleRecID : ServerPacket
+{
+    public MoveSetVehicleRecID() : base(Opcode.SMSG_MOVE_SET_VEHICLE_REC_ID, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(MoverGUID);
+        _worldPacket.WriteUInt32(SequenceIndex);
+        _worldPacket.WriteUInt32(VehicleRecID);
+    }
+
+    public WowGuid128 MoverGUID;
+    public uint SequenceIndex;
+    public uint VehicleRecID;
+}
+
+public readonly record struct MoveSetVehicleRecIDAck(WowGuid128 MoverGUID, MovementAck Ack, uint VehicleRecID);
+
 public readonly record struct MoveSetCollisionHeightAck(WowGuid128 MoverGUID, float Height, uint MountDisplayID, byte Reason);
 
 class MoveSetCollisionHeight : ServerPacket, ISpanWritable
