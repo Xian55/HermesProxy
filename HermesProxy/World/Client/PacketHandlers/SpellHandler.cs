@@ -1641,7 +1641,12 @@ public partial class WorldClient
         data.Flags = AuraFlagsModern.None;
         data.ActiveFlags = 0u;
 
-        if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.Positive)) data.Flags |= AuraFlagsModern.Positive;
+        // 3.3.5a suppresses Positive for paladin area auras received from another
+        // caster (AuraApplication::BuildUpdatePacket). Neither polarity bit is set
+        // in that case. Classic needs an explicit beneficial flag; only Negative
+        // identifies a harmful WotLK aura.
+        bool isPositive = !legacyFlags.HasAnyFlag(AuraFlagsWotLK.Negative);
+        if (isPositive) data.Flags |= AuraFlagsModern.Positive;
         // Negative (harmful) bit must be forwarded: the modern client categorizes the aura
         // as a debuff from this flag and applies the stat-penalty visual (red character-sheet
         // numbers, e.g. Resurrection Sickness -%stat). Without it the icon shows (debuff
@@ -1667,7 +1672,6 @@ public partial class WorldClient
         // any positive non-passive buff on themselves regardless of who cast it (PWS from
         // a priest, Mark of the Wild from a druid, etc.). Gate purely on "positive aura
         // landing on the local player" — broader than TC, matches legacy client behavior.
-        bool isPositive = legacyFlags.HasAnyFlag(AuraFlagsWotLK.Positive);
         bool isOnLocalPlayer = guid == GetSession().GameState.CurrentPlayerGuid;
         if (isPositive && isOnLocalPlayer)
             data.Flags |= AuraFlagsModern.Cancelable;
