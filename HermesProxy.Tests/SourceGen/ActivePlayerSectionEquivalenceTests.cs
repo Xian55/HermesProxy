@@ -1052,18 +1052,16 @@ public class ActivePlayerSectionEquivalenceTests
         data.WriteInt32(0);                                                        // PerksProgramCurrency (Int32) — no WotLK source (TC UpdateFields.cpp:3015)
 
         // 16 dynamic-field count prefixes. Per WPP V3_4_0 ReadCreateActivePlayerData
-        // wire order. Slots 6 + 7 = Heirlooms.Resize + HeirloomFlags.Resize; we ship
-        // the full 38-item set so the Collections panel renders X/38 owned. Matching
-        // payload bytes are written below, before the PvpInfo loop.
-        uint heirloomCount = (uint)GameData.Heirlooms.Count;
+        // wire order. Slots 6 + 7 = Heirlooms.Resize + HeirloomFlags.Resize.
+        // Legacy inventory does not provide account-wide collection unlocks.
         data.WriteUInt32(0u);                                                      // ResearchSites.Resize
         data.WriteUInt32(0u);                                                      // ResearchSiteProgress.Resize
         data.WriteUInt32(0u);                                                      // Research.Resize
         data.WriteUInt32(0u);                                                      // DailyQuestsCompleted.Resize
         data.WriteUInt32(0u);                                                      // AvailableQuestLineXQuestIDs.Resize
         data.WriteUInt32(0u);                                                      // Field_1000.Resize
-        data.WriteUInt32(heirloomCount);                                           // Heirlooms.Resize
-        data.WriteUInt32(heirloomCount);                                           // HeirloomFlags.Resize
+        data.WriteUInt32(0u);                                           // Heirlooms.Resize
+        data.WriteUInt32(0u);                                           // HeirloomFlags.Resize
         data.WriteUInt32(0u);                                                      // Toys.Resize
         data.WriteUInt32(0u);                                                      // Transmog.Resize
         data.WriteUInt32(0u);                                                      // ConditionalTransmog.Resize
@@ -1094,10 +1092,6 @@ public class ActivePlayerSectionEquivalenceTests
         // HeirloomFlags[Count], then Toys/Transmog/etc, then PvpInfo.
         for (int i = 0; i < knownTitlesCount; i++)
             data.WriteUInt64(foldedTitles[i]);
-        foreach (var itemId in GameData.Heirlooms)
-            data.WriteInt32(itemId);
-        for (int i = 0; i < GameData.Heirlooms.Count; i++)
-            data.WriteUInt32(0u);
 
         // bits 608-614 (parent 607): PvpInfo[7] nested struct, per PVPInfo::WriteCreate —
         // int8 Bracket, int32 PvpRatingID, fifteen uint32, Disqualified bit, flush.

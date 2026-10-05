@@ -1023,13 +1023,12 @@ public partial class ObjectUpdateBuilder
         data.WriteInt32((int?)src.PvPLastWeeksTierMaxFromWins ?? -1);
     }
 
-    // Heirlooms.Resize + HeirloomFlags.Resize. We ship the full owned set so the
-    // Collections panel renders X/38; the count is session data, not ActivePlayerData.
+    // Heirlooms.Resize + HeirloomFlags.Resize. Legacy inventory ownership is not
+    // an account collection unlock; match the empty AccountHeirloomUpdate.
     internal void WriteCreateActivePlayerHeirloomCounts(WorldPacket data, ActivePlayerData src)
     {
-        uint heirloomCount = (uint)GameData.Heirlooms.Count;
-        data.WriteUInt32(heirloomCount);
-        data.WriteUInt32(heirloomCount);
+        data.WriteUInt32(0);
+        data.WriteUInt32(0);
     }
 
     // bit 1512 GlyphsGroup + bit 120 GlyphsEnabled. Sources from _gameState rather than
@@ -1061,10 +1060,6 @@ public partial class ObjectUpdateBuilder
         int knownTitlesCount = FoldKnownTitles(src.KnownTitles, foldedTitles);
         for (int i = 0; i < knownTitlesCount; i++)
             data.WriteUInt64(foldedTitles[i]);
-        foreach (var itemId in GameData.Heirlooms)
-            data.WriteInt32(itemId);
-        for (int i = 0; i < GameData.Heirlooms.Count; i++)
-            data.WriteUInt32(0u);
         var usableToys = _gameState.GetUsableToysOrdered();
         for (int i = 0; i < usableToys.Length; i++)
             data.WriteInt32((int)usableToys[i]);
