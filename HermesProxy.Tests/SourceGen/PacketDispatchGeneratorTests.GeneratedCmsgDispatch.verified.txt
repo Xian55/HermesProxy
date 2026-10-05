@@ -822,6 +822,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.DuelSystem.HandleDuelResponse(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleEjectPassenger_CMSG_EJECT_PASSENGER(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.EjectPassengerCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleEjectPassenger(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_TaxiSystem_HandleEnableTaxiNode_CMSG_ENABLE_TAXI_NODE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.InteractWithNPCCodec.Read(ref reader, out var packet);
@@ -2124,6 +2130,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.SpellSystem.HandleResurrectResponse(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRideVehicleInteract_CMSG_RIDE_VEHICLE_INTERACT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.RideVehicleInteractCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MovementSystem.HandleRideVehicleInteract(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_ClientConfigSystem_HandleSaveCUFProfiles_CMSG_SAVE_CUF_PROFILES(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.SaveCUFProfilesCodec.Read(ref reader, out var packet);
@@ -2760,6 +2772,7 @@ internal static unsafe class GeneratedCmsgDispatch
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DO_READY_CHECK] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleReadyCheck_CMSG_DO_READY_CHECK_DoReadyCheckCodecWotLKClassic;
         }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DUEL_RESPONSE] = &Thunk_HermesProxy_World_Server_Systems_DuelSystem_HandleDuelResponse_CMSG_DUEL_RESPONSE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_EJECT_PASSENGER] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleEjectPassenger_CMSG_EJECT_PASSENGER;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ENABLE_TAXI_NODE] = &Thunk_HermesProxy_World_Server_Systems_TaxiSystem_HandleEnableTaxiNode_CMSG_ENABLE_TAXI_NODE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ENUM_CHARACTERS] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleEnumCharacters_CMSG_ENUM_CHARACTERS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_FAR_SIGHT] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleFarSight_CMSG_FAR_SIGHT;
@@ -3029,6 +3042,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_PREV_SEAT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRequestVehicleSeatChange_CMSG_REQUEST_VEHICLE_PREV_SEAT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_RESET_INSTANCES] = &Thunk_HermesProxy_World_Server_Systems_InstanceSystem_HandleResetInstances_CMSG_RESET_INSTANCES;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_RESURRECT_RESPONSE] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleResurrectResponse_CMSG_RESURRECT_RESPONSE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_RIDE_VEHICLE_INTERACT] = &Thunk_HermesProxy_World_Server_Systems_MovementSystem_HandleRideVehicleInteract_CMSG_RIDE_VEHICLE_INTERACT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SAVE_CUF_PROFILES] = &Thunk_HermesProxy_World_Server_Systems_ClientConfigSystem_HandleSaveCUFProfiles_CMSG_SAVE_CUF_PROFILES;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SAVE_EQUIPMENT_SET] = &Thunk_HermesProxy_World_Server_Systems_EquipmentSetSystem_HandleSaveEquipmentSet_CMSG_SAVE_EQUIPMENT_SET;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SAVE_GUILD_EMBLEM] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleSaveGuildEmblem_CMSG_SAVE_GUILD_EMBLEM;
@@ -3238,6 +3252,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_DISMISS_CRITTER,
             global::HermesProxy.World.Enums.Opcode.CMSG_DO_READY_CHECK,
             global::HermesProxy.World.Enums.Opcode.CMSG_DUEL_RESPONSE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_EJECT_PASSENGER,
             global::HermesProxy.World.Enums.Opcode.CMSG_ENABLE_TAXI_NODE,
             global::HermesProxy.World.Enums.Opcode.CMSG_ENUM_CHARACTERS,
             global::HermesProxy.World.Enums.Opcode.CMSG_FAR_SIGHT,
@@ -3442,6 +3457,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_VEHICLE_PREV_SEAT,
             global::HermesProxy.World.Enums.Opcode.CMSG_RESET_INSTANCES,
             global::HermesProxy.World.Enums.Opcode.CMSG_RESURRECT_RESPONSE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_RIDE_VEHICLE_INTERACT,
             global::HermesProxy.World.Enums.Opcode.CMSG_SAVE_CUF_PROFILES,
             global::HermesProxy.World.Enums.Opcode.CMSG_SAVE_EQUIPMENT_SET,
             global::HermesProxy.World.Enums.Opcode.CMSG_SAVE_GUILD_EMBLEM,

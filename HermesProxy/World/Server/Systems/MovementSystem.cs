@@ -356,6 +356,30 @@ public static class MovementSystem
         ctx.SendPacketToServer(packet);
     }
 
+    [HandlesCmsg(Opcode.CMSG_RIDE_VEHICLE_INTERACT)]
+    public static void HandleRideVehicleInteract(in RideVehicleInteract interact, in SessionContext ctx)
+    {
+        // Player vehicles arrived with 3.0.2; an older server has no opcode to receive this.
+        if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V3_0_2_9056))
+            return;
+
+        // 3.3.5a calls the same request CMSG_PLAYER_VEHICLE_ENTER.
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_PLAYER_VEHICLE_ENTER);
+        packet.WriteGuid(interact.Vehicle.To64());
+        ctx.SendPacketToServer(packet);
+    }
+
+    [HandlesCmsg(Opcode.CMSG_EJECT_PASSENGER)]
+    public static void HandleEjectPassenger(in EjectPassenger eject, in SessionContext ctx)
+    {
+        if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V3_0_2_9056))
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_EJECT_PASSENGER);
+        packet.WriteGuid(eject.Passenger.To64());
+        ctx.SendPacketToServer(packet);
+    }
+
     [HandlesCmsg(Opcode.CMSG_MOVE_SET_VEHICLE_REC_ID_ACK)]
     public static void HandleMoveSetVehicleRecIDAck(in MoveSetVehicleRecIDAck ack, in SessionContext ctx)
     {

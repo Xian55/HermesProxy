@@ -39,6 +39,15 @@ public partial class WorldClient
         }, guid);
     }
 
+    [HandlesSmsg(Opcode.SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA)]
+    internal void HandleOnCancelExpectedRideVehicleAura(WorldPacket packet)
+    {
+        // Sent only to the player it concerns, right behind its vehicle record or its boarding
+        // request. It takes the same hold as the record so a login while mounted keeps that order.
+        SendPlayerMovementPacket(new OnCancelExpectedRideVehicleAura(),
+            GetSession().GameState.CurrentPlayerGuid);
+    }
+
     /// <summary>
     /// A speed change aimed at the player's own guid, held until the client has the player object.
     /// </summary>
@@ -821,7 +830,15 @@ public partial class WorldClient
         // melee targets becoming untrackable. SMSG_MONSTER_MOVE also carries any server-driven
         // spline, not just creatures (AzerothCore's MoveSplineInit takes a Unit*), so bots and
         // charge/knockback on real players went through the same limiter.
-        SendPacketToClient(monsterMove);
+        //
+        // The one move that waits is a seat on the player's own vehicle while the player create is
+        // still held. On a login while mounted the passengers board before that create goes out;
+        // the client cannot seat a unit on an object it does not have and never retries, so the
+        // passengers were left undrawn and the seat indicator empty.
+        if (moveSpline.TransportGuid != default)
+            SendPlayerMovementPacket(monsterMove, moveSpline.TransportGuid);
+        else
+            SendPacketToClient(monsterMove);
 
         if (isTaxiFlight)
         {

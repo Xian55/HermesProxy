@@ -618,6 +618,18 @@ public class MoveSetFlag : ServerPacket, ISpanWritable
 
 public readonly record struct MovementAckMessage(WowGuid128 MoverGUID, MovementAck Ack);
 
+public sealed class OnCancelExpectedRideVehicleAura : ServerPacket, ISpanWritable
+{
+    public OnCancelExpectedRideVehicleAura()
+        : base(Opcode.SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA, ConnectionType.Instance) { }
+
+    public override void Write() { }
+
+    public int MaxSize => 0;
+
+    public int WriteToSpan(Span<byte> buffer) => 0;
+}
+
 public sealed class SetVehicleRecID : ServerPacket
 {
     public SetVehicleRecID() : base(Opcode.SMSG_SET_VEHICLE_REC_ID, ConnectionType.Instance) { }

@@ -134,3 +134,17 @@ public static class RequestVehicleSeatChangeCodec
     public static void Read(ref SpanPacketReader r, out RequestVehicleSeatChange packet)
         => packet = default;
 }
+
+public static class RideVehicleInteractCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out RideVehicleInteract packet)
+        => packet = new RideVehicleInteract(r.ReadPackedGuid128());
+}
+
+public static class EjectPassengerCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out EjectPassenger packet)
+        => packet = new EjectPassenger(r.ReadPackedGuid128());
+}

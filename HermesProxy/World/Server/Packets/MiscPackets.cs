@@ -911,6 +911,12 @@ public readonly record struct ClientCinematicPkt;
 // resolves the vehicle from session state. One empty class covers all three opcodes.
 public readonly record struct RequestVehicleSeatChange;
 
+/// <summary>Board a seat on the vehicle another player is riding, e.g. a passenger mount.</summary>
+public readonly record struct RideVehicleInteract(WowGuid128 Vehicle);
+
+/// <summary>The vehicle's owner removes whoever sits in one of its seats.</summary>
+public readonly record struct EjectPassenger(WowGuid128 Passenger);
+
 public readonly record struct FarSight(bool Enable);
 
 /// <remarks>The handler forwards none of this — 3.3.5a's CMSG_MOUNT_SPECIAL_ANIM has no body at
