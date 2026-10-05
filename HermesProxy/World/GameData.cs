@@ -767,12 +767,19 @@ public static partial class GameData
 
         if (!File.Exists(path))
         {
-            // Not shipped for this build: either the client's own DB2 already carries these
-            // rows, or the table has no overrides for this expansion. Nothing to load.
-            // See scripts/compare-hotfix-csv.py.
+            // The client ships no BroadcastText rows of its own, so without this file every
+            // greeting takes a session-allocated id in GetBroadcastTextId.
+            // See scripts/build-broadcast-texts-csv.py.
             return;
         }
 
+        foreach (BroadcastText broadcastText in ReadBroadcastTexts(path))
+            BroadcastTextStore.Add(broadcastText.Entry, broadcastText);
+    }
+
+    internal static List<BroadcastText> ReadBroadcastTexts(string path)
+    {
+        List<BroadcastText> texts = [];
         using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
 
         foreach (var row in reader)
@@ -788,8 +795,10 @@ public static partial class GameData
             broadcastText.EmoteDelays[0] = UInt16.Parse(row[7].Span);
             broadcastText.EmoteDelays[1] = UInt16.Parse(row[8].Span);
             broadcastText.EmoteDelays[2] = UInt16.Parse(row[9].Span);
-            BroadcastTextStore.Add(broadcastText.Entry, broadcastText);
+            texts.Add(broadcastText);
         }
+
+        return texts;
     }
 
     public static void LoadCurrencyTypes()
