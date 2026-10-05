@@ -62,24 +62,8 @@ public static class HotfixSystem
                     bct.FemaleText = "Clear your cache!";
                 }
 
-                //Log.PrintNet(LogType.Debug, LogNetDir.P2C, $"Sending broadcast text #{id}");
                 reply.Status = HotfixStatus.Valid;
-                reply.Data.WriteCString(bct.MaleText);
-                reply.Data.WriteCString(bct.FemaleText);
-                reply.Data.WriteUInt32(bct.Entry);
-                reply.Data.WriteUInt32(bct.Language);
-                reply.Data.WriteUInt32(0); // ConditionId
-                reply.Data.WriteUInt16(0); // EmotesId
-                reply.Data.WriteUInt8(0); // Flags
-                reply.Data.WriteUInt32(0); // ChatBubbleDurationMs
-                if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-                    reply.Data.WriteUInt32(0); // VoiceOverPriorityID
-                for (int i = 0; i < 2; ++i)
-                    reply.Data.WriteUInt32(0); // SoundEntriesID
-                for (int i = 0; i < 3; ++i)
-                    reply.Data.WriteUInt16(bct.Emotes[i]);
-                for (int i = 0; i < 3; ++i)
-                    reply.Data.WriteUInt16(bct.EmoteDelays[i]);
+                GameData.WriteBroadcastTextHotfix(bct, reply.Data);
             }
             else if (query.TableHash == DB2Hash.Item)
             {

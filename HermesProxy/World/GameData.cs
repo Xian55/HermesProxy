@@ -595,34 +595,63 @@ public static partial class GameData
     public static BroadcastText? GetBroadcastText(uint entry)
     {
         BroadcastText? data;
-        if (BroadcastTextStore.TryGetValue(entry, out data))
-            return data;
+        lock (BroadcastTextStore)
+            if (BroadcastTextStore.TryGetValue(entry, out data))
+                return data;
         return null;
     }
 
+    // Classic has its own BroadcastText IDs. A legacy ID (or max legacy ID + 1)
+    // can resolve to an unrelated baked/cached Classic row without a DB query.
+    internal const uint CustomBroadcastTextStart = 0x40000000;
+    private static uint _nextCustomBroadcastTextId = CustomBroadcastTextStart;
+
     public static uint GetBroadcastTextId(string maleText, string femaleText, uint language, ushort[] emoteDelays, ushort[] emotes)
     {
-        foreach (var itr in BroadcastTextStore)
+        lock (BroadcastTextStore)
         {
-            if (((!String.IsNullOrEmpty(maleText) && itr.Value.MaleText == maleText) ||
-                 (!String.IsNullOrEmpty(femaleText) && itr.Value.FemaleText == femaleText)) &&
-                itr.Value.Language == language &&
-                Enumerable.SequenceEqual(itr.Value.EmoteDelays, emoteDelays) &&
-                Enumerable.SequenceEqual(itr.Value.Emotes, emotes))
+            foreach (var (id, text) in BroadcastTextStore)
             {
-                return itr.Key;
+                if (id >= CustomBroadcastTextStart &&
+                    text.MaleText == maleText && text.FemaleText == femaleText &&
+                    text.Language == language &&
+                    text.EmoteDelays.SequenceEqual(emoteDelays) && text.Emotes.SequenceEqual(emotes))
+                    return id;
             }
-        }
 
-        BroadcastText broadcastText = new();
-        broadcastText.Entry = BroadcastTextStore.Keys.Last() + 1;
-        broadcastText.MaleText = maleText;
-        broadcastText.FemaleText = femaleText;
-        broadcastText.Language = language;
-        broadcastText.EmoteDelays = emoteDelays;
-        broadcastText.Emotes = emotes;
-        BroadcastTextStore.Add(broadcastText.Entry, broadcastText);
-        return broadcastText.Entry;
+            while (BroadcastTextStore.ContainsKey(_nextCustomBroadcastTextId))
+                _nextCustomBroadcastTextId++;
+            if (_nextCustomBroadcastTextId >= int.MaxValue)
+                throw new InvalidOperationException("Custom BroadcastText ID space exhausted.");
+
+            uint entry = _nextCustomBroadcastTextId++;
+            BroadcastTextStore.Add(entry, new BroadcastText
+            {
+                Entry = entry, MaleText = maleText, FemaleText = femaleText, Language = language,
+                EmoteDelays = (ushort[])emoteDelays.Clone(), Emotes = (ushort[])emotes.Clone()
+            });
+            return entry;
+        }
+    }
+
+    internal static void WriteBroadcastTextHotfix(BroadcastText text, Framework.IO.ByteBuffer data)
+    {
+        data.WriteCString(text.MaleText);
+        data.WriteCString(text.FemaleText);
+        data.WriteUInt32(text.Entry);
+        data.WriteUInt32(text.Language);
+        data.WriteUInt32(0); // ConditionId
+        data.WriteUInt16(0); // EmotesId
+        data.WriteUInt8(0); // Flags
+        data.WriteUInt32(0); // ChatBubbleDurationMs
+        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
+            data.WriteUInt32(0); // VoiceOverPriorityID
+        for (int i = 0; i < 2; i++)
+            data.WriteUInt32(0); // SoundEntriesID
+        foreach (ushort emote in text.Emotes)
+            data.WriteUInt16(emote);
+        foreach (ushort delay in text.EmoteDelays)
+            data.WriteUInt16(delay);
     }
     #endregion
     #region Loading

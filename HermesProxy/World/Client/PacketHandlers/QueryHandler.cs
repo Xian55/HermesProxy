@@ -522,7 +522,19 @@ public partial class WorldClient
                 maleText.Equals(placeholderGossip) && femaleText.Equals(placeholderGossip) && i != 0)
                 response.BroadcastTextID[i] = 0;
             else
-                response.BroadcastTextID[i] = GameData.GetBroadcastTextId(maleText, femaleText, language, emoteDelays, emotes);
+            {
+                uint broadcastId = GameData.GetBroadcastTextId(maleText, femaleText, language, emoteDelays, emotes);
+                response.BroadcastTextID[i] = broadcastId;
+                // Refresh before the NPC response: custom IDs may have been cached in
+                // an earlier proxy process with different allocation order or locale.
+                var reply = new DBReply
+                {
+                    TableHash = DB2Hash.BroadcastText, RecordID = broadcastId,
+                    Timestamp = (uint)Time.UnixTime, Status = HotfixStatus.Valid
+                };
+                GameData.WriteBroadcastTextHotfix(GameData.GetBroadcastText(broadcastId)!, reply.Data);
+                SendPacketToClient(reply);
+            }
         }
 
         SendPacketToClient(response);
