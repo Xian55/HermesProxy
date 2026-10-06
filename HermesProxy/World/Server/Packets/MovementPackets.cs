@@ -80,7 +80,12 @@ public class MonsterMove : ServerPacket, ISpanWritable
             _layout = moveSpline.SplineFlags.HasFlag(SplineFlagModern.Cyclic) ? PointLayout.CyclicPath : PointLayout.Path;
             _pathHasEnd = moveSpline.EndPosition != Vector3.Zero;
         }
-        else if (moveSpline.EndPosition != Vector3.Zero)
+        // An end position of zero means "none", except on a transport: the seat a passenger is
+        // moved to is the origin of the vehicle it boards. A native 3.4.3 server sends that as
+        // one point at (0,0,0); without it every boarding and seat change went out pointless.
+        // SplineCount is zero for a stop, which has no end to send.
+        else if (moveSpline.EndPosition != Vector3.Zero ||
+                 (moveSpline.TransportGuid != default && moveSpline.SplineCount > 0))
             _layout = moveSpline.SplinePoints.Count > 0 ? PointLayout.EndWithDeltas : PointLayout.End;
 
         MoverGUID = guid;

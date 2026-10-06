@@ -90,4 +90,18 @@ internal static partial class TransportLogMessages
         float legacyX, float legacyY, float legacyZ, float legacyW,
         float liveX, float liveY, float liveZ, float liveW,
         float x, float y, float z, float w);
+
+    [LoggerMessage(
+        EventId = 1117,
+        Level = LogLevel.Trace,
+        Message = "[TransportRider] gravity off for a seat on vehicle {VehicleLow}/{VehicleHigh}: " +
+                  "player stands on transport {TransportLow}/{TransportHigh}")]
+    public static partial void SeatGravityHeld(
+        ILogger logger, ulong vehicleLow, ulong vehicleHigh, ulong transportLow, ulong transportHigh);
+
+    [LoggerMessage(
+        EventId = 1118,
+        Level = LogLevel.Trace,
+        Message = "[TransportRider] gravity back on, player left the seat")]
+    public static partial void SeatGravityReleased(ILogger logger);
 }

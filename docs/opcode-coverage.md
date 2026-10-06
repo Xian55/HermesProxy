@@ -155,9 +155,9 @@ Each needs a judgement call against the client or WowPacketParser.
 
 Counts per file rather than line numbers, so unrelated edits do not churn this file.
 
-206 sites across 54 files.
+207 sites across 55 files.
 
-### `ModernVersion.Build` compared by equality — 206 sites
+### `ModernVersion.Build` compared by equality — 207 sites
 
 | file | build compared | sites |
 |---|---|---:|
@@ -206,6 +206,7 @@ Counts per file rather than line numbers, so unrelated edits do not churn this f
 | `HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Client/PacketHandlers/TradeHandler.cs` | `V3_4_3_54261` | 1 |
+| `HermesProxy/World/Client/SeatGravity.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Server/Packets/ArenaPackets.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Server/Packets/CharacterPackets.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Server/Packets/Codecs/SupportTicketCodecs.cs` | `V3_4_3_54261` | 1 |

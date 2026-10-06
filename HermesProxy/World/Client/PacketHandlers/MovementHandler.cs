@@ -20,6 +20,7 @@ public partial class WorldClient
     {
         var guid = packet.ReadPackedGuid().To128(GetSession().GameState);
         uint vehicleId = packet.ReadUInt32();
+        GetSession().GameState.SetVehicleRecId(guid, vehicleId);
 
         // A mounted player acquires its vehicle kit after CreateObject. Without this
         // update the client cannot resolve passengers' seat indices to attachments.
@@ -46,6 +47,69 @@ public partial class WorldClient
         // request. It takes the same hold as the record so a login while mounted keeps that order.
         SendPlayerMovementPacket(new OnCancelExpectedRideVehicleAura(),
             GetSession().GameState.CurrentPlayerGuid);
+    }
+
+    /// <summary>
+    /// Switches the player's gravity off ahead of a seat move the client would otherwise undo by
+    /// landing back on the boat it stands on. See <see cref="SeatGravity"/>.
+    /// </summary>
+    void HoldSeatGravity(WowGuid128 vehicleGuid)
+    {
+        var gameState = GetSession().GameState;
+        if (!SeatGravity.ShouldHold(gameState))
+            return;
+
+        gameState.SeatGravity = SeatGravityState.Held;
+        World.Logging.TransportLogMessages.SeatGravityHeld(
+            _melObjLifeClient, vehicleGuid.Low, vehicleGuid.High,
+            gameState.LastReportedTransportGuid.Low, gameState.LastReportedTransportGuid.High);
+
+        // Takes the seat move's own path so the two cannot change places.
+        SendPlayerMovementPacket(new MoveSetFlag(Opcode.SMSG_MOVE_DISABLE_GRAVITY)
+        {
+            MoverGUID = gameState.CurrentPlayerGuid,
+            MoveCounter = SeatGravity.SequenceIndex,
+        }, vehicleGuid);
+    }
+
+    /// <summary>Gives the player its gravity back once the server takes it out of the seat.</summary>
+    void ReleaseSeatGravity()
+    {
+        var gameState = GetSession().GameState;
+        if (gameState.SeatGravity != SeatGravityState.Held)
+            return;
+
+        gameState.SeatGravity = SeatGravityState.Releasing;
+        World.Logging.TransportLogMessages.SeatGravityReleased(_melObjLifeClient);
+        SendPacketToClient(new MoveSetFlag(Opcode.SMSG_MOVE_ENABLE_GRAVITY)
+        {
+            MoverGUID = gameState.CurrentPlayerGuid,
+            MoveCounter = SeatGravity.SequenceIndex,
+        });
+    }
+
+    /// <summary>
+    /// Follows the server's movement flag changes for the player that bear on a held seat.
+    /// </summary>
+    void TrackOwnMoveFlagChange(Opcode opcode)
+    {
+        var gameState = GetSession().GameState;
+        switch (opcode)
+        {
+            case Opcode.SMSG_MOVE_DISABLE_GRAVITY:
+                // The seat is one the server floats its passenger in; gravity is the server's now.
+                gameState.ServerDisabledGravity = true;
+                gameState.SeatGravity = SeatGravityState.None;
+                break;
+            case Opcode.SMSG_MOVE_ENABLE_GRAVITY:
+                gameState.ServerDisabledGravity = false;
+                break;
+            case Opcode.SMSG_MOVE_UNROOT:
+                // A seated unit is unrooted only on leaving the seat, ahead of the exit move. A
+                // native server sends enable gravity, unroot, exit move, in that order.
+                ReleaseSeatGravity();
+                break;
+        }
     }
 
     /// <summary>
@@ -352,8 +416,11 @@ public partial class WorldClient
             if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
             {
                 GetSession().GameState.ClientKnownGuids.Clear();
+                GetSession().GameState.VehicleRecIds.Clear();
                 GetSession().GameState.ClientHasPlayerObject = false;
                 GetSession().GameState.ClientHasPetObject = false;
+                // The player create for the new map carries the server's movement flags only.
+                GetSession().GameState.SeatGravity = SeatGravityState.None;
                 GetSession().ToClient.Cancel(HeldPetUpdateBatch.Key);
                 GetSession().ToClient.Cancel(HeldPlayerValues.Key);
                 GetSession().ToClient.Cancel(PlayerMoveSpeedKey);
@@ -570,9 +637,12 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_MOVE_SET_NORMAL_FALL)]
     internal void HandleMoveForceFlagChange(WorldPacket packet)
     {
-        MoveSetFlag flag = new MoveSetFlag(packet.GetUniversalOpcode(false));
+        Opcode opcode = packet.GetUniversalOpcode(false);
+        MoveSetFlag flag = new MoveSetFlag(opcode);
         flag.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
         flag.MoveCounter = packet.ReadUInt32();
+        if (flag.MoverGUID == GetSession().GameState.CurrentPlayerGuid)
+            TrackOwnMoveFlagChange(opcode);
         SendPacketToClient(flag);
     }
 
@@ -651,6 +721,8 @@ public partial class WorldClient
         bool hasTrajectory;
         bool hasCatmullRom;
         bool isFlyingSpline;
+        bool takesSeat = false;
+        bool leavesSeat = false;
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
             var splineFlags = (SplineFlagVanilla)packet.ReadUInt32();
@@ -702,7 +774,10 @@ public partial class WorldClient
             hasTrajectory = splineFlags.HasAnyFlag(SplineFlagWotLK.Trajectory);
             hasCatmullRom = SplineFlagTranslation.IsSmoothPath(splineFlags);
             isFlyingSpline = SplineFlagTranslation.IsServerFlight(splineFlags);
-            moveSpline.SplineFlags = splineFlags.CastFlags<SplineFlagWotLK, SplineFlagModern>();
+            takesSeat = splineFlags.HasAnyFlag(SplineFlagWotLK.TransportEnter);
+            leavesSeat = splineFlags.HasAnyFlag(SplineFlagWotLK.TransportExit);
+            moveSpline.SplineFlags = splineFlags.CastFlags<SplineFlagWotLK, SplineFlagModern>()
+                                     | SplineFlagTranslation.SeatMoveFlags(splineFlags);
         }
 
         if (hasAnimTier)
@@ -835,6 +910,14 @@ public partial class WorldClient
         // still held. On a login while mounted the passengers board before that create goes out;
         // the client cannot seat a unit on an object it does not have and never retries, so the
         // passengers were left undrawn and the seat indicator empty.
+        if (guid == GetSession().GameState.CurrentPlayerGuid)
+        {
+            if (takesSeat && moveSpline.TransportGuid != default)
+                HoldSeatGravity(moveSpline.TransportGuid);
+            else if (leavesSeat)
+                ReleaseSeatGravity();
+        }
+
         if (moveSpline.TransportGuid != default)
             SendPlayerMovementPacket(monsterMove, moveSpline.TransportGuid);
         else

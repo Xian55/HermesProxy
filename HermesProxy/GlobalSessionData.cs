@@ -481,6 +481,12 @@ public sealed class GameSessionData
     // leaving can be logged as transitions rather than on every packet.
     public WowGuid128 LastReportedTransportGuid;
 
+    // The proxy's own hold on the player's gravity while it sits in a vehicle seat it took on a
+    // transport, and whether the server has gravity off for the player on its own account, in
+    // which case the proxy leaves it alone. See SeatGravity.
+    public World.Client.SeatGravityState SeatGravity;
+    public bool ServerDisabledGravity;
+
     // gameobject_template.data[18] (destructibleData -> DestructibleModelData.db2 id) keyed by
     // GameObject entry, harvested from SMSG_QUERY_GAME_OBJECT_RESPONSE as it passes through.
     // A V3_4_3 client resolves a type-33 object's model through this id and will draw nothing
@@ -557,6 +563,26 @@ public sealed class GameSessionData
     // payloads (TC sends shapeshift / debuff state via the aura packet, not via the
     // CreateObject's UnitData), so a separate authoritative tracker is required.
     public Dictionary<WowGuid128, Dictionary<byte, AuraInfo>> KnownAuras = [];
+
+    /// <summary>
+    /// Vehicle.dbc id of each unit the server has said is a vehicle, by guid. A 3.3.5a movement
+    /// block names what a passenger rides but not that vehicle's id, which the modern transport
+    /// block carries as VehicleRecID, so it is looked up here. Fed by a create's vehicle part and
+    /// by SMSG_PLAYER_VEHICLE_DATA, forgotten with the object.
+    /// </summary>
+    public Dictionary<WowGuid128, uint> VehicleRecIds = [];
+
+    /// <summary>The vehicle id of <paramref name="guid"/>, or 0 when it is not a known vehicle.</summary>
+    public uint GetVehicleRecId(WowGuid128 guid) => VehicleRecIds.GetValueOrDefault(guid);
+
+    /// <summary>Records the vehicle id of <paramref name="guid"/>; id 0 forgets it.</summary>
+    public void SetVehicleRecId(WowGuid128 guid, uint vehicleId)
+    {
+        if (vehicleId != 0)
+            VehicleRecIds[guid] = vehicleId;
+        else
+            VehicleRecIds.Remove(guid);
+    }
     public TradeSession? CurrentTrade = null;
     // The client clears the trade slots it filled after the legacy server has already closed a
     // completed trade, so a trade action with no session is expected only while this is set.

@@ -83,6 +83,71 @@ public class MonsterMoveConstructorTests
         Assert.Equal(0, packet.PointCount);
         Assert.Equal(0, packet.PackedDeltaCount);
     }
+
+    private static readonly WowGuid128 Vehicle = WowGuid128.Create(HighGuidType703.Player, 77);
+
+    // A seat is the origin of the vehicle. A native 3.4.3 server sends that destination as one
+    // point at (0,0,0), with no stop tolerance.
+    [Fact]
+    public void Constructor_SeatAtTheOrigin_IsSentAsAPoint()
+    {
+        var spline = CreateBaseSpline(SplineTypeModern.FacingAngle, SplineFlagModern.TransportEnter);
+        spline.StartPosition = Vector3.Zero;
+        spline.EndPosition = Vector3.Zero;
+        spline.SplineCount = 1;
+        spline.TransportGuid = Vehicle;
+        spline.TransportSeat = 2;
+
+        var packet = new MonsterMove(TestGuid, spline);
+
+        Assert.Equal(1, packet.PointCount);
+        Assert.Equal(Vector3.Zero, packet.Point(0));
+        Assert.Equal(0, packet.PackedDeltaCount);
+        Assert.Equal(0, StopDistanceTolerance(packet));
+    }
+
+    // A stop carries no destination at all, on a transport or off it.
+    [Fact]
+    public void Constructor_StopOnATransport_HasNoPoint()
+    {
+        var spline = CreateBaseSpline();
+        spline.EndPosition = Vector3.Zero;
+        spline.SplineCount = 0;
+        spline.TransportGuid = Vehicle;
+
+        var packet = new MonsterMove(TestGuid, spline);
+
+        Assert.Equal(0, packet.PointCount);
+        Assert.Equal(2, StopDistanceTolerance(packet));
+    }
+
+    // A smooth path keeps all of its positions in the point list; there is no separate end to add.
+    [Fact]
+    public void Constructor_SmoothPathOnATransport_GainsNoPoint()
+    {
+        var spline = CreateBaseSpline(flags: SplineFlagModern.UncompressedPath | SplineFlagModern.CatmullRom);
+        spline.EndPosition = Vector3.Zero;
+        spline.SplineCount = 2;
+        spline.TransportGuid = Vehicle;
+        spline.SplinePoints = new List<Vector3> { new(1f, 2f, 3f), new(4f, 5f, 6f) };
+
+        var packet = new MonsterMove(TestGuid, spline);
+
+        Assert.Equal(2, packet.PointCount);
+    }
+
+    // mover guid, start, spline id, destination, then one byte: CrzTeleport and the tolerance.
+    private static int StopDistanceTolerance(MonsterMove packet)
+    {
+        packet.Write();
+        packet.WritePacketData();
+        using var reader = new WorldPacket(1, packet.GetData()!);
+        reader.ReadPackedGuid128();
+        reader.ReadVector3();
+        reader.ReadUInt32();
+        reader.ReadVector3();
+        return (reader.ReadUInt8() >> 4) & 0x7;
+    }
 }
 
 public class MonsterMoveWriteTests
