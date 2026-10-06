@@ -27,6 +27,26 @@ public class SplineFlagTranslationTests
     private const SplineFlagWotLK WalkingTaxi =
         SplineFlagWotLK.WalkMode | SplineFlagWotLK.Flying;
 
+    // Native 3.4.3 capture: every move into or out of a seat, for players and for a mount's vendor
+    // passengers, carried SmoothGroundPath | CanSwim beside the boarding flag.
+    [Theory]
+    [InlineData(SplineFlagWotLK.TransportEnter)]
+    [InlineData(SplineFlagWotLK.TransportExit)]
+    public void SeatMoveFlags_AreAddedToBoardingAndLeavingMoves(SplineFlagWotLK flags)
+    {
+        Assert.Equal(SplineFlagModern.SmoothGroundPath | SplineFlagModern.CanSwim,
+            SplineFlagTranslation.SeatMoveFlags(flags));
+    }
+
+    [Theory]
+    [InlineData(SplineFlagWotLK.None)]
+    [InlineData(SplineFlagWotLK.WalkMode)]
+    [InlineData(AzerothCoreTaxi)]
+    public void SeatMoveFlags_LeaveOtherMovesAlone(SplineFlagWotLK flags)
+    {
+        Assert.Equal(SplineFlagModern.None, SplineFlagTranslation.SeatMoveFlags(flags));
+    }
+
     [Theory]
     [InlineData(AzerothCoreTaxi)]
     [InlineData(NativeTaxi)]

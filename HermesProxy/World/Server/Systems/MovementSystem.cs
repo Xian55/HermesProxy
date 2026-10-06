@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Framework.Constants;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Client;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
@@ -118,8 +119,11 @@ public static class MovementSystem
         // the deck offset side by side. Not every packet: a rider sends a dozen a second.
         ref readonly MovementInfo moveInfo = ref movement.MoveInfo;
         var gameState = ctx.GetSession().GameState;
+        bool takesSeatFromTransport = false;
         if (moveInfo.TransportGuid != gameState.LastReportedTransportGuid)
         {
+            takesSeatFromTransport = LeavesTransportObjectForUnit(
+                gameState.LastReportedTransportGuid, moveInfo.TransportGuid);
             if (_melTransportRider.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Trace))
             {
                 // Both halves: a HighGuid::Transport guid keeps its identity in High and
@@ -139,10 +143,41 @@ public static class MovementSystem
         WorldPacket packet = new WorldPacket(legacyOpcode);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(movement.Guid.To64());
-        LegacyMovementCodec.Write(packet, in moveInfo);
+        SeatGravity.WriteClientMovement(packet, in moveInfo, gameState);
         ctx.SendPacketToServer(packet);
 
+        if (takesSeatFromTransport)
+            RepeatSeatReport(legacyOpcode, in movement, gameState, in ctx);
+
         CheckProximityAreaTriggers(moveInfo.Position, gameState, ctx);
+    }
+
+    /// <summary>
+    /// True when the client's own report moves it from a transport object onto a unit: a vehicle
+    /// seat taken from a boat's deck.
+    /// </summary>
+    /// <remarks>
+    /// A 3.3.5a server hands a passenger from one transport object to another and nothing else. A
+    /// report naming a unit, from a player it still has down as the boat's passenger, is taken as
+    /// "left the transport": the server drops the boat, blanks the transport in what it relays to
+    /// everyone else, and forgets the seat in its own copy of the player's movement. The same
+    /// report sent again finds no boat to leave and is taken as it stands. A seated player is
+    /// rooted and sends nothing further by itself, so without the repeat the vehicle's rider is
+    /// left with an empty seat it cannot eject anyone from.
+    /// </remarks>
+    private static bool LeavesTransportObjectForUnit(WowGuid128 previous, WowGuid128 current) =>
+        SeatGravity.Applies &&
+        previous.GetObjectType() == ObjectType.GameObject &&
+        current.GetObjectType() is ObjectType.Player or ObjectType.Unit;
+
+    // Out of line so the per-packet path above stays as it was.
+    private static void RepeatSeatReport(uint legacyOpcode, in ClientPlayerMovement movement, GameSessionData gameState, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(legacyOpcode);
+        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
+            packet.WritePackedGuid(movement.Guid.To64());
+        SeatGravity.WriteClientMovement(packet, in movement.MoveInfo, gameState);
+        ctx.SendPacketToServer(packet);
     }
 
     /// <summary>
@@ -254,7 +289,7 @@ public static class MovementSystem
         else
             packet.WriteGuid(speed.MoverGUID.To64());
         packet.WriteUInt32(speed.Ack.MoveCounter);
-        LegacyMovementCodec.Write(packet, speed.Ack.MoveInfo);
+        SeatGravity.WriteClientMovement(packet, speed.Ack.MoveInfo, ctx.GetSession().GameState);
         packet.WriteFloat(speed.Speed);
         ctx.SendPacketToServer(packet);
     }
@@ -271,7 +306,7 @@ public static class MovementSystem
         else
             packet.WriteGuid(movementAck.MoverGUID.To64());
         packet.WriteUInt32(movementAck.Ack.MoveCounter);
-        LegacyMovementCodec.Write(packet, movementAck.Ack.MoveInfo);
+        SeatGravity.WriteClientMovement(packet, movementAck.Ack.MoveInfo, ctx.GetSession().GameState);
         packet.WriteInt32(movementAck.Ack.MoveInfo.Flags.HasAnyFlag(GetFlagForAckOpcode(opcode)) ? 1 : 0);
         ctx.SendPacketToServer(packet);
     }
@@ -283,13 +318,18 @@ public static class MovementSystem
     [HandlesCmsg(Opcode.CMSG_MOVE_GRAVITY_ENABLE_ACK)]
     public static void HandleMoveForceAck2(Opcode opcode, in MovementAckMessage movementAck, in SessionContext ctx)
     {
+        var gameState = ctx.GetSession().GameState;
+        // The proxy's own gravity change for a vehicle seat; the server never asked for it.
+        if (SeatGravity.ConsumeOwnAck(opcode, movementAck.Ack.MoveCounter, gameState))
+            return;
+
         WorldPacket packet = new WorldPacket(opcode);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(movementAck.MoverGUID.To64());
         else
             packet.WriteGuid(movementAck.MoverGUID.To64());
         packet.WriteUInt32(movementAck.Ack.MoveCounter);
-        LegacyMovementCodec.Write(packet, movementAck.Ack.MoveInfo);
+        SeatGravity.WriteClientMovement(packet, movementAck.Ack.MoveInfo, gameState);
         ctx.SendPacketToServer(packet);
     }
 
@@ -324,7 +364,7 @@ public static class MovementSystem
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MOVE_SPLINE_DONE);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(movement.Guid.To64());
-        LegacyMovementCodec.Write(packet, movement.MoveInfo);
+        SeatGravity.WriteClientMovement(packet, movement.MoveInfo, ctx.GetSession().GameState);
         packet.WriteInt32(movement.SplineID);
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
             packet.WriteFloat(0); // Spline Type

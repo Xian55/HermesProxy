@@ -143,6 +143,9 @@ public static class LegacyMovementCodec
                 Time = time,
                 PrevTime = prevTime,
                 Seat = seat,
+                // 3.3.5a names what is ridden but not that vehicle's id. Zero, and so not
+                // written, for a boat or any unit the server has not called a vehicle.
+                VehicleId = TLayout.HasTransportSeat ? gameState.GetVehicleRecId(guid) : 0u,
             };
         }
 

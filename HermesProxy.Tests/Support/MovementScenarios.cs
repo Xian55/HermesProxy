@@ -328,8 +328,8 @@ internal static class MovementScenarios
                 Guid = Vehicle, Entry = 28670,
                 Vehicle = new LegacyVehicle(312, 1.25f),
             });
-            // A vehicle that is itself a passenger: its own vehicle id is what currently lands
-            // in the transport block's VehicleRecID.
+            // A vehicle standing on a boat. Its own vehicle id stays in the vehicle part; the
+            // transport part names what is ridden, and a boat is no vehicle (issue #344).
             yield return ("creature-vehicle-on-transport", CreatureCreate with
             {
                 Guid = Vehicle, Entry = 28670,

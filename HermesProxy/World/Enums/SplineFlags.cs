@@ -105,7 +105,10 @@ public enum SplineFlagWotLK : uint
     EnterCycle          = 0x00100000,
     AnimationTier       = 0x00200000,
     Frozen              = 0x00400000,
-    Transport           = 0x00800000,
+    // Flags are carried over to the modern client by name, so this one has to be spelled
+    // as the modern enum spells it. As plain "Transport" it matched nothing and every
+    // boarding move reached the client without it.
+    TransportEnter      = 0x00800000,
     TransportExit       = 0x01000000,
     Unknown7            = 0x02000000,
     Unknown8            = 0x04000000,

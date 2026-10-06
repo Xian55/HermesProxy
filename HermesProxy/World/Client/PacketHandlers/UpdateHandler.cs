@@ -191,6 +191,7 @@ public partial class WorldClient
             GetSession().GameState.ObjectCacheModern.Remove(guid);
         }
         GetSession().GameState.LastAuraCasterOnTarget.Remove(guid);
+        GetSession().GameState.VehicleRecIds.Remove(guid);
         // The client is about to drop this object, so it must stop counting as "known".
         // ClientKnownGuids gates Values forwarding in FilterV3_4_3Values; leaving a
         // destroyed guid in the set lets later Values deltas through for an object the
@@ -242,6 +243,7 @@ public partial class WorldClient
             GetSession().GameState.ObjectCacheModern.Remove(guid);
         }
         GetSession().GameState.LastAuraCasterOnTarget.Remove(guid);
+        GetSession().GameState.VehicleRecIds.Remove(guid);
         bool wasKnown = GetSession().GameState.ClientKnownGuids.Remove(guid);
         ForgetPetObjectIfLost(guid, wasKnown);
         World.Logging.ObjectLifecycleLogMessages.KnownGuidRemoved(
@@ -1255,6 +1257,7 @@ public partial class WorldClient
                 GetSession().GameState.ObjectCacheModern.Remove(guid);
             }
             GetSession().GameState.LastAuraCasterOnTarget.Remove(guid);
+            GetSession().GameState.VehicleRecIds.Remove(guid);
 
             // If the pet is too far away, sends a SMSG_UPDATE_OBJECT protocol
             if (GetSession().GameState.CurrentPetGuid == guid)
@@ -1891,7 +1894,8 @@ public partial class WorldClient
                 if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 {
                     SplineFlagWotLK splineFlags = (SplineFlagWotLK)packet.ReadUInt32();
-                    monsterMove.SplineFlags = splineFlags.CastFlags<SplineFlagWotLK, SplineFlagModern>();
+                    monsterMove.SplineFlags = splineFlags.CastFlags<SplineFlagWotLK, SplineFlagModern>()
+                                              | SplineFlagTranslation.SeatMoveFlags(splineFlags);
                     isFlyingSpline = SplineFlagTranslation.IsServerFlight(splineFlags);
                     isSmoothSpline = SplineFlagTranslation.IsSmoothPath(splineFlags);
 
@@ -2061,16 +2065,11 @@ public partial class WorldClient
         {
             vehicleId = packet.ReadUInt32();
             vehicleOrientation = packet.ReadFloat();
-            // The object's own vehicle id also goes out as its transport block's VehicleRecID,
-            // which is meant to name the vehicle it rides. Wrong for a vehicle that is itself a
-            // passenger, but it is what every client has been sent so far; kept until a capture
-            // of a native server settles what belongs there.
-            if (moveInfo is { Transport: { } ridden } riding)
-            {
-                ridden.VehicleId = vehicleId;
-                riding.Transport = ridden;
-                moveInfo = riding;
-            }
+            // Remembered so a passenger's transport block can name the vehicle it rides. The
+            // object's own id does not go into its own transport block: a native 3.4.3 server
+            // sends a vehicle standing on a boat with no VehicleRecID there, and a passenger
+            // with the id of what it sits on (issue #344).
+            GetSession().GameState.SetVehicleRecId(guid, vehicleId);
         }
 
         if (flags.HasAnyFlag(UpdateFlag.GORotation))

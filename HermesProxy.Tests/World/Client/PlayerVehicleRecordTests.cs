@@ -223,7 +223,32 @@ public class PlayerVehicleRecordTests
         });
     }
 
-    private static void DeliverSeatMove(LegacyHandlerHarness harness, WowGuid64 mover, WowGuid64 vehicle, sbyte seat)
+    // What a native 3.4.3 server sends for a move into or out of a seat: the boarding flag with
+    // SmoothGroundPath | CanSwim, and the seat itself as one point at the vehicle's origin. The
+    // proxy used to lose the flag (the legacy enum spelled it differently) and the point (an end
+    // position of zero was taken for "no end").
+    [Theory]
+    [InlineData(0x00800000u, SplineFlagModern.TransportEnter)]
+    [InlineData(0x01000000u, SplineFlagModern.TransportExit)]
+    public void SeatMove_ReachesTheClientInTheNativeShape(uint legacyFlags, SplineFlagModern expected)
+    {
+        var harness = new LegacyHandlerHarness(recordClientPackets: true);
+        harness.SetActivePlayer(new WowGuid64(HighGuidTypeLegacy.Player, 77));
+        var rider = new WowGuid64(HighGuidTypeLegacy.Player, 78);
+        var passenger = new WowGuid64(HighGuidTypeLegacy.Player, 79);
+        harness.AddKnownObject(rider, ObjectType.Player);
+        harness.AddKnownObject(passenger, ObjectType.Player);
+
+        DeliverSeatMove(harness, passenger, vehicle: rider, seat: 2, legacyFlags);
+
+        var move = Assert.IsType<MonsterMove>(Assert.Single(harness.ClientWire.Sent).Packet);
+        Assert.Equal(expected | SplineFlagModern.SmoothGroundPath | SplineFlagModern.CanSwim, move.MoveSpline.SplineFlags);
+        Assert.Equal(1, move.PointCount);
+        Assert.Equal(Vector3.Zero, move.Point(0));
+    }
+
+    private static void DeliverSeatMove(LegacyHandlerHarness harness, WowGuid64 mover, WowGuid64 vehicle, sbyte seat,
+        uint splineFlags = 0)
     {
         // 3.3.5a SMSG_MONSTER_MOVE_TRANSPORT, a one-point move onto the seat.
         byte[] wire = LegacyPacketBuilder.Build(Opcode.SMSG_MONSTER_MOVE_TRANSPORT, p =>
@@ -235,7 +260,7 @@ public class PlayerVehicleRecordTests
             p.WriteFloat(0); p.WriteFloat(0); p.WriteFloat(0); // start, seat-relative
             p.WriteUInt32(1);           // spline id
             p.WriteUInt8(0);            // spline type: normal
-            p.WriteUInt32(0);           // spline flags
+            p.WriteUInt32(splineFlags);
             p.WriteUInt32(1);           // duration
             p.WriteUInt32(1);           // point count
             p.WriteFloat(0); p.WriteFloat(0); p.WriteFloat(0); // destination

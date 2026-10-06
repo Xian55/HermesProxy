@@ -52,4 +52,19 @@ internal static class SplineFlagTranslation
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool IsServerFlight(SplineFlagWotLK flags) =>
         (flags & SplineFlagWotLK.Flying) != 0;
+
+    /// <summary>
+    /// The modern-only flags a native 3.4.3 server sets on a move into or out of a vehicle seat.
+    /// </summary>
+    /// <remarks>
+    /// A 3.3.5a server sends such a move as <c>TransportEnter</c> or <c>TransportExit</c> alone. In a
+    /// native capture every one of them, for players and for a mount's vendor passengers, also
+    /// carried <c>SmoothGroundPath | CanSwim</c>. Natively <c>CanSwim</c> follows the unit; the legacy
+    /// wire does not say, and every seated unit captured so far could swim.
+    /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static SplineFlagModern SeatMoveFlags(SplineFlagWotLK flags) =>
+        (flags & (SplineFlagWotLK.TransportEnter | SplineFlagWotLK.TransportExit)) != 0
+            ? SplineFlagModern.SmoothGroundPath | SplineFlagModern.CanSwim
+            : SplineFlagModern.None;
 }
