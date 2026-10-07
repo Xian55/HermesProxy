@@ -347,8 +347,9 @@ public class CharacterCodecEquivalenceTests
     // ---- action bar ----
 
     /// <summary>
-    /// Two uint16s and a byte on the wire; what the two halves <em>mean</em> differs by build and is
-    /// the handler's problem, not the codec's. Picking them apart wrongly here silently miscoded
+    /// Two uint16s and a byte on the wire; the halves are one packed value on every build, and
+    /// putting them back together is the handler's problem, not the codec's
+    /// (<c>SetActionButtonTranslationTests</c>). Picking them apart wrongly here silently miscoded
     /// macros and mounts as spells with truncated ids, which crashed the V3_4_3 client when the
     /// bogus slot was rendered — so the codec stays faithful to the wire and the recombination
     /// stays in one place.

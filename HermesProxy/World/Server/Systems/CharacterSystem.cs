@@ -344,42 +344,28 @@ public static class CharacterSystem
     [HandlesCmsg(Opcode.CMSG_SET_ACTION_BUTTON)]
     public static void HandleSetActionButton(in SetActionButton button, in SessionContext ctx)
     {
-        // Legacy 3.3.5a CMSG_SET_ACTION_BUTTON wire format (per mangos-wotlk
-        // Player.cpp + WPP V3_4_0_45166 ActionBarHandler.cs:12-19):
+        // Legacy CMSG_SET_ACTION_BUTTON wire format, vanilla through 3.3.5a (per
+        // mangos-wotlk Player.cpp + WPP V3_4_0_45166 ActionBarHandler.cs:12-19):
         //   byte 0   = button index (uint8)
         //   bytes 1-4 = packed uint32 (low 24 bits = action ID, high 8 bits = type)
         // Total: 5 bytes.
         //
-        // The CLIENT-side wire format differs by version:
-        //   - V1_14 / V2_5 (per WPP V1_13_2 ActionBarHandler.cs): two
-        //     INDEPENDENT fields — Int16 Action + Int16 Type + Byte Slot.
-        //     SetActionButton.Read() reads them as such; we just repack the
-        //     byte-shifted legacy form.
-        //   - V3_4_3 (per WPP V3_4_0_45166): Int32 packed (low 24 = action,
-        //     high 8 = ActionButtonType) + Byte Slot. SetActionButton.Read()
-        //     splits that int32 across two uint16 fields (Action = low 16,
-        //     Type = high 16 = (action_high8 | (type<<8))), so the V3_4_3
-        //     branch must recombine the bits.
+        // Every modern client sends that same packed uint32, then the index.
+        // SetActionButton.Read() splits it across two uint16 fields (Action =
+        // low 16, Type = high 16 = (action_high8 | (type<<8))), so the bits are
+        // recombined here. WPP V1_13_2 ActionBarHandler.cs labels the halves
+        // "Action" and "Type" as if they were independent fields; they are not.
+        // A 1.14.2 client dragging item 8584 sends 88 21 00 80: Type = 0x8000.
         //
-        // Picking the wrong branch silently miscoded macros/items/mounts/
-        // equipment-sets/companions as SPELLs with truncated IDs — observed
-        // crashing the V3_4_3 client when the resulting bogus slot was
-        // rendered on a side bar.
+        // Taking the type from the low byte of Type silently miscoded macros/
+        // items/mounts/equipment-sets/companions as SPELLs. That crashed the
+        // V3_4_3 client when the resulting bogus slot was rendered on a side
+        // bar; on V1_14 a vanilla server refuses a spell button the player does
+        // not know, so the button was gone at the next login (issue 358).
         ushort actionLow16 = button.Action;
         ushort typeHi16    = button.Type;
-        uint actionReal;
-        byte typeReal;
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            actionReal = (uint)actionLow16 | (((uint)typeHi16 & 0xFFu) << 16);
-            typeReal   = (byte)((typeHi16 >> 8) & 0xFFu);
-        }
-        else
-        {
-            // V1_14 / V2_5 / pre-V3_4_3: independent uint16 fields.
-            actionReal = (uint)actionLow16;
-            typeReal   = (byte)(typeHi16 & 0xFFu);
-        }
+        uint actionReal = (uint)actionLow16 | (((uint)typeHi16 & 0xFFu) << 16);
+        byte typeReal   = (byte)((typeHi16 >> 8) & 0xFFu);
         uint packed = (actionReal & 0x00FFFFFFu) | ((uint)typeReal << 24);
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_ACTION_BUTTON);
