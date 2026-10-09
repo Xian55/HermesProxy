@@ -195,6 +195,7 @@ Counts per file rather than line numbers, so unrelated edits do not churn this f
 | `HermesProxy/World/Client/PacketHandlers/TalentHandler.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/CollectionSync.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/Packets/AuctionPackets.cs` | `V3_4_3_54261` | 2 |
+| `HermesProxy/World/Server/Packets/CharacterPackets.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/Packets/ItemPackets.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/Packets/LootPackets.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/Packets/SystemPackets.cs` | `V3_4_3_54261` | 2 |
@@ -210,7 +211,6 @@ Counts per file rather than line numbers, so unrelated edits do not churn this f
 | `HermesProxy/World/Client/PacketHandlers/TradeHandler.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Client/SeatGravity.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Server/Packets/ArenaPackets.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Server/Packets/CharacterPackets.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Server/Packets/Codecs/SupportTicketCodecs.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Server/Packets/MiscPackets.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Server/Packets/ReputationPackets.cs` | `V3_4_3_54261` | 1 |

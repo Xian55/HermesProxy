@@ -2056,7 +2056,7 @@
 - Modern: 10018 (0x2722) · 3.3.5a: — · Area: General
 - Layout: `{ guid u32 u8 loop[ { u8 u32*17 u8 } ] loop[ guid u32*5 ] }`
 - Bit fields (all-zero packet, widths in arrival order): byte 6: 2 · (6 unused)
-- HermesProxy: `InspectPvP` — differs (#363)
+- HermesProxy: `InspectPvP` — matches; see #363
 
 ### — (0x2723)
 

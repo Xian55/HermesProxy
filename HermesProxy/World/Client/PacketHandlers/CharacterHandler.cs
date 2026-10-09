@@ -878,8 +878,10 @@ public partial class WorldClient
         team.PersonalGamesPlayed = packet.ReadInt32();
         team.PersonalRating = packet.ReadInt32();
         GetSession().GameState.StoreArenaTeamDataForPlayer(inspect.PlayerGUID, slot, team);
+        // The server answers one slot per packet, so the other two come from earlier answers. The
+        // loop used to add the slot just answered three times.
         for (byte i = 0; i < ArenaTeamConst.MaxArenaSlot; i++)
-            inspect.ArenaTeams.Add(GetSession().GameState.GetArenaTeamDataForPlayer(inspect.PlayerGUID, slot));
+            inspect.ArenaTeams.Add(GetSession().GameState.GetArenaTeamDataForPlayer(inspect.PlayerGUID, i));
         SendPacketToClient(inspect);
     }
 

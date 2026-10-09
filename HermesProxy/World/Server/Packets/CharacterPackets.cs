@@ -1524,9 +1524,28 @@ public class InspectPvP : ServerPacket, ISpanWritable
 {
     public InspectPvP() : base(Opcode.SMSG_INSPECT_PVP) { }
 
+    // The 3.4.3 client reads a u32 bracket count, then a byte whose top two bits count the arena
+    // teams, and sizes its bracket array from the u32 unchecked. Sent the 3- and 2-bit counts in one
+    // byte, it took that byte and three bytes of the first team's GUID as the count: inspecting a
+    // player in an arena team asked for 54190428960 bytes and the client exited (#363).
+    private static bool Is343Layout => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
+    internal static bool? ForceV343ForTests;
+
     public override void Write()
     {
         _worldPacket.WritePackedGuid128(PlayerGUID);
+        if (Is343Layout)
+        {
+            // A 3.3.5a server has no rated brackets, and the 3.4.3 bracket (a byte, 17 ints and a
+            // flag) is not modelled, so none are sent.
+            _worldPacket.WriteUInt32(0);
+            _worldPacket.WriteBits(ArenaTeams.Count, 2);
+            _worldPacket.FlushBits();
+            foreach (var team in ArenaTeams)
+                team.Write(_worldPacket);
+            return;
+        }
         _worldPacket.WriteBits(Brackets.Count, 3);
         _worldPacket.WriteBits(ArenaTeams.Count, 2);
         _worldPacket.FlushBits();
@@ -1538,7 +1557,8 @@ public class InspectPvP : ServerPacket, ISpanWritable
             team.Write(_worldPacket);
     }
 
-    // MaxSize: GUID (18) + bits (5 -> 1 byte) + max 8 brackets (42 bytes each) + max 3 teams (38 bytes each)
+    // MaxSize: GUID (18) + bits (5 -> 1 byte) + max 8 brackets (42 bytes each) + max 3 teams (38 bytes each).
+    // It also bounds the 3.4.3 shape: GUID + u32 + 1 byte + 3 teams.
     // PvPBracketInspectData: byte(1) + 10 ints(40) + bool(1) = 42
     // ArenaTeamInspectData: GUID(18) + 5 ints(20) = 38
     private const int MaxBrackets = 8;
@@ -1554,24 +1574,33 @@ public class InspectPvP : ServerPacket, ISpanWritable
 
         var writer = new SpanPacketWriter(buffer);
         writer.WritePackedGuid128(PlayerGUID.Low, PlayerGUID.High);
-        writer.WriteBits((uint)Brackets.Count, 3);
-        writer.WriteBits((uint)ArenaTeams.Count, 2);
-        writer.FlushBits();
-
-        foreach (var bracket in Brackets)
+        if (Is343Layout)
         {
-            writer.WriteUInt8(bracket.Bracket);
-            writer.WriteInt32(bracket.Rating);
-            writer.WriteInt32(bracket.Rank);
-            writer.WriteInt32(bracket.WeeklyPlayed);
-            writer.WriteInt32(bracket.WeeklyWon);
-            writer.WriteInt32(bracket.SeasonPlayed);
-            writer.WriteInt32(bracket.SeasonWon);
-            writer.WriteInt32(bracket.WeeklyBestRating);
-            writer.WriteInt32(bracket.SeasonBestRating);
-            writer.WriteInt32(bracket.PvpTierID);
-            writer.WriteInt32(bracket.WeeklyBestWinPvpTierID);
-            writer.WriteBool(bracket.Disqualified);
+            writer.WriteUInt32(0);
+            writer.WriteBits((uint)ArenaTeams.Count, 2);
+            writer.FlushBits();
+        }
+        else
+        {
+            writer.WriteBits((uint)Brackets.Count, 3);
+            writer.WriteBits((uint)ArenaTeams.Count, 2);
+            writer.FlushBits();
+
+            foreach (var bracket in Brackets)
+            {
+                writer.WriteUInt8(bracket.Bracket);
+                writer.WriteInt32(bracket.Rating);
+                writer.WriteInt32(bracket.Rank);
+                writer.WriteInt32(bracket.WeeklyPlayed);
+                writer.WriteInt32(bracket.WeeklyWon);
+                writer.WriteInt32(bracket.SeasonPlayed);
+                writer.WriteInt32(bracket.SeasonWon);
+                writer.WriteInt32(bracket.WeeklyBestRating);
+                writer.WriteInt32(bracket.SeasonBestRating);
+                writer.WriteInt32(bracket.PvpTierID);
+                writer.WriteInt32(bracket.WeeklyBestWinPvpTierID);
+                writer.WriteBool(bracket.Disqualified);
+            }
         }
 
         foreach (var team in ArenaTeams)
