@@ -462,6 +462,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelCommand(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_ANNOUNCEMENTS, in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_BAN(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChannelPlayerCommandCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelPlayerCommand(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_BAN, in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelDeclineInvite_CMSG_CHAT_CHANNEL_DECLINE_INVITE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ChannelCommandCodec.Read(ref reader, out var packet);
@@ -474,10 +480,28 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelDisplayList(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_INVITE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChannelPlayerCommandCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelPlayerCommand(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_INVITE, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_KICK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChannelPlayerCommandCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelPlayerCommand(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_KICK, in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelList_CMSG_CHAT_CHANNEL_LIST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ChannelCommandCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelList(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_MODERATOR(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChannelPlayerCommandCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelPlayerCommand(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_MODERATOR, in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelCommand_CMSG_CHAT_CHANNEL_OWNER(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -490,6 +514,24 @@ internal static unsafe class GeneratedCmsgDispatch
     {
         global::HermesProxy.World.Server.Packets.ChannelPasswordCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelPassword(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_SET_OWNER(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChannelPlayerCommandCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelPlayerCommand(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_SET_OWNER, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_UNBAN(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChannelPlayerCommandCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelPlayerCommand(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_UNBAN, in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_UNMODERATOR(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChannelPlayerCommandCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelPlayerCommand(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_UNMODERATOR, in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatJoinChannel_CMSG_CHAT_JOIN_CHANNEL_JoinChannelCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -2674,11 +2716,18 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_ADDON_MESSAGE] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleAddonMessage_CMSG_CHAT_ADDON_MESSAGE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_ADDON_MESSAGE_TARGETED] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleAddonMessageTargeted_CMSG_CHAT_ADDON_MESSAGE_TARGETED;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_ANNOUNCEMENTS] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelCommand_CMSG_CHAT_CHANNEL_ANNOUNCEMENTS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_BAN] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_BAN;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_DECLINE_INVITE] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelDeclineInvite_CMSG_CHAT_CHANNEL_DECLINE_INVITE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_DISPLAY_LIST] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelDisplayList_CMSG_CHAT_CHANNEL_DISPLAY_LIST;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_INVITE] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_INVITE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_KICK] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_KICK;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_LIST] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelList_CMSG_CHAT_CHANNEL_LIST;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_MODERATOR] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_MODERATOR;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_OWNER] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelCommand_CMSG_CHAT_CHANNEL_OWNER;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_PASSWORD] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPassword_CMSG_CHAT_CHANNEL_PASSWORD;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_SET_OWNER] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_SET_OWNER;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_UNBAN] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_UNBAN;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_UNMODERATOR] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_UNMODERATOR;
         {
             if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_JOIN_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatJoinChannel_CMSG_CHAT_JOIN_CHANNEL_JoinChannelCodecPreWotLKClassic;
@@ -3231,11 +3280,18 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_ADDON_MESSAGE,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_ADDON_MESSAGE_TARGETED,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_ANNOUNCEMENTS,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_BAN,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_DECLINE_INVITE,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_DISPLAY_LIST,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_INVITE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_KICK,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_LIST,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_MODERATOR,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_OWNER,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_PASSWORD,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_SET_OWNER,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_UNBAN,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_UNMODERATOR,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_JOIN_CHANNEL,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_LEAVE_CHANNEL,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_AFK,
