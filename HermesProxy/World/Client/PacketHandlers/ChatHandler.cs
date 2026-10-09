@@ -117,8 +117,11 @@ public partial class WorldClient
             case ChatNotify.PlayerBanned:
             case ChatNotify.PlayerUnbanned:
             {
-                notice.TargetGuid = packet.ReadGuid().To128(GetSession().GameState); // Bad
-                notice.SenderGuid = packet.ReadGuid().To128(GetSession().GameState); // Good
+                // The 3.4.3 client prints "Player <sender> kicked by <target>", so the player who
+                // was kicked goes first, as 3.3.5a sends it. Swapped, Dk kicking Elmagi read
+                // "Player Dk kicked by Elmagi".
+                notice.SenderGuid = packet.ReadGuid().To128(GetSession().GameState); // Bad
+                notice.TargetGuid = packet.ReadGuid().To128(GetSession().GameState); // Good
                 break;
             }
             case ChatNotify.TrialRestricted:
@@ -152,6 +155,18 @@ public partial class WorldClient
             notice.Sender = GetSession().GameState.GetPlayerName(notice.SenderGuid);
         GetSession().GameState.ChannelIds.TryGetValue(channelName, out notice.ChatChannelID);
         SendPacketToClient(notice);
+
+        // AzerothCore tells a kicked or banned player only that, never "you left", and the 3.4.3
+        // client keeps the channel on its list: its /leave then gets "not on channel" and its /join
+        // is refused until relog. TrinityCore 3.4.3 sends the leave, so send it the same way.
+        if ((type == ChatNotify.PlayerKicked || type == ChatNotify.PlayerBanned) &&
+            notice.SenderGuid == GetSession().GameState.CurrentPlayerGuid)
+        {
+            ChannelNotifyLeft left = new ChannelNotifyLeft();
+            left.Channel = channelName;
+            left.ChatChannelID = notice.ChatChannelID;
+            SendPacketToClient(left);
+        }
     }
 
     [HandlesSmsg(Opcode.SMSG_CHANNEL_LIST)]
