@@ -155,9 +155,9 @@ Each needs a judgement call against the client or WowPacketParser.
 
 Counts per file rather than line numbers, so unrelated edits do not churn this file.
 
-206 sites across 55 files.
+207 sites across 55 files.
 
-### `ModernVersion.Build` compared by equality — 206 sites
+### `ModernVersion.Build` compared by equality — 207 sites
 
 | file | build compared | sites |
 |---|---|---:|
@@ -194,6 +194,7 @@ Counts per file rather than line numbers, so unrelated edits do not churn this f
 | `HermesProxy/World/Server/Packets/ChatPackets.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/Packets/ItemPackets.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/Packets/LootPackets.cs` | `V3_4_3_54261` | 2 |
+| `HermesProxy/World/Server/Packets/SystemPackets.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/Packets/TaxiPackets.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/Packets/UpdatePackets.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/Systems/ItemSystem.cs` | `V3_4_3_54261` | 2 |
@@ -210,7 +211,6 @@ Counts per file rather than line numbers, so unrelated edits do not churn this f
 | `HermesProxy/World/Server/Packets/CharacterPackets.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Server/Packets/Codecs/SupportTicketCodecs.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Server/Packets/ReputationPackets.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Server/Packets/SystemPackets.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Server/Systems/CharacterSystem.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Server/Systems/GuildSystem.cs` | `V3_4_3_54261` | 1 |
 | `HermesProxy/World/Server/Systems/LootSystem.cs` | `V3_4_3_54261` | 1 |

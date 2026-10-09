@@ -271,7 +271,7 @@ Every server-to-client opcode of the client, with its 3.3.5a counterpart where H
 | — | 0x2674 | 9844 | — | General | ignored by the client | — |
 | — | 0x2675 | 9845 | — | General | ignored by the client | — |
 | — | 0x2676 | 9846 | — | General | ignored by the client | — |
-| SMSG_SET_TIME_ZONE_INFORMATION | 0x2677 | 9847 | — | General | variable | differs (#361) |
+| SMSG_SET_TIME_ZONE_INFORMATION | 0x2677 | 9847 | — | General | variable | matches; see #361 |
 | — | 0x2678 | 9848 | — | General | fixed struct | — |
 | — | 0x2679 | 9849 | — | General | ignored by the client | — |
 | SMSG_TEXT_EMOTE | 0x267a | 9850 | 261 (0x105) | General | fixed, 8 bytes | matches |

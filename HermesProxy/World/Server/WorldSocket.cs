@@ -1321,6 +1321,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         SetTimeZoneInformation packet = new();
         packet.ServerTimeTZ = "Europe/Paris";
         packet.GameTimeTZ = "Europe/Paris";
+        packet.ServerRegionalTZ = "Europe/Paris";
 
         return packet;
     }
