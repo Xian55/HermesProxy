@@ -157,9 +157,9 @@ Each needs a judgement call against the client or WowPacketParser.
 
 Counts per file rather than line numbers, so unrelated edits do not churn this file.
 
-208 sites across 56 files.
+209 sites across 56 files.
 
-### `ModernVersion.Build` compared by equality — 208 sites
+### `ModernVersion.Build` compared by equality — 209 sites
 
 | file | build compared | sites |
 |---|---|---:|
@@ -185,6 +185,7 @@ Counts per file rather than line numbers, so unrelated edits do not churn this f
 | `HermesProxy/World/Client/PacketHandlers/EquipmentSetHandler.cs` | `V3_4_3_54261` | 3 |
 | `HermesProxy/World/Client/PacketHandlers/GroupHandler.cs` | `V3_4_3_54261` | 3 |
 | `HermesProxy/World/Client/PacketHandlers/LootHandler.cs` | `V3_4_3_54261` | 3 |
+| `HermesProxy/World/Server/Packets/ChatPackets.cs` | `V3_4_3_54261` | 3 |
 | `HermesProxy/World/Server/Systems/BattlegroundSystem.cs` | `V3_4_3_54261` | 3 |
 | `HermesProxy/World/Server/Systems/EquipmentSetSystem.cs` | `V3_4_3_54261` | 3 |
 | `HermesProxy/World/Server/Systems/PetSystem.cs` | `V3_4_3_54261` | 3 |
@@ -193,7 +194,6 @@ Counts per file rather than line numbers, so unrelated edits do not churn this f
 | `HermesProxy/World/Client/PacketHandlers/TalentHandler.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/CollectionSync.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/Packets/AuctionPackets.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Server/Packets/ChatPackets.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/Packets/ItemPackets.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/Packets/LootPackets.cs` | `V3_4_3_54261` | 2 |
 | `HermesProxy/World/Server/Packets/SystemPackets.cs` | `V3_4_3_54261` | 2 |
