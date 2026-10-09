@@ -1089,7 +1089,7 @@
 - Modern: 9847 (0x2677) · 3.3.5a: — · Area: General
 - Layout: `{ u8*3 bytes bytes bytes }`
 - Bit fields (all-zero packet, widths in arrival order): byte 0: 7 · 7 · 7 · (3 unused)
-- HermesProxy: `SetTimeZoneInformation` — differs (#361)
+- HermesProxy: `SetTimeZoneInformation` — matches; see #361
 
 ### — (0x2678)
 

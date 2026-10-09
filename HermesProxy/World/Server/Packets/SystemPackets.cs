@@ -668,36 +668,57 @@ public class SetTimeZoneInformation : ServerPacket, ISpanWritable
 {
     public SetTimeZoneInformation() : base(Opcode.SMSG_SET_TIME_ZONE_INFORMATION) { }
 
+    // The 3.4.3 client reads a third zone, ServerRegionalTZ: three 7-bit lengths, then three strings.
+    // Sent with two, it took the first character of the first string as the third length and read
+    // past the end of the packet (#361).
+    private static bool HasRegionalZone => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+
+    // The test process never runs as V3_4_3; tests set this to reach the three-zone layout.
+    internal static bool? ForceV343ForTests;
+
     public override void Write()
     {
         _worldPacket.WriteBits(ServerTimeTZ.GetByteCount(), 7);
         _worldPacket.WriteBits(GameTimeTZ.GetByteCount(), 7);
+        if (HasRegionalZone)
+            _worldPacket.WriteBits(ServerRegionalTZ.GetByteCount(), 7);
+        // WriteString does not flush for an empty string, so empty zones would lose the lengths.
+        _worldPacket.FlushBits();
         _worldPacket.WriteString(ServerTimeTZ);
         _worldPacket.WriteString(GameTimeTZ);
+        if (HasRegionalZone)
+            _worldPacket.WriteString(ServerRegionalTZ);
     }
 
     // Cap for timezone strings - 7 bits = max 128 chars each
     private const int MaxTZBytes = 64;
-    // 14 bits (2 bytes) + 2 strings
-    public int MaxSize => 2 + MaxTZBytes * 2;
+    // 21 bits (3 bytes) + 3 strings
+    public int MaxSize => 3 + MaxTZBytes * 3;
 
     public int WriteToSpan(Span<byte> buffer)
     {
         int serverBytes = Encoding.UTF8.GetByteCount(ServerTimeTZ);
         int gameBytes = Encoding.UTF8.GetByteCount(GameTimeTZ);
-        if (serverBytes > MaxTZBytes || gameBytes > MaxTZBytes)
+        int regionalBytes = Encoding.UTF8.GetByteCount(ServerRegionalTZ);
+        if (serverBytes > MaxTZBytes || gameBytes > MaxTZBytes || regionalBytes > MaxTZBytes)
             return -1;
 
         var writer = new SpanPacketWriter(buffer);
         writer.WriteBits((uint)serverBytes, 7);
         writer.WriteBits((uint)gameBytes, 7);
+        if (HasRegionalZone)
+            writer.WriteBits((uint)regionalBytes, 7);
+        writer.FlushBits();
         writer.WriteString(ServerTimeTZ);
         writer.WriteString(GameTimeTZ);
+        if (HasRegionalZone)
+            writer.WriteString(ServerRegionalTZ);
         return writer.Position;
     }
 
     public string ServerTimeTZ = string.Empty;
     public string GameTimeTZ = string.Empty;
+    public string ServerRegionalTZ = string.Empty;
 }
 
 public struct SavedThrottleObjectState
