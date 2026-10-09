@@ -119,6 +119,56 @@ public class ChannelNotifyLeft : ServerPacket, ISpanWritable
     public bool Suspended;
 }
 
+/// Every channel notice other than the player's own join and leave, which have packets of their own.
+public class ChannelNotify : ServerPacket
+{
+    public ChannelNotify() : base(Opcode.SMSG_CHANNEL_NOTIFY) { }
+
+    // Only 3.4.3 has been played against it. The layout is the same on 1.14 and 2.5, but a server
+    // packet the client misreads does more harm than one it never gets, so those keep getting none.
+    public static bool IsSent => ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+
+    public override void Write()
+    {
+        _worldPacket.WriteBits(WireType, 6);
+        _worldPacket.WriteBits(Channel.GetByteCount(), 7);
+        _worldPacket.WriteBits(Sender.GetByteCount(), 6);
+        _worldPacket.WritePackedGuid128(SenderGuid);
+        _worldPacket.WritePackedGuid128(SenderAccountID);
+        _worldPacket.WriteUInt32(SenderVirtualRealm);
+        _worldPacket.WritePackedGuid128(TargetGuid);
+        _worldPacket.WriteUInt32(TargetVirtualRealm);
+        _worldPacket.WriteInt32(ChatChannelID);
+        if (Type == ChatNotify.ModeChange)
+        {
+            _worldPacket.WriteUInt8(OldFlags);
+            _worldPacket.WriteUInt8(NewFlags);
+        }
+        _worldPacket.WriteString(Channel);
+        _worldPacket.WriteString(Sender);
+    }
+
+    // 3.4.3 numbers the notices as 3.3.5a does up to VoiceOff, then inserts VoiceOnNoAnnounce.
+    private uint WireType => Type switch
+    {
+        ChatNotify.TrialRestricted => 0x25,
+        ChatNotify.NotAllowedInChannel => 0x26,
+        _ => (uint)Type,
+    };
+
+    public ChatNotify Type;
+    public string Channel = string.Empty;
+    public string Sender = string.Empty;
+    public WowGuid128 SenderGuid;
+    public WowGuid128 SenderAccountID;
+    public uint SenderVirtualRealm;
+    public WowGuid128 TargetGuid;
+    public uint TargetVirtualRealm;
+    public int ChatChannelID;
+    public byte OldFlags;
+    public byte NewFlags;
+}
+
 public readonly record struct ChannelCommand(string ChannelName);
 
 public class ChannelListResponse : ServerPacket, ISpanWritable

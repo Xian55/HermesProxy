@@ -138,6 +138,7 @@
 - Modern: 11201 (0x2bc1) · 3.3.5a: 153 (0x99) · Area: Chat
 - Layout: `{ u8*3 guid guid u32 guid u32*2 opt[ u8*2 ] bytes bytes }`
 - Bit fields (all-zero packet, widths in arrival order): byte 0: 6 · 7 · 6 · (5 unused)
+- HermesProxy: `ChannelNotify` — matches
 
 ### SMSG_CHANNEL_NOTIFY_JOINED (0x2bc2)
 

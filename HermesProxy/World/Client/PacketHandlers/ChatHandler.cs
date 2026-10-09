@@ -27,6 +27,12 @@ public partial class WorldClient
 
         string channelName = packet.ReadCString();
 
+        // Every notice but the two below used to be read and dropped. A wrong password then left the
+        // 3.4.3 client waiting on its join, and it refused to try that channel again (#362).
+        ChannelNotify notice = new();
+        notice.Type = type;
+        notice.Channel = channelName;
+
         switch (type)
         {
             case ChatNotify.PlayerAlreadyMember:
@@ -42,7 +48,7 @@ public partial class WorldClient
             case ChatNotify.VoiceOn:
             case ChatNotify.VoiceOff:
             {
-                packet.ReadGuid();
+                notice.SenderGuid = packet.ReadGuid().To128(GetSession().GameState);
                 break;
             }
             case ChatNotify.YouJoined:
@@ -68,7 +74,7 @@ public partial class WorldClient
                 joined.ChannelGUID = WowGuid128.Create(HighGuidType703.ChatChannel, (uint)GetSession().GameState.CurrentMapId!, (uint)GetSession().GameState.CurrentZoneId!, (ulong)channelId);
                 SendPacketToClient(joined);
 
-                break;
+                return;
             }
             case ChatNotify.YouLeft:
             {
@@ -89,7 +95,7 @@ public partial class WorldClient
                 if (String.Equals(GetSession().GameState.LeftChannelName, channelName) ||
                     GameData.GetChatChannelIdFromName(channelName) == 0)
                     SendPacketToClient(left);
-                break;
+                return;
             }
             case ChatNotify.PlayerNotFound:
             case ChatNotify.ChannelOwner:
@@ -97,22 +103,22 @@ public partial class WorldClient
             case ChatNotify.PlayerInvited:
             case ChatNotify.PlayerInviteBanned:
             {
-                packet.ReadCString(); // Player Name
+                notice.Sender = packet.ReadCString(); // Player Name
                 break;
             }
             case ChatNotify.ModeChange:
             {
-                packet.ReadGuid();
-                packet.ReadUInt8(); // Old ChannelMemberFlag
-                packet.ReadUInt8(); // New ChannelMemberFlag
+                notice.SenderGuid = packet.ReadGuid().To128(GetSession().GameState);
+                notice.OldFlags = packet.ReadUInt8(); // Old ChannelMemberFlag
+                notice.NewFlags = packet.ReadUInt8(); // New ChannelMemberFlag
                 break;
             }
             case ChatNotify.PlayerKicked:
             case ChatNotify.PlayerBanned:
             case ChatNotify.PlayerUnbanned:
             {
-                packet.ReadGuid(); // Bad
-                packet.ReadGuid(); // Good
+                notice.TargetGuid = packet.ReadGuid().To128(GetSession().GameState); // Bad
+                notice.SenderGuid = packet.ReadGuid().To128(GetSession().GameState); // Good
                 break;
             }
             case ChatNotify.TrialRestricted:
@@ -135,6 +141,17 @@ public partial class WorldClient
             case ChatNotify.NotInLfg:
                 break;
         }
+
+        if (!ChannelNotify.IsSent)
+            return;
+
+        // A sender the client only has the GUID of is printed as "Dk-": it takes the player for one of
+        // another realm whose name it cannot resolve, the display side of #335. Given the name as
+        // well, it prints that. TrinityCore 3.4.3 sends the GUID alone.
+        if (notice.Sender.Length == 0 && !notice.SenderGuid.IsEmpty())
+            notice.Sender = GetSession().GameState.GetPlayerName(notice.SenderGuid);
+        GetSession().GameState.ChannelIds.TryGetValue(channelName, out notice.ChatChannelID);
+        SendPacketToClient(notice);
     }
 
     [HandlesSmsg(Opcode.SMSG_CHANNEL_LIST)]

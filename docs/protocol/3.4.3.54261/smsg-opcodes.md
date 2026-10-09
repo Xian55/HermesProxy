@@ -1162,7 +1162,7 @@ Every server-to-client opcode of the client, with its 3.3.5a counterpart where H
 | — | 0x2bbe | 11198 | — | Chat | fixed struct | — |
 | — | 0x2bbf | 11199 | — | Chat | fixed struct | — |
 | — | 0x2bc0 | 11200 | — | Chat | fixed struct | — |
-| SMSG_CHANNEL_NOTIFY | 0x2bc1 | 11201 | 153 (0x99) | Chat | variable | — |
+| SMSG_CHANNEL_NOTIFY | 0x2bc1 | 11201 | 153 (0x99) | Chat | variable | matches |
 | SMSG_CHANNEL_NOTIFY_JOINED | 0x2bc2 | 11202 | — | Chat | variable | matches |
 | SMSG_CHANNEL_NOTIFY_LEFT | 0x2bc3 | 11203 | — | Chat | variable | matches |
 | SMSG_CHANNEL_LIST | 0x2bc4 | 11204 | 155 (0x9b) | Chat | variable | matches |
