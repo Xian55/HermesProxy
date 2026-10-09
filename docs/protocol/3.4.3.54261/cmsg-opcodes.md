@@ -543,14 +543,14 @@ Every client-to-server opcode the client sends. Layouts are in [cmsg-structures]
 | CMSG_CHAT_CHANNEL_LIST | 0x37d5 | 14293 | 154 (0x9a) | variable | matches |
 | CMSG_CHAT_CHANNEL_DISPLAY_LIST | 0x37d6 | 14294 | 978 (0x3d2) | variable | matches |
 | CMSG_CHAT_CHANNEL_PASSWORD | 0x37d7 | 14295 | 156 (0x9c) | variable | matches; see #362 |
-| CMSG_CHAT_CHANNEL_SET_OWNER | 0x37d8 | 14296 | 157 (0x9d) | variable | no handler (#362) |
+| CMSG_CHAT_CHANNEL_SET_OWNER | 0x37d8 | 14296 | 157 (0x9d) | variable | matches; see #362 |
 | CMSG_CHAT_CHANNEL_OWNER | 0x37d9 | 14297 | 158 (0x9e) | variable | matches |
-| CMSG_CHAT_CHANNEL_MODERATOR | 0x37db | 14299 | 159 (0x9f) | variable | no handler (#362) |
-| CMSG_CHAT_CHANNEL_UNMODERATOR | 0x37dc | 14300 | 160 (0xa0) | variable | no handler (#362) |
-| CMSG_CHAT_CHANNEL_INVITE | 0x37df | 14303 | 163 (0xa3) | variable | no handler (#362) |
-| CMSG_CHAT_CHANNEL_KICK | 0x37e0 | 14304 | 164 (0xa4) | variable | no handler (#362) |
-| CMSG_CHAT_CHANNEL_BAN | 0x37e1 | 14305 | 165 (0xa5) | variable | no handler (#362) |
-| CMSG_CHAT_CHANNEL_UNBAN | 0x37e2 | 14306 | 166 (0xa6) | variable | no handler (#362) |
+| CMSG_CHAT_CHANNEL_MODERATOR | 0x37db | 14299 | 159 (0x9f) | variable | matches; see #362 |
+| CMSG_CHAT_CHANNEL_UNMODERATOR | 0x37dc | 14300 | 160 (0xa0) | variable | matches; see #362 |
+| CMSG_CHAT_CHANNEL_INVITE | 0x37df | 14303 | 163 (0xa3) | variable | matches; see #362 |
+| CMSG_CHAT_CHANNEL_KICK | 0x37e0 | 14304 | 164 (0xa4) | variable | matches; see #362 |
+| CMSG_CHAT_CHANNEL_BAN | 0x37e1 | 14305 | 165 (0xa5) | variable | matches; see #362 |
+| CMSG_CHAT_CHANNEL_UNBAN | 0x37e2 | 14306 | 166 (0xa6) | variable | matches; see #362 |
 | CMSG_CHAT_CHANNEL_ANNOUNCEMENTS | 0x37e3 | 14307 | 167 (0xa7) | variable | matches |
 | CMSG_CHAT_CHANNEL_SILENCE_ALL | 0x37e4 | 14308 | 973 (0x3cd) | variable | no handler (#362) |
 | CMSG_CHAT_CHANNEL_UNSILENCE_ALL | 0x37e5 | 14309 | 975 (0x3cf) | variable | no handler (#362) |

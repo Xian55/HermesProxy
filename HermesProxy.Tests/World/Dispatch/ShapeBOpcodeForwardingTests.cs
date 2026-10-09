@@ -91,4 +91,23 @@ public class ShapeBOpcodeForwardingTests
         Assert.NotEqual(0u, a);
         Assert.NotEqual(0u, b);
     }
+
+    /// <remarks>
+    /// <c>HandleChatChannelPlayerCommand</c> forwards seven opcodes. Their legacy values sit
+    /// between 0x09D and 0x0A6 next to the mute and owner opcodes, so a wrong entry would kick
+    /// where it should ban.
+    /// </remarks>
+    [Theory]
+    [InlineData(Opcode.CMSG_CHAT_CHANNEL_SET_OWNER, 0x09Du)]
+    [InlineData(Opcode.CMSG_CHAT_CHANNEL_MODERATOR, 0x09Fu)]
+    [InlineData(Opcode.CMSG_CHAT_CHANNEL_UNMODERATOR, 0x0A0u)]
+    [InlineData(Opcode.CMSG_CHAT_CHANNEL_INVITE, 0x0A3u)]
+    [InlineData(Opcode.CMSG_CHAT_CHANNEL_KICK, 0x0A4u)]
+    [InlineData(Opcode.CMSG_CHAT_CHANNEL_BAN, 0x0A5u)]
+    [InlineData(Opcode.CMSG_CHAT_CHANNEL_UNBAN, 0x0A6u)]
+    public void ChannelPlayerCommands_TranslateToTheirLegacyValue(Opcode universal, uint expectedLegacy)
+    {
+        Assert.Equal(expectedLegacy,
+            Opcodes.GetOpcodeValueForVersion(universal, ClientVersionBuild.V3_3_5a_12340));
+    }
 }

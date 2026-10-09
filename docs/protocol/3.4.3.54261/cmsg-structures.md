@@ -3522,6 +3522,7 @@ Notation: see [the README](README.md).
 
 - Modern: 14296 (0x37d8) · 3.3.5a: 157 (0x9d)
 - Layout (after the opcode): `bits(7) opt[ u8 ] alt[ u8 ] opt[ u8 ] flush bytes bytes`
+- HermesProxy: `ChannelPlayerCommand` — matches; see #362
 
 ### CMSG_CHAT_CHANNEL_OWNER (0x37d9)
 
@@ -3534,31 +3535,37 @@ Notation: see [the README](README.md).
 
 - Modern: 14299 (0x37db) · 3.3.5a: 159 (0x9f)
 - Layout (after the opcode): `bits(7) opt[ u8 ] alt[ u8 ] opt[ u8 ] flush bytes bytes`
+- HermesProxy: `ChannelPlayerCommand` — matches; see #362
 
 ### CMSG_CHAT_CHANNEL_UNMODERATOR (0x37dc)
 
 - Modern: 14300 (0x37dc) · 3.3.5a: 160 (0xa0)
 - Layout (after the opcode): `bits(7) opt[ u8 ] alt[ u8 ] opt[ u8 ] flush bytes bytes`
+- HermesProxy: `ChannelPlayerCommand` — matches; see #362
 
 ### CMSG_CHAT_CHANNEL_INVITE (0x37df)
 
 - Modern: 14303 (0x37df) · 3.3.5a: 163 (0xa3)
 - Layout (after the opcode): `bits(7) opt[ u8 ] alt[ u8 ] opt[ u8 ] flush bytes bytes`
+- HermesProxy: `ChannelPlayerCommand` — matches; see #362
 
 ### CMSG_CHAT_CHANNEL_KICK (0x37e0)
 
 - Modern: 14304 (0x37e0) · 3.3.5a: 164 (0xa4)
 - Layout (after the opcode): `bits(7) opt[ u8 ] alt[ u8 ] opt[ u8 ] flush bytes bytes`
+- HermesProxy: `ChannelPlayerCommand` — matches; see #362
 
 ### CMSG_CHAT_CHANNEL_BAN (0x37e1)
 
 - Modern: 14305 (0x37e1) · 3.3.5a: 165 (0xa5)
 - Layout (after the opcode): `bits(7) opt[ u8 ] alt[ u8 ] opt[ u8 ] flush bytes bytes`
+- HermesProxy: `ChannelPlayerCommand` — matches; see #362
 
 ### CMSG_CHAT_CHANNEL_UNBAN (0x37e2)
 
 - Modern: 14306 (0x37e2) · 3.3.5a: 166 (0xa6)
 - Layout (after the opcode): `bits(7) opt[ u8 ] alt[ u8 ] opt[ u8 ] flush bytes bytes`
+- HermesProxy: `ChannelPlayerCommand` — matches; see #362
 
 ### CMSG_CHAT_CHANNEL_ANNOUNCEMENTS (0x37e3)
 

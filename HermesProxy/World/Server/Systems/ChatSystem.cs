@@ -66,6 +66,26 @@ public static class ChatSystem
         ctx.SendPacketToServer(packet);
     }
 
+    /// <summary>
+    /// Seven opcodes forwarded under their own id, each the legacy CMSG_CHANNEL_* of the same
+    /// name: channel, then the player. SILENCE_ALL and UNSILENCE_ALL share the layout but are left
+    /// out: no slash command sends them, and 3.3.5a's channel mute is a different opcode.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_CHAT_CHANNEL_SET_OWNER)]
+    [HandlesCmsg(Opcode.CMSG_CHAT_CHANNEL_MODERATOR)]
+    [HandlesCmsg(Opcode.CMSG_CHAT_CHANNEL_UNMODERATOR)]
+    [HandlesCmsg(Opcode.CMSG_CHAT_CHANNEL_INVITE)]
+    [HandlesCmsg(Opcode.CMSG_CHAT_CHANNEL_KICK)]
+    [HandlesCmsg(Opcode.CMSG_CHAT_CHANNEL_BAN)]
+    [HandlesCmsg(Opcode.CMSG_CHAT_CHANNEL_UNBAN)]
+    public static void HandleChatChannelPlayerCommand(Opcode opcode, in ChannelPlayerCommand command, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(opcode);
+        packet.WriteCString(command.ChannelName);
+        packet.WriteCString(LegacyPlayerName.StripRealmSuffixToString(command.Name));
+        ctx.SendPacketToServer(packet);
+    }
+
     [HandlesCmsg(Opcode.CMSG_CHAT_CHANNEL_LIST)]
     public static void HandleChatChannelList(in ChannelCommand command, in SessionContext ctx)
     {

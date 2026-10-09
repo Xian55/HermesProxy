@@ -342,4 +342,17 @@ public class ChatCodecEquivalenceTests
 
         Assert.Equal(e.ChannelName, a.ChannelName);
     }
+
+    // "/ckick hermescp Nobody" from a 3.4.3 client: 8 as 7 bits, then 6 as 9 bits.
+    [Fact]
+    public void ChannelPlayerCommand_ReadsSevenThenNineBitLengths()
+    {
+        byte[] framed = [0, 0, 0x10, 0x06, .. System.Text.Encoding.UTF8.GetBytes("hermescp" + "Nobody")];
+
+        var r = ReaderOver(framed); ChannelPlayerCommandCodec.Read(ref r, out var a);
+
+        Assert.Equal("hermescp", a.ChannelName);
+        Assert.Equal("Nobody", a.Name);
+        Assert.Equal(0, r.Remaining);
+    }
 }

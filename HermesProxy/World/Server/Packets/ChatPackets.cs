@@ -173,6 +173,8 @@ public readonly record struct ChannelCommand(string ChannelName);
 
 public readonly record struct ChannelPassword(string ChannelName, string Password);
 
+public readonly record struct ChannelPlayerCommand(string ChannelName, string Name);
+
 public class ChannelListResponse : ServerPacket, ISpanWritable
 {
     public ChannelListResponse() : base(Opcode.SMSG_CHANNEL_LIST)
