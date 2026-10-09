@@ -121,6 +121,8 @@ public class ChannelNotifyLeft : ServerPacket, ISpanWritable
 
 public readonly record struct ChannelCommand(string ChannelName);
 
+public readonly record struct ChannelPassword(string ChannelName, string Password);
+
 public class ChannelListResponse : ServerPacket, ISpanWritable
 {
     public ChannelListResponse() : base(Opcode.SMSG_CHANNEL_LIST)

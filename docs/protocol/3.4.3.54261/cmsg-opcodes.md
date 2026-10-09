@@ -542,7 +542,7 @@ Every client-to-server opcode the client sends. Layouts are in [cmsg-structures]
 | CMSG_CHAT_MESSAGE_DND | 0x37d4 | 14292 | — | variable | matches |
 | CMSG_CHAT_CHANNEL_LIST | 0x37d5 | 14293 | 154 (0x9a) | variable | matches |
 | CMSG_CHAT_CHANNEL_DISPLAY_LIST | 0x37d6 | 14294 | 978 (0x3d2) | variable | matches |
-| CMSG_CHAT_CHANNEL_PASSWORD | 0x37d7 | 14295 | 156 (0x9c) | variable | no handler (#362) |
+| CMSG_CHAT_CHANNEL_PASSWORD | 0x37d7 | 14295 | 156 (0x9c) | variable | matches; see #362 |
 | CMSG_CHAT_CHANNEL_SET_OWNER | 0x37d8 | 14296 | 157 (0x9d) | variable | no handler (#362) |
 | CMSG_CHAT_CHANNEL_OWNER | 0x37d9 | 14297 | 158 (0x9e) | variable | matches |
 | CMSG_CHAT_CHANNEL_MODERATOR | 0x37db | 14299 | 159 (0x9f) | variable | no handler (#362) |

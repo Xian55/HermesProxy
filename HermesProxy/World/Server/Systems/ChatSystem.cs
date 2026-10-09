@@ -57,6 +57,15 @@ public static class ChatSystem
         ctx.SendPacketToServer(packet);
     }
 
+    [HandlesCmsg(Opcode.CMSG_CHAT_CHANNEL_PASSWORD)]
+    public static void HandleChatChannelPassword(in ChannelPassword command, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_CHAT_CHANNEL_PASSWORD);
+        packet.WriteCString(command.ChannelName);
+        packet.WriteCString(command.Password);
+        ctx.SendPacketToServer(packet);
+    }
+
     [HandlesCmsg(Opcode.CMSG_CHAT_CHANNEL_LIST)]
     public static void HandleChatChannelList(in ChannelCommand command, in SessionContext ctx)
     {

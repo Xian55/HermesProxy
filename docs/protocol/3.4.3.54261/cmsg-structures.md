@@ -3516,6 +3516,7 @@ Notation: see [the README](README.md).
 - Modern: 14295 (0x37d7) · 3.3.5a: 156 (0x9c)
 - Layout (after the opcode): `bits(7) bits(7) flush bytes bytes`
 - Bit fields (message of zeros, widths in order written): byte 0: 7 · 7 · (2 unused)
+- HermesProxy: `ChannelPassword` — matches; see #362
 
 ### CMSG_CHAT_CHANNEL_SET_OWNER (0x37d8)
 
