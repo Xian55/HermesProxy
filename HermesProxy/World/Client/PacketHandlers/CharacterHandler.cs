@@ -361,13 +361,7 @@ public partial class WorldClient
             SendPacketToClient(worldStates);
         }
 
-        WorldServerInfo info = new();
-        if (verify.MapID > 1)
-        {
-            info.DifficultyID = 1;
-            info.InstanceGroupSize = 5;
-        }
-        SendPacketToClient(info);
+        SendPacketToClient(WorldServerInfo.ForMap(verify.MapID));
 
         // SetAllTaskProgress is for pre-WotLK-Classic clients only — V3_4_3 doesn't expect it
         // and the fork explicitly skips it for ExpansionVersion >= 3.

@@ -447,13 +447,7 @@ public partial class WorldClient
             resume.Reason = 1;
             SendPacketToClient(resume);
 
-            WorldServerInfo info = new();
-            if (teleport.MapID > 1)
-            {
-                info.DifficultyID = 1;
-                info.InstanceGroupSize = 5;
-            }
-            SendPacketToClient(info);
+            SendPacketToClient(WorldServerInfo.ForMap(teleport.MapID));
         }
     }
 

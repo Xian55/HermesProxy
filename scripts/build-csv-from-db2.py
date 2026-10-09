@@ -420,6 +420,24 @@ def build_taxi_path(build: str) -> tuple[list[str], list[list[str]]]:
     return header, rows
 
 
+def build_map_difficulty(build: str) -> tuple[list[str], list[list[str]]]:
+    """The difficulties of each dungeon and raid, for SMSG_WORLD_SERVER_INFO.
+
+    A native server sends a map's difficulty and its MaxPlayers, which is 0 / 0 on
+    continents, battlegrounds and arenas. Only dungeons (InstanceType 1) and raids (2)
+    differ from that, so only their rows ship. DifficultyID 0 is dropped: Zul'Aman
+    carries a stray (0, 10) beside its real 10-player row.
+    """
+    instances = {r["ID"] for r in read_csv(fetch_client_csv("Map", build))
+                 if r["InstanceType"] in ("1", "2")}
+    header = ["MapId", "DifficultyId", "MaxPlayers"]
+    rows = [[r["MapID"], r["DifficultyID"], r["MaxPlayers"]]
+            for r in read_csv(fetch_client_csv("MapDifficulty", build))
+            if r["MapID"] in instances and r["DifficultyID"] != "0"]
+    rows.sort(key=lambda r: (int(r[0]), int(r[1])))
+    return header, rows
+
+
 RECIPES: dict[str, Recipe] = {
     "Item3.csv": Recipe(source="Item", columns=ITEM_COLUMNS),
     "ItemSparse3.csv": Recipe(source="ItemSparse", columns=ITEM_SPARSE_COLUMNS, quote_all=True),
@@ -489,6 +507,9 @@ RECIPES: dict[str, Recipe] = {
     "ItemDisplayIdToFileDataId3.csv": Recipe(
         builder=build_item_display_id_to_file_data_id,
         note="ItemIdToDisplayId3 joined with Item.IconFileDataID",
+    ),
+    "MapDifficulty3.csv": Recipe(
+        builder=build_map_difficulty, note="dungeon and raid rows of MapDifficulty"
     ),
 }
 

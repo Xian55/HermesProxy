@@ -50,6 +50,11 @@ public static partial class GameData
     public static Dictionary<uint, ItemModifiedAppearance> ItemModifiedAppearanceStore = [];
     public static Dictionary<uint, ItemEffect> ItemEffectStore = [];
     public static FrozenDictionary<uint, Battleground> Battlegrounds = FrozenDictionary<uint, Battleground>.Empty;
+    // Dungeon and raid map -> its lowest difficulty and that difficulty's MaxPlayers, from
+    // CSV/MapDifficulty{expansion}.csv. Maps not listed are continents, battlegrounds and arenas,
+    // which a native server reports as difficulty 0 with a group size of 0.
+    public static FrozenDictionary<uint, (uint DifficultyId, uint MaxPlayers)> DefaultInstanceDifficulty
+        = FrozenDictionary<uint, (uint DifficultyId, uint MaxPlayers)>.Empty;
 
     /// Every currency the modern client can display on this build, keyed by currency id.
     public static FrozenDictionary<uint, CurrencyTypeRecord> CurrencyTypeStore
@@ -674,6 +679,7 @@ public static partial class GameData
             LoadAreaTriggerProximity,
             AuraSpellRemap.Load,
             LoadBattlegrounds,
+            LoadMapDifficulties,
             LoadCurrencyTypes,
             LoadChatChannels,
             LoadItemEnchantVisuals,
@@ -1323,6 +1329,31 @@ public static partial class GameData
             dict.Add(bgId, bg);
         }
         Battlegrounds = dict.ToFrozenDictionary();
+    }
+
+    public static void LoadMapDifficulties()
+    {
+        var path = Path.Combine("CSV", $"MapDifficulty{ModernVersion.ExpansionVersion}.csv");
+        if (File.Exists(path))
+            DefaultInstanceDifficulty = ParseMapDifficulties(path);
+    }
+
+    public static FrozenDictionary<uint, (uint DifficultyId, uint MaxPlayers)> ParseMapDifficulties(string path)
+    {
+        using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+        var dict = new Dictionary<uint, (uint DifficultyId, uint MaxPlayers)>(EstimateRowCount(path, 10));
+
+        foreach (var row in reader)
+        {
+            uint mapId = uint.Parse(row[0].Span);
+            uint difficultyId = uint.Parse(row[1].Span);
+            uint maxPlayers = uint.Parse(row[2].Span);
+            // Until the proxy follows the legacy server's heroic and 25-player choice, an
+            // instance is reported at its first difficulty: normal, or 10-player for a raid.
+            if (!dict.TryGetValue(mapId, out var known) || difficultyId < known.DifficultyId)
+                dict[mapId] = (difficultyId, maxPlayers);
+        }
+        return dict.ToFrozenDictionary();
     }
 
     public static void LoadChatChannels()
