@@ -442,7 +442,7 @@ Every server-to-client opcode of the client, with its 3.3.5a counterpart where H
 | — | 0x271f | 10015 | — | General | ignored by the client | — |
 | — | 0x2720 | 10016 | — | General | ignored by the client | — |
 | SMSG_SUMMON_REQUEST | 0x2721 | 10017 | 683 (0x2ab) | General | fixed, 10 bytes | matches |
-| SMSG_INSPECT_PVP | 0x2722 | 10018 | — | General | variable | differs (#363) |
+| SMSG_INSPECT_PVP | 0x2722 | 10018 | — | General | variable | matches; see #363 |
 | — | 0x2723 | 10019 | — | General | fixed, 0 bytes | — |
 | SMSG_INITIALIZE_FACTIONS | 0x2724 | 10020 | 290 (0x122) | General | variable | matches; see #361 |
 | — | 0x2725 | 10021 | — | General | variable | — |
