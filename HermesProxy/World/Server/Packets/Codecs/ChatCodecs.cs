@@ -221,3 +221,17 @@ public static class ChannelCommandCodec
     public static void Read(ref SpanPacketReader r, out ChannelCommand packet)
         => packet = new ChannelCommand(r.ReadString(r.ReadBits<uint>(7)));
 }
+
+// Same layout on every modern client: the 3.4.3 client's writer and TrinityCore 3.4.3 agree, and
+// WowPacketParser reads it this way from 6.0 on. Only 3.4.3 has been played against it.
+public static class ChannelPasswordCodec
+{
+    public static void Read(ref SpanPacketReader r, out ChannelPassword packet)
+    {
+        uint channelLength = r.ReadBits<uint>(7);
+        uint passwordLength = r.ReadBits<uint>(7);
+        string channelName = r.ReadString(channelLength);
+        string password = r.ReadString(passwordLength);
+        packet = new ChannelPassword(channelName, password);
+    }
+}

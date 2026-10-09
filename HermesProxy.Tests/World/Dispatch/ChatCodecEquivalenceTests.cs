@@ -305,6 +305,19 @@ public class ChatCodecEquivalenceTests
         Assert.Equal(0, r.Remaining);
     }
 
+    // SetChannelPassword("hermescp", "newpw") from a 3.4.3 client: 8 and 5 as two 7-bit lengths.
+    [Fact]
+    public void ChannelPassword_ReadsTwoLengthsThenTwoStrings()
+    {
+        byte[] framed = [0, 0, 0x10, 0x14, .. System.Text.Encoding.UTF8.GetBytes("hermescp" + "newpw")];
+
+        var r = ReaderOver(framed); ChannelPasswordCodec.Read(ref r, out var a);
+
+        Assert.Equal("hermescp", a.ChannelName);
+        Assert.Equal("newpw", a.Password);
+        Assert.Equal(0, r.Remaining);
+    }
+
     [Fact]
     public void LeaveChannel_MatchesOracle()
     {

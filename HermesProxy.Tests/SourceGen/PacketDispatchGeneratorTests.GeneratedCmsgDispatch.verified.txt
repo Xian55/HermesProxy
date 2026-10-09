@@ -486,6 +486,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelCommand(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_OWNER, in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPassword_CMSG_CHAT_CHANNEL_PASSWORD(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChannelPasswordCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelPassword(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatJoinChannel_CMSG_CHAT_JOIN_CHANNEL_JoinChannelCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.JoinChannelCodecPreWotLKClassic.Read(ref reader, out var packet);
@@ -2672,6 +2678,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_DISPLAY_LIST] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelDisplayList_CMSG_CHAT_CHANNEL_DISPLAY_LIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_LIST] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelList_CMSG_CHAT_CHANNEL_LIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_OWNER] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelCommand_CMSG_CHAT_CHANNEL_OWNER;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_PASSWORD] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPassword_CMSG_CHAT_CHANNEL_PASSWORD;
         {
             if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_JOIN_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatJoinChannel_CMSG_CHAT_JOIN_CHANNEL_JoinChannelCodecPreWotLKClassic;
@@ -3228,6 +3235,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_DISPLAY_LIST,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_LIST,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_OWNER,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_PASSWORD,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_JOIN_CHANNEL,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_LEAVE_CHANNEL,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_AFK,
