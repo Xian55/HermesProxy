@@ -34,7 +34,7 @@
 - Layout: `guid u32*2 u64 u8 u64 u32 guid`
 - Size: 29 bytes (packed GUIDs not counted)
 - Bit fields (all-zero packet, widths in arrival order): byte 18: 1 · (7 unused)
-- HermesProxy: `BattlefieldStatusFailed` — differs (#363)
+- HermesProxy: `BattlefieldStatusFailed` — matches; see #363
 
 ### SMSG_BATTLEFIELD_LIST (0x2927)
 

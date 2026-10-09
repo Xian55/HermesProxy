@@ -245,9 +245,23 @@ public class BattlefieldStatusFailed : ServerPacket, ISpanWritable
 {
     public BattlefieldStatusFailed() : base(Opcode.SMSG_BATTLEFIELD_STATUS_FAILED) { }
 
+    // The 3.4.3 client reads the ride ticket's trailing flag bit here, as RideTicket.Read consumes
+    // it on the way in (#102). Without it the client took the queue id's first byte as that bit,
+    // so it read the reason as 0 and printed no error, and read one byte past the end (#363).
+    // It goes here and not in RideTicket.Write: the status packets with a header already get a
+    // byte in that place from BattlefieldStatusHeader.Unk254.
+    public static bool HasTicketFlag => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
+    internal static bool? ForceV343ForTests;
+
     public override void Write()
     {
         Ticket.Write(_worldPacket);
+        if (HasTicketFlag)
+        {
+            _worldPacket.WriteBit(false);
+            _worldPacket.FlushBits();
+        }
 
         ulong queueID = BattlefieldListId | 0x1F10000000000000;
         _worldPacket.WriteUInt64(queueID);
@@ -255,9 +269,9 @@ public class BattlefieldStatusFailed : ServerPacket, ISpanWritable
         _worldPacket.WritePackedGuid128(ClientID);
     }
 
-    // RideTicket: GUID(18) + uint(4) + uint(4) + long(8) = 34
+    // RideTicket: GUID(18) + uint(4) + uint(4) + long(8) = 34, + the 3.4.3 flag byte
     // Rest: ulong(8) + int(4) + GUID(18) = 30
-    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 16 + 8 + 4 + PackedGuidHelper.MaxPackedGuid128Size;
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 16 + 1 + 8 + 4 + PackedGuidHelper.MaxPackedGuid128Size;
 
     public int WriteToSpan(Span<byte> buffer)
     {
@@ -267,6 +281,11 @@ public class BattlefieldStatusFailed : ServerPacket, ISpanWritable
         writer.WriteUInt32(Ticket.Id);
         writer.WriteUInt32((uint)Ticket.Type);
         writer.WriteInt64(Ticket.Time);
+        if (HasTicketFlag)
+        {
+            writer.WriteBit(false);
+            writer.FlushBits();
+        }
 
         ulong queueID = BattlefieldListId | 0x1F10000000000000;
         writer.WriteUInt64(queueID);
