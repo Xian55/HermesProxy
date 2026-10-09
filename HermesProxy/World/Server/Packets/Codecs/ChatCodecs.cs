@@ -164,9 +164,33 @@ public static class ChatMessageChannelCodecPreWotLKClassic
     }
 }
 
-// ---- Channel membership: no version variance ----
+// ---- Channel membership ----
 
-public static class JoinChannelCodec
+// The 3.4.3 client sends two bits, CreateVoiceSession and Internal, ahead of the lengths
+// (TrinityCore 3.4.3 reads the same). Read without them, the name length took in whichever of
+// the two is set (one always is), came out at 32 or more, and the clamped string read took the
+// rest of the packet. That gave the right name only when there was no password: "/join hermespw
+// secret" joined channel "hermespwsecret" with none (#362). The legacy join carries its own two
+// flag bytes, sent as 0, so both bits are dropped.
+[PacketCodec(typeof(JoinChannel), AddedIn = ClientVersionBuild.V3_4_3_54261)]
+public static class JoinChannelCodecWotLKClassic
+{
+    public static void Read(ref SpanPacketReader r, out JoinChannel packet)
+    {
+        int chatChannelId = r.ReadInt32();
+        r.ReadBit();                                 // CreateVoiceSession
+        r.ReadBit();                                 // Internal
+        uint channelLength = r.ReadBits<uint>(7);
+        uint passwordLength = r.ReadBits<uint>(7);
+        r.ResetBitPos();
+        string channelName = r.ReadString(channelLength);
+        string password = r.ReadString(passwordLength);
+        packet = new JoinChannel(chatChannelId, channelName, password);
+    }
+}
+
+[PacketCodec(typeof(JoinChannel), RemovedIn = ClientVersionBuild.V3_4_3_54261)]
+public static class JoinChannelCodecPreWotLKClassic
 {
     public static void Read(ref SpanPacketReader r, out JoinChannel packet)
     {

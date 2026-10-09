@@ -486,9 +486,15 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatChannelCommand(global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_OWNER, in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatJoinChannel_CMSG_CHAT_JOIN_CHANNEL(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatJoinChannel_CMSG_CHAT_JOIN_CHANNEL_JoinChannelCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
-        global::HermesProxy.World.Server.Packets.JoinChannelCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Packets.JoinChannelCodecPreWotLKClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatJoinChannel(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatJoinChannel_CMSG_CHAT_JOIN_CHANNEL_JoinChannelCodecWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.JoinChannelCodecWotLKClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatJoinChannel(in packet, in ctx);
     }
 
@@ -2666,7 +2672,12 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_DISPLAY_LIST] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelDisplayList_CMSG_CHAT_CHANNEL_DISPLAY_LIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_LIST] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelList_CMSG_CHAT_CHANNEL_LIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_OWNER] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelCommand_CMSG_CHAT_CHANNEL_OWNER;
-        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_JOIN_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatJoinChannel_CMSG_CHAT_JOIN_CHANNEL;
+        {
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_JOIN_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatJoinChannel_CMSG_CHAT_JOIN_CHANNEL_JoinChannelCodecPreWotLKClassic;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_JOIN_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatJoinChannel_CMSG_CHAT_JOIN_CHANNEL_JoinChannelCodecWotLKClassic;
+        }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_LEAVE_CHANNEL] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatLeaveChannel_CMSG_CHAT_LEAVE_CHANNEL;
         {
             if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))

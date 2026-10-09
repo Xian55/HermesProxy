@@ -257,10 +257,10 @@ public class ChatCodecEquivalenceTests
         Assert.Equal(present && secure, a.IsSecure);
     }
 
-    // ---- unranged channel membership ----
+    // ---- channel membership ----
 
     [Fact]
-    public void JoinChannel_MatchesOracle()
+    public void JoinChannel_PreWotLK_MatchesOracle()
     {
         const string name = "LookingForGroup";
         const string password = "hunter2";
@@ -276,11 +276,33 @@ public class ChatCodecEquivalenceTests
         });
 
         var e = new Frozen.JoinChannel(); e.Read(o);
-        var r = ReaderOver(f); JoinChannelCodec.Read(ref r, out var a);
+        var r = ReaderOver(f); JoinChannelCodecPreWotLKClassic.Read(ref r, out var a);
 
         Assert.Equal(e.ChatChannelId, a.ChatChannelId);
         Assert.Equal(e.ChannelName, a.ChannelName);
         Assert.Equal(e.Password, a.Password);
+        Assert.Equal(o.Remaining(), r.Remaining);
+    }
+
+    // Captured from a 3.4.3 client on 2026-10-10: the login join of a built-in channel (first bit
+    // set), and "/join hermestest" and "/join hermespw secret" (second bit set). The pre-WotLK
+    // reader took "hermespwsecret" with no password from the last one.
+    [Theory]
+    [InlineData("01000000" + "C880", 1, "General - Dalaran", "")]
+    [InlineData("00000000" + "4500", 0, "hermestest", "")]
+    [InlineData("00000000" + "4406", 0, "hermespw", "secret")]
+    public void JoinChannel_WotLKClassic_ReadsTheTwoFlagBitsBeforeTheLengths(
+        string head, int channelId, string name, string password)
+    {
+        byte[] payload = [.. Convert.FromHexString(head), .. System.Text.Encoding.UTF8.GetBytes(name + password)];
+        byte[] framed = [0, 0, .. payload];
+
+        var r = ReaderOver(framed); JoinChannelCodecWotLKClassic.Read(ref r, out var a);
+
+        Assert.Equal(channelId, a.ChatChannelId);
+        Assert.Equal(name, a.ChannelName);
+        Assert.Equal(password, a.Password);
+        Assert.Equal(0, r.Remaining);
     }
 
     [Fact]
