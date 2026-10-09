@@ -528,7 +528,7 @@ Every client-to-server opcode the client sends. Layouts are in [cmsg-structures]
 | — | 0x3770 | 14192 | — | variable | — |
 | — | 0x3771 | 14193 | — | variable | — |
 | CMSG_QUERY_PLAYER_NAMES | 0x3772 | 14194 | — | variable | matches |
-| CMSG_CHAT_JOIN_CHANNEL | 0x37c8 | 14280 | 151 (0x97) | variable | differs (#362) |
+| CMSG_CHAT_JOIN_CHANNEL | 0x37c8 | 14280 | 151 (0x97) | variable | matches; see #362 |
 | CMSG_CHAT_LEAVE_CHANNEL | 0x37c9 | 14281 | 152 (0x98) | variable | matches |
 | — | 0x37cb | 14283 | — | fixed, 1 bytes | — |
 | — | 0x37cc | 14284 | — | fixed, 0 bytes | — |

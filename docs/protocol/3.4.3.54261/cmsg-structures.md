@@ -3421,7 +3421,7 @@ Notation: see [the README](README.md).
 - Modern: 14280 (0x37c8) · 3.3.5a: 151 (0x97)
 - Layout (after the opcode): `u32 opt[ u8 ] bits(7) bits(7) flush bytes bytes`
 - Bit fields (message of zeros, widths in order written): byte 4: 1 · 1 · 7 · 7
-- HermesProxy: `JoinChannel` — differs (#362)
+- HermesProxy: `JoinChannel` — matches; see #362
 
 ### CMSG_CHAT_LEAVE_CHANNEL (0x37c9)
 
