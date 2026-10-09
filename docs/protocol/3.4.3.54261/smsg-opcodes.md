@@ -69,7 +69,7 @@ Every server-to-client opcode of the client, with its 3.3.5a counterpart where H
 | — | 0x25aa | 9642 | — | General | fixed struct | — |
 | — | 0x25ab | 9643 | — | General | fixed struct | — |
 | — | 0x25ac | 9644 | — | General | variable | — |
-| SMSG_WORLD_SERVER_INFO | 0x25ad | 9645 | — | General | variable | differs (#361) |
+| SMSG_WORLD_SERVER_INFO | 0x25ad | 9645 | — | General | variable | matches; see #361 |
 | SMSG_ACCOUNT_MOUNT_UPDATE | 0x25ae | 9646 | — | General | variable | matches |
 | — | 0x25af | 9647 | — | General | fixed struct | — |
 | SMSG_ACCOUNT_TOY_UPDATE | 0x25b0 | 9648 | — | General | variable | matches |

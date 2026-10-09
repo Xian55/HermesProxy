@@ -362,7 +362,7 @@
 - Modern: 9645 (0x25ad) · 3.3.5a: — · Area: General
 - Layout: `{ u32 u8 opt[ u32 ] opt[ u64 ] opt[ u32 ] }`
 - Bit fields (all-zero packet, widths in arrival order): byte 4: 1 · 1 · 1 · 1 · 1 · (3 unused)
-- HermesProxy: `WorldServerInfo` — differs (#361)
+- HermesProxy: `WorldServerInfo` — matches; see #361
 
 ### SMSG_ACCOUNT_MOUNT_UPDATE (0x25ae)
 

@@ -459,10 +459,37 @@ public class WorldServerInfo : ServerPacket, ISpanWritable
 {
     public WorldServerInfo() : base(Opcode.SMSG_WORLD_SERVER_INFO, ConnectionType.Instance) { }
 
+    // The 3.4.3 client reads IsTournamentRealm as the first of five bits. Sent as a byte, it took
+    // that byte as the flags, so it never saw InstanceGroupSize and left the rest unread (#361).
+    private static bool IsTournamentBit => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
+    internal static bool? ForceV343ForTests;
+
+    public static WorldServerInfo ForMap(uint mapId)
+    {
+        WorldServerInfo info = new();
+        if (IsTournamentBit)
+        {
+            // What a native 3.4.3 server sends: the instance's difficulty and size in a dungeon
+            // or raid, and a size of 0 everywhere else. A size of 0 is still sent, not left out.
+            (info.DifficultyID, uint groupSize) = GameData.DefaultInstanceDifficulty.GetValueOrDefault(mapId);
+            info.InstanceGroupSize = groupSize;
+        }
+        else if (mapId > 1)
+        {
+            info.DifficultyID = 1;
+            info.InstanceGroupSize = 5;
+        }
+        return info;
+    }
+
     public override void Write()
     {
         _worldPacket.WriteUInt32(DifficultyID);
-        _worldPacket.WriteUInt8(IsTournamentRealm);
+        if (IsTournamentBit)
+            _worldPacket.WriteBit(IsTournamentRealm != 0);
+        else
+            _worldPacket.WriteUInt8(IsTournamentRealm);
         _worldPacket.WriteBit(XRealmPvpAlert);
         _worldPacket.WriteBit(RestrictedAccountMaxLevel.HasValue);
         _worldPacket.WriteBit(RestrictedAccountMaxMoney.HasValue);
@@ -479,14 +506,17 @@ public class WorldServerInfo : ServerPacket, ISpanWritable
             _worldPacket.WriteUInt32(InstanceGroupSize.Value);
     }
 
-    // uint(4) + byte(1) + 4 bits(1) + optional uint(4) + optional ulong(8) + optional uint(4) = 22
+    // uint(4) + byte(1, a bit on 3.4.3) + 4 bits(1) + optional uint(4) + optional ulong(8) + optional uint(4) = 22
     public int MaxSize => 4 + 1 + 1 + 4 + 8 + 4;
 
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
         writer.WriteUInt32(DifficultyID);
-        writer.WriteUInt8(IsTournamentRealm);
+        if (IsTournamentBit)
+            writer.WriteBit(IsTournamentRealm != 0);
+        else
+            writer.WriteUInt8(IsTournamentRealm);
         writer.WriteBit(XRealmPvpAlert);
         writer.WriteBit(RestrictedAccountMaxLevel.HasValue);
         writer.WriteBit(RestrictedAccountMaxMoney.HasValue);
