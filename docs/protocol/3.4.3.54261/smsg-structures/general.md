@@ -833,7 +833,7 @@
 - Modern: 9761 (0x2621) · 3.3.5a: 670 (0x29e) · Area: General
 - Layout: `{ guid u32 { u8 { u32*3 u8*2 loop[ u32 u8 ] opt[ u8 u32 loop[ u32 ] ] } u32 u8*2 } }`
 - Bit fields (all-zero packet, widths in arrival order): byte 6: 2 · 3 · 1 · (2 unused); byte 19: 1 · (7 unused) · 6 · (2 unused); byte 25: 8 · 8
-- HermesProxy: `LootAllPassed` — differs (#360)
+- HermesProxy: `LootAllPassed` — matches; see #360
 
 ### SMSG_LOOT_ROLL_WON (0x2622)
 

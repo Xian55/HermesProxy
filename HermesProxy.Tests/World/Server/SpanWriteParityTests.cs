@@ -60,6 +60,7 @@ public class SpanWriteParityTests
     [InlineData(typeof(LootRollBroadcast))]
     [InlineData(typeof(LootRollWon))]
     [InlineData(typeof(LootRollsComplete))]
+    [InlineData(typeof(LootAllPassed))]
     [InlineData(typeof(LootRemoved))]
     public void WriteToSpan_MatchesWrite_WithDungeonEncounterId(Type type)
     {

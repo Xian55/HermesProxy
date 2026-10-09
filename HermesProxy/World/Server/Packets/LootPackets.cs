@@ -358,6 +358,9 @@ public readonly record struct LootRoll(WowGuid128 LootObj, byte LootListID, Roll
 /// SMSG_LOOT_ROLL and SMSG_LOOT_ROLL_WON carry it at offset 17 (after RollType), and
 /// SMSG_LOOT_ROLLS_COMPLETE at offset 8 (after LootListID). 3.3.5a has no dungeon-encounter
 /// concept on this wire and it is zero in every native packet, so it is always written as 0.
+/// SMSG_LOOT_ALL_PASSED carries it too, right after LootObj: no native capture has one, but the
+/// 3.4.3 client reads it there and TrinityCore 3.4.3 writes it. Without it the client read the
+/// item 4 bytes late and ran past the end of the packet (#360).
 /// SMSG_LOOT_START_ROLL and SMSG_LOOT_REMOVED do NOT have this field. Issue #162.
 /// </summary>
 internal static class LootRollWire
@@ -498,18 +501,22 @@ class LootAllPassed : ServerPacket, ISpanWritable
     public override void Write()
     {
         _worldPacket.WritePackedGuid128(LootObj);
+        if (LootRollWire.WritesDungeonEncounterId)
+            _worldPacket.WriteInt32(0);              // DungeonEncounterID
         Item.Write(_worldPacket);
     }
 
     // LootItemData: 1 (bits) + ItemInstance + 6 = 7 + ItemInstanceMaxSize
     private const int LootItemDataSize = 7 + ItemPacketHelpers.ItemInstanceMaxSize;
-    // GUID + LootItemData
-    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + LootItemDataSize;
+    // GUID + DungeonEncounterID (V3_4_3) + LootItemData
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + LootRollWire.DungeonEncounterIdBytes + LootItemDataSize;
 
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
         writer.WritePackedGuid128(LootObj.Low, LootObj.High);
+        if (LootRollWire.WritesDungeonEncounterId)
+            writer.WriteInt32(0);                    // DungeonEncounterID
 
         // Write LootItemData inline
         writer.WriteBits(Item.Type, 2);

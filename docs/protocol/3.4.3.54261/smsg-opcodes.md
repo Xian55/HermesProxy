@@ -185,7 +185,7 @@ Every server-to-client opcode of the client, with its 3.3.5a counterpart where H
 | SMSG_LOOT_ROLL | 0x261e | 9758 | 674 (0x2a2) | General | variable | differs (#360) |
 | SMSG_LOOT_MASTER_LIST | 0x261f | 9759 | 676 (0x2a4) | General | variable | matches |
 | SMSG_LOOT_ROLLS_COMPLETE | 0x2620 | 9760 | — | General | fixed, 5 bytes | matches |
-| SMSG_LOOT_ALL_PASSED | 0x2621 | 9761 | 670 (0x29e) | General | variable | differs (#360) |
+| SMSG_LOOT_ALL_PASSED | 0x2621 | 9761 | 670 (0x29e) | General | variable | matches; see #360 |
 | SMSG_LOOT_ROLL_WON | 0x2622 | 9762 | 671 (0x29f) | General | variable | differs (#360) |
 | SMSG_ITEM_PUSH_RESULT | 0x2623 | 9763 | 358 (0x166) | General | variable | differs (#360) |
 | SMSG_DISPLAY_TOAST | 0x2624 | 9764 | — | General | variable | differs (#360) |
