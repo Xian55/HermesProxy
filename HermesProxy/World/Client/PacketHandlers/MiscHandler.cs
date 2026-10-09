@@ -144,7 +144,12 @@ public partial class WorldClient
         uint length = packet.ReadUInt32();
         string message = packet.ReadString(length);
 
-        if (GetSession().GameState.LastEnteredAreaTrigger != 0)
+        // The 3.4.3 client prints the message its AreaTrigger.db2 has for the trigger it is sent,
+        // and only 93 of 1154 triggers have one. Sent trigger 2848, AzerothCore's "You must be in a
+        // raid group to enter this instance." at Onyxia's Lair showed nothing (#362). A native
+        // 3.4.3 server never sends this packet, so show the server's own text instead.
+        bool sendsTriggerId = ModernVersion.Build != ClientVersionBuild.V3_4_3_54261;
+        if (sendsTriggerId && GetSession().GameState.LastEnteredAreaTrigger != 0)
         {
             AreaTriggerMessage denied = new AreaTriggerMessage();
             denied.AreaTriggerID = GetSession().GameState.LastEnteredAreaTrigger;
