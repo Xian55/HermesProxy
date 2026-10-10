@@ -136,7 +136,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     {
         public long TimestampTicksUtc;
         public Opcode UniversalOpcode;
-        public ushort RawOpcode;
+        public uint RawOpcode;
         public int Size;
         public byte PreviewLength;
     }
@@ -350,7 +350,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             return ReadDataHandlerResult.Error;
         }
 
-        WorldPacket packet = new(_packetBuffer.GetData());
+        WorldPacket packet = new(_packetBuffer.GetData(), ModernVersion.OpcodeSize);
         _packetBuffer.Reset();
 
         Opcode opcode = packet.GetUniversalOpcode(true);
@@ -514,8 +514,8 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
             // GetRemainingSpan, not GetData or GetDataSpan. GetData hands back the whole
             // bucket-rounded ArrayPool rental (issue #248), and GetDataSpan starts at index 0 —
-            // which for a read-mode WorldPacket includes the 2-byte opcode its constructor already
-            // consumed, shifting every field by two bytes with nothing thrown.
+            // which for a read-mode WorldPacket includes the opcode its constructor already
+            // consumed, shifting every field by the opcode's size with nothing thrown.
             var reader = new SpanPacketReader(packet.GetRemainingSpan());
 
             if (HermesProxy.Server.MetricsEnabled)
@@ -677,12 +677,13 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
             ReadOnlySpan<byte> data = packet.GetDataSpan();
             Opcode universalOpcode = packet.GetUniversalOpcode();
-            ushort opcode = (ushort)packet.GetOpcode();
+            uint opcode = packet.GetOpcode();
+            int opcodeSize = ModernVersion.OpcodeSize;
 
             if (NoisyOpcodes.IsNoisy(universalOpcode))
-                WorldSocketLogMessages.PacketSentNoisy(_melLog, _sourceFile, _netDirSend, universalOpcode, (uint)opcode);
+                WorldSocketLogMessages.PacketSentNoisy(_melLog, _sourceFile, _netDirSend, universalOpcode, opcode);
             else
-                WorldSocketLogMessages.PacketSent(_melLog, _sourceFile, _netDirSend, universalOpcode, (uint)opcode);
+                WorldSocketLogMessages.PacketSent(_melLog, _sourceFile, _netDirSend, universalOpcode, opcode);
 
             // [SendHistory] Append to the ring buffer. Capped — drop the oldest
             // entry when full so the dump on CMSG_LOG_DISCONNECT shows just the most
@@ -722,12 +723,12 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             // it because its opcode table lacked the mapping: the envelope went out as opcode 0,
             // which the client drops, and that is the 14 KB SMSG_AVAILABLE_HOTFIXES that never
             // reached Hotfix.log. The != 0 check keeps a build without the mapping on plain packets.
-            ushort compressedOpcode = (ushort)ModernVersion.GetCurrentOpcode(Opcode.SMSG_COMPRESSED_PACKET);
+            uint compressedOpcode = ModernVersion.GetCurrentOpcode(Opcode.SMSG_COMPRESSED_PACKET);
             bool compress = data.Length > ModernPacketBody.MinSizeForCompression && _worldCrypt.IsInitialized && compressedOpcode != 0;
-            ReadOnlySpan<byte> deflated = compress ? CompressPacket(data, opcode) : default;
+            ReadOnlySpan<byte> deflated = compress ? CompressPacket(data, opcode, opcodeSize) : default;
             int bodySize = compress
-                ? ModernPacketBody.CompressedSize(deflated.Length)
-                : ModernPacketBody.PlainSize(data.Length);
+                ? ModernPacketBody.CompressedSize(opcodeSize, deflated.Length)
+                : ModernPacketBody.PlainSize(opcodeSize, data.Length);
 
             // The body is laid out and encrypted in place behind the header, in one pooled
             // buffer. AsyncWrite is a blocking Socket.Send, so the rental is safe to return the
@@ -739,9 +740,9 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             {
                 Span<byte> body = framed.AsSpan(HeaderSize, bodySize);
                 if (compress)
-                    ModernPacketBody.WriteCompressed(body, compressedOpcode, opcode, data, deflated);
+                    ModernPacketBody.WriteCompressed(body, compressedOpcode, opcode, opcodeSize, data, deflated);
                 else
-                    ModernPacketBody.WritePlain(body, opcode, data);
+                    ModernPacketBody.WritePlain(body, opcode, opcodeSize, data);
 
                 PacketHeader header = new();
                 header.Size = bodySize;
@@ -764,7 +765,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     /// Deflates opcode + payload onto this connection's stream. The result points into the
     /// stream's buffer and is valid until the next call; both run under <c>_sendLock</c>.
     /// </summary>
-    private ReadOnlySpan<byte> CompressPacket(ReadOnlySpan<byte> data, ushort opcode)
+    private ReadOnlySpan<byte> CompressPacket(ReadOnlySpan<byte> data, uint opcode, int opcodeSize)
     {
         // Drain the prior packet's output, then push opcode + body and flush. Flush()
         // on a compress-mode DeflateStream emits a Z_SYNC_FLUSH boundary (00 00 FF FF)
@@ -774,8 +775,9 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         _compressBuffer!.SetLength(0);
         _compressBuffer.Position = 0;
 
-        Span<byte> hdr = stackalloc byte[2];
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(hdr, opcode);
+        Span<byte> hdr = stackalloc byte[sizeof(uint)];
+        hdr = hdr[..opcodeSize];
+        ModernPacketBody.WriteOpcode(hdr, opcode, opcodeSize);
         _deflater!.Write(hdr);
         _deflater.Write(data);
         _deflater.Flush();

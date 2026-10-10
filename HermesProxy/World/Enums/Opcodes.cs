@@ -68,6 +68,7 @@ public static class Opcodes
                 or ClientVersionBuild.V1_14_2_42214
                 or ClientVersionBuild.V1_14_2_42597 => ClientVersionBuild.V2_5_3_41750,
             ClientVersionBuild.V3_4_3_54261 => ClientVersionBuild.V3_4_3_54261,
+            ClientVersionBuild.V4_4_2_60895 => ClientVersionBuild.V4_4_2_60895,
             _ => ClientVersionBuild.Zero,
         };
 
@@ -81,6 +82,7 @@ public static class Opcodes
             ClientVersionBuild.V2_5_3_41750 => typeof(V2_5_3_41750.Opcode),
             ClientVersionBuild.V1_14_1_40688 => typeof(V1_14_1_40688.Opcode),
             ClientVersionBuild.V3_4_3_54261 => typeof(V3_4_3_54261.Opcode),
+            ClientVersionBuild.V4_4_2_60895 => typeof(V4_4_2_60895.Opcode),
             _ => null,
         };
 

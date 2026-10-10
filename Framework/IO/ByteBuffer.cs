@@ -939,9 +939,9 @@ public class ByteBuffer : IDisposable
     /// <remarks>
     /// This is what a reader that continues where this buffer left off must start from.
     /// <see cref="GetDataSpan"/> deliberately starts at index 0, so for a read-mode
-    /// <c>WorldPacket</c> — whose constructor has already consumed the 2-byte opcode — it hands
-    /// back the opcode as if it were payload. Handing that to a fresh parser shifts every field
-    /// by two bytes, which does not throw: it silently yields wrong values.
+    /// <c>WorldPacket</c> — whose constructor has already consumed the opcode — it hands back the
+    /// opcode as if it were payload. Handing that to a fresh parser shifts every field by the
+    /// opcode's size, which does not throw: it silently yields wrong values.
     /// </remarks>
     public ReadOnlySpan<byte> GetRemainingSpan()
     {

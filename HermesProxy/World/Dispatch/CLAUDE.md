@@ -104,8 +104,8 @@ None of them can see a codec that reads the right fields in the wrong order. Tha
 ## Reader rules
 
 - The dispatch site builds the reader from **`packet.GetRemainingSpan()`**. `GetDataSpan()` starts
-  at index 0 and re-reads the 2-byte opcode the `WorldPacket` constructor already consumed, which
-  shifts every field by two bytes with nothing thrown. `GetData()` returns the whole
+  at index 0 and re-reads the opcode the `WorldPacket` constructor already consumed (2 bytes, 4
+  from 4.4.0), which shifts every field by that much with nothing thrown. `GetData()` returns the whole
   bucket-rounded pool rental (#248). The same rule applies to any test helper.
 - `SpanPacketReaderExtensions` members each **mirror a `WorldPacket` member byte for byte** and
   carry its name. Add one only as a mirror of an existing read; a converted body must keep its

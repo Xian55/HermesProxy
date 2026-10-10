@@ -14,6 +14,13 @@ namespace HermesProxy.SourceGen;
 /// runtime — the trade is one-time compile cost for zero runtime reflection and one fewer
 /// <c>IL2026</c> trim warning on the published binary.
 /// </summary>
+/// <remarks>
+/// The current-to-universal table is split by the opcode's upper 16 bits. Clients from 4.4.0 on
+/// carry an opcode group there (server opcodes from 0x3b0000, client opcodes from 0x2e0000), so
+/// one flat array would need millions of slots; every older build's opcodes sit in group 0. The
+/// same split decides the opcode's size on the modern wire: 4 bytes when any opcode has group
+/// bits, 2 otherwise.
+/// </remarks>
 [Generator(LanguageNames.CSharp)]
 public sealed class OpcodeTableGenerator : IIncrementalGenerator
 {
@@ -185,7 +192,9 @@ public sealed class OpcodeTableGenerator : IIncrementalGenerator
         sb.AppendLine("{");
 
         // TryGet switch — one arm per discovered per-version enum.
-        sb.AppendLine("    public static bool TryGet(ClientVersionBuild build, out Opcode[] currentToUniversal, out uint[] universalToCurrent)");
+        sb.AppendLine("    /// <param name=\"currentToUniversal\">Indexed by the opcode's upper 16 bits, then its lower 16 bits.</param>");
+        sb.AppendLine("    /// <param name=\"opcodeSize\">Bytes the opcode takes on the modern wire: 4 when the build's opcodes carry a group, else 2.</param>");
+        sb.AppendLine("    public static bool TryGet(ClientVersionBuild build, out Opcode[][] currentToUniversal, out uint[] universalToCurrent, out int opcodeSize)");
         sb.AppendLine("    {");
         sb.AppendLine("        switch (build)");
         sb.AppendLine("        {");
@@ -200,11 +209,15 @@ public sealed class OpcodeTableGenerator : IIncrementalGenerator
             sb.Append("                universalToCurrent = ");
             sb.Append(v.Namespace);
             sb.AppendLine("_U2C;");
+            sb.Append("                opcodeSize = ");
+            sb.Append(OpcodeSize(v));
+            sb.AppendLine(";");
             sb.AppendLine("                return true;");
         }
         sb.AppendLine("            default:");
-        sb.AppendLine("                currentToUniversal = Array.Empty<Opcode>();");
+        sb.AppendLine("                currentToUniversal = Array.Empty<Opcode[]>();");
         sb.AppendLine("                universalToCurrent = Array.Empty<uint>();");
+        sb.AppendLine("                opcodeSize = 0;");
         sb.AppendLine("                return false;");
         sb.AppendLine("        }");
         sb.AppendLine("    }");
@@ -220,39 +233,66 @@ public sealed class OpcodeTableGenerator : IIncrementalGenerator
         return sb.ToString();
     }
 
+    private const uint GroupShift = 16;
+    private const uint IndexMask = 0xFFFF;
+
+    private static int OpcodeSize(VersionModel v)
+        => v.Entries.Any(e => e.CurrentValue >> (int)GroupShift != 0) ? 4 : 2;
+
     private static void EmitVersionArrays(StringBuilder sb, VersionModel v)
     {
         if (v.Entries.Length == 0)
         {
-            sb.Append("    private static readonly Opcode[] ").Append(v.Namespace).AppendLine("_C2U = Array.Empty<Opcode>();");
+            sb.Append("    private static readonly Opcode[][] ").Append(v.Namespace).AppendLine("_C2U = Array.Empty<Opcode[]>();");
             sb.Append("    private static readonly uint[] ").Append(v.Namespace).AppendLine("_U2C = Array.Empty<uint>();");
             sb.AppendLine();
             return;
         }
 
-        // Size arrays to match max observed values (+1 for the inclusive slot).
-        uint maxCurrent = 0;
         uint maxUniversal = 0;
         foreach (var e in v.Entries)
         {
-            if (e.CurrentValue > maxCurrent) maxCurrent = e.CurrentValue;
             if (e.UniversalValue > maxUniversal) maxUniversal = e.UniversalValue;
         }
 
-        // Forward table: Opcode[maxCurrent + 1] — default slot value is Opcode.MSG_NULL_ACTION (0),
-        // which matches the "not found" sentinel used by the previous FrozenDictionary path.
-        sb.Append("    private static readonly Opcode[] ").Append(v.Namespace).Append("_C2U = new Opcode[")
-          .Append(maxCurrent + 1).AppendLine("]");
-        sb.AppendLine("    {");
-        var c2uSlots = new string[maxCurrent + 1];
-        for (int i = 0; i <= maxCurrent; i++)
-            c2uSlots[i] = "Opcode.MSG_NULL_ACTION";
-        foreach (var e in v.Entries)
-            c2uSlots[(int)e.CurrentValue] = "Opcode." + e.UniversalName;
-        for (int i = 0; i <= maxCurrent; i++)
+        // Forward table: one Opcode[maxIndex + 1] per opcode group. The default slot value is
+        // Opcode.MSG_NULL_ACTION (0), which matches the "not found" sentinel used by the previous
+        // FrozenDictionary path. Group arrays are declared before the outer array that holds them,
+        // because static field initializers run in textual order.
+        var groups = v.Entries
+            .GroupBy(e => e.CurrentValue >> (int)GroupShift)
+            .OrderBy(g => g.Key)
+            .ToList();
+        foreach (var group in groups)
         {
-            sb.Append("        ").Append(c2uSlots[i]);
-            if (i < maxCurrent) sb.Append(',');
+            uint maxIndex = group.Max(e => e.CurrentValue & IndexMask);
+            sb.Append("    private static readonly Opcode[] ").Append(GroupFieldName(v, group.Key)).Append(" = new Opcode[")
+              .Append(maxIndex + 1).AppendLine("]");
+            sb.AppendLine("    {");
+            var c2uSlots = new string[maxIndex + 1];
+            for (int i = 0; i <= maxIndex; i++)
+                c2uSlots[i] = "Opcode.MSG_NULL_ACTION";
+            foreach (var e in group)
+                c2uSlots[(int)(e.CurrentValue & IndexMask)] = "Opcode." + e.UniversalName;
+            for (int i = 0; i <= maxIndex; i++)
+            {
+                sb.Append("        ").Append(c2uSlots[i]);
+                if (i < maxIndex) sb.Append(',');
+                sb.AppendLine();
+            }
+            sb.AppendLine("    };");
+            sb.AppendLine();
+        }
+
+        uint maxGroup = groups[groups.Count - 1].Key;
+        var present = new HashSet<uint>(groups.Select(g => g.Key));
+        sb.Append("    private static readonly Opcode[][] ").Append(v.Namespace).Append("_C2U = new Opcode[")
+          .Append(maxGroup + 1).AppendLine("][]");
+        sb.AppendLine("    {");
+        for (uint g = 0; g <= maxGroup; g++)
+        {
+            sb.Append("        ").Append(present.Contains(g) ? GroupFieldName(v, g) : "Array.Empty<Opcode>()");
+            if (g < maxGroup) sb.Append(',');
             sb.AppendLine();
         }
         sb.AppendLine("    };");
@@ -275,6 +315,9 @@ public sealed class OpcodeTableGenerator : IIncrementalGenerator
         sb.AppendLine("    };");
         sb.AppendLine();
     }
+
+    private static string GroupFieldName(VersionModel v, uint group)
+        => v.Namespace + "_C2U_" + group.ToString("X2");
 
     private sealed record OpcodeEntry(uint CurrentValue, uint UniversalValue, string UniversalName);
     private sealed record VersionModel(string Namespace, ImmutableArray<OpcodeEntry> Entries);
