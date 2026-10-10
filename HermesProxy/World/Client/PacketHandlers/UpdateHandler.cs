@@ -4386,13 +4386,17 @@ public partial class WorldClient
             int PLAYER_FIELD_ARENA_TEAM_INFO_1_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_ARENA_TEAM_INFO_1_1);
             if (PLAYER_FIELD_ARENA_TEAM_INFO_1_1 >= 0)
             {
+                // From 3.2 each team carries its type after the id: 7 fields, where 2.4.3 has 6.
+                // Read with the 2.4.3 stride, a 3.3.5a team's 3v3 slot started one field early and
+                // took the 2v2 personal rating as its team id, and every stat came from the wrong field.
+                int typeShift = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192) ? 1 : 0;
                 int teamIdOffset = 0;
-                //int teamMemberOffset = 1;
-                int teamGamesWeekOffset = 2;
-                int teamGamesSeasonOffset = 3;
-                int teamWinsSeasonOffset = 4;
-                int teamPersonalRatingOffset = 5;
-                int sizePerEntry = 6;
+                //int teamMemberOffset = 1 + typeShift;
+                int teamGamesWeekOffset = 2 + typeShift;
+                int teamGamesSeasonOffset = 3 + typeShift;
+                int teamWinsSeasonOffset = 4 + typeShift;
+                int teamPersonalRatingOffset = 5 + typeShift;
+                int sizePerEntry = 6 + typeShift;
                 for (int i = 0; i < 3; i++)
                 {
                     int startOffset = PLAYER_FIELD_ARENA_TEAM_INFO_1_1 + i * sizePerEntry;
