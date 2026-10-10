@@ -186,7 +186,7 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
         int maskMode = 0;       // 0 = Blocks, 1 = Flat
         int maskWidth = 0;
         bool cascade = false;
-        int blockMaskShape = 0; // 0 = Bits, 1 = UInt32PlusBits16
+        int blockMaskShape = 0; // 0 = Bits, 1 = UInt32PlusBits16, 2 = UInt32PlusBits14
         foreach (var named in sectionAttrData.NamedArguments)
         {
             switch (named.Key)
@@ -399,15 +399,17 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
             return null;
         int parentBit = -1;
         bool writeOnly = false;
+        int writeOrder = 0;
         foreach (var named in attrData.NamedArguments)
         {
             switch (named.Key)
             {
                 case "ParentBit": parentBit = (named.Value.Value as int?) ?? -1; break;
                 case "WriteOnly": writeOnly = (named.Value.Value as bool?) ?? false; break;
+                case "WriteOrder": writeOrder = (named.Value.Value as int?) ?? 0; break;
             }
         }
-        return new CustomFieldEntry(label!, bit.Value, customWriter!, parentBit, writeOnly);
+        return new CustomFieldEntry(label!, bit.Value, customWriter!, parentBit, writeOnly, writeOrder);
     }
 
     private static CreateFieldEntry? ReadCreateField(AttributeData attrData, IFieldSymbol member, INamedTypeSymbol dataType, GeneratorModel model)
@@ -1092,7 +1094,7 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
 
         // Emit blocks-mask prefix + per-block writes. Shape selects between single
         // WriteBits (Item/Container/Unit/Player) and split UInt32+Bits16 (ActivePlayer).
-        if (section.BlockMaskShape == BlockMaskShape.UInt32PlusBits16)
+        if (section.BlockMaskShape is BlockMaskShape.UInt32PlusBits16 or BlockMaskShape.UInt32PlusBits14)
         {
             sb.AppendLine("        uint blocksMask0 = 0;");
             sb.Append("        for (int __i = 0; __i < 32 && __i < ").Append(blockCount).AppendLine("; __i++)");
@@ -1101,7 +1103,8 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
             sb.Append("        for (int __i = 32; __i < ").Append(blockCount).AppendLine("; __i++)");
             sb.AppendLine("            if (blocks[__i] != 0) blocksMask1 |= (1u << (__i - 32));");
             sb.AppendLine("        data.WriteUInt32(blocksMask0);");
-            sb.AppendLine("        data.WriteBits(blocksMask1, 16);");
+            sb.Append("        data.WriteBits(blocksMask1, ")
+              .Append(section.BlockMaskShape == BlockMaskShape.UInt32PlusBits14 ? 14 : 16).AppendLine(");");
             sb.Append("        for (int __i = 0; __i < ").Append(blockCount).AppendLine("; __i++)");
             sb.AppendLine("        {");
             sb.AppendLine("            bool __blockSet = __i < 32 ? (blocksMask0 & (1u << __i)) != 0 : (blocksMask1 & (1u << (__i - 32))) != 0;");
@@ -1140,7 +1143,7 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
         }
 
         sb.AppendLine("        data.FlushBits();");
-        if (section.BlockMaskShape == BlockMaskShape.UInt32PlusBits16)
+        if (section.BlockMaskShape is BlockMaskShape.UInt32PlusBits16 or BlockMaskShape.UInt32PlusBits14)
             sb.AppendLine("        if (blocksMask0 == 0 && blocksMask1 == 0) return;");
         else
             sb.AppendLine("        if (blocksMask == 0) return;");
@@ -1150,7 +1153,7 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
         // enum-declaration order. Merge UpdateFields + CustomFields and sort by Bit.
         var writeOps = section.UpdateFields
             .Select(f => (SortKey: f.WriteOrder != 0 ? f.WriteOrder : f.Bit, Bit: f.Bit, IsCustom: false, FieldEntry: (object)f))
-            .Concat(section.CustomFields.Select(cf => (SortKey: cf.Bit, Bit: cf.Bit, IsCustom: true, FieldEntry: (object)cf)))
+            .Concat(section.CustomFields.Select(cf => (SortKey: cf.WriteOrder != 0 ? cf.WriteOrder : cf.Bit, Bit: cf.Bit, IsCustom: true, FieldEntry: (object)cf)))
             .OrderBy(x => x.SortKey)
             .ToList();
         var postFlushAfterBit = new HashSet<int>(section.UpdatePostFlushes.Select(pf => pf.AfterBit));
@@ -1577,7 +1580,7 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
         public int WriteOrder => writeOrder;
     }
 
-    private sealed record CustomFieldEntry(string Label, int Bit, string CustomWriter, int ParentBit, bool WriteOnly);
+    private sealed record CustomFieldEntry(string Label, int Bit, string CustomWriter, int ParentBit, bool WriteOnly, int WriteOrder = 0);
 
     private sealed record MaskPreambleEntry(int Bit, string CustomWriter);
 
@@ -1641,6 +1644,7 @@ public sealed class ObjectUpdateBuilderGenerator : IIncrementalGenerator
     {
         Bits = 0,
         UInt32PlusBits16 = 1,
+        UInt32PlusBits14 = 2,
     }
 
     private sealed record VersionEntry(string VersionName, List<SectionEntry> Sections);

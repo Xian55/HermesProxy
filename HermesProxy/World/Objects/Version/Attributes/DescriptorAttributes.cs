@@ -80,6 +80,12 @@ public enum BlockMaskShape
     /// 48-block changesMask. <c>MaskWidth</c> is ignored under this shape.
     /// </summary>
     UInt32PlusBits16,
+
+    /// <summary>
+    /// As <see cref="UInt32PlusBits16"/> with <c>data.WriteBits(blocksMask1, 14)</c>: blocks
+    /// 32-45. ActivePlayer's 46-block changesMask from 4.4.2 on.
+    /// </summary>
+    UInt32PlusBits14,
 }
 
 /// <summary>
@@ -358,6 +364,13 @@ public sealed class DescriptorCustomFieldAttribute : Attribute
     /// when one custom writer fans out across multiple array fields' bits.
     /// </summary>
     public bool WriteOnly { get; set; }
+
+    /// <summary>
+    /// Pass-2 position, as on <see cref="DescriptorUpdateFieldAttribute.WriteOrder"/>: 0 places the
+    /// call at <see cref="Bit"/>, anything else sorts it there instead while it stays gated on
+    /// <see cref="Bit"/>. Ties keep declaration order, with update fields ahead of custom fields.
+    /// </summary>
+    public int WriteOrder { get; set; }
 }
 
 /// <summary>

@@ -32,102 +32,167 @@ namespace HermesProxy.World.Server.Packets;
 
 public readonly record struct InteractWithNPC(WowGuid128 CreatureGUID);
 
-public class GossipMessagePkt : ServerPacket
+public sealed class GossipMessagePkt : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<GossipMessagePkt>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V3_4_3_54261, new ClassicEraLayout()),
+        (ClientVersionBuild.V3_4_3_54261, ClientVersionBuild.V4_4_2_60895, new WotLKClassicLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
+
+    private static readonly ServerPacketLayout<GossipMessagePkt> Layout = Layouts.ForRunningClient();
+
     public GossipMessagePkt() : base(Opcode.SMSG_GOSSIP_MESSAGE) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>1.14 and 2.5.</summary>
+    internal sealed class ClassicEraLayout : ServerPacketLayout<GossipMessagePkt>
     {
-        // V3_4_3 (WotLK Classic) uses a distinct on-the-wire shape: TextID is at
-        // the END of the packet (not after FriendshipFactionID), per-option fields
-        // include a duplicated OptionIndex + an extra reserved Int32 + an extra
-        // trailing bit, and there are two leading bits before the options array.
-        // Without this, the V3_4_3 client mis-parses the bit cascade and the quest
-        // list reads `ConditionalQuestText` as garbage → 5 TB allocation OOM
-        // (observed crash: ?AUConditionalQuestText@@, line -6). Layout mirrors
-        // HermesProxy-WOTLK's GossipMessagePkt.WriteWotLK exactly.
-        if (ModernVersion.IsWotLKClassicOrLater)
+        public override void Write(GossipMessagePkt packet, WorldPacket data)
         {
-            WriteWotLK();
-            return;
+            data.WritePackedGuid128(packet.GossipGUID);
+            data.WriteInt32(packet.GossipID);
+            data.WriteInt32(packet.FriendshipFactionID);
+            data.WriteInt32(packet.TextID);
+
+            data.WriteInt32(packet.GossipOptions.Count);
+            data.WriteInt32(packet.GossipQuests.Count);
+
+            foreach (ClientGossipOption options in packet.GossipOptions)
+            {
+                data.WriteInt32(options.OptionIndex);
+                data.WriteUInt8(options.OptionIcon);
+                data.WriteUInt8(options.OptionFlags);
+                data.WriteInt32(options.OptionCost);
+                if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
+                    data.WriteUInt32(options.Language);
+
+                data.WriteBits(options.Text.GetByteCount(), 12);
+                data.WriteBits(options.Confirm.GetByteCount(), 12);
+                data.WriteBits((byte)options.Status, 2);
+                data.WriteBit(options.SpellID.HasValue);
+                data.FlushBits();
+
+                options.Treasure.Write(data);
+
+                data.WriteString(options.Text);
+                data.WriteString(options.Confirm);
+
+                if (options.SpellID.HasValue)
+                    data.WriteInt32(options.SpellID.Value);
+            }
+
+            foreach (ClientGossipQuest text in packet.GossipQuests)
+                text.Write(data);
         }
-
-        _worldPacket.WritePackedGuid128(GossipGUID);
-        _worldPacket.WriteInt32(GossipID);
-        _worldPacket.WriteInt32(FriendshipFactionID);
-        _worldPacket.WriteInt32(TextID);
-
-        _worldPacket.WriteInt32(GossipOptions.Count);
-        _worldPacket.WriteInt32(GossipQuests.Count);
-
-        foreach (ClientGossipOption options in GossipOptions)
-        {
-            _worldPacket.WriteInt32(options.OptionIndex);
-            _worldPacket.WriteUInt8(options.OptionIcon);
-            _worldPacket.WriteUInt8(options.OptionFlags);
-            _worldPacket.WriteInt32(options.OptionCost);
-            if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-                _worldPacket.WriteUInt32(options.Language);
-
-            _worldPacket.WriteBits(options.Text.GetByteCount(), 12);
-            _worldPacket.WriteBits(options.Confirm.GetByteCount(), 12);
-            _worldPacket.WriteBits((byte)options.Status, 2);
-            _worldPacket.WriteBit(options.SpellID.HasValue);
-            _worldPacket.FlushBits();
-
-            options.Treasure.Write(_worldPacket);
-
-            _worldPacket.WriteString(options.Text);
-            _worldPacket.WriteString(options.Confirm);
-
-            if (options.SpellID.HasValue)
-                _worldPacket.WriteInt32(options.SpellID.Value);
-        }
-
-        foreach (ClientGossipQuest text in GossipQuests)
-            text.Write(_worldPacket);
     }
 
-    private void WriteWotLK()
+    /// <summary>
+    /// 3.4.3 (WotLK Classic) uses a distinct on-the-wire shape: TextID is at the END of the
+    /// packet (not after FriendshipFactionID), per-option fields include a duplicated
+    /// OptionIndex + an extra reserved Int32 + an extra trailing bit, and there are two leading
+    /// bits before the options array. Without this, the V3_4_3 client mis-parses the bit cascade
+    /// and the quest list reads `ConditionalQuestText` as garbage → 5 TB allocation OOM
+    /// (observed crash: ?AUConditionalQuestText@@, line -6). Layout mirrors HermesProxy-WOTLK's
+    /// GossipMessagePkt.WriteWotLK exactly.
+    /// </summary>
+    internal sealed class WotLKClassicLayout : ServerPacketLayout<GossipMessagePkt>
     {
-        _worldPacket.WritePackedGuid128(GossipGUID);
-        _worldPacket.WriteInt32(GossipID);
-        _worldPacket.WriteInt32(FriendshipFactionID);
-        _worldPacket.WriteUInt32((uint)GossipOptions.Count);
-        _worldPacket.WriteUInt32((uint)GossipQuests.Count);
-        _worldPacket.WriteBit(true);
-        _worldPacket.WriteBit(false);
-        _worldPacket.FlushBits();
-
-        foreach (ClientGossipOption options in GossipOptions)
+        public override void Write(GossipMessagePkt packet, WorldPacket data)
         {
-            _worldPacket.WriteInt32(options.OptionIndex);
-            _worldPacket.WriteUInt8(options.OptionIcon);
-            _worldPacket.WriteInt8((sbyte)options.OptionFlags);
-            _worldPacket.WriteInt32(options.OptionCost);
-            _worldPacket.WriteUInt32(options.Language);
-            _worldPacket.WriteInt32(0);
-            _worldPacket.WriteInt32(options.OptionIndex);
-            _worldPacket.WriteBits(options.Text.GetByteCount(), 12);
-            _worldPacket.WriteBits(options.Confirm.GetByteCount(), 12);
-            _worldPacket.WriteBits((byte)options.Status, 2);
-            _worldPacket.WriteBit(options.SpellID.HasValue);
-            _worldPacket.WriteBit(false);
-            _worldPacket.FlushBits();
+            data.WritePackedGuid128(packet.GossipGUID);
+            data.WriteInt32(packet.GossipID);
+            data.WriteInt32(packet.FriendshipFactionID);
+            data.WriteUInt32((uint)packet.GossipOptions.Count);
+            data.WriteUInt32((uint)packet.GossipQuests.Count);
+            data.WriteBit(true);
+            data.WriteBit(false);
+            data.FlushBits();
 
-            options.Treasure.Write(_worldPacket);
+            foreach (ClientGossipOption options in packet.GossipOptions)
+            {
+                data.WriteInt32(options.OptionIndex);
+                data.WriteUInt8(options.OptionIcon);
+                data.WriteInt8((sbyte)options.OptionFlags);
+                data.WriteInt32(options.OptionCost);
+                data.WriteUInt32(options.Language);
+                data.WriteInt32(0);
+                data.WriteInt32(options.OptionIndex);
+                data.WriteBits(options.Text.GetByteCount(), 12);
+                data.WriteBits(options.Confirm.GetByteCount(), 12);
+                data.WriteBits((byte)options.Status, 2);
+                data.WriteBit(options.SpellID.HasValue);
+                data.WriteBit(false);
+                data.FlushBits();
 
-            _worldPacket.WriteString(options.Text);
-            _worldPacket.WriteString(options.Confirm);
+                options.Treasure.Write(data);
 
-            if (options.SpellID.HasValue)
-                _worldPacket.WriteInt32(options.SpellID.Value);
+                data.WriteString(options.Text);
+                data.WriteString(options.Confirm);
+
+                if (options.SpellID.HasValue)
+                    data.WriteInt32(options.SpellID.Value);
+            }
+
+            data.WriteInt32(packet.TextID);
+
+            foreach (ClientGossipQuest quest in packet.GossipQuests)
+                quest.WriteWotLK(data);
         }
+    }
 
-        _worldPacket.WriteInt32(TextID);
+    /// <summary>
+    /// Cataclysm Classic 4.4.2 (TrinityCore cata_classic NPCPackets.cpp, and the client's own
+    /// reader): the 3.4.3 shape plus LfgDungeonsID after GossipID; per option an 8-bit
+    /// FailureDescription length (+1) after the OverrideIconID bit and a trailing ItemContext
+    /// byte on every treasure item; per quest Unused1102, a third QuestFlags word and the
+    /// ResetByScheduler and Meta bits.
+    /// </summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<GossipMessagePkt>
+    {
+        public override void Write(GossipMessagePkt packet, WorldPacket data)
+        {
+            data.WritePackedGuid128(packet.GossipGUID);
+            data.WriteInt32(packet.GossipID);
+            data.WriteInt32(0);                         // LfgDungeonsID
+            data.WriteInt32(packet.FriendshipFactionID);
+            data.WriteUInt32((uint)packet.GossipOptions.Count);
+            data.WriteUInt32((uint)packet.GossipQuests.Count);
+            data.WriteBit(true);                        // TextID present
+            data.WriteBit(false);                       // BroadcastTextID present
+            data.FlushBits();
 
-        foreach (ClientGossipQuest quest in GossipQuests)
-            quest.WriteWotLK(_worldPacket);
+            foreach (ClientGossipOption options in packet.GossipOptions)
+            {
+                data.WriteInt32(options.OptionIndex);   // GossipOptionID
+                data.WriteUInt8(options.OptionIcon);    // OptionNPC
+                data.WriteInt8((sbyte)options.OptionFlags);
+                data.WriteInt32(options.OptionCost);
+                data.WriteUInt32(options.Language);
+                data.WriteInt32(0);                     // Flags
+                data.WriteInt32(options.OptionIndex);   // OrderIndex
+                data.WriteBits(options.Text.GetByteCount(), 12);
+                data.WriteBits(options.Confirm.GetByteCount(), 12);
+                data.WriteBits((byte)options.Status, 2);
+                data.WriteBit(options.SpellID.HasValue);
+                data.WriteBit(false);                   // OverrideIconID present
+                data.WriteBits(1, 8);                   // FailureDescription length + 1: none
+                data.FlushBits();
+
+                options.Treasure.WriteCataClassic(data);
+
+                data.WriteString(options.Text);
+                data.WriteString(options.Confirm);
+
+                if (options.SpellID.HasValue)
+                    data.WriteInt32(options.SpellID.Value);
+            }
+
+            data.WriteInt32(packet.TextID);
+
+            foreach (ClientGossipQuest quest in packet.GossipQuests)
+                quest.WriteCataClassic(data);
+        }
     }
 
     public List<ClientGossipOption> GossipOptions = new();
@@ -162,6 +227,13 @@ public class TreasureLootList
         foreach (TreasureItem treasureItem in Items)
             treasureItem.Write(data);
     }
+
+    public void WriteCataClassic(WorldPacket data)
+    {
+        data.WriteInt32(Items.Count);
+        foreach (TreasureItem treasureItem in Items)
+            treasureItem.WriteCataClassic(data);
+    }
 }
 
 public struct TreasureItem
@@ -175,6 +247,13 @@ public struct TreasureItem
         data.WriteBits((byte)Type, 1);
         data.WriteInt32(ID);
         data.WriteInt32(Quantity);
+    }
+
+    // 4.4.2 appends the item context.
+    public void WriteCataClassic(WorldPacket data)
+    {
+        Write(data);
+        data.WriteInt8(0);                          // ItemContext
     }
 }
 
@@ -222,6 +301,28 @@ public class ClientGossipQuest
         data.WriteInt32((int)QuestFlagsEx);
         data.WriteBit(Repeatable);
         data.WriteBit(false);               // Important
+        data.WriteBits(QuestTitle.GetByteCount(), 9);
+        data.FlushBits();
+        data.WriteString(QuestTitle);
+    }
+
+    // 4.4.2 (TrinityCore cata_classic ClientGossipText): Unused1102 after the max scaling level,
+    // a third QuestFlags word, and ResetByScheduler / Meta around Important.
+    public void WriteCataClassic(WorldPacket data)
+    {
+        data.WriteInt32((int)QuestID);
+        data.WriteInt32((int)ContentTuningID);
+        data.WriteInt32(QuestType);
+        data.WriteInt32(QuestLevel);
+        data.WriteInt32(QuestMaxLevel);     // QuestMaxScalingLevel
+        data.WriteInt32(0);                 // Unused1102
+        data.WriteInt32((int)QuestFlags);
+        data.WriteInt32((int)QuestFlagsEx);
+        data.WriteInt32(0);                 // QuestFlags[2]
+        data.WriteBit(Repeatable);
+        data.WriteBit(false);               // ResetByScheduler
+        data.WriteBit(false);               // Important
+        data.WriteBit(false);               // Meta
         data.WriteBits(QuestTitle.GetByteCount(), 9);
         data.FlushBits();
         data.WriteString(QuestTitle);
@@ -304,19 +405,22 @@ public class BinderConfirm : ServerPacket, ISpanWritable
     public WowGuid128 Guid;
 }
 
-public class VendorInventory : ServerPacket
+public sealed class VendorInventory : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<VendorInventory>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V3_4_3_54261, new ClassicEraLayout()),
+        (ClientVersionBuild.V3_4_3_54261, ClientVersionBuild.V4_4_2_60895, new WotLKClassicLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
+
+    private static readonly ServerPacketLayout<VendorInventory> Layout = Layouts.ForRunningClient();
+
     public VendorInventory() : base(Opcode.SMSG_VENDOR_INVENTORY, ConnectionType.Instance) { }
 
     public override void Write()
     {
         Log.Print(LogType.Trace,
             $"[VendorTrace] SMSG_VENDOR_INVENTORY write: VendorGUID={VendorGUID} " +
-            $"Reason={Reason} Items.Count={Items.Count} layoutPath={(ModernVersion.IsWotLKClassicOrLater ? "WotLK" : "Vanilla")}");
-
-        _worldPacket.WritePackedGuid128(VendorGUID);
-        _worldPacket.WriteUInt8(Reason);
-        _worldPacket.WriteInt32(Items.Count);
+            $"Reason={Reason} Items.Count={Items.Count}");
 
         for (int i = 0; i < Items.Count; i++)
         {
@@ -328,7 +432,50 @@ public class VendorInventory : ServerPacket
                     $"Type={item.Type} Quantity={item.Quantity} Price={item.Price} StackCount={item.StackCount} " +
                     $"ExtCost={item.ExtendedCostID} Durability={item.Durability}");
             }
-            item.Write(_worldPacket);
+        }
+
+        Layout.Write(this, _worldPacket);
+    }
+
+    /// <summary>1.14 and 2.5.</summary>
+    internal sealed class ClassicEraLayout : ServerPacketLayout<VendorInventory>
+    {
+        public override void Write(VendorInventory packet, WorldPacket data)
+        {
+            data.WritePackedGuid128(packet.VendorGUID);
+            data.WriteUInt8(packet.Reason);
+            data.WriteInt32(packet.Items.Count);
+
+            foreach (VendorItem item in packet.Items)
+                item.WriteClassicEra(data);
+        }
+    }
+
+    /// <summary>3.4.3.</summary>
+    internal sealed class WotLKClassicLayout : ServerPacketLayout<VendorInventory>
+    {
+        public override void Write(VendorInventory packet, WorldPacket data)
+        {
+            data.WritePackedGuid128(packet.VendorGUID);
+            data.WriteUInt8(packet.Reason);
+            data.WriteInt32(packet.Items.Count);
+
+            foreach (VendorItem item in packet.Items)
+                item.WriteWotLKClassic(data);
+        }
+    }
+
+    /// <summary>4.4.2 (TrinityCore cata_classic, and the client's reader): Reason is an int32.</summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<VendorInventory>
+    {
+        public override void Write(VendorInventory packet, WorldPacket data)
+        {
+            data.WritePackedGuid128(packet.VendorGUID);
+            data.WriteInt32(packet.Reason);
+            data.WriteInt32(packet.Items.Count);
+
+            foreach (VendorItem item in packet.Items)
+                item.WriteCataClassic(data);
         }
     }
 
@@ -339,18 +486,8 @@ public class VendorInventory : ServerPacket
 
 public class VendorItem
 {
-    public void Write(WorldPacket data)
+    public void WriteClassicEra(WorldPacket data)
     {
-        // V3_4_3 reorders the vendor item record and inserts a MuID slot index.
-        // Without this layout the client mis-parses the field stream and the
-        // vendor window renders empty / corrupted. Layout mirrors
-        // HermesProxy-WOTLK Server/Packets/VendorItem.cs:WriteWotLK exactly.
-        if (ModernVersion.IsWotLKClassicOrLater)
-        {
-            WriteWotLK(data);
-            return;
-        }
-
         data.WriteInt32(Slot);
         data.WriteInt32(Type);
         data.WriteInt32(Quantity);
@@ -365,7 +502,11 @@ public class VendorItem
         data.FlushBits();
     }
 
-    private void WriteWotLK(WorldPacket data)
+    // V3_4_3 reorders the vendor item record and inserts a MuID slot index.
+    // Without this layout the client mis-parses the field stream and the
+    // vendor window renders empty / corrupted. Layout mirrors
+    // HermesProxy-WOTLK Server/Packets/VendorItem.cs:WriteWotLK exactly.
+    public void WriteWotLKClassic(WorldPacket data)
     {
         data.WriteUInt64(Price);
         data.WriteUInt32(MuID);
@@ -376,6 +517,23 @@ public class VendorItem
         data.WriteInt32(ExtendedCostID);
         data.WriteInt32(PlayerConditionFailed);
         data.WriteBit(false);
+        data.WriteBit(DoNotFilterOnVendor);
+        data.WriteBit(Refundable);
+        data.FlushBits();
+        Item.Write(data);
+    }
+
+    // 4.4.2 dropped Durability.
+    public void WriteCataClassic(WorldPacket data)
+    {
+        data.WriteUInt64(Price);
+        data.WriteUInt32(MuID);
+        data.WriteInt32(Type);
+        data.WriteInt32((int)StackCount);
+        data.WriteInt32(Quantity);
+        data.WriteInt32(ExtendedCostID);
+        data.WriteInt32(PlayerConditionFailed);
+        data.WriteBit(false);                       // Locked
         data.WriteBit(DoNotFilterOnVendor);
         data.WriteBit(Refundable);
         data.FlushBits();
@@ -435,73 +593,93 @@ public class ShowBank : ServerPacket, ISpanWritable
 
 public readonly record struct BuyBankSlot(WowGuid128 Guid);
 
-public class TrainerList : ServerPacket, ISpanWritable
+public sealed class TrainerList : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<TrainerList>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new SpellsLayout(unk440: false)),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new SpellsLayout(unk440: true)));
+
+    private static readonly ServerPacketLayout<TrainerList> Layout = Layouts.ForRunningClient();
+
     public TrainerList() : base(Opcode.SMSG_TRAINER_LIST, ConnectionType.Instance) { }
 
-    public override void Write()
-    {
-        _worldPacket.WritePackedGuid128(TrainerGUID);
-        _worldPacket.WriteInt32(TrainerType);
-        _worldPacket.WriteUInt32(TrainerID);
+    public override void Write() => Layout.Write(this, _worldPacket);
 
-        _worldPacket.WriteInt32(Spells.Count);
-        foreach (TrainerListSpell spell in Spells)
-        {
-            _worldPacket.WriteUInt32(spell.SpellID);
-            _worldPacket.WriteUInt32(spell.MoneyCost);
-            _worldPacket.WriteUInt32(spell.ReqSkillLine);
-            _worldPacket.WriteUInt32(spell.ReqSkillRank);
-
-            for (uint i = 0; i < 3; ++i)
-                _worldPacket.WriteUInt32(spell.ReqAbility[i]);
-
-            _worldPacket.WriteUInt8((byte)spell.Usable);
-            _worldPacket.WriteUInt8(spell.ReqLevel);
-        }
-
-        _worldPacket.WriteBits(Greeting.GetByteCount(), 11);
-        _worldPacket.FlushBits();
-        _worldPacket.WriteString(Greeting);
-    }
-
-    // MaxSize: GUID(18) + 2 ints(8) + count(4) + max 200 spells (30 each) + bits(2) + greeting(256) = 6288
-    // TrainerListSpell: 4 uints(16) + 3 reqAbility(12) + 2 bytes(2) = 30
+    // MaxSize: GUID(18) + 2 ints(8) + count(4) + max 200 spells (34 each) + bits(2) + greeting(256) = 7088
+    // TrainerListSpell: 4 uints(16) + 3 reqAbility(12) + 4.4.2's Unk440(4) + 2 bytes(2) = 34
     private const int MaxSpells = 200;
-    private const int SpellSize = 30;
+    private const int SpellSize = 34;
     private const int MaxGreetingBytes = 256;
     public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 12 + MaxSpells * SpellSize + 2 + MaxGreetingBytes;
 
-    public int WriteToSpan(Span<byte> buffer)
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>4.4.2 (TrinityCore cata_classic, and the client's reader) adds a uint32 after ReqAbility.</summary>
+    internal sealed class SpellsLayout(bool unk440) : ServerPacketLayout<TrainerList>
     {
-        int greetingBytes = Encoding.UTF8.GetByteCount(Greeting ?? "");
-        if (Spells.Count > MaxSpells || greetingBytes > 2047) // 11 bits max
-            return -1;
-
-        var writer = new SpanPacketWriter(buffer);
-        writer.WritePackedGuid128(TrainerGUID.Low, TrainerGUID.High);
-        writer.WriteInt32(TrainerType);
-        writer.WriteUInt32(TrainerID);
-
-        writer.WriteInt32(Spells.Count);
-        foreach (var spell in Spells)
+        public override void Write(TrainerList packet, WorldPacket data)
         {
-            writer.WriteUInt32(spell.SpellID);
-            writer.WriteUInt32(spell.MoneyCost);
-            writer.WriteUInt32(spell.ReqSkillLine);
-            writer.WriteUInt32(spell.ReqSkillRank);
+            data.WritePackedGuid128(packet.TrainerGUID);
+            data.WriteInt32(packet.TrainerType);
+            data.WriteUInt32(packet.TrainerID);
 
-            for (int i = 0; i < 3; ++i)
-                writer.WriteUInt32(spell.ReqAbility[i]);
+            data.WriteInt32(packet.Spells.Count);
+            foreach (TrainerListSpell spell in packet.Spells)
+            {
+                data.WriteUInt32(spell.SpellID);
+                data.WriteUInt32(spell.MoneyCost);
+                data.WriteUInt32(spell.ReqSkillLine);
+                data.WriteUInt32(spell.ReqSkillRank);
 
-            writer.WriteUInt8((byte)spell.Usable);
-            writer.WriteUInt8(spell.ReqLevel);
+                for (uint i = 0; i < 3; ++i)
+                    data.WriteUInt32(spell.ReqAbility[i]);
+
+                if (unk440)
+                    data.WriteUInt32(0);
+
+                data.WriteUInt8((byte)spell.Usable);
+                data.WriteUInt8(spell.ReqLevel);
+            }
+
+            data.WriteBits(packet.Greeting.GetByteCount(), 11);
+            data.FlushBits();
+            data.WriteString(packet.Greeting);
         }
 
-        writer.WriteBits((uint)greetingBytes, 11);
-        writer.FlushBits();
-        writer.WriteString(Greeting ?? "");
-        return writer.Position;
+        public override int WriteToSpan(TrainerList packet, Span<byte> buffer)
+        {
+            int greetingBytes = Encoding.UTF8.GetByteCount(packet.Greeting ?? "");
+            if (packet.Spells.Count > MaxSpells || greetingBytes > 2047) // 11 bits max
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(packet.TrainerGUID.Low, packet.TrainerGUID.High);
+            writer.WriteInt32(packet.TrainerType);
+            writer.WriteUInt32(packet.TrainerID);
+
+            writer.WriteInt32(packet.Spells.Count);
+            foreach (var spell in packet.Spells)
+            {
+                writer.WriteUInt32(spell.SpellID);
+                writer.WriteUInt32(spell.MoneyCost);
+                writer.WriteUInt32(spell.ReqSkillLine);
+                writer.WriteUInt32(spell.ReqSkillRank);
+
+                for (int i = 0; i < 3; ++i)
+                    writer.WriteUInt32(spell.ReqAbility[i]);
+
+                if (unk440)
+                    writer.WriteUInt32(0);
+
+                writer.WriteUInt8((byte)spell.Usable);
+                writer.WriteUInt8(spell.ReqLevel);
+            }
+
+            writer.WriteBits((uint)greetingBytes, 11);
+            writer.FlushBits();
+            writer.WriteString(packet.Greeting ?? "");
+            return writer.Position;
+        }
     }
 
     public WowGuid128 TrainerGUID;

@@ -1,0 +1,1967 @@
+﻿// Nullable disabled file-wide because the ported WriteUpdate*Data methods (lifted
+// verbatim from the HermesProxy-WOTLK fork, which compiles with nullable disabled)
+// access nullable struct/reference members without `.Value` / null-forgiving annotation.
+// The pre-port WriteCreate*Data code in this file was nullable-safe, but the ported
+// update path would otherwise produce ~400 nullability warnings (which are promoted
+// to errors by Directory.Packages.props `WarningsAsErrors=nullable`). Disabling
+// nullable here keeps the port mechanical; future cleanup can reintroduce per-section
+// nullable contexts once the update writers stabilise.
+#nullable disable
+
+using Framework.GameMath;
+using Framework.Util;
+using HermesProxy.World.Enums;
+using HermesProxy.World.Objects.Version.Attributes;
+using HermesProxy.World.Server;
+using HermesProxy.World.Server.Packets;
+using System;
+using System.Linq;
+
+namespace HermesProxy.World.Objects.Version.V4_4_2_60895;
+
+// Phase 5a hand-port of the WotLK Classic 3.4.3 descriptor-tree serializer.
+// Phases 5b–5e progressively replace sections with source-generator output,
+// using this hand-port as the byte-equivalence test oracle.
+public partial class ObjectUpdateBuilder
+{
+    private readonly ObjectUpdate _updateData;
+    private readonly GameSessionData _gameState;
+    private readonly ObjectTypeBCC _objectType;
+    private readonly ObjectTypeBCC _realObjectType;
+    private readonly ObjectTypeMask _objectTypeMask;
+    private CreateObjectBits _createBits;
+
+    public ObjectUpdateBuilder(ObjectUpdate updateData, GameSessionData gameState)
+    {
+        _updateData = updateData;
+        _gameState = gameState;
+        _objectType = ResolveObjectType(updateData, gameState);
+        _realObjectType = _objectType;
+        _objectTypeMask = TypeMaskFor(_objectType);
+    }
+
+    /// <summary>
+    /// The object type this update writes as. Static so the V3_4_3 Values filter can ask the
+    /// same question without building a builder — see <see cref="HasAnyValuesDelta"/>.
+    /// </summary>
+    internal static ObjectTypeBCC ResolveObjectType(ObjectUpdate updateData, GameSessionData gameState)
+    {
+        var objectType = updateData.Guid.GetObjectType();
+        if (updateData.CreateData != null)
+        {
+            objectType = updateData.CreateData.ObjectType;
+            if (updateData.CreateData.ThisIsYou)
+                objectType = ObjectType.ActivePlayer;
+        }
+        else if (gameState.OriginalObjectTypes.TryGetValue(updateData.Guid, out var cachedType))
+        {
+            // Values updates: GUID-derived type can't distinguish Container vs Item
+            // (both share HighGuid.Item) or ActivePlayer vs Player. Prefer the type
+            // captured on CreateObject so Container Values updates correctly include
+            // the Container bit in _objectTypeMask and route to WriteUpdateContainerData.
+            objectType = cachedType;
+        }
+        if (objectType == ObjectType.Player && gameState.CurrentPlayerGuid == updateData.Guid)
+            objectType = ObjectType.ActivePlayer;
+
+        return ObjectTypeConverter.ConvertToBCC(objectType);
+    }
+
+    internal static ObjectTypeMask TypeMaskFor(ObjectTypeBCC objectType)
+    {
+        var mask = ObjectTypeMask.Object;
+        switch (objectType)
+        {
+            case ObjectTypeBCC.Item:          mask |= ObjectTypeMask.Item; break;
+            case ObjectTypeBCC.Container:     mask |= ObjectTypeMask.Item | ObjectTypeMask.Container; break;
+            case ObjectTypeBCC.Unit:          mask |= ObjectTypeMask.Unit; break;
+            case ObjectTypeBCC.Player:        mask |= ObjectTypeMask.Unit | ObjectTypeMask.Player; break;
+            case ObjectTypeBCC.ActivePlayer:  mask |= ObjectTypeMask.Unit | ObjectTypeMask.Player | ObjectTypeMask.ActivePlayer; break;
+            case ObjectTypeBCC.GameObject:    mask |= ObjectTypeMask.GameObject; break;
+            case ObjectTypeBCC.DynamicObject: mask |= ObjectTypeMask.DynamicObject; break;
+            case ObjectTypeBCC.Corpse:        mask |= ObjectTypeMask.Corpse; break;
+        }
+        return mask;
+    }
+
+    private bool IsOwner =>
+        _realObjectType == ObjectTypeBCC.ActivePlayer ||
+        _realObjectType == ObjectTypeBCC.Item ||
+        _realObjectType == ObjectTypeBCC.Container;
+
+    /// <summary>
+    /// The values blob's leading visibility byte, and the gate the generated create writers test
+    /// per field. This build only ever declares both groups or neither — PartyMember is what makes
+    /// QuestLog visible, and nothing here is party-visible without also being owner-visible — so
+    /// the whole byte follows <see cref="IsOwner"/>. Builds that separate the groups override the
+    /// flags per object instead.
+    /// </summary>
+    private FieldVisibility FieldVisibilityFlags =>
+        IsOwner ? FieldVisibility.Owner | FieldVisibility.PartyMember : FieldVisibility.None;
+
+    private bool IsGameObjectOwner
+    {
+        get
+        {
+            if (_realObjectType != ObjectTypeBCC.GameObject)
+                return false;
+            var createdBy = _updateData.GameObjectData?.CreatedBy;
+            if (createdBy is null)
+                return false;
+            var playerGuid = _gameState.CurrentPlayerGuid;
+            return createdBy.Value.GetCounter() == playerGuid.GetCounter() &&
+                   createdBy.Value.GetHighType() == playerGuid.GetHighType();
+        }
+    }
+
+    // Wire-format type mask sent in the SMSG_UPDATE_OBJECT header. The bit
+    // positions here are the protocol values, not the in-memory ObjectTypeMask
+    // enum values — they intentionally differ.
+    private static uint ConvertTypeMask(ObjectTypeMask mask)
+    {
+        uint result = 0;
+        if (mask.HasAnyFlag(ObjectTypeMask.Object))        result |= 0x0001;
+        if (mask.HasAnyFlag(ObjectTypeMask.Item))          result |= 0x0002;
+        if (mask.HasAnyFlag(ObjectTypeMask.Container))     result |= 0x0004;
+        if (mask.HasAnyFlag(ObjectTypeMask.Unit))          result |= 0x0020;
+        if (mask.HasAnyFlag(ObjectTypeMask.Player))        result |= 0x0040;
+        if (mask.HasAnyFlag(ObjectTypeMask.ActivePlayer))  result |= 0x0080;
+        if (mask.HasAnyFlag(ObjectTypeMask.GameObject))    result |= 0x0100;
+        if (mask.HasAnyFlag(ObjectTypeMask.DynamicObject)) result |= 0x0200;
+        if (mask.HasAnyFlag(ObjectTypeMask.Corpse))        result |= 0x0400;
+        if (mask.HasAnyFlag(ObjectTypeMask.AreaTrigger))   result |= 0x0800;
+        if (mask.HasAnyFlag(ObjectTypeMask.Sceneobject))   result |= 0x1000;
+        if (mask.HasAnyFlag(ObjectTypeMask.Conversation))  result |= 0x2000;
+        return result;
+    }
+
+    private static byte ConvertTypeId(ObjectTypeBCC type) => type switch
+    {
+        ObjectTypeBCC.Object        => 0,
+        ObjectTypeBCC.Item          => 1,
+        ObjectTypeBCC.Container     => 2,
+        ObjectTypeBCC.Unit          => 5,
+        ObjectTypeBCC.Player        => 6,
+        ObjectTypeBCC.ActivePlayer  => 7,
+        ObjectTypeBCC.GameObject    => 8,
+        ObjectTypeBCC.DynamicObject => 9,
+        ObjectTypeBCC.Corpse        => 10,
+        ObjectTypeBCC.AreaTrigger   => 11,
+        ObjectTypeBCC.SceneObject   => 12,
+        _                           => 0,
+    };
+
+    internal void SetCreateObjectBits()
+    {
+        _createBits = CreateObjectBits.None;
+        var create = _updateData.CreateData;
+        var moveInfo = create?.MoveInfo;
+        var hasMoveInfo = moveInfo != null;
+
+        if (create is { PlayHoverAnim: true })
+            _createBits |= CreateObjectBits.PlayHoverAnim;
+        if (hasMoveInfo && _objectTypeMask.HasAnyFlag(ObjectTypeMask.Unit))
+            _createBits |= CreateObjectBits.MovementUpdate;
+        if (hasMoveInfo && moveInfo!.Value.TransportGuid != default && _objectType == ObjectTypeBCC.GameObject)
+            _createBits |= CreateObjectBits.MovementTransport;
+        if (hasMoveInfo && !_objectTypeMask.HasAnyFlag(ObjectTypeMask.Unit))
+            _createBits |= CreateObjectBits.Stationary;
+        // Native 3.4.3 sets ServerTime for both transport types (golden capture: SotA
+        // gunship 193182 has HasServerTime true). Guid high type alone misses type 11 from
+        // a 3.3.5a core, which creates it with HighGuid::GameObject. ServerTime must only
+        // ever travel together with a stop frame -- on its own it hands the client a time
+        // base for a boat TrinityCore never actually relocates (GameObject::Update advances
+        // Transport.PathProgress with the matching GameObjectRelocation commented out), and
+        // the client animates it far from where the server places players.
+        if (hasMoveInfo && (_updateData.Guid.GetHighType() == HighGuidType.Transport
+                            || _updateData.Guid.GetHighType() == HighGuidType.MOTransport
+                            || _updateData.TransportStopFrame is > 0))
+            _createBits |= CreateObjectBits.ServerTime;
+        if (create != null && create.AutoAttackVictim != null)
+            _createBits |= CreateObjectBits.CombatVictim;
+        if (create is { VehicleId: not 0 })
+            _createBits |= CreateObjectBits.Vehicle;
+        if (hasMoveInfo && _objectType == ObjectTypeBCC.GameObject)
+            _createBits |= CreateObjectBits.Rotation;
+        // CreateObjectBits.GameObject is NOT set unconditionally here — empirical
+        // capture vs CypherCore (canonical V3_4_3 server) shows the bit must stay
+        // false for typical GameObjects (transports, mailboxes, doodads). It writes
+        // an extra 4-byte uint32 + 1-bit (WorldEffectID + bit8) section that the
+        // V3_4_3 client doesn't read for ordinary GameObjects, causing byte
+        // misalignment and CMSG_OBJECT_UPDATE_FAILED. CypherCore only sets it when
+        // m_goTemplateAddon.WorldEffectID != 0 (rare special GOs with world-effect
+        // overlays). HermesProxy doesn't track WorldEffectID, so we never set it.
+        // If a GO surfaces that needs the bit, add a targeted check here.
+        if (_objectType == ObjectTypeBCC.ActivePlayer)
+            _createBits |= CreateObjectBits.ActivePlayer | CreateObjectBits.ThisIsYou;
+    }
+
+    private bool Has(CreateObjectBits flag) => (_createBits & flag) != 0;
+
+    internal void BuildMovementUpdate(WorldPacket data)
+    {
+        // Native 3.4.3 ships exactly one stop frame for a type 11 transport (golden capture:
+        // PauseTimesCount 1, PauseTimes [60133]). The stop frame is what makes the client
+        // hold the boat still; with a count of 0 it free-runs the TransportAnimation path.
+        // Type 15 MO_TRANSPORTs loop continuously and carry none.
+        uint stopFrame = _updateData.TransportStopFrame ?? 0u;
+        int PauseTimesCount = stopFrame > 0 ? 1 : 0;
+
+        // HasPositionFragment: every world object, i.e. everything but items and containers.
+        data.WriteBit(!_objectTypeMask.HasAnyFlag(ObjectTypeMask.Item));
+        _createBits.WriteCreateBits(data);
+
+        if (Has(CreateObjectBits.MovementUpdate))
+        {
+            MovementInfo moveInfo = _updateData.CreateData.MoveInfo.GetValueOrDefault();
+            var hasSpline = _updateData.CreateData.MoveSpline != null;
+
+            ModernMovementCodec.Write(data, _updateData.Guid, in moveInfo);
+
+            _updateData.CreateData.Speeds.Write(data);
+            data.WriteUInt32(0u);
+            data.WriteFloat(1f);
+            data.WriteFloat(2f);
+            data.WriteFloat(65f);
+            data.WriteFloat(1f);
+            data.WriteFloat(3f);
+            data.WriteFloat(10f);
+            data.WriteFloat(100f);
+            data.WriteFloat(90f);
+            data.WriteFloat(140f);
+            data.WriteFloat(180f);
+            data.WriteFloat(360f);
+            data.WriteFloat(90f);
+            data.WriteFloat(270f);
+            data.WriteFloat(30f);
+            data.WriteFloat(80f);
+            data.WriteFloat(2.75f);
+            data.WriteFloat(7f);
+            data.WriteFloat(0.4f);
+            data.WriteBit(hasSpline);
+            data.FlushBits();
+            if (hasSpline)
+                WriteCreateObjectSplineDataBlock(_updateData.CreateData.MoveSpline!, data);
+        }
+
+        data.WriteInt32(PauseTimesCount);
+
+        if (Has(CreateObjectBits.Stationary))
+        {
+            MovementInfo stationary = _updateData.CreateData.MoveInfo.GetValueOrDefault();
+            data.WriteFloat(stationary.Position.X);
+            data.WriteFloat(stationary.Position.Y);
+            data.WriteFloat(stationary.Position.Z);
+            data.WriteFloat(stationary.Orientation);
+        }
+
+        if (Has(CreateObjectBits.CombatVictim))
+            data.WritePackedGuid128(_updateData.CreateData.AutoAttackVictim!.Value);
+
+        if (Has(CreateObjectBits.ServerTime))
+        {
+            // Legacy UPDATEFLAG_TRANSPORT carries Transport::GetPathProgress() — how far
+            // into its loop the transport is, in ms (AzerothCore Object.cpp:463-469). The
+            // client interpolates its own animation from that offset, so forwarding it is
+            // what keeps every client seeing the boat in the same place. Matches the V1_14
+            // and V2_5 builders. Only fall back to a local clock when the legacy server
+            // sent nothing (non-transport objects that still set the bit).
+            //
+            // A transport the proxy parks and sails itself gets the proxy clock instead
+            // (ObjectUpdate.TransportServerTime): the client seeds the clock it compares
+            // GameObjectData.Level against from this field, and the sail deadline written
+            // into Level on the ships-start flip is stamped from the same clock.
+            var pathProgress = _updateData.CreateData.TransportPathTimer;
+            data.WriteUInt32(_updateData.TransportServerTime
+                             ?? (pathProgress != 0 ? pathProgress : (uint)Environment.TickCount));
+        }
+
+        if (Has(CreateObjectBits.Vehicle))
+        {
+            data.WriteUInt32(_updateData.CreateData.VehicleId);
+            data.WriteFloat(_updateData.CreateData.VehicleOrientation);
+        }
+
+        if (Has(CreateObjectBits.AnimKit))
+        {
+            data.WriteUInt16(0);
+            data.WriteUInt16(0);
+            data.WriteUInt16(0);
+        }
+
+        if (Has(CreateObjectBits.Rotation))
+            data.WriteInt64(_updateData.CreateData.Rotation.GetPackedRotation());
+
+        for (int i = 0; i < PauseTimesCount; i++)
+            data.WriteUInt32(stopFrame);
+
+        if (Has(CreateObjectBits.MovementTransport))
+            ModernMovementCodec.WriteTransport(data, _updateData.CreateData.MoveInfo.GetValueOrDefault().Transport.GetValueOrDefault());
+
+        if (Has(CreateObjectBits.GameObject))
+        {
+            data.WriteUInt32(0u);
+            data.WriteBit(false);
+            data.FlushBits();
+        }
+
+        if (Has(CreateObjectBits.ActivePlayer))
+        {
+            const bool hasSceneInstanceIDs = false;
+            // RuneState is allocated for V3_4_3 DK sessions in CharacterHandler.HandlePlayerLogin.
+            // The 3.3.5 server overwrites the seeded "all usable" defaults with authoritative
+            // values via SMSG_RESYNC_RUNES; without this block (was hardcoded false), the V3_4_3
+            // client starts up believing all 6 runes are on cooldown and refuses every rune-cost cast.
+            bool hasRuneState = _gameState.RuneState != null;
+            const bool hasActionButtons = true;
+            data.WriteBit(hasSceneInstanceIDs);
+            data.WriteBit(hasRuneState);
+            data.WriteBit(hasActionButtons);
+            data.FlushBits();
+            if (hasRuneState)
+            {
+                var runeState = _gameState.RuneState;
+                data.WriteUInt8(runeState.RechargingRuneMask);
+                data.WriteUInt8(runeState.UsableRuneMask);
+                data.WriteUInt32(RuneStateData.MaxRunes);
+                for (int i = 0; i < RuneStateData.MaxRunes; i++)
+                    data.WriteUInt8(runeState.Cooldowns[i]);
+            }
+            // Embedded ActivePlayer.ActionButtons — 180 × int32 (legacy packed action+type).
+            // V3_4_3 client uses this as the authoritative bar state; the standalone
+            // SMSG_UPDATE_ACTION_BUTTONS only carries updates relative to it. Writing zeros
+            // here leaves every slot blank regardless of the standalone packet that follows.
+            for (int j = 0; j < PlayerConst.MaxActionButtonsModern; j++)
+            {
+                int legacy = j < _gameState.ActionButtons.Count ? _gameState.ActionButtons[j] : 0;
+                data.WriteInt32(legacy);
+            }
+        }
+    }
+
+    private static void WriteCreateObjectSplineDataBlock(ServerSideMovement moveSpline, WorldPacket data)
+    {
+        data.WriteUInt32(moveSpline.SplineId);
+
+        if (!moveSpline.SplineFlags.HasAnyFlag(SplineFlagModern.Cyclic))
+            data.WriteVector3(moveSpline.EndPosition);
+        else
+            data.WriteVector3(Vector3.Zero);
+
+        var hasSplineMove = data.WriteBit(moveSpline.SplineCount != 0);
+        data.FlushBits();
+        if (!hasSplineMove)
+            return;
+
+        data.WriteUInt32((uint)moveSpline.SplineFlags);
+        data.WriteUInt32(moveSpline.SplineTime);
+        data.WriteUInt32(moveSpline.SplineTimeFull);
+        data.WriteFloat(1f);
+        data.WriteFloat(1f);
+        data.WriteBits((byte)moveSpline.SplineType, 2);
+        var hasFadeObjectTime = data.WriteBit(false);
+        data.WriteBits(moveSpline.SplineCount, 16);
+        data.WriteBit(false);
+        data.WriteBit(false);
+        data.WriteBit(false);
+        data.WriteBit(false);
+        data.FlushBits();
+
+        switch (moveSpline.SplineType)
+        {
+            case SplineTypeModern.FacingSpot:
+                data.WriteVector3(moveSpline.FinalFacingSpot);
+                break;
+            case SplineTypeModern.FacingTarget:
+                // Modern wire layout: PackedGuid128 only — no leading orientation float.
+                // The earlier extra WriteFloat shifted SplinePoints/PauseTimesCount by
+                // 4 bytes, the client read garbage PauseTimesCount (~2.8 GiB array
+                // alloc), froze, then sent CMSG_LOG_DISCONNECT reason=7. Triggered
+                // mid-combat whenever a creature spawning into LoS had a FacingTarget
+                // spline (TC AI casting/aiming at the player). Matches V2_5_3 / V1_14
+                // writers.
+                data.WritePackedGuid128(moveSpline.FinalFacingGuid);
+                break;
+            case SplineTypeModern.FacingAngle:
+                data.WriteFloat(moveSpline.FinalOrientation);
+                break;
+        }
+
+        if (hasFadeObjectTime)
+            data.WriteInt32(0);
+
+        foreach (var vec in moveSpline.SplinePoints)
+            data.WriteVector3(vec);
+    }
+
+    // WriteCreateObjectData emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator
+    // from [DescriptorCreateField] attributes on V4_4_2_60895.ObjectField enum members.
+    // See HermesProxy/obj/Generated/HermesProxy.SourceGen/.../V4_4_2_60895.ObjectUpdateBuilder.g.cs
+
+    // WriteCreateItemData + WriteUpdateItemData + HasAnyItemFieldSet emitted by
+    // HermesProxy.SourceGen.ObjectUpdateBuilderGenerator from
+    // V4_4_2_60895.ItemField. WriteEmptyItemCreate was equivalent to
+    // WriteCreateItemData(new ItemData()) — generator subsumes both.
+    //
+    // Custom writers for the per-element ItemEnchantment[13] nested-struct payload.
+    // Referenced by [DescriptorCreateField(CustomWriter = "WriteEnchantmentCreate")]
+    // and [DescriptorUpdateField(CustomWriter = "WriteEnchantmentUpdate")] on
+    // ITEM_ENCHANTMENT in V4_4_2_60895.ItemField.
+    internal void WriteEnchantmentCreate(WorldPacket data, ItemEnchantment[] arr, int i)
+    {
+        var ench = arr[i];
+        if (ench != null)
+        {
+            data.WriteInt32(ench.ID.GetValueOrDefault());
+            data.WriteUInt32(ench.Duration.GetValueOrDefault());
+            data.WriteInt16((short)ench.Charges.GetValueOrDefault());
+            data.WriteUInt16(ench.Inactive.GetValueOrDefault());
+        }
+        else
+        {
+            data.WriteInt32(0);
+            data.WriteUInt32(0u);
+            data.WriteInt16(0);
+            data.WriteUInt16(0);
+        }
+    }
+
+    internal void WriteEnchantmentUpdate(WorldPacket data, ItemEnchantment[] arr, int i)
+    {
+        // UF::ItemEnchantment is HasChangesMask<5> in 4.4.2 (6 in 3.4.3), so the inner mask is
+        // FIVE bits wide: bit 0 group gate, 1 ID (int32), 2 Duration (uint32), 3 Charges (int16),
+        // 4 Inactive (uint16).
+        // Writing it as 4 bits silently broke every live enchantment update: the 4-bit
+        // mask 0b0011 flushed to 0x30, the client read 6 bits from that byte and got
+        // 0b001100 — group bit clear — so it discarded the whole struct and left the
+        // payload bytes unconsumed. Symptom was "enchant only appears after relog",
+        // because the Create path writes the struct flat with no mask. Gems escaped it
+        // only because they ride the separate Gems dynamic field.
+        // Inactive has no legacy source, so bit 4 stays clear.
+        var ench = arr[i];   // guaranteed non-null — caller gates on element bit
+        uint enchMask = 0;
+        if (ench.ID.HasValue) enchMask |= 2;
+        if (ench.Duration.HasValue) enchMask |= 4;
+        if (ench.Charges.HasValue) enchMask |= 8;
+        if (enchMask != 0) enchMask |= 1;
+        data.WriteBits(enchMask, 5);
+        data.FlushBits();
+        if (ench.ID.HasValue) data.WriteInt32(ench.ID.Value);
+        if (ench.Duration.HasValue) data.WriteUInt32(ench.Duration.Value);
+        if (ench.Charges.HasValue) data.WriteInt16((short)ench.Charges.Value);
+    }
+
+    // -----------------------------------------------------------------------------------
+    // Item Gems dynamic field (ItemData bit 2). Source is GameState.GetGemsForItem — the
+    // legacy parse path (UpdateHandler) maps each socket enchant id to its gem item id via
+    // CSV/Gems3.csv and caches the 3-slot array there.
+    //
+    // Element layout is UF::SocketedGem from the 3.4.3 server source:
+    //   WriteCreate: Int32 ItemID + 16x UInt16 BonusListIDs + UInt8 Context  (37 bytes)
+    //   WriteUpdate: WriteBits(blocksMask, 1) + WriteBits(block, 32) + FlushBits, then the
+    //                bit-gated fields in *declaration* order (ItemID, Context, BonusListIDs) —
+    //                which is NOT the create order.
+    // Verified against a native Wrathion 3.4.3 capture: two item CreateObject1 blocks with
+    // identical guid packing differ by exactly 74 bytes for 2 gems. (WowPacketParser's
+    // V3_4_0 module under-reads the create element — it skips BonusListIDs — so its parse
+    // output is not the reference here; the server source is.)
+    //
+    // Gems.size() follows Item::SetGem, which does ModifyValue(&Gems, slot): the array is
+    // indexed by socket slot and sized to the highest filled slot + 1, so an item gemmed
+    // only in socket 3 sends 3 elements with the first two ItemID = 0.
+    // -----------------------------------------------------------------------------------
+
+    /// <summary>Element count for the Gems dynamic field: highest filled socket slot + 1.</summary>
+    private uint GetItemGemsSize()
+    {
+        var gems = _gameState.GetGemsForItem(_updateData.Guid);
+        if (gems == null)
+            return 0;
+
+        uint size = 0;
+        for (int i = 0; i < gems.Length; i++)
+            if (gems[i] != 0)
+                size = (uint)(i + 1);
+        return size;
+    }
+
+    internal void WriteCreateItemGemsSize(WorldPacket data, ItemData src)
+    {
+        data.WriteUInt32(GetItemGemsSize());
+    }
+
+    internal void WriteCreateItemGemsBody(WorldPacket data, ItemData src)
+    {
+        uint size = GetItemGemsSize();
+        if (size == 0)
+            return;
+
+        var gems = _gameState.GetGemsForItem(_updateData.Guid)!;
+        for (int i = 0; i < size; i++)
+        {
+            data.WriteInt32((int)gems[i]);      // ItemID
+            for (int b = 0; b < 16; b++)        // BonusListIDs[16] — no legacy source
+                data.WriteUInt16(0);
+            data.WriteUInt8(0);                 // Context
+        }
+    }
+
+    internal void WriteUpdateItemGemsMaskPreamble(WorldPacket data, ref Framework.Util.StackBitMask blocks, ItemData src)
+    {
+        // DynamicUpdateField preamble: 32-bit size + per-element changed bitmask. Runs
+        // between the blocks-mask prefix write and FlushBits, so it is bit-aligned to the
+        // prefix rather than byte-aligned with the field payload.
+        uint size = GetItemGemsSize();
+        data.WriteBits(size, 32);
+        if (size != 0)
+            data.WriteBits(0xFFFFFFFFu, (int)size);
+    }
+
+    internal void WriteUpdateItemGemsBody(WorldPacket data, ItemData src)
+    {
+        uint size = GetItemGemsSize();
+        if (size == 0)
+            return;
+
+        var gems = _gameState.GetGemsForItem(_updateData.Guid)!;
+        for (int i = 0; i < size; i++)
+        {
+            // SocketedGem::WriteUpdate with every bit of the 20-bit inner mask set —
+            // bit 0 group, 1 ItemID, 2 Context, 3 BonusListIDs group, 4..19 per element.
+            // Matches what the native server emits after a socket operation.
+            data.WriteBits(1u, 1);
+            data.WriteBits(0x000FFFFFu, 32);
+            data.FlushBits();
+            data.WriteInt32((int)gems[i]);      // ItemID
+            data.WriteUInt8(0);                 // Context
+            for (int b = 0; b < 16; b++)        // BonusListIDs[16]
+                data.WriteUInt16(0);
+        }
+    }
+
+    // WriteCreateContainerData emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator
+    // from V4_4_2_60895.ContainerField.
+
+    // -----------------------------------------------------------------------------------
+    // Unit Create custom writers — referenced by V4_4_2_60895.UnitField placeholder
+    // members with CustomWriter set. Each method takes (WorldPacket data, UnitData src)
+    // matching the generator's emitted call shape. IsOwner gating is applied by the
+    // generator before invocation when the placeholder declares OwnerOnly = true.
+    // -----------------------------------------------------------------------------------
+
+    internal void WriteCreateUnitRaceId(WorldPacket data, UnitData src)
+    {
+        bool zeroCharBakeIds = IsImpersonatingCreatureBake();
+        data.WriteUInt8(zeroCharBakeIds ? (byte)0 : src.RaceId.GetValueOrDefault());
+    }
+
+    internal void WriteCreateUnitClassId(WorldPacket data, UnitData src)
+    {
+        bool zeroCharBakeIds = IsImpersonatingCreatureBake();
+        data.WriteUInt8(zeroCharBakeIds ? (byte)0 : src.ClassId.GetValueOrDefault());
+    }
+
+    internal void WriteCreateUnitSexId(WorldPacket data, UnitData src)
+    {
+        bool zeroCharBakeIds = IsImpersonatingCreatureBake();
+        data.WriteUInt8(zeroCharBakeIds ? (byte)0 : src.SexId.GetValueOrDefault());
+    }
+
+    internal void WriteCreateUnitChannelDataInline(WorldPacket data, UnitData src)
+    {
+        data.WriteInt32(src.ChannelData?.SpellID ?? 0);
+        data.WriteInt32(src.ChannelData?.SpellXSpellVisualID ?? 0);
+    }
+
+    internal void WriteCreateUnitOwnerFloatPairs(WorldPacket data, UnitData src)
+    {
+        // IF IsOwner: 10× (Float 0, Float 0). Generator wraps the call in if (IsOwner).
+        for (int j = 0; j < 10; j++)
+        {
+            data.WriteFloat(0f);
+            data.WriteFloat(0f);
+        }
+    }
+
+    internal void WriteCreateUnitPowerInterleaved(WorldPacket data, UnitData src)
+    {
+        // 10 iterations × (Power[k] if k<7 else 0, MaxPower[k] if k<7 else 0, Float 0)
+        for (int k = 0; k < 10; k++)
+        {
+            data.WriteInt32(k < 7 ? src.Power[k].GetValueOrDefault() : 0);
+            data.WriteInt32(k < 7 ? src.MaxPower[k].GetValueOrDefault() : 0);
+            data.WriteFloat(0f);
+        }
+    }
+
+    internal void WriteCreateUnitEffectiveLevel(WorldPacket data, UnitData src)
+    {
+        data.WriteInt32(src.EffectiveLevel ?? src.Level.GetValueOrDefault());
+    }
+
+    internal void WriteCreateUnitVirtualItems(WorldPacket data, UnitData src)
+    {
+        for (int l = 0; l < 3; l++)
+        {
+            int vItemId = src.VirtualItems[l] is VisibleItem vi ? vi.ItemID : 0;
+            // Players don't populate VirtualItems server-side (use PLAYER_VISIBLE_ITEM
+            // descriptors instead). For the local player, fall back to PlayerData.VisibleItems:
+            // slot 0=mainhand(15), 1=offhand(16), 2=ranged(17).
+            if (vItemId == 0 && IsOwner && _updateData.PlayerData != null)
+            {
+                int playerSlot = 15 + l;
+                if (playerSlot < _updateData.PlayerData.VisibleItems.Length
+                    && _updateData.PlayerData.VisibleItems[playerSlot] is VisibleItem pv && pv.ItemID != 0)
+                {
+                    vItemId = pv.ItemID;
+                }
+            }
+            data.WriteInt32(vItemId);
+            data.WriteUInt16(0);
+            data.WriteUInt16(0);
+        }
+    }
+
+    internal void WriteCreateUnitFlags2Sanitized(WorldPacket data, UnitData src)
+    {
+        data.WriteUInt32(SanitizeFlags2(src.Flags2.GetValueOrDefault(), src.CreatedBy));
+    }
+
+    internal void WriteCreateUnitRangedAttackTime(WorldPacket data, UnitData src)
+    {
+        // IF IsOwner: bow-default fallback. Generator wraps in if (IsOwner) already.
+        uint rangedTime = src.RangedAttackRoundBaseTime.GetValueOrDefault();
+        if (rangedTime == 0 && _updateData.PlayerData != null
+            && _updateData.PlayerData.VisibleItems.Length > 17
+            && _updateData.PlayerData.VisibleItems[17] is VisibleItem ranged && ranged.ItemID != 0)
+        {
+            rangedTime = 2300;
+        }
+        data.WriteUInt32(rangedTime);
+    }
+
+    internal void WriteCreateUnitStatsInterleaved(WorldPacket data, UnitData src)
+    {
+        // IF IsOwner: 5 slots × (Stats[n], StatPosBuff[n], StatNegBuff[n]).
+        for (int n = 0; n < 5; n++)
+        {
+            data.WriteInt32(src.Stats[n].GetValueOrDefault());
+            data.WriteInt32(src.StatPosBuff[n].GetValueOrDefault());
+            data.WriteInt32(src.StatNegBuff[n].GetValueOrDefault());
+        }
+    }
+
+    internal void WriteCreateUnitResistances(WorldPacket data, UnitData src)
+    {
+        // IF IsOwner: 7× Resistances Int32.
+        for (int r = 0; r < 7; r++)
+            data.WriteInt32(src.Resistances[r].GetValueOrDefault());
+    }
+
+    internal void WriteCreateUnitPowerCostInterleaved(WorldPacket data, UnitData src)
+    {
+        // IF IsOwner: 7 slots × (PowerCostModifier[p] Int32, PowerCostMultiplier[p] Float).
+        for (int p = 0; p < 7; p++)
+        {
+            data.WriteInt32(src.PowerCostModifier[p].GetValueOrDefault());
+            data.WriteFloat(src.PowerCostMultiplier[p].GetValueOrDefault());
+        }
+    }
+
+    internal void WriteCreateUnitResistanceBuffModsInterleaved(WorldPacket data, UnitData src)
+    {
+        // 7 slots × (ResistanceBuffModsPositive[b] Int32, ResistanceBuffModsNegative[b] Int32).
+        for (int b = 0; b < 7; b++)
+        {
+            data.WriteInt32(src.ResistanceBuffModsPositive[b].GetValueOrDefault());
+            data.WriteInt32(src.ResistanceBuffModsNegative[b].GetValueOrDefault());
+        }
+    }
+
+    internal void WriteCreateUnitChannelObjectsCount(WorldPacket data, UnitData src)
+    {
+        bool hasChannelObject = src.ChannelObject.HasValue && !src.ChannelObject.Value.IsEmpty();
+        data.WriteUInt32(hasChannelObject ? 1u : 0u);
+    }
+
+    internal void WriteCreateUnitChannelObjectsBody(WorldPacket data, UnitData src)
+    {
+        if (src.ChannelObject.HasValue && !src.ChannelObject.Value.IsEmpty())
+            data.WritePackedGuid128(src.ChannelObject.Value);
+    }
+
+    // -----------------------------------------------------------------------------------
+    // Unit Update custom writers — referenced by V4_4_2_60895.UnitField update-side
+    // attributes. Scalar CustomWriter sig: (WorldPacket, UnitData). Synthetic group +
+    // mask-preamble sig: (WorldPacket, ref StackBitMask, UnitData). Per-element array
+    // CustomWriter sig: (WorldPacket, VisibleItem[], int).
+    // -----------------------------------------------------------------------------------
+
+    internal void WriteUpdateUnitFlags2(WorldPacket data, UnitData src)
+    {
+        data.WriteUInt32(SanitizeFlags2(src.Flags2.Value, src.CreatedBy));
+    }
+
+    internal void WriteUpdateUnitChannelDataInline(WorldPacket data, UnitData src)
+    {
+        // ChannelData composite: 2× Int32 (SpellID + SpellXSpellVisualID). No inner mask,
+        // no FlushBits — TC UpdateFields.cs UnitChannel.WriteUpdate writes raw fields.
+        // The pre-Phase-5b bug history (file:2112-2127 pre-delete) was an erroneous
+        // inner-mask emit that shifted SpellID by 1 byte.
+        data.WriteInt32(src.ChannelData.Value.SpellID);
+        data.WriteInt32(src.ChannelData.Value.SpellXSpellVisualID);
+    }
+
+    internal void WriteUpdateUnitChannelObjectsMaskPreamble(WorldPacket data, ref Framework.Util.StackBitMask blocks, UnitData src)
+    {
+        // DynamicUpdateField preamble for ChannelObjects: 32-bit size + per-element bitmask.
+        // Runs between blocks-mask prefix write and FlushBits (bit-aligned to the prefix,
+        // not byte-aligned with field payload).
+        uint channelObjectsSize = (src.ChannelObject.HasValue && !src.ChannelObject.Value.IsEmpty()) ? 1u : 0u;
+        data.WriteBits(channelObjectsSize, 32);
+        if (channelObjectsSize != 0)
+            data.WriteBits(0xFFFFFFFFu, (int)channelObjectsSize);
+    }
+
+    internal void WriteUpdateUnitChannelObjectsBody(WorldPacket data, UnitData src)
+    {
+        data.WritePackedGuid128(src.ChannelObject.Value);
+    }
+
+    internal void WriteUpdateUnitVirtualItem(WorldPacket data, ReadOnlySpan<VisibleItem?> arr, int i)
+    {
+        // VirtualItem inner mask: 4-bit (bit 0 = group, 1 = ItemID present). Hand-port
+        // (file:2308-2316 pre-delete) emits mask 0x03 then Int32 ItemID.
+        data.WriteBits(0x03u, 4);
+        data.FlushBits();
+        var vItem = arr[i];
+        data.WriteInt32(vItem.HasValue ? vItem.Value.ItemID : 0);
+    }
+
+    internal void WriteUpdateUnitPowerGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, UnitData src)
+    {
+        int maxLen = 7;
+        if (src.Power.Length > maxLen) maxLen = src.Power.Length;
+        if (src.MaxPower.Length > maxLen) maxLen = src.MaxPower.Length;
+        for (int pi = 0; pi < maxLen; pi++)
+        {
+            if (pi < src.Power.Length && src.Power[pi].HasValue)
+                data.WriteInt32(src.Power[pi].Value);
+            if (pi < src.MaxPower.Length && src.MaxPower[pi].HasValue)
+                data.WriteInt32(src.MaxPower[pi].Value);
+            if (pi < src.ModPowerRegen.Length && src.ModPowerRegen[pi].HasValue)
+                data.WriteFloat(src.ModPowerRegen[pi].Value);
+        }
+    }
+
+    internal void WriteUpdateUnitStatsGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, UnitData src)
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            if (src.Stats[i].HasValue) data.WriteInt32(src.Stats[i].Value);
+            if (src.StatPosBuff[i].HasValue) data.WriteInt32(src.StatPosBuff[i].Value);
+            if (src.StatNegBuff[i].HasValue) data.WriteInt32(src.StatNegBuff[i].Value);
+        }
+    }
+
+    // 4.4.2 folds the resistance buff mods into this group: per index, the resistance, both buff
+    // mods, then the power-cost pair.
+    internal void WriteUpdateUnitResistancesGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, UnitData src)
+    {
+        for (int i = 0; i < 7; i++)
+        {
+            if (src.Resistances[i].HasValue) data.WriteInt32(src.Resistances[i].Value);
+            if (src.ResistanceBuffModsPositive[i].HasValue) data.WriteInt32(src.ResistanceBuffModsPositive[i].Value);
+            if (src.ResistanceBuffModsNegative[i].HasValue) data.WriteInt32(src.ResistanceBuffModsNegative[i].Value);
+            if (src.PowerCostModifier[i].HasValue) data.WriteInt32(src.PowerCostModifier[i].Value);
+            if (src.PowerCostMultiplier[i].HasValue) data.WriteFloat(src.PowerCostMultiplier[i].Value);
+        }
+    }
+
+    // NPCBot / Playerbot frameworks (e.g. trickerer/Trinity-Bots) stamp UNIT_FLAG2_CLONED
+    // (0x10) on every bot creature and populate CreatedBy with the owning player's GUID.
+    // The V3_4_3 client treats CLONED as "render the appearance of CreatedBy"; when
+    // CreatedBy is the local player, the client refuses to render anything (it won't
+    // self-clone), which is why a hired bot is invisible until its mount mesh attaches
+    // and the mount renderer takes over independently of CLONED.
+    //
+    // Strip the bit unconditionally for any Creature-typed object on V3_4_3 so the bot
+    // renders via its real DisplayID. Real Mage Mirror Image (creature entry 31216) also
+    // sets CLONED; it relies on SPELL_AURA_MIRROR_IMAGE (effect 218) for the actual
+    // appearance copy, so stripping the flag should leave the clones rendering via their
+    // own (already mage-shaped) DisplayID instead of invisible. Revisit if Mirror Image
+    // visuals regress.
+    private const uint UNIT_FLAG2_CLONED = 0x00000010;
+    private uint SanitizeFlags2(uint flags2, WowGuid128? createdBy)
+    {
+        if ((flags2 & UNIT_FLAG2_CLONED) == 0)
+            return flags2;
+
+        bool isCreature = _updateData.Guid.GetHighType() == HighGuidType.Creature;
+        uint outFlags = isCreature ? (flags2 & ~UNIT_FLAG2_CLONED) : flags2;
+
+        if (Framework.Logging.Log.IsTraceEnabled)
+        {
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[SanitizeFlags2] guid={_updateData.Guid} highType={_updateData.Guid.GetHighType()} in=0x{flags2:X8} out=0x{outFlags:X8} stripped={isCreature} createdBy={(createdBy?.ToString() ?? "null")}");
+        }
+        return outFlags;
+    }
+
+    // NPCBot/Playerbot creatures wear a player-race DisplayID (e.g. Draenei Male = 17247)
+    // AND set RaceId/ClassId/SexId on the creature so internal AI works. The V3_4_3 client
+    // appears to interpret a creature carrying Race/Class/Sex as a modern-bake character
+    // and tries to look up ChrCustomization records the proxy never forwards — the model
+    // loads but textures don't bake, leaving the bot rendered as a flat-white silhouette.
+    // Real NPCs that share these DisplayIDs (e.g. Velen) leave Race=Class=Sex=0 and render
+    // textured via the CreatureDisplayInfoExtra bake path.
+    //
+    // Detection signal: Creature-typed GUID + CLONED bit on Flags2 (NPCBot stamps it on
+    // every bot creature). Zero Race/Class/Sex on the wire for those objects so the client
+    // takes the legacy bake path.
+    private bool IsImpersonatingCreatureBake()
+    {
+        if (_updateData.Guid.GetHighType() != HighGuidType.Creature) return false;
+        var unit = _updateData.UnitData;
+        if (unit == null || !unit.Flags2.HasValue) return false;
+        return (unit.Flags2.Value & UNIT_FLAG2_CLONED) != 0;
+    }
+
+    // WriteCreateUnitData emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator from V4_4_2_60895.UnitField.
+    // WriteCreatePlayerData emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator from V4_4_2_60895.PlayerField.
+    // WriteEmptyQuestLog removed — was unused; QuestLog Create handled by WriteCreatePlayerQuestLog custom writer.
+
+    // -----------------------------------------------------------------------------------
+    // Player Create + Update custom writers — referenced by V4_4_2_60895.PlayerField.
+    // -----------------------------------------------------------------------------------
+
+    private static uint GetPlayerCustomizationsSize(PlayerData src)
+    {
+        uint size = 0;
+        for (int i = 0; i < src.Customizations.Length; i++)
+            if (src.Customizations[i] != null)
+                size++;
+        return size;
+    }
+
+    internal void WriteUpdatePlayerCustomizationsMaskPreamble(WorldPacket data, ref Framework.Util.StackBitMask blocks, PlayerData src)
+    {
+        if (!src.HasCustomizationsUpdate)
+            return;
+
+        // DynamicUpdateField preamble: 32-bit size then one changed-bit per element. Emitted
+        // with the blocks-mask prefix, so it is bit-aligned rather than byte-aligned.
+        uint size = GetPlayerCustomizationsSize(src);
+        data.WriteBits(size, 32);
+        if (size != 0)
+            data.WriteBits(0xFFFFFFFFu, (int)size);
+    }
+
+    internal void WriteUpdatePlayerCustomizationsBody(WorldPacket data, PlayerData src)
+    {
+        // ChrCustomizationChoice::WriteUpdate (UpdateFields.cpp:1626) is two bare uint32s —
+        // the struct carries no changesMask of its own, unlike SocketedGem.
+        for (int i = 0; i < src.Customizations.Length; i++)
+        {
+            var choice = src.Customizations[i];
+            if (choice == null)
+                continue;
+
+            data.WriteUInt32(choice.ChrCustomizationOptionID);
+            data.WriteUInt32(choice.ChrCustomizationChoiceID);
+        }
+    }
+
+    internal void WriteCreatePlayerCustomizationsCount(WorldPacket data, PlayerData src)
+    {
+        int customizationCount = 0;
+        for (int i = 0; i < src.Customizations.Length; i++)
+            if (src.Customizations[i] != null) customizationCount++;
+        data.WriteUInt32((uint)customizationCount);
+    }
+
+    internal void WriteCreatePlayerCustomizationsData(WorldPacket data, PlayerData src)
+    {
+        for (int m = 0; m < src.Customizations.Length; m++)
+        {
+            var choice = src.Customizations[m];
+            if (choice != null)
+            {
+                data.WriteUInt32(choice.ChrCustomizationOptionID);
+                data.WriteUInt32(choice.ChrCustomizationChoiceID);
+            }
+        }
+    }
+
+    internal void WriteCreateCorpseCustomizationsCount(WorldPacket data, CorpseData src)
+    {
+        int customizationCount = 0;
+        if (src.Customizations != null)
+        {
+            for (int i = 0; i < src.Customizations.Length; i++)
+                if (src.Customizations[i] != null) customizationCount++;
+        }
+        data.WriteUInt32((uint)customizationCount);
+    }
+
+    internal void WriteCreateCorpseCustomizationsData(WorldPacket data, CorpseData src)
+    {
+        if (src.Customizations == null) return;
+        for (int m = 0; m < src.Customizations.Length; m++)
+        {
+            var choice = src.Customizations[m];
+            if (choice != null)
+            {
+                data.WriteUInt32(choice.ChrCustomizationOptionID);
+                data.WriteUInt32(choice.ChrCustomizationChoiceID);
+            }
+        }
+    }
+
+    internal void WriteCreatePlayerQuestLog(WorldPacket data, PlayerData src)
+    {
+        // Owner-gated by generator (placeholder declares OwnerOnly = true). Iterates
+        // 25 quest slots, writing each entry's 4 fields. Null entries write zeros.
+        for (int q = 0; q < QuestConst.MaxQuestLogSize; q++)
+        {
+            var quest = q < src.QuestLog.Length ? src.QuestLog[q] : null;
+            data.WriteInt64(quest?.EndTime ?? 0);
+            data.WriteInt32(quest?.QuestID ?? 0);
+            data.WriteUInt32(quest?.StateFlags ?? 0);
+            for (int obj = 0; obj < 24; obj++)
+                data.WriteUInt16((ushort)(quest?.ObjectiveProgress[obj] ?? 0));
+        }
+    }
+
+    internal void WriteCreatePlayerVisibleItems(WorldPacket data, PlayerData src)
+    {
+        // 19× always-write. Null entry → zero placeholder (Int32 ItemID + 2× UInt16 0).
+        for (int j = 0; j < 19; j++)
+        {
+            if (j < src.VisibleItems.Length && src.VisibleItems[j] is VisibleItem pv)
+            {
+                data.WriteInt32(pv.ItemID);
+                data.WriteUInt16(pv.ItemAppearanceModID);
+                data.WriteUInt16(pv.ItemVisual);
+            }
+            else
+            {
+                data.WriteInt32(0);
+                data.WriteUInt16(0);
+                data.WriteUInt16(0);
+            }
+        }
+    }
+
+    internal void WriteCreatePlayerLogoutTime(WorldPacket data, PlayerData src)
+    {
+        // Owner: real UnixTime. Non-owner: 0. Matches hand-port (file:775 pre-delete).
+        data.WriteInt64(IsOwner ? (long)Time.UnixTime : 0L);
+    }
+
+    internal void WriteCreatePlayerBnetAccount(WorldPacket data, PlayerData src)
+    {
+        // Owner: BNet account GUID lookup. Non-owner: Empty. Matches hand-port file:781-783.
+        data.WritePackedGuid128(IsOwner
+            ? _gameState.GlobalSession.GetBnetAccountGuidForPlayer(_updateData.Guid)
+            : WowGuid128.Empty);
+    }
+
+    // PlayerData ends with the character name from 4.4.2 on. The proxy has the name only from its
+    // own cache (the character list or a name query); an unknown one is sent empty.
+    private string PlayerName => _gameState.GetPlayerName(_updateData.Guid);
+
+    internal void WriteCreatePlayerNameBits(WorldPacket data, PlayerData src)
+    {
+        data.WriteBits(System.Text.Encoding.UTF8.GetByteCount(PlayerName), 6);
+        data.WriteBit(false);                       // HasDeclinedNames
+        data.FlushBits();
+    }
+
+    internal void WriteCreatePlayerName(WorldPacket data, PlayerData src)
+        => data.WriteString(PlayerName);
+
+    internal void WriteUpdatePlayerQuestLogEntry(WorldPacket data, ReadOnlySpan<QuestLog> arr, int i)
+    {
+        // Per-element write at bit 36+i. Same shape as hand-port file:1576-1583 — uses
+        // WriteCreate format (no inner mask, raw fields) per IsQuestLogChangesMaskSkipped = 1.
+        QuestLog quest = arr[i];
+        data.WriteInt64(quest?.EndTime ?? 0);
+        data.WriteInt32(quest?.QuestID ?? 0);
+        data.WriteUInt32(quest?.StateFlags ?? 0);
+        for (int obj = 0; obj < 24; obj++)
+            data.WriteUInt16((ushort)(quest?.ObjectiveProgress[obj] ?? 0));
+    }
+
+    internal void WriteUpdatePlayerVisibleItem(WorldPacket data, ReadOnlySpan<VisibleItem?> arr, int i)
+    {
+        // Per-element write at bit 62+i. Inner 4-bit mask (0x0F = all 4 bits set) +
+        // FlushBits + Int32 ItemID + UInt16 ItemAppearanceModID + UInt16 ItemVisual.
+        // Matches hand-port file:1593-1599.
+        VisibleItem item = arr[i].Value;
+        data.WriteBits(0x0Fu, 4);
+        data.FlushBits();
+        data.WriteInt32(item.ItemID);
+        data.WriteUInt16(item.ItemAppearanceModID);
+        data.WriteUInt16(item.ItemVisual);
+    }
+
+    // ============================================================
+    // ActivePlayer custom writers (Phase 5b ActivePlayer migration)
+    // ============================================================
+
+    // Whole-Create writer — kept as one method because the byte-stream is mostly
+    // zero placeholders interleaved with a few real fields; declarative per-write
+    // enum members would balloon to ~200 entries with no readability win.
+    // bits 540-541 (parent 539): RestInfo[2] nested {Threshold:UInt32, StateID:UInt8}.
+    // Custom because StateID defaults to 1 rather than the type's natural zero, and the
+    // element is a nested struct the per-field descriptor shape cannot express.
+    internal void WriteCreateActivePlayerRestInfo(WorldPacket data, ActivePlayerData src)
+    {
+        for (int i = 0; i < 2; i++)
+        {
+            data.WriteUInt32(src.RestInfo[i]?.Threshold ?? 0u);
+            data.WriteUInt8((byte)(src.RestInfo[i]?.StateID ?? 1));
+        }
+    }
+
+    // bits 112-113: PvPTierMaxFromWins / PvPLastWeeksTierMaxFromWins. Custom because the
+    // source is uint? but the sentinel for "unset" is -1, so the cast has to happen before
+    // the null-coalesce ((int?)x ?? -1) rather than after it.
+    internal void WriteCreateActivePlayerPvPTierMax(WorldPacket data, ActivePlayerData src)
+    {
+        data.WriteInt32((int?)src.PvPTierMaxFromWins ?? -1);
+        data.WriteInt32((int?)src.PvPLastWeeksTierMaxFromWins ?? -1);
+    }
+
+    // Heirlooms.Resize + HeirloomFlags.Resize. We ship the full owned set so the
+    // Collections panel renders X/38; the count is session data, not ActivePlayerData.
+    internal void WriteCreateActivePlayerHeirloomCounts(WorldPacket data, ActivePlayerData src)
+    {
+        uint heirloomCount = (uint)GameData.Heirlooms.Count;
+        data.WriteUInt32(heirloomCount);
+        data.WriteUInt32(heirloomCount);
+    }
+
+    // bit 1512 GlyphsGroup + bit 120 GlyphsEnabled. Sources from _gameState rather than
+    // ActivePlayerData — the legacy glyph state is tracked per session, not per update.
+    internal void WriteCreateActivePlayerGlyphs(WorldPacket data, ActivePlayerData src)
+    {
+        for (int g = 0; g < PlayerConst.MaxGlyphSlots; g++)
+        {
+            data.WriteUInt32(_gameState.ActiveGlyphSlotIds[g]);
+            data.WriteUInt32(_gameState.ActiveGlyphs[g]);
+        }
+        for (int g = PlayerConst.MaxGlyphSlots; g < GlyphSlotCount; g++)
+        {
+            data.WriteUInt32(0u);
+            data.WriteUInt32(0u);
+        }
+        data.WriteUInt16(_gameState.GlyphsEnabled);
+    }
+
+    // 4.4.2 has 9 glyph slots; the legacy server knows 6, which fill the first six.
+    private const int GlyphSlotCount = 9;
+
+    // NumStableSlots. A zero placeholder here makes every stable slot render locked even
+    // after the player has paid for one, because the count reaches the client only through
+    // ActivePlayerData (issue #224). Sourced from the legacy stable list.
+    internal void WriteCreateActivePlayerNumStableSlots(WorldPacket data, ActivePlayerData src)
+    {
+        data.WriteUInt8(_gameState.NumStableSlots);
+    }
+
+    // Dynamic-field payloads, in WPP wire order: KnownTitles (folded to 64-bit words),
+    // then Heirlooms[Count], HeirloomFlags[Count], then Toys[Count]. Counts were
+    // written earlier by the resize prefixes, so payload length has to agree with them.
+    internal void WriteCreateActivePlayerDynamicPayloads(WorldPacket data, ActivePlayerData src)
+    {
+        Span<ulong> foldedTitles = stackalloc ulong[6];
+        int knownTitlesCount = FoldKnownTitles(src.KnownTitles, foldedTitles);
+        for (int i = 0; i < knownTitlesCount; i++)
+            data.WriteUInt64(foldedTitles[i]);
+        foreach (var itemId in GameData.Heirlooms)
+            data.WriteInt32(itemId);
+        for (int i = 0; i < GameData.Heirlooms.Count; i++)
+            data.WriteUInt32(0u);
+        var usableToys = _gameState.GetUsableToysOrdered();
+        for (int i = 0; i < usableToys.Length; i++)
+            data.WriteInt32((int)usableToys[i]);
+    }
+
+    // Toys.Resize + the seven empty prefixes after it (Transmog through TaskQuests).
+    // Missing LearnedToys still writes Resize 0 so the later payload length stays valid.
+    internal void WriteCreateActivePlayerToyResizePrefixes(WorldPacket data, ActivePlayerData src)
+    {
+        data.WriteUInt32((uint)_gameState.GetUsableToysOrdered().Length);
+        for (int i = 0; i < 7; i++)
+            data.WriteUInt32(0u);
+    }
+
+    // bits 608-614 (parent 607): PvpInfo[7]. Per element, PVPInfo::WriteCreate is
+    // int8 Bracket, int32 PvpRatingID, fifteen uint32, then the Disqualified bit and a flush.
+    // Live property is PVPInfo[6] on ActivePlayerData, so the seventh slot is always defaults.
+    //
+    // Bracket defaults to the slot index rather than 0. The client finds a bracket by scanning
+    // for the element whose Bracket matches (Player::GetPvpInfoForBracket), so leaving them all
+    // at 0 made every slot claim the 2v2 bracket: the scan stopped at slot 0 and brackets 1 and
+    // 2 were unreachable however they were populated later.
+    internal void WriteCreateActivePlayerPvpInfo(WorldPacket data, ActivePlayerData src)
+    {
+        for (int t = 0; t < 9; t++)
+        {
+            PVPInfo pi = (src.PvpInfo != null && t < src.PvpInfo.Length) ? src.PvpInfo[t] : null;
+
+            data.WriteInt8(pi?.Bracket ?? (sbyte)t);
+            data.WriteInt32(pi?.PvpRatingID ?? 0);
+            data.WriteUInt32(pi?.WeeklyPlayed ?? 0u);
+            data.WriteUInt32(pi?.WeeklyWon ?? 0u);
+            data.WriteUInt32(pi?.SeasonPlayed ?? 0u);
+            data.WriteUInt32(pi?.SeasonWon ?? 0u);
+            data.WriteUInt32(pi?.Rating ?? 0u);
+            data.WriteUInt32(pi?.WeeklyBestRating ?? 0u);
+            data.WriteUInt32(pi?.SeasonBestRating ?? 0u);
+            data.WriteUInt32(pi?.PvpTierID ?? 0u);
+            data.WriteUInt32(pi?.WeeklyBestWinPvpTierID ?? 0u);
+            data.WriteUInt32(pi?.Field_28 ?? 0u);
+            data.WriteUInt32(pi?.Field_2C ?? 0u);
+            data.WriteUInt32(pi?.WeeklyRoundsPlayed ?? 0u);
+            data.WriteUInt32(pi?.WeeklyRoundsWon ?? 0u);
+            data.WriteUInt32(pi?.SeasonRoundsPlayed ?? 0u);
+            data.WriteUInt32(pi?.SeasonRoundsWon ?? 0u);
+            data.WriteBit(pi?.Disqualified ?? false);
+            data.FlushBits();
+        }
+    }
+
+    // ---- Create slice 1: members migrated out of the mega-writer ----
+
+    // InvSlots[141]: modern flat layout fanned from the legacy 23/24/28/7/12/32 slot arrays.
+    // Stays a custom writer because the value is computed (GetModernInvSlot), not a field read.
+    internal void WriteCreateActivePlayerInvSlots(WorldPacket data, ActivePlayerData src)
+    {
+        for (int i = 0; i < 141; i++)
+            data.WritePackedGuid128(GetModernInvSlot(src, i) ?? WowGuid128.Empty);
+        // Slots 141-145: the account-bank bags, which a legacy server does not have.
+        for (int i = 141; i < 146; i++)
+            data.WritePackedGuid128(WowGuid128.Empty);
+    }
+
+    // bit 27: SummonedBattlePetGUID. Custom because the fallback is session state, not a
+    // literal default, so DescriptorCreateField.DefaultExpression cannot express it.
+    internal void WriteCreateActivePlayerSummonedBattlePet(WorldPacket data, ActivePlayerData src)
+    {
+        data.WritePackedGuid128(src.SummonedBattlePetGUID ?? _gameState.SummonedBattlePetGuid);
+    }
+
+    // bit 3 dynamic field: KnownTitles.size. The count sits here in the Create sequence while
+    // the payload lands much later, so each half folds independently — six ulongs, and it keeps
+    // both writers self-contained instead of threading a local across the whole block.
+    internal void WriteCreateActivePlayerKnownTitlesCount(WorldPacket data, ActivePlayerData src)
+    {
+        Span<ulong> folded = stackalloc ulong[6];
+        data.WriteUInt32((uint)FoldKnownTitles(src.KnownTitles, folded));
+    }
+
+    // Interleaved Create group, extracted from the ActivePlayer Create block so the descriptor
+    // migration can address it as a positioned DescriptorCreatePlaceholder + CustomWriter,
+    // the same shape UnitField already uses for its interleaved groups.
+    // bit 32: Skill — 256 slots x 7 parallel ushort arrays woven per index.
+    internal void WriteCreateActivePlayerSkillInterleaved(WorldPacket data, ActivePlayerData src)
+    {
+        var skill = src.Skill;
+        for (int j = 0; j < 256; j++)
+        {
+            data.WriteUInt16(skill?.SkillLineID[j].GetValueOrDefault() ?? 0);
+            data.WriteUInt16(skill?.SkillStep[j].GetValueOrDefault() ?? 0);
+            data.WriteUInt16(skill?.SkillRank[j].GetValueOrDefault() ?? 0);
+            data.WriteUInt16(skill?.SkillStartingRank[j].GetValueOrDefault() ?? 0);
+            data.WriteUInt16(skill?.SkillMaxRank[j].GetValueOrDefault() ?? 0);
+            data.WriteUInt16((ushort)(skill?.SkillTempBonus[j].GetValueOrDefault() ?? 0));
+            data.WriteUInt16(skill?.SkillPermBonus[j].GetValueOrDefault() ?? 0);
+        }
+    }
+
+    // Interleaved Create group, extracted from the ActivePlayer Create block so the descriptor
+    // migration can address it as a positioned DescriptorCreatePlaceholder + CustomWriter,
+    // the same shape UnitField already uses for its interleaved groups.
+    // 7 schools x 4 parallel arrays woven per index.
+    internal void WriteCreateActivePlayerDamageDoneInterleaved(WorldPacket data, ActivePlayerData src)
+    {
+        for (int k = 0; k < 7; k++)
+        {
+            data.WriteFloat(src.SpellCritPercentage[k].GetValueOrDefault());
+            data.WriteInt32(src.ModDamageDonePos[k].GetValueOrDefault());
+            data.WriteInt32(src.ModDamageDoneNeg[k].GetValueOrDefault());
+            data.WriteFloat(src.ModDamageDonePercent[k].GetValueOrDefault());
+        }
+    }
+
+    // Interleaved Create group, extracted from the ActivePlayer Create block so the descriptor
+    // migration can address it as a positioned DescriptorCreatePlaceholder + CustomWriter,
+    // the same shape UnitField already uses for its interleaved groups.
+    // 3 slots x 2 parallel float arrays woven per index; both default to 1f, not 0f.
+    internal void WriteCreateActivePlayerWeaponMultipliersInterleaved(WorldPacket data, ActivePlayerData src)
+    {
+        for (int m = 0; m < 3; m++)
+        {
+            data.WriteFloat(src.WeaponDmgMultipliers[m] ?? 1f);                 // WeaponDmgMultipliers[m]
+            data.WriteFloat(src.WeaponAtkSpeedMultipliers[m] ?? 1f);            // WeaponAtkSpeedMultipliers[m]
+        }
+    }
+
+    // Interleaved Create group, extracted from the ActivePlayer Create block so the descriptor
+    // migration can address it as a positioned DescriptorCreatePlaceholder + CustomWriter,
+    // the same shape UnitField already uses for its interleaved groups.
+    // 12 slots x 2 parallel arrays woven per index (UInt32 price, Int64 timestamp).
+    internal void WriteCreateActivePlayerBuybackInterleaved(WorldPacket data, ActivePlayerData src)
+    {
+        for (int n = 0; n < 12; n++)
+        {
+            data.WriteUInt32(src.BuybackPrice[n].GetValueOrDefault());          // BuybackPrice[n] (UInt32)
+            data.WriteInt64((long)src.BuybackTimestamp[n].GetValueOrDefault()); // BuybackTimestamp[n] ((long)cast)
+        }
+    }
+
+    // MaskMutator — pass-1, sets InvSlots bits (131 parent + 132-272 per-element)
+    // for each modern slot that has a non-null mapped legacy entry.
+    internal void ApplyActivePlayerInvSlotsMaskMutator(ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        for (int i = 0; i < 141; i++)
+        {
+            if (GetModernInvSlot(src, i) != null)
+            {
+                blocks.SetBit(131);
+                blocks.SetBit(132 + i);
+            }
+        }
+    }
+
+    // MaskMutator — pass-1, captures and clears _gameState.ActiveGlyphsDirty.
+    // When dirty, sets 1410 + 1411.. + 1420.. (parent + GlyphSlots + Glyphs) for the six
+    // legacy slots.
+    internal void ApplyActivePlayerGlyphsMaskMutator(ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        if (!_gameState.ActiveGlyphsDirty)
+            return;
+        _gameState.ActiveGlyphsDirty = false;
+        blocks.SetBit(1410);
+        for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
+        {
+            blocks.SetBit(1411 + i);
+            blocks.SetBit(1420 + i);
+        }
+    }
+
+    // Folds KnownTitles uint?[12] → ulong[6] (lo + hi<<32 per pair). Used by both
+    // preamble (count) and body (data).
+    internal static int FoldKnownTitles(uint?[] knownTitles, Span<ulong> dest)
+    {
+        if (knownTitles == null)
+            return 0;
+        bool anyTitle = false;
+        for (int i = 0; i < knownTitles.Length; i++)
+            if (knownTitles[i].HasValue) { anyTitle = true; break; }
+        if (!anyTitle)
+            return 0;
+        for (int i = 0; i < 6; i++)
+        {
+            uint lo = (i * 2 < knownTitles.Length && knownTitles[i * 2].HasValue) ? knownTitles[i * 2]!.Value : 0;
+            uint hi = (i * 2 + 1 < knownTitles.Length && knownTitles[i * 2 + 1].HasValue) ? knownTitles[i * 2 + 1]!.Value : 0;
+            dest[i] = (ulong)lo | ((ulong)hi << 32);
+        }
+        return 6;
+    }
+
+    // Static predicate referenced from ActivePlayerField.ACTIVEPLAYER_KNOWN_TITLES CustomPredicate.
+    internal static bool HasAnyKnownTitle(uint?[] knownTitles)
+    {
+        if (knownTitles == null) return false;
+        for (int i = 0; i < knownTitles.Length; i++)
+            if (knownTitles[i].HasValue) return true;
+        return false;
+    }
+
+    // Static wrapper for HasAnySkillChanged — referenced from CustomPredicate.
+    internal static bool HasAnySkillChangedStatic(SkillInfo s) => HasAnySkillChanged(s);
+
+    // KnownTitles preamble — between blocks-mask write and FlushBits.
+    // Emits: WriteBits(count, 32) + count× WriteBit(true).
+    internal void WriteUpdateActivePlayerKnownTitlesPreamble(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        Span<ulong> folded = stackalloc ulong[6];
+        int count = FoldKnownTitles(src.KnownTitles, folded);
+        data.WriteBits((uint)count, 32);
+        for (int i = 0; i < count; i++)
+            data.WriteBit(true);
+    }
+
+    // KnownTitles body — count× WriteUInt64(folded[i]).
+    internal void WriteUpdateActivePlayerKnownTitlesBody(WorldPacket data, ActivePlayerData src)
+    {
+        Span<ulong> folded = stackalloc ulong[6];
+        int count = FoldKnownTitles(src.KnownTitles, folded);
+        for (int i = 0; i < count; i++)
+            data.WriteUInt64(folded[i]);
+    }
+
+    internal static int GetToyCount(ActivePlayerData src) => src.Toys?.Count ?? 0;
+
+    internal void WriteUpdateActivePlayerToysPreamble(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        int count = GetToyCount(src);
+        data.WriteBits((uint)count, 32);
+        for (int i = 0; i < count; i++)
+            data.WriteBit(true);
+    }
+
+    internal void WriteUpdateActivePlayerToysBody(WorldPacket data, ActivePlayerData src)
+    {
+        if (src.Toys == null)
+            return;
+        foreach (int itemId in src.Toys)
+            data.WriteInt32(itemId);
+    }
+
+    // Skill (bit 32) — nested SkillInfo write via existing WriteUpdateSkillInfo helper.
+    internal void WriteUpdateActivePlayerSkill(WorldPacket data, ActivePlayerData src)
+    {
+        WriteUpdateSkillInfo(data, src.Skill);
+    }
+
+    // InvSlots group (bit 131) — iterate the 141 mapped slots, write each via GetModernInvSlot
+    // gated on its element bit (132 + i).
+    internal void WriteUpdateActivePlayerInvSlotsGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        for (int i = 0; i < 141; i++)
+        {
+            if (blocks.IsBitSet(132 + i))
+            {
+                WowGuid128 guid = GetModernInvSlot(src, i) ?? WowGuid128.Empty;
+                data.WritePackedGuid128(guid);
+            }
+        }
+    }
+
+    // RestInfo per-element — 3-bit inner mask (bit 0 group, 1 Threshold, 2 StateID)
+    // + FlushBits + conditional UInt32 Threshold + UInt8 StateID.
+    internal void WriteUpdateActivePlayerRestInfo(WorldPacket data, RestInfo[] arr, int i)
+    {
+        var ri = arr[i];
+        uint restMask = 0;
+        if (ri != null && ri.Threshold.HasValue) restMask |= 2;
+        if (ri != null && ri.StateID.HasValue) restMask |= 4;
+        if (restMask != 0) restMask |= 1;
+        data.WriteBits(restMask, 3);
+        data.FlushBits();
+        if ((restMask & 2) != 0) data.WriteUInt32(ri!.Threshold!.Value);
+        if ((restMask & 4) != 0) data.WriteUInt8((byte)ri!.StateID!.Value);
+    }
+
+    // PvpInfo per-element — 19-bit inner mask + optional Disqualified bit before
+    // flush + FlushBits + conditional UInt32 fields. Mirrors hand-port file:2018-2069.
+    internal void WriteUpdateActivePlayerPvpInfo(WorldPacket data, PVPInfo[] arr, int i)
+    {
+        PVPInfo pi = (arr != null && i < arr.Length) ? arr[i] : null;
+        uint pvpMask = 0;
+        if (pi != null)
+        {
+            if (pi.Disqualified) pvpMask |= (1u << 1);
+            // Bracket is nullable, not tested against 0: bracket 0 is 2v2.
+            if (pi.Bracket.HasValue) pvpMask |= (1u << 2);
+            if (pi.PvpRatingID != 0) pvpMask |= (1u << 3);
+            if (pi.WeeklyPlayed != 0) pvpMask |= (1u << 4);
+            if (pi.WeeklyWon != 0) pvpMask |= (1u << 5);
+            if (pi.SeasonPlayed != 0) pvpMask |= (1u << 6);
+            if (pi.SeasonWon != 0) pvpMask |= (1u << 7);
+            if (pi.Rating != 0) pvpMask |= (1u << 8);
+            if (pi.WeeklyBestRating != 0) pvpMask |= (1u << 9);
+            if (pi.SeasonBestRating != 0) pvpMask |= (1u << 10);
+            if (pi.PvpTierID != 0) pvpMask |= (1u << 11);
+            if (pi.WeeklyBestWinPvpTierID != 0) pvpMask |= (1u << 12);
+            if (pi.Field_28 != 0) pvpMask |= (1u << 13);
+            if (pi.Field_2C != 0) pvpMask |= (1u << 14);
+            if (pi.WeeklyRoundsPlayed != 0) pvpMask |= (1u << 15);
+            if (pi.WeeklyRoundsWon != 0) pvpMask |= (1u << 16);
+            if (pi.SeasonRoundsPlayed != 0) pvpMask |= (1u << 17);
+            if (pi.SeasonRoundsWon != 0) pvpMask |= (1u << 18);
+        }
+        if (pvpMask != 0) pvpMask |= 1;
+        data.WriteBits(pvpMask, 19);
+        if ((pvpMask & (1u << 1)) != 0) data.WriteBit(pi!.Disqualified);
+        data.FlushBits();
+        if ((pvpMask & 1) != 0)
+        {
+            if ((pvpMask & (1u << 2)) != 0) data.WriteInt8(pi!.Bracket!.Value);
+            if ((pvpMask & (1u << 3)) != 0) data.WriteInt32(pi!.PvpRatingID);
+            if ((pvpMask & (1u << 4)) != 0) data.WriteUInt32(pi!.WeeklyPlayed);
+            if ((pvpMask & (1u << 5)) != 0) data.WriteUInt32(pi!.WeeklyWon);
+            if ((pvpMask & (1u << 6)) != 0) data.WriteUInt32(pi!.SeasonPlayed);
+            if ((pvpMask & (1u << 7)) != 0) data.WriteUInt32(pi!.SeasonWon);
+            if ((pvpMask & (1u << 8)) != 0) data.WriteUInt32(pi!.Rating);
+            if ((pvpMask & (1u << 9)) != 0) data.WriteUInt32(pi!.WeeklyBestRating);
+            if ((pvpMask & (1u << 10)) != 0) data.WriteUInt32(pi!.SeasonBestRating);
+            if ((pvpMask & (1u << 11)) != 0) data.WriteUInt32(pi!.PvpTierID);
+            if ((pvpMask & (1u << 12)) != 0) data.WriteUInt32(pi!.WeeklyBestWinPvpTierID);
+            if ((pvpMask & (1u << 13)) != 0) data.WriteUInt32(pi!.Field_28);
+            if ((pvpMask & (1u << 14)) != 0) data.WriteUInt32(pi!.Field_2C);
+            if ((pvpMask & (1u << 15)) != 0) data.WriteUInt32(pi!.WeeklyRoundsPlayed);
+            if ((pvpMask & (1u << 16)) != 0) data.WriteUInt32(pi!.WeeklyRoundsWon);
+            if ((pvpMask & (1u << 17)) != 0) data.WriteUInt32(pi!.SeasonRoundsPlayed);
+            if ((pvpMask & (1u << 18)) != 0) data.WriteUInt32(pi!.SeasonRoundsWon);
+        }
+    }
+
+    // Glyphs group (bit 1410). Native WriteUpdate interleaves per index
+    // (Slot[i] then Glyph[i]), not all slots then all glyphs. A slots-then-glyphs
+    // dump makes the client reread glyph IDs as GlyphSlot.dbc rows, so only the
+    // first Major/Minor sockets stay valid drop targets.
+    internal void WriteUpdateActivePlayerGlyphsGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
+        {
+            if (blocks.IsBitSet(1411 + i))
+                data.WriteUInt32(_gameState.ActiveGlyphSlotIds[i]);
+            if (blocks.IsBitSet(1420 + i))
+                data.WriteUInt32((uint)_gameState.ActiveGlyphs[i]);
+        }
+    }
+
+    // Closes group 102: native flushes after NumStableSlots and writes whether a PetStable
+    // follows. The proxy never sends one.
+    internal void WriteUpdateActivePlayerPetStableBit(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        data.FlushBits();
+        data.WriteBit(false);
+    }
+
+    // HasAny helper for the InvSlots mask-mutator. Returns true when any of the 141
+    // modern InvSlots positions has a non-null mapped legacy entry. Required because
+    // the bits set by `ApplyActivePlayerInvSlotsMaskMutator` aren't covered by any
+    // declared UpdateField presence check — without this, loot/bag-pickup that only
+    // touches InvSlots would skip the Values update (items invisible until relog).
+    internal static bool HasAnyInvSlotMapped(ActivePlayerData a)
+    {
+        if (a == null) return false;
+        for (int i = 0; i < 141; i++)
+            if (GetModernInvSlot(a, i) != null)
+                return true;
+        return false;
+    }
+
+    // Maps the modern 3.4.3 InvSlots index (0-140) to the corresponding legacy slot
+    // arrays on ActivePlayerData. Returns null when the modern slot has no legacy
+    // equivalent or the entry is missing.
+    internal static WowGuid128? GetModernInvSlot(ActivePlayerData a, int modernIdx)
+    {
+        if (modernIdx <= 18)
+        {
+            if (a.InvSlots != null && modernIdx < a.InvSlots.Length)
+                return a.InvSlots[modernIdx];
+        }
+        else if (modernIdx >= 30 && modernIdx <= 33)
+        {
+            int legacyIdx = 19 + (modernIdx - 30);
+            if (a.InvSlots != null && legacyIdx < a.InvSlots.Length)
+                return a.InvSlots[legacyIdx];
+        }
+        else if (modernIdx >= 35 && modernIdx <= 58)
+        {
+            int idx = modernIdx - 35;
+            if (a.PackSlots != null && idx < a.PackSlots.Length)
+                return a.PackSlots[idx];
+        }
+        else if (modernIdx >= 59 && modernIdx <= 86)
+        {
+            int idx = modernIdx - 59;
+            if (a.BankSlots != null && idx < a.BankSlots.Length)
+                return a.BankSlots[idx];
+        }
+        else if (modernIdx >= 87 && modernIdx <= 93)
+        {
+            int idx = modernIdx - 87;
+            if (a.BankBagSlots != null && idx < a.BankBagSlots.Length)
+                return a.BankBagSlots[idx];
+        }
+        else if (modernIdx >= 94 && modernIdx <= 105)
+        {
+            int idx = modernIdx - 94;
+            if (a.BuyBackSlots != null && idx < a.BuyBackSlots.Length)
+                return a.BuyBackSlots[idx];
+        }
+        else if (modernIdx >= 106 && modernIdx <= 137)
+        {
+            int idx = modernIdx - 106;
+            if (a.KeyringSlots != null && idx < a.KeyringSlots.Length)
+                return a.KeyringSlots[idx];
+        }
+        return null;
+    }
+
+
+    // WriteCreateGameObjectData emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator
+    // from V4_4_2_60895.GameObjectField (see HermesProxy/obj/Generated/.../V4_4_2_60895.ObjectUpdateBuilder.g.cs).
+
+    internal static bool HasAnySkillChanged(SkillInfo s)
+    {
+        for (int i = 0; i < SkillInfo.MaxSkills; i++)
+        {
+            if (s.SkillLineID[i].HasValue) return true;
+            if (s.SkillRank[i].HasValue) return true;
+            if (s.SkillMaxRank[i].HasValue) return true;
+        }
+        return false;
+    }
+
+    // Writes SkillInfo nested update using TC343 format: HasChangesMask<1793> = 57 blocks of 32 bits.
+    // Bit 0 is the root flag; bits 1..1792 are the per-skill fields, grouped 256 at a time
+    // (LineID, Step, Rank, StartingRank, MaxRank, TempBonus, PermBonus). Mask encoding:
+    //   1) WriteUInt32(blocksMask0) — which of blocks 0-31 have changes
+    //   2) WriteBits(blocksMask1, 25) — which of blocks 32-56 have changes
+    //   3) For each set block: WriteBits(block[b], 32)
+    //   4) FlushBits
+    //   5) Per-skill interleaved data (all 7 fields for skill i before skill i+1).
+    internal static void WriteUpdateSkillInfo(WorldPacket data, SkillInfo s)
+    {
+        if (s == null)
+        {
+            data.WriteUInt32(0);
+            data.WriteBits(0, 25);
+            data.FlushBits();
+            return;
+        }
+
+        Span<uint> skillBlockBuf = stackalloc uint[57];
+        var skillBlocks = new StackBitMask(skillBlockBuf);
+
+        bool anyChanged = false;
+        for (int i = 0; i < SkillInfo.MaxSkills; i++)
+        {
+            if (s.SkillLineID[i].HasValue) { skillBlocks.SetBit(1 + i); anyChanged = true; }
+            if (s.SkillStep[i].HasValue) { skillBlocks.SetBit(257 + i); anyChanged = true; }
+            if (s.SkillRank[i].HasValue) { skillBlocks.SetBit(513 + i); anyChanged = true; }
+            if (s.SkillStartingRank[i].HasValue) { skillBlocks.SetBit(769 + i); anyChanged = true; }
+            if (s.SkillMaxRank[i].HasValue) { skillBlocks.SetBit(1025 + i); anyChanged = true; }
+            if (s.SkillTempBonus[i].HasValue) { skillBlocks.SetBit(1281 + i); anyChanged = true; }
+            if (s.SkillPermBonus[i].HasValue) { skillBlocks.SetBit(1537 + i); anyChanged = true; }
+        }
+
+        if (anyChanged)
+            skillBlocks.SetBit(0);
+
+        uint blocksMask0 = 0;
+        for (int b = 0; b < 32; b++)
+            if (skillBlocks[b] != 0) blocksMask0 |= (1u << b);
+
+        uint blocksMask1 = 0;
+        for (int b = 32; b < 57; b++)
+            if (skillBlocks[b] != 0) blocksMask1 |= (1u << (b - 32));
+
+        data.WriteUInt32(blocksMask0);
+        data.WriteBits(blocksMask1, 25);
+
+        for (int b = 0; b < 57; b++)
+        {
+            bool blockSet = b < 32
+                ? (blocksMask0 & (1u << b)) != 0
+                : (blocksMask1 & (1u << (b - 32))) != 0;
+            if (blockSet)
+                data.WriteBits(skillBlocks[b], 32);
+        }
+
+        data.FlushBits();
+
+        if ((skillBlocks[0] & 1) == 0)
+            return;
+
+        for (int i = 0; i < SkillInfo.MaxSkills; i++)
+        {
+            if (skillBlocks.IsBitSet(1 + i))
+                data.WriteUInt16(s.SkillLineID[i]!.Value);
+            if (skillBlocks.IsBitSet(257 + i))
+                data.WriteUInt16(s.SkillStep[i]!.Value);
+            if (skillBlocks.IsBitSet(513 + i))
+                data.WriteUInt16(s.SkillRank[i]!.Value);
+            if (skillBlocks.IsBitSet(769 + i))
+                data.WriteUInt16(s.SkillStartingRank[i]!.Value);
+            if (skillBlocks.IsBitSet(1025 + i))
+                data.WriteUInt16(s.SkillMaxRank[i]!.Value);
+            if (skillBlocks.IsBitSet(1281 + i))
+                data.WriteInt16(s.SkillTempBonus[i]!.Value);
+            if (skillBlocks.IsBitSet(1537 + i))
+                data.WriteUInt16(s.SkillPermBonus[i]!.Value);
+        }
+    }
+
+    private void WriteValuesCreate(WorldPacket data)
+    {
+        var effectiveMask = _objectTypeMask;
+        bool trace = _objectType == ObjectTypeBCC.ActivePlayer && Framework.Logging.Log.IsTraceEnabled;
+
+        byte updateFieldFlags = (byte)FieldVisibilityFlags;
+        data.WriteUInt8(updateFieldFlags);
+
+        int vendorFlags = ComputeVendorFlags();
+        if (vendorFlags != 0)
+            _gameState.VendorFragmentFlags[_updateData.Guid] = vendorFlags;
+        else
+            _gameState.VendorFragmentFlags.Remove(_updateData.Guid);
+
+        WriteEntityFragments(data, vendorFragment: vendorFlags != 0);
+        data.WriteUInt8(1);     // IndirectFragmentActive: CGObject
+
+        int p0 = data.GetWrittenLength();
+        WriteCreateObjectData(data);
+        int p1 = data.GetWrittenLength();
+
+        if (effectiveMask.HasAnyFlag(ObjectTypeMask.Item))
+            WriteCreateItemData(data);
+        int p2 = data.GetWrittenLength();
+
+        if (effectiveMask.HasAnyFlag(ObjectTypeMask.Container))
+            WriteCreateContainerData(data);
+        int p3 = data.GetWrittenLength();
+
+        if (effectiveMask.HasAnyFlag(ObjectTypeMask.Unit))
+            WriteCreateUnitData(data);
+        int p4 = data.GetWrittenLength();
+
+        if (effectiveMask.HasAnyFlag(ObjectTypeMask.Player))
+            WriteCreatePlayerData(data);
+        int p5 = data.GetWrittenLength();
+
+        if (effectiveMask.HasAnyFlag(ObjectTypeMask.ActivePlayer))
+            WriteCreateActivePlayerData(data);
+        int p6 = data.GetWrittenLength();
+
+        if (_objectTypeMask.HasAnyFlag(ObjectTypeMask.GameObject))
+            WriteCreateGameObjectData(data);
+        int p7 = data.GetWrittenLength();
+
+        if (_objectTypeMask.HasAnyFlag(ObjectTypeMask.DynamicObject))
+            WriteCreateDynamicObjectData(data);
+        int p8 = data.GetWrittenLength();
+
+        if (_objectTypeMask.HasAnyFlag(ObjectTypeMask.Corpse))
+            WriteCreateCorpseData(data);
+        int p9 = data.GetWrittenLength();
+
+        if (vendorFlags != 0)
+        {
+            data.WriteUInt8(1);     // IndirectFragmentActive: FVendor_C
+            data.WriteInt32(vendorFlags);
+        }
+
+        // Phase 5a diagnostic — per-section byte sizes for the ActivePlayer create
+        // packet. Used to bisect which descriptor section diverges from the V3_4_3
+        // expected wire format (root cause of the ERROR #132 ACCESS_VIOLATION on
+        // world-enter). Counts may be off by up to 1 byte per section if a section
+        // ends with unflushed bits — acceptable for first-pass bisection.
+        if (trace)
+        {
+            ReadOnlySpan<byte> buf = data.GetDataSpan();
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[Phase5aTrace] sections flags=1 obj={p1 - p0} item={p2 - p1} container={p3 - p2} " +
+                $"unit={p4 - p3} player={p5 - p4} active={p6 - p5} " +
+                $"go={p7 - p6} dynobj={p8 - p7} corpse={p9 - p8} valuesTotal={p9 - p0 + 1}");
+
+            DumpSectionHead(buf, p0, p1, "obj");
+            DumpSectionHead(buf, p3, p4, "unit");
+            DumpSectionHead(buf, p4, p5, "player");
+            DumpSectionHead(buf, p5, p6, "active");
+        }
+    }
+
+    private const uint VendorNpcFlags = (uint)(NPCFlags.Vendor | NPCFlags.VendorAmmo | NPCFlags.VendorFood |
+                                               NPCFlags.VendorPoison | NPCFlags.VendorReagent);
+    private const int PetitionVendorFlag = 0x20;
+
+    // The 4.4.2 client opens no vendor or petition window for a creature without the FVendor_C
+    // fragment: it does not even send the request. The fragment's one field is the NPC's vendor
+    // flags shifted down to bit 0, plus 0x20 for a petitioner (TrinityCore cata_classic
+    // Creature::SetVendor and SetPetitioner).
+    private int ComputeVendorFlags()
+    {
+        if (!_objectTypeMask.HasAnyFlag(ObjectTypeMask.Unit) || _objectTypeMask.HasAnyFlag(ObjectTypeMask.Player))
+            return 0;
+
+        uint npcFlags = _updateData.UnitData?.NpcFlags[0] ?? 0;
+        int flags = (int)((npcFlags & VendorNpcFlags) >> 7);
+        if ((npcFlags & (uint)NPCFlags.Petitioner) != 0)
+            flags |= PetitionVendorFlag;
+        return flags;
+    }
+
+    // The entity fragments an object carries from 4.4.2 on, in ascending id order as
+    // TrinityCore's constructors add them: CGObject on every object, then one tag per type in
+    // its type mask, FVendor_C for vendors, closed by End.
+    private void WriteEntityFragments(WorldPacket data, bool vendorFragment)
+    {
+        data.WriteUInt8(0);                                                                 // CGObject
+        if (_objectTypeMask.HasAnyFlag(ObjectTypeMask.Item)) data.WriteUInt8(1);            // Tag_Item
+        if (_objectTypeMask.HasAnyFlag(ObjectTypeMask.Container)) data.WriteUInt8(2);       // Tag_Container
+        if (_objectTypeMask.HasAnyFlag(ObjectTypeMask.Unit)) data.WriteUInt8(5);            // Tag_Unit
+        if (_objectTypeMask.HasAnyFlag(ObjectTypeMask.Player)) data.WriteUInt8(6);          // Tag_Player
+        if (_objectTypeMask.HasAnyFlag(ObjectTypeMask.GameObject)) data.WriteUInt8(7);      // Tag_GameObject
+        if (_objectTypeMask.HasAnyFlag(ObjectTypeMask.DynamicObject)) data.WriteUInt8(8);   // Tag_DynamicObject
+        if (_objectTypeMask.HasAnyFlag(ObjectTypeMask.Corpse)) data.WriteUInt8(9);          // Tag_Corpse
+        if (vendorFragment) data.WriteUInt8(117);                                           // FVendor_C
+        data.WriteUInt8(0xFF);                                                              // End
+    }
+
+    private static void DumpSectionHead(ReadOnlySpan<byte> buf, int start, int end, string label)
+    {
+        int len = end - start;
+        if (len <= 0) return;
+        int dumpLen = Math.Min(64, len);
+        // Copy only the window being dumped -- BitConverter.ToString needs an array, but the
+        // whole packet does not have to become one to hex 64 bytes of it.
+        string hex = BitConverter.ToString(buf.Slice(start, dumpLen).ToArray());
+        Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+            $"[Phase5aTrace]   {label} ({len} bytes) head={hex}");
+    }
+
+    // V3_4_3 Values-update writer. Ported from HermesProxy-WOTLK fork. Builds the
+    // changedMask + per-section bit-mask blocks for partial UpdateObject packets so
+    // the modern client receives real field deltas. The fork's logic is reused
+    // verbatim (same bit positions, same block layout) — see WriteUpdate*Data
+    // methods and the HasAny*FieldSet predicates below.
+    private void WriteValuesUpdate(WorldPacket data)
+    {
+        uint changedMask = ComputeValuesChangedMask(_updateData, _gameState, _objectTypeMask);
+
+        // 4.4.2 fragment header: whether the receiver owns the object, no change to the fragment
+        // list, and CGObject both active (0x1) and changed (0x2). A zero mask would tear CGObject
+        // down on the client, so it is sent even for an empty delta. A vendor's FVendor_C keeps
+        // its active bit (0x4) set, or the client drops the fragment; its own fields never
+        // change, so its changed bit (0x8) stays clear.
+        data.WriteUInt8((FieldVisibilityFlags & FieldVisibility.Owner) != 0 ? (byte)1 : (byte)0);
+        data.WriteUInt8(0);
+        data.WriteUInt8(_gameState.VendorFragmentFlags.ContainsKey(_updateData.Guid) ? (byte)0x7 : (byte)0x3);
+
+        // Safety: if changedMask is 0, nothing to write — emit empty mask so the
+        // outer wire format stays valid. Filter at QueryHandler/UpdateHandler will
+        // drop the empty entry before shipping.
+        if (changedMask == 0)
+        {
+            data.WriteUInt32(0u);
+            return;
+        }
+
+        data.WriteUInt32(changedMask);
+        if ((changedMask & ValuesMaskObject) != 0) WriteUpdateObjectData(data);
+        if ((changedMask & ValuesMaskItem) != 0) WriteUpdateItemData(data);
+        if ((changedMask & ValuesMaskContainer) != 0) WriteUpdateContainerData(data);
+        if ((changedMask & ValuesMaskUnit) != 0) WriteUpdateUnitData(data);
+        if ((changedMask & ValuesMaskPlayer) != 0) WriteUpdatePlayerData(data);
+        if ((changedMask & ValuesMaskActivePlayer) != 0) WriteUpdateActivePlayerData(data);
+        if ((changedMask & ValuesMaskGameObject) != 0) WriteUpdateGameObjectData(data);
+        if ((changedMask & ValuesMaskDynamicObject) != 0) WriteUpdateDynamicObjectData(data);
+        if ((changedMask & ValuesMaskCorpse) != 0) WriteUpdateCorpseData(data);
+    }
+
+    private const uint ValuesMaskObject = 0x001;
+    private const uint ValuesMaskItem = 0x002;
+    private const uint ValuesMaskContainer = 0x004;
+    private const uint ValuesMaskUnit = 0x020;
+    private const uint ValuesMaskPlayer = 0x040;
+    private const uint ValuesMaskActivePlayer = 0x080;
+    private const uint ValuesMaskGameObject = 0x100;
+    private const uint ValuesMaskDynamicObject = 0x200;
+    private const uint ValuesMaskCorpse = 0x400;
+
+    /// <summary>
+    /// The changedMask <see cref="WriteValuesUpdate"/> is about to write: one bit per section
+    /// that has something to say. Static, and the only implementation — the V3_4_3 Values
+    /// filter decides whether a delta is worth sending by asking this, so the filter cannot
+    /// disagree with the writer about what "empty" means.
+    /// </summary>
+    internal static uint ComputeValuesChangedMask(ObjectUpdate updateData, GameSessionData gameState, ObjectTypeMask typeMask)
+    {
+        uint changedMask = 0u;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.Object) && HasAnyObjectFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskObject;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.Item) && HasAnyItemFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskItem;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.Container) && updateData.ContainerData != null && HasAnyContainerFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskContainer;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.Unit) && updateData.UnitData != null && HasAnyUnitFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskUnit;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.Player) && HasAnyPlayerFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskPlayer;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.ActivePlayer) && HasAnyActivePlayerFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskActivePlayer;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.GameObject) && updateData.GameObjectData != null && HasAnyGameObjectFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskGameObject;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.DynamicObject) && updateData.DynamicObjectData != null && HasAnyDynamicObjectFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskDynamicObject;
+        if (typeMask.HasAnyFlag(ObjectTypeMask.Corpse) && updateData.CorpseData != null && HasAnyCorpseFieldSet(updateData, gameState))
+            changedMask |= ValuesMaskCorpse;
+        return changedMask;
+    }
+
+    /// <summary>
+    /// True when a Values update for this object would put at least one field on the wire.
+    /// </summary>
+    /// <remarks>
+    /// The V3_4_3 Values filter drops a delta that says nothing: cMangos emits those as
+    /// bookkeeping and the client answers the resulting 13-byte body with
+    /// CMSG_OBJECT_UPDATE_FAILED. Deciding that used to mean a second, hand-written field
+    /// list in <c>UpdatePackets.IsEmptyValuesDelta</c>, which covered a fraction of the
+    /// descriptor tree and went stale every time a field was added — quest completion, the
+    /// quest log, stable slots, action bars, bag contents, durability and corpse sparkle were
+    /// each lost to it in turn (issue #235). Asking the writer removes the second list: a
+    /// field reaches the wire and the filter at the same moment, because it is one predicate.
+    /// <para>
+    /// Allocation-free by design — it runs per Values entry on every batch, so it resolves
+    /// the type mask itself rather than constructing a builder that the send path will build
+    /// again a moment later.
+    /// </para>
+    /// </remarks>
+    public static bool HasAnyValuesDelta(ObjectUpdate updateData, GameSessionData gameState)
+    {
+        var typeMask = TypeMaskFor(ResolveObjectType(updateData, gameState));
+        return ComputeValuesChangedMask(updateData, gameState, typeMask) != 0;
+    }
+
+    // HasAnyContainerFieldSet emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator.
+
+    // === HasAnyUnitFieldSet (fork lines 1140-1196) ===
+    // HasAnyUnitFieldSet emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator from V4_4_2_60895.UnitField.
+    // HasAnyPlayerFieldSet emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator from V4_4_2_60895.PlayerField.
+    // HasAnyGameObjectFieldSet emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator.
+
+
+    private void WriteValuesModern(WorldPacket packet)
+    {
+        // ByteBuffer rents from ArrayPool and has a finalizer, so an undisposed scratch packet
+        // both leaks the rental and puts one finalizable object per update on the queue.
+        using var valuesBuffer = new WorldPacket();
+        if (_updateData.Type == UpdateTypeModern.Values)
+            WriteValuesUpdate(valuesBuffer);
+        else
+            WriteValuesCreate(valuesBuffer);
+
+        ReadOnlySpan<byte> valuesData = valuesBuffer.GetDataSpan();
+
+        // Debug: dump the bytes we produce for Values updates so we can compare against
+        // TC's accepted format. CMSG_OBJECT_UPDATE_FAILED or `CMSG_LOG_DISCONNECT(reason=7)`
+        // immediately after an UPDATE_OBJECT means the V3_4_3 client cannot parse what we
+        // wrote — diff the hex against a known-good capture to find the bad byte.
+        //
+        // Gated on IsEnabled: this fires for every Unit Values update, and the hex
+        // formatting plus the GUID ToString allocate on each one. Log.Print only checks the
+        // level *inside*, so an ungated interpolated call pays full cost even when Debug is
+        // off — see the logging rule in CLAUDE.md.
+        if (_updateData.Type == UpdateTypeModern.Values
+            && _objectTypeMask.HasAnyFlag(ObjectTypeMask.Unit | ObjectTypeMask.GameObject | ObjectTypeMask.DynamicObject | ObjectTypeMask.Corpse)
+            && Framework.Logging.Log.IsEnabled(Framework.Logging.LogType.Debug))
+        {
+            int dumpLen = System.Math.Min(96, valuesData.Length);
+            string hex = System.BitConverter.ToString(valuesData[..dumpLen].ToArray());
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Debug,
+                $"[ValuesUpdateHex] guid={_updateData.Guid} type={_objectType} size={valuesData.Length} hasUnit={_updateData.UnitData != null} hasPlayer={_updateData.PlayerData != null} hasActive={_updateData.ActivePlayerData != null} hasGO={_updateData.GameObjectData != null} hex={hex}");
+        }
+
+        packet.WriteUInt32((uint)valuesData.Length);
+        packet.WriteBytes(valuesData);
+    }
+
+    public void WriteToPacket(WorldPacket packet)
+    {
+        int startPos = packet.GetWrittenLength();
+        bool traceOn = Framework.Logging.Log.IsTraceEnabled;
+
+        // Phase 5a diagnostic — log the player's UnitData fields most likely to cause
+        // ERROR #132 ACCESS_VIOLATION crashes (null model dereference).
+        if (traceOn && _updateData.UnitData != null && _objectType == ObjectTypeBCC.ActivePlayer)
+        {
+            var u = _updateData.UnitData;
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[Phase5aTrace] WriteToPacket type={_updateData.Type} guid={_updateData.Guid} " +
+                $"DisplayID={u.DisplayID?.ToString() ?? "null"} NativeDisplayID={u.NativeDisplayID?.ToString() ?? "null"} " +
+                $"MountDisplayID={u.MountDisplayID?.ToString() ?? "null"} " +
+                $"Race={u.RaceId?.ToString() ?? "null"} Class={u.ClassId?.ToString() ?? "null"} Sex={u.SexId?.ToString() ?? "null"} " +
+                $"Health={u.Health?.ToString() ?? "null"}/{u.MaxHealth?.ToString() ?? "null"} Level={u.Level?.ToString() ?? "null"} " +
+                $"FactionTemplate={u.FactionTemplate?.ToString() ?? "null"} BoundingRadius={u.BoundingRadius?.ToString() ?? "null"} " +
+                $"CombatReach={u.CombatReach?.ToString() ?? "null"}");
+        }
+
+        packet.WriteUInt8((byte)_updateData.Type);
+        packet.WritePackedGuid128(_updateData.Guid);
+        if (_updateData.Type != UpdateTypeModern.Values)
+        {
+            packet.WriteUInt8(ConvertTypeId(_objectType));
+            SetCreateObjectBits();
+            if (traceOn && _objectType == ObjectTypeBCC.ActivePlayer)
+            {
+                Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                    $"[Phase5aTrace] ActivePlayer createBits=0x{(uint)_createBits:X} " +
+                    $"hasThisIsYou={Has(CreateObjectBits.ThisIsYou)} " +
+                    $"hasActivePlayer={Has(CreateObjectBits.ActivePlayer)} " +
+                    $"hasMovementUpdate={Has(CreateObjectBits.MovementUpdate)} " +
+                    $"hasNoBirthAnim={Has(CreateObjectBits.NoBirthAnim)}");
+            }
+            BuildMovementUpdate(packet);
+        }
+        WriteValuesModern(packet);
+
+        // Hex-dump the produced packet body so we can correlate with the client crash dump.
+        // Limited to first 80 bytes to avoid log spam — the header + first descriptor section
+        // is enough to identify which object type was being written.
+        if (traceOn && _objectType == ObjectTypeBCC.ActivePlayer)
+        {
+            // Slice the dump window off a span over the live buffer; GetData would copy the
+            // entire packet just to hex its first 80 bytes.
+            ReadOnlySpan<byte> all = packet.GetDataSpan();
+            int len = all.Length - startPos;
+            int dumpLen = Math.Min(80, len);
+            string hex = BitConverter.ToString(all.Slice(startPos, dumpLen).ToArray());
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[Phase5aTrace] ActivePlayer packet bytes={len} first80={hex}");
+        }
+
+        // Phase 5a-7c diagnostic — dump the wire bytes for Transport/GameObject creates
+        // so we can byte-diff against the fork's working output. Per-object, capped at 200
+        // bytes so a populated Stormwind area (5+ MOTransports) doesn't drown the log.
+        if (traceOn
+            && _updateData.Type != UpdateTypeModern.Values
+            && _objectType == ObjectTypeBCC.GameObject)
+        {
+            // Slice the dump window off a span over the live buffer; GetData would copy the
+            // entire packet just to hex its first 200 bytes.
+            ReadOnlySpan<byte> all = packet.GetDataSpan();
+            int len = all.Length - startPos;
+            int dumpLen = Math.Min(200, len);
+            string hex = BitConverter.ToString(all.Slice(startPos, dumpLen).ToArray());
+            var moveInfo = _updateData.CreateData?.MoveInfo;
+            var go = _updateData.GameObjectData;
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"GameObject packet entry={_updateData.ObjectData?.EntryID} guid={_updateData.Guid} " +
+                $"highType={_updateData.Guid.GetHighType()} typeIdByte={ConvertTypeId(_objectType)} " +
+                $"createBits=0x{(uint)_createBits:X} typeID={go?.TypeID?.ToString() ?? "null"} " +
+                $"state={go?.State?.ToString() ?? "null"} display={go?.DisplayID?.ToString() ?? "null"} " +
+                $"flags=0x{go?.Flags?.ToString("X") ?? "null"} " +
+                $"pos=({moveInfo?.Position.X.ToString("F2") ?? "?"},{moveInfo?.Position.Y.ToString("F2") ?? "?"},{moveInfo?.Position.Z.ToString("F2") ?? "?"}) " +
+                $"orient={moveInfo?.Orientation.ToString("F3") ?? "?"} bytes={len} first200={hex}");
+        }
+
+        // NPCBot-render diagnostic — dump the first ~256 bytes of any Creature-typed
+        // CreateObject so we can see the actual Flags2 byte that hit the wire (and confirm
+        // whether SanitizeFlags2 stripped UNIT_FLAG2_CLONED before emit).
+        if (traceOn
+            && _updateData.Type != UpdateTypeModern.Values
+            && _updateData.Guid.GetHighType() == HighGuidType.Creature)
+        {
+            // Slice the dump window off a span over the live buffer; GetData would copy the
+            // entire packet just to hex its first 256 bytes.
+            ReadOnlySpan<byte> all = packet.GetDataSpan();
+            int len = all.Length - startPos;
+            int dumpLen = Math.Min(256, len);
+            string hex = BitConverter.ToString(all.Slice(startPos, dumpLen).ToArray());
+            Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
+                $"[CreateObjectHex] guid={_updateData.Guid} entry={_updateData.ObjectData?.EntryID?.ToString() ?? "null"} " +
+                $"type={_objectType} bytes={len} first256={hex}");
+        }
+    }
+}

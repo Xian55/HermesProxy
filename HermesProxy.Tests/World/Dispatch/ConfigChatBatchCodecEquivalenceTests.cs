@@ -233,7 +233,7 @@ public class ConfigChatBatchCodecEquivalenceTests
         });
 
         var e = new Frozen.UserClientUpdateAccountData(); e.Read(o);
-        var r = ReaderOver(f); UserClientUpdateAccountDataCodec.Read(ref r, out var a);
+        var r = ReaderOver(f); UserClientUpdateAccountDataCodecPreCataClassic.Read(ref r, out var a);
 
         Assert.Equal(e.PlayerGuid, a.PlayerGuid);
         Assert.Equal(e.Time, a.Time);
@@ -257,7 +257,7 @@ public class ConfigChatBatchCodecEquivalenceTests
         });
 
         var e = new Frozen.UserClientUpdateAccountData(); e.Read(o);
-        var r = ReaderOver(f); UserClientUpdateAccountDataCodec.Read(ref r, out var a);
+        var r = ReaderOver(f); UserClientUpdateAccountDataCodecPreCataClassic.Read(ref r, out var a);
 
         Assert.Equal(e.CompressedData, a.CompressedData);
         Assert.Empty(a.CompressedData);
@@ -275,7 +275,7 @@ public class ConfigChatBatchCodecEquivalenceTests
         });
 
         var e = new Frozen.RequestAccountData(); e.Read(o);
-        var r = ReaderOver(f); RequestAccountDataCodec.Read(ref r, out var a);
+        var r = ReaderOver(f); RequestAccountDataCodecPreCataClassic.Read(ref r, out var a);
 
         Assert.Equal(e.PlayerGuid, a.PlayerGuid);
         Assert.Equal(e.DataType, a.DataType);

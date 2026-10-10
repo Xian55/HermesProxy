@@ -20,6 +20,7 @@ using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
 using Framework.Logging;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -58,8 +59,26 @@ public class MoveUpdate : ServerPacket, ISpanWritable
     public MovementInfo MoveInfo;
 }
 
-public class MonsterMove : ServerPacket, ISpanWritable
+public sealed class MonsterMove : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<MonsterMove>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new SplineLayout(destination: true)),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new SplineLayout(destination: false)));
+
+    private static readonly ServerPacketLayout<MonsterMove> Layout = Layouts.ForRunningClient();
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, and the client's reader) dropped the Destination vector that
+    /// followed the spline id. Sent anyway, the client reads it as the spline flags, elapsed time and
+    /// move time, and every creature runs its path at the wrong speed.
+    /// </summary>
+    internal sealed class SplineLayout(bool destination) : ServerPacketLayout<MonsterMove>
+    {
+        public override void Write(MonsterMove packet, WorldPacket data) => packet.Write(data, destination);
+
+        public override int WriteToSpan(MonsterMove packet, Span<byte> buffer) => packet.WriteToSpan(buffer, destination);
+    }
+
     // Practical cap for spline points - covers real-world movement patterns
     // Corruption guard, not a sizing cap. SplineCount is read straight off the legacy wire
     // (MovementHandler.cs:563) and is unbounded, so a garbage count must not turn into a
@@ -128,32 +147,35 @@ public class MonsterMove : ServerPacket, ISpanWritable
     public Vector3 PackedDelta(int index) =>
         (MoveSpline.StartPosition + MoveSpline.EndPosition) / 2.0f - MoveSpline.SplinePoints[index];
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    private void Write(WorldPacket data, bool destination)
     {
-        _worldPacket.WritePackedGuid128(MoverGUID);
-        _worldPacket.WriteVector3(MoveSpline.StartPosition);
+        data.WritePackedGuid128(MoverGUID);
+        data.WriteVector3(MoveSpline.StartPosition);
 
-        _worldPacket.WriteUInt32(MoveSpline.SplineId);
-        _worldPacket.WriteVector3(Vector3.Zero); // Destination
-        _worldPacket.WriteBit(false); // CrzTeleport
-        _worldPacket.WriteBits(PointCount == 0 ? 2 : 0, 3); // StopDistanceTolerance
+        data.WriteUInt32(MoveSpline.SplineId);
+        if (destination)
+            data.WriteVector3(Vector3.Zero); // Destination
+        data.WriteBit(false); // CrzTeleport
+        data.WriteBits(PointCount == 0 ? 2 : 0, 3); // StopDistanceTolerance
 
-        _worldPacket.WriteUInt32((uint)MoveSpline.SplineFlags);
-        _worldPacket.WriteInt32(0); // Elapsed
-        _worldPacket.WriteUInt32(MoveSpline.SplineTimeFull);
-        _worldPacket.WriteUInt32(0); // FadeObjectTime
-        _worldPacket.WriteUInt8(MoveSpline.SplineMode);
-        _worldPacket.WritePackedGuid128(MoveSpline.TransportGuid); // != default ? MoveSpline.TransportGuid : WowGuid128.Empty
-        _worldPacket.WriteInt8(MoveSpline.TransportSeat);
-        _worldPacket.WriteBits((byte)MoveSpline.SplineType, 2);
-        _worldPacket.WriteBits(PointCount, 16);
-        _worldPacket.WriteBit(false); // VehicleExitVoluntary ;
-        _worldPacket.WriteBit(false); // Interpolate
-        _worldPacket.WriteBits(PackedDeltaCount, 16);
-        _worldPacket.WriteBit(false); // SplineFilter.HasValue
-        _worldPacket.WriteBit(false); // SpellEffectExtraData.HasValue
-        _worldPacket.WriteBit(false); // JumpExtraData.HasValue
-        _worldPacket.FlushBits();
+        data.WriteUInt32((uint)MoveSpline.SplineFlags);
+        data.WriteInt32(0); // Elapsed
+        data.WriteUInt32(MoveSpline.SplineTimeFull);
+        data.WriteUInt32(0); // FadeObjectTime
+        data.WriteUInt8(MoveSpline.SplineMode);
+        data.WritePackedGuid128(MoveSpline.TransportGuid); // != default ? MoveSpline.TransportGuid : WowGuid128.Empty
+        data.WriteInt8(MoveSpline.TransportSeat);
+        data.WriteBits((byte)MoveSpline.SplineType, 2);
+        data.WriteBits(PointCount, 16);
+        data.WriteBit(false); // VehicleExitVoluntary ;
+        data.WriteBit(false); // Interpolate
+        data.WriteBits(PackedDeltaCount, 16);
+        data.WriteBit(false); // SplineFilter.HasValue
+        data.WriteBit(false); // SpellEffectExtraData.HasValue
+        data.WriteBit(false); // JumpExtraData.HasValue
+        data.FlushBits();
 
         //if (SplineFilter.HasValue)
         //    SplineFilter.Value.Write(data);
@@ -161,7 +183,7 @@ public class MonsterMove : ServerPacket, ISpanWritable
         switch (MoveSpline.SplineType)
         {
             case SplineTypeModern.FacingSpot:
-                _worldPacket.WriteVector3(MoveSpline.FinalFacingSpot);
+                data.WriteVector3(MoveSpline.FinalFacingSpot);
                 break;
             case SplineTypeModern.FacingTarget:
                 // Universal modern Classic wire: float FaceDirection + PackedGuid128 FaceGUID.
@@ -170,19 +192,19 @@ public class MonsterMove : ServerPacket, ISpanWritable
                 // V2_5, V3_4_3 — dropping the float corrupts FaceGUID + every subsequent point by
                 // 4 bytes on the client side (issue #74 reopen, modern_*_parsed.txt confirms WPP
                 // ArgumentOutOfRangeException on FacingGUID high-byte after FaceDirection read).
-                _worldPacket.WriteFloat(MoveSpline.FinalOrientation);
-                _worldPacket.WritePackedGuid128(MoveSpline.FinalFacingGuid);
+                data.WriteFloat(MoveSpline.FinalOrientation);
+                data.WritePackedGuid128(MoveSpline.FinalFacingGuid);
                 break;
             case SplineTypeModern.FacingAngle:
-                _worldPacket.WriteFloat(MoveSpline.FinalOrientation);
+                data.WriteFloat(MoveSpline.FinalOrientation);
                 break;
         }
 
         for (int i = 0; i < PointCount; i++)
-            _worldPacket.WriteVector3(Point(i));
+            data.WriteVector3(Point(i));
 
         for (int i = 0; i < PackedDeltaCount; i++)
-            _worldPacket.WritePackXYZ(PackedDelta(i));
+            data.WritePackXYZ(PackedDelta(i));
 
         /*
         if (SpellEffectExtraData.HasValue)
@@ -200,7 +222,7 @@ public class MonsterMove : ServerPacket, ISpanWritable
                 $"face={MoveSpline.SplineType} flags=0x{(uint)MoveSpline.SplineFlags:X8} mode={MoveSpline.SplineMode} " +
                 $"pts={PointCount} deltas={PackedDeltaCount} " +
                 $"orient={MoveSpline.FinalOrientation:F3} faceGuid=0x{MoveSpline.FinalFacingGuid.Low:X} " +
-                $"wire={_worldPacket.GetSize()}B");
+                $"wire={data.GetSize()}B");
     }
 
     // Fixed: GUID(18) + StartPos(12) + SplineId(4) + Dest(12) + flags/times(36) + bits(6) = 88
@@ -213,7 +235,9 @@ public class MonsterMove : ServerPacket, ISpanWritable
     // exact sizing costs nothing versus a constant and never under-provisions.
     public int MaxSize => FixedSize + PointCount * 12 + PackedDeltaCount * 4;
 
-    public int WriteToSpan(Span<byte> buffer)
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    private int WriteToSpan(Span<byte> buffer, bool destination)
     {
         // Only a corrupt or hostile SplineCount should land here; MaxSize already sized the
         // buffer for this spline's real length.
@@ -226,7 +250,8 @@ public class MonsterMove : ServerPacket, ISpanWritable
         writer.WriteVector3(MoveSpline.StartPosition);
 
         writer.WriteUInt32(MoveSpline.SplineId);
-        writer.WriteVector3(Vector3.Zero); // Destination
+        if (destination)
+            writer.WriteVector3(Vector3.Zero); // Destination
         writer.WriteBit(false); // CrzTeleport
         writer.WriteBits((uint)(PointCount == 0 ? 2 : 0), 3); // StopDistanceTolerance
 

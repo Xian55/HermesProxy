@@ -243,3 +243,44 @@ public enum QuestPushReason
     DifferentServerDaily = 13,
     NotAllowed = 14
 }
+
+// Cataclysm Classic 4.4.2 status bit-flags: the whole enum was renumbered from 3.4.3 and grew past
+// 32 bits (TrinityCore cata_classic QuestDef.h). Only the values a 3.3.5a status can map to.
+[Flags]
+public enum QuestGiverStatusCata : ulong
+{
+    None                    = 0x000000000000,
+    Future                  = 0x000000000002,  // grey !
+    TrivialRepeatableTurnin = 0x000000000020,
+    Trivial                 = 0x000000000040,
+    TrivialDailyQuest       = 0x000000000080,
+    Reward                  = 0x000000002000,  // quest taken, not complete: grey ?
+    RepeatableTurnin        = 0x000000100000,  // blue ?
+    Quest                   = 0x000000400000,  // yellow !
+    DailyQuest              = 0x000000800000,  // blue !
+    RewardCompleteNoPOI     = 0x000200000000,  // yellow ?, no minimap POI
+    RewardCompletePOI       = 0x000400000000,  // yellow ?
+}
+
+public static class QuestGiverStatusCataConverter
+{
+    // Maps QuestGiverStatusModern (HermesProxy's internal) to 4.4.2 wire bits, following
+    // TrinityCore cata_classic Player::GetQuestDialogStatus: an incomplete quest is Reward, a
+    // complete one RewardCompletePOI (or NoPOI), an available one Quest. A native 4.4.2 capture
+    // shows Quest (0x400000) and Reward (0x2000) over Northshire's quest givers.
+    public static ulong FromModern(QuestGiverStatusModern modern) => modern switch
+    {
+        QuestGiverStatusModern.None                 => (ulong)QuestGiverStatusCata.None,
+        QuestGiverStatusModern.Unavailable          => (ulong)QuestGiverStatusCata.Future,
+        QuestGiverStatusModern.LowLevelAvailable    => (ulong)QuestGiverStatusCata.Trivial,
+        QuestGiverStatusModern.LowLevelRewardRep    => (ulong)QuestGiverStatusCata.TrivialRepeatableTurnin,
+        QuestGiverStatusModern.LowLevelAvailableRep => (ulong)QuestGiverStatusCata.TrivialDailyQuest,
+        QuestGiverStatusModern.Incomplete           => (ulong)QuestGiverStatusCata.Reward,
+        QuestGiverStatusModern.RewardRep            => (ulong)QuestGiverStatusCata.RepeatableTurnin,
+        QuestGiverStatusModern.AvailableRep         => (ulong)QuestGiverStatusCata.DailyQuest,
+        QuestGiverStatusModern.Available            => (ulong)QuestGiverStatusCata.Quest,
+        QuestGiverStatusModern.Reward2              => (ulong)QuestGiverStatusCata.RewardCompleteNoPOI,
+        QuestGiverStatusModern.Reward               => (ulong)QuestGiverStatusCata.RewardCompletePOI,
+        _                                           => (ulong)QuestGiverStatusCata.None,
+    };
+}

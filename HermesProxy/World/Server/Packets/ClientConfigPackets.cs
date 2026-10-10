@@ -18,6 +18,7 @@
 using System;
 using Framework.Constants;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using System.Collections.Generic;
 
@@ -77,8 +78,14 @@ public class ClientCacheVersion : ServerPacket, ISpanWritable
 
 public readonly record struct RequestAccountData(WowGuid128 PlayerGuid, uint DataType);
 
-public class UpdateAccountData : ServerPacket, ISpanWritable
+public sealed class UpdateAccountData : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<UpdateAccountData>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new PlayerFirstLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new TimeFirstLayout()));
+
+    private static readonly ServerPacketLayout<UpdateAccountData> Layout = Layouts.ForRunningClient();
+
     public UpdateAccountData(AccountData data) : base(Opcode.SMSG_UPDATE_ACCOUNT_DATA)
     {
         Player = data.Guid;
@@ -88,54 +95,98 @@ public class UpdateAccountData : ServerPacket, ISpanWritable
         CompressedData = data.CompressedData;
     }
 
-    public override void Write()
-    {
-        _worldPacket.WritePackedGuid128(Player);
-        _worldPacket.WriteInt64(Time);
-        _worldPacket.WriteUInt32(Size);
+    public override void Write() => Layout.Write(this, _worldPacket);
 
-        if (ModernVersion.GetAccountDataCount() <= 8)
-            _worldPacket.WriteBits(DataType, 3);
-        else
-            _worldPacket.WriteBits(DataType, 4);
-
-        if (CompressedData == null)
-            _worldPacket.WriteUInt32(0);
-        else
-        {
-            _worldPacket.WriteInt32(CompressedData.Length);
-            _worldPacket.WriteBytes(CompressedData);
-        }
-    }
-
-    // MaxSize: GUID(18) + long(8) + uint(4) + bits(1) + length(4) + max compressed data
     // Reduced from 16KB to 2KB based on typical usage (235 bytes observed)
     private const int MaxCompressedDataSize = 2048;
-    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 17 + MaxCompressedDataSize;
+
+    public int MaxSize => Layout.MaxSize;
 
     public int WriteToSpan(Span<byte> buffer)
     {
         if (CompressedData != null && CompressedData.Length > MaxCompressedDataSize)
             return -1;
+        return Layout.WriteToSpan(this, buffer);
+    }
 
-        var writer = new SpanPacketWriter(buffer);
-        writer.WritePackedGuid128(Player.Low, Player.High);
-        writer.WriteInt64(Time);
-        writer.WriteUInt32(Size);
+    /// <summary>Up to 3.4.3: Player, Time, Size, then DataType in 3 or 4 bits.</summary>
+    internal sealed class PlayerFirstLayout : ServerPacketLayout<UpdateAccountData>
+    {
+        // GUID(18) + long(8) + uint(4) + bits(1) + length(4) + max compressed data
+        public override int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 17 + MaxCompressedDataSize;
 
-        if (ModernVersion.GetAccountDataCount() <= 8)
-            writer.WriteBits(DataType, 3);
-        else
-            writer.WriteBits(DataType, 4);
-
-        if (CompressedData == null)
-            writer.WriteUInt32(0);
-        else
+        public override void Write(UpdateAccountData packet, WorldPacket data)
         {
-            writer.WriteInt32(CompressedData.Length);
-            writer.WriteBytes(CompressedData);
+            data.WritePackedGuid128(packet.Player);
+            data.WriteInt64(packet.Time);
+            data.WriteUInt32(packet.Size);
+
+            if (ModernVersion.GetAccountDataCount() <= 8)
+                data.WriteBits(packet.DataType, 3);
+            else
+                data.WriteBits(packet.DataType, 4);
+
+            if (packet.CompressedData == null)
+                data.WriteUInt32(0);
+            else
+            {
+                data.WriteInt32(packet.CompressedData.Length);
+                data.WriteBytes(packet.CompressedData);
+            }
         }
-        return writer.Position;
+
+        public override int WriteToSpan(UpdateAccountData packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(packet.Player.Low, packet.Player.High);
+            writer.WriteInt64(packet.Time);
+            writer.WriteUInt32(packet.Size);
+
+            if (ModernVersion.GetAccountDataCount() <= 8)
+                writer.WriteBits(packet.DataType, 3);
+            else
+                writer.WriteBits(packet.DataType, 4);
+
+            if (packet.CompressedData == null)
+                writer.WriteUInt32(0);
+            else
+            {
+                writer.WriteInt32(packet.CompressedData.Length);
+                writer.WriteBytes(packet.CompressedData);
+            }
+            return writer.Position;
+        }
+    }
+
+    /// <summary>4.4.2: Time, Size, Player, then DataType as an int32 (TrinityCore cata_classic).</summary>
+    internal sealed class TimeFirstLayout : ServerPacketLayout<UpdateAccountData>
+    {
+        // long(8) + uint(4) + GUID(18) + int(4) + length(4) + max compressed data
+        public override int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 20 + MaxCompressedDataSize;
+
+        public override void Write(UpdateAccountData packet, WorldPacket data)
+        {
+            data.WriteInt64(packet.Time);
+            data.WriteUInt32(packet.Size);
+            data.WritePackedGuid128(packet.Player);
+            data.WriteUInt32(packet.DataType);
+            data.WriteInt32(packet.CompressedData?.Length ?? 0);
+            if (packet.CompressedData != null)
+                data.WriteBytes(packet.CompressedData);
+        }
+
+        public override int WriteToSpan(UpdateAccountData packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt64(packet.Time);
+            writer.WriteUInt32(packet.Size);
+            writer.WritePackedGuid128(packet.Player.Low, packet.Player.High);
+            writer.WriteUInt32(packet.DataType);
+            writer.WriteInt32(packet.CompressedData?.Length ?? 0);
+            if (packet.CompressedData != null)
+                writer.WriteBytes(packet.CompressedData);
+            return writer.Position;
+        }
     }
 
     public WowGuid128 Player;

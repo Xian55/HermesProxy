@@ -77,8 +77,10 @@ public partial class WorldClient
 
         var state = GetSession().GameState;
         // V3_4_3 only: a gossip list from the NPC we are mid-quest with would
-        // replace the details / RequestItems frame with a dead overlay.
-        if (ModernVersion.IsWotLKClassicOrLater
+        // replace the details / RequestItems frame with a dead overlay. Exactly 3.4.3, like
+        // the CLOSE_INTERACTION / CLOSE_QUEST handlers that clear this state: on 4.4.2 nothing
+        // clears it, and every later gossip was dropped.
+        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
             && gossip.GossipGUID == state.CurrentInteractedWithNPC
             && (state.AwaitingQuestRewardId != 0 || state.QuestDetailsOpen))
             return;
