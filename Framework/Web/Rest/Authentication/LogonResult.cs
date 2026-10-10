@@ -23,6 +23,10 @@ public class LogonResult
     [DataMember(Name = "support_error_code")]
     public string? SupportErrorCode { get; set; }
 
+    /// <summary>The server's SRP proof; an SRP client rejects a DONE result without it.</summary>
+    [DataMember(Name = "server_evidence_M2", EmitDefaultValue = false)]
+    public string? ServerEvidenceM2 { get; set; }
+
     [DataMember(Name = "authenticator_form")]
     public FormInputs AuthenticatorForm { get; set; } = new FormInputs();
 }

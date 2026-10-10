@@ -17,4 +17,8 @@ public class FormInputs
 
     [DataMember(Name = "inputs")]
     public List<FormInput> Inputs { get; set; } = new List<FormInput>();
+
+    /// <summary>Where the client starts an SRP login; left out of the JSON when unset.</summary>
+    [DataMember(Name = "srp_url", EmitDefaultValue = false)]
+    public string? SrpUrl { get; set; }
 }

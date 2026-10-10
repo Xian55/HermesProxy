@@ -14,13 +14,17 @@ namespace HermesProxy.World.Server.Packets;
 /// </remarks>
 public abstract class ServerPacketLayout<TPacket> where TPacket : ServerPacket
 {
-    /// <summary>See <see cref="Framework.IO.ISpanWritable.MaxSize"/>.</summary>
-    public abstract int MaxSize { get; }
+    /// <summary>
+    /// See <see cref="Framework.IO.ISpanWritable.MaxSize"/>. Overridden by the layouts of packets
+    /// that implement <see cref="Framework.IO.ISpanWritable"/>; nothing asks the others.
+    /// </summary>
+    public virtual int MaxSize => throw new NotSupportedException($"{typeof(TPacket).Name} is not span-writable.");
 
     public abstract void Write(TPacket packet, WorldPacket data);
 
-    /// <summary>See <see cref="Framework.IO.ISpanWritable.WriteToSpan"/>.</summary>
-    public abstract int WriteToSpan(TPacket packet, Span<byte> buffer);
+    /// <summary>See <see cref="Framework.IO.ISpanWritable.WriteToSpan"/> and <see cref="MaxSize"/>.</summary>
+    public virtual int WriteToSpan(TPacket packet, Span<byte> buffer)
+        => throw new NotSupportedException($"{typeof(TPacket).Name} is not span-writable.");
 }
 
 /// <summary>

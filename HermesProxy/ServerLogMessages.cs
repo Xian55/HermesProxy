@@ -44,6 +44,12 @@ internal static partial class ServerLogMessages
     public static partial void StopRequested(
         ILogger logger, string SourceFile, string NetDir, string EventName);
 
+    [LoggerMessage(EventId = 608, Level = LogLevel.Error, Message =
+        "This client logs in with SRP and never sends its password, and no legacy account password was given: " +
+        "set HERMES_LegacyServerOptions__Password. Logins will fail until then.")]
+    public static partial void SrpPasswordMissing(
+        ILogger logger, string SourceFile, string NetDir);
+
     // The line that dates a hot reload in the log: packets before it ran the old code.
     [LoggerMessage(EventId = 609, Level = LogLevel.Information,
         Message = "Hot reload #{Number} patched {Types}; dispatch tables rebuilt")]

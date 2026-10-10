@@ -42,8 +42,11 @@ public class ClientBranchTests
     [Fact]
     public void GetBranch_MatchesTheOldInlineChain_ForEverySupportedModernBuild()
     {
+        // 4.4.2 is excluded on purpose: the old chain had no arm for expansion 4 and sent it to
+        // the retail triple, which is the bug ClientBranch fixed (CataclysmClassic_* below).
         var mismatches = AllBuilds
             .Where(VersionChecker.IsSupportedModernVersion)
+            .Where(b => b != ClientVersionBuild.V4_4_2_60895)
             .Select(b => (Build: b, Parsed: Parse(b)))
             .Where(x => OldChain(x.Parsed.Expansion) !=
                         NewChain(VersionChecker.GetBranch(x.Parsed.Expansion, x.Parsed.Major)))
@@ -64,6 +67,7 @@ public class ClientBranchTests
     {
         var mismatches = AllBuilds
             .Where(VersionChecker.IsSupportedModernVersion)
+            .Where(b => b != ClientVersionBuild.V4_4_2_60895)
             .Where(b => VersionChecker.IsWotLKClassicOrLater(b) != (b == ClientVersionBuild.V3_4_3_54261))
             .Select(b => b.ToString())
             .ToList();

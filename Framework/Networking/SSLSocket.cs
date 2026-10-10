@@ -18,6 +18,7 @@
 using Framework.Logging;
 using System;
 using System.Buffers;
+using System.IO;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -36,6 +37,8 @@ public abstract class SSLSocket : ISocket, IDisposable
 
     Socket _socket;
     internal SslStream _stream;
+    // What reads and writes go through: _stream, or the bare NetworkStream on a plain socket.
+    readonly Stream _io;
     IPEndPoint? _remoteEndPoint;
     byte[]? _receiveBuffer;
 
@@ -44,13 +47,18 @@ public abstract class SSLSocket : ISocket, IDisposable
     // in arrival order, which keeps frames in the order they were sent.
     readonly SemaphoreSlim _writeLock = new(1, 1);
 
-    protected SSLSocket(Socket socket)
+    /// <param name="useTls">False for a plain-TCP socket: <see cref="AsyncHandshake"/> is then never
+    /// called and <see cref="AsyncRead"/> starts it. The login web service runs that way for clients
+    /// that refuse the development certificate over HTTPS.</param>
+    protected SSLSocket(Socket socket, bool useTls = true)
     {
         _socket = socket;
         _remoteEndPoint = _socket.RemoteEndPoint as IPEndPoint;
         _receiveBuffer = new byte[ushort.MaxValue];
 
-        _stream = new SslStream(new NetworkStream(socket), false);
+        var network = new NetworkStream(socket);
+        _stream = new SslStream(network, false);
+        _io = useTls ? _stream : network;
     }
 
     public virtual void Dispose()
@@ -79,7 +87,7 @@ public abstract class SSLSocket : ISocket, IDisposable
         try
         {
             var receiveBuffer = _receiveBuffer;
-            var result = await _stream.ReadAsync(receiveBuffer, 0, receiveBuffer.Length);
+            var result = await _io.ReadAsync(receiveBuffer, 0, receiveBuffer.Length);
             if (result == 0)
             {
                 CloseSocket();
@@ -155,7 +163,7 @@ public abstract class SSLSocket : ISocket, IDisposable
         try
         {
             if (IsOpen())
-                await _stream.WriteAsync(buffer.AsMemory(0, length));
+                await _io.WriteAsync(buffer.AsMemory(0, length));
         }
         catch (Exception ex)
         {

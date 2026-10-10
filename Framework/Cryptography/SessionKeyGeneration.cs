@@ -22,18 +22,27 @@ namespace Framework.Cryptography;
 
 public sealed class SessionKeyGenerator
 {
-    private const int HashSize = 32; // SHA-256
-
-    private readonly byte[] _o0 = new byte[HashSize];
-    private readonly byte[] _o1 = new byte[HashSize];
-    private readonly byte[] _o2 = new byte[HashSize];
+    private readonly HashAlgorithmName _hash;
+    private readonly int _hashSize;
+    private readonly byte[] _o0;
+    private readonly byte[] _o1;
+    private readonly byte[] _o2;
     private int _taken;
 
-    public SessionKeyGenerator(ReadOnlySpan<byte> buff)
+    public SessionKeyGenerator(ReadOnlySpan<byte> buff) : this(buff, HashAlgorithmName.SHA256) { }
+
+    /// <param name="hash">SHA-256 up to 3.4.x; Cataclysm Classic 4.4 runs it on SHA-512.</param>
+    public SessionKeyGenerator(ReadOnlySpan<byte> buff, HashAlgorithmName hash)
     {
+        _hash = hash;
+        _hashSize = hash == HashAlgorithmName.SHA512 ? SHA512.HashSizeInBytes : SHA256.HashSizeInBytes;
+        _o0 = new byte[_hashSize];
+        _o1 = new byte[_hashSize];
+        _o2 = new byte[_hashSize];
+
         int halfSize = buff.Length / 2;
-        SHA256.HashData(buff[..halfSize], _o1);
-        SHA256.HashData(buff[halfSize..], _o2);
+        CryptographicOperations.HashData(hash, buff[..halfSize], _o1);
+        CryptographicOperations.HashData(hash, buff[halfSize..], _o2);
         FillUp();
     }
 
@@ -43,7 +52,7 @@ public sealed class SessionKeyGenerator
     {
         for (int i = 0; i < buf.Length; i++)
         {
-            if (_taken == HashSize)
+            if (_taken == _hashSize)
                 FillUp();
 
             buf[i] = _o0[_taken];
@@ -55,14 +64,14 @@ public sealed class SessionKeyGenerator
 
     private void FillUp()
     {
-        using var ih = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        using var ih = IncrementalHash.CreateHash(_hash);
         ih.AppendData(_o1);
         ih.AppendData(_o0);
         ih.AppendData(_o2);
 
         // Hash directly into _o0 to avoid the byte[] allocation that GetHashAndReset would produce.
-        if (!ih.TryGetHashAndReset(_o0, out int written) || written != HashSize)
-            throw new CryptographicException("SessionKeyGenerator.FillUp: SHA-256 produced unexpected output size.");
+        if (!ih.TryGetHashAndReset(_o0, out int written) || written != _hashSize)
+            throw new CryptographicException("SessionKeyGenerator.FillUp: hash produced unexpected output size.");
 
         _taken = 0;
     }
