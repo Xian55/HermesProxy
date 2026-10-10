@@ -32,6 +32,7 @@ dotnet run --project HermesProxy.Benchmarks -c Release -- --filter "*Name*"  # R
 - **PascalCase** for types, methods, properties, public fields
 - **_camelCase** for private fields (leading underscore)
 - **File-scoped namespaces** in newer code (`namespace Foo;`)
+- **`sealed` by default** — every class is `sealed` unless it is meant to be derived from (an abstraction). Server packet layouts are enforced by `HPSG009`; for the rest it is the rule for new and touched code
 - **CypherCore GPL v3 headers** on legacy/ported files — preserve these when editing
 - Prefer `var` when the type is obvious from context
 

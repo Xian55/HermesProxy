@@ -499,6 +499,10 @@ construction.
    this after step 1 costs nothing and closes the trap permanently.
 3. **Decide the write-path dispatch shape** — factory, startup-resolved delegate, or generated
    table. Prerequisite for step 5, and it is where the 375-class blast radius lives.
+   ✅ **Decided 2026-10-10: startup-resolved.** Each shape is a sealed `ServerPacketLayout<TPacket>`;
+   the packet lists them with build ranges in a `ServerPacketLayouts<>` and keeps the running
+   client's in a static readonly field, so call sites are unchanged. `GossipPOI` is the first
+   conversion. See `HermesProxy/World/Server/Packets/CLAUDE.md`.
 4. **Refresh `perf/union-object-update`** onto `master` and make `ObjectUpdateBuilderGenerator`
    union-aware. Enabling step for the union direction, and where the real work is. Note the
    reference counts above: this is a materially larger change than it was in April.
