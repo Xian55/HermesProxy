@@ -1975,6 +1975,14 @@ class SpellPeriodicAuraLog : ServerPacket
 {
     public SpellPeriodicAuraLog() : base(Opcode.SMSG_SPELL_PERIODIC_AURA_LOG, ConnectionType.Instance) { }
 
+    // The 3.4.3 client reads a u32 count of supporters (and that many entries) after the seven
+    // effect values, before the flag byte. Without it the client read that count from the flag byte
+    // and the end of the packet, then read the flags past the end: every tick lost its crit flag
+    // (#365). TrinityCore 3.4.3 writes its four zero bytes after the flag byte, also wrong.
+    internal static bool HasSupporterCount => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
+    internal static bool? ForceV343ForTests;
+
     public override void Write()
     {
         _worldPacket.WritePackedGuid128(TargetGUID);
@@ -2014,6 +2022,8 @@ class SpellPeriodicAuraLog : ServerPacket
             data.WriteUInt32(SchoolMaskOrPower);
             data.WriteUInt32(AbsorbedOrAmplitude);
             data.WriteUInt32(Resisted);
+            if (SpellPeriodicAuraLog.HasSupporterCount)
+                data.WriteUInt32(0);   // supporters: a 3.3.5a server has none
 
             data.WriteBit(Crit);
             data.WriteBit(DebugInfo != null);
