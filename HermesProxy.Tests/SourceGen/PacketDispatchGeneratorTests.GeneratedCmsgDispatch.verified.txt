@@ -768,9 +768,15 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.GroupSystem.HandleConvertRaid(in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleCreateCharacter_CMSG_CREATE_CHARACTER(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleCreateCharacter_CMSG_CREATE_CHARACTER_CreateCharacterCodecCataClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
-        global::HermesProxy.World.Server.Packets.CreateCharacterCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Packets.CreateCharacterCodecCataClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CharacterSystem.HandleCreateCharacter(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleCreateCharacter_CMSG_CREATE_CHARACTER_CreateCharacterCodecPreCataClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CreateCharacterCodecPreCataClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.CharacterSystem.HandleCreateCharacter(in packet, in ctx);
     }
 
@@ -2848,7 +2854,12 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CONFIRM_RESPEC_WIPE] = &Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleConfirmRespecWipe_CMSG_CONFIRM_RESPEC_WIPE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CONTACT_LIST] = &Thunk_HermesProxy_World_Server_Systems_SocialSystem_HandleContactList_CMSG_CONTACT_LIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CONVERT_RAID] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleConvertRaid_CMSG_CONVERT_RAID;
-        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CREATE_CHARACTER] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleCreateCharacter_CMSG_CREATE_CHARACTER;
+        {
+            if (global::HermesProxy.ModernVersion.AddedInVersion(4, 4, 2))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CREATE_CHARACTER] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleCreateCharacter_CMSG_CREATE_CHARACTER_CreateCharacterCodecCataClassic;
+            else if (!global::HermesProxy.ModernVersion.AddedInVersion(4, 4, 2))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CREATE_CHARACTER] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleCreateCharacter_CMSG_CREATE_CHARACTER_CreateCharacterCodecPreCataClassic;
+        }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DB_QUERY_BULK] = &Thunk_HermesProxy_World_Server_Systems_HotfixSystem_HandleDbQueryBulk_CMSG_DB_QUERY_BULK;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DECLINE_GUILD_INVITES] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleDeclineGuildInvites_CMSG_DECLINE_GUILD_INVITES;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_DECLINE_PETITION] = &Thunk_HermesProxy_World_Server_Systems_PetitionSystem_HandleDeclinePetition_CMSG_DECLINE_PETITION;

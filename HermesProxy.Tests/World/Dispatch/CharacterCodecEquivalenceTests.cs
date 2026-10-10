@@ -139,7 +139,7 @@ public class CharacterCodecEquivalenceTests
         });
 
         var e = new Frozen.CreateCharacter(); e.Read(o);
-        var r = ReaderOver(f); CreateCharacterCodec.Read(ref r, out var a);
+        var r = ReaderOver(f); CreateCharacterCodecPreCataClassic.Read(ref r, out var a);
 
         Assert.Equal(e.CreateInfo.Name, a.CreateInfo.Name);
         Assert.Equal(name, a.CreateInfo.Name);
@@ -152,6 +152,49 @@ public class CharacterCodecEquivalenceTests
         Assert.Equal(e.CreateInfo.Customizations.Count, a.CreateInfo.Customizations.Count);
         Assert.Equal(customizations, a.CreateInfo.Customizations.Count);
         Assert.Equal(o.Remaining(), r.Remaining);
+    }
+
+    /// <summary>
+    /// 4.4.2 adds a fourth flag bit and a TimerunningSeasonID after the customization count; the
+    /// rest must read as on 3.4.3, and the reader must end where the packet does.
+    /// </summary>
+    [Theory]
+    [InlineData("Pally", false, 0)]
+    [InlineData("Pally", true, 3)]
+    public void CreateCharacter_CataClassic_ReadsTheExtraFields(string name, bool hasTemplateSet, int customizations)
+    {
+        var (_, f) = Build(w =>
+        {
+            w.WriteBits((uint)name.Length, 6);
+            w.WriteBit(hasTemplateSet);
+            w.WriteBit(false);                  // IsTrialBoost
+            w.WriteBit(true);                   // UseNPE
+            w.WriteBit(true);                   // HardcoreSelfFound
+            w.WriteUInt8((byte)Race.Draenei);
+            w.WriteUInt8((byte)Class.Paladin);
+            w.WriteUInt8((byte)Gender.Female);
+            w.WriteUInt32((uint)customizations);
+            w.WriteInt32(5);                    // TimerunningSeasonID
+            w.WriteString(name);
+            if (hasTemplateSet)
+                w.WriteUInt32(77);
+            for (int i = 0; i < customizations; i++)
+            {
+                w.WriteUInt32((uint)(1000 + i));
+                w.WriteUInt32((uint)(2000 + i));
+            }
+        });
+
+        var r = ReaderOver(f); CreateCharacterCodecCataClassic.Read(ref r, out var a);
+
+        Assert.Equal(name, a.CreateInfo.Name);
+        Assert.Equal(Race.Draenei, a.CreateInfo.RaceId);
+        Assert.Equal(Class.Paladin, a.CreateInfo.ClassId);
+        Assert.Equal(Gender.Female, a.CreateInfo.Sex);
+        Assert.True(a.CreateInfo.UseNPE);
+        Assert.Equal(hasTemplateSet ? 77u : null, a.CreateInfo.TemplateSet);
+        Assert.Equal(customizations, a.CreateInfo.Customizations.Count);
+        Assert.Equal(0, r.Remaining);
     }
 
     [Fact]

@@ -72,7 +72,8 @@ public static class VersionChecker
                 or ClientVersionBuild.V1_12_2_6005
                 or ClientVersionBuild.V1_12_3_6141
                 or ClientVersionBuild.V2_4_3_8606
-                or ClientVersionBuild.V3_3_5a_12340 => true,
+                or ClientVersionBuild.V3_3_5a_12340
+                or ClientVersionBuild.V4_3_4_15595 => true,
             _ => false,
         };
 
@@ -427,6 +428,7 @@ public static class LegacyVersion
             ClientVersionBuild.V1_12_1_5875 => typeof(World.Enums.V1_12_1_5875.ResponseCodes),
             ClientVersionBuild.V2_4_3_8606 => typeof(World.Enums.V2_4_3_8606.ResponseCodes),
             ClientVersionBuild.V3_3_5a_12340 => typeof(World.Enums.V3_3_5a_12340.ResponseCodes),
+            ClientVersionBuild.V4_3_4_15595 => typeof(World.Enums.V4_3_4_15595.ResponseCodes),
             _ => null,
         };
 
