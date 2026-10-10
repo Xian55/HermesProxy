@@ -52,11 +52,25 @@ public static class ArenaSystem
         }
     }
 
+    // 3.4.3 names the query CMSG_QUERY_ARENA_TEAM; the inspect frame sends it for each team of the
+    // inspected player once the season info says arenas use teams.
     [HandlesCmsg(Opcode.CMSG_ARENA_TEAM_QUERY)]
+    [HandlesCmsg(Opcode.CMSG_QUERY_ARENA_TEAM)]
     public static void HandleArenaTeamQuery(in ArenaTeamQuery arena, in SessionContext ctx)
     {
         ArenaTeamData? team;
-        if (ctx.GetSession().GameState.ArenaTeams.TryGetValue(arena.TeamId, out team))
+        if (!ctx.GetSession().GameState.ArenaTeams.TryGetValue(arena.TeamId, out team) || team.Name is null)
+        {
+            // Another player's team, or one known only from its stats: only the server has the
+            // name and emblem. HandleArenaTeamQueryResponse caches the answer and passes it on.
+            if (PvpWire.IsV343 && LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
+            {
+                WorldPacket packet = new WorldPacket(Opcode.CMSG_ARENA_TEAM_QUERY);
+                packet.WriteUInt32(arena.TeamId);
+                ctx.SendPacketToServer(packet);
+            }
+        }
+        else
         {
             ArenaTeamQueryResponse response = new ArenaTeamQueryResponse();
             response.TeamId = arena.TeamId;

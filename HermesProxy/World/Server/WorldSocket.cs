@@ -1427,6 +1427,8 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             seasonInfo.CurrentSeason = 2;
             seasonInfo.PreviousSeason = 1;
         }
+        // TBC and WotLK servers rate arenas by team.
+        seasonInfo.CurrentArenaSeasonUsesTeams = LegacyVersion.ExpansionVersion > 1;
         return seasonInfo;
     }
 

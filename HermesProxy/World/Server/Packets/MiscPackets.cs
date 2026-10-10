@@ -1218,6 +1218,7 @@ public class SeasonInfo : ServerPacket, ISpanWritable
             _worldPacket.WriteInt32(ConquestWeeklyProgressCurrencyID);
             _worldPacket.WriteInt32(PvpSeasonID);
             _worldPacket.WriteBit(WeeklyRewardChestsEnabled);
+            _worldPacket.WriteBit(CurrentArenaSeasonUsesTeams);
             _worldPacket.FlushBits();
             return;
         }
@@ -1247,6 +1248,7 @@ public class SeasonInfo : ServerPacket, ISpanWritable
             writer.WriteInt32(ConquestWeeklyProgressCurrencyID);
             writer.WriteInt32(PvpSeasonID);
             writer.WriteBit(WeeklyRewardChestsEnabled);
+            writer.WriteBit(CurrentArenaSeasonUsesTeams);
             writer.FlushBits();
             return writer.Position;
         }
@@ -1269,6 +1271,10 @@ public class SeasonInfo : ServerPacket, ISpanWritable
     public int PvpSeasonID;
     public int ConquestWeeklyProgressCurrencyID;
     public bool WeeklyRewardChestsEnabled;
+    /// <summary>V3_4_3 only - the second flag bit. The client's arena UI follows it: with it set the
+    /// PvP and inspect frames show arena teams, as on a 3.3.5a server; clear, they show solo
+    /// brackets, which a team-based server never fills.</summary>
+    public bool CurrentArenaSeasonUsesTeams;
 }
 
 public class InvalidatePlayer : ServerPacket, ISpanWritable

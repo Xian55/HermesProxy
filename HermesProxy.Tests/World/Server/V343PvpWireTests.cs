@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using Framework.IO;
 using HermesProxy.World;
 using HermesProxy.World.Server.Packets;
@@ -24,6 +25,9 @@ namespace HermesProxy.Tests.World.Server;
 [Collection("V343ValuesFilter")]
 public class V343PvpWireTests
 {
+    private static readonly PropertyInfo WorldPacketField =
+        typeof(ServerPacket).GetProperty("_worldPacket", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
     private static byte[] SpanBytes(ServerPacket packet)
     {
         var spanWritable = (ISpanWritable)packet;
@@ -67,6 +71,34 @@ public class V343PvpWireTests
 
             Assert.Equal(25, expected.Length);
             Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(SpanBytes(packet)));
+        }
+        finally
+        {
+            PvpWire.ForceV343ForTests = null;
+        }
+    }
+
+    /// <summary>
+    /// The second flag bit is "the current arena season uses teams": the 3.4.3 client's PvP and
+    /// inspect frames follow it. Left clear, they showed solo brackets that a team-based 3.3.5a
+    /// server never fills, so an inspected player's arena slots were always empty.
+    /// </summary>
+    [Theory]
+    [InlineData(true, "40")]
+    [InlineData(false, "00")]
+    public void SeasonInfo_OnV343_SendsUsesTeamsAsTheSecondBit(bool v343, string flags)
+    {
+        PvpWire.ForceV343ForTests = v343;
+        try
+        {
+            var packet = new SeasonInfo { CurrentArenaSeasonUsesTeams = true };
+
+            string viaSpan = Convert.ToHexString(SpanBytes(packet));
+            packet.Write();
+            string viaWrite = Convert.ToHexString(((WorldPacket)WorldPacketField.GetValue(packet)!).GetData());
+
+            Assert.EndsWith(flags, viaSpan);
+            Assert.Equal(viaSpan, viaWrite);
         }
         finally
         {
