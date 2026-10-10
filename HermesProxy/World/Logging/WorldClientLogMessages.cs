@@ -302,4 +302,34 @@ internal static partial class WorldClientLogMessages
         string SourceFile,
         string NetDir,
         uint PetNumber);
+
+    [LoggerMessage(
+        EventId = 225,
+        Level = LogLevel.Error,
+        Message = "Legacy world server opened with an unexpected connection greeting (size {Size}). Dropping the connection.")]
+    public static partial void UnexpectedConnectionGreeting(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        ushort Size);
+
+    [LoggerMessage(
+        EventId = 226,
+        Level = LogLevel.Error,
+        Message = "Compressed legacy packet (opcode={OpcodeId}) claims {InflatedSize} bytes inflated; dropping the connection rather than reading a desynced stream.")]
+    public static partial void BadCompressedPacket(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        ushort OpcodeId,
+        uint InflatedSize);
+
+    [LoggerMessage(
+        EventId = 227,
+        Level = LogLevel.Error,
+        Message = "The auth client was torn down before world auth; cannot sign CMSG_AUTH_SESSION.")]
+    public static partial void AuthClientGoneBeforeWorldAuth(
+        ILogger logger,
+        string SourceFile,
+        string NetDir);
 }

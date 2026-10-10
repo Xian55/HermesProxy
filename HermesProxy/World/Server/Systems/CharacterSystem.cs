@@ -245,7 +245,11 @@ public static class CharacterSystem
         ctx.ToClient.BeginInstanceConnect();
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PLAYER_LOGIN);
-        packet.WriteGuid(playerLogin.Guid.To64());
+        // 4.3.4 masks the GUID (TrinityCore 4.3.4 PlayerLogin::Read).
+        if (LegacyVersion.ExpansionVersion >= 4)
+            MaskedGuid.Write(packet, playerLogin.Guid.To64().Low, [2, 3, 0, 6, 4, 5, 1, 7], [2, 7, 0, 3, 5, 6, 1, 4]);
+        else
+            packet.WriteGuid(playerLogin.Guid.To64());
         ctx.SendPacketToServer(packet);
     }
 

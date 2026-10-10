@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
@@ -57,6 +58,8 @@ public partial class WorldClient
     string _username = null!;
     Realm _realm = null!;
     LegacyWorldCrypt _worldCrypt = null!;
+    // 4.x servers compress through one zlib stream per connection; see LegacyStreamInflater.
+    LegacyStreamInflater? _inflater;
     GlobalSessionData _globalSession = null!;
     // Built alongside _globalSession in ConnectToWorldServer; the ctor runs before a session exists.
     SessionContext _sessionContext;
@@ -112,6 +115,8 @@ public partial class WorldClient
     public bool ConnectToWorldServer(Realm realm, GlobalSessionData globalSession)
     {
         _worldCrypt = null!;
+        _inflater?.Dispose();
+        _inflater = IsCataLegacy ? new LegacyStreamInflater() : null;
         _realm = realm;
         _globalSession = globalSession;
         _sessionContext = new SessionContext(globalSession, globalSession.RealmSocket, this);
@@ -188,6 +193,7 @@ public partial class WorldClient
                 _worldCrypt = new TbcWorldCrypt();
                 break;
             case ClientVersionBuild.V3_3_5a_12340:
+            case ClientVersionBuild.V4_3_4_15595:   // same ARC4 header keys (TrinityCore 4.3.4 WorldPacketCrypt)
                 _worldCrypt = new WotlkWorldCrypt();
                 break;
         }
@@ -295,6 +301,12 @@ public partial class WorldClient
     {
         try
         {
+            if (IsCataLegacy && !await ExchangeConnectionGreeting())
+            {
+                HandleDisconnect("greeting");
+                return;
+            }
+
             while (true)
             {
                 // Explicit length: _headerBuffer is sized for the 5-byte large form, so an
@@ -369,6 +381,20 @@ public partial class WorldClient
                         return;
                     }
 
+                    if (_inflater != null && (header.Opcode & CompressedOpcodeFlag) != 0)
+                    {
+                        byte[]? inflated = InflatePacket(buffer, (int)packetSize, header.Opcode, out int inflatedSize);
+                        if (inflated == null)
+                        {
+                            HandleDisconnect("compressed payload");
+                            return;
+                        }
+
+                        ArrayPool<byte>.Shared.Return(buffer);
+                        buffer = inflated;
+                        packetSize = (uint)inflatedSize;
+                    }
+
                     WorldPacket packet = new WorldPacket(buffer, (int)packetSize, isPooled: true);
                     packetOwnsBuffer = true;
                     packet.SetReceiveTime(Environment.TickCount);
@@ -395,6 +421,45 @@ public partial class WorldClient
             }
         }
     }
+
+    // A 4.x server marks a compressed packet with this opcode bit; the body is the uint32 size of
+    // the original body, then that body deflated (TrinityCore 4.3.4 WorldPacket::Compress).
+    private const ushort CompressedOpcodeFlag = 0x8000;
+
+    /// <summary>
+    /// Inflates a compressed packet (opcode in the first two bytes, as the receive loop lays it out)
+    /// into a new pooled buffer with the flag cleared, or returns null on a malformed one.
+    /// </summary>
+    private byte[]? InflatePacket(byte[] buffer, int packetSize, ushort opcode, out int inflatedSize)
+    {
+        inflatedSize = 0;
+        const int SizeOffset = sizeof(ushort);
+        if (packetSize < SizeOffset + sizeof(uint))
+            return null;
+
+        uint bodySize = BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(SizeOffset));
+        if (bodySize > MaxInflatedPacketSize)
+        {
+            WorldClientLogMessages.BadCompressedPacket(_melLog, _sourceFile, _netDirRecv, opcode, bodySize);
+            return null;
+        }
+
+        byte[] inflated = ArrayPool<byte>.Shared.Rent(sizeof(ushort) + (int)bodySize);
+        BinaryPrimitives.WriteUInt16LittleEndian(inflated, (ushort)(opcode & ~CompressedOpcodeFlag));
+        int compressedOffset = SizeOffset + sizeof(uint);
+        if (!_inflater!.TryInflate(buffer.AsSpan(compressedOffset, packetSize - compressedOffset), inflated.AsSpan(sizeof(ushort), (int)bodySize)))
+        {
+            ArrayPool<byte>.Shared.Return(inflated);
+            WorldClientLogMessages.BadCompressedPacket(_melLog, _sourceFile, _netDirRecv, opcode, bodySize);
+            return null;
+        }
+
+        inflatedSize = sizeof(ushort) + (int)bodySize;
+        return inflated;
+    }
+
+    // Far above any real packet; a size beyond it is a desynced stream, not a payload to rent for.
+    private const uint MaxInflatedPacketSize = 16 * 1024 * 1024;
 
     // C P>S: Sends data to world server.
     // Wave 2-C send-loop refactor was reverted on this side after a regression: the legacy
@@ -538,10 +603,16 @@ public partial class WorldClient
         switch (universalOpcode)
         {
             case Opcode.SMSG_AUTH_CHALLENGE:
-                HandleAuthChallenge(packet);
+                if (IsCataLegacy)
+                    HandleAuthChallengeCata(packet);
+                else
+                    HandleAuthChallenge(packet);
                 break;
             case Opcode.SMSG_AUTH_RESPONSE:
-                HandleAuthResponse(packet);
+                if (IsCataLegacy)
+                    HandleAuthResponseCata(packet);
+                else
+                    HandleAuthResponse(packet);
                 break;
             case Opcode.SMSG_ADDON_INFO:
                 break; // don't need to handle
@@ -765,7 +836,6 @@ public partial class WorldClient
     private void HandleAuthResponse(WorldPacket packet)
     {
         AuthResult result = (AuthResult)packet.ReadUInt8();
-        LastAuthResult = result;
 
         if (_isSuccessful == null)
         {
@@ -778,6 +848,14 @@ public partial class WorldClient
                 byte expansion = packet.ReadUInt8();
             }
         }
+
+        uint queuePosition = result == AuthResult.AUTH_WAIT_QUEUE ? packet.ReadUInt32() : 0;
+        ApplyAuthResult(result, queuePosition);
+    }
+
+    private void ApplyAuthResult(AuthResult result, uint queuePosition)
+    {
+        LastAuthResult = result;
 
         if (result == AuthResult.AUTH_OK)
         {
@@ -792,7 +870,7 @@ public partial class WorldClient
         }
         else if (result == AuthResult.AUTH_WAIT_QUEUE)
         {
-            _queuePosition = packet.ReadUInt32();
+            _queuePosition = queuePosition;
             WorldClientLogMessages.QueuePosition(_melNet, _sourceFile, _netDirNone, _queuePosition);
             if (_isSuccessful != null && GetSession().RealmSocket != null)
                 GetSession().RealmSocket.SendAuthWaitQue(_queuePosition);
