@@ -1,0 +1,5 @@
+Message_lang,Pos_0,Pos_1,Pos_2,ID,ContinentID,PhaseUseFlags,PhaseID,PhaseGroupID,Radius,Box_length,Box_width,Box_height,Box_yaw,ShapeType,ShapeID,AreaTriggerActionSetID,Flags,Comment
+,-247.677,895.675,84.362,4356,530,0,0,0,0,72.83,6.6,53.81,0,1,0,26557,0,"Dark Portal Outland->BL. Existing client row relocated onto legacy 4352's DBC box; AreaTriggerReconciliation remaps 4356->4352."
+,-11908.9,-3209.1,-14.79,4354,0,0,0,0,0,3.833,15.47,25.83,3.281,1,0,18443,0,"Dark Portal BL->Outland. New row - map 0 has no Dark Portal trigger in ANY Classic build. Real 3.3.5a DBC box; excludes the arrival pad at (-11896.8,-3206.77,-14.67)."
+,1539.89,1481.36,352.659,3646,489,0,0,0,5,0,0,0,0,0,0,18443,0,"WSG Silverwing Hold (Alliance flag). New row - absent from 3.4.3. r=5 matches legacy DBC so client-fire and server-accept coincide."
+,918.496,1434.04,346.054,3647,489,0,0,0,5,0,0,0,0,0,0,18443,0,"WSG Warsong Lumber Mill (Horde flag). New row - absent from 3.4.3. r=5 matches legacy DBC."

@@ -22,6 +22,7 @@ Usage
     python scripts/build-csv-from-db2.py --all 3 --build 3.4.3.54261
     python scripts/build-csv-from-db2.py Item3.csv --build 3.4.3.54261
     python scripts/build-csv-from-db2.py --audit --all 3
+    python scripts/build-csv-from-db2.py --all 4 --build 4.4.2.60895
 
 `--audit` builds each file in memory and reports how it differs from what is
 committed, writing nothing.
@@ -52,6 +53,11 @@ The suffix on a CSV is the expansion version, not the build:
     *1.csv -> V1_14  (Classic Era)  e.g. --build 1.14.2.42597
     *2.csv -> V2_5   (TBC Classic)  e.g. --build 2.5.3.41750
     *3.csv -> V3_4_3 (WotLK)        e.g. --build 3.4.3.54261
+    *4.csv -> V4_4_2 (Cataclysm)    e.g. --build 4.4.2.60895
+
+Not every CSV is a DB2 export: CSV/README.md lists each family, where it comes from and how
+it is regenerated. The *4 set's hand-made families are carried from *3 by `carry`, for the
+4.4.2 client in front of a 3.3.5a server.
 """
 
 from __future__ import annotations
@@ -148,8 +154,16 @@ LOADER_TYPES: dict[str, dict[str, str]] = {
     "ItemAppearance3.csv": {"DisplayType": "byte"},
 }
 
-# The TBC file uses the same loader field types as the WotLK one.
+# The TBC and Cataclysm Classic files go through the same loaders as the WotLK ones.
 LOADER_TYPES["ItemSparse2.csv"] = LOADER_TYPES["ItemSparse3.csv"]
+for _family in ("ItemSparse", "ItemEffect", "Item", "ItemAppearance"):
+    LOADER_TYPES[f"{_family}4.csv"] = LOADER_TYPES[f"{_family}3.csv"]
+# LoadItemEffectHotfixes reads TriggerType as a byte where LoadItemEffect reads an sbyte, and 4.4.2
+# is the first export with a TriggerType of -1 in it.
+LOADER_TYPES["Hotfix/ItemEffect4.csv"] = {
+    "LegacySlotIndex": "byte", "TriggerType": "byte", "Charges": "short",
+    "SpellCategoryID": "short", "ChrSpecializationID": "short",
+}
 
 INT_WIDTHS = {"sbyte": (8, True), "byte": (8, False), "short": (16, True), "ushort": (16, False),
               "uint": (32, False), "ulong": (64, False)}
@@ -248,6 +262,7 @@ class Recipe:
     where    row predicate, applied to the source row.
     dedupe   our-header whose duplicates collapse, last row winning.
     builder  full override, receives the resolved build and returns rows.
+    raw      the builder returns the header and rows as text lines, written as they are.
     """
 
     source: str | None = None
@@ -256,7 +271,8 @@ class Recipe:
     quote_all: bool = False
     where: Callable[[dict[str, str]], bool] | None = None
     dedupe: str | None = None
-    builder: Callable[[str], tuple[list[str], list[list[str]]]] | None = None
+    builder: Callable[[str], tuple] | None = None
+    raw: bool = False
     note: str = ""
 
     def header(self) -> list[str]:
@@ -514,6 +530,119 @@ RECIPES: dict[str, Recipe] = {
 }
 
 
+CRLF = chr(13) + chr(10)
+
+
+def committed_header(relative: str) -> list[str]:
+    """The header of a committed CSV, so a regeneration keeps its column order exactly."""
+    with open(CSV_DIR / relative, encoding="utf-8-sig", newline="") as f:
+        return next(csv.reader(f))
+
+
+def carry(relative: str, checks: Sequence[tuple[str, str, str]] = ()):
+    """The rows of a hand-made file, carried to another client build unchanged.
+
+    For the 4.4.2 client in front of a 3.3.5a server: what these files hold about the server
+    still holds, but a column naming something in the client's own tables may not. Each check
+    is (our column, wago table, its column); a row whose value is not in that table at the
+    build is dropped and reported. Rows are copied as text, comments and quoting included.
+    """
+
+    def builder(build: str) -> tuple[str, list[str]]:
+        lines = (CSV_DIR / relative).read_text(encoding="utf-8-sig").splitlines()
+        header, body = lines[0], [line for line in lines[1:] if line]
+        columns = next(csv.reader([header]))
+        for column, table, source_column in checks:
+            known = {r[source_column] for r in read_csv(fetch_client_csv(table, build))}
+            index = columns.index(column)
+            kept = []
+            for line in body:
+                value = next(csv.reader([line]))[index]
+                if value in known:
+                    kept.append(line)
+                else:
+                    print(f"    {relative}: dropped {column}={value}, not in {table}.{source_column} "
+                          f"at {build}", file=sys.stderr)
+            body = kept
+        return header, body
+
+    return builder
+
+
+# Hotfix/ files the loaders read as client data. The verbatim ones keep the committed header;
+# BattlePetSpecies, Mount and SpellVisualMissile are projections of one table.
+HOTFIX_EXPORTS: dict[str, Recipe] = {
+    "GlyphProperties": Recipe(source="GlyphProperties", columns=committed_header("Hotfix/GlyphProperties3.csv")),
+    "Heirloom": Recipe(source="Heirloom", columns=committed_header("Hotfix/Heirloom3.csv")),
+    "Toy": Recipe(source="Toy", columns=committed_header("Hotfix/Toy3.csv")),
+    "SpellXSpellVisual": Recipe(source="SpellXSpellVisual",
+                                columns=committed_header("Hotfix/SpellXSpellVisual3.csv")),
+    "ItemEffect": Recipe(source="ItemEffect", columns=committed_header("Hotfix/ItemEffect3.csv")),
+    "BattlePetSpecies": Recipe(
+        source="BattlePetSpecies",
+        columns=[("SpeciesId", "ID"), ("SummonSpellId", "SummonSpellID"), ("CreatureId", "CreatureID"),
+                 "Flags"],
+        # The loader keys species by their summon spell.
+        where=lambda r: r["SummonSpellID"] not in ("", "0"),
+    ),
+    "Mount": Recipe(
+        source="Mount",
+        columns=[("SourceSpellId", "SourceSpellID")],
+        where=lambda r: r["SourceSpellID"] not in ("", "0"),
+    ),
+    "SpellVisualMissile": Recipe(
+        source="SpellVisual",
+        columns=["ID"],
+        # The SpellVisual ids that fly a missile, which LoadSpellVisualMissileFlags reads.
+        where=lambda r: r["HasMissile"] not in ("", "0"),
+    ),
+}
+
+# Cataclysm Classic, built with --build 4.4.2.60895. The legacy-keyed families (AuraSpells,
+# CreatureModelCollisionHeightsModern and the like, see CSV/README.md) follow the server's
+# expansion and stay *3 while the server is 3.3.5a, so they have no *4 here.
+RECIPES.update({
+    "Item4.csv": RECIPES["Item3.csv"],
+    "ItemSparse4.csv": RECIPES["ItemSparse3.csv"],
+    "ItemAppearance4.csv": RECIPES["ItemAppearance3.csv"],
+    "ItemModifiedAppearance4.csv": RECIPES["ItemModifiedAppearance3.csv"],
+    "ItemEnchantVisuals4.csv": RECIPES["ItemEnchantVisuals3.csv"],
+    "QuestV2_4.csv": RECIPES["QuestV2_3.csv"],
+    "TaxiNodes4.csv": RECIPES["TaxiNodes3.csv"],
+    "TaxiPath4.csv": RECIPES["TaxiPath3.csv"],
+    "TaxiPathNode4.csv": RECIPES["TaxiPathNode3.csv"],
+    "MapDifficulty4.csv": RECIPES["MapDifficulty3.csv"],
+    # The *3 recipes read these from committed 3.4.3 exports; for 4.4.2 they come from wago.
+    "ItemEffect4.csv": Recipe(source="ItemEffect", columns=RECIPES["ItemEffect3.csv"].columns),
+    "SpellVisuals4.csv": Recipe(
+        source="SpellXSpellVisual",
+        columns=[("SpellId", "SpellID"), ("SpellXSpellVisualId", "ID")],
+        dedupe="SpellId",
+    ),
+    # The id set is ItemSpellsData3's (curated, see build_item_spells_data); the values are 4.4.2's.
+    "ItemSpellsData4.csv": RECIPES["ItemSpellsData3.csv"],
+    # Keyed by the server's display ids: the *3 rows carry over, keys the 4.4.2 Item table
+    # resolves are added.
+    "ItemDisplayIdToFileDataId4.csv": RECIPES["ItemDisplayIdToFileDataId3.csv"],
+    **{f"Hotfix/{name}4.csv": recipe for name, recipe in HOTFIX_EXPORTS.items()},
+    # Hand-made families, carried for the 3.3.5a-backed test bed.
+    "ItemIdToDisplayId4.csv": Recipe(builder=carry("ItemIdToDisplayId3.csv"), raw=True),
+    "MeleeSpells4.csv": Recipe(builder=carry("MeleeSpells3.csv"), raw=True),
+    "AutoRepeatSpells4.csv": Recipe(builder=carry("AutoRepeatSpells3.csv"), raw=True),
+    "AreaTriggerProximity4.csv": Recipe(builder=carry("AreaTriggerProximity3.csv"), raw=True),
+    "Gems4.csv": Recipe(builder=carry("Gems3.csv", [("ItemId", "Item", "ID")]), raw=True),
+    "AreaTriggerRemap4.csv": Recipe(
+        builder=carry("AreaTriggerRemap3.csv", [("ModernId", "AreaTrigger", "ID")]), raw=True),
+    "AuraSpellRemap4.csv": Recipe(
+        builder=carry("AuraSpellRemap3.csv", [("ModernId", "SpellName", "ID")]), raw=True),
+    "CurrencyTypes4.csv": Recipe(
+        builder=carry("CurrencyTypes3.csv", [("CurrencyId", "CurrencyTypes", "ID")]), raw=True),
+    "WorldMapAreaIDToUiMapID4.csv": Recipe(
+        builder=carry("WorldMapAreaIDToUiMapID3.csv", [("UiMapID", "UiMap", "ID")]), raw=True),
+    "Hotfix/AreaTrigger4.csv": Recipe(builder=carry("Hotfix/AreaTrigger3.csv"), raw=True),
+})
+
+
 # --------------------------------------------------------------------- building
 
 
@@ -630,7 +759,10 @@ def main() -> int:
             failures += 1
             continue
 
-        rendered = render(header, rows, recipe.quote_all)
+        if recipe.raw:
+            rendered = CRLF.join([header, *rows]) + CRLF
+        else:
+            rendered = render(header, rows, recipe.quote_all)
         target = CSV_DIR / name
         if args.audit:
             print(audit(name, rendered, target))

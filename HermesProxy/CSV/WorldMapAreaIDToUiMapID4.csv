@@ -1,0 +1,97 @@
+WorldMapAreaID,UiMapID,QuestAgreement,Name
+4,1411,485/486,Durotar
+9,1412,373/374,Mulgore
+11,1413,278/278,The Barrens
+16,1417,178/178,Arathi Highlands
+17,1418,130/130,Badlands
+19,1419,107/107,Blasted Lands
+20,1420,384/392,Tirisfal Glades
+21,1421,150/150,Silverpine Forest
+22,1422,189/189,Western Plaguelands
+23,1423,502/502,Eastern Plaguelands
+24,1424,186/186,Hillsbrad Foothills
+26,1425,150/150,The Hinterlands
+27,1426,475/476,Dun Morogh
+28,1427,123/124,Searing Gorge
+29,1428,110/110,Burning Steppes
+30,1429,584/588,Elwynn Forest
+32,1430,42/42,Deadwind Pass
+34,1431,121/121,Duskwood
+35,1432,161/161,Loch Modan
+36,1433,122/122,Redridge Mountains
+37,1434,360/360,Stranglethorn Vale
+38,1435,116/116,Swamp of Sorrows
+39,1436,204/204,Westfall
+40,1437,117/117,Wetlands
+41,1438,396/396,Teldrassil
+42,1439,195/195,Darkshore
+43,1440,305/305,Ashenvale
+61,1441,125/128,Thousand Needles
+81,1442,138/138,Stonetalon Mountains
+101,1443,160/160,Desolace
+121,1444,195/195,Feralas
+141,1445,264/264,Dustwallow Marsh
+161,1446,275/276,Tanaris
+181,1447,164/164,Azshara
+182,1448,144/144,Felwood
+201,1449,149/149,Un'Goro Crater
+241,1450,63/63,Moonglade
+261,1451,341/341,Silithus
+281,1452,232/232,Winterspring
+301,1453,66/66,Stormwind City
+321,1454,174/174,Orgrimmar
+341,1455,75/75,Ironforge
+362,1456,10/10,Thunder Bluff
+381,1457,14/14,Darnassus
+382,1458,34/34,Undercity
+401,1459,81/81,Alterac Valley
+443,1460,1/1,Warsong Gulch
+461,1461,38/38,Arathi Basin
+462,1941,295/298,Eversong Woods
+463,1942,211/211,Ghostlands
+464,1943,349/349,Azuremyst Isle
+465,1944,590/590,Hellfire Peninsula
+467,1946,301/301,Zangarmarsh
+471,1947,7/7,The Exodar
+473,1948,446/446,Shadowmoon Valley
+475,1949,372/372,Blade's Edge Mountains
+476,1950,200/200,Bloodmyst Isle
+477,1951,390/390,Nagrand
+478,1952,721/721,Terokkar Forest
+479,1953,381/381,Netherstorm
+480,1954,4/4,Silvermoon City
+481,1955,25/25,Shattrath City
+486,114,569/569,Borean Tundra
+488,115,560/560,Dragonblight
+490,116,521/521,Grizzly Hills
+491,117,503/503,Howling Fjord
+492,118,687/687,Icecrown
+493,119,288/288,Sholazar Basin
+495,120,328/328,The Storm Peaks
+496,121,342/342,Zul'Drak
+499,1957,98/98,Isle of Quel'Danas
+501,123,165/165,Wintergrasp
+502,124,103/103,Plaguelands: The Scarlet Enclave
+504,125,71/79,Dalaran
+510,127,164/166,Crystalsong Forest
+520,129,7/7,The Nexus
+521,130,5/7,The Culling of Stratholme
+522,132,17/17,Ahn'kahet: The Old Kingdom
+523,133,13/15,Utgarde Keep
+524,137,3/5,Utgarde Pinnacle
+525,138,3/5,Halls of Lightning
+526,140,3/3,Halls of Stone
+527,141,3/3,The Eye of Eternity
+528,142,8/11,The Oculus
+529,148,18/31,Ulduar
+530,154,6/7,Gundrak
+531,155,1/1,The Obsidian Sanctum
+533,157,2/4,Azjol-Nerub
+534,160,7/8,Drak'Tharon Keep
+535,162,6/13,Naxxramas
+536,168,1/1,The Violet Hold
+541,170,253/260,Hrothgar's Landing
+601,183,8/8,The Forge of Souls
+602,184,30/30,Pit of Saron
+603,185,12/12,Halls of Reflection
+604,186,47/84,Icecrown Citadel

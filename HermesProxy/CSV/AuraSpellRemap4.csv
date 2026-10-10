@@ -1,0 +1,3 @@
+LegacyId,ModernId,Comment
+48110,41635,"Prayer of Mending aura applied by the rank 2 cast (48112). Classic applies 41635 for every rank and left 48110 on aura type 225, which its engine reads as SPELL_AURA_MOD_VISIBILITY_RANGE: the carrier sees no other unit and others stop seeing the carrier. Issue #330."
+48111,41635,"Prayer of Mending aura applied by the rank 3 cast (48113). Same as 48110. The rank 1 cast (33076) applies 41635 on both sides and needs no row. Issue #330."
