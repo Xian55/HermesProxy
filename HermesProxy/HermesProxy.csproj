@@ -132,7 +132,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="CSV\*.*">
+    <!-- README.md catalogues the files; it is not data. -->
+    <Content Include="CSV\*.*" Exclude="CSV\*.md">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Content>

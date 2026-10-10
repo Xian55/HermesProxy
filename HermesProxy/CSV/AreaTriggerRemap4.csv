@@ -1,0 +1,4 @@
+ModernId,LegacyId,Comment
+4356,4352,"Dark Portal Outland->Blasted Lands. Legacy id is 4352 (""Dark Portal - E. Kingdoms Target""), NOT 4524 which public sniffs and the modern DB2 use."
+4628,3646,"Warsong Gulch, Silverwing Hold (Alliance flag room). 3.3.5a BattlegroundWS::HandleAreaTrigger switches on 3646 and no-ops the modern 4628."
+4629,3647,"Warsong Gulch, Warsong Lumber Mill (Horde flag room). Legacy cores gate capture on 3647 and no-op the modern 4629."

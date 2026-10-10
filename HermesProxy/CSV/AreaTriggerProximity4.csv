@@ -1,0 +1,5 @@
+LegacyId,MapId,X,Y,Z,Radius,Comment
+4476,566,2048.48,1393.60,1194.54,3.0,"Eye of the Storm, Blood Elf Tower. AT_BLOOD_ELF_POINT."
+4514,566,2044.00,1729.73,1190.03,3.0,"Eye of the Storm, Fel Reaver Ruins. AT_FEL_REAVER_POINT. AzerothCore already force-fires this one from its own proximity poll; the other three towers have no such workaround."
+4516,566,2284.78,1731.12,1190.08,3.0,"Eye of the Storm, Mage Tower. AT_MAGE_TOWER_POINT."
+4518,566,2286.56,1402.36,1197.29,3.0,"Eye of the Storm, Draenei Ruins. AT_DRAENEI_RUINS_POINT."
