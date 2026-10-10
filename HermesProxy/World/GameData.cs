@@ -55,6 +55,10 @@ public static partial class GameData
     // which a native server reports as difficulty 0 with a group size of 0.
     public static FrozenDictionary<uint, (uint DifficultyId, uint MaxPlayers)> DefaultInstanceDifficulty
         = FrozenDictionary<uint, (uint DifficultyId, uint MaxPlayers)>.Empty;
+    // Every (map, difficulty) row of the same file with its MaxPlayers, to tell whether an instance
+    // has the heroic or 25-player difficulty the legacy server put the player in.
+    public static FrozenDictionary<(uint MapId, uint DifficultyId), uint> InstanceDifficultySizes
+        = FrozenDictionary<(uint MapId, uint DifficultyId), uint>.Empty;
 
     /// Every currency the modern client can display on this build, keyed by currency id.
     public static FrozenDictionary<uint, CurrencyTypeRecord> CurrencyTypeStore
@@ -1335,7 +1339,20 @@ public static partial class GameData
     {
         var path = Path.Combine("CSV", $"MapDifficulty{ModernVersion.ExpansionVersion}.csv");
         if (File.Exists(path))
+        {
             DefaultInstanceDifficulty = ParseMapDifficulties(path);
+            InstanceDifficultySizes = ParseMapDifficultySizes(path);
+        }
+    }
+
+    public static FrozenDictionary<(uint MapId, uint DifficultyId), uint> ParseMapDifficultySizes(string path)
+    {
+        using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+        var dict = new Dictionary<(uint MapId, uint DifficultyId), uint>(EstimateRowCount(path, 10));
+
+        foreach (var row in reader)
+            dict[(uint.Parse(row[0].Span), uint.Parse(row[1].Span))] = uint.Parse(row[2].Span);
+        return dict.ToFrozenDictionary();
     }
 
     public static FrozenDictionary<uint, (uint DifficultyId, uint MaxPlayers)> ParseMapDifficulties(string path)
@@ -1348,8 +1365,8 @@ public static partial class GameData
             uint mapId = uint.Parse(row[0].Span);
             uint difficultyId = uint.Parse(row[1].Span);
             uint maxPlayers = uint.Parse(row[2].Span);
-            // Until the proxy follows the legacy server's heroic and 25-player choice, an
-            // instance is reported at its first difficulty: normal, or 10-player for a raid.
+            // An instance starts out reported at its first difficulty: normal, or 10-player for a
+            // raid. SMSG_INSTANCE_DIFFICULTY then corrects it for heroic and 25-player instances.
             if (!dict.TryGetValue(mapId, out var known) || difficultyId < known.DifficultyId)
                 dict[mapId] = (difficultyId, maxPlayers);
         }

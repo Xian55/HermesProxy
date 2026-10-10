@@ -29,6 +29,24 @@ public partial class WorldClient
         SendPacketToClient(pending);
     }
 
+    /// <summary>
+    /// The difficulty the legacy server put the player's instance in, sent on login and on every
+    /// map change after the new-world packet. The world server info already sent for the map
+    /// carried its first difficulty, so a heroic or 25-player instance showed as normal or
+    /// 10-player; a second one corrects it, as a native 3.4.3 server reports the instance's own
+    /// difficulty at this point.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_INSTANCE_DIFFICULTY)]
+    internal void HandleInstanceDifficulty(WorldPacket packet)
+    {
+        uint difficulty = packet.ReadUInt32();
+        uint? mapId = GetSession().GameState.CurrentMapId;
+        if (difficulty == 0 || mapId is null || !WorldServerInfo.FollowsInstanceDifficulty)
+            return;
+
+        SendPacketToClient(WorldServerInfo.ForMap(mapId.Value, difficulty));
+    }
+
     [HandlesSmsg(Opcode.SMSG_UPDATE_INSTANCE_OWNERSHIP)]
     internal void HandleUpdateInstanceOwnership(WorldPacket packet)
     {

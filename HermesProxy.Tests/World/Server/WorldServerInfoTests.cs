@@ -135,6 +135,38 @@ public class WorldServerInfoTests
     }
 
     [Theory]
+    // Heroic Forge of Souls: AzerothCore sent difficulty 1 and the client was told normal (1).
+    [InlineData(632u, 1u, 2u, 5u)]
+    [InlineData(632u, 0u, 1u, 5u)]
+    [InlineData(631u, 1u, 4u, 25u)]  // Icecrown Citadel 25
+    [InlineData(631u, 2u, 5u, 10u)]  // 10 heroic
+    [InlineData(631u, 3u, 6u, 25u)]  // 25 heroic
+    [InlineData(249u, 1u, 4u, 25u)]  // Onyxia's Lair 25
+    // No heroic or 25-player row in the client's data: the first difficulty stays.
+    [InlineData(36u, 1u, 1u, 5u)]
+    [InlineData(409u, 1u, 9u, 40u)]
+    [InlineData(571u, 1u, 0u, 0u)]
+    public void ForMap_OnV343_FollowsTheServersInstanceDifficulty(uint mapId, uint legacyDifficulty, uint difficulty, uint groupSize)
+    {
+        var (defaults, sizes) = (GameData.DefaultInstanceDifficulty, GameData.InstanceDifficultySizes);
+        GameData.DefaultInstanceDifficulty = ShippedDifficulties;
+        GameData.InstanceDifficultySizes = GameData.ParseMapDifficultySizes(Path.Combine("CSV", "MapDifficulty3.csv"));
+        WorldServerInfo.ForceV343ForTests = true;
+        try
+        {
+            var info = WorldServerInfo.ForMap(mapId, legacyDifficulty);
+
+            Assert.Equal(difficulty, info.DifficultyID);
+            Assert.Equal(groupSize, info.InstanceGroupSize);
+        }
+        finally
+        {
+            WorldServerInfo.ForceV343ForTests = null;
+            (GameData.DefaultInstanceDifficulty, GameData.InstanceDifficultySizes) = (defaults, sizes);
+        }
+    }
+
+    [Theory]
     [InlineData(0u, 0u, null)]
     [InlineData(1u, 0u, null)]
     [InlineData(571u, 1u, 5u)]
