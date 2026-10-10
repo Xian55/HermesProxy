@@ -196,7 +196,7 @@ public partial class WorldClient
     internal void HandleAuctionBidderNotification(WorldPacket packet)
     {
         AuctionBidderNotification info = new AuctionBidderNotification();
-        uint auctionHouseId = packet.ReadUInt32();
+        info.AuctionHouseID = packet.ReadUInt32();
         info.AuctionID = packet.ReadUInt32();
         info.Bidder = packet.ReadGuid().To128(GetSession().GameState);
         uint bidAmount = packet.ReadUInt32();
