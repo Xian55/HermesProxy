@@ -1097,7 +1097,7 @@ Every server-to-client opcode of the client, with its 3.3.5a counterpart where H
 | — | 0x2a35 | 10805 | — | LFG | variable | — |
 | SMSG_LFG_PARTY_INFO | 0x2a36 | 10806 | 882 (0x372) | LFG | variable | matches |
 | SMSG_LFG_PLAYER_INFO | 0x2a37 | 10807 | 879 (0x36f) | LFG | variable | matches |
-| SMSG_LFG_PLAYER_REWARD | 0x2a38 | 10808 | 511 (0x1ff) | LFG | variable | differs (#364) |
+| SMSG_LFG_PLAYER_REWARD | 0x2a38 | 10808 | 511 (0x1ff) | LFG | variable | matches; see #364 |
 | SMSG_ROLE_CHOSEN | 0x2a39 | 10809 | — | LFG | fixed, 2 bytes | matches |
 | — | 0x2a3a | 10810 | — | LFG | fixed, 1 bytes | — |
 | — | 0x2a3b | 10811 | — | LFG | fixed, 17 bytes | — |

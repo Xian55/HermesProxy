@@ -173,7 +173,7 @@
 
 - Modern: 10808 (0x2a38) · 3.3.5a: 511 (0x1ff) · Area: LFG
 - Layout: `{ u32*5 loop[ u8 opt[ { u32*3 u8*2 loop[ u32 u8 ] opt[ u8 u32 loop[ u32 ] ] } ] u32*2 opt[ u32 ] ] }`
-- HermesProxy: `LFGPlayerReward` — differs (#364)
+- HermesProxy: `LFGPlayerReward` — matches; see #364
 
 ### SMSG_ROLE_CHOSEN (0x2a39)
 
