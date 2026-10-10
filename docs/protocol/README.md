@@ -5,6 +5,7 @@ proxy's writers and codecs compare.
 
 | Build | Reference |
 |---|---|
+| Cataclysm Classic 4.4.2.60895 | [4.4.2.60895/](4.4.2.60895/README.md) (not served by HermesProxy) |
 | WotLK Classic 3.4.3.54261 | [3.4.3.54261/](3.4.3.54261/README.md) |
 | TBC Classic 2.5.3.42328 | [2.5.3.42328/](2.5.3.42328/README.md) |
 | TBC Classic 2.5.2.40892 | [2.5.2.40892/](2.5.2.40892/README.md) |
