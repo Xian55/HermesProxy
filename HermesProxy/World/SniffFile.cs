@@ -1,15 +1,20 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using Framework.Logging;
 
 namespace HermesProxy.World;
 
-public sealed class SniffFile
+/// <summary>
+/// A per-session .pkt capture that WowPacketParser reads.
+/// </summary>
+/// <remarks>
+/// Two formats, chosen once when the capture opens. PKT 2.1 stores a server opcode in 2 bytes:
+/// every legacy stream and every modern build before 4.4.0. A modern stream whose opcodes carry a
+/// group (4.4.0 on) is written as PKT 3.1, the format TrinityCore's own packet log uses, which
+/// stores the opcode in 4 bytes in both directions.
+/// </remarks>
+public abstract class SniffFile
 {
     // Monotonic counter suffixed to filenames so multiple captures within a single proxy
     // process (e.g. realm-switch, reconnect) get distinct paths even though they share the
@@ -22,7 +27,7 @@ public sealed class SniffFile
 
     public readonly string FilePath;
 
-    public SniffFile(string fileName, ushort build)
+    private SniffFile(string fileName, uint build)
     {
         string dir = "PacketsLog";
         if (!Directory.Exists(dir))
@@ -44,11 +49,9 @@ public sealed class SniffFile
             FileShare.Read,
             FileBufferSize,
             FileOptions.SequentialScan);
-        _fileWriter = new BinaryWriter(stream);
-        _gameVersion = build;
+        Writer = new BinaryWriter(stream);
     }
-    BinaryWriter _fileWriter;
-    ushort _gameVersion;
+    private protected readonly BinaryWriter Writer;
     readonly Lock _lock = new();
     bool _closed;
 
@@ -71,7 +74,9 @@ public sealed class SniffFile
     /// after the header is on disk, so a reader that observes a non-null reference is
     /// guaranteed to be appending after a complete header.
     /// </summary>
-    public static SniffFile EnsureOpen(ref SniffFile sniffFile, string fileName, ushort build)
+    /// <param name="opcodeSize">Bytes a server opcode takes on this stream's wire. Above 2 the
+    /// capture is PKT 3.1, because PKT 2.1 has no room for the rest.</param>
+    public static SniffFile EnsureOpen(ref SniffFile sniffFile, string fileName, uint build, int opcodeSize)
     {
         var existing = Volatile.Read(ref sniffFile);
         if (existing != null)
@@ -83,7 +88,9 @@ public sealed class SniffFile
             if (existing != null)
                 return existing;
 
-            var created = new SniffFile(fileName, build);
+            SniffFile created = opcodeSize == sizeof(ushort)
+                ? new Pkt21(fileName, build)
+                : new Pkt31(fileName, build);
             created.WriteHeader();
 
             // Publish last. Everything above is invisible to other threads until this
@@ -96,59 +103,25 @@ public sealed class SniffFile
         }
     }
 
-    private void WriteHeader()
-    {
-        _fileWriter.Write('P');
-        _fileWriter.Write('K');
-        _fileWriter.Write('T');
-        UInt16 sniffVersion = 0x201;
-        _fileWriter.Write(sniffVersion);
-        _fileWriter.Write(_gameVersion);
+    private protected abstract void WriteHeader();
 
-        for (int i = 0; i < 40; i++)
-        {
-            byte zero = 0;
-            _fileWriter.Write(zero);
-        }
-    }
+    private protected abstract void WriteRecord(uint opcode, bool isFromClient, ReadOnlySpan<byte> payload);
 
-    public void WritePacket(uint opcode, bool isFromClient, ReadOnlySpan<byte> data)
+    /// <param name="payload">The packet body after its opcode.</param>
+    public void WritePacket(uint opcode, bool isFromClient, ReadOnlySpan<byte> payload)
     {
         lock (_lock)
         {
             if (_closed)
                 return;
 
-            byte direction = !isFromClient ? (byte)0xff : (byte)0x0;
-            _fileWriter.Write(direction);
-
-            uint unixtime = (uint)Time.UnixTime;
-            _fileWriter.Write(unixtime);
-            _fileWriter.Write(Environment.TickCount);
-
-            if (isFromClient)
-            {
-                uint packetSize = (uint)(data.Length - 2 + sizeof(uint));
-                _fileWriter.Write(packetSize);
-                _fileWriter.Write(opcode);
-
-                // Skip the 2-byte opcode prefix; single bulk write of the payload.
-                _fileWriter.Write(data[2..]);
-            }
-            else
-            {
-                uint packetSize = (uint)data.Length + sizeof(ushort);
-                _fileWriter.Write(packetSize);
-                ushort opcode2 = (ushort)opcode;
-                _fileWriter.Write(opcode2);
-                _fileWriter.Write(data);
-            }
+            WriteRecord(opcode, isFromClient, payload);
 
             // Flush so that the .pkt is parseable mid-session — e.g. when a test
             // harness uses Stop-Process -Force on the proxy (no graceful Dispose),
             // the 64 KB FileStream buffer would otherwise keep recent packets
             // in-process and the on-disk file would appear empty/short.
-            _fileWriter.Flush();
+            Writer.Flush();
         }
     }
 
@@ -166,8 +139,99 @@ public sealed class SniffFile
             if (_closed)
                 return;
             _closed = true;
-            _fileWriter.Flush();
-            _fileWriter.Close();
+            Writer.Flush();
+            Writer.Close();
+        }
+    }
+
+    /// <summary>
+    /// "PKT", version 0x201, u16 build, 40-byte session key. A record is u8 direction, u32 unix
+    /// time, i32 tick count, u32 size, then a u32 opcode from the client or a u16 opcode from the
+    /// server, then the payload.
+    /// </summary>
+    private sealed class Pkt21 : SniffFile
+    {
+        private readonly ushort _build;
+
+        public Pkt21(string fileName, uint build) : base(fileName, build) => _build = (ushort)build;
+
+        private protected override void WriteHeader()
+        {
+            Writer.Write('P');
+            Writer.Write('K');
+            Writer.Write('T');
+            Writer.Write((ushort)0x201);
+            Writer.Write(_build);
+
+            Span<byte> sessionKey = stackalloc byte[40];
+            Writer.Write(sessionKey);
+        }
+
+        private protected override void WriteRecord(uint opcode, bool isFromClient, ReadOnlySpan<byte> payload)
+        {
+            Writer.Write(isFromClient ? (byte)0x00 : (byte)0xff);
+            Writer.Write((uint)Time.UnixTime);
+            Writer.Write(Environment.TickCount);
+
+            if (isFromClient)
+            {
+                Writer.Write((uint)(payload.Length + sizeof(uint)));
+                Writer.Write(opcode);
+            }
+            else
+            {
+                Writer.Write((uint)(payload.Length + sizeof(ushort)));
+                Writer.Write((ushort)opcode);
+            }
+
+            Writer.Write(payload);
+        }
+    }
+
+    /// <summary>
+    /// TrinityCore's <c>PacketLog</c> layout: "PKT", version 0x301, sniffer id, u32 build, locale,
+    /// 40-byte session key, start unix time, start tick count, optional-data size. A record is the
+    /// direction ("SMSG"/"CMSG"), connection id, tick count, optional-data size, length, then a u32
+    /// opcode and the payload.
+    /// </summary>
+    private sealed class Pkt31 : SniffFile
+    {
+        // WowPacketParser special-cases a few sniffer ids ('T' is TrinityCore's, which promises a
+        // socket address in every record); this one only has to be none of them.
+        private const byte SnifferId = (byte)'H';
+        private const uint ServerToClient = 0x47534D53;
+        private const uint ClientToServer = 0x47534D43;
+
+        private readonly uint _build;
+
+        public Pkt31(string fileName, uint build) : base(fileName, build) => _build = build;
+
+        private protected override void WriteHeader()
+        {
+            Writer.Write("PKT"u8);
+            Writer.Write((ushort)0x301);
+            Writer.Write(SnifferId);
+            Writer.Write(_build);
+            Writer.Write("enUS"u8);
+
+            Span<byte> sessionKey = stackalloc byte[40];
+            Writer.Write(sessionKey);
+
+            // A record's time is the start time plus its tick count minus this one.
+            Writer.Write((uint)Time.UnixTime);
+            Writer.Write((uint)Environment.TickCount);
+            Writer.Write(0);
+        }
+
+        private protected override void WriteRecord(uint opcode, bool isFromClient, ReadOnlySpan<byte> payload)
+        {
+            Writer.Write(isFromClient ? ClientToServer : ServerToClient);
+            Writer.Write(0);
+            Writer.Write((uint)Environment.TickCount);
+            Writer.Write(0);
+            Writer.Write(payload.Length + sizeof(uint));
+            Writer.Write(opcode);
+            Writer.Write(payload);
         }
     }
 }

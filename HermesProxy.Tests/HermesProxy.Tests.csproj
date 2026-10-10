@@ -40,6 +40,8 @@
   <ItemGroup>
     <ProjectReference Include="..\HermesProxy\HermesProxy.csproj" />
     <ProjectReference Include="..\Framework\Framework.csproj" />
+    <!-- A plain reference, not an analyzer: OpcodeTableGeneratorTests drives the generator itself. -->
+    <ProjectReference Include="..\HermesProxy.SourceGen\HermesProxy.SourceGen.csproj" />
   </ItemGroup>
 
 </Project>

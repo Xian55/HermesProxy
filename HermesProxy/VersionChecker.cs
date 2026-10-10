@@ -269,11 +269,18 @@ public static class LegacyVersion
         // build is resolved to its defining build via Opcodes.GetOpcodesDefiningBuild so aliased
         // builds (V1_12_2_6005, V2_5_2_40892, etc.) pick up the right table.
         var definingBuild = Opcodes.GetOpcodesDefiningBuild(Build);
-        if (!GeneratedOpcodeTables.TryGet(definingBuild, out currentToUniversal, out universalToCurrent))
+        if (!GeneratedOpcodeTables.TryGet(definingBuild, out Opcode[][] groups, out universalToCurrent, out _))
         {
             Log.Print(LogType.Error, "Could not load opcodes for current legacy version.");
+            currentToUniversal = [];
             return false;
         }
+
+        // Legacy opcodes never carry a group, so the whole table is group 0 and the lookup stays
+        // a single load.
+        if (groups.Length > 1)
+            throw new InvalidOperationException($"Legacy opcode table for {definingBuild} has opcodes above 0xFFFF.");
+        currentToUniversal = groups.Length == 1 ? groups[0] : [];
 
         ServerLogMessages.LoadedLegacyOpcodes(
             VersionChecker._melServer, VersionChecker._sourceFile, VersionChecker._netDirNone,
@@ -549,11 +556,24 @@ public static class ModernVersion
     public static int BuildInt => (int)Build;
     public static string VersionString => Build.ToString();
 
-    // Same direct-indexed array scheme as LegacyVersion — see LegacyVersion for the rationale.
-    private static readonly Opcode[] _currentToUniversal;
-    private static readonly uint[]   _universalToCurrent;
+    // Same direct-indexed array scheme as LegacyVersion — see LegacyVersion for the rationale —
+    // with one level more: from 4.4.0 the upper 16 bits of an opcode name its group, and each
+    // group has its own array. Older builds have group 0 only, which is kept on its own below so
+    // their lookup stays the one bounds check and load it was; through the group array it cost
+    // a quarter more (0.52 -> 0.65 ns on the M4).
+    private static readonly Opcode[][] _currentToUniversal;
+    private static readonly uint[]     _universalToCurrent;
 
-    private static readonly bool _opcodeTablesLoaded = LoadOpcodeTables(out _currentToUniversal, out _universalToCurrent);
+    /// <summary>
+    /// Bytes the opcode takes in a world packet body, both directions and inside the
+    /// <c>SMSG_COMPRESSED_PACKET</c> envelope: 4 from 4.4.0, whose opcodes carry a group, else 2.
+    /// </summary>
+    public static readonly int OpcodeSize;
+
+    private static readonly bool _opcodeTablesLoaded = LoadOpcodeTables(out _currentToUniversal, out _universalToCurrent, out OpcodeSize);
+
+    // Empty for a build whose opcodes all carry a group, so every lookup goes to the groups.
+    private static readonly Opcode[] _currentToUniversalGroup0 = _currentToUniversal.Length > 0 ? _currentToUniversal[0] : [];
 
     private static ClientVersionBuild RequireBuild()
     {
@@ -564,13 +584,14 @@ public static class ModernVersion
         return VersionBootstrap.ModernBuild;
     }
 
-    private static bool LoadOpcodeTables(out Opcode[] currentToUniversal, out uint[] universalToCurrent)
+    private static bool LoadOpcodeTables(out Opcode[][] currentToUniversal, out uint[] universalToCurrent, out int opcodeSize)
     {
         // Same generator-backed path as LegacyVersion. See LegacyVersion.LoadOpcodeTables for the rationale.
         var definingBuild = Opcodes.GetOpcodesDefiningBuild(Build);
-        if (!GeneratedOpcodeTables.TryGet(definingBuild, out currentToUniversal, out universalToCurrent))
+        if (!GeneratedOpcodeTables.TryGet(definingBuild, out currentToUniversal, out universalToCurrent, out opcodeSize))
         {
             Log.Print(LogType.Error, "Could not load opcodes for current modern version.");
+            opcodeSize = sizeof(ushort);
             return false;
         }
 
@@ -592,8 +613,21 @@ public static class ModernVersion
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Opcode GetUniversalOpcode(uint opcode)
     {
-        var table = _currentToUniversal;
-        return opcode < (uint)table.Length ? table[opcode] : Opcode.MSG_NULL_ACTION;
+        var group0 = _currentToUniversalGroup0;
+        return opcode < (uint)group0.Length ? group0[opcode] : GetGroupedUniversalOpcode(opcode);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Opcode GetGroupedUniversalOpcode(uint opcode)
+    {
+        var groups = _currentToUniversal;
+        uint group = opcode >> 16;
+        if (group >= (uint)groups.Length)
+            return Opcode.MSG_NULL_ACTION;
+
+        var table = groups[group];
+        uint index = opcode & 0xFFFF;
+        return index < (uint)table.Length ? table[index] : Opcode.MSG_NULL_ACTION;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

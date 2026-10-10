@@ -90,13 +90,14 @@ public class SendPipelineBenchmarks
     {
         packet.WritePacketData();
         ReadOnlySpan<byte> data = packet.GetDataSpan();
-        ushort opcode = (ushort)packet.GetOpcode();
+        uint opcode = packet.GetOpcode();
+        int opcodeSize = ModernVersion.OpcodeSize;
 
-        int bodySize = ModernPacketBody.PlainSize(data.Length);
+        int bodySize = ModernPacketBody.PlainSize(opcodeSize, data.Length);
         int framedSize = PacketHeader.StructSize + bodySize;
         byte[] framed = ArrayPool<byte>.Shared.Rent(framedSize);
         Span<byte> body = framed.AsSpan(PacketHeader.StructSize, bodySize);
-        ModernPacketBody.WritePlain(body, opcode, data);
+        ModernPacketBody.WritePlain(body, opcode, opcodeSize, data);
 
         PacketHeader header = new();
         header.Size = bodySize;

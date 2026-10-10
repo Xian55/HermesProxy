@@ -140,7 +140,7 @@ public partial class OpcodeCoverageReportTests
     /// <summary>Universal opcodes that the given build's table actually maps (0 = no mapping).</summary>
     private static HashSet<Opcode> DefinedFor(ClientVersionBuild build)
     {
-        if (!GeneratedOpcodeTables.TryGet(build, out _, out uint[] universalToCurrent))
+        if (!GeneratedOpcodeTables.TryGet(build, out _, out uint[] universalToCurrent, out _))
             throw new InvalidOperationException($"No generated opcode table for {build}.");
 
         var set = new HashSet<Opcode>();

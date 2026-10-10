@@ -117,7 +117,7 @@ public abstract class ServerPacket
         if (!context.PacketsLog)
             return;
 
-        var sniff = SniffFile.EnsureOpen(ref sniffFile, "modern", (ushort)context.ClientBuild);
+        var sniff = SniffFile.EnsureOpen(ref sniffFile, "modern", (uint)context.ClientBuild, ModernVersion.OpcodeSize);
         sniff.WritePacket(GetOpcode(), false, GetDataSpan());
     }
 
@@ -247,9 +247,15 @@ public class WorldPacket : ByteBuffer
             Log.Print(LogType.Warn, "Constructed a legacy packet with opcode 0 from received data; it will be dropped as unknown.");
     }
 
-    public WorldPacket(byte[] data) : base(data)
+    public WorldPacket(byte[] data) : this(data, sizeof(ushort))
     {
-        opcode = ReadUInt16();
+    }
+
+    /// Read-mode ctor for a packet whose first <paramref name="opcodeSize"/> bytes are its opcode:
+    /// a modern client packet, 2 bytes before 4.4.0 and 4 after (see <see cref="ModernVersion.OpcodeSize"/>).
+    public WorldPacket(byte[] data, int opcodeSize) : base(data)
+    {
+        opcode = opcodeSize == sizeof(uint) ? ReadUInt32() : ReadUInt16();
     }
 
     /// Read-mode ctor for a possibly-oversized backing buffer with an explicit payload length.
@@ -383,10 +389,11 @@ public class WorldPacket : ByteBuffer
         if (!context.PacketsLog)
             return;
 
-        var sniff = SniffFile.EnsureOpen(ref sniffFile, "modern", (ushort)context.ClientBuild);
+        var sniff = SniffFile.EnsureOpen(ref sniffFile, "modern", (uint)context.ClientBuild, ModernVersion.OpcodeSize);
         // GetDataSpan: this packet was received into a pooled rental, and GetData would hand back
-        // the whole bucket-rounded buffer rather than the payload (issue #248).
-        sniff.WritePacket(GetOpcode(), true, GetDataSpan());
+        // the whole bucket-rounded buffer rather than the payload (issue #248). It starts at the
+        // opcode the constructor read.
+        sniff.WritePacket(GetOpcode(), true, GetDataSpan()[ModernVersion.OpcodeSize..]);
     }
 
     public uint GetOpcode() { return opcode; }

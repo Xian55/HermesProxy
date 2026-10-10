@@ -28,7 +28,8 @@ public class SocketSendTimeoutTests
         var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         // A zero-length send buffer makes every send wait for the peer's window rather than the
         // kernel's copy, which is what a congested or stalled client looks like from here.
-        client.SendBufferSize = unbuffered ? 0 : 512;
+        // macOS rejects a zero SO_SNDBUF with EINVAL, so it gets the smallest one it accepts.
+        client.SendBufferSize = unbuffered ? (OperatingSystem.IsMacOS() ? 1 : 0) : 512;
         client.Connect((IPEndPoint)listener.LocalEndpoint);
 
         Socket peer = listener.AcceptSocket();

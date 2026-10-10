@@ -94,34 +94,19 @@ public partial class WorldClient
     public GlobalSessionData Session => _globalSession;
 
     // Writes a legacy packet to the per-session legacy .pkt sniff (the cMangos↔HermesProxy stream).
-    // SMSG (isFromClient=false) bodies have no opcode prefix — pass through directly. CMSG
-    // (isFromClient=true) bodies also have no prefix in our WorldPacket abstraction, but
-    // SniffFile.WritePacket expects a 2-byte prefix to strip on the client path; we prepend two
-    // zero bytes so it strips them and writes the original body intact.
     private void WriteLegacySniff(WorldPacket packet, bool isFromClient)
     {
         var session = _globalSession;
         if (session == null || !session.DiagnosticsOptions.PacketsLog)
             return;
 
-        var sniff = SniffFile.EnsureOpen(ref session.LegacySniff, "legacy", (ushort)LegacyVersion.Build);
+        // Legacy server opcodes are 2 bytes on every build.
+        var sniff = SniffFile.EnsureOpen(ref session.LegacySniff, "legacy", (uint)LegacyVersion.Build, sizeof(ushort));
 
         // GetDataSpan, not GetData: received packets sit in an ArrayPool rental rounded up to a
         // bucket, so GetData would staple that slack onto every captured server packet and make
         // the .pkt claim payloads longer than the wire ever carried (issue #248).
-        ReadOnlySpan<byte> body = packet.GetDataSpan();
-        uint opcode = packet.GetOpcode();
-
-        if (isFromClient)
-        {
-            byte[] prefixed = new byte[body.Length + 2];
-            body.CopyTo(prefixed.AsSpan(2));
-            sniff.WritePacket(opcode, true, prefixed);
-        }
-        else
-        {
-            sniff.WritePacket(opcode, false, body);
-        }
+        sniff.WritePacket(packet.GetOpcode(), isFromClient, packet.GetDataSpan());
     }
 
     public bool ConnectToWorldServer(Realm realm, GlobalSessionData globalSession)

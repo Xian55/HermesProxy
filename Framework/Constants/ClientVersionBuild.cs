@@ -527,6 +527,9 @@ public enum ClientVersionBuild
     // WotLK Classic
     V3_4_3_54261 = 54261,
 
+    // Cataclysm Classic
+    V4_4_2_60895 = 60895,
+
     // Battle.net - should probably not mix this but oh well
     BattleNetV37165 = 37165,
 

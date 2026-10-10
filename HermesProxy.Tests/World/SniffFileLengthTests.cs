@@ -52,7 +52,7 @@ public class SniffFileLengthTests
             // EnsureOpen rather than the ctor: it is what production uses, and it writes the
             // PKT header before publishing the reference.
             SniffFile slot = null!;
-            sniff = SniffFile.EnsureOpen(ref slot, "test-authchallenge", LegacyBuild);
+            sniff = SniffFile.EnsureOpen(ref slot, "test-authchallenge", LegacyBuild, sizeof(ushort));
             sniff.WritePacket(packet.GetOpcode(), isFromClient: false, packet.GetDataSpan());
             sniff.CloseFile();
 
