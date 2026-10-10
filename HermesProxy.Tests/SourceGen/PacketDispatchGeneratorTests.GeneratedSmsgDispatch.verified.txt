@@ -1127,6 +1127,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleInspectResult(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleInstanceDifficulty_SMSG_INSTANCE_DIFFICULTY(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleInstanceDifficulty(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleInstanceLockWarningQuery_SMSG_INSTANCE_LOCK_WARNING_QUERY(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleInstanceLockWarningQuery(packet);
@@ -2545,6 +2550,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INIT_WORLD_STATES] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInitWorldStates_SMSG_INIT_WORLD_STATES;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInspectResult_SMSG_INSPECT_RESULT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_TALENT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInspectResult_SMSG_INSPECT_TALENT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INSTANCE_DIFFICULTY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInstanceDifficulty_SMSG_INSTANCE_DIFFICULTY;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INSTANCE_LOCK_WARNING_QUERY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInstanceLockWarningQuery_SMSG_INSTANCE_LOCK_WARNING_QUERY;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INSTANCE_RESET] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInstanceReset_SMSG_INSTANCE_RESET;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INSTANCE_RESET_FAILED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInstanceResetFailed_SMSG_INSTANCE_RESET_FAILED;
@@ -3010,6 +3016,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_INIT_WORLD_STATES,
             global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_RESULT,
             global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_TALENT,
+            global::HermesProxy.World.Enums.Opcode.SMSG_INSTANCE_DIFFICULTY,
             global::HermesProxy.World.Enums.Opcode.SMSG_INSTANCE_LOCK_WARNING_QUERY,
             global::HermesProxy.World.Enums.Opcode.SMSG_INSTANCE_RESET,
             global::HermesProxy.World.Enums.Opcode.SMSG_INSTANCE_RESET_FAILED,

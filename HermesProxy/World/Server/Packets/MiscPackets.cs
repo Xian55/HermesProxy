@@ -465,7 +465,14 @@ public class WorldServerInfo : ServerPacket, ISpanWritable
     // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
     internal static bool? ForceV343ForTests;
 
-    public static WorldServerInfo ForMap(uint mapId)
+    // A native 3.4.3 server sends this packet where a 3.3.5a server sends SMSG_INSTANCE_DIFFICULTY,
+    // so on 3.4.3 that packet is translated into a second one carrying the instance's real
+    // difficulty. Other builds keep the single map id guess.
+    internal static bool FollowsInstanceDifficulty => IsTournamentBit;
+
+    /// <param name="legacyDifficulty">The 3.3.5a instance difficulty: 0-1 in a dungeon (normal,
+    /// heroic), 0-3 in a raid (10, 25, 10 heroic, 25 heroic). 0 keeps the map's first difficulty.</param>
+    public static WorldServerInfo ForMap(uint mapId, uint legacyDifficulty = 0)
     {
         WorldServerInfo info = new();
         if (IsTournamentBit)
@@ -473,6 +480,15 @@ public class WorldServerInfo : ServerPacket, ISpanWritable
             // What a native 3.4.3 server sends: the instance's difficulty and size in a dungeon
             // or raid, and a size of 0 everywhere else. A size of 0 is still sent, not left out.
             (info.DifficultyID, uint groupSize) = GameData.DefaultInstanceDifficulty.GetValueOrDefault(mapId);
+            if (legacyDifficulty != 0 && info.DifficultyID != 0)
+            {
+                uint modern = info.DifficultyID is (uint)DifficultyModern.Normal or (uint)DifficultyModern.Heroic
+                    ? (uint)DifficultyModern.Heroic
+                    : (uint)RaidDifficulties.ToLegacyId((byte)legacyDifficulty);
+                // An instance without that difficulty in the client's data keeps its first one.
+                if (GameData.InstanceDifficultySizes.TryGetValue((mapId, modern), out uint size))
+                    (info.DifficultyID, groupSize) = (modern, size);
+            }
             info.InstanceGroupSize = groupSize;
         }
         else if (mapId > 1)
