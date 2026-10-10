@@ -69,9 +69,10 @@ public static class ModernMovementLayouts
     /// </summary>
     public static ModernMovementLayout For(ClientVersionBuild build)
     {
-        // An exact build, deliberately. 3.4.4 (59817) adds a ninth header bit, HasDriveStatus, so
+        // Exact builds, deliberately. 3.4.4 (59817) adds a ninth header bit, HasDriveStatus, so
         // a range here would hand it the 3.4.3 layout and misalign every packet after the bits.
-        if (build == ClientVersionBuild.V3_4_3_54261)
+        // 4.4.2 reads the movement block exactly as 3.4.3 does (docs/protocol/4.4.2.60895).
+        if (build is ClientVersionBuild.V3_4_3_54261 or ClientVersionBuild.V4_4_2_60895)
             return ModernMovementLayout.WotLKClassic;
 
         byte expansion = VersionChecker.GetExpansionVersion(build);

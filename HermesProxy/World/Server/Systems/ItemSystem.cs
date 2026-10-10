@@ -47,7 +47,7 @@ public static class ItemSystem
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
         {
             // Legacy slot is the 1-based vendor-array index. 3.4.3 sends that as MuID.
-            uint legacySlot = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? item.MuID : item.Slot;
+            uint legacySlot = ModernVersion.IsWotLKClassicOrLater ? item.MuID : item.Slot;
             packet.WriteUInt32(legacySlot);
             packet.WriteUInt32(quantity);
         }
@@ -103,7 +103,7 @@ public static class ItemSystem
         // item to an equip slot reaches the server as "move from empty equip
         // slot to backpack slot" and silently fails. Mirrors fork
         // HermesProxy-WOTLK Server/WorldSocket.cs:HandleSwapInvItem.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             ItemLogMessages.SwapInvItemForwardV343(_melServerItem, _logSourceItem, item.Slot2, item.Slot1, slot2, slot1);
             packet.WriteUInt8(slot2);

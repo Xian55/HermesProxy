@@ -142,7 +142,7 @@ public class SupercededSpells : ServerPacket, ISpanWritable
         // V3_4_3 uses the same per-spell LearnedSpellInfo bit-cascade as
         // SMSG_LEARNED_SPELLS (see CypherCore SpellPackets.cs:302-315 + 1905-1931).
         // SpellID and Superceded are paired one-for-one by HandleSupercededSpells.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             int pairCount = Math.Min(SpellID.Count, Superceded.Count);
             _worldPacket.WriteInt32(pairCount);
@@ -180,7 +180,7 @@ public class SupercededSpells : ServerPacket, ISpanWritable
 
     public int WriteToSpan(Span<byte> buffer)
     {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             int pairCount = Math.Min(SpellID.Count, Superceded.Count);
             if (pairCount > MaxSpellsPerList)
@@ -247,7 +247,7 @@ public class LearnedSpells : ServerPacket, ISpanWritable
         // the client mis-parses every entry and the spellbook silently ignores
         // newly-learned trainer spells (until logout/login resets via
         // SMSG_SEND_KNOWN_SPELLS, which has its own correct format).
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             _worldPacket.WriteInt32(Spells.Count);
             _worldPacket.WriteUInt32(SpecializationID);
@@ -287,7 +287,7 @@ public class LearnedSpells : ServerPacket, ISpanWritable
         // V3_4_3 uses a different bit-packed cascade (see Write()). Fall back to
         // the boxed Write path for V3_4_3 by returning -1 — the framework will
         // detect the overflow sentinel and re-emit via Write().
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
             return -1;
 
         if (Spells.Count > MaxSpells || FavoriteSpellID.Count > MaxSpells)
@@ -740,7 +740,7 @@ public class SpellCastRequest
         var optionalReagentsCount = data.ReadUInt32();
         var optionalCurrenciesCount = data.ReadUInt32();
         // V3_4_1+ wire field; not present in V1_14 / V2_5 SpellCastRequest layout.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
             _ = data.ReadUInt32(); // removedModificationsCount — count only, no per-entry payload in 54261
 
         for (var i = 0; i < optionalReagentsCount; ++i)
@@ -761,7 +761,7 @@ public class SpellCastRequest
         bool hasMoveUpdate = data.HasBit();
         var weightCount = data.ReadBits<uint>(2);
         // V3_4_1+ bit; not present in V1_14 / V2_5 SpellCastRequest layout.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
             _ = data.HasBit(); // hasCraftingOrderID — bit only, no UInt64 follow-up in 54261
         Target.Read(data);
 
@@ -803,7 +803,7 @@ public class SpellCastRequest
         var optionalReagentsCount = data.ReadUInt32();
         var optionalCurrenciesCount = data.ReadUInt32();
         // V3_4_1+ wire field; not present in V1_14 / V2_5 SpellCastRequest layout.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
             _ = data.ReadUInt32(); // removedModificationsCount — count only, no per-entry payload in 54261
 
         for (var i = 0; i < optionalReagentsCount; ++i)
@@ -824,7 +824,7 @@ public class SpellCastRequest
         bool hasMoveUpdate = data.HasBit();
         var weightCount = data.ReadBits<uint>(2);
         // V3_4_1+ bit; not present in V1_14 / V2_5 SpellCastRequest layout.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
             _ = data.HasBit(); // hasCraftingOrderID — bit only, no UInt64 follow-up in 54261
         Target.Read(ref data);
 
@@ -1177,7 +1177,7 @@ public class SpellCastData
         // (Death Grip on an immune target observed crashing the V3_4_3 client) and
         // misaligns the embedded RuneData. Branch on ModernVersion so V1_14 / V2_5
         // (pre-3.4.3.51505) keep the layout they've used since the codebase shipped.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             Target.Write(data);
 
@@ -1266,7 +1266,7 @@ public struct SpellMissStatus
         // (e.g. Reason=7 -> wire byte 0x70 = 112) which the client interprets as an
         // invalid miss reason and aborts spell handling — observed as a #132 ACCESS_VIOLATION
         // on Death Grip cast against an immune target (MissStatusCount=1, Reason=Immune1).
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             data.WriteUInt8((byte)Reason);
             if (Reason == SpellMissInfo.Reflect)
@@ -1326,11 +1326,11 @@ public class SpellTargetData
         // hasCraftingOrderID bit was added to SpellCastRequest.Read).
         // Gated to V3_4_3_54261: V1_14 / V2_5 SpellCastRequest doesn't leave dangling
         // cached bits, so a reset there would not corrupt anything but is unnecessary.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
             data.ResetBitReader();
 
         // V3_4_3 client uses 28-bit target flags (WPP V3_4_0 module gates 28 at V3_4_1+).
-        int flagBits = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 28 : 26;
+        int flagBits = ModernVersion.IsWotLKClassicOrLater ? 28 : 26;
         Flags = (SpellCastTargetFlags)data.ReadBits<uint>(flagBits);
         if (data.HasBit())
             SrcLocation = new();
@@ -1374,11 +1374,11 @@ public class SpellTargetData
         // hasCraftingOrderID bit was added to SpellCastRequest.Read).
         // Gated to V3_4_3_54261: V1_14 / V2_5 SpellCastRequest doesn't leave dangling
         // cached bits, so a reset there would not corrupt anything but is unnecessary.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
             data.ResetBitReader();
 
         // V3_4_3 client uses 28-bit target flags (WPP V3_4_0 module gates 28 at V3_4_1+).
-        int flagBits = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 28 : 26;
+        int flagBits = ModernVersion.IsWotLKClassicOrLater ? 28 : 26;
         Flags = (SpellCastTargetFlags)data.ReadBits<uint>(flagBits);
         if (data.HasBit())
             SrcLocation = new();
@@ -1411,7 +1411,7 @@ public class SpellTargetData
     public void Write(WorldPacket data)
     {
         // V3_4_3 client uses 28-bit target flags (WPP V3_4_0 module gates 28 at V3_4_1+).
-        int flagBits = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 28 : 26;
+        int flagBits = ModernVersion.IsWotLKClassicOrLater ? 28 : 26;
         data.WriteBits((uint)Flags, flagBits);
         data.WriteBit(SrcLocation != null);
         data.WriteBit(DstLocation != null);
@@ -1979,7 +1979,7 @@ class SpellPeriodicAuraLog : ServerPacket
     // effect values, before the flag byte. Without it the client read that count from the flag byte
     // and the end of the packet, then read the flags past the end: every tick lost its crit flag
     // (#365). TrinityCore 3.4.3 writes its four zero bytes after the flag byte, also wrong.
-    internal static bool HasSupporterCount => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    internal static bool HasSupporterCount => ForceV343ForTests ?? ModernVersion.IsWotLKClassicOrLater;
     // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
     internal static bool? ForceV343ForTests;
 

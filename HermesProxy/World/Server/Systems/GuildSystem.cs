@@ -142,7 +142,7 @@ public static class GuildSystem
     public static void HandleGuildSetRankPermissions(in GuildSetRankPermissions rank, in SessionContext ctx)
     {
         // The burst was only observed, and the fix only tested, on the 3.4.3 client.
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
         {
             ctx.SendPacketToServer(BuildLegacyGuildRank(rank));
             return;

@@ -88,7 +88,7 @@ public partial class WorldClient
 
         GetSession().GameState.TalentInfo = cache;
 
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         SendPacketToClient(cache.ToPacket());
@@ -139,7 +139,7 @@ public partial class WorldClient
         // World_hunter_pet_tame_pet_actionbar_pet_spellbook lines 76367-76368);
         // padding zeros widens the body and the client refuses to bind the pet tab.
 
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         var modern = new UpdateTalentData

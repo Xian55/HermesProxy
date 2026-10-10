@@ -33,7 +33,7 @@ public static class BattlePetSystem
     [HandlesCmsg(Opcode.CMSG_BATTLE_PET_REQUEST_JOURNAL)]
     public static void HandleBattlePetRequestJournal(in EmptyClientPacket request, in SessionContext ctx)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         EnsureCollectionFavorites(ctx.GetSession());
@@ -44,7 +44,7 @@ public static class BattlePetSystem
     [HandlesCmsg(Opcode.CMSG_BATTLE_PET_SUMMON)]
     public static void HandleBattlePetSummon(in BattlePetSummon summon, in SessionContext ctx)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         if (!ctx.GetSession().GameState.BattlePetGuidToSummonSpell.TryGetValue(summon.PetGuid, out uint spellId)
@@ -69,7 +69,7 @@ public static class BattlePetSystem
     [HandlesCmsg(Opcode.CMSG_BATTLE_PET_SET_FLAGS)]
     public static void HandleBattlePetSetFlags(in BattlePetSetFlags setFlags, in SessionContext ctx)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         var favorites = EnsureCollectionFavorites(ctx.GetSession());
@@ -92,7 +92,7 @@ public static class BattlePetSystem
     [HandlesCmsg(Opcode.CMSG_MOUNT_SET_FAVORITE)]
     public static void HandleMountSetFavorite(in MountSetFavorite setFavorite, in SessionContext ctx)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         var favorites = EnsureCollectionFavorites(ctx.GetSession());

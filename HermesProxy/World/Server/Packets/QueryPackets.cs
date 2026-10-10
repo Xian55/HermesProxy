@@ -136,14 +136,14 @@ public class QueryPlayerNameResponse : ServerPacket, ISpanWritable
 
     private static Opcode GetResponseOpcode()
     {
-        return ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        return ModernVersion.IsWotLKClassicOrLater
             ? Opcode.SMSG_QUERY_PLAYER_NAMES_RESPONSE
             : Opcode.SMSG_QUERY_PLAYER_NAME_RESPONSE;
     }
 
     public override void Write()
     {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             _worldPacket.WriteUInt32(1);   // Count: we always carry exactly one
                                            // legacy SMSG_NAME_QUERY_RESPONSE.
@@ -174,7 +174,7 @@ public class QueryPlayerNameResponse : ServerPacket, ISpanWritable
     {
         var writer = new SpanPacketWriter(buffer);
 
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             writer.WriteUInt32(1);
             writer.WriteUInt8(Result);
@@ -364,7 +364,7 @@ public class QueryQuestInfoResponse : ServerPacket
             // these, the V3_4_3 client mis-parses the title-length bits at line
             // ~113 of the writer, then reads garbage as a ConditionalQuestText
             // length prefix → ~5 TB allocation crash (?AUConditionalQuestText@@).
-            bool isV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+            bool isV343 = ModernVersion.IsWotLKClassicOrLater;
             if (isV343)
             {
                 _worldPacket.WriteInt32((int)Info.PortraitGiver);

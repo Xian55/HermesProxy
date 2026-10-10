@@ -39,7 +39,7 @@ public partial class WorldClient
         }
 
         // 3.4.3 has no arena registrar; a non-guild SHOW_LIST opens GuildRegistrar.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             && PetitionShowListCompat.ShouldDropArenaList(petitions.Petitions))
         {
             WorldClientLogMessages.ArenaPetitionDropped(

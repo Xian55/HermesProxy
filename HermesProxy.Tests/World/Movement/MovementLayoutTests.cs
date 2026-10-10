@@ -95,6 +95,16 @@ public class MovementLayoutTests
         Assert.True(checkedBuilds > 50);
     }
 
+    /// <summary>
+    /// 4.4.2 is not supported yet, so the loop above does not reach it. Its client reads the
+    /// movement block exactly as 3.4.3 does (docs/protocol/4.4.2.60895).
+    /// </summary>
+    [Fact]
+    public void ModernLayout_4_4_2_IsTheWotLKClassicLayout()
+    {
+        Assert.Equal(ModernMovementLayout.WotLKClassic, ModernMovementLayouts.For(ClientVersionBuild.V4_4_2_60895));
+    }
+
     /// <summary>What each modern layout struct says, against the wire: the table the codec is compiled from.</summary>
     [Fact]
     public void ModernLayouts_StateTheirWireFacts()

@@ -42,7 +42,7 @@ internal static class PvpWire
     internal static bool? ForceV343ForTests;
 
     public static bool IsV343 =>
-        ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        ForceV343ForTests ?? ModernVersion.IsWotLKClassicOrLater;
 }
 
 public readonly record struct ArenaTeamRosterRequest(uint TeamIndex);

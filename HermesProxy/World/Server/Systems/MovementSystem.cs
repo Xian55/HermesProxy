@@ -199,7 +199,7 @@ public static class MovementSystem
     /// </remarks>
     private static void CheckProximityAreaTriggers(in Vector3 position, GameSessionData gameState, in SessionContext ctx)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         if (gameState.CurrentMapId is not uint mapId)

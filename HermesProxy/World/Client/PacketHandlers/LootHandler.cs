@@ -71,7 +71,7 @@ public partial class WorldClient
         // SMSG_LOOT_REMOVED packets for the remaining slots no-ops on the UI side.
         // Only forward when (a) gate is inactive, (b) client itself requested release, or
         // (c) the loot is genuinely drained.
-        bool gateActive = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        bool gateActive = ModernVersion.IsWotLKClassicOrLater;
         bool clientAsked = state.ExpectingLootReleaseResponse;
         bool drained = state.RemainingLootSlots.Count == 0 && state.RemainingLootCoins == 0;
 
@@ -123,7 +123,7 @@ public partial class WorldClient
         loot.LootListID = resolvedSlot;
         SendPacketToClient(loot);
 
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             && state.RemainingLootSlots.Count == 0
             && state.RemainingLootCoins == 0)
         {
@@ -151,7 +151,7 @@ public partial class WorldClient
         // second, and the V3_4_3 client refuses to auto-close if the release arrives
         // *before* the notify. Fire here once the session is fully drained.
         var state = GetSession().GameState;
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             && state.RemainingLootSlots.Count == 0
             && state.RemainingLootCoins == 0)
         {

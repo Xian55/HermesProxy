@@ -97,7 +97,7 @@ public partial class WorldClient
             // starting (Map, Zone, Position) whenever ZoneId=0 — the legacy server
             // overwrites these on the real login.
             if (char1.FirstLogin
-                && ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+                && ModernVersion.IsWotLKClassicOrLater
                 && char1.ZoneId == 0)
             {
                 ApplyStartingLocation(char1);
@@ -245,7 +245,7 @@ public partial class WorldClient
         // request a fresh CMSG_CHAR_ENUM ourselves, and stamp the matching
         // FirstLogin entry's GUID into SMSG_CREATE_CHAR before forwarding.
         // Failure paths skip this dance (no GUID needed for an error reply).
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             && result == (byte)Enums.V3_3_5a_12340.ResponseCodes.CharCreateSuccess
             && !string.IsNullOrEmpty(state.PendingCreateCharName))
         {
@@ -514,7 +514,7 @@ public partial class WorldClient
         // V3_4_3 client requires before it sends CMSG_MOVE_INIT_ACTIVE_MOVER_COMPLETE
         // and dismisses the loading screen. UpdateActionButtons.Write pads to 180
         // internally, so we don't need to pad the list here.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // Hardcode Reason=0 (Initial sync). cmangos sends reason=1 (spec swap)
             // sometimes but the V3_4_3 client interprets reason=0 as "world-entry
@@ -629,7 +629,7 @@ public partial class WorldClient
         // Only the V1_14/V2_5 builders read ComboTarget from ActivePlayerData; V3_4_3 writes it
         // from UnitData. Materialising ActivePlayerData for this one field was nearly all of the
         // ~35 KB each combo-point update allocated on V3_4_3.
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             updateData.EnsureActivePlayerData().ComboTarget = comboTarget;
         updateData.UnitData.ComboTarget = comboTarget;
         byte comboPoints = packet.ReadUInt8();
@@ -818,7 +818,7 @@ public partial class WorldClient
         // Layout taken from the 3.4.3 server's InspectHonorStatsResult::Write and byte-checked
         // against a native 47-byte capture. The counters a 3.3.5a backend cannot supply
         // (dishonorable kills, weekly splits, standing) stay zero rather than being guessed.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             InspectHonorStatsResultWotLKClassic honor = new InspectHonorStatsResultWotLKClassic();
             honor.PlayerGUID = playerGuid;

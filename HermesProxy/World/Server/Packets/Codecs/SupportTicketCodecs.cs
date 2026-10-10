@@ -17,7 +17,7 @@ public static class SupportTicketSubmitComplaintCodec
     /// </remarks>
     public static void Read(ref SpanPacketReader r, out SupportTicketSubmitComplaint packet)
     {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             ReadV343(ref r, out packet);
             return;

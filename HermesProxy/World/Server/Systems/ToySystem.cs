@@ -26,7 +26,7 @@ public static class ToySystem
     [HandlesCmsg(Opcode.CMSG_ADD_TOY)]
     public static void HandleAddToy(in AddToy add, in SessionContext ctx)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         uint itemId = ctx.GetSession().GameState.GetItemId(add.Guid);
@@ -49,7 +49,7 @@ public static class ToySystem
     [HandlesCmsg(Opcode.CMSG_USE_TOY)]
     public static void HandleUseToy(in UseToy use, in SessionContext ctx)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         uint itemId = use.ItemId;
@@ -116,7 +116,7 @@ public static class ToySystem
     [HandlesCmsg(Opcode.CMSG_COLLECTION_ITEM_SET_FAVORITE)]
     public static void HandleCollectionItemSetFavorite(in CollectionItemSetFavorite setFavorite, in SessionContext ctx)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
         if (setFavorite.Type != ItemCollectionType.Toy || setFavorite.ID == 0)
             return;
@@ -133,7 +133,7 @@ public static class ToySystem
     [HandlesCmsg(Opcode.CMSG_TOY_CLEAR_FANFARE)]
     public static void HandleToyClearFanfare(in ToyClearFanfare _, in SessionContext ctx)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
     }
 }

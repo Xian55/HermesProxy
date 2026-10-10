@@ -3167,7 +3167,7 @@ public static partial class GameData
             record.HotfixContent.WriteUInt32(durationInInventory);
             record.HotfixContent.WriteFloat(qualityModifier);
             record.HotfixContent.WriteUInt32(bagFamily);
-            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            if (ModernVersion.IsWotLKClassicOrLater)
             {
                 // V3_4_3 (ItemSparseHandler341): StartQuestID (Int32) + ItemRange (Single).
                 record.HotfixContent.WriteInt32(0);         // StartQuestID
@@ -3199,7 +3199,7 @@ public static partial class GameData
             record.HotfixContent.WriteInt32(statPercentEditor10);
             record.HotfixContent.WriteInt32(stackable);
             record.HotfixContent.WriteInt32(maxCount);
-            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            if (ModernVersion.IsWotLKClassicOrLater)
             {
                 // V3_4_3 (ItemSparseHandler341): MinReputation as Int32 between MaxCount
                 // and RequiredAbility. The trailing MinReputation byte is dropped.
@@ -3216,7 +3216,7 @@ public static partial class GameData
             record.HotfixContent.WriteInt32(flags3);
             record.HotfixContent.WriteInt32(flags4);
             record.HotfixContent.WriteInt32(oppositeFactionItemId);
-            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            if (ModernVersion.IsWotLKClassicOrLater)
             {
                 // V3_4_3 (ItemSparseHandler341): three Int32 fields between FactionRelated
                 // (oppositeFactionItemId) and MaxDurability.
@@ -3265,7 +3265,7 @@ public static partial class GameData
             record.HotfixContent.WriteInt16(shadowResistance);
             record.HotfixContent.WriteInt16(arcaneResistance);
             record.HotfixContent.WriteUInt16(scalingStatDistributionId);
-            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            if (ModernVersion.IsWotLKClassicOrLater)
             {
                 // V3_4_3 ItemSparse layout. Reference: WPP V3_4_0_45166 HotfixHandler.cs:4087-4113.
                 // Note: statValue1..10 move from the trailing block to here as
@@ -3383,7 +3383,7 @@ public static partial class GameData
         buffer.WriteUInt32(item.Duration);
         buffer.WriteFloat(0);
         buffer.WriteUInt32(item.BagFamily);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3 (ItemSparseHandler341): StartQuestID (Int32) + ItemRange (Single).
             buffer.WriteInt32(0);                           // StartQuestID
@@ -3415,7 +3415,7 @@ public static partial class GameData
         buffer.WriteInt32(0);
         buffer.WriteInt32(item.MaxStackSize);
         buffer.WriteInt32(item.MaxCount);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3 (ItemSparseHandler341 layout): MinReputation moved here from a
             // trailing byte to a 4-byte field between MaxCount and RequiredAbility.
@@ -3432,7 +3432,7 @@ public static partial class GameData
         buffer.WriteInt32(0);
         buffer.WriteInt32(0);
         buffer.WriteInt32(0);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3 (ItemSparseHandler341): three Int32 fields between FactionRelated
             // and MaxDurability — ModifiedCraftingReagentItemID, ContentTuningID,
@@ -3482,7 +3482,7 @@ public static partial class GameData
         buffer.WriteInt16((short)item.ShadowResistance);
         buffer.WriteInt16((short)item.ArcaneResistance);
         buffer.WriteUInt16((ushort)item.ScalingStatDistribution);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3 ItemSparse format. Reference: WPP V3_4_0_45166 HotfixHandler.cs:4087-4113,
             // HermesProxy-WOTLK GameData.cs:2549-2581.
@@ -3575,7 +3575,7 @@ public static partial class GameData
         buffer.WriteUInt32(row.DurationInInventory);
         buffer.WriteFloat(row.QualityModifier);
         buffer.WriteUInt32(row.BagFamily);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3 (ItemSparseHandler341): split into StartQuestID (Int32) + ItemRange (Single).
             // Older V1_14/V2_5 layout has a single combined RangeMod here AND a UInt16
@@ -3610,7 +3610,7 @@ public static partial class GameData
         buffer.WriteInt32(row.StatPercentEditor[9]);
         buffer.WriteInt32(row.Stackable);
         buffer.WriteInt32(row.MaxCount);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3 (ItemSparseHandler341): MinReputation Int32 between MaxCount
             // and RequiredAbility. The trailing MinReputation byte is dropped.
@@ -3627,7 +3627,7 @@ public static partial class GameData
         buffer.WriteUInt32(row.Flags[2]);
         buffer.WriteUInt32(row.Flags[3]);
         buffer.WriteInt32(row.OppositeFactionItemId);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3 (ItemSparseHandler341): three Int32 fields between FactionRelated
             // and MaxDurability.
@@ -3648,7 +3648,7 @@ public static partial class GameData
         buffer.WriteUInt16(row.ZoneBound[1]);
         buffer.WriteUInt16(row.ItemSet);
         buffer.WriteUInt16(row.LockId);
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
         {
             // V1_14/V2_5: StartQuestId UInt16 sits here. V3_4_3 promoted this to a
             // 4-byte StartQuestID Int32 written earlier (after BagFamily), so the
@@ -3684,7 +3684,7 @@ public static partial class GameData
         buffer.WriteUInt16(row.ScalingStatDistributionId);
         GameDataLogMessages.ItemSparseHotfixPreScaling(_melServer, _sourceFile, _netDirNone,
             row.Id, buffer.GetSize() - startSize, ModernVersion.Build);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             GameDataLogMessages.ItemSparseHotfixV343Path(_melServer, _sourceFile, _netDirNone, row.Id);
             // V3_4_3 ItemSparse format. Reference: WPP V3_4_0_45166 HotfixHandler.cs:4087-4113.
@@ -3965,7 +3965,7 @@ public static partial class GameData
         buffer.WriteInt32(modAppearance.ItemAppearanceModifierID);
         buffer.WriteInt32(modAppearance.ItemAppearanceID);
         buffer.WriteInt32(modAppearance.OrderIndex);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3: TransmogSourceTypeEnum is sbyte (1 byte), per WPP
             // V3_4_0_45166/HotfixHandler.cs:3725. Sending Int32 (4 bytes) like the
@@ -4739,7 +4739,7 @@ public static partial class GameData
         // Gated to V3_4_3_54261: V1_14 / V2_5 have different baked-in DBC RecordIDs;
         // applying this lookup there would map V3_4_3 IDs onto the wrong client.
         int id;
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             && V3_4_3ItemEffectRecordIdByItemSlot.TryGetValue(((uint)item.Entry, slot), out var bakedRecordId))
         {
             id = (int)bakedRecordId;

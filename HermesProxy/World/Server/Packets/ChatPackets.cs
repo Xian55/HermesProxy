@@ -126,7 +126,7 @@ public class ChannelNotify : ServerPacket
 
     // Only 3.4.3 has been played against it. The layout is the same on 1.14 and 2.5, but a server
     // packet the client misreads does more harm than one it never gets, so those keep getting none.
-    public static bool IsSent => ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    public static bool IsSent => ModernVersion.IsWotLKClassicOrLater;
 
     public override void Write()
     {
@@ -331,7 +331,7 @@ public class ChatPkt : ServerPacket, ISpanWritable
         // Earlier "fix" wrote uint16 ChatFlags byte-aligned + 50 bits — those
         // 2 extra bytes shifted every following field, so WPP saw Prefix="Xii"
         // and Text="" and the V3_4_3 client silently dropped the message.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             _worldPacket.WriteUInt8((byte)SlashCmd);
             _worldPacket.WriteUInt32(_Language);
@@ -440,7 +440,7 @@ public class ChatPkt : ServerPacket, ISpanWritable
         writer.WriteUInt32(TargetVirtualAddress);
         writer.WriteUInt32(SenderVirtualAddress);
 
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             writer.WriteInt32((int)AchievementID);
             writer.WriteFloat(DisplayTime);

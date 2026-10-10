@@ -128,7 +128,7 @@ public static class CollectionSync
         // newly created objects (pets, spell-spawned GameObjects) until the next zone
         // change rebuilt the grid. Defer instead, and let UpdateHandler flush once the
         // player create has actually gone out.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             && !state.ClientKnownGuids.Contains(state.CurrentPlayerGuid))
         {
             // The release reads the toy state it sends then, so one waiting sync covers every
@@ -159,7 +159,7 @@ public static class CollectionSync
 
     public static void RefreshUsableToys(GlobalSessionData session)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
         var state = session.GameState;
         if (state.CurrentPlayerGuid.IsEmpty() || session.WorldClient == null)

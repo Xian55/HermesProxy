@@ -129,7 +129,7 @@ public class MailListEntry
 {
     public void Write(WorldPacket data)
     {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3 layout (per CypherCore Source/Game/Networking/Packets/MailPackets.cs:395-435)
             data.WriteInt64(MailID);
@@ -215,7 +215,7 @@ public class MailAttachedItem
     {
         data.WriteUInt8(Position);
 
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3 layout (per CypherCore Source/Game/Networking/Packets/MailPackets.cs:321-340)
             data.WriteInt64(AttachID);
@@ -286,7 +286,7 @@ public class MailCommandResult : ServerPacket, ISpanWritable
 
     public override void Write()
     {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3 layout (per CypherCore Source/Game/Networking/Packets/MailPackets.cs:115-123)
             _worldPacket.WriteInt64(MailID);
@@ -306,12 +306,12 @@ public class MailCommandResult : ServerPacket, ISpanWritable
         _worldPacket.WriteUInt32(QtyInInventory);
     }
 
-    public int MaxSize => ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 32 : 24;
+    public int MaxSize => ModernVersion.IsWotLKClassicOrLater ? 32 : 24;
 
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             writer.WriteInt64(MailID);
             writer.WriteInt32((int)Command);

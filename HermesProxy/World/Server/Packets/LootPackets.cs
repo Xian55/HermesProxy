@@ -288,7 +288,7 @@ class StartLootRoll : ServerPacket, ISpanWritable
     private const int IneligibleReasonBytes = IneligibleReasonCount * sizeof(uint);
 
     private static bool WritesIneligibleReasons =>
-        ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        ModernVersion.IsWotLKClassicOrLater;
 
     public override void Write()
     {
@@ -370,7 +370,7 @@ internal static class LootRollWire
     internal static bool? ForceDungeonEncounterIdForTests;
 
     public static bool WritesDungeonEncounterId =>
-        ForceDungeonEncounterIdForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        ForceDungeonEncounterIdForTests ?? ModernVersion.IsWotLKClassicOrLater;
 
     public static int DungeonEncounterIdBytes => WritesDungeonEncounterId ? 4 : 0;
 }

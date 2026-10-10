@@ -46,7 +46,7 @@ public class GossipMessagePkt : ServerPacket
         // list reads `ConditionalQuestText` as garbage → 5 TB allocation OOM
         // (observed crash: ?AUConditionalQuestText@@, line -6). Layout mirrors
         // HermesProxy-WOTLK's GossipMessagePkt.WriteWotLK exactly.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             WriteWotLK();
             return;
@@ -240,7 +240,7 @@ public class GossipComplete : ServerPacket, ISpanWritable
 
     public override void Write()
     {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             || ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 2, 2, 5, 3))
         {
             _worldPacket.WriteBit(SuppressSound);
@@ -254,7 +254,7 @@ public class GossipComplete : ServerPacket, ISpanWritable
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             || ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 2, 2, 5, 3))
         {
             writer.WriteBit(SuppressSound);
@@ -277,7 +277,7 @@ public class BinderConfirm : ServerPacket, ISpanWritable
         // ShowBank / SpiritHealerConfirm. WPP V3_4_3_51666 has no
         // SMSG_BINDER_CONFIRM; type Binder (20) opens the innkeeper dialog.
         _worldPacket.WritePackedGuid128(Guid);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             _worldPacket.WriteInt32((int)PlayerInteractionType.Binder);
             _worldPacket.WriteBit(true);
@@ -286,13 +286,13 @@ public class BinderConfirm : ServerPacket, ISpanWritable
     }
 
     public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size
-        + (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 5 : 0);
+        + (ModernVersion.IsWotLKClassicOrLater ? 5 : 0);
 
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
         writer.WritePackedGuid128(Guid.Low, Guid.High);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             writer.WriteInt32((int)PlayerInteractionType.Binder);
             writer.WriteBit(true);
@@ -312,7 +312,7 @@ public class VendorInventory : ServerPacket
     {
         Log.Print(LogType.Trace,
             $"[VendorTrace] SMSG_VENDOR_INVENTORY write: VendorGUID={VendorGUID} " +
-            $"Reason={Reason} Items.Count={Items.Count} layoutPath={(ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? "WotLK" : "Vanilla")}");
+            $"Reason={Reason} Items.Count={Items.Count} layoutPath={(ModernVersion.IsWotLKClassicOrLater ? "WotLK" : "Vanilla")}");
 
         _worldPacket.WritePackedGuid128(VendorGUID);
         _worldPacket.WriteUInt8(Reason);
@@ -345,7 +345,7 @@ public class VendorItem
         // Without this layout the client mis-parses the field stream and the
         // vendor window renders empty / corrupted. Layout mirrors
         // HermesProxy-WOTLK Server/Packets/VendorItem.cs:WriteWotLK exactly.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             WriteWotLK(data);
             return;
@@ -406,7 +406,7 @@ public class ShowBank : ServerPacket, ISpanWritable
         // (Guid + Int32 InteractionType + bit Success). Without the type+success
         // tail the client reads InteractionType=None and the bank UI never opens.
         _worldPacket.WritePackedGuid128(Guid);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             _worldPacket.WriteInt32((int)PlayerInteractionType.Banker);
             _worldPacket.WriteBit(true);
@@ -415,13 +415,13 @@ public class ShowBank : ServerPacket, ISpanWritable
     }
 
     public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size
-        + (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 5 : 0);
+        + (ModernVersion.IsWotLKClassicOrLater ? 5 : 0);
 
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
         writer.WritePackedGuid128(Guid.Low, Guid.High);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             writer.WriteInt32((int)PlayerInteractionType.Banker);
             writer.WriteBit(true);
@@ -710,7 +710,7 @@ public class SpiritHealerConfirm : ServerPacket, ISpanWritable
         // "resurrect with sickness" confirm dialog, so legacy res-via-gossip silently
         // dies (the confirm previously translated to MSG_NULL_ACTION and was dropped).
         _worldPacket.WritePackedGuid128(Guid);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             _worldPacket.WriteInt32((int)PlayerInteractionType.SpiritHealer);
             _worldPacket.WriteBit(true);
@@ -719,13 +719,13 @@ public class SpiritHealerConfirm : ServerPacket, ISpanWritable
     }
 
     public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size
-        + (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 5 : 0);
+        + (ModernVersion.IsWotLKClassicOrLater ? 5 : 0);
 
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
         writer.WritePackedGuid128(Guid.Low, Guid.High);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             writer.WriteInt32((int)PlayerInteractionType.SpiritHealer);
             writer.WriteBit(true);

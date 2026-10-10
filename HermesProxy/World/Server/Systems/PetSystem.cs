@@ -25,7 +25,7 @@ public static class PetSystem
         // V3_4_3 client packs Action in modern slot-shifted layout; legacy 3.3.5a server
         // expects the older state-byte layout. Translate only for V3_4_3 — V1_14 / V2_5
         // modern clients use different/uncertain Action layouts; preserve their behavior.
-        uint legacyAction = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        uint legacyAction = ModernVersion.IsWotLKClassicOrLater
             ? TranslateV343PetActionToLegacy(act.Action)
             : act.Action;
 
@@ -36,7 +36,7 @@ public static class PetSystem
         // so failures were dropped and the action button locked until /reload.
         // Enqueue here for spell-bearing slots (plain spell / manual / autocast). Skip
         // command buttons (Attack/Stay/Follow/React) — they have no spell ID.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             uint v343Slot = act.Action >> 23;
             if (v343Slot == 0 || v343Slot == 0x101 || v343Slot == 0x181)
@@ -81,7 +81,7 @@ public static class PetSystem
         packet.WriteGuid(action.PetGUID.To64(ctx.GetSession().GameState));
         packet.WriteUInt32(action.Index);
         // Same gating as CMSG_PET_ACTION above — translate only for V3_4_3.
-        uint legacyAction = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        uint legacyAction = ModernVersion.IsWotLKClassicOrLater
             ? TranslateV343PetActionToLegacy(action.Action)
             : action.Action;
         packet.WriteUInt32(legacyAction);

@@ -26,7 +26,7 @@ public class LFGPlayerReward : ServerPacket
     // instance, the quantity, the bonus quantity, then the currency id (TrinityCore 3.4.3
     // LFGPlayerRewards). Sent the other layout, it took its two bits from the item id: Emblem of
     // Triumph (47241) became an item instance of id 0x020000B8, and it read past the end (#364).
-    private static bool Is343Layout => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    private static bool Is343Layout => ForceV343ForTests ?? ModernVersion.IsWotLKClassicOrLater;
     // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
     internal static bool? ForceV343ForTests;
 

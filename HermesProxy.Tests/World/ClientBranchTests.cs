@@ -54,6 +54,36 @@ public class ClientBranchTests
             $"ClientBranch changed which version triple these builds select: {string.Join(", ", mismatches)}");
     }
 
+    /// <summary>
+    /// The 3.4.3 port compared <c>ModernVersion.Build == V3_4_3_54261</c> at over 200 sites; they
+    /// now ask <see cref="ModernVersion.IsWotLKClassicOrLater"/>. For every build supported before
+    /// 4.4.2 the answers must be the same, or the rename changed behaviour.
+    /// </summary>
+    [Fact]
+    public void IsWotLKClassicOrLater_MatchesTheOldExactCheck_ForEverySupportedModernBuild()
+    {
+        var mismatches = AllBuilds
+            .Where(VersionChecker.IsSupportedModernVersion)
+            .Where(b => VersionChecker.IsWotLKClassicOrLater(b) != (b == ClientVersionBuild.V3_4_3_54261))
+            .Select(b => b.ToString())
+            .ToList();
+
+        Assert.True(mismatches.Count == 0,
+            $"IsWotLKClassicOrLater disagrees with the exact 3.4.3 check for: {string.Join(", ", mismatches)}");
+    }
+
+    [Theory]
+    [InlineData(ClientVersionBuild.V4_4_2_60895, true)]
+    [InlineData(ClientVersionBuild.V3_4_3_54261, true)]
+    [InlineData(ClientVersionBuild.V2_5_3_41750, false)]
+    [InlineData(ClientVersionBuild.V1_14_2_42597, false)]
+    [InlineData(ClientVersionBuild.V3_3_5a_12340, false)]
+    [InlineData(ClientVersionBuild.V4_3_4_15595, false)]
+    public void IsWotLKClassicOrLater_IsTheClassicLineFrom3_4_3(ClientVersionBuild build, bool expected)
+    {
+        Assert.Equal(expected, VersionChecker.IsWotLKClassicOrLater(build));
+    }
+
     [Fact]
     public void GetBranch_MatchesTheOldInlineChain_ForEverySupportedLegacyBuild()
     {

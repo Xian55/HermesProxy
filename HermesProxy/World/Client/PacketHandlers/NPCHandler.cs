@@ -53,7 +53,7 @@ public partial class WorldClient
             gossip.GossipQuests.Add(quest);
         }
 
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             int totalOptionTextLen = 0;
             int maxOptionTextLen = 0;
@@ -78,7 +78,7 @@ public partial class WorldClient
         var state = GetSession().GameState;
         // V3_4_3 only: a gossip list from the NPC we are mid-quest with would
         // replace the details / RequestItems frame with a dead overlay.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             && gossip.GossipGUID == state.CurrentInteractedWithNPC
             && (state.AwaitingQuestRewardId != 0 || state.QuestDetailsOpen))
             return;

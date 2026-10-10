@@ -59,7 +59,7 @@ public class ShowTaxiNodes : ServerPacket, ISpanWritable
 
     public override void Write()
     {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3.54261 wire layout (matches CypherCore TaxiPackets.cs ShowTaxiNodes::Write):
             // count is in uint64 blocks, payload is fixed bytes (must be a multiple of 8).
@@ -120,7 +120,7 @@ public class ShowTaxiNodes : ServerPacket, ISpanWritable
 
     public int WriteToSpan(Span<byte> buffer)
     {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             var writer = new SpanPacketWriter(buffer);
             writer.WriteBit(WindowInfo != null);
