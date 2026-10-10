@@ -612,9 +612,14 @@ public sealed class PacketDispatchGenerator : IIncrementalGenerator
             var all = group.ToList();
             string slot = $"table[(int){OpcodeFullName}.{group.Key}]";
 
-            if (all.Count == 1 && all[0].AddedIn is null && all[0].RemovedIn is null)
+            // Unguarded only when neither the handler nor its codec carries a range. Checking the
+            // handler alone registered a lone ranged codec (one [PacketCodec] with AddedIn and no
+            // counterpart) for every build, so builds outside its range decoded with its layout.
+            var only = all[0];
+            if (all.Count == 1 && only.AddedIn is null && only.RemovedIn is null
+                && only.CodecAddedIn is null && only.CodecRemovedIn is null)
             {
-                sb.Append("        ").Append(slot).Append(" = &").Append(ThunkName(all[0])).AppendLine(";");
+                sb.Append("        ").Append(slot).Append(" = &").Append(ThunkName(only)).AppendLine(";");
                 continue;
             }
 
