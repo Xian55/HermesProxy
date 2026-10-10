@@ -31,18 +31,24 @@ class AuctionHelloResponse : ServerPacket, ISpanWritable
 {
     public AuctionHelloResponse() : base(Opcode.SMSG_AUCTION_HELLO_RESPONSE) { }
 
+    // The 3.4.3 client reads two delivery delays and then the auction house id, before the
+    // OpenForBusiness bit (without the delays the bit lands past the payload and the client shows
+    // "auction house closed", #85). Its house id is what it matches outbid notices against: sent
+    // first (as TrinityCore 3.4.3 does), the id landed in a delay and the client held house 0, so
+    // it ignored every outbid and kept showing the player as the high bidder.
+    private static bool HasDeliveryDelays => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
+    internal static bool? ForceV343ForTests;
+
     public override void Write()
     {
         _worldPacket.WritePackedGuid128(Guid);
-        _worldPacket.WriteUInt32(AuctionHouseID);
-        // V3_4_3 added the delivery-delay fields between AuctionHouseID and the
-        // OpenForBusiness bit; omitting them shifts the bit past the payload so
-        // the client reads it as 0 and shows "auction house closed" (#85).
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (HasDeliveryDelays)
         {
             _worldPacket.WriteUInt32(PurchasedItemDeliveryDelay);
             _worldPacket.WriteUInt32(CancelledItemDeliveryDelay);
         }
+        _worldPacket.WriteUInt32(AuctionHouseID);
         _worldPacket.WriteBit(OpenForBusiness);
         _worldPacket.FlushBits();
     }
@@ -53,12 +59,12 @@ class AuctionHelloResponse : ServerPacket, ISpanWritable
     {
         var writer = new SpanPacketWriter(buffer);
         writer.WritePackedGuid128(Guid.Low, Guid.High);
-        writer.WriteUInt32(AuctionHouseID);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (HasDeliveryDelays)
         {
             writer.WriteUInt32(PurchasedItemDeliveryDelay);
             writer.WriteUInt32(CancelledItemDeliveryDelay);
         }
+        writer.WriteUInt32(AuctionHouseID);
         writer.WriteBit(OpenForBusiness);
         writer.FlushBits();
         return writer.Position;
