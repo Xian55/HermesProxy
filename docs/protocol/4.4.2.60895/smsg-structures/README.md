@@ -10,5 +10,8 @@ One file per area. Notation: see [the README](../README.md).
 - [Guild](guild.md) — 57 packets
 - [LFG](lfg.md) — 31 packets
 - [Movement](movement.md) — 95 packets
+- [Object update](object-update.md) — 1 packets
 - [Player](player.md) — 31 packets
 - [Quest](quest.md) — 35 packets
+- [Spell](spell.md) — 70 packets
+- [Storage](storage.md) — 8 packets

@@ -6,19 +6,23 @@ emulator's source or from a sniff parser.
 
 | File | Contents |
 |---|---|
-| [smsg-opcodes.md](smsg-opcodes.md) | All 1,344 server-to-client opcodes: number, 4.3.4 counterpart, area, layout kind |
+| [smsg-opcodes.md](smsg-opcodes.md) | All 1,436 server-to-client opcodes: number, 4.3.4 counterpart, area, layout kind |
 | [smsg-structures/](smsg-structures/README.md) | Per server packet: layout, size, bit fields, fixed-struct fields; one file per area |
 | [cmsg-opcodes.md](cmsg-opcodes.md) | All 713 client-to-server opcodes: number, 4.3.4 counterpart, layout kind |
 | [cmsg-structures.md](cmsg-structures.md) | Per client packet: layout, size, bit fields |
 
 HermesProxy does not serve this client, so unlike the other builds there is no HermesProxy column.
+The layouts were checked against packet logs of 4.4.2 sessions on a TrinityCore `cata_classic`
+server: every packet in them whose layout has a fixed size has exactly that size.
 
 Opcode numbers carry their group in the upper bits: server opcodes start at 0x3b0000 (general),
 0x400000 (chat), 0x4c0000 (movement) and so on; client opcodes lie in groups from 0x2e0000 to
-0x3a0000. Of the 1,344 server opcodes, 901 have a handler in the client and 443 are ignored by it.
+0x3a0000. Of the 1,436 server opcodes, 980 have a handler in the client and 456 are ignored by it.
+The connection opcodes (0x420000 and up: the authentication challenge, encryption switch, ping) are
+handled before any of these groups and are not listed, as in the other builds' references.
 
 Names follow WowPacketParser's 4.4.2 opcode table; the numbers and layouts come from the client
-itself. A row named "—" is an opcode the client has but that table does not name (446 server
+itself. A row named "—" is an opcode the client has but that table does not name (459 server
 opcodes, most of them ignored by the client; 9 client opcodes). The 4.3.4 column is the original
 Cataclysm number of the same name, where there is one.
 

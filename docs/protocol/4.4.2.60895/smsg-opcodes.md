@@ -1142,6 +1142,7 @@ Every server-to-client opcode of the client, with its 4.3.4 counterpart where th
 | SMSG_LFG_READY_CHECK_RESULT | 0x49001e | 4784158 | — | LFG | fixed, 1 bytes |
 | SMSG_LFG_EXPAND_SEARCH_PROMPT | 0x49001f | 4784159 | — | LFG | fixed, 17 bytes |
 | SMSG_LFG_JOIN_LOBBY_MATCHMAKER_QUEUE | 0x490020 | 4784160 | — | LFG | fixed, 4 bytes |
+| SMSG_UPDATE_OBJECT | 0x4b0000 | 4915200 | 18197 (0x4715) | Object update | variable |
 | SMSG_TIME_SYNC_REQUEST | 0x4c0000 | 4980736 | 15524 (0x3ca4) | Movement | fixed struct |
 | SMSG_TIME_ADJUSTMENT | 0x4c0001 | 4980737 | 31159 (0x79b7) | Movement | fixed struct |
 | SMSG_ON_MONSTER_MOVE | 0x4c0002 | 4980738 | 28183 (0x6e17) | Movement | variable |
@@ -1348,3 +1349,94 @@ Every server-to-client opcode of the client, with its 4.3.4 counterpart where th
 | — | 0x4f0026 | 5177382 | — | Quest | ignored by the client |
 | — | 0x4f0027 | 5177383 | — | Quest | ignored by the client |
 | SMSG_GOSSIP_OPTION_NPC_INTERACTION | 0x4f0028 | 5177384 | — | Quest | variable |
+| — | 0x510000 | 5308416 | — | Spell | ignored by the client |
+| — | 0x510001 | 5308417 | — | Spell | ignored by the client |
+| SMSG_CHEAT_IGNORE_DIMISHING_RETURNS | 0x510002 | 5308418 | — | Spell | fixed, 1 bytes |
+| SMSG_MIRROR_IMAGE_CREATURE_DATA | 0x510003 | 5308419 | — | Spell | fixed, 8 bytes |
+| SMSG_MIRROR_IMAGE_COMPONENTED_DATA | 0x510004 | 5308420 | 9780 (0x2634) | Spell | variable |
+| SMSG_SPELL_COOLDOWN | 0x510005 | 5308421 | 19222 (0x4b16) | Spell | variable |
+| SMSG_SPELL_CATEGORY_COOLDOWN | 0x510006 | 5308422 | — | Spell | fixed, 13 bytes |
+| SMSG_SPELL_DISPELL_LOG | 0x510007 | 5308423 | 17686 (0x4516) | Spell | variable |
+| SMSG_SPELL_PERIODIC_AURA_LOG | 0x510008 | 5308424 | 1046 (0x416) | Spell | variable |
+| SMSG_SPELL_ENERGIZE_LOG | 0x510009 | 5308425 | 1044 (0x414) | Spell | variable |
+| SMSG_SPELL_HEAL_LOG | 0x51000a | 5308426 | 10262 (0x2816) | Spell | variable |
+| SMSG_SPELL_HEAL_ABSORB_LOG | 0x51000b | 5308427 | — | Spell | variable |
+| SMSG_SPELL_ABSORB_LOG | 0x51000c | 5308428 | — | Spell | variable |
+| SMSG_SPELL_INTERRUPT_LOG | 0x51000d | 5308429 | 7591 (0x1da7) | Spell | fixed, 8 bytes |
+| SMSG_ENVIRONMENTAL_DAMAGE_LOG | 0x51000e | 5308430 | 27653 (0x6c05) | Spell | variable |
+| — | 0x51000f | 5308431 | — | Spell | ignored by the client |
+| — | 0x510010 | 5308432 | — | Spell | ignored by the client |
+| SMSG_AURA_UPDATE | 0x510011 | 5308433 | 18183 (0x4707) | Spell | variable |
+| SMSG_AURA_POINTS_DEPLETED | 0x510012 | 5308434 | 31927 (0x7cb7) | Spell | fixed, 2 bytes |
+| SMSG_PET_CLEAR_SPELLS | 0x510013 | 5308435 | — | Spell | fixed struct |
+| SMSG_PET_SPELLS_MESSAGE | 0x510014 | 5308436 | 16660 (0x4114) | Spell | variable |
+| SMSG_CLEAR_COOLDOWNS | 0x510015 | 5308437 | 22964 (0x59b4) | Spell | variable |
+| SMSG_CLEAR_ALL_SPELL_CHARGES | 0x510016 | 5308438 | — | Spell | fixed, 1 bytes |
+| SMSG_CLEAR_SPELL_CHARGES | 0x510017 | 5308439 | — | Spell | fixed, 5 bytes |
+| SMSG_SET_SPELL_CHARGES | 0x510018 | 5308440 | — | Spell | fixed, 14 bytes |
+| SMSG_SEND_KNOWN_SPELLS | 0x510019 | 5308441 | 260 (0x104) | Spell | variable |
+| SMSG_SEND_SPELL_HISTORY | 0x51001a | 5308442 | — | Spell | variable |
+| SMSG_REFRESH_SPELL_HISTORY | 0x51001b | 5308443 | — | Spell | variable |
+| SMSG_SEND_SPELL_CHARGES | 0x51001c | 5308444 | — | Spell | variable |
+| SMSG_SEND_UNLEARN_SPELLS | 0x51001d | 5308445 | 20005 (0x4e25) | Spell | variable |
+| SMSG_SPELL_OR_DAMAGE_IMMUNE | 0x51001e | 5308446 | 17671 (0x4507) | Spell | fixed, 5 bytes |
+| SMSG_DISPEL_FAILED | 0x51001f | 5308447 | 775 (0x307) | Spell | variable |
+| SMSG_SPELL_DAMAGE_SHIELD | 0x510020 | 5308448 | 10535 (0x2927) | Spell | variable |
+| SMSG_SPELL_NON_MELEE_DAMAGE_LOG | 0x510021 | 5308449 | 17173 (0x4315) | Spell | variable |
+| SMSG_SPELL_INSTAKILL_LOG | 0x510022 | 5308450 | 25110 (0x6216) | Spell | fixed, 4 bytes |
+| SMSG_SPELL_CHANNEL_START | 0x510023 | 5308451 | — | Spell | variable |
+| SMSG_SPELL_CHANNEL_UPDATE | 0x510024 | 5308452 | — | Spell | fixed, 4 bytes |
+| SMSG_SET_FLAT_SPELL_MODIFIER | 0x510025 | 5308453 | 10292 (0x2834) | Spell | variable |
+| SMSG_SET_PCT_SPELL_MODIFIER | 0x510026 | 5308454 | 548 (0x224) | Spell | variable |
+| SMSG_SPELL_PREPARE | 0x510027 | 5308455 | — | Spell | fixed, 0 bytes |
+| SMSG_SPELL_GO | 0x510028 | 5308456 | 28182 (0x6e16) | Spell | variable |
+| SMSG_SPELL_START | 0x510029 | 5308457 | 25621 (0x6415) | Spell | variable |
+| SMSG_RESUME_CAST | 0x51002a | 5308458 | — | Spell | fixed, 8 bytes |
+| — | 0x51002b | 5308459 | — | Spell | ignored by the client |
+| — | 0x51002c | 5308460 | — | Spell | ignored by the client |
+| SMSG_RESUME_CAST_BAR | 0x51002d | 5308461 | — | Spell | variable |
+| SMSG_SPELL_DELAYED | 0x51002e | 5308462 | 1813 (0x715) | Spell | fixed, 4 bytes |
+| SMSG_SPELL_EXECUTE_LOG | 0x51002f | 5308463 | 1574 (0x626) | Spell | variable |
+| SMSG_SPELL_MISS_LOG | 0x510030 | 5308464 | 1573 (0x625) | Spell | variable |
+| — | 0x510031 | 5308465 | — | Spell | ignored by the client |
+| SMSG_NOTIFY_DEST_LOC_SPELL_CAST | 0x510032 | 5308466 | 25092 (0x6204) | Spell | fixed, 45 bytes |
+| SMSG_CANCEL_SPELL_VISUAL | 0x510033 | 5308467 | — | Spell | fixed, 4 bytes |
+| SMSG_PLAY_SPELL_VISUAL | 0x510034 | 5308468 | 4273 (0x10b1) | Spell | fixed, 35 bytes |
+| SMSG_CANCEL_ORPHAN_SPELL_VISUAL | 0x510035 | 5308469 | — | Spell | fixed struct |
+| SMSG_PLAY_ORPHAN_SPELL_VISUAL | 0x510036 | 5308470 | — | Spell | fixed, 53 bytes |
+| SMSG_CANCEL_SPELL_VISUAL_KIT | 0x510037 | 5308471 | — | Spell | fixed, 5 bytes |
+| SMSG_PLAY_SPELL_VISUAL_KIT | 0x510038 | 5308472 | 21925 (0x55a5) | Spell | fixed, 13 bytes |
+| SMSG_GAME_OBJECT_PLAY_SPELL_VISUAL_KIT | 0x510039 | 5308473 | — | Spell | fixed, 12 bytes |
+| SMSG_GAME_OBJECT_PLAY_SPELL_VISUAL | 0x51003a | 5308474 | — | Spell | fixed, 4 bytes |
+| SMSG_SUPERCEDED_SPELLS | 0x51003b | 5308475 | 13744 (0x35b0) | Spell | variable |
+| SMSG_LEARNED_SPELLS | 0x51003c | 5308476 | — | Spell | variable |
+| SMSG_UNLEARNED_SPELLS | 0x51003d | 5308477 | 18436 (0x4804) | Spell | variable |
+| SMSG_PET_LEARNED_SPELLS | 0x51003e | 5308478 | 1287 (0x507) | Spell | variable |
+| SMSG_PET_UNLEARNED_SPELLS | 0x51003f | 5308479 | 27140 (0x6a04) | Spell | variable |
+| SMSG_PUSH_SPELL_TO_ACTION_BAR | 0x510040 | 5308480 | — | Spell | fixed struct |
+| SMSG_REMOVE_SPELL_FROM_ACTION_BAR | 0x510041 | 5308481 | — | Spell | fixed struct |
+| SMSG_SPELL_FAILURE | 0x510042 | 5308482 | 17717 (0x4535) | Spell | fixed, 10 bytes |
+| SMSG_ACTIVE_GLYPHS | 0x510043 | 5308483 | — | Spell | variable |
+| SMSG_SPELL_FAILED_OTHER | 0x510044 | 5308484 | 3124 (0xc34) | Spell | fixed, 9 bytes |
+| SMSG_SCRIPT_CAST | 0x510045 | 5308485 | — | Spell | fixed struct |
+| SMSG_CAST_FAILED | 0x510046 | 5308486 | 19734 (0x4d16) | Spell | fixed, 20 bytes |
+| SMSG_PET_CAST_FAILED | 0x510047 | 5308487 | 11029 (0x2b15) | Spell | fixed, 16 bytes |
+| SMSG_INTERRUPT_POWER_REGEN | 0x510048 | 5308488 | — | Spell | fixed, 1 bytes |
+| SMSG_SPELL_FAILURE_MESSAGE | 0x510049 | 5308489 | — | Spell | fixed struct |
+| — | 0x51004a | 5308490 | — | Spell | ignored by the client |
+| — | 0x51004b | 5308491 | — | Spell | ignored by the client |
+| — | 0x51004c | 5308492 | — | Spell | ignored by the client |
+| — | 0x51004d | 5308493 | — | Spell | ignored by the client |
+| SMSG_RESYNC_RUNES | 0x51004e | 5308494 | 25124 (0x6224) | Spell | variable |
+| SMSG_CONVERT_RUNE | 0x51004f | 5308495 | 20244 (0x4f14) | Spell | variable |
+| — | 0x510050 | 5308496 | — | Spell | ignored by the client |
+| SMSG_DAMAGE_CALC_LOG | 0x510051 | 5308497 | 9270 (0x2436) | Spell | variable |
+| SMSG_VOID_STORAGE_FAILED | 0x520000 | 5373952 | 6311 (0x18a7) | Storage | fixed struct |
+| SMSG_VOID_STORAGE_CONTENTS | 0x520001 | 5373953 | 30132 (0x75b4) | Storage | variable |
+| SMSG_VOID_STORAGE_TRANSFER_CHANGES | 0x520002 | 5373954 | 20902 (0x51a6) | Storage | variable |
+| SMSG_VOID_TRANSFER_RESULT | 0x520003 | 5373955 | 7590 (0x1da6) | Storage | fixed struct |
+| SMSG_VOID_ITEM_SWAP_RESPONSE | 0x520004 | 5373956 | 30882 (0x78a2) | Storage | fixed, 8 bytes |
+| SMSG_INVENTORY_CHANGE_FAILURE | 0x520005 | 5373957 | 8758 (0x2236) | Storage | variable |
+| SMSG_OPEN_CONTAINER | 0x520006 | 5373958 | 18196 (0x4714) | Storage | fixed, 0 bytes |
+| SMSG_BAG_CLEANUP_FINISHED | 0x520007 | 5373959 | — | Storage | fixed struct |
+| — | 0x540000 | 5505024 | — | Walk-in | ignored by the client |
