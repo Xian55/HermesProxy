@@ -720,9 +720,7 @@ public static class ModernVersion
                 or ClientVersionBuild.V2_5_3_42328
                 or ClientVersionBuild.V2_5_3_42598 => ClientVersionBuild.V2_5_3_41750,
             ClientVersionBuild.V3_4_3_54261 => ClientVersionBuild.V3_4_3_54261,
-            // No 4.4.2 descriptor set yet: its update fields are 3.4.3's plus deltas in ActivePlayer,
-            // Player, Unit and Item (refs/cata-442-feasibility), so the 3.4.3 builder is the nearest.
-            ClientVersionBuild.V4_4_2_60895 => ClientVersionBuild.V3_4_3_54261,
+            ClientVersionBuild.V4_4_2_60895 => ClientVersionBuild.V4_4_2_60895,
             _ => ClientVersionBuild.Zero,
         };
 

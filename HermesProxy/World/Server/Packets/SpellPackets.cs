@@ -1101,8 +1101,42 @@ public class SpellFailedOther : ServerPacket, ISpanWritable
     public byte Reason;
 }
 
-public class SpellStart : ServerPacket
+public sealed class SpellStart : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<SpellStart>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V3_4_3_54261, new ClassicEraLayout()),
+        (ClientVersionBuild.V3_4_3_54261, ClientVersionBuild.V4_4_2_60895, new WotLKClassicLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
+
+    private static readonly ServerPacketLayout<SpellStart> Layout = Layouts.ForRunningClient();
+
+    /// <summary>1.14 and 2.5.</summary>
+    internal sealed class ClassicEraLayout : ServerPacketLayout<SpellStart>
+    {
+        public override void Write(SpellStart packet, WorldPacket data)
+        {
+            packet.Cast.WriteClassicEra(data);
+        }
+    }
+
+    /// <summary>3.4.3.</summary>
+    internal sealed class WotLKClassicLayout : ServerPacketLayout<SpellStart>
+    {
+        public override void Write(SpellStart packet, WorldPacket data)
+        {
+            packet.Cast.WriteWotLKClassic(data);
+        }
+    }
+
+    /// <summary>4.4.2.</summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<SpellStart>
+    {
+        public override void Write(SpellStart packet, WorldPacket data)
+        {
+            packet.Cast.WriteCataClassic(data);
+        }
+    }
+
     /// <summary>
     /// Set by whoever builds the packet, which is every caller. Building one here as well cost a
     /// second <see cref="SpellCastData"/> — five lists, a target and a heal prediction — that was
@@ -1114,24 +1148,58 @@ public class SpellStart : ServerPacket
     {
     }
 
-    public override void Write()
-    {
-        Cast.Write(_worldPacket);
-    }
+    public override void Write() => Layout.Write(this, _worldPacket);
 }
 
-class SpellGo : ServerPacket
+sealed class SpellGo : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<SpellGo>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V3_4_3_54261, new ClassicEraLayout()),
+        (ClientVersionBuild.V3_4_3_54261, ClientVersionBuild.V4_4_2_60895, new WotLKClassicLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
+
+    private static readonly ServerPacketLayout<SpellGo> Layout = Layouts.ForRunningClient();
+
+    /// <summary>1.14 and 2.5.</summary>
+    internal sealed class ClassicEraLayout : ServerPacketLayout<SpellGo>
+    {
+        public override void Write(SpellGo packet, WorldPacket data)
+        {
+            packet.Cast.WriteClassicEra(data);
+            packet.WriteLogData(data);
+        }
+    }
+
+    /// <summary>3.4.3.</summary>
+    internal sealed class WotLKClassicLayout : ServerPacketLayout<SpellGo>
+    {
+        public override void Write(SpellGo packet, WorldPacket data)
+        {
+            packet.Cast.WriteWotLKClassic(data);
+            packet.WriteLogData(data);
+        }
+    }
+
+    /// <summary>4.4.2.</summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<SpellGo>
+    {
+        public override void Write(SpellGo packet, WorldPacket data)
+        {
+            packet.Cast.WriteCataClassic(data);
+            packet.WriteLogData(data);
+        }
+    }
+
     public SpellGo() : base(Opcode.SMSG_SPELL_GO, ConnectionType.Instance) { }
 
-    public override void Write()
-    {
-        Cast.Write(_worldPacket);
+    public override void Write() => Layout.Write(this, _worldPacket);
 
-        _worldPacket.WriteBit(LogData != null);
+    private void WriteLogData(WorldPacket data)
+    {
+        data.WriteBit(LogData != null);
         if (LogData != null)
-            LogData.Write(_worldPacket);
-        _worldPacket.FlushBits();
+            LogData.Write(data);
+        data.FlushBits();
     }
 
     /// <summary>Set by whoever builds the packet — see <see cref="SpellStart.Cast"/>.</summary>
@@ -1141,7 +1209,7 @@ class SpellGo : ServerPacket
 
 public class SpellCastData
 {
-    public void Write(WorldPacket data)
+    private void WriteHead(WorldPacket data)
     {
         data.WritePackedGuid128(CasterGUID);
         data.WritePackedGuid128(CasterUnit);
@@ -1169,53 +1237,93 @@ public class SpellCastData
         data.WriteBit(AmmoDisplayId != null);
         data.WriteBit(AmmoInventoryType != null);
         data.FlushBits();
+    }
 
-        // Field order changed at V3_4_3.51505 (per WPP V3_4_0_45166 ReadSpellCastData
-        // lines 126-140): pre-3.4.3.51505 reads MissStatus first, then Target;
-        // 3.4.3.51505+ reads Target / HitTargets / MissTargets / MissStatus.
-        // Mis-ordering scrambles the bit-stream for any spell with misses
-        // (Death Grip on an immune target observed crashing the V3_4_3 client) and
-        // misaligns the embedded RuneData. Branch on ModernVersion so V1_14 / V2_5
-        // (pre-3.4.3.51505) keep the layout they've used since the codebase shipped.
-        if (ModernVersion.IsWotLKClassicOrLater)
-        {
-            Target.Write(data);
+    /// <summary>1.14 and 2.5: MissStatus before Target.</summary>
+    public void WriteClassicEra(WorldPacket data)
+    {
+        WriteHead(data);
 
-            foreach (WowGuid128 hitTarget in HitTargets)
-                data.WritePackedGuid128(hitTarget);
+        foreach (SpellMissStatus missStatus in MissStatus)
+            missStatus.Write(data);
 
-            foreach (WowGuid128 missTarget in MissTargets)
-                data.WritePackedGuid128(missTarget);
+        Target.Write(data);
 
-            foreach (SpellMissStatus missStatus in MissStatus)
-                missStatus.Write(data);
+        foreach (WowGuid128 hitTarget in HitTargets)
+            data.WritePackedGuid128(hitTarget);
 
-            foreach (SpellPowerData power in RemainingPower)
-                power.Write(data);
+        foreach (WowGuid128 missTarget in MissTargets)
+            data.WritePackedGuid128(missTarget);
 
-            if (RemainingRunes != null)
-                RemainingRunes.Write(data);
-        }
-        else
-        {
-            foreach (SpellMissStatus missStatus in MissStatus)
-                missStatus.Write(data);
+        foreach (SpellPowerData power in RemainingPower)
+            power.Write(data);
 
-            Target.Write(data);
+        if (RemainingRunes != null)
+            RemainingRunes.Write(data);
 
-            foreach (WowGuid128 hitTarget in HitTargets)
-                data.WritePackedGuid128(hitTarget);
+        WriteTail(data);
+    }
 
-            foreach (WowGuid128 missTarget in MissTargets)
-                data.WritePackedGuid128(missTarget);
+    // Field order changed at V3_4_3.51505 (per WPP V3_4_0_45166 ReadSpellCastData
+    // lines 126-140): pre-3.4.3.51505 reads MissStatus first, then Target;
+    // 3.4.3.51505+ reads Target / HitTargets / MissTargets / MissStatus.
+    // Mis-ordering scrambles the bit-stream for any spell with misses
+    // (Death Grip on an immune target observed crashing the V3_4_3 client) and
+    // misaligns the embedded RuneData.
+    public void WriteWotLKClassic(WorldPacket data)
+    {
+        WriteHead(data);
 
-            foreach (SpellPowerData power in RemainingPower)
-                power.Write(data);
+        Target.Write(data);
 
-            if (RemainingRunes != null)
-                RemainingRunes.Write(data);
-        }
+        foreach (WowGuid128 hitTarget in HitTargets)
+            data.WritePackedGuid128(hitTarget);
 
+        foreach (WowGuid128 missTarget in MissTargets)
+            data.WritePackedGuid128(missTarget);
+
+        foreach (SpellMissStatus missStatus in MissStatus)
+            missStatus.Write(data);
+
+        foreach (SpellPowerData power in RemainingPower)
+            power.Write(data);
+
+        if (RemainingRunes != null)
+            RemainingRunes.Write(data);
+
+        WriteTail(data);
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, and the client's reader): the 3.4.3 order, with each
+    /// remaining-power entry as (Type, Cost) instead of (Cost, Type).
+    /// </summary>
+    public void WriteCataClassic(WorldPacket data)
+    {
+        WriteHead(data);
+
+        Target.Write(data);
+
+        foreach (WowGuid128 hitTarget in HitTargets)
+            data.WritePackedGuid128(hitTarget);
+
+        foreach (WowGuid128 missTarget in MissTargets)
+            data.WritePackedGuid128(missTarget);
+
+        foreach (SpellMissStatus missStatus in MissStatus)
+            missStatus.Write(data);
+
+        foreach (SpellPowerData power in RemainingPower)
+            power.WriteTypeFirst(data);
+
+        if (RemainingRunes != null)
+            RemainingRunes.Write(data);
+
+        WriteTail(data);
+    }
+
+    private void WriteTail(WorldPacket data)
+    {
         foreach (TargetLocation targetLoc in TargetPoints)
             targetLoc.Write(data);
 
@@ -1454,6 +1562,13 @@ public struct SpellPowerData
     {
         data.WriteInt32(Cost);
         data.WriteInt8((sbyte)Type);
+    }
+
+    // 4.4.2 swapped the two fields.
+    public void WriteTypeFirst(WorldPacket data)
+    {
+        data.WriteInt8((sbyte)Type);
+        data.WriteInt32(Cost);
     }
 
     public int Cost;

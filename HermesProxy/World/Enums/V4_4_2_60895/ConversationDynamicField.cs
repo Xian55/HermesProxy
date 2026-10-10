@@ -1,0 +1,8 @@
+namespace HermesProxy.World.Enums.V4_4_2_60895;
+
+public enum ConversationDynamicField
+{
+	CONVERSATION_DYNAMIC_FIELD_ACTORS = 0,
+	CONVERSATION_DYNAMIC_FIELD_LINES = 1,
+	CONVERSATION_DYNAMIC_END = 2
+}

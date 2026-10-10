@@ -251,7 +251,8 @@ public readonly record struct ChatMessageDND(string Text);
 
 public readonly record struct ChatMessageChannel(uint Language, WowGuid128 ChannelGUID, string Target, string Text, bool IsSecure);
 
-public readonly record struct ChatMessageWhisper(uint Language, string Target, string Text);
+/// <param name="TargetGUID">4.4.2 sends the target's GUID too, and may leave the name empty.</param>
+public readonly record struct ChatMessageWhisper(uint Language, string Target, string Text, WowGuid128 TargetGUID = default);
 
 public readonly record struct ChatMessageEmote(string Text);
 
@@ -265,7 +266,7 @@ public readonly record struct ChatAddonMessage(ChatAddonMessageParams Params);
 public readonly record struct ChatAddonMessageTargeted(
     ChatAddonMessageParams Params, WowGuid128 ChannelGuid, string Target);
 
-public class ChatPkt : ServerPacket, ISpanWritable
+public sealed class ChatPkt : ServerPacket, ISpanWritable
 {
     public ChatPkt(GlobalSessionData globalSession, ChatMessageTypeModern chatType, string message, uint language = 0, WowGuid128 sender = default, string senderName = "", WowGuid128 receiver = default, string receiverName = "", string channelName = "", ChatFlags chatFlags = ChatFlags.None, string addonPrefix = "", uint achievementId = 0) : base(Opcode.SMSG_CHAT)
     {
@@ -318,93 +319,14 @@ public class ChatPkt : ServerPacket, ISpanWritable
         }
         return true;
     }
-    public override void Write()
-    {
-        // V3_4_3.54261 layout per WPP V9_0_1 ChatHandler.cs:12-83 (gated by
-        // WotLK branch >= V3_4_2_50129 and < V10_2_7_54577):
-        //   - PartyGUID is dropped (V3_4_2+)
-        //   - SpellID int32 added after DisplayTime (V3_4_2+)
-        //   - ChatFlags is NOT byte-aligned uint16 (that's V10_2_7+); instead
-        //     it lives as a 15-bit field inside the bit section, between
-        //     textLen and HideChatLog.
-        // Total bits: 11+11+5+7+12 + 15 + 4 = 65 bits = 9 bytes.
-        // Earlier "fix" wrote uint16 ChatFlags byte-aligned + 50 bits — those
-        // 2 extra bytes shifted every following field, so WPP saw Prefix="Xii"
-        // and Text="" and the V3_4_3 client silently dropped the message.
-        if (ModernVersion.IsWotLKClassicOrLater)
-        {
-            _worldPacket.WriteUInt8((byte)SlashCmd);
-            _worldPacket.WriteUInt32(_Language);
-            _worldPacket.WritePackedGuid128(SenderGUID);
-            _worldPacket.WritePackedGuid128(SenderGuildGUID);
-            _worldPacket.WritePackedGuid128(SenderAccountGUID);
-            _worldPacket.WritePackedGuid128(TargetGUID);
-            _worldPacket.WriteUInt32(TargetVirtualAddress);
-            _worldPacket.WriteUInt32(SenderVirtualAddress);
-            _worldPacket.WriteInt32((int)AchievementID);
-            _worldPacket.WriteFloat(DisplayTime);
-            _worldPacket.WriteInt32(SpellID);
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<ChatPkt>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V3_4_3_54261, new ClassicEraLayout()),
+        (ClientVersionBuild.V3_4_3_54261, ClientVersionBuild.V4_4_2_60895, new WotLKClassicLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
 
-            _worldPacket.WriteBits(SenderName.GetByteCount(), 11);
-            _worldPacket.WriteBits(TargetName.GetByteCount(), 11);
-            _worldPacket.WriteBits(Prefix.GetByteCount(), 5);
-            _worldPacket.WriteBits(Channel.GetByteCount(), 7);
-            _worldPacket.WriteBits(ChatText.GetByteCount(), 12);
-            _worldPacket.WriteBits((uint)_ChatFlags, 15);
-            _worldPacket.WriteBit(HideChatLog);
-            _worldPacket.WriteBit(FakeSenderName);
-            _worldPacket.WriteBit(Unused_801.HasValue);
-            _worldPacket.WriteBit(ChannelGUID != default);
-            _worldPacket.FlushBits();
+    private static readonly ServerPacketLayout<ChatPkt> Layout = Layouts.ForRunningClient();
 
-            _worldPacket.WriteString(SenderName);
-            _worldPacket.WriteString(TargetName);
-            _worldPacket.WriteString(Prefix);
-            _worldPacket.WriteString(Channel);
-            _worldPacket.WriteString(ChatText);
-
-            if (Unused_801.HasValue)
-                _worldPacket.WriteUInt32(Unused_801.Value);
-            if (ChannelGUID != default)
-                _worldPacket.WritePackedGuid128(ChannelGUID);
-            return;
-        }
-
-        _worldPacket.WriteUInt8((byte)SlashCmd);
-        _worldPacket.WriteUInt32((uint)_Language);
-        _worldPacket.WritePackedGuid128(SenderGUID);
-        _worldPacket.WritePackedGuid128(SenderGuildGUID);
-        _worldPacket.WritePackedGuid128(SenderAccountGUID);
-        _worldPacket.WritePackedGuid128(TargetGUID);
-        _worldPacket.WriteUInt32(TargetVirtualAddress);
-        _worldPacket.WriteUInt32(SenderVirtualAddress);
-        _worldPacket.WritePackedGuid128(PartyGUID);
-        _worldPacket.WriteUInt32(AchievementID);
-        _worldPacket.WriteFloat(DisplayTime);
-        _worldPacket.WriteBits(SenderName.GetByteCount(), 11);
-        _worldPacket.WriteBits(TargetName.GetByteCount(), 11);
-        _worldPacket.WriteBits(Prefix.GetByteCount(), 5);
-        _worldPacket.WriteBits(Channel.GetByteCount(), 7);
-        _worldPacket.WriteBits(ChatText.GetByteCount(), 12);
-        _worldPacket.WriteBits((byte)_ChatFlags, 14);
-        _worldPacket.WriteBit(HideChatLog);
-        _worldPacket.WriteBit(FakeSenderName);
-        _worldPacket.WriteBit(Unused_801.HasValue);
-        _worldPacket.WriteBit(ChannelGUID != default);
-        _worldPacket.FlushBits();
-
-        _worldPacket.WriteString(SenderName);
-        _worldPacket.WriteString(TargetName);
-        _worldPacket.WriteString(Prefix);
-        _worldPacket.WriteString(Channel);
-        _worldPacket.WriteString(ChatText);
-
-        if (Unused_801.HasValue)
-            _worldPacket.WriteUInt32(Unused_801.Value);
-
-        if (ChannelGUID != default)
-            _worldPacket.WritePackedGuid128(ChannelGUID);
-    }
+    public override void Write() => Layout.Write(this, _worldPacket);
 
     // MaxSize: byte(1) + uint(4) + 6 GUIDs(108) + 2 uints(8) + uint(4) + float(4)
     // + bits(8) + strings: sender(128) + target(128) + prefix(32) + channel(128) + chat(512)
@@ -416,21 +338,37 @@ public class ChatPkt : ServerPacket, ISpanWritable
     public int MaxSize => 1 + 4 + PackedGuidHelper.MaxPackedGuid128Size * 6 + 16 + 8 +
         MaxSenderNameBytes * 2 + 32 + 128 + MaxChatTextBytes + 22;
 
-    public int WriteToSpan(Span<byte> buffer)
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>The string lengths, or false when one exceeds the span path's budget.</summary>
+    private bool TryMeasure(out int senderNameBytes, out int targetNameBytes, out int prefixBytes, out int channelBytes, out int chatTextBytes)
     {
-        int senderNameBytes = Encoding.UTF8.GetByteCount(SenderName ?? "");
-        int targetNameBytes = Encoding.UTF8.GetByteCount(TargetName ?? "");
-        int prefixBytes = Encoding.UTF8.GetByteCount(Prefix ?? "");
-        int channelBytes = Encoding.UTF8.GetByteCount(Channel ?? "");
-        int chatTextBytes = Encoding.UTF8.GetByteCount(ChatText ?? "");
+        senderNameBytes = Encoding.UTF8.GetByteCount(SenderName ?? "");
+        targetNameBytes = Encoding.UTF8.GetByteCount(TargetName ?? "");
+        prefixBytes = Encoding.UTF8.GetByteCount(Prefix ?? "");
+        channelBytes = Encoding.UTF8.GetByteCount(Channel ?? "");
+        chatTextBytes = Encoding.UTF8.GetByteCount(ChatText ?? "");
 
         // Check against our reduced MaxSize limits - fallback to Write() for oversized messages
         // Protocol limits are larger (2047/4095) but we optimize for typical usage
-        if (senderNameBytes > MaxSenderNameBytes || targetNameBytes > MaxSenderNameBytes ||
-            prefixBytes > 31 || channelBytes > 127 || chatTextBytes > MaxChatTextBytes)
-            return -1;
+        return senderNameBytes <= MaxSenderNameBytes && targetNameBytes <= MaxSenderNameBytes &&
+            prefixBytes <= 31 && channelBytes <= 127 && chatTextBytes <= MaxChatTextBytes;
+    }
 
-        var writer = new SpanPacketWriter(buffer);
+    private void WriteHead(WorldPacket data)
+    {
+        data.WriteUInt8((byte)SlashCmd);
+        data.WriteUInt32(_Language);
+        data.WritePackedGuid128(SenderGUID);
+        data.WritePackedGuid128(SenderGuildGUID);
+        data.WritePackedGuid128(SenderAccountGUID);
+        data.WritePackedGuid128(TargetGUID);
+        data.WriteUInt32(TargetVirtualAddress);
+        data.WriteUInt32(SenderVirtualAddress);
+    }
+
+    private void WriteHead(ref SpanPacketWriter writer)
+    {
         writer.WriteUInt8((byte)SlashCmd);
         writer.WriteUInt32(_Language);
         writer.WritePackedGuid128(SenderGUID.Low, SenderGUID.High);
@@ -439,48 +377,31 @@ public class ChatPkt : ServerPacket, ISpanWritable
         writer.WritePackedGuid128(TargetGUID.Low, TargetGUID.High);
         writer.WriteUInt32(TargetVirtualAddress);
         writer.WriteUInt32(SenderVirtualAddress);
+    }
 
-        if (ModernVersion.IsWotLKClassicOrLater)
-        {
-            writer.WriteInt32((int)AchievementID);
-            writer.WriteFloat(DisplayTime);
-            writer.WriteInt32(SpellID);
+    private void WriteFlagBitsAndTail(WorldPacket data)
+    {
+        data.WriteBit(HideChatLog);
+        data.WriteBit(FakeSenderName);
+        data.WriteBit(Unused_801.HasValue);
+        data.WriteBit(ChannelGUID != default);
+        data.FlushBits();
 
-            writer.WriteBits((uint)senderNameBytes, 11);
-            writer.WriteBits((uint)targetNameBytes, 11);
-            writer.WriteBits((uint)prefixBytes, 5);
-            writer.WriteBits((uint)channelBytes, 7);
-            writer.WriteBits((uint)chatTextBytes, 12);
-            writer.WriteBits((uint)_ChatFlags, 15);
-            writer.WriteBit(HideChatLog);
-            writer.WriteBit(FakeSenderName);
-            writer.WriteBit(Unused_801.HasValue);
-            writer.WriteBit(ChannelGUID != default);
-            writer.FlushBits();
+        data.WriteString(SenderName);
+        data.WriteString(TargetName);
+        data.WriteString(Prefix);
+        data.WriteString(Channel);
+        data.WriteString(ChatText);
 
-            writer.WriteString(SenderName ?? "");
-            writer.WriteString(TargetName ?? "");
-            writer.WriteString(Prefix ?? "");
-            writer.WriteString(Channel ?? "");
-            writer.WriteString(ChatText ?? "");
+        if (Unused_801.HasValue)
+            data.WriteUInt32(Unused_801.Value);
 
-            if (Unused_801.HasValue)
-                writer.WriteUInt32(Unused_801.Value);
-            if (ChannelGUID != default)
-                writer.WritePackedGuid128(ChannelGUID.Low, ChannelGUID.High);
+        if (ChannelGUID != default)
+            data.WritePackedGuid128(ChannelGUID);
+    }
 
-            return writer.Position;
-        }
-
-        writer.WritePackedGuid128(PartyGUID.Low, PartyGUID.High);
-        writer.WriteUInt32(AchievementID);
-        writer.WriteFloat(DisplayTime);
-        writer.WriteBits((uint)senderNameBytes, 11);
-        writer.WriteBits((uint)targetNameBytes, 11);
-        writer.WriteBits((uint)prefixBytes, 5);
-        writer.WriteBits((uint)channelBytes, 7);
-        writer.WriteBits((uint)chatTextBytes, 12);
-        writer.WriteBits((uint)_ChatFlags, 14);
+    private void WriteFlagBitsAndTail(ref SpanPacketWriter writer)
+    {
         writer.WriteBit(HideChatLog);
         writer.WriteBit(FakeSenderName);
         writer.WriteBit(Unused_801.HasValue);
@@ -498,8 +419,137 @@ public class ChatPkt : ServerPacket, ISpanWritable
 
         if (ChannelGUID != default)
             writer.WritePackedGuid128(ChannelGUID.Low, ChannelGUID.High);
+    }
 
-        return writer.Position;
+    /// <summary>1.14 and 2.5: PartyGUID, and ChatFlags as a 14-bit field.</summary>
+    internal sealed class ClassicEraLayout : ServerPacketLayout<ChatPkt>
+    {
+        public override void Write(ChatPkt packet, WorldPacket data)
+        {
+            packet.WriteHead(data);
+            data.WritePackedGuid128(packet.PartyGUID);
+            data.WriteUInt32(packet.AchievementID);
+            data.WriteFloat(packet.DisplayTime);
+            data.WriteBits(packet.SenderName.GetByteCount(), 11);
+            data.WriteBits(packet.TargetName.GetByteCount(), 11);
+            data.WriteBits(packet.Prefix.GetByteCount(), 5);
+            data.WriteBits(packet.Channel.GetByteCount(), 7);
+            data.WriteBits(packet.ChatText.GetByteCount(), 12);
+            data.WriteBits((byte)packet._ChatFlags, 14);
+            packet.WriteFlagBitsAndTail(data);
+        }
+
+        public override int WriteToSpan(ChatPkt packet, Span<byte> buffer)
+        {
+            if (!packet.TryMeasure(out int senderNameBytes, out int targetNameBytes, out int prefixBytes, out int channelBytes, out int chatTextBytes))
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            packet.WriteHead(ref writer);
+            writer.WritePackedGuid128(packet.PartyGUID.Low, packet.PartyGUID.High);
+            writer.WriteUInt32(packet.AchievementID);
+            writer.WriteFloat(packet.DisplayTime);
+            writer.WriteBits((uint)senderNameBytes, 11);
+            writer.WriteBits((uint)targetNameBytes, 11);
+            writer.WriteBits((uint)prefixBytes, 5);
+            writer.WriteBits((uint)channelBytes, 7);
+            writer.WriteBits((uint)chatTextBytes, 12);
+            writer.WriteBits((uint)packet._ChatFlags, 14);
+            packet.WriteFlagBitsAndTail(ref writer);
+            return writer.Position;
+        }
+    }
+
+    /// <summary>
+    /// 3.4.3, per WPP V9_0_1 ChatHandler.cs:12-83 (gated by WotLK branch >= V3_4_2_50129 and
+    /// &lt; V10_2_7_54577): PartyGUID is dropped, SpellID int32 follows DisplayTime, and ChatFlags is
+    /// a 15-bit field inside the bit section, between textLen and HideChatLog. Total bits:
+    /// 11+11+5+7+12 + 15 + 4 = 65 bits = 9 bytes. An earlier "fix" wrote a byte-aligned uint16
+    /// ChatFlags + 50 bits; those 2 extra bytes shifted every following field, so WPP saw
+    /// Prefix="Xii" and Text="" and the V3_4_3 client silently dropped the message.
+    /// </summary>
+    internal sealed class WotLKClassicLayout : ServerPacketLayout<ChatPkt>
+    {
+        public override void Write(ChatPkt packet, WorldPacket data)
+        {
+            packet.WriteHead(data);
+            data.WriteInt32((int)packet.AchievementID);
+            data.WriteFloat(packet.DisplayTime);
+            data.WriteInt32(packet.SpellID);
+
+            data.WriteBits(packet.SenderName.GetByteCount(), 11);
+            data.WriteBits(packet.TargetName.GetByteCount(), 11);
+            data.WriteBits(packet.Prefix.GetByteCount(), 5);
+            data.WriteBits(packet.Channel.GetByteCount(), 7);
+            data.WriteBits(packet.ChatText.GetByteCount(), 12);
+            data.WriteBits((uint)packet._ChatFlags, 15);
+            packet.WriteFlagBitsAndTail(data);
+        }
+
+        public override int WriteToSpan(ChatPkt packet, Span<byte> buffer)
+        {
+            if (!packet.TryMeasure(out int senderNameBytes, out int targetNameBytes, out int prefixBytes, out int channelBytes, out int chatTextBytes))
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            packet.WriteHead(ref writer);
+            writer.WriteInt32((int)packet.AchievementID);
+            writer.WriteFloat(packet.DisplayTime);
+            writer.WriteInt32(packet.SpellID);
+
+            writer.WriteBits((uint)senderNameBytes, 11);
+            writer.WriteBits((uint)targetNameBytes, 11);
+            writer.WriteBits((uint)prefixBytes, 5);
+            writer.WriteBits((uint)channelBytes, 7);
+            writer.WriteBits((uint)chatTextBytes, 12);
+            writer.WriteBits((uint)packet._ChatFlags, 15);
+            packet.WriteFlagBitsAndTail(ref writer);
+            return writer.Position;
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, and the client's reader): ChatFlags is a byte-aligned uint16
+    /// between AchievementID and DisplayTime, and the bit section loses it.
+    /// </summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<ChatPkt>
+    {
+        public override void Write(ChatPkt packet, WorldPacket data)
+        {
+            packet.WriteHead(data);
+            data.WriteInt32((int)packet.AchievementID);
+            data.WriteUInt16((ushort)packet._ChatFlags);
+            data.WriteFloat(packet.DisplayTime);
+            data.WriteInt32(packet.SpellID);
+
+            data.WriteBits(packet.SenderName.GetByteCount(), 11);
+            data.WriteBits(packet.TargetName.GetByteCount(), 11);
+            data.WriteBits(packet.Prefix.GetByteCount(), 5);
+            data.WriteBits(packet.Channel.GetByteCount(), 7);
+            data.WriteBits(packet.ChatText.GetByteCount(), 12);
+            packet.WriteFlagBitsAndTail(data);
+        }
+
+        public override int WriteToSpan(ChatPkt packet, Span<byte> buffer)
+        {
+            if (!packet.TryMeasure(out int senderNameBytes, out int targetNameBytes, out int prefixBytes, out int channelBytes, out int chatTextBytes))
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            packet.WriteHead(ref writer);
+            writer.WriteInt32((int)packet.AchievementID);
+            writer.WriteUInt16((ushort)packet._ChatFlags);
+            writer.WriteFloat(packet.DisplayTime);
+            writer.WriteInt32(packet.SpellID);
+
+            writer.WriteBits((uint)senderNameBytes, 11);
+            writer.WriteBits((uint)targetNameBytes, 11);
+            writer.WriteBits((uint)prefixBytes, 5);
+            writer.WriteBits((uint)channelBytes, 7);
+            writer.WriteBits((uint)chatTextBytes, 12);
+            packet.WriteFlagBitsAndTail(ref writer);
+            return writer.Position;
+        }
     }
 
     public ChatMessageTypeModern SlashCmd = 0;

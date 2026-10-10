@@ -97,7 +97,7 @@ public static class ChatMessageEmoteCodecPreWotLKClassic
 
 // ---- Whisper: both lengths are read before either string, so they cannot be inlined ----
 
-[PacketCodec(typeof(ChatMessageWhisper), AddedIn = ClientVersionBuild.V3_4_3_54261)]
+[PacketCodec(typeof(ChatMessageWhisper), AddedIn = ClientVersionBuild.V3_4_3_54261, RemovedIn = ClientVersionBuild.V4_4_2_60895)]
 public static class ChatMessageWhisperCodecWotLKClassic
 {
     public static void Read(ref SpanPacketReader r, out ChatMessageWhisper packet)
@@ -122,6 +122,35 @@ public static class ChatMessageWhisperCodecPreWotLKClassic
         string target = r.ReadString(targetLen);
         string text = r.ReadString(textLen);
         packet = new ChatMessageWhisper(language, target, text);
+    }
+}
+
+// 4.4.2 (TrinityCore cata_classic, and the client's writer): the target's GUID and realm come
+// first, the name length shrank to 7 bits, and both lengths count a trailing NUL that is on the
+// wire. A length of 0 or 1 means no string at all.
+[PacketCodec(typeof(ChatMessageWhisper), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class ChatMessageWhisperCodecCataClassic
+{
+    public static void Read(ref SpanPacketReader r, out ChatMessageWhisper packet)
+    {
+        uint language = r.ReadUInt32();
+        WowGuid128 targetGuid = r.ReadPackedGuid128();
+        r.ReadUInt32();                             // TargetVirtualRealmAddress
+        uint targetLen = r.ReadBits<uint>(7);
+        uint textLen = r.ReadBits<uint>(11);
+        string target = ReadTerminated(ref r, targetLen);
+        string text = ReadTerminated(ref r, textLen);
+        packet = new ChatMessageWhisper(language, target, text, targetGuid);
+    }
+
+    private static string ReadTerminated(ref SpanPacketReader r, uint len)
+    {
+        if (len <= 1)
+            return "";
+
+        string value = r.ReadString(len - 1);
+        r.ReadUInt8();                              // NUL
+        return value;
     }
 }
 

@@ -443,6 +443,9 @@ public sealed class GameSessionData
     public Dictionary<WowGuid128, ObjectType> OriginalObjectTypes = [];
     public Dictionary<WowGuid128, uint[]> ItemGems = [];
     public Dictionary<WowGuid128, Class> CreatureClasses = [];
+    // 4.4.2: the creatures created with the FVendor_C fragment, and its flags. Their values
+    // updates have to keep the fragment active. Written and read by the update builder only.
+    public Dictionary<WowGuid128, int> VendorFragmentFlags = [];
 
     public Dictionary<string, int> ChannelIds = [];
     public Dictionary<int, string> ChannelNamesById = [];

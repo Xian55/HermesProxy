@@ -705,35 +705,78 @@ public readonly record struct RepopRequest(bool CheckInstance);
 
 public readonly record struct QueryCorpseLocationFromClient(WowGuid128 Player);
 
-public class CorpseLocation : ServerPacket, ISpanWritable
+public sealed class CorpseLocation : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<CorpseLocation>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new PositionAfterActualMapLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new PositionLastLayout()));
+
+    private static readonly ServerPacketLayout<CorpseLocation> Layout = Layouts.ForRunningClient();
+
     public CorpseLocation() : base(Opcode.SMSG_CORPSE_LOCATION) { }
 
-    public override void Write()
-    {
-        _worldPacket.WriteBit(Valid);
-        _worldPacket.FlushBits();
-
-        _worldPacket.WritePackedGuid128(Player);
-        _worldPacket.WriteInt32(ActualMapID);
-        _worldPacket.WriteVector3(Position);
-        _worldPacket.WriteInt32(MapID);
-        _worldPacket.WritePackedGuid128(Transport);
-    }
+    public override void Write() => Layout.Write(this, _worldPacket);
 
     public int MaxSize => 1 + PackedGuidHelper.MaxPackedGuid128Size * 2 + 4 + 12 + 4; // bit + 2 GUIDs + int + Vector3 + int
 
-    public int WriteToSpan(Span<byte> buffer)
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>Up to 3.4.3: Position between ActualMapID and MapID.</summary>
+    internal sealed class PositionAfterActualMapLayout : ServerPacketLayout<CorpseLocation>
     {
-        var writer = new SpanPacketWriter(buffer);
-        writer.WriteBit(Valid);
-        writer.FlushBits();
-        writer.WritePackedGuid128(Player.Low, Player.High);
-        writer.WriteInt32(ActualMapID);
-        writer.WriteVector3(Position);
-        writer.WriteInt32(MapID);
-        writer.WritePackedGuid128(Transport.Low, Transport.High);
-        return writer.Position;
+        public override void Write(CorpseLocation packet, WorldPacket data)
+        {
+            data.WriteBit(packet.Valid);
+            data.FlushBits();
+
+            data.WritePackedGuid128(packet.Player);
+            data.WriteInt32(packet.ActualMapID);
+            data.WriteVector3(packet.Position);
+            data.WriteInt32(packet.MapID);
+            data.WritePackedGuid128(packet.Transport);
+        }
+
+        public override int WriteToSpan(CorpseLocation packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBit(packet.Valid);
+            writer.FlushBits();
+            writer.WritePackedGuid128(packet.Player.Low, packet.Player.High);
+            writer.WriteInt32(packet.ActualMapID);
+            writer.WriteVector3(packet.Position);
+            writer.WriteInt32(packet.MapID);
+            writer.WritePackedGuid128(packet.Transport.Low, packet.Transport.High);
+            return writer.Position;
+        }
+    }
+
+    /// <summary>4.4.2 (TrinityCore cata_classic, and the client's reader): Position after Transport.</summary>
+    internal sealed class PositionLastLayout : ServerPacketLayout<CorpseLocation>
+    {
+        public override void Write(CorpseLocation packet, WorldPacket data)
+        {
+            data.WriteBit(packet.Valid);
+            data.FlushBits();
+
+            data.WritePackedGuid128(packet.Player);
+            data.WriteInt32(packet.ActualMapID);
+            data.WriteInt32(packet.MapID);
+            data.WritePackedGuid128(packet.Transport);
+            data.WriteVector3(packet.Position);
+        }
+
+        public override int WriteToSpan(CorpseLocation packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBit(packet.Valid);
+            writer.FlushBits();
+            writer.WritePackedGuid128(packet.Player.Low, packet.Player.High);
+            writer.WriteInt32(packet.ActualMapID);
+            writer.WriteInt32(packet.MapID);
+            writer.WritePackedGuid128(packet.Transport.Low, packet.Transport.High);
+            writer.WriteVector3(packet.Position);
+            return writer.Position;
+        }
     }
 
     public WowGuid128 Player;

@@ -23,7 +23,7 @@ internal static partial class QuestLogMessages
                   "entry={Entry} modern={Status} (0x{Encoded:X}) build={Build}")]
     public static partial void QuestGiverStatusWrite(
         ILogger logger, string path, ulong guidLow, ulong guidHigh, uint entry,
-        QuestGiverStatusModern status, uint encoded, ClientVersionBuild build);
+        QuestGiverStatusModern status, ulong encoded, ClientVersionBuild build);
 
     [LoggerMessage(
         EventId = 1601,
@@ -39,7 +39,7 @@ internal static partial class QuestLogMessages
                   "modern={Status} (0x{Encoded:X})")]
     public static partial void QuestGiverStatusMultipleEntry(
         ILogger logger, string path, int index, ulong guidLow, ulong guidHigh, uint entry,
-        QuestGiverStatusModern status, uint encoded);
+        QuestGiverStatusModern status, ulong encoded);
 
     [LoggerMessage(
         EventId = 1603,

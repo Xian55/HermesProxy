@@ -167,6 +167,8 @@ public static class ChatSystem
     public static void HandleChatMessageWhisper(in ChatMessageWhisper whisper, in SessionContext ctx)
     {
         string target = LegacyPlayerName.StripRealmSuffixToString(whisper.Target);
+        if (target.Length == 0 && !whisper.TargetGUID.IsEmpty())
+            target = ctx.GameState.GetPlayerName(whisper.TargetGUID);
         var toBeSentTextParts = ConvertTextMessageIntoMaxLengthParts(whisper.Text);
         foreach (string text in toBeSentTextParts)
         {

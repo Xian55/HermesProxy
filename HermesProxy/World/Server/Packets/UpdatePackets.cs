@@ -617,6 +617,12 @@ public class ObjectUpdate
 
 public class UpdateObject : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<UpdateObjectHeader> HeaderLayouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new UpdateObjectHeader.CountThenMap()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new UpdateObjectHeader.MapThenCount()));
+
+    private static readonly UpdateObjectHeader Header = HeaderLayouts.ForRunningClient();
+
     public UpdateObject(GameSessionData gameState) : base(Opcode.SMSG_UPDATE_OBJECT, ConnectionType.Instance)
     {
         _gameState = gameState;
@@ -643,6 +649,12 @@ public class UpdateObject : ServerPacket
     // ModernVersion.Build is fixed for the test process (V1_14_2), so the V3_4_3 arm is reached
     // through this hook, the same escape hatch ArenaPackets uses. Null in production.
     internal static bool? ForceV343ForTests;
+
+    // The running client's builder answers, so the filter and the writer agree on what is empty.
+    private static readonly Func<ObjectUpdate, GameSessionData, bool> HasAnyValuesDelta =
+        ModernVersion.GetUpdateFieldsDefiningBuild() == ClientVersionBuild.V4_4_2_60895
+            ? Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.HasAnyValuesDelta
+            : Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.HasAnyValuesDelta;
 
     public static int FilterV3_4_3Values(UpdateObject obj, GameSessionData gameState)
     {
@@ -705,7 +717,7 @@ public class UpdateObject : ServerPacket
                 // used to live here and answer it a second time; it covered a fraction of the
                 // tree, and every field added to a descriptor after it was written went missing
                 // in game instead of failing a build (issue #235).
-                if (!Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.HasAnyValuesDelta(u, gameState))
+                if (!HasAnyValuesDelta(u, gameState))
                 {
                     valuesEmptyStripped++;
                     World.Logging.ObjectLifecycleLogMessages.ValuesStripped(
@@ -783,13 +795,11 @@ public class UpdateObject : ServerPacket
         NumObjUpdates = (uint)ObjectUpdates.Count;
         MapID = (ushort)_gameState.CurrentMapId!;
 
-        _worldPacket.WriteUInt32(NumObjUpdates);
-        _worldPacket.WriteUInt16(MapID);
-
         // Both scratch buffers are disposed and spliced in as spans: they used to be left to the
         // finalizer with their rentals, and the result was copied out through GetData twice
         // before being copied into the packet a third time.
         using WorldPacket buffer = new();
+        Header.Write(_worldPacket, buffer, NumObjUpdates, MapID);
         if (buffer.WriteBit(!OutOfRangeGuids.Empty() || !DestroyedGuids.Empty()))
         {
             buffer.WriteUInt16((ushort)DestroyedGuids.Count);
@@ -838,6 +848,12 @@ public class UpdateObject : ServerPacket
                     builder.WriteToPacket(data);
                     break;
                 }
+                case ClientVersionBuild.V4_4_2_60895:
+                {
+                    Objects.Version.V4_4_2_60895.ObjectUpdateBuilder builder = new Objects.Version.V4_4_2_60895.ObjectUpdateBuilder(update, _gameState);
+                    builder.WriteToPacket(data);
+                    break;
+                }
                 default:
                     throw new System.ArgumentOutOfRangeException("No object update builder defined for current build.");
             }
@@ -878,8 +894,14 @@ public class HealthUpdate : ServerPacket
     public long Health;
 }
 
-public class PowerUpdate : ServerPacket, ISpanWritable
+public sealed class PowerUpdate : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<PowerUpdate>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new PowerFirstLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new TypeFirstLayout()));
+
+    private static readonly ServerPacketLayout<PowerUpdate> Layout = Layouts.ForRunningClient();
+
     // WoW has ~20 power types (mana, rage, focus, energy, combo points, runes, etc.)
     // Practical cap is much lower since a unit only has a few power types
     private const int MaxPowerTypes = 16;
@@ -890,40 +912,111 @@ public class PowerUpdate : ServerPacket, ISpanWritable
         Powers = new List<PowerUpdatePower>();
     }
 
-    public override void Write()
-    {
-        _worldPacket.WritePackedGuid128(Guid);
-        _worldPacket.WriteInt32(Powers.Count);
-        foreach (var power in Powers)
-        {
-            _worldPacket.WriteInt32(power.Power);
-            _worldPacket.WriteUInt8(power.PowerType);
-        }
-    }
+    public override void Write() => Layout.Write(this, _worldPacket);
 
     // MaxSize: PackedGuid128 (18) + int (4) + 16 * (int (4) + byte (1)) = 102
     public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + MaxPowerTypes * 5;
 
-    public int WriteToSpan(Span<byte> buffer)
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>Up to 3.4.3: each entry is (int32 Power, uint8 PowerType).</summary>
+    internal sealed class PowerFirstLayout : ServerPacketLayout<PowerUpdate>
     {
-        if (Powers.Count > MaxPowerTypes)
-            return -1;
-
-        var writer = new SpanPacketWriter(buffer);
-        writer.WritePackedGuid128(Guid.Low, Guid.High);
-        writer.WriteInt32(Powers.Count);
-
-        foreach (var power in Powers)
+        public override void Write(PowerUpdate packet, WorldPacket data)
         {
-            writer.WriteInt32(power.Power);
-            writer.WriteUInt8(power.PowerType);
+            data.WritePackedGuid128(packet.Guid);
+            data.WriteInt32(packet.Powers.Count);
+            foreach (var power in packet.Powers)
+            {
+                data.WriteInt32(power.Power);
+                data.WriteUInt8(power.PowerType);
+            }
         }
 
-        return writer.Position;
+        public override int WriteToSpan(PowerUpdate packet, Span<byte> buffer)
+        {
+            if (packet.Powers.Count > MaxPowerTypes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(packet.Guid.Low, packet.Guid.High);
+            writer.WriteInt32(packet.Powers.Count);
+
+            foreach (var power in packet.Powers)
+            {
+                writer.WriteInt32(power.Power);
+                writer.WriteUInt8(power.PowerType);
+            }
+
+            return writer.Position;
+        }
+    }
+
+    /// <summary>4.4.2 (TrinityCore cata_classic, and the client's reader): (uint8 PowerType, int32 Power).</summary>
+    internal sealed class TypeFirstLayout : ServerPacketLayout<PowerUpdate>
+    {
+        public override void Write(PowerUpdate packet, WorldPacket data)
+        {
+            data.WritePackedGuid128(packet.Guid);
+            data.WriteInt32(packet.Powers.Count);
+            foreach (var power in packet.Powers)
+            {
+                data.WriteUInt8(power.PowerType);
+                data.WriteInt32(power.Power);
+            }
+        }
+
+        public override int WriteToSpan(PowerUpdate packet, Span<byte> buffer)
+        {
+            if (packet.Powers.Count > MaxPowerTypes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(packet.Guid.Low, packet.Guid.High);
+            writer.WriteInt32(packet.Powers.Count);
+
+            foreach (var power in packet.Powers)
+            {
+                writer.WriteUInt8(power.PowerType);
+                writer.WriteInt32(power.Power);
+            }
+
+            return writer.Position;
+        }
     }
 
     public WowGuid128 Guid;
     public List<PowerUpdatePower> Powers;
+}
+
+/// <summary>
+/// The fields of SMSG_UPDATE_OBJECT ahead of the removed-objects bit, which differ by build.
+/// </summary>
+internal abstract class UpdateObjectHeader
+{
+    /// <param name="bits">The bit stream the removed-objects flag goes into next.</param>
+    public abstract void Write(WorldPacket data, WorldPacket bits, uint numObjUpdates, ushort mapId);
+
+    /// <summary>Up to 3.4.3: NumObjUpdates, then MapID.</summary>
+    internal sealed class CountThenMap : UpdateObjectHeader
+    {
+        public override void Write(WorldPacket data, WorldPacket bits, uint numObjUpdates, ushort mapId)
+        {
+            data.WriteUInt32(numObjUpdates);
+            data.WriteUInt16(mapId);
+        }
+    }
+
+    /// <summary>4.4.2: MapID, NumObjUpdates, then a bit TrinityCore always sets (unnamed).</summary>
+    internal sealed class MapThenCount : UpdateObjectHeader
+    {
+        public override void Write(WorldPacket data, WorldPacket bits, uint numObjUpdates, ushort mapId)
+        {
+            data.WriteUInt16(mapId);
+            data.WriteUInt32(numObjUpdates);
+            bits.WriteBit(true);
+        }
+    }
 }
 
 public struct PowerUpdatePower

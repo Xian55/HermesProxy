@@ -119,8 +119,15 @@ public readonly record struct QueryPlayerName(WowGuid128 Player);
 
 public readonly record struct QueryPlayerNames(List<WowGuid128> Players);
 
-public class QueryPlayerNameResponse : ServerPacket, ISpanWritable
+public sealed class QueryPlayerNameResponse : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<QueryPlayerNameResponse>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V3_4_3_54261, new SingleLayout()),
+        (ClientVersionBuild.V3_4_3_54261, ClientVersionBuild.V4_4_2_60895, new ListLayout(timerunning: false)),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new ListLayout(timerunning: true)));
+
+    private static readonly ServerPacketLayout<QueryPlayerNameResponse> Layout = Layouts.ForRunningClient();
+
     // V3_4_3 dropped the singular SMSG_QUERY_PLAYER_NAME_RESPONSE opcode and
     // expects everything via SMSG_QUERY_PLAYER_NAMES_RESPONSE (plural, with a
     // Count + array). Per WPP V3_4_0_45166 QueryHandler.cs:517 the per-entry
@@ -141,86 +148,74 @@ public class QueryPlayerNameResponse : ServerPacket, ISpanWritable
             : Opcode.SMSG_QUERY_PLAYER_NAME_RESPONSE;
     }
 
-    public override void Write()
-    {
-        if (ModernVersion.IsWotLKClassicOrLater)
-        {
-            _worldPacket.WriteUInt32(1);   // Count: we always carry exactly one
-                                           // legacy SMSG_NAME_QUERY_RESPONSE.
-            _worldPacket.WriteUInt8(Result);
-            _worldPacket.WritePackedGuid128(Player);
-            _worldPacket.WriteBit(Result == 0);   // HasPlayerGuidLookupData
-            _worldPacket.WriteBit(false);          // HasNameCacheUnused920
-            _worldPacket.FlushBits();
-            if (Result == 0)
-                Data.Write(_worldPacket);
-            return;
-        }
-
-        _worldPacket.WriteInt8((sbyte)Result);
-        _worldPacket.WritePackedGuid128(Player);
-
-        if (Result == 0)
-            Data.Write(_worldPacket);
-    }
+    public override void Write() => Layout.Write(this, _worldPacket);
 
     // Result byte(1) + GUID(18) + Data: bits(6) + 5 declined names(120) + 3 GUIDs(54) + ulong(8) + uint(4) + 5 bytes(5) + name(24) = 240 bytes max
-    // V3_4_3 adds Count(4) + 1 byte for the two extra bits, all within margin.
-    public int MaxSize => 4 + 1 + PackedGuidHelper.MaxPackedGuid128Size + 6 +
+    // V3_4_3 adds Count(4) + 1 byte for the two extra bits, 4.4.2 an int32, all within margin.
+    public int MaxSize => 4 + 4 + 1 + PackedGuidHelper.MaxPackedGuid128Size + 6 +
         (PlayerConst.MaxDeclinedNameCases * GameLimits.MaxPlayerNameBytes) +
         PackedGuidHelper.MaxPackedGuid128Size * 3 + 8 + 4 + 5 + GameLimits.MaxPlayerNameBytes;
 
-    public int WriteToSpan(Span<byte> buffer)
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>1.14 and 2.5: SMSG_QUERY_PLAYER_NAME_RESPONSE, one entry.</summary>
+    internal sealed class SingleLayout : ServerPacketLayout<QueryPlayerNameResponse>
     {
-        var writer = new SpanPacketWriter(buffer);
-
-        if (ModernVersion.IsWotLKClassicOrLater)
+        public override void Write(QueryPlayerNameResponse packet, WorldPacket data)
         {
-            writer.WriteUInt32(1);
-            writer.WriteUInt8(Result);
-            writer.WritePackedGuid128(Player.Low, Player.High);
-            writer.WriteBit(Result == 0);
-            writer.WriteBit(false);
-            writer.FlushBits();
+            data.WriteInt8((sbyte)packet.Result);
+            data.WritePackedGuid128(packet.Player);
 
-            if (Result == 0)
-                WritePlayerGuidLookupDataInline(ref writer);
+            if (packet.Result == 0)
+                packet.Data.Write(data, timerunning: false);
+        }
+
+        public override int WriteToSpan(QueryPlayerNameResponse packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt8((sbyte)packet.Result);
+            writer.WritePackedGuid128(packet.Player.Low, packet.Player.High);
+
+            if (packet.Result == 0)
+                packet.Data.WriteInline(ref writer, timerunning: false);
 
             return writer.Position;
         }
-
-        writer.WriteInt8((sbyte)Result);
-        writer.WritePackedGuid128(Player.Low, Player.High);
-
-        if (Result == 0)
-            WritePlayerGuidLookupDataInline(ref writer);
-
-        return writer.Position;
     }
 
-    private void WritePlayerGuidLookupDataInline(ref SpanPacketWriter writer)
+    /// <summary>
+    /// From 3.4.3 on: SMSG_QUERY_PLAYER_NAMES_RESPONSE with a count of one. 4.4.2 adds
+    /// TimerunningSeasonID to the lookup data.
+    /// </summary>
+    internal sealed class ListLayout(bool timerunning) : ServerPacketLayout<QueryPlayerNameResponse>
     {
-        writer.WriteBit(Data.IsDeleted);
-        writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Data.Name), 6);
+        public override void Write(QueryPlayerNameResponse packet, WorldPacket data)
+        {
+            data.WriteUInt32(1);   // Count: we always carry exactly one legacy SMSG_NAME_QUERY_RESPONSE.
+            data.WriteUInt8(packet.Result);
+            data.WritePackedGuid128(packet.Player);
+            data.WriteBit(packet.Result == 0);   // HasPlayerGuidLookupData
+            data.WriteBit(false);                // HasNameCacheUnused920
+            data.FlushBits();
+            if (packet.Result == 0)
+                packet.Data.Write(data, timerunning);
+        }
 
-        for (byte i = 0; i < PlayerConst.MaxDeclinedNameCases; ++i)
-            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Data.DeclinedNames.name[i]), 7);
+        public override int WriteToSpan(QueryPlayerNameResponse packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(1);
+            writer.WriteUInt8(packet.Result);
+            writer.WritePackedGuid128(packet.Player.Low, packet.Player.High);
+            writer.WriteBit(packet.Result == 0);
+            writer.WriteBit(false);
+            writer.FlushBits();
 
-        writer.FlushBits();
-        for (byte i = 0; i < PlayerConst.MaxDeclinedNameCases; ++i)
-            writer.WriteString(Data.DeclinedNames.name[i]);
+            if (packet.Result == 0)
+                packet.Data.WriteInline(ref writer, timerunning);
 
-        writer.WritePackedGuid128(Data.AccountID.Low, Data.AccountID.High);
-        writer.WritePackedGuid128(Data.BnetAccountID.Low, Data.BnetAccountID.High);
-        writer.WritePackedGuid128(Data.GuidActual.Low, Data.GuidActual.High);
-        writer.WriteUInt64(Data.GuildClubMemberID);
-        writer.WriteUInt32(Data.VirtualRealmAddress);
-        writer.WriteUInt8((byte)Data.RaceID);
-        writer.WriteUInt8((byte)Data.Sex);
-        writer.WriteUInt8((byte)Data.ClassID);
-        writer.WriteUInt8(Data.Level);
-        writer.WriteUInt8(Data.Unused915);
-        writer.WriteString(Data.Name);
+            return writer.Position;
+        }
     }
 
     public WowGuid128 Player;
@@ -230,7 +225,8 @@ public class QueryPlayerNameResponse : ServerPacket, ISpanWritable
 
 public class PlayerGuidLookupData
 {
-    public void Write(WorldPacket data)
+    /// <param name="timerunning">4.4.2 writes TimerunningSeasonID before the name.</param>
+    public void Write(WorldPacket data, bool timerunning)
     {
         data.WriteBit(IsDeleted);
         data.WriteBits(Name.GetByteCount(), 6);
@@ -252,7 +248,37 @@ public class PlayerGuidLookupData
         data.WriteUInt8((byte)ClassID);
         data.WriteUInt8(Level);
         data.WriteUInt8(Unused915);
+        if (timerunning)
+            data.WriteInt32(0);         // TimerunningSeasonID
         data.WriteString(Name);
+    }
+
+    /// <summary>The same fields as <see cref="Write"/>, for the span path.</summary>
+    internal void WriteInline(ref SpanPacketWriter writer, bool timerunning)
+    {
+        writer.WriteBit(IsDeleted);
+        writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Name), 6);
+
+        for (byte i = 0; i < PlayerConst.MaxDeclinedNameCases; ++i)
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(DeclinedNames.name[i]), 7);
+
+        writer.FlushBits();
+        for (byte i = 0; i < PlayerConst.MaxDeclinedNameCases; ++i)
+            writer.WriteString(DeclinedNames.name[i]);
+
+        writer.WritePackedGuid128(AccountID.Low, AccountID.High);
+        writer.WritePackedGuid128(BnetAccountID.Low, BnetAccountID.High);
+        writer.WritePackedGuid128(GuidActual.Low, GuidActual.High);
+        writer.WriteUInt64(GuildClubMemberID);
+        writer.WriteUInt32(VirtualRealmAddress);
+        writer.WriteUInt8((byte)RaceID);
+        writer.WriteUInt8((byte)Sex);
+        writer.WriteUInt8((byte)ClassID);
+        writer.WriteUInt8(Level);
+        writer.WriteUInt8(Unused915);
+        if (timerunning)
+            writer.WriteInt32(0);       // TimerunningSeasonID
+        writer.WriteString(Name);
     }
 
     public bool IsDeleted;
@@ -282,193 +308,270 @@ public class DeclinedName
 
 public readonly record struct QueryQuestInfo(uint QuestID, WowGuid128 QuestGiver);
 
-public class QueryQuestInfoResponse : ServerPacket
+public sealed class QueryQuestInfoResponse : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<QueryQuestInfoResponse>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V3_4_3_54261, new ClassicEraLayout()),
+        (ClientVersionBuild.V3_4_3_54261, ClientVersionBuild.V4_4_2_60895, new WotLKClassicLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
+
+    private static readonly ServerPacketLayout<QueryQuestInfoResponse> Layout = Layouts.ForRunningClient();
+
     public QueryQuestInfoResponse() : base(Opcode.SMSG_QUERY_QUEST_INFO_RESPONSE, ConnectionType.Instance) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>1.14 and 2.5.</summary>
+    internal sealed class ClassicEraLayout : ServerPacketLayout<QueryQuestInfoResponse>
     {
-        _worldPacket.WriteUInt32(QuestID);
-        _worldPacket.WriteBit(Allow);
-        _worldPacket.FlushBits();
-
-        if (Allow)
+        public override void Write(QueryQuestInfoResponse packet, WorldPacket data)
         {
-            _worldPacket.WriteUInt32(Info.QuestID);
-            _worldPacket.WriteInt32(Info.QuestType);
-            _worldPacket.WriteInt32(Info.QuestLevel);
-            _worldPacket.WriteInt32(Info.QuestScalingFactionGroup);
-            _worldPacket.WriteInt32(Info.QuestMaxScalingLevel);
-            _worldPacket.WriteUInt32(Info.QuestPackageID);
-            _worldPacket.WriteInt32(Info.MinLevel);
-            _worldPacket.WriteInt32(Info.QuestSortID);
-            _worldPacket.WriteUInt32(Info.QuestInfoID);
-            _worldPacket.WriteUInt32(Info.SuggestedGroupNum);
-            _worldPacket.WriteUInt32(Info.RewardNextQuest);
-            _worldPacket.WriteUInt32(Info.RewardXPDifficulty);
+            if (!packet.WriteHead(data))
+                return;
 
-            _worldPacket.WriteFloat(Info.RewardXPMultiplier);
+            QuestTemplate info = packet.Info;
+            data.WriteUInt32(info.PortraitGiver);
+            data.WriteUInt32(info.PortraitGiverMount);
+            data.WriteUInt32(info.PortraitTurnIn);
 
-            _worldPacket.WriteInt32(Info.RewardMoney);
-            _worldPacket.WriteUInt32(Info.RewardMoneyDifficulty);
-            _worldPacket.WriteFloat(Info.RewardMoneyMultiplier);
-            _worldPacket.WriteUInt32(Info.RewardBonusMoney);
+            data.WriteInt32(0); // Unk 2.5.2
 
-            for (uint i = 0; i < QuestConst.QuestRewardDisplaySpellCount; ++i)
-                _worldPacket.WriteUInt32(Info.RewardDisplaySpell[i]);
+            packet.WriteFactionsAndCurrencies(data);
 
-            _worldPacket.WriteUInt32(Info.RewardSpell);
-            _worldPacket.WriteUInt32(Info.RewardHonor);
+            data.WriteUInt32(info.AreaGroupID);
+            data.WriteUInt32(info.TimeAllowed);
 
-            _worldPacket.WriteFloat(Info.RewardKillHonor);
+            data.WriteInt32(info.Objectives.Count);
+            data.WriteInt64(info.AllowableRaces);
+            data.WriteInt32(info.TreasurePickerID);
+            data.WriteInt32(info.Expansion);
 
-            _worldPacket.WriteInt32(Info.RewardArtifactXPDifficulty);
-            _worldPacket.WriteFloat(Info.RewardArtifactXPMultiplier);
-            _worldPacket.WriteInt32(Info.RewardArtifactCategoryID);
-
-            _worldPacket.WriteUInt32(Info.StartItem);
-            _worldPacket.WriteUInt32(Info.Flags);
-            _worldPacket.WriteUInt32(Info.FlagsEx);
-            _worldPacket.WriteUInt32(Info.FlagsEx2);
-
-            for (uint i = 0; i < QuestConst.QuestRewardItemCount; ++i)
-            {
-                _worldPacket.WriteUInt32(Info.RewardItems[i]);
-                _worldPacket.WriteUInt32(Info.RewardAmount[i]);
-                _worldPacket.WriteInt32(Info.ItemDrop[i]);
-                _worldPacket.WriteInt32(Info.ItemDropQuantity[i]);
-            }
-
-            for (uint i = 0; i < QuestConst.QuestRewardChoicesCount; ++i)
-            {
-                _worldPacket.WriteUInt32(Info.UnfilteredChoiceItems[i].ItemID);
-                _worldPacket.WriteUInt32(Info.UnfilteredChoiceItems[i].Quantity);
-                _worldPacket.WriteUInt32(Info.UnfilteredChoiceItems[i].DisplayID);
-            }
-
-            _worldPacket.WriteUInt32(Info.POIContinent);
-            _worldPacket.WriteFloat(Info.POIx);
-            _worldPacket.WriteFloat(Info.POIy);
-            _worldPacket.WriteUInt32(Info.POIPriority);
-
-            _worldPacket.WriteUInt32(Info.RewardTitle);
-            _worldPacket.WriteInt32(Info.RewardArenaPoints);
-            _worldPacket.WriteUInt32(Info.RewardSkillLineID);
-            _worldPacket.WriteUInt32(Info.RewardNumSkillUps);
-
-            // V3_4_3 layout (fork QueryQuestInfoResponse:82-112): adds
-            // PortraitGiverModelSceneID between Mount and TurnIn, uses INT32 for
-            // portrait fields (instead of UINT32), promotes TimeAllowed from
-            // UINT32 to INT64, treats AllowableRaces as UINT64, and appends
-            // ManagedWorldStateID/QuestSessionBonus/QuestGiverCreatureID. Without
-            // these, the V3_4_3 client mis-parses the title-length bits at line
-            // ~113 of the writer, then reads garbage as a ConditionalQuestText
-            // length prefix → ~5 TB allocation crash (?AUConditionalQuestText@@).
-            bool isV343 = ModernVersion.IsWotLKClassicOrLater;
-            if (isV343)
-            {
-                _worldPacket.WriteInt32((int)Info.PortraitGiver);
-                _worldPacket.WriteInt32((int)Info.PortraitGiverMount);
-                _worldPacket.WriteInt32((int)Info.PortraitGiverModelSceneID);
-                _worldPacket.WriteInt32((int)Info.PortraitTurnIn);
-            }
-            else
-            {
-                _worldPacket.WriteUInt32(Info.PortraitGiver);
-                _worldPacket.WriteUInt32(Info.PortraitGiverMount);
-                _worldPacket.WriteUInt32(Info.PortraitTurnIn);
-
-                _worldPacket.WriteInt32(0); // Unk 2.5.2
-            }
-
-            for (uint i = 0; i < QuestConst.QuestRewardReputationsCount; ++i)
-            {
-                _worldPacket.WriteUInt32(Info.RewardFactionID[i]);
-                _worldPacket.WriteInt32(Info.RewardFactionValue[i]);
-                _worldPacket.WriteInt32(Info.RewardFactionOverride[i]);
-                _worldPacket.WriteInt32(Info.RewardFactionCapIn[i]);
-            }
-
-            _worldPacket.WriteUInt32(Info.RewardFactionFlags);
-
-            for (uint i = 0; i < QuestConst.QuestRewardCurrencyCount; ++i)
-            {
-                _worldPacket.WriteUInt32(Info.RewardCurrencyID[i]);
-                _worldPacket.WriteUInt32(Info.RewardCurrencyQty[i]);
-            }
-
-            _worldPacket.WriteUInt32(Info.AcceptedSoundKitID);
-            _worldPacket.WriteUInt32(Info.CompleteSoundKitID);
-
-            if (isV343)
-            {
-                _worldPacket.WriteInt32((int)Info.AreaGroupID);
-                _worldPacket.WriteInt64(Info.TimeAllowed);
-            }
-            else
-            {
-                _worldPacket.WriteUInt32(Info.AreaGroupID);
-                _worldPacket.WriteUInt32(Info.TimeAllowed);
-            }
-
-            _worldPacket.WriteInt32(Info.Objectives.Count);
-            if (isV343)
-                _worldPacket.WriteUInt64((ulong)Info.AllowableRaces);
-            else
-                _worldPacket.WriteInt64(Info.AllowableRaces);
-            _worldPacket.WriteInt32(Info.TreasurePickerID);
-            _worldPacket.WriteInt32(Info.Expansion);
-
-            if (isV343)
-            {
-                _worldPacket.WriteInt32(Info.ManagedWorldStateID);
-                _worldPacket.WriteInt32(Info.QuestSessionBonus);
-                _worldPacket.WriteInt32((int)Info.QuestGiverCreatureID);
-            }
-
-            _worldPacket.WriteBits(Info.LogTitle.GetByteCount(), 9);
-            _worldPacket.WriteBits(Info.LogDescription.GetByteCount(), 12);
-            _worldPacket.WriteBits(Info.QuestDescription.GetByteCount(), 12);
-            _worldPacket.WriteBits(Info.AreaDescription.GetByteCount(), 9);
-            _worldPacket.WriteBits(Info.PortraitGiverText.GetByteCount(), 10);
-            _worldPacket.WriteBits(Info.PortraitGiverName.GetByteCount(), 8);
-            _worldPacket.WriteBits(Info.PortraitTurnInText.GetByteCount(), 10);
-            _worldPacket.WriteBits(Info.PortraitTurnInName.GetByteCount(), 8);
-            _worldPacket.WriteBits(Info.QuestCompletionLog.GetByteCount(), 11);
-            _worldPacket.WriteBit(Info.ReadyForTranslation);
-            _worldPacket.FlushBits();
-
-            foreach (QuestObjective questObjective in Info.Objectives)
-            {
-                _worldPacket.WriteUInt32(questObjective.Id);
-                _worldPacket.WriteUInt8((byte)questObjective.Type);
-                _worldPacket.WriteInt8(questObjective.StorageIndex);
-                _worldPacket.WriteInt32(questObjective.ObjectID);
-                _worldPacket.WriteInt32(questObjective.Amount);
-                _worldPacket.WriteUInt32((uint)questObjective.Flags);
-                _worldPacket.WriteUInt32(questObjective.Flags2);
-                _worldPacket.WriteFloat(questObjective.ProgressBarWeight);
-
-                _worldPacket.WriteInt32(questObjective.VisualEffects.Length);
-                foreach (var visualEffect in questObjective.VisualEffects)
-                    _worldPacket.WriteInt32(visualEffect);
-
-                _worldPacket.WriteBits(questObjective.Description.GetByteCount(), 8);
-                _worldPacket.FlushBits();
-
-                _worldPacket.WriteString(questObjective.Description);
-            }
-
-            _worldPacket.WriteString(Info.LogTitle);
-            _worldPacket.WriteString(Info.LogDescription);
-            _worldPacket.WriteString(Info.QuestDescription);
-            _worldPacket.WriteString(Info.AreaDescription);
-            _worldPacket.WriteString(Info.PortraitGiverText);
-            _worldPacket.WriteString(Info.PortraitGiverName);
-            _worldPacket.WriteString(Info.PortraitTurnInText);
-            _worldPacket.WriteString(Info.PortraitTurnInName);
-            _worldPacket.WriteString(Info.QuestCompletionLog);
+            packet.WriteTexts(data, objectiveTypeInt32: false);
         }
+    }
+
+    // V3_4_3 layout (fork QueryQuestInfoResponse:82-112): adds
+    // PortraitGiverModelSceneID between Mount and TurnIn, uses INT32 for
+    // portrait fields (instead of UINT32), promotes TimeAllowed from
+    // UINT32 to INT64, treats AllowableRaces as UINT64, and appends
+    // ManagedWorldStateID/QuestSessionBonus/QuestGiverCreatureID. Without
+    // these, the V3_4_3 client mis-parses the title-length bits at line
+    // ~113 of the writer, then reads garbage as a ConditionalQuestText
+    // length prefix → ~5 TB allocation crash (?AUConditionalQuestText@@).
+    internal sealed class WotLKClassicLayout : ServerPacketLayout<QueryQuestInfoResponse>
+    {
+        public override void Write(QueryQuestInfoResponse packet, WorldPacket data)
+        {
+            if (!packet.WriteHead(data))
+                return;
+
+            QuestTemplate info = packet.Info;
+            WritePortraits(data, info);
+            packet.WriteFactionsAndCurrencies(data);
+
+            data.WriteInt32((int)info.AreaGroupID);
+            data.WriteInt64(info.TimeAllowed);
+
+            data.WriteInt32(info.Objectives.Count);
+            data.WriteUInt64((ulong)info.AllowableRaces);
+            data.WriteInt32(info.TreasurePickerID);
+            data.WriteInt32(info.Expansion);
+            data.WriteInt32(info.ManagedWorldStateID);
+            data.WriteInt32(info.QuestSessionBonus);
+            data.WriteInt32((int)info.QuestGiverCreatureID);
+
+            packet.WriteTexts(data, objectiveTypeInt32: false);
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic QuestPackets.cpp): TreasurePickerID became two counted lists,
+    /// ManagedWorldStateID and QuestSessionBonus are gone, two conditional-text counts follow the
+    /// creature id (their texts would close the packet; there are none), and the objective type is
+    /// an int32.
+    /// </summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<QueryQuestInfoResponse>
+    {
+        public override void Write(QueryQuestInfoResponse packet, WorldPacket data)
+        {
+            if (!packet.WriteHead(data))
+                return;
+
+            QuestTemplate info = packet.Info;
+            WritePortraits(data, info);
+            packet.WriteFactionsAndCurrencies(data);
+
+            data.WriteInt32((int)info.AreaGroupID);
+            data.WriteInt64(info.TimeAllowed);
+
+            data.WriteInt32(info.Objectives.Count);
+            data.WriteUInt64((ulong)info.AllowableRaces);
+            data.WriteUInt32(info.TreasurePickerID != 0 ? 1u : 0u);
+            data.WriteUInt32(0);                        // TreasurePickerID2 count
+            data.WriteInt32(info.Expansion);
+            data.WriteInt32((int)info.QuestGiverCreatureID);
+            data.WriteUInt32(0);                        // ConditionalQuestDescription count
+            data.WriteUInt32(0);                        // ConditionalQuestCompletionLog count
+            if (info.TreasurePickerID != 0)
+                data.WriteInt32(info.TreasurePickerID);
+
+            packet.WriteTexts(data, objectiveTypeInt32: true);
+        }
+    }
+
+    private static void WritePortraits(WorldPacket data, QuestTemplate info)
+    {
+        data.WriteInt32((int)info.PortraitGiver);
+        data.WriteInt32((int)info.PortraitGiverMount);
+        data.WriteInt32((int)info.PortraitGiverModelSceneID);
+        data.WriteInt32((int)info.PortraitTurnIn);
+    }
+
+    /// <summary>QuestID and Allow, then, when allowed, every field up to the portraits.</summary>
+    private bool WriteHead(WorldPacket data)
+    {
+        data.WriteUInt32(QuestID);
+        data.WriteBit(Allow);
+        data.FlushBits();
+
+        if (!Allow)
+            return false;
+
+        data.WriteUInt32(Info.QuestID);
+        data.WriteInt32(Info.QuestType);
+        data.WriteInt32(Info.QuestLevel);
+        data.WriteInt32(Info.QuestScalingFactionGroup);
+        data.WriteInt32(Info.QuestMaxScalingLevel);
+        data.WriteUInt32(Info.QuestPackageID);
+        data.WriteInt32(Info.MinLevel);
+        data.WriteInt32(Info.QuestSortID);
+        data.WriteUInt32(Info.QuestInfoID);
+        data.WriteUInt32(Info.SuggestedGroupNum);
+        data.WriteUInt32(Info.RewardNextQuest);
+        data.WriteUInt32(Info.RewardXPDifficulty);
+
+        data.WriteFloat(Info.RewardXPMultiplier);
+
+        data.WriteInt32(Info.RewardMoney);
+        data.WriteUInt32(Info.RewardMoneyDifficulty);
+        data.WriteFloat(Info.RewardMoneyMultiplier);
+        data.WriteUInt32(Info.RewardBonusMoney);
+
+        for (uint i = 0; i < QuestConst.QuestRewardDisplaySpellCount; ++i)
+            data.WriteUInt32(Info.RewardDisplaySpell[i]);
+
+        data.WriteUInt32(Info.RewardSpell);
+        data.WriteUInt32(Info.RewardHonor);
+
+        data.WriteFloat(Info.RewardKillHonor);
+
+        data.WriteInt32(Info.RewardArtifactXPDifficulty);
+        data.WriteFloat(Info.RewardArtifactXPMultiplier);
+        data.WriteInt32(Info.RewardArtifactCategoryID);
+
+        data.WriteUInt32(Info.StartItem);
+        data.WriteUInt32(Info.Flags);
+        data.WriteUInt32(Info.FlagsEx);
+        data.WriteUInt32(Info.FlagsEx2);
+
+        for (uint i = 0; i < QuestConst.QuestRewardItemCount; ++i)
+        {
+            data.WriteUInt32(Info.RewardItems[i]);
+            data.WriteUInt32(Info.RewardAmount[i]);
+            data.WriteInt32(Info.ItemDrop[i]);
+            data.WriteInt32(Info.ItemDropQuantity[i]);
+        }
+
+        for (uint i = 0; i < QuestConst.QuestRewardChoicesCount; ++i)
+        {
+            data.WriteUInt32(Info.UnfilteredChoiceItems[i].ItemID);
+            data.WriteUInt32(Info.UnfilteredChoiceItems[i].Quantity);
+            data.WriteUInt32(Info.UnfilteredChoiceItems[i].DisplayID);
+        }
+
+        data.WriteUInt32(Info.POIContinent);
+        data.WriteFloat(Info.POIx);
+        data.WriteFloat(Info.POIy);
+        data.WriteUInt32(Info.POIPriority);
+
+        data.WriteUInt32(Info.RewardTitle);
+        data.WriteInt32(Info.RewardArenaPoints);
+        data.WriteUInt32(Info.RewardSkillLineID);
+        data.WriteUInt32(Info.RewardNumSkillUps);
+
+        return true;
+    }
+
+    private void WriteFactionsAndCurrencies(WorldPacket data)
+    {
+        for (uint i = 0; i < QuestConst.QuestRewardReputationsCount; ++i)
+        {
+            data.WriteUInt32(Info.RewardFactionID[i]);
+            data.WriteInt32(Info.RewardFactionValue[i]);
+            data.WriteInt32(Info.RewardFactionOverride[i]);
+            data.WriteInt32(Info.RewardFactionCapIn[i]);
+        }
+
+        data.WriteUInt32(Info.RewardFactionFlags);
+
+        for (uint i = 0; i < QuestConst.QuestRewardCurrencyCount; ++i)
+        {
+            data.WriteUInt32(Info.RewardCurrencyID[i]);
+            data.WriteUInt32(Info.RewardCurrencyQty[i]);
+        }
+
+        data.WriteUInt32(Info.AcceptedSoundKitID);
+        data.WriteUInt32(Info.CompleteSoundKitID);
+    }
+
+    /// <summary>The text lengths, the objectives and the texts.</summary>
+    private void WriteTexts(WorldPacket data, bool objectiveTypeInt32)
+    {
+        data.WriteBits(Info.LogTitle.GetByteCount(), 9);
+        data.WriteBits(Info.LogDescription.GetByteCount(), 12);
+        data.WriteBits(Info.QuestDescription.GetByteCount(), 12);
+        data.WriteBits(Info.AreaDescription.GetByteCount(), 9);
+        data.WriteBits(Info.PortraitGiverText.GetByteCount(), 10);
+        data.WriteBits(Info.PortraitGiverName.GetByteCount(), 8);
+        data.WriteBits(Info.PortraitTurnInText.GetByteCount(), 10);
+        data.WriteBits(Info.PortraitTurnInName.GetByteCount(), 8);
+        data.WriteBits(Info.QuestCompletionLog.GetByteCount(), 11);
+        data.WriteBit(Info.ReadyForTranslation);
+        data.FlushBits();
+
+        foreach (QuestObjective questObjective in Info.Objectives)
+        {
+            data.WriteUInt32(questObjective.Id);
+            if (objectiveTypeInt32)
+                data.WriteInt32((int)questObjective.Type);
+            else
+                data.WriteUInt8((byte)questObjective.Type);
+            data.WriteInt8(questObjective.StorageIndex);
+            data.WriteInt32(questObjective.ObjectID);
+            data.WriteInt32(questObjective.Amount);
+            data.WriteUInt32((uint)questObjective.Flags);
+            data.WriteUInt32(questObjective.Flags2);
+            data.WriteFloat(questObjective.ProgressBarWeight);
+
+            data.WriteInt32(questObjective.VisualEffects.Length);
+            foreach (var visualEffect in questObjective.VisualEffects)
+                data.WriteInt32(visualEffect);
+
+            data.WriteBits(questObjective.Description.GetByteCount(), 8);
+            data.FlushBits();
+
+            data.WriteString(questObjective.Description);
+        }
+
+        data.WriteString(Info.LogTitle);
+        data.WriteString(Info.LogDescription);
+        data.WriteString(Info.QuestDescription);
+        data.WriteString(Info.AreaDescription);
+        data.WriteString(Info.PortraitGiverText);
+        data.WriteString(Info.PortraitGiverName);
+        data.WriteString(Info.PortraitTurnInText);
+        data.WriteString(Info.PortraitTurnInName);
+        data.WriteString(Info.QuestCompletionLog);
     }
 
     public bool Allow;
@@ -478,94 +581,114 @@ public class QueryQuestInfoResponse : ServerPacket
 
 public readonly record struct QueryCreature(uint CreatureID);
 
-public class QueryCreatureResponse : ServerPacket
+public sealed class QueryCreatureResponse : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<QueryCreatureResponse>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new StatsLayout(questCurrencies: false)),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new StatsLayout(questCurrencies: true)));
+
+    private static readonly ServerPacketLayout<QueryCreatureResponse> Layout = Layouts.ForRunningClient();
+
     public QueryCreatureResponse() : base(Opcode.SMSG_QUERY_CREATURE_RESPONSE, ConnectionType.Instance) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic) adds a QuestCurrencies count after the QuestItems count and
+    /// the currency ids after the quest items. The legacy servers have no quest currencies, so the
+    /// count is always zero.
+    /// </summary>
+    internal sealed class StatsLayout(bool questCurrencies) : ServerPacketLayout<QueryCreatureResponse>
     {
-        _worldPacket.WriteUInt32(CreatureID);
-        _worldPacket.WriteBit(Allow);
-        _worldPacket.FlushBits();
+        public override void Write(QueryCreatureResponse packet, WorldPacket data) => packet.Write(data, questCurrencies);
+    }
+
+    private void Write(WorldPacket data, bool questCurrencies)
+    {
+        data.WriteUInt32(CreatureID);
+        data.WriteBit(Allow);
+        data.FlushBits();
 
         if (Allow)
         {
-            _worldPacket.WriteBits(Stats.Title.IsEmpty() ? 0 : Stats.Title.GetByteCount() + 1, 11);
-            _worldPacket.WriteBits(Stats.TitleAlt.IsEmpty() ? 0 : Stats.TitleAlt.GetByteCount() + 1, 11);
-            _worldPacket.WriteBits(Stats.CursorName.IsEmpty() ? 0 : Stats.CursorName.GetByteCount() + 1, 6);
-            _worldPacket.WriteBit(Stats.Civilian);
-            _worldPacket.WriteBit(Stats.Leader);
+            data.WriteBits(Stats.Title.IsEmpty() ? 0 : Stats.Title.GetByteCount() + 1, 11);
+            data.WriteBits(Stats.TitleAlt.IsEmpty() ? 0 : Stats.TitleAlt.GetByteCount() + 1, 11);
+            data.WriteBits(Stats.CursorName.IsEmpty() ? 0 : Stats.CursorName.GetByteCount() + 1, 6);
+            data.WriteBit(Stats.Civilian);
+            data.WriteBit(Stats.Leader);
 
             for (var i = 0; i < CreatureConst.MaxCreatureNames; ++i)
             {
-                _worldPacket.WriteBits(Stats.Name[i].GetByteCount() + 1, 11);
-                _worldPacket.WriteBits(Stats.NameAlt[i].GetByteCount() + 1, 11);
+                data.WriteBits(Stats.Name[i].GetByteCount() + 1, 11);
+                data.WriteBits(Stats.NameAlt[i].GetByteCount() + 1, 11);
             }
 
             for (var i = 0; i < CreatureConst.MaxCreatureNames; ++i)
             {
                 if (!string.IsNullOrEmpty(Stats.Name[i]))
-                    _worldPacket.WriteCString(Stats.Name[i]);
+                    data.WriteCString(Stats.Name[i]);
                 if (!string.IsNullOrEmpty(Stats.NameAlt[i]))
-                    _worldPacket.WriteCString(Stats.NameAlt[i]);
+                    data.WriteCString(Stats.NameAlt[i]);
             }
 
             for (var i = 0; i < 2; ++i)
-                _worldPacket.WriteUInt32(Stats.Flags[i]);
+                data.WriteUInt32(Stats.Flags[i]);
 
-            _worldPacket.WriteInt32(Stats.Type);
-            _worldPacket.WriteInt32(Stats.Family);
-            _worldPacket.WriteInt32(Stats.Classification);
-            _worldPacket.WriteUInt32(Stats.PetSpellDataId);
+            data.WriteInt32(Stats.Type);
+            data.WriteInt32(Stats.Family);
+            data.WriteInt32(Stats.Classification);
+            data.WriteUInt32(Stats.PetSpellDataId);
 
             for (var i = 0; i < CreatureConst.MaxCreatureKillCredit; ++i)
-                _worldPacket.WriteUInt32(Stats.ProxyCreatureID[i]);
+                data.WriteUInt32(Stats.ProxyCreatureID[i]);
 
-            _worldPacket.WriteInt32(Stats.Display.CreatureDisplay.Count);
-            _worldPacket.WriteFloat(Stats.Display.TotalProbability);
+            data.WriteInt32(Stats.Display.CreatureDisplay.Count);
+            data.WriteFloat(Stats.Display.TotalProbability);
 
             foreach (CreatureXDisplay display in Stats.Display.CreatureDisplay)
             {
-                _worldPacket.WriteUInt32(display.CreatureDisplayID);
-                _worldPacket.WriteFloat(display.Scale);
-                _worldPacket.WriteFloat(display.Probability);
+                data.WriteUInt32(display.CreatureDisplayID);
+                data.WriteFloat(display.Scale);
+                data.WriteFloat(display.Probability);
             }
 
-            _worldPacket.WriteFloat(Stats.HpMulti);
-            _worldPacket.WriteFloat(Stats.EnergyMulti);
+            data.WriteFloat(Stats.HpMulti);
+            data.WriteFloat(Stats.EnergyMulti);
 
-            _worldPacket.WriteInt32(Stats.QuestItems.Count);
-            _worldPacket.WriteUInt32(Stats.MovementInfoID);
-            _worldPacket.WriteInt32(Stats.HealthScalingExpansion);
-            _worldPacket.WriteUInt32(Stats.RequiredExpansion);
-            _worldPacket.WriteUInt32(Stats.VignetteID);
-            _worldPacket.WriteInt32(Stats.Class);
-            _worldPacket.WriteInt32(Stats.DifficultyID);
-            _worldPacket.WriteInt32(Stats.WidgetSetID);
-            _worldPacket.WriteInt32(Stats.WidgetSetUnitConditionID);
+            data.WriteInt32(Stats.QuestItems.Count);
+            if (questCurrencies)
+                data.WriteUInt32(0);    // QuestCurrencies count
+            data.WriteUInt32(Stats.MovementInfoID);
+            data.WriteInt32(Stats.HealthScalingExpansion);
+            data.WriteUInt32(Stats.RequiredExpansion);
+            data.WriteUInt32(Stats.VignetteID);
+            data.WriteInt32(Stats.Class);
+            data.WriteInt32(Stats.DifficultyID);
+            data.WriteInt32(Stats.WidgetSetID);
+            data.WriteInt32(Stats.WidgetSetUnitConditionID);
 
             if (!Stats.Title.IsEmpty())
-                _worldPacket.WriteCString(Stats.Title);
+                data.WriteCString(Stats.Title);
 
             if (!Stats.TitleAlt.IsEmpty())
-                _worldPacket.WriteCString(Stats.TitleAlt);
+                data.WriteCString(Stats.TitleAlt);
 
             if (!Stats.CursorName.IsEmpty())
-                _worldPacket.WriteCString(Stats.CursorName);
+                data.WriteCString(Stats.CursorName);
 
             foreach (var questItem in Stats.QuestItems)
-                _worldPacket.WriteUInt32(questItem);
+                data.WriteUInt32(questItem);
         }
 
         if (Allow)
         {
             Log.Print(LogType.Trace,
-                $"[CreatureQueryTrace][write] entry={CreatureID} allow=true packetBytes={_worldPacket.GetSize()} healthScalingExp={Stats.HealthScalingExpansion} reqExp={Stats.RequiredExpansion} creatureClass={Stats.Class} displays={Stats.Display.CreatureDisplay.Count} totalProb={Stats.Display.TotalProbability}");
+                $"[CreatureQueryTrace][write] entry={CreatureID} allow=true packetBytes={data.GetSize()} healthScalingExp={Stats.HealthScalingExpansion} reqExp={Stats.RequiredExpansion} creatureClass={Stats.Class} displays={Stats.Display.CreatureDisplay.Count} totalProb={Stats.Display.TotalProbability}");
         }
         else
         {
             Log.Print(LogType.Trace,
-                $"[CreatureQueryTrace][write] entry={CreatureID} allow=false packetBytes={_worldPacket.GetSize()}");
+                $"[CreatureQueryTrace][write] entry={CreatureID} allow=false packetBytes={data.GetSize()}");
         }
     }
 
@@ -897,17 +1020,30 @@ public class WhoRequestServerInfo
     public uint RequesterVirtualRealmAddress;
 }
 
-public class WhoResponsePkt : ServerPacket
+public sealed class WhoResponsePkt : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<WhoResponsePkt>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new EntriesLayout(timerunning: false)),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new EntriesLayout(timerunning: true)));
+
+    private static readonly ServerPacketLayout<WhoResponsePkt> Layout = Layouts.ForRunningClient();
+
     public WhoResponsePkt() : base(Opcode.SMSG_WHO) { }
 
-    public override void Write()
-    {
-        _worldPacket.WriteUInt32(RequestID);
-        _worldPacket.WriteBits(Players.Count, 6);
-        _worldPacket.FlushBits();
+    public override void Write() => Layout.Write(this, _worldPacket);
 
-        Players.ForEach(p => p.Write(_worldPacket));
+    /// <summary>Every entry carries a <see cref="PlayerGuidLookupData"/>, which grew a field in 4.4.2.</summary>
+    internal sealed class EntriesLayout(bool timerunning) : ServerPacketLayout<WhoResponsePkt>
+    {
+        public override void Write(WhoResponsePkt packet, WorldPacket data)
+        {
+            data.WriteUInt32(packet.RequestID);
+            data.WriteBits(packet.Players.Count, 6);
+            data.FlushBits();
+
+            foreach (WhoEntry entry in packet.Players)
+                entry.Write(data, timerunning);
+        }
     }
 
     public uint RequestID;
@@ -916,9 +1052,9 @@ public class WhoResponsePkt : ServerPacket
 
 public class WhoEntry
 {
-    public void Write(WorldPacket data)
+    public void Write(WorldPacket data, bool timerunning)
     {
-        PlayerData.Write(data);
+        PlayerData.Write(data, timerunning);
 
         data.WritePackedGuid128(GuildGUID);
         data.WriteUInt32(GuildVirtualRealmAddress);
