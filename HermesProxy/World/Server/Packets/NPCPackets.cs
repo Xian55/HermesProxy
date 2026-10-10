@@ -580,87 +580,24 @@ class RespecWipeConfirm : ServerPacket, ISpanWritable
 
 public readonly record struct ConfirmRespecWipe(WowGuid128 TrainerGUID, SpecResetType RespecType);
 
-class GossipPOI : ServerPacket, ISpanWritable
+sealed class GossipPOI : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<GossipPOI>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V3_4_3_54261, new RetailLayout()),
+        (ClientVersionBuild.V3_4_3_54261, ClientVersionBuild.Zero, new FlatLayout()));
+
+    private static readonly ServerPacketLayout<GossipPOI> Layout = Layouts.ForRunningClient();
+
     public GossipPOI() : base(Opcode.SMSG_GOSSIP_POI) { }
 
-    public override void Write()
-    {
-        // V3_4_3 client uses a flat layout: Flags is a full uint32 in field position 2,
-        // not a 14-bit field at the end (retail layout). Mismatch shifts the whole packet
-        // and the client silently drops the POI. Matches TC 3.4.3 GossipPOI::Write.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            _worldPacket.WriteUInt32(Id);
-            _worldPacket.WriteUInt32(Flags);
-            _worldPacket.WriteFloat(Pos.X);
-            _worldPacket.WriteFloat(Pos.Y);
-            _worldPacket.WriteFloat(Pos.Z);
-            _worldPacket.WriteUInt32(Icon);
-            _worldPacket.WriteUInt32(Importance);
-            _worldPacket.WriteUInt32(Unknown905);
-            _worldPacket.WriteBits(Name.GetByteCount(), 6);
-            _worldPacket.FlushBits();
-            _worldPacket.WriteString(Name);
-            return;
-        }
+    public override void Write() => Layout.Write(this, _worldPacket);
 
-        _worldPacket.WriteUInt32(Id);
-        _worldPacket.WriteFloat(Pos.X);
-        _worldPacket.WriteFloat(Pos.Y);
-        _worldPacket.WriteFloat(Pos.Z);
-        _worldPacket.WriteUInt32(Icon);
-        _worldPacket.WriteUInt32(Importance);
-        _worldPacket.WriteUInt32(Unknown905);
-        _worldPacket.WriteBits(Flags, 14);
-        _worldPacket.WriteBits(Name.GetByteCount(), 6);
-        _worldPacket.FlushBits();
-        _worldPacket.WriteString(Name);
-    }
+    public int MaxSize => Layout.MaxSize;
+
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
 
     // Cap for POI name - limited by 6 bits = 64 bytes max
     private const int MaxNameBytes = 64;
-    // Worst case (V3_4_3 flat layout): 8 uint(32) + 1 byte for flushed 6-bit name length + name
-    public int MaxSize => 32 + 1 + MaxNameBytes;
-
-    public int WriteToSpan(Span<byte> buffer)
-    {
-        int nameBytes = Encoding.UTF8.GetByteCount(Name);
-        if (nameBytes > MaxNameBytes)
-            return -1;
-
-        var writer = new SpanPacketWriter(buffer);
-
-        // See Write() — V3_4_3 emits Flags as a full uint32 in position 2 (flat layout).
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
-        {
-            writer.WriteUInt32(Id);
-            writer.WriteUInt32(Flags);
-            writer.WriteFloat(Pos.X);
-            writer.WriteFloat(Pos.Y);
-            writer.WriteFloat(Pos.Z);
-            writer.WriteUInt32(Icon);
-            writer.WriteUInt32(Importance);
-            writer.WriteUInt32(Unknown905);
-            writer.WriteBits((uint)nameBytes, 6);
-            writer.FlushBits();
-            writer.WriteString(Name);
-            return writer.Position;
-        }
-
-        writer.WriteUInt32(Id);
-        writer.WriteFloat(Pos.X);
-        writer.WriteFloat(Pos.Y);
-        writer.WriteFloat(Pos.Z);
-        writer.WriteUInt32(Icon);
-        writer.WriteUInt32(Importance);
-        writer.WriteUInt32(Unknown905);
-        writer.WriteBits(Flags, 14);
-        writer.WriteBits((uint)nameBytes, 6);
-        writer.FlushBits();
-        writer.WriteString(Name);
-        return writer.Position;
-    }
 
     public uint Id = 1;
     public uint Flags;
@@ -669,6 +606,96 @@ class GossipPOI : ServerPacket, ISpanWritable
     public uint Importance;
     public uint Unknown905;
     public string Name = string.Empty;
+
+    /// <summary>1.14 and 2.5: Flags is a 14-bit field after the fixed part.</summary>
+    internal sealed class RetailLayout : ServerPacketLayout<GossipPOI>
+    {
+        // 7 uint(32) + 20 bits (Flags + name length) flushed into 3 bytes + name
+        public override int MaxSize => 28 + 3 + MaxNameBytes;
+
+        public override void Write(GossipPOI packet, WorldPacket data)
+        {
+            data.WriteUInt32(packet.Id);
+            data.WriteFloat(packet.Pos.X);
+            data.WriteFloat(packet.Pos.Y);
+            data.WriteFloat(packet.Pos.Z);
+            data.WriteUInt32(packet.Icon);
+            data.WriteUInt32(packet.Importance);
+            data.WriteUInt32(packet.Unknown905);
+            data.WriteBits(packet.Flags, 14);
+            data.WriteBits(packet.Name.GetByteCount(), 6);
+            data.FlushBits();
+            data.WriteString(packet.Name);
+        }
+
+        public override int WriteToSpan(GossipPOI packet, Span<byte> buffer)
+        {
+            int nameBytes = Encoding.UTF8.GetByteCount(packet.Name);
+            if (nameBytes > MaxNameBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(packet.Id);
+            writer.WriteFloat(packet.Pos.X);
+            writer.WriteFloat(packet.Pos.Y);
+            writer.WriteFloat(packet.Pos.Z);
+            writer.WriteUInt32(packet.Icon);
+            writer.WriteUInt32(packet.Importance);
+            writer.WriteUInt32(packet.Unknown905);
+            writer.WriteBits(packet.Flags, 14);
+            writer.WriteBits((uint)nameBytes, 6);
+            writer.FlushBits();
+            writer.WriteString(packet.Name);
+            return writer.Position;
+        }
+    }
+
+    /// <summary>
+    /// 3.4.3 on: Flags is a full uint32 in field position 2, not a 14-bit field at the end. The
+    /// retail layout shifts the whole packet and the client silently drops the POI. Matches
+    /// TrinityCore 3.4.3 GossipPOI::Write, and the 4.4.2 client reads the same layout.
+    /// </summary>
+    internal sealed class FlatLayout : ServerPacketLayout<GossipPOI>
+    {
+        // 8 uint(32) + 1 byte for the flushed 6-bit name length + name
+        public override int MaxSize => 32 + 1 + MaxNameBytes;
+
+        public override void Write(GossipPOI packet, WorldPacket data)
+        {
+            data.WriteUInt32(packet.Id);
+            data.WriteUInt32(packet.Flags);
+            data.WriteFloat(packet.Pos.X);
+            data.WriteFloat(packet.Pos.Y);
+            data.WriteFloat(packet.Pos.Z);
+            data.WriteUInt32(packet.Icon);
+            data.WriteUInt32(packet.Importance);
+            data.WriteUInt32(packet.Unknown905);
+            data.WriteBits(packet.Name.GetByteCount(), 6);
+            data.FlushBits();
+            data.WriteString(packet.Name);
+        }
+
+        public override int WriteToSpan(GossipPOI packet, Span<byte> buffer)
+        {
+            int nameBytes = Encoding.UTF8.GetByteCount(packet.Name);
+            if (nameBytes > MaxNameBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(packet.Id);
+            writer.WriteUInt32(packet.Flags);
+            writer.WriteFloat(packet.Pos.X);
+            writer.WriteFloat(packet.Pos.Y);
+            writer.WriteFloat(packet.Pos.Z);
+            writer.WriteUInt32(packet.Icon);
+            writer.WriteUInt32(packet.Importance);
+            writer.WriteUInt32(packet.Unknown905);
+            writer.WriteBits((uint)nameBytes, 6);
+            writer.FlushBits();
+            writer.WriteString(packet.Name);
+            return writer.Position;
+        }
+    }
 }
 
 public class SpiritHealerConfirm : ServerPacket, ISpanWritable

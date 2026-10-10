@@ -108,6 +108,8 @@ constraint is stricter than it looks: `CustomPredicate` is inlined into the inst
 writer *as well*, so it would compile there and break only in the static.
 
 Those are the only structural checks. `HPSG004`–`HPSG007` belong to the dispatch generator.
+`HPSG009` (error) is not a generator check: `SealedLayoutAnalyzer` fails the build for a class
+deriving from `ServerPacketLayout<>` that is not sealed (see `World/Server/Packets/CLAUDE.md`).
 
 There is no diagnostic for the failure mode that actually costs a debugging session: a field in
 the *wrong position*. Nothing in the generator knows the wire layout, so nothing can. That is
