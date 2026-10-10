@@ -158,6 +158,7 @@ public partial class OpcodeCoverageReportTests
         var smsg = Handlers<HandlesSmsgAttribute>();
         var codecs = Codecs();
         var equality = ScanEqualitySites();
+        var inherited = ScanInheritedSites();
 
         var sb = new StringBuilder();
         sb.AppendLine("# Opcode coverage and version lifecycle");
@@ -182,6 +183,7 @@ public partial class OpcodeCoverageReportTests
         AppendRangedHandlers(sb, smsg, cmsg);
         AppendCodecRanges(sb, codecs);
         AppendEqualitySites(sb, equality);
+        AppendInheritedSites(sb, inherited);
 
         return sb.ToString();
     }
@@ -289,9 +291,10 @@ public partial class OpcodeCoverageReportTests
         sb.AppendLine("newer client wants, and silent when wrong.");
         sb.AppendLine();
         sb.AppendLine("Converting one to a range (`AddedInVersion`, or a second `[PacketCodec]`) makes it inherit");
-        sb.AppendLine("correctly by default. They cannot be swept mechanically: some genuinely mean \"this build");
-        sb.AppendLine("only\" — a quirk a later client fixed — and widening those would propagate a bug forward.");
-        sb.AppendLine("Each needs a judgement call against the client or WowPacketParser.");
+        sb.AppendLine("correctly by default. Some genuinely mean \"this build only\" — a quirk a later client fixed —");
+        sb.AppendLine("and widening those propagates a bug forward, so each needs a judgement call against the");
+        sb.AppendLine("client or WowPacketParser. The 3.4.3 ones became `IsWotLKClassicOrLater` (section 5), which");
+        sb.AppendLine("kept every supported build's behaviour; that judgement is still owed per site there.");
         sb.AppendLine();
         sb.AppendLine("Counts per file rather than line numbers, so unrelated edits do not churn this file.");
         sb.AppendLine();
@@ -318,6 +321,27 @@ public partial class OpcodeCoverageReportTests
         }
     }
 
+    private static void AppendInheritedSites(StringBuilder sb, List<(string File, int Count)> sites)
+    {
+        sb.AppendLine("## 5. Inherited 3.4.3 behaviour — the 4.4.2 review list");
+        sb.AppendLine();
+        sb.AppendLine("`IsWotLKClassicOrLater` (and `VersionChecker.IsWotLKClassicOrLater(build)`) inside a method");
+        sb.AppendLine("body. Each was an exact `== V3_4_3_54261` until 2026-10-10. A later Classic client now takes");
+        sb.AppendLine("the 3.4.3 path at every one of them, which is right wherever its layout matches 3.4.3 and");
+        sb.AppendLine("silently wrong wherever it does not. Check each against the 4.4.2 client");
+        sb.AppendLine("(`docs/protocol/4.4.2.60895`) before 4.4.2 becomes a supported build; where it differs, the");
+        sb.AppendLine("site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a narrower check.");
+        sb.AppendLine();
+
+        sb.AppendLine($"{sites.Sum(s => s.Count)} sites across {sites.Count} files.");
+        sb.AppendLine();
+        sb.AppendLine("| file | sites |");
+        sb.AppendLine("|---|---:|");
+        foreach (var s in sites.OrderByDescending(s => s.Count).ThenBy(s => s.File, StringComparer.Ordinal))
+            sb.AppendLine($"| `{s.File}` | {s.Count} |");
+        sb.AppendLine();
+    }
+
     private static string Show(ClientVersionBuild b)
         => b == ClientVersionBuild.Zero ? "—" : $"`{b}`";
 
@@ -326,11 +350,33 @@ public partial class OpcodeCoverageReportTests
     [GeneratedRegex(@"\b(ModernVersion|LegacyVersion)\.Build\s*(?:==|!=)\s*ClientVersionBuild\.(\w+)")]
     private static partial Regex EqualitySite();
 
-    private static List<(string File, string Side, string Build, int Count)> ScanEqualitySites()
+    [GeneratedRegex(@"(?<![\w""])(?:ModernVersion\.|VersionChecker\.)?IsWotLKClassicOrLater\b")]
+    private static partial Regex InheritedSite();
+
+    /// <summary>Uses of IsWotLKClassicOrLater in code: comment lines and its own declarations skipped.</summary>
+    private static List<(string File, int Count)> ScanInheritedSites()
+    {
+        var counts = new Dictionary<string, int>();
+        foreach (var (rel, file) in SourceFiles())
+        {
+            foreach (string line in File.ReadLines(file))
+            {
+                string code = line.TrimStart();
+                if (code.StartsWith("//", StringComparison.Ordinal) || code.Contains("bool IsWotLKClassicOrLater", StringComparison.Ordinal))
+                    continue;
+
+                int n = InheritedSite().Matches(code).Count;
+                if (n > 0)
+                    counts[rel] = counts.GetValueOrDefault(rel) + n;
+            }
+        }
+        return counts.Select(kv => (File: kv.Key, Count: kv.Value)).ToList();
+    }
+
+    /// <summary>(repo-relative path, full path) of every .cs file in HermesProxy and Framework, obj/ and bin/ excluded.</summary>
+    private static IEnumerable<(string Rel, string Full)> SourceFiles()
     {
         string root = FindRepoRoot();
-        var counts = new Dictionary<(string, string, string), int>();
-
         foreach (var project in (string[])["HermesProxy", "Framework"])
         {
             string dir = Path.Combine(root, project);
@@ -343,12 +389,21 @@ public partial class OpcodeCoverageReportTests
                 string rel = Path.GetRelativePath(root, file).Replace('\\', '/');
                 if (rel.Contains("/obj/", StringComparison.Ordinal) || rel.Contains("/bin/", StringComparison.Ordinal))
                     continue;
+                yield return (rel, file);
+            }
+        }
+    }
 
-                foreach (Match m in EqualitySite().Matches(File.ReadAllText(file)))
-                {
-                    var key = (rel, m.Groups[1].Value, m.Groups[2].Value);
-                    counts[key] = counts.GetValueOrDefault(key) + 1;
-                }
+    private static List<(string File, string Side, string Build, int Count)> ScanEqualitySites()
+    {
+        var counts = new Dictionary<(string, string, string), int>();
+
+        foreach (var (rel, file) in SourceFiles())
+        {
+            foreach (Match m in EqualitySite().Matches(File.ReadAllText(file)))
+            {
+                var key = (rel, m.Groups[1].Value, m.Groups[2].Value);
+                counts[key] = counts.GetValueOrDefault(key) + 1;
             }
         }
 

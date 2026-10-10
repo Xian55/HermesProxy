@@ -30,7 +30,7 @@ public partial class WorldClient
         // dead, ...) arrives without one. Those must reach the client with their own status,
         // not a substituted Cancelled (#228). Verified on V3_4_3 only.
         if (tradeSession == null && trade.Status is not (TradeStatus.Proposed or TradeStatus.Initiated)
-            && ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+            && !ModernVersion.IsWotLKClassicOrLater)
         {
             Log.Print(LogType.Error, $"Got SMSG_TRADE_STATUS without trade session (status: {trade.Status})");
             SendPacketToClient(new TradeStatusPkt { Status = TradeStatus.Cancelled });

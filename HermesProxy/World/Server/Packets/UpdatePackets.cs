@@ -207,7 +207,7 @@ public class ObjectUpdate
         // backend can never produce one, and the gate keeps the V1_14 / V2_5 wire
         // byte-identical even if a client is pointed at a WotLK core by mistake.
         (sbyte)GameObjectTypeModern.DestructibleBuilding =>
-            build == ClientVersionBuild.V3_4_3_54261,
+            VersionChecker.IsWotLKClassicOrLater(build),
         _ => false,
     };
 
@@ -250,7 +250,7 @@ public class ObjectUpdate
         if (needsWmoFlag && (CreateData != null || GameObjectData.Flags != null))
             GameObjectData.Flags = (GameObjectData.Flags ?? 0) | ModernTransportFlag;
 
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261
+        if (!ModernVersion.IsWotLKClassicOrLater
             || GameObjectData.TypeID != (sbyte)GameObjectTypeModern.Transport)
             return;
 
@@ -646,7 +646,7 @@ public class UpdateObject : ServerPacket
 
     public static int FilterV3_4_3Values(UpdateObject obj, GameSessionData gameState)
     {
-        if (!(ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261))
+        if (!(ForceV343ForTests ?? ModernVersion.IsWotLKClassicOrLater))
             return 0;
 
         int beforeCount = obj.ObjectUpdates.Count;

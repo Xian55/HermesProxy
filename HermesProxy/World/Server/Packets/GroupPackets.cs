@@ -125,7 +125,7 @@ class PartyInvite : ServerPacket
         // bytes to a 3.4.3 client shifts everything after it, and since InviterName is declared
         // by the 6-bit length prefix above but written last, the client reads the name from the
         // wrong offset and renders it empty. Issue #199.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
             _worldPacket.WriteUInt8((byte)ProposedRoles);
         else
             _worldPacket.WriteUInt32(ProposedRoles);
@@ -174,7 +174,7 @@ public class PartyUpdate : ServerPacket
         _worldPacket.WritePackedGuid128(PartyGUID);
         _worldPacket.WriteInt32(SequenceNum);
         _worldPacket.WritePackedGuid128(LeaderGUID);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
             _worldPacket.WriteUInt8(LeaderFactionGroup);
         _worldPacket.WriteInt32(PlayerList.Count);
         _worldPacket.WriteBit(LfgInfos != null);
@@ -240,7 +240,7 @@ public struct PartyPlayerInfo
         data.WriteBits(Name.GetByteCount(), 6);
         data.WriteBits(VoiceStateID.GetByteCount() + 1, 6);
 
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             bool isConnected = Connected || Status != GroupMemberOnlineStatus.Offline;
             data.WriteBit(isConnected);
@@ -255,7 +255,7 @@ public struct PartyPlayerInfo
 
         data.WritePackedGuid128(GUID);
 
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             data.WriteUInt8((byte)Status);
 
         data.WriteUInt8(Subgroup);
@@ -263,7 +263,7 @@ public struct PartyPlayerInfo
         data.WriteUInt8(RolesAssigned);
         data.WriteUInt8((byte)ClassId);
 
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
             data.WriteUInt8(FactionGroup);
 
         data.WriteString(Name);

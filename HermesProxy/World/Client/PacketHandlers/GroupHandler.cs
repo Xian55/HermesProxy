@@ -428,7 +428,7 @@ public partial class WorldClient
 
     private void SendLfgAssociationEnded(bool isParty)
     {
-        bool isV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        bool isV343 = ModernVersion.IsWotLKClassicOrLater;
 
         DFUpdateStatus status = new DFUpdateStatus();
         status.Ticket = MakeLfgTicket();
@@ -631,7 +631,7 @@ public partial class WorldClient
     // joining a group that already carries marks sees none of them.
     private void RequestRaidTargetIconList()
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         WorldPacket packet = new WorldPacket(Opcode.MSG_RAID_TARGET_UPDATE);
@@ -946,7 +946,7 @@ public partial class WorldClient
     // about 4%. Decided from the update mask alone so a dropped update never allocates.
     private bool ShouldThrottlePartyMemberState(WowGuid128 affectedGuid, GroupUpdateFlagTBC updateFlags)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return false;
 
         int minIntervalMs = GetSession().ThrottlingOptions.PartyMemberStateMinIntervalMs;

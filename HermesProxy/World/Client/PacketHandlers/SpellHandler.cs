@@ -28,7 +28,7 @@ public partial class WorldClient
     {
         SendKnownSpells spells = new SendKnownSpells();
         bool legacyInitialLogin = packet.ReadBool();
-        spells.InitialLogin = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        spells.InitialLogin = ModernVersion.IsWotLKClassicOrLater
             ? GetSession().GameState.IsFirstEnterWorld
             : legacyInitialLogin;
         ushort spellCount = packet.ReadUInt16();
@@ -50,7 +50,7 @@ public partial class WorldClient
 
         SendPacketToClient(spells);
 
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             var session = GetSession();
             if (session.GameState.CollectionFavorites == null)
@@ -169,7 +169,7 @@ public partial class WorldClient
         GetSession().GameState.KnownSpells.Add(spellId);
         SendPacketToClient(spells);
 
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             if (GameData.TryGetBattlePetSpecies(spellId, out _))
                 SendPacketToClient(BattlePetJournal.FromSession(GetSession().GameState));
@@ -206,7 +206,7 @@ public partial class WorldClient
             && GameData.TryGetBattlePetSpecies(spellId, out _);
         SendPacketToClient(spells);
 
-        if (wasCompanion && ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (wasCompanion && ModernVersion.IsWotLKClassicOrLater)
             SendPacketToClient(BattlePetJournal.FromSession(GetSession().GameState));
     }
 
@@ -528,7 +528,7 @@ public partial class WorldClient
     /// </summary>
     void SendSynthesizedItemCooldown(ClientCastRequest pendingCast, uint modernSpellId)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
         if (pendingCast.ItemGUID.IsEmpty() || modernSpellId == 0)
             return;
@@ -666,7 +666,7 @@ public partial class WorldClient
         ApplyV343NativeCastPolicy(spell.Cast, isSpellGo: true);
         SendPacketToClient(spell);
 
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             && GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit
             && GameData.TryGetBattlePetSpecies((uint)spell.Cast.SpellID, out _))
             HermesProxy.World.Server.CollectionSync.SendSummonedBattlePet(GetSession());
@@ -681,7 +681,7 @@ public partial class WorldClient
     // packets — zeroing it kills the cast anim and leaves the action bar lit.
     static void ApplyV343NativeCastPolicy(SpellCastData cast, bool isSpellGo)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         if (GameData.IsMissileSpellVisual(cast.SpellXSpellVisualID))

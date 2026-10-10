@@ -42,7 +42,7 @@ public static class SupportTicketSystem
         if (!WowGuid128.IsUnknownPlayerGuid(complaint.TargetCharacterGuid))
             ticketText += $"  (id: {complaint.TargetCharacterGuid.GetCounter()})";
 
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3 reports a major category plus a minor bitmask instead of one enum.
             ticketText += $" for {complaint.MajorCategory}";

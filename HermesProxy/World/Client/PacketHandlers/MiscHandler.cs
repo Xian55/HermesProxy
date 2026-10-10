@@ -148,7 +148,7 @@ public partial class WorldClient
         // and only 93 of 1154 triggers have one. Sent trigger 2848, AzerothCore's "You must be in a
         // raid group to enter this instance." at Onyxia's Lair showed nothing (#362). A native
         // 3.4.3 server never sends this packet, so show the server's own text instead.
-        bool sendsTriggerId = ModernVersion.Build != ClientVersionBuild.V3_4_3_54261;
+        bool sendsTriggerId = !ModernVersion.IsWotLKClassicOrLater;
         if (sendsTriggerId && GetSession().GameState.LastEnteredAreaTrigger != 0)
         {
             AreaTriggerMessage denied = new AreaTriggerMessage();
@@ -372,7 +372,7 @@ public partial class WorldClient
         // on 3.4.3: the client itself sends them with Legacy 0 for all four raid sizes. Claiming
         // Legacy here filed the answer under the legacy slot, so the picker never showed a
         // selection and fell back to 25-player.
-        difficulty.Legacy = (byte)(ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 0 : 1);
+        difficulty.Legacy = (byte)(ModernVersion.IsWotLKClassicOrLater ? 0 : 1);
         packet.ReadInt32(); // always 1
         packet.ReadInt32(); // IsInGroup
         SendPacketToClient(difficulty);

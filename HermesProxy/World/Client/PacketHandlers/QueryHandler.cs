@@ -438,7 +438,7 @@ public partial class WorldClient
         //
         // This handler is shared by every client version; only V3_4_3 consumes the cache, and
         // type 33 does not exist before WotLK, so gate the bookkeeping to match its one reader.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             && gameObject.Type == (uint)GameObjectTypeModern.DestructibleBuilding)
         {
             GetSession().GameState.DestructibleModelIdByEntry[response.GameObjectID] =
@@ -450,7 +450,7 @@ public partial class WorldClient
         // lock id, and this response is the only place gameobject_template.data crosses the
         // wire. Same V3_4_3 gate as above: no other build's client and server disagree.
         // See GameObjectLockRemap, issue #269.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             uint lockId = gameObject.LegacyLockId;
             if (lockId != 0)
@@ -599,7 +599,7 @@ public partial class WorldClient
         // (pet's SummonedBy references a player object that doesn't exist yet).
         bool mergedPetBatchHasPetCreate = false;
         WowGuid128 mergedPetGuid = WowGuid128.Empty;
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             var currentPlayerGuidForMerge = session.GameState.CurrentPlayerGuid;
             bool playerInThisBatch = false;
@@ -704,7 +704,7 @@ public partial class WorldClient
         // the GuidKnown notify, which would only run them after this method returns — a nested
         // release appends to the running release run — and so after the world-ready handshake
         // below. Claimed in registration order, and only ever after the create above.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && session.ToClient.HasPending)
+        if (ModernVersion.IsWotLKClassicOrLater && session.ToClient.HasPending)
         {
             foreach (var playerValues in ClaimHeldPlayerValues(session))
             {
@@ -725,7 +725,7 @@ public partial class WorldClient
         // without disturbing the wire format of the CreateObject. Without this,
         // the V3_4_3 pet character sheet shows Stats=0/Power=0/etc. even though
         // the legacy 3.3.5a server already computed and sent the values.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && mergedPetBatchHasPetCreate)
+        if (ModernVersion.IsWotLKClassicOrLater && mergedPetBatchHasPetCreate)
         {
             ObjectUpdate? petCreateOu = null;
             foreach (var u in entry.UpdateObject.ObjectUpdates)
@@ -779,7 +779,7 @@ public partial class WorldClient
         // legacy guid since the map is now fully populated. Without this, the
         // login scenario's spells message either was forwarded too early (pet
         // wasn't bound to the player yet) or got cached and never released.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && mergedPetBatchHasPetCreate)
+        if (ModernVersion.IsWotLKClassicOrLater && mergedPetBatchHasPetCreate)
         {
             var heldSpells = session.ToClient.Peek<HeldPetSpells>(HeldPetSpells.Key);
             var pendingSpells = heldSpells?.Spells;
@@ -814,7 +814,7 @@ public partial class WorldClient
         // the player object. Without this, the player CreateObject2 ships to the
         // client but the client never sends CMSG_MOVE_INIT_ACTIVE_MOVER_COMPLETE
         // and the loading screen never dismisses.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             var currentPlayerGuid = session.GameState.CurrentPlayerGuid;
             bool playerCreateInBatch = false;

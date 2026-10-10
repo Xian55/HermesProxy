@@ -46,7 +46,7 @@ public static class BattlegroundSystem
     {
         // V3_4_3-only: forwarding the PvP-UI BG-list query is part of the 54261 fix.
         // V1_14/V2_5 keep their original behaviour (request not forwarded) — no side effect.
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_BATTLEFIELD_LIST);
@@ -93,7 +93,7 @@ public static class BattlegroundSystem
         bool isArena = GameData.Battlegrounds.TryGetValue(bgTypeId, out var bg) && bg.IsArena;
         byte queuedArenaType = ctx.GetSession().GameState.GetBattleFieldQueueArenaType(port.Ticket.Id);
         byte arenaType = BattlefieldQueueArenaType.ForLegacyPort(
-            ModernVersion.Build == ClientVersionBuild.V3_4_3_54261, isArena, queuedArenaType);
+            ModernVersion.IsWotLKClassicOrLater, isArena, queuedArenaType);
 
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
@@ -150,7 +150,7 @@ public static class BattlegroundSystem
             uint bgTypeId = ctx.GetSession().GameState.GetBattleFieldQueueType(1);
             bool isArena = GameData.Battlegrounds.TryGetValue(bgTypeId, out var bg) && bg.IsArena;
             byte arenaType = BattlefieldQueueArenaType.ForLegacyPort(
-                ModernVersion.Build == ClientVersionBuild.V3_4_3_54261, isArena,
+                ModernVersion.IsWotLKClassicOrLater, isArena,
                 ctx.GetSession().GameState.GetBattleFieldQueueArenaType(1));
             packet.WriteUInt8(arenaType);
             packet.WriteUInt8(ctx.GetSession().GameState.GetBattleFieldQueueBracketId(1));

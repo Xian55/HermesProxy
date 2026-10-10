@@ -82,7 +82,7 @@ public static class SpellSystem
         }
 
         // V3_4_3 RequiresSpellFocus is 123, the same number as Classic SpellInProgress.
-        uint inProgress = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        uint inProgress = ModernVersion.IsWotLKClassicOrLater
             ? (uint)SpellCastResultV343.SpellInProgress
             : (uint)SpellCastResultClassic.SpellInProgress;
 
@@ -439,7 +439,7 @@ public static class SpellSystem
 
     static uint ResolveLegacyOpenLockSpell(in SessionContext ctx, SpellCastRequest cast)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return 0;
         if (!cast.Target.Flags.HasFlag(SpellCastTargetFlags.GameObject))
             return 0;

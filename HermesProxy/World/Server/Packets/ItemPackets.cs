@@ -225,7 +225,7 @@ public class SellResponse : ServerPacket, ISpanWritable
 
     public override void Write()
     {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             _worldPacket.WritePackedGuid128(VendorGUID);
             _worldPacket.WriteUInt32(1);
@@ -245,7 +245,7 @@ public class SellResponse : ServerPacket, ISpanWritable
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             writer.WritePackedGuid128(VendorGUID.Low, VendorGUID.High);
             writer.WriteUInt32(1);

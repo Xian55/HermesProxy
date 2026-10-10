@@ -232,7 +232,7 @@ public static class CharacterSystem
         // the client starts up believing all 6 runes are on cooldown and refuses to
         // send rune-cost CMSG_CAST_SPELL until a SpellGo proves otherwise. SMSG_RESYNC_RUNES
         // from the legacy server later overwrites this default with authoritative values.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+        if (ModernVersion.IsWotLKClassicOrLater &&
             ctx.GetSession().GameState.CurrentPlayerInfo!.ClassId == Class.Deathknight)
         {
             ctx.GetSession().GameState.RuneState = new RuneStateData();

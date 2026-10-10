@@ -13,7 +13,7 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_LOAD_EQUIPMENT_SET)]
     internal void HandleLoadEquipmentSet(WorldPacket packet)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         LoadEquipmentSet load = new();
@@ -48,7 +48,7 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_EQUIPMENT_SET_ID)]
     internal void HandleEquipmentSetId(WorldPacket packet)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         EquipmentSetID id = new();
@@ -61,7 +61,7 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_USE_EQUIPMENT_SET_RESULT)]
     internal void HandleUseEquipmentSetResult(WorldPacket packet)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         UseEquipmentSetResult result = new();

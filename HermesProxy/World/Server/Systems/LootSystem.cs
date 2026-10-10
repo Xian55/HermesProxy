@@ -39,7 +39,7 @@ public static class LootSystem
         // crediting the player). Pre-claim the gold *before* the item forward so the
         // server processes money first; the client's matching CMSG_LOOT_MONEY half of
         // the auto-loot pair is suppressed below in HandleLootMoney.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             && state.RemainingLootCoins > 0)
         {
             WorldPacket moneyPacket = new WorldPacket(Opcode.CMSG_LOOT_MONEY);

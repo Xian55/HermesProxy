@@ -48,7 +48,7 @@ public partial class WorldClient
             // Native V3_4_3 answers both a dismissed pet and an ended charm or vehicle with an
             // empty SMSG_PET_SPELLS_MESSAGE (Player::RemovePet, Player::SendRemoveControlBar) and
             // never sends SMSG_PET_CLEAR_SPELLS (STATUS_UNHANDLED).
-            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            if (ModernVersion.IsWotLKClassicOrLater)
             {
                 SendPacketToClient(new PetSpells { Specialization = 0 });
 
@@ -92,7 +92,7 @@ public partial class WorldClient
         spells.Flag = packet.ReadUInt8();
 
         const int maxCreatureSpells = 10;
-        bool translateActionEncoding = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        bool translateActionEncoding = ModernVersion.IsWotLKClassicOrLater;
 
         Span<uint> rawButtons = stackalloc uint[maxCreatureSpells];
         bool isVehicleBar = false;
@@ -187,7 +187,7 @@ public partial class WorldClient
         // (with re-translated PetGUID) right after the pet's CreateObject is
         // sent. If the pet is already in ClientKnownGuids (TC backends, or a
         // second SMSG_PET_SPELLS_MESSAGE on the same pet), forward immediately.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+        if (ModernVersion.IsWotLKClassicOrLater &&
             !GetSession().GameState.ClientKnownGuids.Contains(spells.PetGUID))
         {
             var toClient = GetSession().ToClient;
@@ -248,7 +248,7 @@ public partial class WorldClient
         // here from the cached UNIT_FIELD_SUMMON, it read 0 when a pet came out of the stable:
         // the list answer lands before the server's Summon update, and the client took the
         // empty list as "no pet", dropping the pet frame and bar until the pet was re-called.
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
         {
             PetGuids pets = new PetGuids();
             var updateFields = GetSession().GameState.GetCachedObjectFieldsLegacy(GetSession().GameState.CurrentPlayerGuid);
@@ -272,7 +272,7 @@ public partial class WorldClient
         // from ActivePlayerData. Cache it for the next CreateObject, and push a Values update
         // now so an already-logged-in player sees a slot unlock the moment it is bought.
         GetSession().GameState.NumStableSlots = numStableSlots;
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             ObjectUpdate slotUpdate = new ObjectUpdate(GetSession().GameState.CurrentPlayerGuid, UpdateTypeModern.Values, GetSession());
             slotUpdate.EnsureActivePlayerData().NumStableSlots = numStableSlots;
@@ -311,7 +311,7 @@ public partial class WorldClient
 
         // V3_4_3 deleted SMSG_PET_STABLE_LIST; the stable lives in ActivePlayerData and the
         // native server ships it as a hand-built SMSG_UPDATE_OBJECT (issue #224).
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             SendPacketToClient(BuildStableUpdate(stableMaster, stabledPets));
             return;
@@ -393,7 +393,7 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_PET_LEARNED_SPELLS)]
     internal void HandlePetLearnedSpells(WorldPacket packet)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         var learned = new PetLearnedSpells();
@@ -404,7 +404,7 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_PET_UNLEARNED_SPELLS)]
     internal void HandlePetUnlearnedSpells(WorldPacket packet)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         var unlearned = new PetUnlearnedSpells();

@@ -48,7 +48,7 @@ public class QuestGiverQuestDetails : ServerPacket
         // QuestRewards. Without this dispatch the client mis-reads a count and
         // attempts a ~112 GB allocation. Layout mirrors TC wotlk_classic
         // QuestPackets.cpp:458 exactly.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             WriteWotLK();
             return;
@@ -441,7 +441,7 @@ public class QuestGiverStatusPkt : ServerPacket, ISpanWritable
 
     public override void Write()
     {
-        bool useV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        bool useV343 = ModernVersion.IsWotLKClassicOrLater;
         uint encoded = useV343
             ? QuestGiverStatusV343Converter.FromModern(QuestGiver.Status)
             : (uint)QuestGiver.Status;
@@ -461,7 +461,7 @@ public class QuestGiverStatusPkt : ServerPacket, ISpanWritable
 
     public int WriteToSpan(Span<byte> buffer)
     {
-        bool useV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        bool useV343 = ModernVersion.IsWotLKClassicOrLater;
         uint encoded = useV343
             ? QuestGiverStatusV343Converter.FromModern(QuestGiver.Status)
             : (uint)QuestGiver.Status;
@@ -487,7 +487,7 @@ public class QuestGiverStatusMultiple : ServerPacket, ISpanWritable
 
     public override void Write()
     {
-        bool useV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        bool useV343 = ModernVersion.IsWotLKClassicOrLater;
         QuestLogMessages.QuestGiverStatusMultipleWrite(_melQuest, "", QuestGivers.Count, ModernVersion.Build);
         _worldPacket.WriteInt32(QuestGivers.Count);
         for (int i = 0; i < QuestGivers.Count; i++)
@@ -517,7 +517,7 @@ public class QuestGiverStatusMultiple : ServerPacket, ISpanWritable
         if (QuestGivers.Count > MaxQuestGivers)
             return -1;
 
-        bool useV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        bool useV343 = ModernVersion.IsWotLKClassicOrLater;
         QuestLogMessages.QuestGiverStatusMultipleWrite(_melQuest, "(span)", QuestGivers.Count, ModernVersion.Build);
         var writer = new SpanPacketWriter(buffer);
         writer.WriteInt32(QuestGivers.Count);
@@ -564,7 +564,7 @@ public class QuestGiverQuestListMessage : ServerPacket
 
     public override void Write()
     {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             WriteWotLK();
             return;
@@ -614,7 +614,7 @@ public class QuestGiverRequestItems : ServerPacket
 
     public override void Write()
     {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             WriteWotLK();
             return;
@@ -751,7 +751,7 @@ public class QuestGiverOfferRewardMessage : ServerPacket
 
     public override void Write()
     {
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             WriteWotLK();
             return;

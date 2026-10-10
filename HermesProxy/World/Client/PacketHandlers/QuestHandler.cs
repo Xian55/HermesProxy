@@ -437,7 +437,7 @@ public partial class WorldClient
 
         quest.ItemReward.ItemID = itemId;
         QuestTemplate? questTemplate = GameData.GetQuestTemplate((uint)quest.QuestID);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             // AC already pushes the next QUEST_DETAILS on the same NPC.
             // LaunchQuest makes 3.4.3 HELLO again and the details window opens twice.
@@ -448,7 +448,7 @@ public partial class WorldClient
             quest.LaunchQuest = false;
         }
 
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261
+        if (!ModernVersion.IsWotLKClassicOrLater
             && !quest.LaunchQuest
             && GetSession().GameState.CurrentInteractedWithNPC != default)
         {
@@ -461,7 +461,7 @@ public partial class WorldClient
         GetSession().GameState.LastGossip = null;
         GetSession().GameState.LastQuestList = null;
         SendPacketToClient(quest);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
             SendPacketToClient(new GossipComplete());
 
         DisplayToast toast = new();
@@ -702,7 +702,7 @@ public partial class WorldClient
                 packet.ReadUInt32(); // Unk3 / Priority
                 packet.ReadUInt32(); // Unk4 / Flags
 
-                bool isV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+                bool isV343 = ModernVersion.IsWotLKClassicOrLater;
 
                 // The V3_4_3 client wants a Classic UiMap id here, not the legacy
                 // WorldMapArea id. Zones outside the derived set fall back to the raw id.

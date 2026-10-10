@@ -100,7 +100,7 @@ class SetFactionStanding : ServerPacket, ISpanWritable
     /// SMSG_INITIALIZE_FACTIONS. Older builds still carry it - WPP's V6_0_2 parser, which covers
     /// V1_14 and V2_5, reads both.
     /// </summary>
-    private static bool HasReferAFriendBonus => ModernVersion.Build != ClientVersionBuild.V3_4_3_54261;
+    private static bool HasReferAFriendBonus => !ModernVersion.IsWotLKClassicOrLater;
 
     public override void Write()
     {

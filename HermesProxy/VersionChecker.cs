@@ -172,6 +172,25 @@ public static class VersionChecker
     };
 
     /// <summary>
+    /// A Classic-line client from WotLK Classic 3.4.3 on: the builds whose modern side is the 3.4.3
+    /// one, Cataclysm Classic 4.4.x included.
+    /// </summary>
+    /// <remarks>
+    /// Replaces the exact <c>== ClientVersionBuild.V3_4_3_54261</c> the 3.4.3 port was written
+    /// with. For every build supported before 4.4.2 the two agree (ClientBranchTests), so the
+    /// rename changed nothing for them; a later build now takes the 3.4.3 path instead of the
+    /// 1.14/2.5 one. Where a later build differs from 3.4.3, that difference gets its own layout
+    /// or range rather than a narrower predicate.
+    /// </remarks>
+    public static bool IsWotLKClassicOrLater(ClientVersionBuild build)
+    {
+        byte expansion = GetExpansionVersion(build);
+        byte major = GetMajorPatchVersion(build);
+        byte minor = GetMinorPatchVersion(build);
+        return GetBranch(expansion, major) == ClientBranch.Classic && (expansion, major, minor).CompareTo((3, 4, 3)) >= 0;
+    }
+
+    /// <summary>
     /// Guards a raw-build comparison against crossing release lines.
     /// </summary>
     /// <remarks>
@@ -489,7 +508,7 @@ public static class LegacyVersion
         // and again at 31. Without this dispatch, NotShapeshift (TC reason 68) name-mapped to
         // SpellCastResultClassic.NotShapeshift=89, but 89 in the V3_4_3 client is `NotOnTaxi`
         // — Bear Form / shapeshift cast errors displayed as flight-related text.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             if (AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 return (uint)((SpellCastResultWotLK)result).CastEnum<SpellCastResultV343>();
@@ -552,6 +571,9 @@ public static class ModernVersion
     public static readonly byte MajorVersion = GetMajorPatchVersion();
     public static readonly byte MinorVersion = GetMinorPatchVersion();
     public static readonly ClientBranch Branch = VersionChecker.GetBranch(ExpansionVersion, MajorVersion);
+
+    /// <summary>See <see cref="VersionChecker.IsWotLKClassicOrLater"/>.</summary>
+    public static readonly bool IsWotLKClassicOrLater = VersionChecker.IsWotLKClassicOrLater(Build);
 
     public static int BuildInt => (int)Build;
     public static string VersionString => Build.ToString();
@@ -1022,7 +1044,7 @@ public static class ModernVersion
         if (slot == World.Enums.Classic.InventorySlots.Bag0)
             return slot;
 
-        if (Build != ClientVersionBuild.V3_4_3_54261)
+        if (!IsWotLKClassicOrLater)
             return AdjustInventorySlot(slot);
 
         if (slot >= 30 && slot <= 33)
@@ -1055,7 +1077,7 @@ public static class ModernVersion
         if (slot == World.Enums.Classic.InventorySlots.Bag0)
             return slot;
 
-        if (Build != ClientVersionBuild.V3_4_3_54261)
+        if (!IsWotLKClassicOrLater)
             return slot;
 
         // Legacy WotLK 3.3.5a slot layout:

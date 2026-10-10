@@ -139,7 +139,7 @@ public partial class WorldClient
     void SendPlayerMovementPacket(ServerPacket packet, WowGuid128 moverGuid)
     {
         var session = GetSession();
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261 ||
+        if (!ModernVersion.IsWotLKClassicOrLater ||
             moverGuid != session.GameState.CurrentPlayerGuid ||
             session.GameState.ClientKnownGuids.Contains(moverGuid))
         {
@@ -196,7 +196,7 @@ public partial class WorldClient
         WowGuid128 mover = packet.ReadPackedGuid().To128(gameState);
         // Looked at before the block is read, and only where there is anything to drop: a dropped
         // heartbeat then costs no decode, and a forwarded one is read straight into its packet.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             && IsSplineDrivenMove((uint)LegacyMovementCodec.PeekFlags(packet), ModernVersion.Build))
             return;
 
@@ -220,7 +220,7 @@ public partial class WorldClient
     /// sees the combination, and the spline already carries the position.
     /// </remarks>
     internal static bool IsSplineDrivenMove(uint legacyFlags, ClientVersionBuild modernBuild) =>
-        modernBuild == ClientVersionBuild.V3_4_3_54261 &&
+        VersionChecker.IsWotLKClassicOrLater(modernBuild) &&
         legacyFlags.HasAnyFlag((uint)MovementFlagWotLK.SplineEnabled);
 
     [HandlesSmsg(Opcode.MSG_MOVE_KNOCK_BACK)]
@@ -261,7 +261,7 @@ public partial class WorldClient
         // without this synthesis the modern client treats CONTROL_UPDATE as camera-only
         // and never sends client movement for vehicle/charm/possess targets like the
         // Eye of Acherus (quest 12641).
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && control.HasControl)
+        if (ModernVersion.IsWotLKClassicOrLater && control.HasControl)
         {
             MoveSetActiveMover setMover = new MoveSetActiveMover();
             setMover.MoverGUID = control.Guid;
@@ -413,7 +413,7 @@ public partial class WorldClient
             // player create, ahead of the server's fresh creates for the same pets. Player Values
             // held for the old map go the same way: the server re-sends the player's whole state
             // in the new map's create, so a delta read against the old one is stale.
-            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            if (ModernVersion.IsWotLKClassicOrLater)
             {
                 GetSession().GameState.ClientKnownGuids.Clear();
                 GetSession().GameState.VehicleRecIds.Clear();
@@ -837,7 +837,7 @@ public partial class WorldClient
         // forwards, and released when those bits clear at landing. Forwarding the spline as-is is
         // also what already happens on AzerothCore today, where flights work — the exact-match flag
         // test never fired there, which is how #301 was found.
-        bool isTaxiFlight = (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261 &&
+        bool isTaxiFlight = (!ModernVersion.IsWotLKClassicOrLater &&
                              isFlyingSpline &&
                             (GetSession().GameState.IsWaitingForTaxiStart ||
                              Math.Abs(packet.GetReceivedTime() - GetSession().GameState.CurrentPlayerCreateTime) <= 1000) &&

@@ -35,7 +35,7 @@ public static class MiscSystem
         // legacy server's areatrigger_teleport table is keyed on. V3_4_3 only.
         // Table is data-driven: CSV/AreaTriggerRemap*.csv.
         uint idToForward = at.AreaTriggerID;
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+        if (ModernVersion.IsWotLKClassicOrLater &&
             GameData.AreaTriggerModernToLegacy.TryGetValue(at.AreaTriggerID, out var legacyId))
         {
             idToForward = legacyId;
@@ -194,7 +194,7 @@ public static class MiscSystem
         // V3_4_3 client DB2 — receiving it appears to route the modern client's
         // LFG UI toward the Premade-Group code path, hiding the Dungeon Finder
         // microbar eye icon and disabling the regular Queue button.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
             return;
 
         // Static blacklist for the modern Premade-Group LFG List (Cataclysm+

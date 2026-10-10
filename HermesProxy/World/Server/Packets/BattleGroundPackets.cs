@@ -250,7 +250,7 @@ public class BattlefieldStatusFailed : ServerPacket, ISpanWritable
     // so it read the reason as 0 and printed no error, and read one byte past the end (#363).
     // It goes here and not in RideTicket.Write: the status packets with a header already get a
     // byte in that place from BattlefieldStatusHeader.Unk254.
-    public static bool HasTicketFlag => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    public static bool HasTicketFlag => ForceV343ForTests ?? ModernVersion.IsWotLKClassicOrLater;
     // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
     internal static bool? ForceV343ForTests;
 
@@ -351,7 +351,7 @@ public class RideTicket
         // consuming it, the next bit read — BattlefieldPort.AcceptedInvite — lands on THIS bit
         // instead of the real accept bit in the following byte, so "Enter Battle" was read as a
         // decline and the player never entered the popped battleground (#102).
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             data.HasBit();         // Unknown925
             data.ResetBitReader(); // byte-align to the next field's bit byte
@@ -371,7 +371,7 @@ public class RideTicket
         Id = data.ReadUInt32();
         Type = (RideType)data.ReadUInt32();
         Time = data.ReadInt64();
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             data.HasBit();         // Unknown925
             data.ResetBitReader(); // byte-align to the next field's bit byte
@@ -508,7 +508,7 @@ public class PVPMatchStatisticsMessage : ServerPacket
         // (0x2933, which is what Classic Era and TBC Classic use). Wrathion, a native
         // 3.4.3.54261 server, hardcodes the HasNames bit to false with the comment
         // "ArenaTeams no longer in 3.4.3".
-        bool writeArenaTeams = ArenaTeams != null && ModernVersion.Build != ClientVersionBuild.V3_4_3_54261;
+        bool writeArenaTeams = ArenaTeams != null && !ModernVersion.IsWotLKClassicOrLater;
 
         _worldPacket.WriteBit(Ratings != null);
         _worldPacket.WriteBit(writeArenaTeams);
@@ -601,7 +601,7 @@ public class PVPMatchStatisticsMessage : ServerPacket
             data.WriteInt32(Stats.Count);
             data.WriteInt32(PrimaryTalentTree);
             // 3.4.3 narrows Sex to a single byte; wider writes shift every following field.
-            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            if (ModernVersion.IsWotLKClassicOrLater)
                 data.WriteInt8((sbyte)Sex);
             else
                 data.WriteUInt32((uint)Sex);

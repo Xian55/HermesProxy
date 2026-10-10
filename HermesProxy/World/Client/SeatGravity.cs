@@ -43,7 +43,7 @@ internal static class SeatGravity
 
     /// <summary>Only a 3.4.3 client behind a server that has vehicles needs any of this.</summary>
     public static bool Applies =>
-        ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+        ModernVersion.IsWotLKClassicOrLater &&
         LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056);
 
     /// <summary>

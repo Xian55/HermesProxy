@@ -151,73 +151,83 @@ takes the `else`, which is generally the oldest supported layout — the opposit
 newer client wants, and silent when wrong.
 
 Converting one to a range (`AddedInVersion`, or a second `[PacketCodec]`) makes it inherit
-correctly by default. They cannot be swept mechanically: some genuinely mean "this build
-only" — a quirk a later client fixed — and widening those would propagate a bug forward.
-Each needs a judgement call against the client or WowPacketParser.
+correctly by default. Some genuinely mean "this build only" — a quirk a later client fixed —
+and widening those propagates a bug forward, so each needs a judgement call against the
+client or WowPacketParser. The 3.4.3 ones became `IsWotLKClassicOrLater` (section 5), which
+kept every supported build's behaviour; that judgement is still owed per site there.
 
 Counts per file rather than line numbers, so unrelated edits do not churn this file.
 
-212 sites across 57 files.
+0 sites across 0 files.
 
-### `ModernVersion.Build` compared by equality — 212 sites
+## 5. Inherited 3.4.3 behaviour — the 4.4.2 review list
 
-| file | build compared | sites |
-|---|---|---:|
-| `HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs` | `V3_4_3_54261` | 21 |
-| `HermesProxy/World/Server/Packets/SpellPackets.cs` | `V3_4_3_54261` | 16 |
-| `HermesProxy/World/GameData.cs` | `V3_4_3_54261` | 15 |
-| `HermesProxy/World/Server/Packets/NPCPackets.cs` | `V3_4_3_54261` | 14 |
-| `HermesProxy/World/Client/PacketHandlers/PetHandler.cs` | `V3_4_3_54261` | 8 |
-| `HermesProxy/World/Server/Packets/QuestPackets.cs` | `V3_4_3_54261` | 8 |
-| `HermesProxy/World/Client/PacketHandlers/QueryHandler.cs` | `V3_4_3_54261` | 7 |
-| `HermesProxy/World/Client/PacketHandlers/SpellHandler.cs` | `V3_4_3_54261` | 7 |
-| `HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs` | `V3_4_3_54261` | 5 |
-| `HermesProxy/World/Client/PacketHandlers/MovementHandler.cs` | `V3_4_3_54261` | 5 |
-| `HermesProxy/World/Server/Packets/BattleGroundPackets.cs` | `V3_4_3_54261` | 5 |
-| `HermesProxy/World/Server/Packets/GroupPackets.cs` | `V3_4_3_54261` | 5 |
-| `HermesProxy/World/Server/Packets/MailPackets.cs` | `V3_4_3_54261` | 5 |
-| `HermesProxy/World/Client/PacketHandlers/QuestHandler.cs` | `V3_4_3_54261` | 4 |
-| `HermesProxy/World/Server/Packets/GuildPackets.cs` | `V3_4_3_54261` | 4 |
-| `HermesProxy/World/Server/Packets/QueryPackets.cs` | `V3_4_3_54261` | 4 |
-| `HermesProxy/World/Server/Systems/BattlePetSystem.cs` | `V3_4_3_54261` | 4 |
-| `HermesProxy/World/Server/Systems/ToySystem.cs` | `V3_4_3_54261` | 4 |
-| `HermesProxy/World/Client/PacketHandlers/CombatHandler.cs` | `V3_4_3_54261` | 3 |
-| `HermesProxy/World/Client/PacketHandlers/EquipmentSetHandler.cs` | `V3_4_3_54261` | 3 |
-| `HermesProxy/World/Client/PacketHandlers/GroupHandler.cs` | `V3_4_3_54261` | 3 |
-| `HermesProxy/World/Client/PacketHandlers/LootHandler.cs` | `V3_4_3_54261` | 3 |
-| `HermesProxy/World/Server/Packets/ChatPackets.cs` | `V3_4_3_54261` | 3 |
-| `HermesProxy/World/Server/Systems/BattlegroundSystem.cs` | `V3_4_3_54261` | 3 |
-| `HermesProxy/World/Server/Systems/EquipmentSetSystem.cs` | `V3_4_3_54261` | 3 |
-| `HermesProxy/World/Server/Systems/PetSystem.cs` | `V3_4_3_54261` | 3 |
-| `HermesProxy/World/Client/PacketHandlers/LFGHandler.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Client/PacketHandlers/MiscHandler.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Client/PacketHandlers/NPCHandler.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Client/PacketHandlers/TalentHandler.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Server/CollectionSync.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Server/Packets/AuctionPackets.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Server/Packets/CharacterPackets.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Server/Packets/ItemPackets.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Server/Packets/LootPackets.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Server/Packets/SystemPackets.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Server/Packets/TaxiPackets.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Server/Packets/UpdatePackets.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Server/Systems/ItemSystem.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Server/Systems/MiscSystem.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Server/Systems/SpellSystem.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/World/Server/WorldSocket.cs` | `V3_4_3_54261` | 2 |
-| `HermesProxy/VersionChecker.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Client/PacketHandlers/TradeHandler.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Client/SeatGravity.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Server/Packets/ArenaPackets.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Server/Packets/Codecs/SupportTicketCodecs.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Server/Packets/LFG/SMSG/LFGPlayerReward.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Server/Packets/MiscPackets.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Server/Packets/ReputationPackets.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Server/Systems/CharacterSystem.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Server/Systems/GuildSystem.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Server/Systems/LootSystem.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Server/Systems/MovementSystem.cs` | `V3_4_3_54261` | 1 |
-| `HermesProxy/World/Server/Systems/SupportTicketSystem.cs` | `V3_4_3_54261` | 1 |
+`IsWotLKClassicOrLater` (and `VersionChecker.IsWotLKClassicOrLater(build)`) inside a method
+body. Each was an exact `== V3_4_3_54261` until 2026-10-10. A later Classic client now takes
+the 3.4.3 path at every one of them, which is right wherever its layout matches 3.4.3 and
+silently wrong wherever it does not. Check each against the 4.4.2 client
+(`docs/protocol/4.4.2.60895`) before 4.4.2 becomes a supported build; where it differs, the
+site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a narrower check.
+
+216 sites across 57 files.
+
+| file | sites |
+|---|---:|
+| `HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs` | 21 |
+| `HermesProxy/World/Server/Packets/SpellPackets.cs` | 16 |
+| `HermesProxy/World/GameData.cs` | 15 |
+| `HermesProxy/World/Server/Packets/NPCPackets.cs` | 14 |
+| `HermesProxy/World/Client/PacketHandlers/PetHandler.cs` | 8 |
+| `HermesProxy/World/Server/Packets/QuestPackets.cs` | 8 |
+| `HermesProxy/World/Client/PacketHandlers/QueryHandler.cs` | 7 |
+| `HermesProxy/World/Client/PacketHandlers/SpellHandler.cs` | 7 |
+| `HermesProxy/World/Client/PacketHandlers/MovementHandler.cs` | 6 |
+| `HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs` | 5 |
+| `HermesProxy/World/Server/Packets/BattleGroundPackets.cs` | 5 |
+| `HermesProxy/World/Server/Packets/GroupPackets.cs` | 5 |
+| `HermesProxy/World/Server/Packets/MailPackets.cs` | 5 |
+| `HermesProxy/World/Client/PacketHandlers/QuestHandler.cs` | 4 |
+| `HermesProxy/World/Server/Packets/GuildPackets.cs` | 4 |
+| `HermesProxy/World/Server/Packets/QueryPackets.cs` | 4 |
+| `HermesProxy/World/Server/Systems/BattlePetSystem.cs` | 4 |
+| `HermesProxy/World/Server/Systems/ToySystem.cs` | 4 |
+| `HermesProxy/VersionChecker.cs` | 3 |
+| `HermesProxy/World/Client/PacketHandlers/CombatHandler.cs` | 3 |
+| `HermesProxy/World/Client/PacketHandlers/EquipmentSetHandler.cs` | 3 |
+| `HermesProxy/World/Client/PacketHandlers/GroupHandler.cs` | 3 |
+| `HermesProxy/World/Client/PacketHandlers/LootHandler.cs` | 3 |
+| `HermesProxy/World/Server/Packets/ChatPackets.cs` | 3 |
+| `HermesProxy/World/Server/Packets/UpdatePackets.cs` | 3 |
+| `HermesProxy/World/Server/Systems/BattlegroundSystem.cs` | 3 |
+| `HermesProxy/World/Server/Systems/EquipmentSetSystem.cs` | 3 |
+| `HermesProxy/World/Server/Systems/PetSystem.cs` | 3 |
+| `HermesProxy/World/Client/PacketHandlers/LFGHandler.cs` | 2 |
+| `HermesProxy/World/Client/PacketHandlers/MiscHandler.cs` | 2 |
+| `HermesProxy/World/Client/PacketHandlers/NPCHandler.cs` | 2 |
+| `HermesProxy/World/Client/PacketHandlers/TalentHandler.cs` | 2 |
+| `HermesProxy/World/Server/CollectionSync.cs` | 2 |
+| `HermesProxy/World/Server/Packets/AuctionPackets.cs` | 2 |
+| `HermesProxy/World/Server/Packets/CharacterPackets.cs` | 2 |
+| `HermesProxy/World/Server/Packets/ItemPackets.cs` | 2 |
+| `HermesProxy/World/Server/Packets/LootPackets.cs` | 2 |
+| `HermesProxy/World/Server/Packets/SystemPackets.cs` | 2 |
+| `HermesProxy/World/Server/Packets/TaxiPackets.cs` | 2 |
+| `HermesProxy/World/Server/Systems/ItemSystem.cs` | 2 |
+| `HermesProxy/World/Server/Systems/MiscSystem.cs` | 2 |
+| `HermesProxy/World/Server/Systems/SpellSystem.cs` | 2 |
+| `HermesProxy/World/Server/WorldSocket.cs` | 2 |
+| `HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs` | 1 |
+| `HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs` | 1 |
+| `HermesProxy/World/Client/PacketHandlers/TradeHandler.cs` | 1 |
+| `HermesProxy/World/Client/SeatGravity.cs` | 1 |
+| `HermesProxy/World/Server/Packets/ArenaPackets.cs` | 1 |
+| `HermesProxy/World/Server/Packets/Codecs/SupportTicketCodecs.cs` | 1 |
+| `HermesProxy/World/Server/Packets/LFG/SMSG/LFGPlayerReward.cs` | 1 |
+| `HermesProxy/World/Server/Packets/MiscPackets.cs` | 1 |
+| `HermesProxy/World/Server/Packets/ReputationPackets.cs` | 1 |
+| `HermesProxy/World/Server/Systems/CharacterSystem.cs` | 1 |
+| `HermesProxy/World/Server/Systems/GuildSystem.cs` | 1 |
+| `HermesProxy/World/Server/Systems/LootSystem.cs` | 1 |
+| `HermesProxy/World/Server/Systems/MovementSystem.cs` | 1 |
+| `HermesProxy/World/Server/Systems/SupportTicketSystem.cs` | 1 |
 

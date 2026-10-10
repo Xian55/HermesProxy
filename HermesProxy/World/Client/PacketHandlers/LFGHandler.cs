@@ -51,7 +51,7 @@ public partial class WorldClient
         // The legacy and V3_4_3 LfgJoinResult enums do not share numbering, so forwarding the
         // raw byte made every rejection invisible in the modern UI.
         byte legacyResult = (byte)packet.ReadUInt32();    // joinData.result
-        result.Result = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        result.Result = ModernVersion.IsWotLKClassicOrLater
             ? LfgJoinResults.ToModern(legacyResult)
             : legacyResult;
         result.ResultDetail = (byte)packet.ReadUInt32();  // joinData.state
@@ -96,7 +96,7 @@ public partial class WorldClient
         status.RequestedRoles = GetSession().GameState.LfgRequestedRoles;
 
         byte legacyUpdateType = packet.ReadUInt8();
-        bool isV343 = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+        bool isV343 = ModernVersion.IsWotLKClassicOrLater;
 
         // TC 3.4.3 puts a constant queue type in SubType and the update type in Reason
         // (Handlers/LFGHandler.cpp SendLfgUpdateStatus). Forwarding the legacy update type as

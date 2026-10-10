@@ -27,7 +27,7 @@ public static class EquipmentSetSystem
     [HandlesCmsg(Opcode.CMSG_SAVE_EQUIPMENT_SET)]
     public static void HandleSaveEquipmentSet(in SaveEquipmentSet save, in SessionContext ctx)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SAVE_EQUIPMENT_SET);
@@ -52,7 +52,7 @@ public static class EquipmentSetSystem
     [HandlesCmsg(Opcode.CMSG_DELETE_EQUIPMENT_SET)]
     public static void HandleDeleteEquipmentSet(in DeleteEquipmentSet delete, in SessionContext ctx)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_EQUIPMENT_SET_DELETE);
@@ -63,7 +63,7 @@ public static class EquipmentSetSystem
     [HandlesCmsg(Opcode.CMSG_USE_EQUIPMENT_SET)]
     public static void HandleUseEquipmentSet(in UseEquipmentSet use, in SessionContext ctx)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         ctx.GetSession().GameState.LastUsedEquipmentSetGuid = use.GUID;

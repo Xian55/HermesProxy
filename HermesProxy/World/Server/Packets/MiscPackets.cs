@@ -461,7 +461,7 @@ public class WorldServerInfo : ServerPacket, ISpanWritable
 
     // The 3.4.3 client reads IsTournamentRealm as the first of five bits. Sent as a byte, it took
     // that byte as the flags, so it never saw InstanceGroupSize and left the rest unread (#361).
-    private static bool IsTournamentBit => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    private static bool IsTournamentBit => ForceV343ForTests ?? ModernVersion.IsWotLKClassicOrLater;
     // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
     internal static bool? ForceV343ForTests;
 

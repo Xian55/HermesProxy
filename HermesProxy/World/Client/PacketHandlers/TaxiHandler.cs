@@ -69,7 +69,7 @@ public partial class WorldClient
         // SMSG_CONTROL_UPDATE anywhere in the session. Sending it here also means a taxi activation
         // is always resolved, so IsWaitingForTaxiStart can never go stale waiting for a spline
         // whose flags the proxy failed to recognise (#301).
-        if (reply != ActivateTaxiReply.Ok || ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (reply != ActivateTaxiReply.Ok || ModernVersion.IsWotLKClassicOrLater)
         {
             ActivateTaxiReplyPkt taxi = new();
             taxi.Reply = reply;

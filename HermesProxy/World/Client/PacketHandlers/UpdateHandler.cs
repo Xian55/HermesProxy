@@ -169,7 +169,7 @@ public partial class WorldClient
     internal void HandleDestroyObject(WorldPacket packet)
     {
         WowGuid128 guid = packet.ReadGuid().To128(GetSession().GameState);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+        if (ModernVersion.IsWotLKClassicOrLater
             && guid.GetHighType() == HighGuidType.Corpse)
         {
             var toClient = GetSession().ToClient;
@@ -217,7 +217,7 @@ public partial class WorldClient
 
     bool ShouldSkipV343CorpseRecreate(WowGuid128 guid)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261
+        if (!ModernVersion.IsWotLKClassicOrLater
             || guid.GetHighType() != HighGuidType.Corpse)
             return false;
         if (GetSession().ToClient.Cancel(CorpseDestroyKey(guid)))
@@ -602,7 +602,7 @@ public partial class WorldClient
                         // GameObjects forward fine. ItemContainer (0x4700) is also
                         // forwarded (HighGuid mapping converts to a normal Item guid).
                         bool filtered = ShouldSkipV343CorpseRecreate(guid);
-                        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+                        if (ModernVersion.IsWotLKClassicOrLater)
                         {
                             var legacyHigh = oldGuid.GetHighGuidTypeLegacy();
                             if (legacyHigh == HighGuidTypeLegacy.Transport ||
@@ -685,7 +685,7 @@ public partial class WorldClient
                     {
                         // Mirror of CreateObject1 — see filter comments there for rationale.
                         bool filtered = ShouldSkipV343CorpseRecreate(guid);
-                        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+                        if (ModernVersion.IsWotLKClassicOrLater)
                         {
                             var legacyHigh = oldGuid.GetHighGuidTypeLegacy();
                             if (legacyHigh == HighGuidTypeLegacy.Transport ||
@@ -929,7 +929,7 @@ public partial class WorldClient
         // .FlushDeferredUpdate so they ship atomically alongside the player; when the
         // player's batch was not deferred, they go out on their own right after it.
         // A batch carrying the player's own create is never held: nothing would release it.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+        if (ModernVersion.IsWotLKClassicOrLater &&
             activePlayerUpdateIndex < 0 &&
             ContainsPetCreateObject(updateObject) &&
             !GetSession().GameState.ClientKnownGuids.Contains(GetSession().GameState.CurrentPlayerGuid))
@@ -957,7 +957,7 @@ public partial class WorldClient
     {
         var session = GetSession();
         WowGuid128 playerGuid = session.GameState.CurrentPlayerGuid;
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261 ||
+        if (!ModernVersion.IsWotLKClassicOrLater ||
             session.GameState.ClientKnownGuids.Contains(playerGuid))
         {
             SendPacketToClient(playerValues);
@@ -1007,7 +1007,7 @@ public partial class WorldClient
         // the first auto-attack swing. Sending creature updates first preserves
         // the order legacy servers emit (target state arrives before owner deltas).
         List<ObjectUpdate>? playerValuesUpdates = null;
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             WowGuid128 playerGuidForSplit = GetSession().GameState.CurrentPlayerGuid;
             foreach (var upd in updateObject.ObjectUpdates)
@@ -1037,7 +1037,7 @@ public partial class WorldClient
         // any same-tick Values updates the client receives next reference already-
         // known guids (FilterV3_4_3Values already populated ClientKnownGuids).
         List<ObjectUpdate>? createsToSplit = null;
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             int createCount = 0;
             foreach (var u in updateObject.ObjectUpdates)
@@ -1096,7 +1096,7 @@ public partial class WorldClient
         // CreateObject for that pet, flush the cached spells with the corrected
         // PetGUID (the pet was registered during ReadCreateObjectBlock, so
         // legacyGuid.To128 now resolves correctly).
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 && GetSession().ToClient.HasPending)
+        if (ModernVersion.IsWotLKClassicOrLater && GetSession().ToClient.HasPending)
         {
             var heldSpells = GetSession().ToClient.Peek<HeldPetSpells>(HeldPetSpells.Key);
             var pendingSpells = heldSpells?.Spells;
@@ -1164,7 +1164,7 @@ public partial class WorldClient
         // BEFORE the create, so we need to synthesize the post-create UpdateAll
         // ourselves. Empty list is fine for a fresh / unbuffed character; any real
         // auras already arrived via the legacy SMSG_AURA_UPDATE flow.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             WowGuid128 currentPlayerGuid = GetSession().GameState.CurrentPlayerGuid;
             bool playerCreateInBatch = false;
@@ -1243,7 +1243,7 @@ public partial class WorldClient
             // (observed once in twelve crossings). Keep it; a later create is a no-op for a
             // guid the client holds, and an explicit SMSG_DESTROY_OBJECT -- the round-2
             // respawn -- still goes through HandleDestroyObject untouched.
-            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+            if (ModernVersion.IsWotLKClassicOrLater
                 && GetSession().GameState.SynthesizedTransports.ContainsKey(guid))
             {
                 if (_melGoFields.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Trace))
@@ -1842,7 +1842,7 @@ public partial class WorldClient
         // signal that this is the active player and force the flag. Gated to
         // V3_4_3 to avoid altering the legacy Self semantics for V1_14/V2_5.
         bool guidMatchesPlayer =
-            ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+            ModernVersion.IsWotLKClassicOrLater &&
             guid == GetSession().GameState.CurrentPlayerGuid;
         if (legacySelf || guidMatchesPlayer)
         {
@@ -1974,7 +1974,7 @@ public partial class WorldClient
                 // Flying|Catmullrom|CanSwim|UncompressedPath and nothing else, so the translated
                 // flags are already the right shape and this decoration would only add flags the
                 // 3.4.3 client lists under Mask_Unused.
-                if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261 &&
+                if (!ModernVersion.IsWotLKClassicOrLater &&
                     isFlyingSpline && guid.IsPlayer() &&
                     flags.HasAnyFlag(UpdateFlag.Self))
                 {
@@ -2313,7 +2313,7 @@ public partial class WorldClient
             // update did not carry would go out as 0. V1_14 / V2_5 write the quest log
             // sparsely (SetUpdateField per index), where a null is skipped and the client
             // keeps its own value — restoring there would write over it for no reason.
-            if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+            if (ModernVersion.IsWotLKClassicOrLater)
             {
                 int recovered = state.RestoreQuestLogProgress(i, questLog);
                 if (recovered > 0)
@@ -3043,7 +3043,7 @@ public partial class WorldClient
                     updateData.EnsurePlayerData().ArenaFaction = (byte)(GameData.IsAllianceRace((Race)updateData.UnitData.RaceId) ? 1 : 0);
                 }
 
-                if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+                if (ModernVersion.IsWotLKClassicOrLater &&
                     guid == GetSession().GameState.CurrentPlayerGuid)
                 {
                     Log.Print(LogType.Debug,
@@ -3710,7 +3710,7 @@ public partial class WorldClient
             int PLAYER_FIELD_INV_SLOT_HEAD = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_INV_SLOT_HEAD);
             if (PLAYER_FIELD_INV_SLOT_HEAD >= 0)
             {
-                bool tracePlayer = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+                bool tracePlayer = ModernVersion.IsWotLKClassicOrLater &&
                                    guid == GetSession().GameState.CurrentPlayerGuid;
                 for (int i = 0; i < 23; i++)
                 {
@@ -3930,7 +3930,7 @@ public partial class WorldClient
                 var comboTarget = GetGuidValue(updates, PlayerField.PLAYER_FIELD_COMBO_TARGET).To128(GetSession().GameState);
                 // Only the V1_14/V2_5 builders read ComboTarget from ActivePlayerData; V3_4_3
                 // writes it from UnitData, so don't materialise ActivePlayerData just for it.
-                if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+                if (!ModernVersion.IsWotLKClassicOrLater)
                     updateData.EnsureActivePlayerData().ComboTarget = comboTarget;
                 updateData.UnitData.ComboTarget = comboTarget;
             }
@@ -4134,7 +4134,7 @@ public partial class WorldClient
             if (PLAYER_FIELD_COINAGE >= 0 && updateMaskArray[PLAYER_FIELD_COINAGE])
             {
                 updateData.EnsureActivePlayerData().Coinage = updates[PLAYER_FIELD_COINAGE].UInt32Value;
-                if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 &&
+                if (ModernVersion.IsWotLKClassicOrLater &&
                     guid == GetSession().GameState.CurrentPlayerGuid)
                 {
                     Log.Print(LogType.Debug,
@@ -4644,7 +4644,7 @@ public partial class WorldClient
             // refreshed. Tracked transports only; for a destructible building this slot is a
             // model id, not a rotation.
             if (GAMEOBJECT_ROTATION >= 0 && updateData.CreateData == null
-                && ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+                && ModernVersion.IsWotLKClassicOrLater)
             {
                 // Mask bits first: almost no Values touches rotation, and the registry
                 // lookup behind them is the only cost worth avoiding on the common path.
@@ -4865,7 +4865,7 @@ public partial class WorldClient
                 // every intact type-33 object (verified against a Strand of the Ancients
                 // capture, 8 of 8). Rescaling to 0..100 would leave an intact gate at 100/255.
                 // See issue #184.
-                if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261
+                if (!ModernVersion.IsWotLKClassicOrLater
                     || updateData.GameObjectData.TypeID == (sbyte)GameObjectTypeModern.DestructibleBuilding)
                     updateData.GameObjectData.PercentHealth = (byte)((packed >> 24) & 0xFF);
             }
@@ -4899,7 +4899,7 @@ public partial class WorldClient
                 // GameObjectRelocation call commented out), so forwarding it renders the
                 // boat away from where the server places players on it.
                 bool isTransport = guid.IsTransport();
-                bool stripHighBits = ModernVersion.Build == ClientVersionBuild.V3_4_3_54261
+                bool stripHighBits = ModernVersion.IsWotLKClassicOrLater
                                      && !isTransport;
                 uint effectiveLegacyRaw = stripHighBits ? (legacyRaw & 0x0000FFFFu) : legacyRaw;
 

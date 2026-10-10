@@ -36,7 +36,7 @@ class AuctionHelloResponse : ServerPacket, ISpanWritable
     // "auction house closed", #85). Its house id is what it matches outbid notices against: sent
     // first (as TrinityCore 3.4.3 does), the id landed in a delay and the client held house 0, so
     // it ignored every outbid and kept showing the player as the high bidder.
-    private static bool HasDeliveryDelays => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    private static bool HasDeliveryDelays => ForceV343ForTests ?? ModernVersion.IsWotLKClassicOrLater;
     // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
     internal static bool? ForceV343ForTests;
 
@@ -509,7 +509,7 @@ class AuctionBidderNotification
     // when it matches the open auction house. The fixed 2 (TrinityCore 3.4.3 sends the same) matched
     // only house 2, so outbids at the Horde and Blackwater auction houses were ignored. Other builds
     // keep the 2 until their clients are checked.
-    private static bool SendsHouseId => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    private static bool SendsHouseId => ForceV343ForTests ?? ModernVersion.IsWotLKClassicOrLater;
     // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
     internal static bool? ForceV343ForTests;
 

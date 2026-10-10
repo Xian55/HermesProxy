@@ -64,7 +64,7 @@ public partial class WorldClient
         // trailing "now dead" uint32; guard the read so it doesn't kill the WorldClient
         // receive loop (issue #102). Gated to V3_4_3 so V1_14/V2_5 keep the original
         // unconditional read (no behaviour change for older modern clients).
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
             attack.NowDead = packet.CanRead() && packet.ReadUInt32() != 0;
         else
             attack.NowDead = packet.ReadUInt32() != 0;
@@ -224,7 +224,7 @@ public partial class WorldClient
         // verified against V3_4_3.54261 native sniffs only. V1_14 / V2_5 modern clients
         // may use a different shape — keep them on the pre-fix silent-drop behaviour
         // until separately verified.
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         ThreatUpdate update = new();
@@ -248,7 +248,7 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_HIGHEST_THREAT_UPDATE)]
     internal void HandleHighestThreatUpdate(WorldPacket packet)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
 
         HighestThreatUpdate update = new();

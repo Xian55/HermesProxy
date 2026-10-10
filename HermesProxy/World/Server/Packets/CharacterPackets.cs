@@ -1056,7 +1056,7 @@ public class InspectResult : ServerPacket
     {
         DisplayInfo.Write(_worldPacket);
 
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             WriteV343();
             return;
@@ -1528,7 +1528,7 @@ public class InspectPvP : ServerPacket, ISpanWritable
     // teams, and sizes its bracket array from the u32 unchecked. Sent the 3- and 2-bit counts in one
     // byte, it took that byte and three bytes of the first team's GUID as the count: inspecting a
     // player in an arena team asked for 54190428960 bytes and the client exited (#363).
-    private static bool Is343Layout => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    private static bool Is343Layout => ForceV343ForTests ?? ModernVersion.IsWotLKClassicOrLater;
     // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
     internal static bool? ForceV343ForTests;
 

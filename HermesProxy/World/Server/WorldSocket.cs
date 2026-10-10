@@ -588,7 +588,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     /// </summary>
     private void LogIfClientHasNoPlayerObject(ServerPacket packet)
     {
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261)
+        if (!ModernVersion.IsWotLKClassicOrLater)
             return;
         if (!_melNoPlayerYet.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Trace))
             return;
@@ -1453,7 +1453,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         // advertised here. Both were verified byte-identical to the client's 3.4.3.54261
         // DB2s (1064/1064 and 190/190, zero differing, zero new), i.e. 1254 wasted records
         // per login. Neither store is read anywhere else in the proxy.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             hotfixes.TableFilter = new HashSet<DB2Hash>
             {

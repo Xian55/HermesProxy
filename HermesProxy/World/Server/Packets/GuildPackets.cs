@@ -222,7 +222,7 @@ public class GuildRosterMemberData
         // inserts GuildClubMemberID + RaceID before the name/note bits.
         // Without them the client reads those 9 bytes as the name length
         // and the MOTD/info strings after the members land on garbage.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             data.WriteUInt64(GuildClubMemberID);
             data.WriteUInt8((byte)RaceID);
@@ -858,7 +858,7 @@ public class PlayerTabardVendorActivate : ServerPacket, ISpanWritable
         // opens TabardFrame. AC still sends MSG_TABARDVENDOR_ACTIVATE
         // with no guild check; the no-guild error is on save.
         _worldPacket.WritePackedGuid128(DesignerGUID);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             _worldPacket.WriteInt32((int)PlayerInteractionType.GuildTabardVendor);
             _worldPacket.WriteBit(true);
@@ -867,13 +867,13 @@ public class PlayerTabardVendorActivate : ServerPacket, ISpanWritable
     }
 
     public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size
-        + (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261 ? 5 : 0);
+        + (ModernVersion.IsWotLKClassicOrLater ? 5 : 0);
 
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
         writer.WritePackedGuid128(DesignerGUID.Low, DesignerGUID.High);
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             writer.WriteInt32((int)PlayerInteractionType.GuildTabardVendor);
             writer.WriteBit(true);

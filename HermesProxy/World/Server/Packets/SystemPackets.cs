@@ -58,7 +58,7 @@ public class FeatureSystemStatus : ServerPacket
         // category does not populate. Confirmed by Wrathion 3.4.3 reference
         // sniff (World_dungeon_finder_exists_parsed.txt:36832) which sets it
         // True alongside IsGroupFinderEnabled True.
-        if (ModernVersion.Build == ClientVersionBuild.V3_4_3_54261)
+        if (ModernVersion.IsWotLKClassicOrLater)
         {
             WriteV3_4_3();
             return;
@@ -671,7 +671,7 @@ public class SetTimeZoneInformation : ServerPacket, ISpanWritable
     // The 3.4.3 client reads a third zone, ServerRegionalTZ: three 7-bit lengths, then three strings.
     // Sent with two, it took the first character of the first string as the third length and read
     // past the end of the packet (#361).
-    private static bool HasRegionalZone => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    private static bool HasRegionalZone => ForceV343ForTests ?? ModernVersion.IsWotLKClassicOrLater;
 
     // The test process never runs as V3_4_3; tests set this to reach the three-zone layout.
     internal static bool? ForceV343ForTests;
