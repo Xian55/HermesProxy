@@ -870,7 +870,7 @@ Every server-to-client opcode of the client, with its 3.3.5a counterpart where H
 | SMSG_BATTLEFIELD_STATUS_ACTIVE | 0x2923 | 10531 | — | Combat | variable | differs |
 | SMSG_BATTLEFIELD_STATUS_QUEUED | 0x2924 | 10532 | 744 (0x2e8) | Combat | variable | differs |
 | SMSG_BATTLEFIELD_STATUS | 0x2925 | 10533 | 724 (0x2d4) | Combat | fixed, 17 bytes | — |
-| SMSG_BATTLEFIELD_STATUS_FAILED | 0x2926 | 10534 | — | Combat | fixed, 29 bytes | differs (#363) |
+| SMSG_BATTLEFIELD_STATUS_FAILED | 0x2926 | 10534 | — | Combat | fixed, 29 bytes | matches; see #363 |
 | SMSG_BATTLEFIELD_LIST | 0x2927 | 10535 | 573 (0x23d) | Combat | variable | matches |
 | SMSG_BATTLEGROUND_PLAYER_POSITIONS | 0x2928 | 10536 | — | Combat | variable | matches |
 | — | 0x2929 | 10537 | — | Combat | ignored by the client | — |

@@ -484,7 +484,11 @@ public partial class WorldClient
             ? GetSession().GameState.GetPlayerName(playerGuid.Value)
             : null;
         string? text = BattlefieldQueueArenaType.JoinErrorText(result, playerName);
-        if (!string.IsNullOrEmpty(text))
+        // With the ticket flag in place the 3.4.3 client prints the error codes from
+        // BATTLEFIELD_STATUS_FAILED itself, so the text would show twice. Result 0 has no
+        // client text and keeps it.
+        bool clientPrintsError = BattlefieldStatusFailed.HasTicketFlag && result < 0;
+        if (!clientPrintsError && !string.IsNullOrEmpty(text))
         {
             PrintNotification notify = new PrintNotification();
             notify.NotifyText = text;

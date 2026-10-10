@@ -19,8 +19,9 @@ internal static class BattlefieldQueueArenaType
     public static int ToModernJoinError(int acResult) =>
         acResult < 0 ? -acResult : acResult;
 
-    // Official 3.3.5 / Classic GlobalStrings for SMSG_GROUP_JOINED_BATTLEGROUND.
-    // 3.4.3 STATUS_FAILED clears the queue eye and does not print these.
+    // Official 3.3.5 / Classic GlobalStrings for SMSG_GROUP_JOINED_BATTLEGROUND, shown where the
+    // client prints nothing itself. The 3.4.3 client prints the negative codes from
+    // BATTLEFIELD_STATUS_FAILED; it only seemed not to while that packet lacked its ticket flag.
     public static string? JoinErrorText(int acResult, string? playerName)
     {
         return acResult switch
