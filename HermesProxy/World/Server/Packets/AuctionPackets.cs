@@ -436,7 +436,7 @@ internal static class AuctionPacketHelpers
 
     public static bool WriteAuctionBidderNotification(ref SpanPacketWriter writer, AuctionBidderNotification info)
     {
-        writer.WriteUInt32(info.Command);
+        writer.WriteUInt32(info.WireHouseId);
         writer.WriteUInt32(info.AuctionID);
         writer.WritePackedGuid128(info.Bidder.Low, info.Bidder.High);
         return ItemPacketHelpers.WriteItemInstance(ref writer, info.Item);
@@ -505,15 +505,25 @@ class AuctionOwnerBidNotification : ServerPacket, ISpanWritable
 
 class AuctionBidderNotification
 {
+    // The 3.4.3 client reads the first field as the auction house id and applies an outbid only
+    // when it matches the open auction house. The fixed 2 (TrinityCore 3.4.3 sends the same) matched
+    // only house 2, so outbids at the Horde and Blackwater auction houses were ignored. Other builds
+    // keep the 2 until their clients are checked.
+    private static bool SendsHouseId => ForceV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261;
+    // The test process never runs as V3_4_3; tests set this to reach the 3.4.3 layout.
+    internal static bool? ForceV343ForTests;
+
+    internal uint WireHouseId => SendsHouseId ? AuctionHouseID : 2;
+
     public void Write(WorldPacket data)
     {
-        data.WriteUInt32(Command);
+        data.WriteUInt32(WireHouseId);
         data.WriteUInt32(AuctionID);
         data.WritePackedGuid128(Bidder);
         Item.Write(data);
     }
 
-    public uint Command = 2;
+    public uint AuctionHouseID;
     public uint AuctionID;
     public WowGuid128 Bidder;
     public ItemInstance Item = new ItemInstance();
