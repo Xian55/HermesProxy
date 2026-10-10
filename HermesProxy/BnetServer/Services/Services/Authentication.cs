@@ -55,7 +55,7 @@ public partial class BnetServices
 
         ChallengeExternalRequest externalChallenge = new();
         externalChallenge.PayloadType = "web_auth_url";            
-        externalChallenge.Payload = ByteString.CopyFromUtf8($"https://{endpoint.Address}:{endpoint.Port}/bnetserver/login/{logonRequest.Platform}/{logonRequest.ApplicationVersion}/{logonRequest.Locale}/");
+        externalChallenge.Payload = ByteString.CopyFromUtf8($"{LoginServiceManager.Scheme}://{endpoint.Address}:{endpoint.Port}/bnetserver/login/{logonRequest.Platform}/{logonRequest.ApplicationVersion}/{logonRequest.Locale}/");
 
         SendRequest(OriginalHash.ChallengeListener, 3, externalChallenge);
         return BattlenetRpcErrorCode.Ok;

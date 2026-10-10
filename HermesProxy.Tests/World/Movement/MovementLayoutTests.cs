@@ -81,6 +81,7 @@ public class MovementLayoutTests
             ("V2_5_2_", ModernMovementLayout.BitFlags),
             ("V2_5_3_", ModernMovementLayout.WordFlags),
             ("V3_4_3_", ModernMovementLayout.WotLKClassic),
+            ("V4_4_2_", ModernMovementLayout.WotLKClassic),
         ];
 
         int checkedBuilds = 0;

@@ -15,6 +15,12 @@ public static class BnetServerCertificate
     public static X509Certificate2 Certificate => _certificate ??= LoadEmbedded();
 
     /// <summary>
+    /// True for TrinityCore's development wildcard certificate (common name <c>*.*</c>), which the
+    /// embedded one is. No system trust store accepts it.
+    /// </summary>
+    public static bool IsDevWildcard => Certificate.GetNameInfo(X509NameType.SimpleName, false) == "*.*";
+
+    /// <summary>
     /// Loads the certificate served on the BNet TLS endpoints. With a null/empty path the
     /// embedded TrinityCore-compatible certificate is used — the chain most patched 3.4.3
     /// clients are pinned to. A custom pfx is only needed for setups validating against the

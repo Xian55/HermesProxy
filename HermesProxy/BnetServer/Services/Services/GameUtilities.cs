@@ -28,6 +28,8 @@ public partial class BnetServices
             return "bcc1";
         if (ModernVersion.ExpansionVersion == 3)
             return "wotlk1";
+        if (ModernVersion.ExpansionVersion == 4)
+            return "cata1";
         return "b9";
     }
 

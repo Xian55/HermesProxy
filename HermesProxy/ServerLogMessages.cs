@@ -43,4 +43,10 @@ internal static partial class ServerLogMessages
     [LoggerMessage(EventId = 607, Level = LogLevel.Information, Message = "Stop requested through {EventName}, shutting down.")]
     public static partial void StopRequested(
         ILogger logger, string SourceFile, string NetDir, string EventName);
+
+    [LoggerMessage(EventId = 608, Level = LogLevel.Error, Message =
+        "This client logs in with SRP and never sends its password, and no legacy account password was given: " +
+        "set HERMES_LegacyServerOptions__Password. Logins will fail until then.")]
+    public static partial void SrpPasswordMissing(
+        ILogger logger, string SourceFile, string NetDir);
 }

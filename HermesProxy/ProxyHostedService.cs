@@ -118,6 +118,7 @@ internal sealed class ProxyHostedService : BackgroundService
         // directly. Removed in Phase 4 when those call sites move to ctor injection.
         LoginServiceManager.Instance = _loginServiceManager;
         _loginServiceManager.Initialize();
+        _loginServiceManager.EnsureSrpPassword();
 
         BnetServerCertificate.Initialize(net.CertificatePfxPath, net.CertificatePfxPassword);
 

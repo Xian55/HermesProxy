@@ -129,7 +129,8 @@ public static class VersionChecker
                 or ClientVersionBuild.V1_14_2_42082
                 or ClientVersionBuild.V1_14_2_42214
                 or ClientVersionBuild.V1_14_2_42597
-                or ClientVersionBuild.V3_4_3_54261 => true,
+                or ClientVersionBuild.V3_4_3_54261
+                or ClientVersionBuild.V4_4_2_60895 => true,
             _ => false,
         };
 
@@ -719,6 +720,9 @@ public static class ModernVersion
                 or ClientVersionBuild.V2_5_3_42328
                 or ClientVersionBuild.V2_5_3_42598 => ClientVersionBuild.V2_5_3_41750,
             ClientVersionBuild.V3_4_3_54261 => ClientVersionBuild.V3_4_3_54261,
+            // No 4.4.2 descriptor set yet: its update fields are 3.4.3's plus deltas in ActivePlayer,
+            // Player, Unit and Item (refs/cata-442-feasibility), so the 3.4.3 builder is the nearest.
+            ClientVersionBuild.V4_4_2_60895 => ClientVersionBuild.V3_4_3_54261,
             _ => ClientVersionBuild.Zero,
         };
 
@@ -797,6 +801,7 @@ public static class ModernVersion
             ClientVersionBuild.V2_5_3_41750
                 or ClientVersionBuild.V1_14_1_40688 => typeof(World.Enums.V1_14_1_40688.ResponseCodes),
             ClientVersionBuild.V3_4_3_54261 => typeof(World.Enums.V3_4_3_54261.ResponseCodes),
+            ClientVersionBuild.V4_4_2_60895 => typeof(World.Enums.V3_4_3_54261.ResponseCodes),
             _ => null,
         };
 
@@ -926,6 +931,12 @@ public static class ModernVersion
                 return 15;
             if (AddedInVersion(2, 5, 3))
                 return 13;
+        }
+        else if (ExpansionVersion == 4 && MajorVersion >= 4)
+        {
+            // TrinityCore cata_classic's NUM_ACCOUNT_DATA_TYPES, and what a native 4.4.2.60895
+            // capture carries: 146 bytes, an empty packed guid, the server time and 17 times.
+            return 17;
         }
         else if (!IsClassicVersionBuild())
         {

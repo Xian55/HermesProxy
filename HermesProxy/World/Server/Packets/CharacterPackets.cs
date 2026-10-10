@@ -42,23 +42,69 @@ public sealed class EnumCharactersResult : ServerPacket
     // Matches the column the [CallerFilePath] form used to render, so existing greps still work.
     private static readonly string _logSource = "CharacterPackets".PadRight(15);
 
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<EnumCharactersResult>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V3_4_3_54261, new ClassicEraLayout()),
+        (ClientVersionBuild.V3_4_3_54261, ClientVersionBuild.V4_4_2_60895, new WotLKClassicLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
+
+    private static readonly ServerPacketLayout<EnumCharactersResult> Layout = Layouts.ForRunningClient();
+
     public EnumCharactersResult() : base(Opcode.SMSG_ENUM_CHARACTERS_RESULT) { }
 
     public override void Write()
     {
         CharacterEnumLogMessages.EnumEnter(_melServer, _logSource, ModernVersion.ExpansionVersion, Characters.Count);
-        // GetWrittenLength keeps GetData's bit flush — which callers here sit mid-write of —
-        // without copying the whole packet just to read a length.
-        int envStart = _worldPacket.GetWrittenLength();
+        Layout.Write(this, _worldPacket);
+    }
 
-        _worldPacket.WriteBit(Success);
-        _worldPacket.WriteBit(IsDeletedCharacters);
-        _worldPacket.WriteBit(IsNewPlayerRestrictionSkipped);
-        _worldPacket.WriteBit(IsNewPlayerRestricted);
-        _worldPacket.WriteBit(IsNewPlayer);
-
-        if (ModernVersion.ExpansionVersion >= 3)
+    /// <summary>1.14 and 2.5.</summary>
+    internal sealed class ClassicEraLayout : ServerPacketLayout<EnumCharactersResult>
+    {
+        public override void Write(EnumCharactersResult packet, WorldPacket data)
         {
+            data.WriteBit(packet.Success);
+            data.WriteBit(packet.IsDeletedCharacters);
+            data.WriteBit(packet.IsNewPlayerRestrictionSkipped);
+            data.WriteBit(packet.IsNewPlayerRestricted);
+            data.WriteBit(packet.IsNewPlayer);
+
+            CharacterEnumLogMessages.EnumBranchLegacy(_melServer, _logSource);
+            data.WriteBit(packet.DisabledClassesMask.HasValue);
+            data.WriteBit(packet.IsAlliedRacesCreationAllowed);
+            data.WriteInt32(packet.Characters.Count);
+            data.WriteInt32(packet.MaxCharacterLevel);
+            data.WriteInt32(packet.RaceUnlockData.Count);
+            data.WriteInt32(packet.UnlockedConditionalAppearances.Count);
+
+            if (packet.DisabledClassesMask.HasValue)
+                data.WriteUInt32(packet.DisabledClassesMask.Value);
+
+            foreach (var unlockedConditionalAppearance in packet.UnlockedConditionalAppearances)
+                unlockedConditionalAppearance.Write(data);
+
+            foreach (var charInfo in packet.Characters)
+                charInfo.WriteClassicEra(data);
+
+            foreach (var raceUnlock in packet.RaceUnlockData)
+                raceUnlock.Write(data);
+        }
+    }
+
+    /// <summary>3.4.3.</summary>
+    internal sealed class WotLKClassicLayout : ServerPacketLayout<EnumCharactersResult>
+    {
+        public override void Write(EnumCharactersResult packet, WorldPacket data)
+        {
+            // GetWrittenLength keeps GetData's bit flush — which callers here sit mid-write of —
+            // without copying the whole packet just to read a length.
+            int envStart = data.GetWrittenLength();
+
+            data.WriteBit(packet.Success);
+            data.WriteBit(packet.IsDeletedCharacters);
+            data.WriteBit(packet.IsNewPlayerRestrictionSkipped);
+            data.WriteBit(packet.IsNewPlayerRestricted);
+            data.WriteBit(packet.IsNewPlayer);
+
             CharacterEnumLogMessages.EnumBranchV343(_melServer, _logSource);
             // 3.4.3.54261 (WotLK Classic) envelope per WowPacketParser
             // WowPacketParserModule.V3_4_0_45166/Parsers/CharacterHandler.cs:402-460
@@ -66,82 +112,84 @@ public sealed class EnumCharactersResult : ServerPacket
             // 7 bits + 5 UInt32 size fields. Realmless/DontCreateCharacterDisplays/
             // RegionwideCharacters/WarbandGroups were all added in 3.4.4 — they MUST NOT
             // appear in the 3.4.3 wire format or every byte after them is misaligned.
-            //_worldPacket.WriteBit(Success);
-            //_worldPacket.WriteBit(IsDeletedCharacters);
-            //_worldPacket.WriteBit(IsNewPlayerRestrictionSkipped);
-            //_worldPacket.WriteBit(IsNewPlayerRestricted);
-            //_worldPacket.WriteBit(IsNewPlayer);
+            data.WriteBit(packet.IsTrialAccountRestricted);
+            data.WriteBit(packet.DisabledClassesMask.HasValue);
+            data.WriteUInt32((uint)packet.Characters.Count);
+            data.WriteInt32(packet.MaxCharacterLevel);
+            data.WriteUInt32((uint)packet.RaceUnlockData.Count);
+            data.WriteUInt32((uint)packet.UnlockedConditionalAppearances.Count);
+            data.WriteUInt32((uint)packet.RaceLimitDisablesCount);
 
-            _worldPacket.WriteBit(IsTrialAccountRestricted);
-            _worldPacket.WriteBit(DisabledClassesMask.HasValue);
-            _worldPacket.WriteUInt32((uint)Characters.Count);
-            _worldPacket.WriteInt32(MaxCharacterLevel);
-            _worldPacket.WriteUInt32((uint)RaceUnlockData.Count);
-            _worldPacket.WriteUInt32((uint)UnlockedConditionalAppearances.Count);
-            _worldPacket.WriteUInt32((uint)RaceLimitDisablesCount);
+            if (packet.DisabledClassesMask.HasValue)
+                data.WriteUInt32(packet.DisabledClassesMask.Value);
 
-            //_worldPacket.WriteUInt32(0u);
-
-            if (DisabledClassesMask.HasValue)
-                _worldPacket.WriteUInt32(DisabledClassesMask.Value);
-
-            foreach (var unlockedConditionalAppearance in UnlockedConditionalAppearances)
-                unlockedConditionalAppearance.Write(_worldPacket);
+            foreach (var unlockedConditionalAppearance in packet.UnlockedConditionalAppearances)
+                unlockedConditionalAppearance.Write(data);
 
             // RaceLimitDisables loop intentionally absent — count is always 0.
 
             // Envelope hex dump BEFORE Characters loop — captures the wrapper bits/UInt32s the
             // client reads first. If the wrapper is wrong, every Character entry is misaligned.
-            DumpEnvelope(envStart);
+            packet.DumpEnvelope(data, envStart);
 
-            foreach (var charInfo in Characters)
-                charInfo.Write(_worldPacket);
+            foreach (var charInfo in packet.Characters)
+                charInfo.WriteWotLKClassic(data);
 
-            foreach (var raceUnlock in RaceUnlockData)
-                raceUnlock.Write(_worldPacket);
+            foreach (var raceUnlock in packet.RaceUnlockData)
+                raceUnlock.Write(data);
 
-            CharacterEnumLogMessages.EnumExitV343(_melServer, _logSource, _worldPacket.GetWrittenLength());
-
-            return;
+            CharacterEnumLogMessages.EnumExitV343(_melServer, _logSource, data.GetWrittenLength());
         }
-
-        CharacterEnumLogMessages.EnumBranchLegacy(_melServer, _logSource);
-        // Legacy modern (V1_14, V2_5) envelope.
-        //_worldPacket.WriteBit(Success);
-        //_worldPacket.WriteBit(IsDeletedCharacters);
-        //_worldPacket.WriteBit(IsNewPlayerRestrictionSkipped);
-        //_worldPacket.WriteBit(IsNewPlayerRestricted);
-        //_worldPacket.WriteBit(IsNewPlayer);
-
-        _worldPacket.WriteBit(DisabledClassesMask.HasValue);
-        _worldPacket.WriteBit(IsAlliedRacesCreationAllowed);
-        _worldPacket.WriteInt32(Characters.Count);
-        _worldPacket.WriteInt32(MaxCharacterLevel);
-        _worldPacket.WriteInt32(RaceUnlockData.Count);
-        _worldPacket.WriteInt32(UnlockedConditionalAppearances.Count);
-
-        if (DisabledClassesMask.HasValue)
-            _worldPacket.WriteUInt32(DisabledClassesMask.Value);
-
-        foreach (var unlockedConditionalAppearance in UnlockedConditionalAppearances)
-            unlockedConditionalAppearance.Write(_worldPacket);
-
-        foreach (var charInfo in Characters)
-            charInfo.Write(_worldPacket);
-
-        foreach (var raceUnlock in RaceUnlockData)
-            raceUnlock.Write(_worldPacket);
     }
 
-    private void DumpEnvelope(int start)
+    /// <summary>
+    /// Cataclysm Classic 4.4.2: TrinityCore cata_classic's writer, the shape 3.4.4 introduced.
+    /// <c>EnumCharactersResultLayoutTests</c> checks it byte for byte against a native capture.
+    /// </summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<EnumCharactersResult>
+    {
+        public override void Write(EnumCharactersResult packet, WorldPacket data)
+        {
+            data.WriteBit(packet.Success);
+            data.WriteBit(packet.Realmless);
+            data.WriteBit(packet.IsDeletedCharacters);
+            data.WriteBit(packet.IsNewPlayerRestrictionSkipped);
+            data.WriteBit(packet.IsNewPlayerRestricted);
+            data.WriteBit(packet.IsNewPlayer);
+            data.WriteBit(packet.IsTrialAccountRestricted);
+            data.WriteBit(packet.DisabledClassesMask.HasValue);
+            data.WriteBit(packet.DontCreateCharacterDisplays);
+            data.WriteUInt32((uint)packet.Characters.Count);
+            data.WriteUInt32(0);    // region-wide characters: the legacy server has none
+            data.WriteInt32(packet.MaxCharacterLevel);
+            data.WriteUInt32((uint)packet.RaceUnlockData.Count);
+            data.WriteUInt32((uint)packet.UnlockedConditionalAppearances.Count);
+            data.WriteUInt32(0);    // race limit disables
+            data.WriteUInt32(0);    // warband groups
+
+            if (packet.DisabledClassesMask.HasValue)
+                data.WriteUInt32(packet.DisabledClassesMask.Value);
+
+            foreach (var unlockedConditionalAppearance in packet.UnlockedConditionalAppearances)
+                unlockedConditionalAppearance.Write(data);
+
+            foreach (var charInfo in packet.Characters)
+                charInfo.WriteCataClassic(data);
+
+            foreach (var raceUnlock in packet.RaceUnlockData)
+                raceUnlock.Write(data);
+        }
+    }
+
+    private void DumpEnvelope(WorldPacket data, int start)
     {
         // Flush unconditionally so the wire is identical whether or not Trace is on; only the
         // buffer copy and the hex / LINQ formatting are gated.
-        int len = _worldPacket.GetWrittenLength() - start;
+        int len = data.GetWrittenLength() - start;
         if (!_melServer.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Trace))
             return;
 
-        byte[] all = _worldPacket.GetData();
+        byte[] all = data.GetData();
         int dumpLen = Math.Min(40, len);
         string hex = BitConverter.ToString(all, start, dumpLen);
         string customSummary = Characters.Count > 0 && Characters[0].Customizations.Count > 0
@@ -177,19 +225,32 @@ public sealed class EnumCharactersResult : ServerPacket
 
     public class CharacterInfo
     {
-        public void Write(WorldPacket data)
+        // The 19 equipment slots; bags are not shown from 3.4.4 on.
+        private const int VisualItemCountCataClassic = 19;
+
+        internal void WriteClassicEra(WorldPacket data)
         {
             int startSize = data.GetWrittenLength();
+            WriteLegacyModern(data);
+            TraceWritten(data, startSize);
+        }
 
-            if (ModernVersion.ExpansionVersion >= 3)
-            {
-                Write_V3_4_3(data);
-            }
-            else
-            {
-                WriteLegacyModern(data);
-            }
+        internal void WriteWotLKClassic(WorldPacket data)
+        {
+            int startSize = data.GetWrittenLength();
+            Write_V3_4_3(data);
+            TraceWritten(data, startSize);
+        }
 
+        internal void WriteCataClassic(WorldPacket data)
+        {
+            int startSize = data.GetWrittenLength();
+            Write_V4_4_2(data);
+            TraceWritten(data, startSize);
+        }
+
+        private void TraceWritten(WorldPacket data, int startSize)
+        {
             // Phase 5a diagnostic: hex-dump the per-character block so we can compare against
             // a known-good 3.4.3 capture. Drop after character-select renders correctly.
             // Flush unconditionally so the wire does not depend on the log level; gate only
@@ -285,6 +346,77 @@ public sealed class EnumCharactersResult : ServerPacket
                     data.WriteCString(str);
 
             data.WriteString(Name);
+        }
+
+        // Cataclysm Classic 4.4.2 (TrinityCore cata_classic): CharacterInfoBasic followed by
+        // CharacterRestrictionAndMailData, the split 3.4.4 introduced.
+        private void Write_V4_4_2(WorldPacket data)
+        {
+            data.WritePackedGuid128(Guid);
+            data.WriteUInt32(VirtualRealmAddress);
+            data.WriteUInt8(ListPosition);
+            data.WriteUInt8((byte)RaceId);
+            data.WriteUInt8((byte)SexId);
+            data.WriteUInt8((byte)ClassId);
+            data.WriteInt16((short)SpecID);
+            data.WriteUInt32((uint)Customizations.Count);
+            data.WriteUInt8(ExperienceLevel);
+            data.WriteInt32((int)MapId);
+            data.WriteInt32((int)ZoneId);
+            data.WriteVector3(PreloadPos);
+            data.WriteUInt64(GuildClubMemberID);
+            data.WritePackedGuid128(GuildGuid);
+            data.WriteUInt32((uint)Flags);
+            data.WriteUInt32(Flags2);
+            data.WriteUInt32(Flags3);
+            data.WriteUInt8(unkWod61x);                 // CantLoginReason in WPP
+            data.WriteUInt32(PetCreatureDisplayId);
+            data.WriteUInt32(PetExperienceLevel);
+            data.WriteUInt32(PetCreatureFamilyId);
+
+            for (int vi = 0; vi < VisualItemCountCataClassic; vi++)
+                (vi < VisualItems.Length ? VisualItems[vi] : default).WriteCataClassic(data);
+
+            data.WriteInt32((int)Unknown703);          // SaveVersion in WPP
+            data.WriteUInt64(LastPlayedTime);
+            data.WriteInt32((int)LastLoginVersion);
+            PersonalTabard.Write(data);
+            data.WriteUInt32(ProfessionIds[0]);
+            data.WriteUInt32(ProfessionIds[1]);
+            data.WriteInt32(TimerunningSeasonID);
+            data.WriteUInt32(OverrideSelectScreenFileDataID);
+
+            foreach (ChrCustomizationChoice customization in Customizations)
+            {
+                data.WriteUInt32(customization.ChrCustomizationOptionID);
+                data.WriteUInt32(customization.ChrCustomizationChoiceID);
+            }
+
+            data.WriteBits(Name.GetByteCount(), 6);
+            data.WriteBit(FirstLogin);
+            data.FlushBits();
+            data.WriteString(Name);
+
+            data.WriteBit(BoostInProgress);
+            data.WriteBit(false);                       // RpeResetAvailable
+            data.WriteBit(false);                       // RpeResetQuestClearAvailable
+            data.FlushBits();
+
+            data.WriteUInt32(Flags4);                  // RestrictionFlags in WPP
+            data.WriteUInt32((uint)MailSenders.Count);
+            data.WriteUInt32((uint)MailSenderTypes.Count);
+
+            foreach (var mailSenderType in MailSenderTypes)
+                data.WriteUInt32(mailSenderType);
+
+            foreach (string str in MailSenders)
+                data.WriteBits(str.GetByteCount() + 1, 6);
+
+            data.FlushBits();
+
+            foreach (string str in MailSenders)
+                if (!str.IsEmpty())
+                    data.WriteCString(str);
         }
 
         // Legacy modern (V1_14, V2_5) per-character body — preserves the prior layout
@@ -403,6 +535,19 @@ public sealed class EnumCharactersResult : ServerPacket
                 data.WriteUInt32(SecondaryItemModifiedAppearanceID);
                 data.WriteUInt8(InvType);
                 data.WriteUInt8(Subclass);
+            }
+
+            // The 22-byte layout of 4.4.2: reordered, with the item ids last. The legacy
+            // character list carries no item ids; TrinityCore's native list leaves them 0 too.
+            public void WriteCataClassic(WorldPacket data)
+            {
+                data.WriteUInt32(DisplayId);
+                data.WriteUInt8(InvType);
+                data.WriteUInt32(DisplayEnchantId);
+                data.WriteUInt8(Subclass);
+                data.WriteUInt32(SecondaryItemModifiedAppearanceID);
+                data.WriteUInt32(0);                    // ItemID
+                data.WriteUInt32(0);                    // TransmogrifiedItemID
             }
 
             public uint DisplayId;
