@@ -468,9 +468,10 @@ public sealed class GameSessionData
     // delta alone. Only transports and destructible buildings ever land here.
     public HashSet<WowGuid128> WmoMapObjectGuids = [];
 
-    // Type 11 GAMEOBJECT_TYPE_TRANSPORT objects whose parking and sailing the proxy drives
-    // itself, because the backend never relocates them (TrinityCore 3.3.5a leaves
-    // GameObjectRelocation commented out). Captured from the create: a later state flip
+    // Type 11 GAMEOBJECT_TYPE_TRANSPORT objects with a stop frame, whose parking and
+    // sailing the proxy drives on the modern client. TrinityCore 3.3.5a does not relocate
+    // them; AzerothCore does, but its modern client still needs the same stop-frame state
+    // and deadline to stay in phase. Captured from the create: a later state flip
     // arrives as a Values update carrying only GAMEOBJECT_BYTES_1, so the stop frame it has
     // to sail to is no longer on the wire, and a rider's deck-relative offset can only be
     // derived from where the deck actually is. Keyed by the modern guid; a struct value so

@@ -151,10 +151,8 @@ public class ObjectUpdate
     /// ServerTime for the create of a transport the proxy parks and sails itself. Native
     /// 3.4.3 writes GameTime::GetGameTimeMS() there, and the client seeds the clock it
     /// compares GameObjectData.Level against from it, so the two must share a source. A
-    /// backend that never relocates its type 11 transports hands us a free-running path
-    /// counter instead, which cannot be extended into a deadline. Null leaves the builder
-    /// forwarding the legacy path progress, which is right for a backend that moves the
-    /// boat itself.
+    /// legacy backend hands us a path period in GAMEOBJECT_LEVEL. Null leaves the builder
+    /// forwarding the legacy path progress for a transport without a stop frame.
     /// </summary>
     public uint? TransportServerTime;
     public DynamicObjectData DynamicObjectData = null!;
@@ -216,7 +214,9 @@ public class ObjectUpdate
     /// V3_4_3 server sends. Verified field-by-field against the golden capture
     /// refs/native-captures/wrathion_343_sota_attacker_boat_20260830.pkt.
     /// </summary>
-    private void ApplyTransportGameObjectFixups()
+    internal static bool? ForceTransportV343ForTests;
+
+    internal void ApplyTransportGameObjectFixups()
     {
         if (GameObjectData == null)
             return;
@@ -250,33 +250,26 @@ public class ObjectUpdate
         if (needsWmoFlag && (CreateData != null || GameObjectData.Flags != null))
             GameObjectData.Flags = (GameObjectData.Flags ?? 0) | ModernTransportFlag;
 
-        if (ModernVersion.Build != ClientVersionBuild.V3_4_3_54261
-            || GameObjectData.TypeID != (sbyte)GameObjectTypeModern.Transport)
+        if (!(ForceTransportV343ForTests ?? ModernVersion.Build == ClientVersionBuild.V3_4_3_54261))
             return;
 
-        // Everything below is for backends that do NOT move the transport themselves, and
-        // only the WMO flag above is common to both.
-        //
-        // AzerothCore routes type 11 through StaticTransport -- Battleground::AddObject picks
-        // it via ObjectMgr::IsGameObjectStaticTransport -- which takes HIGHGUID_TRANSPORT and
-        // genuinely relocates the boat and its passengers each tick, with path progress
-        // climbing in GAMEOBJECT_DYNAMIC. The HighGuidType.Transport block below already
-        // forwards that faithfully. TrinityCore instead hands type 11 a plain
-        // HighGuid::GameObject and leaves GameObjectRelocation commented out, so its boat
-        // never moves and needs the parking synthesized below.
-        //
-        // The stop frame and the state translation are a pair and must not be split: the
-        // client indexes _stopFrames[state - GO_STATE_TRANSPORT_STOPPED], so a non-empty
-        // stop-frame array alongside a raw 3.3.5a door state reads index -24 and dies with
-        // ERROR 132. With no stop frame it takes the _stopFrames.empty() path and is safe.
-        // AzerothCore therefore gets neither, which leaves its boat looping its path instead
-        // of docking -- tracked separately, and closing it means translating its state while
-        // keeping its moving boat and riding passengers correct.
-        if (Guid.GetHighType() == HighGuidType.Transport)
+        // A Values update may contain only path progress, with no TypeID. Recognize it from
+        // the type-11 create remembered below. Type-15 MO_TRANSPORT has no slot in this map
+        // and retains its free-running period and path-progress forwarding.
+        var transports = GlobalSession.GameState.SynthesizedTransports;
+        bool isType11 = GameObjectData.TypeID == (sbyte)GameObjectTypeModern.Transport;
+        if (!isType11 && (GameObjectData.TypeID != null || !transports.ContainsKey(Guid)))
             return;
 
         if (GameObjectData.Level is > 0)
             TransportStopFrame = (uint)GameObjectData.Level.Value;
+
+        // A type-11 transport without a pause frame (for example the Deeprun tram)
+        // still loops. State 24/25 and a deadline only make sense with a stop frame.
+        bool isCreate = CreateData?.MoveInfo != null;
+        if (isCreate ? TransportStopFrame is not > 0 && !transports.ContainsKey(Guid)
+                     : !transports.ContainsKey(Guid))
+            return;
 
         // Remember the boat from its create. The ships-start flip arrives later as a Values
         // update carrying only GAMEOBJECT_BYTES_1, so the stop frame it has to sail to is
@@ -285,11 +278,12 @@ public class ObjectUpdate
         //
         // One hash lookup per update: a create always writes its slot, a Values update only
         // reads one that exists. The ref is not held across any other mutation of the map.
-        var transports = GlobalSession.GameState.SynthesizedTransports;
-        bool isCreate = CreateData?.MoveInfo != null;
         ref SynthesizedTransport known = ref isCreate
             ? ref CollectionsMarshal.GetValueRefOrAddDefault(transports, Guid, out _)
             : ref CollectionsMarshal.GetValueRefOrNullRef(transports, Guid);
+        bool firstCreate = isCreate && known.StopFrame == 0;
+        uint legacyPathProgress = Guid.GetHighType() == HighGuidType.Transport
+            ? ObjectData.DynamicFlags.GetValueOrDefault() >> 16 : 0;
         if (isCreate)
         {
             // A re-create keeps whatever sail is already under way (see below).
@@ -316,9 +310,19 @@ public class ObjectUpdate
         else if (GameObjectData.State == LegacyGameObjectStateActive)
             GameObjectData.State = ModernTransportStateStopped;
 
-        // Native sends 255; the V3_4_3 PercentHealth default is meant for destructible
-        // GameObjects and reads as a damaged transport.
-        GameObjectData.PercentHealth = 255;
+        bool hasStopFrame = !Unsafe.IsNullRef(ref known) && known.StopFrame != 0;
+        if (hasStopFrame)
+        {
+            // AC publishes its server-side path progress on every tick. The modern client
+            // must follow the stop-frame deadline instead; leave unrelated fields alone.
+            if (ObjectData.DynamicFlags != null || isCreate)
+                ObjectData.DynamicFlags = 0;
+        }
+
+        // Native sends 255. Do not add a GAMEOBJECT_BYTES_1 delta to a Values packet that
+        // only updates path progress.
+        if (isCreate || GameObjectData.State != null)
+            GameObjectData.PercentHealth = 255;
 
         // Level is a deadline in the game clock, not a period: the client interpolates the
         // transport's path progress toward the state's stop frame only while `now < Level`,
@@ -349,25 +353,41 @@ public class ObjectUpdate
         // to sail to, and keeps the legacy path counter in Level exactly as before.
         uint now = Time.GetMSTime();
         sbyte state = GameObjectData.State ?? 0;
-        bool hasStopFrame = !Unsafe.IsNullRef(ref known) && known.StopFrame != 0;
-        bool sailing = hasStopFrame && known.IsSailing(now) && known.SailTargetState == state;
         if (isCreate)
         {
             if (hasStopFrame)
             {
                 TransportServerTime = now;
-                GameObjectData.Level = (int)(sailing ? known.SailDeadline : now);
+                if (firstCreate && state == ModernTransportStateStopped)
+                {
+                    // A client entering an already-running AC crossing sees a create, not
+                    // the earlier flip. Use AC's 16-bit path fraction to join mid-sail.
+                    uint remaining = known.StopFrame - (uint)((ulong)known.StopFrame * legacyPathProgress / ushort.MaxValue);
+                    uint deadline = now + remaining;
+                    known = known with { SailDeadline = deadline, SailTargetState = state };
+                }
+                else if (known.SailTargetState != 0 && known.SailTargetState != state)
+                {
+                    uint deadline = now + known.StopFrame;
+                    known = known with { SailDeadline = deadline, SailTargetState = state };
+                }
+                else if (known.SailTargetState == 0)
+                    known = known with { SailTargetState = state };
+
+                GameObjectData.Level = (int)(known.SailDeadline != 0 ? known.SailDeadline : now);
             }
             else
             {
                 GameObjectData.Level = (int)CreateData!.TransportPathTimer;
             }
         }
-        else if (state is ModernTransportStateActive or ModernTransportStateStopped)
+        else if (GameObjectData.State is ModernTransportStateActive or ModernTransportStateStopped)
         {
-            if (sailing)
+            if (hasStopFrame && known.SailTargetState == state)
             {
-                GameObjectData.Level = (int)known.SailDeadline;
+                // Repeated AC state/path deltas must not restart a completed crossing.
+                if (known.SailDeadline != 0)
+                    GameObjectData.Level = (int)known.SailDeadline;
             }
             else if (hasStopFrame)
             {
