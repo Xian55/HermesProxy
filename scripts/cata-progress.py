@@ -353,14 +353,13 @@ def normalise(layout: str) -> str:
 # Differences someone checked and found harmless, with the reason. The only hand-kept part of
 # the client side: a docs difference stays a todo until it has a 4.4.2 shape in HermesProxy or
 # a line here.
-REVIEWED_HUNKS = {
-    'loop[ u32 [u8 → ] ] opt[': 'item modifiers swap to (type, value); HermesProxy writes none, '
-                                'and a read takes the same five bytes',
-    'u8 loop[ [ → u8] u32 u8': 'item modifiers, as above',
-    'flush loop[ [ → u8] u32 u8': 'item modifiers, as above',
-    'u32 u32 [ → u32 u32] u8 u8': 'SpellCastLogData gains two ints; HermesProxy never sends log data',
-    'u8 loop[ [u32 → u8] u32 u32': 'SpellCastLogData power type; never sent, as above',
-}
+# A shared change is matched by what it turns into what, whatever the context around it.
+REVIEWED_HUNKS = [
+    ('loop[ u32 u8 ]', 'loop[ u8 u32 ]',
+     'item modifiers swap to (type, value); HermesProxy writes none, and a read takes the same five bytes'),
+    ('u8 u8 loop[ u32 u32 u32', 'u8 u8 loop[ u8 u32 u32',
+     'SpellCastLogData gains two ints and a byte power type; HermesProxy never sends log data'),
+]
 REVIEWED_OPCODES = {
     'SMSG_AURA_UPDATE': 'notation: both builds read a 1-bit and a 9-bit field first',
     'SMSG_RESURRECT_REQUEST': 'notation: 11-bit name length and two bits in both; HermesProxy '
@@ -375,6 +374,9 @@ REVIEWED_OPCODES = {
                                'two bytes',
     'SMSG_PARTY_MEMBER_FULL_STATE': 'phase flags widen to u32; HermesProxy sends no phases',
     'SMSG_PARTY_MEMBER_PARTIAL_STATE': 'phase flags widen to u32; HermesProxy sends no phases',
+    'CMSG_BANKER_ACTIVATE': '4.4.2 appends an int32 interaction type; HermesProxy reads the GUID and '
+                            'nothing after it',
+    'CMSG_TABARD_VENDOR_ACTIVATE': 'as CMSG_BANKER_ACTIVATE',
     # Identical "Bit fields" lines in both docs: the difference is how the RE wrote the bits.
     'SMSG_CHANNEL_NOTIFY_LEFT': 'notation: bit fields 7 · 1 in both',
     'SMSG_GUILD_EVENT_MOTD': 'notation: bit fields 11 in both',
@@ -402,22 +404,48 @@ def reviewed(name: str, hunks: list[str]) -> str:
     """Why a docs difference is harmless, or '' while it is not known to be."""
     if name in REVIEWED_OPCODES:
         return REVIEWED_OPCODES[name]
-    if hunks and all(h in REVIEWED_HUNKS for h in hunks):
-        return '; '.join(dict.fromkeys(REVIEWED_HUNKS[h] for h in hunks))
+    if hunks and all(hunk_review(h) for h in hunks):
+        return '; '.join(dict.fromkeys(hunk_review(h) for h in hunks))
     return ''
 
 
-def changes(layout: str, new_layout: str) -> list[str]:
-    """What changed between two layouts, as `before [old → new] after` hunks with two tokens of
-    context. The same hunk in several packets is a nested structure they share."""
+def hunk_review(hunk: tuple[str, str]) -> str:
+    """Why a change is harmless, from REVIEWED_HUNKS, or '' while it is not known to be."""
+    for old, new, reason in REVIEWED_HUNKS:
+        if old in hunk[0] and new in hunk[1]:
+            return reason
+    return ''
+
+
+def changes(layout: str, new_layout: str) -> list[tuple[str, str]]:
+    """What changed between two layouts: each change as the 3.4.3 snippet and the 4.4.2 snippet,
+    both with two tokens of context on either side. The same change in several packets is a
+    nested structure they share."""
     a, b = normalise(layout).split(), normalise(new_layout).split()
-    out: list[str] = []
-    for tag, i1, i2, j1, j2 in SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
-        if tag == 'equal':
-            continue
-        hunk = f'{" ".join(a[max(0, i1 - 2):i1])} [{" ".join(a[i1:i2])} → {" ".join(b[j1:j2])}] {" ".join(a[i2:i2 + 2])}'
+    out: list[tuple[str, str]] = []
+    # Changes closer than four tokens are one hunk: a swapped pair reads as one change, not two.
+    for group in SequenceMatcher(None, a, b, autojunk=False).get_grouped_opcodes(2):
+        hunk = (' '.join(a[group[0][1]:group[-1][2]]), ' '.join(b[group[0][3]:group[-1][4]]))
         if hunk not in out:
-            out.append(hunk.strip())
+            out.append(hunk)
+    return out
+
+
+def show(hunk: tuple[str, str]) -> str:
+    return f'`{hunk[0]}` → `{hunk[1]}`'
+
+
+def cmsg_packet_types() -> dict[str, str]:
+    """The packet type each CMSG handler takes today, from [HandlesCmsg] and the handler's
+    `in T` parameter."""
+    out: dict[str, str] = {}
+    for f in glob.glob(str(HP / 'World' / 'Server' / 'Systems' / '*.cs')):
+        text = Path(f).read_text(encoding='utf-8-sig', errors='ignore')
+        for m in re.finditer(r'((?:\[HandlesCmsg\(Opcode\.\w+\)\]\s*)+)public static void \w+\(([^)]*)\)', text):
+            param = re.search(r'\bin (\w+) \w+\s*,\s*in SessionContext', m.group(2))
+            if param:
+                for opcode in re.findall(r'Opcode\.(\w+)', m.group(1)):
+                    out[opcode] = param.group(1)
     return out
 
 
@@ -432,9 +460,11 @@ def client_layout_section(log_dirs: list[Path], client_errors: dict) -> list[str
 
     rows = []
     unresolved: list[str] = []
+    cmsg_types = cmsg_packet_types()
     for name, (layout, hp_type) in old.items():
         if name not in new or not hp_type or hp_type == 'EmptyClientPacket':
             continue
+        hp_type = cmsg_types.get(name, hp_type)  # the docs name the type HermesProxy had then
         new_layout = new[name][0]
         if not new_layout or normalise(new_layout) == normalise(layout):
             continue
@@ -445,17 +475,22 @@ def client_layout_section(log_dirs: list[Path], client_errors: dict) -> list[str
         rows.append((has, -seen.get(name, 0), name, hp_type, layout, new_layout, changes(layout, new_layout)))
     rows.sort()
     notes = {r[2]: reviewed(r[2], r[6]) for r in rows}
+    # Open first, then ruled out, then done; the busiest first within each.
+    rows.sort(key=lambda r: (r[0], bool(notes[r[2]]), r[1], r[2]))
     todo = sum(1 for r in rows if not r[0] and not notes[r[2]])
 
     def icon(has: bool, name: str) -> str:
         return '✅' if has else ('🟰' if notes[name] else '⬜')
 
-    by_hunk: dict[str, list[tuple[bool, str]]] = defaultdict(list)
+    by_hunk: dict[tuple[str, str], list[tuple[bool, str]]] = defaultdict(list)
     for has, _, name, _, _, _, hunks in rows:
         for hunk in hunks:
             by_hunk[hunk].append((has, name))
     shared = sorted(((h, ops) for h, ops in by_hunk.items() if len(ops) > 1),
                     key=lambda x: (-sum(1 for has, _ in x[1] if not has), -len(x[1]), x[0]))
+    # A shared change matters while some packet carrying it has neither a 4.4.2 shape nor a review.
+    open_shared = [(h, ops) for h, ops in shared
+                   if not hunk_review(h) and any(not has and not notes[n] for has, n in ops)]
 
     md = ['## 4.4.2 client side', '']
     if client_errors:
@@ -465,25 +500,35 @@ def client_layout_section(log_dirs: list[Path], client_errors: dict) -> list[str
         for op, e in sorted(client_errors.items()):
             md.append(f'| `{op}` | {e.sample} | {e.errors + e.dropped} | {e.session} |')
         md.append('')
+    md += ['Reading a change: `3.4.3 snippet` → `4.4.2 snippet`, in the docs/protocol layout notation '
+           '(u8/u16/u32/u64/f32 fields, `guid` a packed GUID, `bytes` a string, `bits(n)` a bit field, '
+           '`opt[ … ]` present only when a flag says so, `loop[ … ]` repeated, `alt[ … ]` one of two '
+           'branches; grouping braces dropped). Two tokens of context either side.', '']
     if shared:
         md += ['### Changes several packets share', '',
-               'The same change in more than one packet below: most likely a nested structure they all '
-               'write, so one writer fix covers them. ⬜ packets have no 4.4.2 shape yet. Only a change '
-               'that writes a non-empty part matters; an empty loop or an absent optional reads the same.', '',
-               '| Change | Packets |', '|---|---|']
-        for hunk, ops in shared:
-            note = f' 🟰 {REVIEWED_HUNKS[hunk]}' if hunk in REVIEWED_HUNKS else ''
-            md.append(f'| `{hunk}`{note} | ' + ', '.join(f'{icon(has, n)} `{n}`' for has, n in ops) + ' |')
-        md.append('')
+               'The same change in more than one packet: most likely a nested structure they all write, '
+               'so one writer fix covers them. Only a change that writes a non-empty part matters; an '
+               'empty loop or an absent optional reads the same.', '']
+        if open_shared:
+            md += ['| Change | Packets |', '|---|---|']
+            for hunk, ops in open_shared:
+                md.append(f'| {show(hunk)} | ' + ', '.join(f'{icon(has, n)} `{n}`' for has, n in ops) + ' |')
+            md.append('')
+        else:
+            md += ['None left open.', '']
+        done = len(shared) - len(open_shared)
+        if done:
+            md += [f'{done} more shared change(s) are handled (✅) or ruled out (🟰) in every packet '
+                   'that carries them.', '']
     md += ['### Layouts that changed from 3.4.3', '',
           f'Opcodes HermesProxy writes or reads whose 4.4.2 layout differs from 3.4.3 (docs/protocol, from the '
           f'clients\' own readers): {len(rows)}, of which {todo} have no 4.4.2 shape yet and no review '
           'that rules them out (🟰, the reason under the change; REVIEWED_* in the script). "Change" is the '
-          'difference as `before [3.4.3 → 4.4.2] after`. "Sent" counts the opcode in 4.4.2 client captures, '
+          'difference, read as above. "Sent" counts the opcode in 4.4.2 client captures, '
           'either backend; the busiest gaps are first.', '',
           '| | Opcode | HP type | Change | Sent | 3.4.3 | 4.4.2 |', '|---|---|---|---|---:|---|---|']
     for has, sent, name, hp_type, layout, new_layout, hunks in rows:
-        shown = '<br>'.join(f'`{h}`' for h in hunks[:4]) + (f'<br>… {len(hunks) - 4} more' if len(hunks) > 4 else '')
+        shown = '<br>'.join(show(h) for h in hunks[:4]) + (f'<br>… {len(hunks) - 4} more' if len(hunks) > 4 else '')
         if notes[name] and not has:
             shown += f'<br>🟰 {notes[name]}'
         md.append(f'| {icon(has, name)} | `{name}` | `{hp_type}` | {shown} | {-sent or ""} '
