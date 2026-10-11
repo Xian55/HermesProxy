@@ -1070,6 +1070,7 @@ public enum Opcode : uint
     SMSG_QUERY_GAME_OBJECT_RESPONSE                       = 0x0915,
     SMSG_QUERY_GUILD_INFO_RESPONSE                        = 0x0E06,
     SMSG_QUERY_ITEM_TEXT_RESPONSE                         = 0x2725,
+    SMSG_QUERY_NPC_TEXT_RESPONSE                          = 0x4436,
     SMSG_QUERY_PAGE_TEXT_RESPONSE                         = 0x2B14,
     SMSG_QUERY_PETITION_RESPONSE                          = 0x4B37,
     SMSG_QUERY_PET_NAME_RESPONSE                          = 0x4C37,

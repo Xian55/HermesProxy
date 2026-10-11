@@ -2,6 +2,7 @@
 using Framework.Constants;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Client;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -109,6 +110,8 @@ public static class BattlePetSystem
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CAST_SPELL);
         packet.WriteUInt8(0);
         packet.WriteUInt32(spellId);
+        if (WorldClient.IsCataLegacy)
+            packet.WriteUInt32(0);              // Misc
         packet.WriteUInt8(0);
         packet.WriteUInt32(0);
         ctx.SendPacketToServer(packet);

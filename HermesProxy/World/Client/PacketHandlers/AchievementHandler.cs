@@ -1,4 +1,5 @@
-﻿using Framework.Util;
+﻿using System;
+using Framework.Util;
 using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
@@ -25,6 +26,12 @@ public partial class WorldClient
         uint realmAddress = GetSession().RealmId.GetAddress();
 
         var data = new AllAchievementData();
+        if (IsCataLegacy)
+        {
+            ReadAllAchievementDataCata(packet, data, ownerGuid, realmAddress);
+            SendPacketToClient(data);
+            return;
+        }
 
         // Earned achievements — loop until 0xFFFFFFFF terminator.
         while (true)
@@ -69,6 +76,98 @@ public partial class WorldClient
         }
 
         SendPacketToClient(data);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 AchievementMgr::SendAllAchievementData: the criteria count and each
+    /// criterion's masked counter and owner GUID bits come first, then each criterion's bytes
+    /// with those GUID bytes scattered between its fields, then the earned achievements. The
+    /// counts replace 3.3.5a's terminators.
+    /// </summary>
+    private static void ReadAllAchievementDataCata(WorldPacket packet, AllAchievementData data, WowGuid128 ownerGuid, uint realmAddress)
+    {
+        int criteriaCount = (int)packet.ReadBits<uint>(21);
+        // Per criterion: 8 owner GUID bits, then 8 counter bits.
+        var masks = new bool[criteriaCount * 16];
+        for (int i = 0; i < criteriaCount; i++)
+        {
+            Span<bool> guid = masks.AsSpan(i * 16, 8);
+            Span<bool> counter = masks.AsSpan(i * 16 + 8, 8);
+            guid[4] = packet.HasBit();
+            counter[3] = packet.HasBit();
+            guid[5] = packet.HasBit();
+            counter[0] = packet.HasBit();
+            counter[6] = packet.HasBit();
+            guid[3] = packet.HasBit();
+            guid[0] = packet.HasBit();
+            counter[4] = packet.HasBit();
+            guid[2] = packet.HasBit();
+            counter[7] = packet.HasBit();
+            guid[7] = packet.HasBit();
+            packet.ReadBits<uint>(2);                     // Flags
+            guid[6] = packet.HasBit();
+            counter[2] = packet.HasBit();
+            counter[1] = packet.HasBit();
+            counter[5] = packet.HasBit();
+            guid[1] = packet.HasBit();
+        }
+        int achievementCount = (int)packet.ReadBits<uint>(23);
+        packet.ResetBitPos();
+
+        Span<byte> guidBytes = stackalloc byte[8];
+        Span<byte> counterBytes = stackalloc byte[8];
+        for (int i = 0; i < criteriaCount; i++)
+        {
+            ReadOnlySpan<bool> guid = masks.AsSpan(i * 16, 8);
+            ReadOnlySpan<bool> counter = masks.AsSpan(i * 16 + 8, 8);
+            guidBytes.Clear();
+            counterBytes.Clear();
+
+            MaskedGuid.ReadByte(packet, guid, guidBytes, 3);
+            MaskedGuid.ReadByte(packet, counter, counterBytes, 5);
+            MaskedGuid.ReadByte(packet, counter, counterBytes, 6);
+            MaskedGuid.ReadByte(packet, guid, guidBytes, 4);
+            MaskedGuid.ReadByte(packet, guid, guidBytes, 6);
+            MaskedGuid.ReadByte(packet, counter, counterBytes, 2);
+            uint timeFromCreate = packet.ReadUInt32();
+            MaskedGuid.ReadByte(packet, guid, guidBytes, 2);
+            uint criteriaId = packet.ReadUInt32();
+            MaskedGuid.ReadByte(packet, guid, guidBytes, 5);
+            MaskedGuid.ReadByte(packet, counter, counterBytes, 0);
+            MaskedGuid.ReadByte(packet, counter, counterBytes, 3);
+            MaskedGuid.ReadByte(packet, counter, counterBytes, 1);
+            MaskedGuid.ReadByte(packet, counter, counterBytes, 4);
+            MaskedGuid.ReadByte(packet, guid, guidBytes, 0);
+            MaskedGuid.ReadByte(packet, guid, guidBytes, 7);
+            MaskedGuid.ReadByte(packet, counter, counterBytes, 7);
+            uint timeFromStart = packet.ReadUInt32();
+            uint packedDate = packet.ReadUInt32();
+            MaskedGuid.ReadByte(packet, guid, guidBytes, 1);
+
+            data.Progress.Add(new CriteriaProgressPkt
+            {
+                Id = criteriaId,
+                Quantity = MaskedGuid.ToUInt64(counterBytes),
+                Player = ownerGuid,
+                Date = Time.GetUnixTimeFromPackedTime(packedDate),
+                TimeFromStart = timeFromStart,
+                TimeFromCreate = timeFromCreate,
+            });
+        }
+
+        for (int i = 0; i < achievementCount; i++)
+        {
+            uint achievementId = packet.ReadUInt32();
+            uint packedDate = packet.ReadUInt32();
+            data.Earned.Add(new EarnedAchievement
+            {
+                Id = achievementId,
+                Date = Time.GetUnixTimeFromPackedTime(packedDate),
+                Owner = ownerGuid,
+                VirtualRealmAddress = realmAddress,
+                NativeRealmAddress = realmAddress,
+            });
+        }
     }
 
     [HandlesSmsg(Opcode.SMSG_CRITERIA_UPDATE)]

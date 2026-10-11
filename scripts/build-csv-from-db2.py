@@ -640,6 +640,13 @@ RECIPES.update({
     "WorldMapAreaIDToUiMapID4.csv": Recipe(
         builder=carry("WorldMapAreaIDToUiMapID3.csv", [("UiMapID", "UiMap", "ID")]), raw=True),
     "Hotfix/AreaTrigger4.csv": Recipe(builder=carry("Hotfix/AreaTrigger3.csv"), raw=True),
+    # 4.4.2 names a reputation by its faction id where legacy servers send the reputation list
+    # index, so SMSG_INITIALIZE_FACTIONS and SMSG_SET_FACTION_STANDING need the one from the other.
+    "FactionReputation4.csv": Recipe(
+        source="Faction",
+        columns=[("Id", "ID"), "ReputationIndex"],
+        where=lambda r: r["ReputationIndex"] not in ("", "-1"),
+    ),
 })
 
 

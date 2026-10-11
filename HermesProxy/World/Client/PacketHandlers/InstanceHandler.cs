@@ -162,7 +162,7 @@ public partial class WorldClient
                 instance.DifficultyID = DifficultyModern.Raid25N;
         }
 
-        packet.ReadUInt32(); // time
+        instance.TimeLeft = packet.ReadInt32();
 
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056) &&
             instance.Type == InstanceResetWarningType.Welcome)

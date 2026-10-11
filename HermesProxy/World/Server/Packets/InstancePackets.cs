@@ -19,6 +19,7 @@
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -242,37 +243,86 @@ class RaidGroupOnly : ServerPacket, ISpanWritable
     public RaidGroupReason Reason;
 }
 
-class RaidInstanceMessage : ServerPacket, ISpanWritable
+sealed class RaidInstanceMessage : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<RaidInstanceMessage>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new ByteTypeLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new TimeLeftLayout()));
+
+    private static readonly ServerPacketLayout<RaidInstanceMessage> Layout = Layouts.ForRunningClient();
+
     public RaidInstanceMessage() : base(Opcode.SMSG_RAID_INSTANCE_MESSAGE) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    public int MaxSize => 18; // 4 ints + 2 bytes of bits, from 4.4.2
+
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>Up to 3.4.3: a byte type, the map and difficulty, and two bits.</summary>
+    internal sealed class ByteTypeLayout : ServerPacketLayout<RaidInstanceMessage>
     {
-        _worldPacket.WriteUInt8((byte)Type);
-        _worldPacket.WriteUInt32(MapID);
-        _worldPacket.WriteUInt32((uint)DifficultyID);
-        _worldPacket.WriteBit(Locked);
-        _worldPacket.WriteBit(Extended);
-        _worldPacket.FlushBits();
+        public override void Write(RaidInstanceMessage packet, WorldPacket data)
+        {
+            data.WriteUInt8((byte)packet.Type);
+            data.WriteUInt32(packet.MapID);
+            data.WriteUInt32((uint)packet.DifficultyID);
+            data.WriteBit(packet.Locked);
+            data.WriteBit(packet.Extended);
+            data.FlushBits();
+        }
+
+        public override int WriteToSpan(RaidInstanceMessage packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt8((byte)packet.Type);
+            writer.WriteUInt32(packet.MapID);
+            writer.WriteUInt32((uint)packet.DifficultyID);
+            writer.WriteBit(packet.Locked);
+            writer.WriteBit(packet.Extended);
+            writer.FlushBits();
+            return writer.Position;
+        }
     }
 
-    public int MaxSize => 10; // byte + 2 uint + 1 byte for bits
-
-    public int WriteToSpan(Span<byte> buffer)
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, and the client's reader): the type is an int32, the
+    /// time left follows the difficulty, and an 8-bit length for a warning text precedes the two
+    /// bits. Legacy servers send no text.
+    /// </summary>
+    internal sealed class TimeLeftLayout : ServerPacketLayout<RaidInstanceMessage>
     {
-        var writer = new SpanPacketWriter(buffer);
-        writer.WriteUInt8((byte)Type);
-        writer.WriteUInt32(MapID);
-        writer.WriteUInt32((uint)DifficultyID);
-        writer.WriteBit(Locked);
-        writer.WriteBit(Extended);
-        writer.FlushBits();
-        return writer.Position;
+        public override void Write(RaidInstanceMessage packet, WorldPacket data)
+        {
+            data.WriteInt32((int)packet.Type);
+            data.WriteUInt32(packet.MapID);
+            data.WriteUInt32((uint)packet.DifficultyID);
+            data.WriteInt32(packet.TimeLeft);
+            data.WriteBits(0u, 8);
+            data.WriteBit(packet.Locked);
+            data.WriteBit(packet.Extended);
+            data.FlushBits();
+        }
+
+        public override int WriteToSpan(RaidInstanceMessage packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32((int)packet.Type);
+            writer.WriteUInt32(packet.MapID);
+            writer.WriteUInt32((uint)packet.DifficultyID);
+            writer.WriteInt32(packet.TimeLeft);
+            writer.WriteBits(0u, 8);
+            writer.WriteBit(packet.Locked);
+            writer.WriteBit(packet.Extended);
+            writer.FlushBits();
+            return writer.Position;
+        }
     }
 
     public InstanceResetWarningType Type;
     public uint MapID;
     public DifficultyModern DifficultyID;
+    public int TimeLeft;
     public bool Locked;
     public bool Extended;
 }

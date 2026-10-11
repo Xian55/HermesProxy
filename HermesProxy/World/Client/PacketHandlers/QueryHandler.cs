@@ -113,6 +113,12 @@ public partial class WorldClient
         quest.StartItem = packet.ReadUInt32();
         quest.Flags = packet.ReadUInt32();
 
+        // 4.3.4 additions (TrinityCore 4.3.4 QueryQuestInfoResponse): the minimap mark here, the
+        // skill and portrait fields where 3.3.5a has one unknown, the required spell after the
+        // required items, and currencies, portrait texts and sound kits at the end.
+        if (IsCataLegacy)
+            packet.ReadUInt32();                // MinimapTargetMark
+
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_4_0_8089))
             quest.RewardTitle = packet.ReadUInt32();
 
@@ -136,7 +142,15 @@ public partial class WorldClient
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
             quest.RewardArenaPoints = packet.ReadInt32();
 
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
+        if (IsCataLegacy)
+        {
+            quest.RewardSkillLineID = packet.ReadUInt32();
+            quest.RewardNumSkillUps = packet.ReadUInt32();
+            packet.ReadUInt32();                // RewardReputationMask
+            quest.PortraitGiver = packet.ReadUInt32();
+            quest.PortraitTurnIn = packet.ReadUInt32();
+        }
+        else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
             packet.ReadInt32(); // Unk
 
         for (int i = 0; i < 4; i++)
@@ -258,11 +272,38 @@ public partial class WorldClient
             }
         }
 
+        if (IsCataLegacy)
+            packet.ReadUInt32();                // RequiredSpell
+
         for (int i = 0; i < 4; i++)
         {
             string objectiveText = packet.ReadCString();
             if (quest.Objectives.Count > i)
                 quest.Objectives[i].Description = objectiveText;
+        }
+
+        uint acceptedSoundKit = 890;
+        uint completeSoundKit = 878;
+        if (IsCataLegacy)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                quest.RewardCurrencyID[i] = packet.ReadUInt32();
+                quest.RewardCurrencyQty[i] = packet.ReadUInt32();
+            }
+
+            for (int i = 0; i < 4; i++)
+            {
+                packet.ReadUInt32();            // RequiredCurrencyID
+                packet.ReadUInt32();            // RequiredCurrencyQty
+            }
+
+            quest.PortraitGiverText = packet.ReadCString();
+            quest.PortraitGiverName = packet.ReadCString();
+            quest.PortraitTurnInText = packet.ReadCString();
+            quest.PortraitTurnInName = packet.ReadCString();
+            acceptedSoundKit = packet.ReadUInt32();
+            completeSoundKit = packet.ReadUInt32();
         }
 
         // Placeholders
@@ -273,8 +314,8 @@ public partial class WorldClient
         for (int i = 0; i < QuestConst.QuestRewardReputationsCount; i++)
             quest.RewardFactionCapIn[i] = 7;
         quest.AllowableRaces = 511;
-        quest.AcceptedSoundKitID = 890;
-        quest.CompleteSoundKitID = 878;
+        quest.AcceptedSoundKitID = acceptedSoundKit;
+        quest.CompleteSoundKitID = completeSoundKit;
 
         GameData.StoreQuestTemplate(response.QuestID, quest);
 
@@ -324,12 +365,22 @@ public partial class WorldClient
         for (int i = 0; i < 4; i++)
             creature.Name[i] = packet.ReadCString();
 
+        // 4.3.4 adds the alternate (female) names and a second flags word (TrinityCore 4.3.4
+        // QueryCreatureResponse), and RequiredExpansion at the end.
+        if (IsCataLegacy)
+        {
+            for (int i = 0; i < 4; i++)
+                creature.NameAlt[i] = packet.ReadCString();
+        }
+
         creature.Title = packet.ReadCString();
 
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             creature.CursorName = packet.ReadCString();
 
         creature.Flags[0] = packet.ReadUInt32(); // Type Flags
+        if (IsCataLegacy)
+            creature.Flags[1] = packet.ReadUInt32();
         creature.Type = packet.ReadInt32();
         creature.Family = packet.ReadInt32();
         creature.Classification = packet.ReadInt32();
@@ -382,6 +433,9 @@ public partial class WorldClient
             packet.ReadUInt32(); // Movement ID
         }
 
+        if (IsCataLegacy)
+            creature.RequiredExpansion = packet.ReadUInt32();
+
         // Placeholders
         creature.MovementInfoID = 1693;
         creature.Class = 1;
@@ -428,7 +482,9 @@ public partial class WorldClient
             gameObject.UnkString = packet.ReadCString();
         }
 
-        for (int i = 0; i < 24; i++)
+        // 4.3.4 has 32 data fields (TrinityCore 4.3.4 MAX_GAMEOBJECT_DATA), and RequiredLevel at the end.
+        int dataCount = IsCataLegacy ? 32 : 24;
+        for (int i = 0; i < dataCount; i++)
             gameObject.Data[i] = packet.ReadInt32();
 
         // A V3_4_3 client takes a destructible building's model from DestructibleModelData
@@ -470,6 +526,9 @@ public partial class WorldClient
                     gameObject.QuestItems.Add(itemId);
             }
         }
+
+        if (IsCataLegacy)
+            packet.ReadInt32();                 // RequiredLevel
 
         SendPacketToClient(response);
     }

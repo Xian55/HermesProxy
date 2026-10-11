@@ -8,6 +8,7 @@ using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 using System;
 using System.Globalization;
+using System.Text;
 using Framework.Logging;
 using Microsoft.Extensions.Logging;
 using static HermesProxy.World.Server.Packets.ChannelListResponse;
@@ -551,6 +552,12 @@ public partial class WorldClient
             return; // was handled by us
         }
 
+        if (IsCataLegacy)
+        {
+            SendMessageChatCata(type, lang, msg, channel, to);
+            return;
+        }
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MESSAGECHAT);
         packet.WriteUInt32((uint)type);
         packet.WriteUInt32(lang);
@@ -580,6 +587,65 @@ public partial class WorldClient
             case ChatMessageTypeWotLK.Afk:
             case ChatMessageTypeWotLK.Dnd:
                 packet.WriteCString(msg);
+                break;
+        }
+
+        SendPacket(packet);
+    }
+
+    /// <summary>
+    /// 4.3.4 has one opcode per chat type, and the strings behind lengths in a bit section
+    /// (TrinityCore 4.3.4 WorldSession::HandleMessagechatOpcode). Emote, AFK and DND carry no
+    /// language. Leaders speak through the party, raid and battleground opcodes; the server
+    /// knows who leads.
+    /// </summary>
+    private void SendMessageChatCata(ChatMessageTypeWotLK type, uint lang, string msg, string channel, string to)
+    {
+        Opcode opcode = type switch
+        {
+            ChatMessageTypeWotLK.Say => Opcode.CMSG_CHAT_MESSAGE_SAY,
+            ChatMessageTypeWotLK.Yell => Opcode.CMSG_CHAT_MESSAGE_YELL,
+            ChatMessageTypeWotLK.Emote => Opcode.CMSG_CHAT_MESSAGE_EMOTE,
+            ChatMessageTypeWotLK.Party or ChatMessageTypeWotLK.PartyLeader => Opcode.CMSG_CHAT_MESSAGE_PARTY,
+            ChatMessageTypeWotLK.Raid or ChatMessageTypeWotLK.RaidLeader => Opcode.CMSG_CHAT_MESSAGE_RAID,
+            ChatMessageTypeWotLK.RaidWarning => Opcode.CMSG_CHAT_MESSAGE_RAID_WARNING,
+            ChatMessageTypeWotLK.Battleground or ChatMessageTypeWotLK.BattlegroundLeader => Opcode.CMSG_CHAT_MESSAGE_BATTLEGROUND,
+            ChatMessageTypeWotLK.Guild => Opcode.CMSG_CHAT_MESSAGE_GUILD,
+            ChatMessageTypeWotLK.Officer => Opcode.CMSG_CHAT_MESSAGE_OFFICER,
+            ChatMessageTypeWotLK.Whisper => Opcode.CMSG_CHAT_MESSAGE_WHISPER,
+            ChatMessageTypeWotLK.Channel => Opcode.CMSG_CHAT_MESSAGE_CHANNEL,
+            ChatMessageTypeWotLK.Afk => Opcode.CMSG_CHAT_MESSAGE_AFK,
+            ChatMessageTypeWotLK.Dnd => Opcode.CMSG_CHAT_MESSAGE_DND,
+            _ => Opcode.MSG_NULL_ACTION,
+        };
+        if (opcode == Opcode.MSG_NULL_ACTION)
+            return;
+
+        WorldPacket packet = new WorldPacket(opcode);
+        if (type is not (ChatMessageTypeWotLK.Emote or ChatMessageTypeWotLK.Afk or ChatMessageTypeWotLK.Dnd))
+            packet.WriteUInt32(lang);
+
+        int textLength = System.Text.Encoding.UTF8.GetByteCount(msg);
+        switch (type)
+        {
+            case ChatMessageTypeWotLK.Whisper:
+                packet.WriteBits(System.Text.Encoding.UTF8.GetByteCount(to), 10);
+                packet.WriteBits(textLength, 9);
+                packet.FlushBits();
+                packet.WriteString(to);
+                packet.WriteString(msg);
+                break;
+            case ChatMessageTypeWotLK.Channel:
+                packet.WriteBits(System.Text.Encoding.UTF8.GetByteCount(channel), 10);
+                packet.WriteBits(textLength, 9);
+                packet.FlushBits();
+                packet.WriteString(msg);
+                packet.WriteString(channel);
+                break;
+            default:
+                packet.WriteBits(textLength, 9);
+                packet.FlushBits();
+                packet.WriteString(msg);
                 break;
         }
 
@@ -647,6 +713,22 @@ public partial class WorldClient
     public void SendChatJoinChannel(int channelId, string channelName, string password)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CHAT_JOIN_CHANNEL);
+        if (WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 HandleJoinChannel: two bits, then 8-bit lengths and the strings
+            // without terminators. Sent the 3.3.5a way the name read as empty and every join
+            // was refused.
+            packet.WriteInt32(channelId);
+            packet.WriteBit(false); // Has Voice
+            packet.WriteBit(false); // Joined by zone update
+            packet.WriteBits((uint)Encoding.UTF8.GetByteCount(channelName), 8);
+            packet.WriteBits((uint)Encoding.UTF8.GetByteCount(password), 8);
+            packet.FlushBits();
+            packet.WriteString(channelName);
+            packet.WriteString(password);
+            SendPacketToServer(packet);
+            return;
+        }
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
             packet.WriteInt32(channelId);
@@ -661,6 +743,16 @@ public partial class WorldClient
     public void SendChatLeaveChannel(int channelId, string channelName)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CHAT_LEAVE_CHANNEL);
+        if (WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 HandleLeaveChannel: an 8-bit length, then the unterminated name.
+            packet.WriteInt32(channelId);
+            packet.WriteBits((uint)Encoding.UTF8.GetByteCount(channelName), 8);
+            packet.FlushBits();
+            packet.WriteString(channelName);
+            SendPacketToServer(packet);
+            return;
+        }
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             packet.WriteInt32(channelId);
         packet.WriteCString(channelName);

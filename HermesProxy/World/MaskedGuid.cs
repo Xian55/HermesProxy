@@ -36,4 +36,27 @@ public static class MaskedGuid
     }
 
     private static byte ByteAt(ulong guid, int index) => (byte)(guid >> (index * 8));
+
+    /// <summary>Reads presence bits into <paramref name="mask"/>, in <paramref name="order"/>.</summary>
+    public static void ReadMaskBits(WorldPacket packet, Span<bool> mask, ReadOnlySpan<byte> order)
+    {
+        foreach (byte i in order)
+            mask[i] = packet.HasBit();
+    }
+
+    /// <summary>Reads one byte when its presence bit is set, undoing the XOR.</summary>
+    public static void ReadByte(WorldPacket packet, ReadOnlySpan<bool> mask, Span<byte> bytes, int index)
+    {
+        if (mask[index])
+            bytes[index] = (byte)(packet.ReadUInt8() ^ 1);
+    }
+
+    /// <summary>Reads the bytes whose presence bits are set, in <paramref name="order"/>.</summary>
+    public static void ReadBytes(WorldPacket packet, ReadOnlySpan<bool> mask, Span<byte> bytes, ReadOnlySpan<byte> order)
+    {
+        foreach (byte i in order)
+            ReadByte(packet, mask, bytes, i);
+    }
+
+    public static ulong ToUInt64(ReadOnlySpan<byte> bytes) => System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(bytes);
 }

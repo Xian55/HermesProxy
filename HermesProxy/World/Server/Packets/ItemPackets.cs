@@ -101,26 +101,64 @@ public class BuySucceeded : ServerPacket, ISpanWritable
     public uint QuantityBought;
 }
 
-public class BuyFailed : ServerPacket, ISpanWritable
+public sealed class BuyFailed : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<BuyFailed>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new ByteReasonLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new IntReasonLayout()));
+
+    private static readonly ServerPacketLayout<BuyFailed> Layout = Layouts.ForRunningClient();
+
     public BuyFailed() : base(Opcode.SMSG_BUY_FAILED) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 8; // GUID + uint + int
+
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>Up to 3.4.3 (the client's reader: guid, u32, u8): the reason is one byte.</summary>
+    internal sealed class ByteReasonLayout : ServerPacketLayout<BuyFailed>
     {
-        _worldPacket.WritePackedGuid128(VendorGUID);
-        _worldPacket.WriteUInt32(Slot);
-        _worldPacket.WriteUInt8((byte)Reason);
+        public override void Write(BuyFailed packet, WorldPacket data)
+        {
+            data.WritePackedGuid128(packet.VendorGUID);
+            data.WriteUInt32(packet.Slot);
+            data.WriteUInt8((byte)packet.Reason);
+        }
+
+        public override int WriteToSpan(BuyFailed packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(packet.VendorGUID.Low, packet.VendorGUID.High);
+            writer.WriteUInt32(packet.Slot);
+            writer.WriteUInt8((byte)packet.Reason);
+            return writer.Position;
+        }
     }
 
-    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 5; // GUID + uint + byte
-
-    public int WriteToSpan(Span<byte> buffer)
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, and the client's reader: guid, u32, u32): the reason is an
+    /// int32. Sent as one byte, the client read three bytes past it and showed "Item not found" for
+    /// every refused purchase, not enough money included.
+    /// </summary>
+    internal sealed class IntReasonLayout : ServerPacketLayout<BuyFailed>
     {
-        var writer = new SpanPacketWriter(buffer);
-        writer.WritePackedGuid128(VendorGUID.Low, VendorGUID.High);
-        writer.WriteUInt32(Slot);
-        writer.WriteUInt8((byte)Reason);
-        return writer.Position;
+        public override void Write(BuyFailed packet, WorldPacket data)
+        {
+            data.WritePackedGuid128(packet.VendorGUID);
+            data.WriteUInt32(packet.Slot);
+            data.WriteInt32((int)packet.Reason);
+        }
+
+        public override int WriteToSpan(BuyFailed packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(packet.VendorGUID.Low, packet.VendorGUID.High);
+            writer.WriteUInt32(packet.Slot);
+            writer.WriteInt32((int)packet.Reason);
+            return writer.Position;
+        }
     }
 
     public WowGuid128 VendorGUID;
@@ -128,64 +166,134 @@ public class BuyFailed : ServerPacket, ISpanWritable
     public BuyResult Reason = BuyResult.CantFindItem;
 }
 
-class ItemPushResult : ServerPacket, ISpanWritable
+sealed class ItemPushResult : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<ItemPushResult>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new IntQualityLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new ByteQualityLayout()));
+
+    private static readonly ServerPacketLayout<ItemPushResult> Layout = Layouts.ForRunningClient();
+
     public ItemPushResult() : base(Opcode.SMSG_ITEM_PUSH_RESULT) { }
 
-    public override void Write()
-    {
-        _worldPacket.WritePackedGuid128(PlayerGUID);
-        _worldPacket.WriteUInt8(Slot);
-        _worldPacket.WriteInt32(SlotInBag);
-        _worldPacket.WriteInt32(QuestLogItemID);
-        _worldPacket.WriteUInt32(Quantity);
-        _worldPacket.WriteUInt32(QuantityInInventory);
-        _worldPacket.WriteInt32(DungeonEncounterID);
-        _worldPacket.WriteInt32(BattlePetSpeciesID);
-        _worldPacket.WriteInt32(BattlePetBreedID);
-        _worldPacket.WriteUInt32(BattlePetBreedQuality);
-        _worldPacket.WriteInt32(BattlePetLevel);
-        _worldPacket.WritePackedGuid128(ItemGUID);
-        _worldPacket.WriteBit(Pushed);
-        _worldPacket.WriteBit(Created);
-        _worldPacket.WriteBits((uint)DisplayText, 3);
-        _worldPacket.WriteBit(IsBonusRoll);
-        _worldPacket.WriteBit(IsEncounterLoot);
-        _worldPacket.FlushBits();
-
-        Item.Write(_worldPacket);
-    }
+    public override void Write() => Layout.Write(this, _worldPacket);
 
     // 2 GUIDs (18 each) + byte + 9 ints + 1 byte bits + ItemInstance
     public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 1 + 9 * 4 + 1 +
                           ItemPacketHelpers.ItemInstanceMaxSize;
 
-    public int WriteToSpan(Span<byte> buffer)
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    private static void WriteHead(ItemPushResult packet, WorldPacket data)
     {
-        var writer = new SpanPacketWriter(buffer);
-        writer.WritePackedGuid128(PlayerGUID.Low, PlayerGUID.High);
-        writer.WriteUInt8(Slot);
-        writer.WriteInt32(SlotInBag);
-        writer.WriteInt32(QuestLogItemID);
-        writer.WriteUInt32(Quantity);
-        writer.WriteUInt32(QuantityInInventory);
-        writer.WriteInt32(DungeonEncounterID);
-        writer.WriteInt32(BattlePetSpeciesID);
-        writer.WriteInt32(BattlePetBreedID);
-        writer.WriteUInt32(BattlePetBreedQuality);
-        writer.WriteInt32(BattlePetLevel);
-        writer.WritePackedGuid128(ItemGUID.Low, ItemGUID.High);
-        writer.WriteBit(Pushed);
-        writer.WriteBit(Created);
-        writer.WriteBits((uint)DisplayText, 3);
-        writer.WriteBit(IsBonusRoll);
-        writer.WriteBit(IsEncounterLoot);
-        writer.FlushBits();
+        data.WritePackedGuid128(packet.PlayerGUID);
+        data.WriteUInt8(packet.Slot);
+        data.WriteInt32(packet.SlotInBag);
+        data.WriteInt32(packet.QuestLogItemID);
+        data.WriteUInt32(packet.Quantity);
+        data.WriteUInt32(packet.QuantityInInventory);
+        data.WriteInt32(packet.DungeonEncounterID);
+        data.WriteInt32(packet.BattlePetSpeciesID);
+        data.WriteInt32(packet.BattlePetBreedID);
+    }
 
-        if (!ItemPacketHelpers.WriteItemInstance(ref writer, Item))
-            return -1;
+    private static void WriteHead(ItemPushResult packet, ref SpanPacketWriter writer)
+    {
+        writer.WritePackedGuid128(packet.PlayerGUID.Low, packet.PlayerGUID.High);
+        writer.WriteUInt8(packet.Slot);
+        writer.WriteInt32(packet.SlotInBag);
+        writer.WriteInt32(packet.QuestLogItemID);
+        writer.WriteUInt32(packet.Quantity);
+        writer.WriteUInt32(packet.QuantityInInventory);
+        writer.WriteInt32(packet.DungeonEncounterID);
+        writer.WriteInt32(packet.BattlePetSpeciesID);
+        writer.WriteInt32(packet.BattlePetBreedID);
+    }
 
-        return writer.Position;
+    /// <summary>Up to 3.4.3: BattlePetBreedQuality is a uint32, and seven flag bits.</summary>
+    internal sealed class IntQualityLayout : ServerPacketLayout<ItemPushResult>
+    {
+        public override void Write(ItemPushResult packet, WorldPacket data)
+        {
+            WriteHead(packet, data);
+            data.WriteUInt32(packet.BattlePetBreedQuality);
+            data.WriteInt32(packet.BattlePetLevel);
+            data.WritePackedGuid128(packet.ItemGUID);
+            data.WriteBit(packet.Pushed);
+            data.WriteBit(packet.Created);
+            data.WriteBits((uint)packet.DisplayText, 3);
+            data.WriteBit(packet.IsBonusRoll);
+            data.WriteBit(packet.IsEncounterLoot);
+            data.FlushBits();
+
+            packet.Item.Write(data);
+        }
+
+        public override int WriteToSpan(ItemPushResult packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            WriteHead(packet, ref writer);
+            writer.WriteUInt32(packet.BattlePetBreedQuality);
+            writer.WriteInt32(packet.BattlePetLevel);
+            writer.WritePackedGuid128(packet.ItemGUID.Low, packet.ItemGUID.High);
+            writer.WriteBit(packet.Pushed);
+            writer.WriteBit(packet.Created);
+            writer.WriteBits((uint)packet.DisplayText, 3);
+            writer.WriteBit(packet.IsBonusRoll);
+            writer.WriteBit(packet.IsEncounterLoot);
+            writer.FlushBits();
+
+            if (!ItemPacketHelpers.WriteItemInstance(ref writer, packet.Item))
+                return -1;
+
+            return writer.Position;
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, and the client's reader): BattlePetBreedQuality is a
+    /// byte, and an unused bit sits between Created and DisplayText. Written the 3.4.3 way the
+    /// client read the next three bytes into the wrong fields.
+    /// </summary>
+    internal sealed class ByteQualityLayout : ServerPacketLayout<ItemPushResult>
+    {
+        public override void Write(ItemPushResult packet, WorldPacket data)
+        {
+            WriteHead(packet, data);
+            data.WriteUInt8((byte)packet.BattlePetBreedQuality);
+            data.WriteInt32(packet.BattlePetLevel);
+            data.WritePackedGuid128(packet.ItemGUID);
+            data.WriteBit(packet.Pushed);
+            data.WriteBit(packet.Created);
+            data.WriteBit(false);
+            data.WriteBits((uint)packet.DisplayText, 3);
+            data.WriteBit(packet.IsBonusRoll);
+            data.WriteBit(packet.IsEncounterLoot);
+            data.FlushBits();
+
+            packet.Item.Write(data);
+        }
+
+        public override int WriteToSpan(ItemPushResult packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            WriteHead(packet, ref writer);
+            writer.WriteUInt8((byte)packet.BattlePetBreedQuality);
+            writer.WriteInt32(packet.BattlePetLevel);
+            writer.WritePackedGuid128(packet.ItemGUID.Low, packet.ItemGUID.High);
+            writer.WriteBit(packet.Pushed);
+            writer.WriteBit(packet.Created);
+            writer.WriteBit(false);
+            writer.WriteBits((uint)packet.DisplayText, 3);
+            writer.WriteBit(packet.IsBonusRoll);
+            writer.WriteBit(packet.IsEncounterLoot);
+            writer.FlushBits();
+
+            if (!ItemPacketHelpers.WriteItemInstance(ref writer, packet.Item))
+                return -1;
+
+            return writer.Position;
+        }
     }
 
     public WowGuid128 PlayerGUID;
@@ -286,6 +394,12 @@ public readonly record struct SwapItem(
     byte SlotA);
 
 public readonly record struct AutoEquipItem(InvUpdate Inv, byte PackSlot, byte Slot);
+
+/// <summary>
+/// CMSG_AUTOBANK_ITEM. Shaped like <see cref="AutoEquipItem"/> until 4.4.2, which puts a
+/// BankType byte before the bag and slot; its own type lets that build read it.
+/// </summary>
+public readonly record struct AutoBankItem(InvUpdate Inv, byte PackSlot, byte Slot);
 
 public readonly record struct AutoStoreBagItem(
     InvUpdate Inv,

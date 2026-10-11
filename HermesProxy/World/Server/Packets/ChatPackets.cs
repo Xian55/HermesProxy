@@ -31,46 +31,68 @@ namespace HermesProxy.World.Server.Packets;
 
 public readonly record struct JoinChannel(int ChatChannelId, string ChannelName, string Password);
 
-public class ChannelNotifyJoined : ServerPacket, ISpanWritable
+public sealed class ChannelNotifyJoined : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<ChannelNotifyJoined>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new FlagsThenIdLayout(unknownByte: false)),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new FlagsThenIdLayout(unknownByte: true)));
+
+    private static readonly ServerPacketLayout<ChannelNotifyJoined> Layout = Layouts.ForRunningClient();
+
     public ChannelNotifyJoined() : base(Opcode.SMSG_CHANNEL_NOTIFY_JOINED) { }
 
-    public override void Write()
-    {
-        _worldPacket.WriteBits(Channel.GetByteCount(), 7);
-        _worldPacket.WriteBits(ChannelWelcomeMsg.GetByteCount(), 11);
-        _worldPacket.WriteUInt32((uint)ChannelFlags);
-        _worldPacket.WriteInt32(ChatChannelID);
-        _worldPacket.WriteUInt64(InstanceID);
-        _worldPacket.WritePackedGuid128(ChannelGUID);
-        _worldPacket.WriteString(Channel);
-        _worldPacket.WriteString(ChannelWelcomeMsg);
-    }
+    public override void Write() => Layout.Write(this, _worldPacket);
 
     // Cap for channel name and welcome message
     // Reduced MaxWelcomeMsgBytes from 256 to 64 based on typical usage (~50 bytes)
     private const int MaxChannelBytes = 64;
     private const int MaxWelcomeMsgBytes = 64;
-    // 18 bits(3) + uint(4) + int(4) + ulong(8) + GUID(18) + channel + msg
-    public int MaxSize => 3 + 4 + 4 + 8 + PackedGuidHelper.MaxPackedGuid128Size + MaxChannelBytes + MaxWelcomeMsgBytes;
+    // 18 bits(3) + uint(4) + byte(1, from 4.4.2) + int(4) + ulong(8) + GUID(18) + channel + msg
+    public int MaxSize => 3 + 4 + 1 + 4 + 8 + PackedGuidHelper.MaxPackedGuid128Size + MaxChannelBytes + MaxWelcomeMsgBytes;
 
-    public int WriteToSpan(Span<byte> buffer)
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>
+    /// From 4.4.2 (TrinityCore cata_classic, and the client's reader) a byte TrinityCore calls
+    /// Unknown1107 follows the channel flags. Without it the client read the channel id one byte
+    /// early, and every later field with it.
+    /// </summary>
+    internal sealed class FlagsThenIdLayout(bool unknownByte) : ServerPacketLayout<ChannelNotifyJoined>
     {
-        int channelBytes = Encoding.UTF8.GetByteCount(Channel);
-        int welcomeBytes = Encoding.UTF8.GetByteCount(ChannelWelcomeMsg);
-        if (channelBytes > MaxChannelBytes || welcomeBytes > MaxWelcomeMsgBytes)
-            return -1;
+        public override void Write(ChannelNotifyJoined packet, WorldPacket data)
+        {
+            data.WriteBits(packet.Channel.GetByteCount(), 7);
+            data.WriteBits(packet.ChannelWelcomeMsg.GetByteCount(), 11);
+            data.WriteUInt32((uint)packet.ChannelFlags);
+            if (unknownByte)
+                data.WriteUInt8(0);
+            data.WriteInt32(packet.ChatChannelID);
+            data.WriteUInt64(packet.InstanceID);
+            data.WritePackedGuid128(packet.ChannelGUID);
+            data.WriteString(packet.Channel);
+            data.WriteString(packet.ChannelWelcomeMsg);
+        }
 
-        var writer = new SpanPacketWriter(buffer);
-        writer.WriteBits((uint)channelBytes, 7);
-        writer.WriteBits((uint)welcomeBytes, 11);
-        writer.WriteUInt32((uint)ChannelFlags);
-        writer.WriteInt32(ChatChannelID);
-        writer.WriteUInt64(InstanceID);
-        writer.WritePackedGuid128(ChannelGUID.Low, ChannelGUID.High);
-        writer.WriteString(Channel);
-        writer.WriteString(ChannelWelcomeMsg);
-        return writer.Position;
+        public override int WriteToSpan(ChannelNotifyJoined packet, Span<byte> buffer)
+        {
+            int channelBytes = Encoding.UTF8.GetByteCount(packet.Channel);
+            int welcomeBytes = Encoding.UTF8.GetByteCount(packet.ChannelWelcomeMsg);
+            if (channelBytes > MaxChannelBytes || welcomeBytes > MaxWelcomeMsgBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)channelBytes, 7);
+            writer.WriteBits((uint)welcomeBytes, 11);
+            writer.WriteUInt32((uint)packet.ChannelFlags);
+            if (unknownByte)
+                writer.WriteUInt8(0);
+            writer.WriteInt32(packet.ChatChannelID);
+            writer.WriteUInt64(packet.InstanceID);
+            writer.WritePackedGuid128(packet.ChannelGUID.Low, packet.ChannelGUID.High);
+            writer.WriteString(packet.Channel);
+            writer.WriteString(packet.ChannelWelcomeMsg);
+            return writer.Position;
+        }
     }
 
     public string ChannelWelcomeMsg = "";

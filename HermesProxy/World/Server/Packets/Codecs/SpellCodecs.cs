@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -13,6 +14,9 @@ namespace HermesProxy.World.Server.Packets;
 // list, and an optional MovementInfo. It keeps its class form because of the lists, so the packet
 // structs hold a reference and the one allocation per cast survives.
 
+// 4.4.2 adds a CraftingFlags byte to SpellCastRequest; see SpellCastRequestShape.CataClassic.
+
+[PacketCodec(typeof(CastSpell), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
 public static class CastSpellCodec
 {
     public static void Read(ref SpanPacketReader r, out CastSpell packet)
@@ -23,6 +27,18 @@ public static class CastSpellCodec
     }
 }
 
+[PacketCodec(typeof(CastSpell), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class CastSpellCodecCataClassic
+{
+    public static void Read(ref SpanPacketReader r, out CastSpell packet)
+    {
+        var cast = new SpellCastRequest();
+        cast.Read(ref r, SpellCastRequestShape.CataClassic);
+        packet = new CastSpell(cast);
+    }
+}
+
+[PacketCodec(typeof(PetCastSpell), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
 public static class PetCastSpellCodec
 {
     public static void Read(ref SpanPacketReader r, out PetCastSpell packet)
@@ -34,6 +50,19 @@ public static class PetCastSpellCodec
     }
 }
 
+[PacketCodec(typeof(PetCastSpell), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class PetCastSpellCodecCataClassic
+{
+    public static void Read(ref SpanPacketReader r, out PetCastSpell packet)
+    {
+        WowGuid128 petGuid = r.ReadPackedGuid128();
+        var cast = new SpellCastRequest();
+        cast.Read(ref r, SpellCastRequestShape.CataClassic);
+        packet = new PetCastSpell(petGuid, cast);
+    }
+}
+
+[PacketCodec(typeof(UseItem), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
 public static class UseItemCodec
 {
     public static void Read(ref SpanPacketReader r, out UseItem packet)
@@ -43,6 +72,20 @@ public static class UseItemCodec
         WowGuid128 castItem = r.ReadPackedGuid128();
         var cast = new SpellCastRequest();
         cast.Read(ref r);
+        packet = new UseItem(packSlot, slot, castItem, cast);
+    }
+}
+
+[PacketCodec(typeof(UseItem), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class UseItemCodecCataClassic
+{
+    public static void Read(ref SpanPacketReader r, out UseItem packet)
+    {
+        byte packSlot = r.ReadUInt8();
+        byte slot = r.ReadUInt8();
+        WowGuid128 castItem = r.ReadPackedGuid128();
+        var cast = new SpellCastRequest();
+        cast.Read(ref r, SpellCastRequestShape.CataClassic);
         packet = new UseItem(packSlot, slot, castItem, cast);
     }
 }

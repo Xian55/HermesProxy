@@ -36,6 +36,7 @@ public sealed class OwnCharacterInfo : PlayerCache
     public WowGuid128 CharacterGuid;
     public Realm Realm = null!;
     public ulong LastLoginUnixSec;
+    public uint MapId;
 }
 
 public sealed class TradeSession

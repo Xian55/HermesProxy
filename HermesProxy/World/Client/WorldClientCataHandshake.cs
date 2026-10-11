@@ -20,7 +20,13 @@ public partial class WorldClient
     private const string ClientConnectionGreeting = "WORLD OF WARCRAFT CONNECTION - CLIENT TO SERVER";
 
     /// <summary>The legacy server speaks the 4.x protocol: greeting, new auth layouts, compression.</summary>
-    private static bool IsCataLegacy => LegacyVersion.ExpansionVersion >= 4;
+    internal static bool IsCataLegacy => LegacyVersion.ExpansionVersion >= 4;
+
+    /// <summary>
+    /// 4.x moved item data into DB2 records the server sends on request, so there is no
+    /// CMSG_ITEM_QUERY_SINGLE to send and its opcode has no mapping.
+    /// </summary>
+    internal static bool LegacyHasItemQuery => !IsCataLegacy;
 
     /// <summary>
     /// Reads the server's greeting and answers with the client's. Each is a big-endian uint16 length

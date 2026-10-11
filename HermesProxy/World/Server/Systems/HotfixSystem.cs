@@ -4,6 +4,7 @@ using Framework.Constants;
 using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World;
+using HermesProxy.World.Client;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -73,7 +74,8 @@ public static class HotfixSystem
                     reply.Status = HotfixStatus.Valid;
                     GameData.WriteItemHotfix(item, reply.Data);
                 }
-                else if (!ctx.GetSession().GameState.RequestedItemHotfixes.Contains(id) &&
+                else if (WorldClient.LegacyHasItemQuery &&
+                          !ctx.GetSession().GameState.RequestedItemHotfixes.Contains(id) &&
                           ctx.GetSession().WorldClient != null && ctx.GetSession().WorldClient!.IsConnected())
                 {
                     //Log.PrintNet(LogType.Storage, LogNetDir.P2S, $"Item #{id} not cached, requesting server data...");
@@ -95,7 +97,8 @@ public static class HotfixSystem
                     reply.Status = HotfixStatus.Valid;
                     GameData.WriteItemSparseHotfix(item, reply.Data);
                 }
-                else if (!ctx.GetSession().GameState.RequestedItemSparseHotfixes.Contains(id) &&
+                else if (WorldClient.LegacyHasItemQuery &&
+                          !ctx.GetSession().GameState.RequestedItemSparseHotfixes.Contains(id) &&
                           ctx.GetSession().WorldClient != null && ctx.GetSession().WorldClient!.IsConnected())
                 {
                     ctx.GetSession().GameState.RequestedItemSparseHotfixes.Add(id);

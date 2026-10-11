@@ -147,6 +147,7 @@ public partial class WorldClient
                 ClassId = char1.ClassId,
                 SexId = char1.SexId,
                 Level = char1.ExperienceLevel,
+                MapId = char1.MapId,
             });
         }
 
@@ -648,7 +649,15 @@ public partial class WorldClient
     internal void HandleUpdateActionButtons(WorldPacket packet)
     {
         byte reason = 0;
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
+        if (IsCataLegacy)
+        {
+            // 4.3.4 moved the reason behind the buttons (TrinityCore 4.3.4 UpdateActionButtons).
+            ReadOnlySpan<byte> rest = packet.GetRemainingSpan();
+            reason = rest.Length > 0 ? rest[^1] : (byte)0;
+            if (reason == 2)
+                return;
+        }
+        else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
         {
             reason = packet.ReadUInt8();
             if (reason == 2)

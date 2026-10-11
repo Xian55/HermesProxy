@@ -35,6 +35,7 @@ using HermesProxy.Configuration.Options;
 using HermesProxy.Enums;
 using Microsoft.Extensions.Options;
 using Framework.Realm;
+using HermesProxy.World.Client;
 using HermesProxy.World.Dispatch;
 
 using HermesProxy.World.Enums;
@@ -1129,6 +1130,8 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             // 0-indexed expansion (Classic=0, TBC=1, WotLK=2). LegacyVersion.ExpansionVersion is
             // the 1-indexed major; advertising it verbatim puts the client one expansion ahead,
             // which zeroes its quest/mob green range. SMSG_INITIAL_SETUP uses the same mapping.
+            // For a 4.4.2 client one too high is Mists of Pandaria, for which it has no level
+            // cap: its reputation bar then compares against nil.
             response.SuccessInfo.ActiveExpansionLevel = VersionChecker.GetClientExpansionLevel(LegacyVersion.Build);
             response.SuccessInfo.AccountExpansionLevel = VersionChecker.GetClientExpansionLevel(LegacyVersion.Build);
             response.SuccessInfo.VirtualRealmAddress = _realmId.GetAddress();

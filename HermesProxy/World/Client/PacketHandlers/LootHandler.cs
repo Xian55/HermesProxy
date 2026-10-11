@@ -38,6 +38,10 @@ public partial class WorldClient
         loot.Coins = packet.ReadUInt32();
 
         var itemsCount = packet.ReadUInt8();
+        // 4.3.4 counts the currencies here too and lists them after the items (TrinityCore 4.3.4
+        // LootResponse::Write). Read as 3.3.5a, that count became the first item's slot and the
+        // loot window never opened.
+        byte currencyCount = IsCataLegacy ? packet.ReadUInt8() : (byte)0;
         for (var i = 0; i < itemsCount; ++i)
         {
             LootItemData lootItem = new();
@@ -51,6 +55,12 @@ public partial class WorldClient
             lootItem.UIType = uiType.CastEnum<LootSlotTypeModern>();
             loot.Items.Add(lootItem);
             state.RemainingLootSlots.Add(lootItem.LootListID);
+        }
+        for (var i = 0; i < currencyCount; ++i)
+        {
+            packet.ReadUInt8();                 // LootListID
+            packet.ReadUInt32();                // CurrencyID
+            packet.ReadUInt32();                // Quantity
         }
         state.RemainingLootCoins = loot.Coins;
         SendMasterLootListIfApplicable();
