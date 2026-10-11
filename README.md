@@ -301,5 +301,6 @@ The 3.4.3 → 3.3.5a port leans heavily on the following projects:
 
 ### Cataclysm Classic References
 
+- [Xian55/TrinityCore-docker](https://github.com/Xian55/TrinityCore-docker) — `docker compose up` servers for TrinityCore 3.3.5, 4.3.4 (Cataclysm Preservation Project), `cata_classic` 4.4.2 and Wrathion 3.4.3, multi-arch with native arm64. The test servers this work is playtested and captured against.
 - [The Cataclysm Preservation Project's TrinityCore](https://github.com/The-Cataclysm-Preservation-Project/TrinityCore) — the 4.3.4 server, and the reference for every 4.3.4 packet and movement layout on the legacy side.
 - [TrinityCore `cata_classic`](https://github.com/TrinityCore/TrinityCore/tree/cata_classic) — native 4.4.2 server, used for plaintext captures and as a second opinion on 4.4.2 packet shapes, after the client's own readers in [docs/protocol/4.4.2.60895](docs/protocol/4.4.2.60895).
