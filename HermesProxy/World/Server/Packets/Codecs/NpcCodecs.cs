@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 
@@ -75,6 +76,7 @@ public static class ActivateTaxiCodec
     }
 }
 
+[PacketCodec(typeof(AuctionListOwnerItems), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
 public static class AuctionListOwnerItemsCodec
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -82,6 +84,28 @@ public static class AuctionListOwnerItemsCodec
     {
         WowGuid128 auctioneer = r.ReadPackedGuid128();
         uint offset = r.ReadUInt32();
+        packet = new AuctionListOwnerItems(auctioneer, offset);
+    }
+}
+
+// 4.4.2 (TrinityCore cata_classic, and the client's writer): a TaintedBy bit and a 2-bit count of
+// sort orders follow the offset, then the addon info and the sorts.
+[PacketCodec(typeof(AuctionListOwnerItems), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class AuctionListOwnerItemsCodecCataClassic
+{
+    public static void Read(ref SpanPacketReader r, out AuctionListOwnerItems packet)
+    {
+        WowGuid128 auctioneer = r.ReadPackedGuid128();
+        uint offset = r.ReadUInt32();
+
+        bool hasTaintedBy = r.HasBit();
+        uint sortCount = r.ReadBits<uint>(2);
+        if (hasTaintedBy)
+            new AddOnInfo().Read(ref r);
+        else
+            r.ResetBitReader();
+
+        AuctionSortCodec.Skip(ref r, sortCount);
         packet = new AuctionListOwnerItems(auctioneer, offset);
     }
 }

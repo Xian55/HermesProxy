@@ -86,14 +86,18 @@ Each of these has more than one codec, chosen by build range at table-build time
 anyone adding a client this is the short list worth checking first: a layout that already
 changed once is the most likely to have changed again.
 
-39 packets across 79 codecs.
+42 packets across 85 codecs.
 
 | packet | codec | axis | added in | removed in |
 |---|---|---|---|---|
 | `AlterAppearance` | `AlterAppearanceCodec` | modern | — | `V4_4_2_60895` |
 | `AlterAppearance` | `AlterAppearanceCodecCataClassic` | modern | `V4_4_2_60895` | — |
+| `AuctionListBidderItems` | `AuctionListBidderItemsCodec` | modern | — | `V4_4_2_60895` |
+| `AuctionListBidderItems` | `AuctionListBidderItemsCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `AuctionListItems` | `AuctionListItemsCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `AuctionListItems` | `AuctionListItemsCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `AuctionListOwnerItems` | `AuctionListOwnerItemsCodec` | modern | — | `V4_4_2_60895` |
+| `AuctionListOwnerItems` | `AuctionListOwnerItemsCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `AuctionRemoveItem` | `AuctionRemoveItemCodec` | modern | — | `V4_4_2_60895` |
 | `AuctionRemoveItem` | `AuctionRemoveItemCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `AutoBankItem` | `AutoBankItemCodec` | modern | — | `V4_4_2_60895` |
@@ -121,6 +125,8 @@ changed once is the most likely to have changed again.
 | `CreateCharacter` | `CreateCharacterCodecPreCataClassic` | modern | — | `V4_4_2_60895` |
 | `DoReadyCheck` | `DoReadyCheckCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `DoReadyCheck` | `DoReadyCheckCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `GuildSetRankPermissions` | `GuildSetRankPermissionsCodec` | modern | — | `V4_4_2_60895` |
+| `GuildSetRankPermissions` | `GuildSetRankPermissionsCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `JoinChannel` | `JoinChannelCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `JoinChannel` | `JoinChannelCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `MailCreateTextItem` | `MailCreateTextItemCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |

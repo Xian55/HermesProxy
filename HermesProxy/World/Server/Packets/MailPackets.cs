@@ -25,6 +25,7 @@ using HermesProxy.World.Objects;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using Framework.Util;
 
 namespace HermesProxy.World.Server.Packets;
 
@@ -152,10 +153,101 @@ public static class CalendarMailSubject
     }
 }
 
+/// <summary>
+/// What the body of an auction house mail from a legacy server says: the other party and the
+/// sums. The body is a text record the client turns into the invoice it shows, and every server
+/// from 1.12 to 4.3.4 writes it the same way: the player's GUID as 16 hex digits, right-aligned,
+/// then <c>:bid:buyout:deposit:cut</c>, and on some a delay and a packed time after those.
+/// </summary>
+public readonly record struct AuctionMailRecord(
+    int Type, WowGuid128 Counterparty, ulong Bid, ulong Buyout, ulong Deposit, ulong Cut, uint MoneyDelay, uint Eta)
+{
+    // The third field of the subject, "item:0:type:auction:count".
+    public const int Won = 1;
+    public const int Sold = 2;
+    public const int SalePending = 6;
+
+    public static AuctionMailRecord? FromLegacy(string subject, string body, Func<WowGuid64, WowGuid128> toModern)
+    {
+        string[] title = subject.Split(':');
+        string[] fields = body.Trim().Split(':');
+        if (title.Length < 3 || fields.Length < 3
+            || !int.TryParse(title[2], NumberStyles.None, CultureInfo.InvariantCulture, out int type)
+            || !ulong.TryParse(fields[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong rawGuid))
+            return null;
+
+        ulong Field(int index) => index < fields.Length
+            && ulong.TryParse(fields[index], NumberStyles.None, CultureInfo.InvariantCulture, out ulong value) ? value : 0;
+
+        WowGuid128 counterparty = rawGuid == 0 ? WowGuid128.Empty : toModern(new WowGuid64(rawGuid));
+        return new AuctionMailRecord(type, counterparty, Field(1), Field(2), Field(3), Field(4), (uint)Field(5), (uint)Field(6));
+    }
+}
+
+/// <summary>The record in an auction house mail's body, in the form the running client parses.</summary>
+internal abstract class AuctionMailBody
+{
+    internal static readonly ServerPacketLayouts<AuctionMailBody> Shapes = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new AsSent()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new RetailStyle()));
+
+    internal static readonly AuctionMailBody Running = Shapes.ForRunningClient();
+
+    public abstract string Of(MailListEntry mail, long now);
+
+    /// <summary>Up to 3.4.3: the legacy record, untouched.</summary>
+    internal sealed class AsSent : AuctionMailBody
+    {
+        public override string Of(MailListEntry mail, long now) => mail.Body;
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic AuctionHouseMgr::BuildAuction*MailBody): the GUID in the
+    /// client's own text form, a trailing 0, and for a pending sale the delay and the packed time
+    /// the money arrives. Given the legacy record, the client showed a pending sale with no
+    /// buyer, an amount of 0 and a wrong time. The other kinds of auction mail have no body.
+    /// </summary>
+    internal sealed class RetailStyle : AuctionMailBody
+    {
+        public override string Of(MailListEntry mail, long now)
+        {
+            if (mail.Auction is not { } record)
+                return mail.Body;
+
+            WowGuid128 guid = record.Counterparty;
+            string who = string.Create(CultureInfo.InvariantCulture, $"Player-{guid.GetRealmId()}-{guid.GetCounter():X8}");
+
+            switch (record.Type)
+            {
+                case AuctionMailRecord.Won:
+                    return string.Create(CultureInfo.InvariantCulture, $"{who}:{record.Bid}:{record.Buyout}:0");
+                case AuctionMailRecord.Sold:
+                    return string.Create(CultureInfo.InvariantCulture,
+                        $"{who}:{record.Bid}:{record.Buyout}:{record.Deposit}:{record.Cut}:0");
+                case AuctionMailRecord.SalePending:
+                {
+                    // A server that leaves the delay out deletes the notice when the money mail
+                    // arrives, so what the notice has left to live is the delay.
+                    uint delay = record.MoneyDelay != 0 ? record.MoneyDelay : (uint)MathF.Round(MathF.Max(mail.DaysLeft, 0) * 86400);
+                    uint eta = record.Eta != 0 ? record.Eta : Time.GetPackedTimeFromUnixTime(now + delay);
+                    return string.Create(CultureInfo.InvariantCulture,
+                        $"{who}:{record.Bid}:{record.Buyout}:{record.Deposit}:{record.Cut}:{delay}:{eta}:0");
+                }
+                default:
+                    return string.Empty;
+            }
+        }
+    }
+}
+
 public class MailListEntry
 {
     public void Write(WorldPacket data)
     {
+        string body = SenderType == MailType.Auction
+            ? AuctionMailBody.Running.Of(this, DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+            : Body;
+
         if (ModernVersion.IsWotLKClassicOrLater)
         {
             // V3_4_3 layout (per CypherCore Source/Game/Networking/Packets/MailPackets.cs:395-435)
@@ -183,13 +275,13 @@ public class MailListEntry
             }
 
             data.WriteBits(Subject.GetByteCount(), 8);
-            data.WriteBits(Body.GetByteCount(), 13);
+            data.WriteBits(body.GetByteCount(), 13);
             data.FlushBits();
 
             Attachments.ForEach(p => p.Write(data));
 
             data.WriteString(Subject);
-            data.WriteString(Body);
+            data.WriteString(body);
             return;
         }
 
@@ -206,7 +298,7 @@ public class MailListEntry
         data.WriteBit(SenderCharacter != default);
         data.WriteBit(AltSenderID.HasValue);
         data.WriteBits(Subject.GetByteCount(), 8);
-        data.WriteBits(Body.GetByteCount(), 13);
+        data.WriteBits(body.GetByteCount(), 13);
         data.FlushBits();
 
         Attachments.ForEach(p => p.Write(data));
@@ -218,7 +310,7 @@ public class MailListEntry
             data.WriteUInt32(AltSenderID.Value);
 
         data.WriteString(Subject);
-        data.WriteString(Body);
+        data.WriteString(body);
     }
 
     public long MailID;
@@ -233,6 +325,7 @@ public class MailListEntry
     public int MailTemplateID;
     public string Subject = "";
     public string Body = "";
+    public AuctionMailRecord? Auction; // an auction house mail's body, read; each client gets it in its own form
     public uint ItemTextId; // not sent for new clients, save it here so we can fetch text prior to 3.3
     public List<MailAttachedItem> Attachments = new();
 }

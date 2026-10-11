@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Framework.IO;
 using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
+using HermesProxy.World.Enums;
 
 namespace HermesProxy.World.Server.Packets;
 
@@ -20,6 +22,7 @@ namespace HermesProxy.World.Server.Packets;
 // everything after it misaligns — so it is parsed and kept on the packet rather than skipped by
 // byte count, which would silently rot if the addon block ever changed shape.
 
+[PacketCodec(typeof(AuctionListBidderItems), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
 public static class AuctionListBidderItemsCodec
 {
     /// <remarks>
@@ -39,6 +42,49 @@ public static class AuctionListBidderItemsCodec
             auctionItemIds.Add(r.ReadUInt32());
 
         packet = new AuctionListBidderItems(auctioneer, offset, auctionItemIds);
+    }
+}
+
+// 4.4.2 (TrinityCore cata_classic, and the client's writer): the TaintedBy bit comes before the
+// auction-id count, and a 2-bit count of sort orders after it; the sorts trail the ids. Read the
+// 3.4.3 way, the id count came out shifted by one bit.
+[PacketCodec(typeof(AuctionListBidderItems), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class AuctionListBidderItemsCodecCataClassic
+{
+    public static void Read(ref SpanPacketReader r, out AuctionListBidderItems packet)
+    {
+        WowGuid128 auctioneer = r.ReadPackedGuid128();
+        uint offset = r.ReadUInt32();
+
+        bool hasTaintedBy = r.HasBit();
+        uint auctionIdCount = r.ReadBits<uint>(7);
+        uint sortCount = r.ReadBits<uint>(2);
+        if (hasTaintedBy)
+            new AddOnInfo().Read(ref r);
+        else
+            r.ResetBitReader();
+
+        var auctionItemIds = new List<uint>((int)auctionIdCount);
+        for (var i = 0; i < auctionIdCount; ++i)
+            auctionItemIds.Add(r.ReadUInt32());
+
+        AuctionSortCodec.Skip(ref r, sortCount);
+        packet = new AuctionListBidderItems(auctioneer, offset, auctionItemIds);
+    }
+}
+
+/// <summary>4.4.2's AuctionSortDef: a sort order byte and a reverse bit. Legacy servers sort themselves.</summary>
+internal static class AuctionSortCodec
+{
+    public static void Skip(ref SpanPacketReader r, uint count)
+    {
+        for (uint i = 0; i < count; i++)
+        {
+            r.ResetBitReader();
+            r.ReadUInt8();
+            r.HasBit();
+        }
+        r.ResetBitReader();
     }
 }
 
@@ -271,5 +317,196 @@ public static class AuctionPlaceBidCodec
             taintedBy.Read(ref r);
 
         packet = new AuctionPlaceBid(auctioneer, auctionId, bidAmount, taintedBy);
+    }
+}
+
+// ---- the 4.4.2 client's retail-style auction house ----
+//
+// Only that client has these opcodes. Layouts: docs/protocol/4.4.2.60895/cmsg-structures.md, read
+// from the client, and TrinityCore cata_classic's readers, which agree with it. Every request
+// leads its bit section with the TaintedBy bit and trails its sort orders; the proxy forwards
+// neither.
+
+public static class AuctionBrowseQueryCodec
+{
+    public static void Read(ref SpanPacketReader r, out AuctionBrowseQuery packet)
+    {
+        WowGuid128 auctioneer = r.ReadPackedGuid128();
+        uint offset = r.ReadUInt32();
+        byte minLevel = r.ReadUInt8();
+        byte maxLevel = r.ReadUInt8();
+        r.ReadUInt8();                          // Unused1007_1
+        r.ReadUInt8();                          // Unused1007_2
+        var filters = (AuctionHouseFilterMask)r.ReadUInt32();
+        uint knownPetsSize = r.ReadUInt32();
+        r.ReadUInt8();                          // MaxPetLevel
+        r.ReadUInt32();                         // Unused1026
+        r.Skip((int)Math.Min(knownPetsSize, (uint)r.Remaining)); // KnownPets
+
+        bool hasTaintedBy = r.HasBit();
+        uint nameLength = r.ReadBits<uint>(8);
+        uint classFilterCount = r.ReadBits<uint>(3);
+        uint sortCount = r.ReadBits<uint>(2);
+        r.ResetBitReader();
+
+        if (hasTaintedBy)
+            new AddOnInfo().Read(ref r);
+
+        string name = r.ReadString(nameLength);
+
+        var classFilters = new List<ClassFilter>((int)classFilterCount);
+        for (uint i = 0; i < classFilterCount; ++i)
+        {
+            int itemClass = r.ReadInt32();
+            uint subClassFilterCount = r.ReadBits<uint>(5);
+            r.ResetBitReader();
+
+            var subFilters = new List<SubClassFilter>((int)subClassFilterCount);
+            for (uint j = 0; j < subClassFilterCount; ++j)
+            {
+                // 64 bits wide; no inventory type is past bit 31.
+                uint invTypeMask = (uint)r.ReadUInt64();
+                subFilters.Add(new SubClassFilter(r.ReadInt32(), invTypeMask));
+            }
+            classFilters.Add(new ClassFilter(itemClass, subFilters));
+        }
+
+        AuctionSortCodec.Skip(ref r, sortCount);
+        packet = new AuctionBrowseQuery(auctioneer, offset, minLevel, maxLevel, filters, name, classFilters);
+    }
+}
+
+public static class AuctionListItemsByBucketKeyCodec
+{
+    public static void Read(ref SpanPacketReader r, out AuctionListItemsByBucketKey packet)
+    {
+        WowGuid128 auctioneer = r.ReadPackedGuid128();
+        uint offset = r.ReadUInt32();
+        r.ReadUInt8();                          // Unknown830
+
+        bool hasTaintedBy = r.HasBit();
+        uint sortCount = r.ReadBits<uint>(2);
+        AuctionBucketKey bucketKey = AuctionBucketKey.Read(ref r);
+
+        if (hasTaintedBy)
+            new AddOnInfo().Read(ref r);
+
+        AuctionSortCodec.Skip(ref r, sortCount);
+        packet = new AuctionListItemsByBucketKey(auctioneer, offset, bucketKey);
+    }
+}
+
+public static class AuctionListItemsByItemIDCodec
+{
+    public static void Read(ref SpanPacketReader r, out AuctionListItemsByItemID packet)
+    {
+        WowGuid128 auctioneer = r.ReadPackedGuid128();
+        uint itemId = r.ReadUInt32();
+        uint suffix = r.ReadUInt32();
+        uint offset = r.ReadUInt32();
+
+        bool hasTaintedBy = r.HasBit();
+        uint sortCount = r.ReadBits<uint>(2);
+        r.ResetBitReader();
+
+        if (hasTaintedBy)
+            new AddOnInfo().Read(ref r);
+
+        AuctionSortCodec.Skip(ref r, sortCount);
+        packet = new AuctionListItemsByItemID(auctioneer, itemId, suffix, offset);
+    }
+}
+
+public static class AuctionListBucketsByBucketKeysCodec
+{
+    /// <remarks>The key count is seven bits, so the list is capped at 127 by the wire format.</remarks>
+    public static void Read(ref SpanPacketReader r, out AuctionListBucketsByBucketKeys packet)
+    {
+        WowGuid128 auctioneer = r.ReadPackedGuid128();
+
+        bool hasTaintedBy = r.HasBit();
+        uint keyCount = r.ReadBits<uint>(7);
+        uint sortCount = r.ReadBits<uint>(2);
+        r.ResetBitReader();
+
+        if (hasTaintedBy)
+            new AddOnInfo().Read(ref r);
+
+        var bucketKeys = new List<AuctionBucketKey>((int)keyCount);
+        for (uint i = 0; i < keyCount; ++i)
+            bucketKeys.Add(AuctionBucketKey.Read(ref r));
+
+        AuctionSortCodec.Skip(ref r, sortCount);
+        packet = new AuctionListBucketsByBucketKeys(auctioneer, bucketKeys);
+    }
+}
+
+public static class AuctionSellCommodityCodec
+{
+    /// <remarks>The item count is six bits, so the list is capped at 63 by the wire format.</remarks>
+    public static void Read(ref SpanPacketReader r, out AuctionSellCommodity packet)
+    {
+        WowGuid128 auctioneer = r.ReadPackedGuid128();
+        ulong unitPrice = r.ReadUInt64();
+        uint runTime = r.ReadUInt32();
+
+        bool hasTaintedBy = r.HasBit();
+        uint itemCount = r.ReadBits<uint>(6);
+        r.ResetBitReader();
+
+        if (hasTaintedBy)
+            new AddOnInfo().Read(ref r);
+
+        var items = new List<AuctionItemForSale>((int)itemCount);
+        for (uint i = 0; i < itemCount; ++i)
+        {
+            WowGuid128 guid = r.ReadPackedGuid128();
+            items.Add(new AuctionItemForSale(guid, r.ReadUInt32()));
+        }
+
+        packet = new AuctionSellCommodity(auctioneer, unitPrice, runTime, items);
+    }
+}
+
+public static class AuctionGetCommodityQuoteCodec
+{
+    public static void Read(ref SpanPacketReader r, out AuctionGetCommodityQuote packet)
+    {
+        WowGuid128 auctioneer = r.ReadPackedGuid128();
+        uint itemId = r.ReadUInt32();
+        uint quantity = r.ReadUInt32();
+
+        if (r.HasBit())
+            new AddOnInfo().Read(ref r);
+
+        packet = new AuctionGetCommodityQuote(auctioneer, itemId, quantity);
+    }
+}
+
+public static class AuctionConfirmCommoditiesPurchaseCodec
+{
+    public static void Read(ref SpanPacketReader r, out AuctionConfirmCommoditiesPurchase packet)
+    {
+        WowGuid128 auctioneer = r.ReadPackedGuid128();
+        uint itemId = r.ReadUInt32();
+        uint quantity = r.ReadUInt32();
+
+        if (r.HasBit())
+            new AddOnInfo().Read(ref r);
+
+        packet = new AuctionConfirmCommoditiesPurchase(auctioneer, itemId, quantity);
+    }
+}
+
+public static class AuctionCancelCommoditiesPurchaseCodec
+{
+    public static void Read(ref SpanPacketReader r, out AuctionCancelCommoditiesPurchase packet)
+    {
+        WowGuid128 auctioneer = r.ReadPackedGuid128();
+
+        if (r.HasBit())
+            new AddOnInfo().Read(ref r);
+
+        packet = new AuctionCancelCommoditiesPurchase(auctioneer);
     }
 }

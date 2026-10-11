@@ -18,6 +18,7 @@
 using Framework.Constants;
 using Framework.Cryptography;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using System;
 using System.Collections.Generic;
@@ -318,16 +319,12 @@ class WaitQueueUpdate : ServerPacket, ISpanWritable
         WaitInfo.Write(_worldPacket);
     }
 
-    // AuthWaitInfo: 2 uints(8) + 1 bit(1) = 9 bytes
-    public int MaxSize => 9;
+    public int MaxSize => AuthWaitInfo.MaxSize;
 
     public int WriteToSpan(Span<byte> buffer)
     {
         var writer = new SpanPacketWriter(buffer);
-        writer.WriteUInt32(WaitInfo.WaitCount);
-        writer.WriteUInt32(WaitInfo.WaitTime);
-        writer.WriteBit(WaitInfo.HasFCM);
-        writer.FlushBits();
+        WaitInfo.Write(ref writer);
         return writer.Position;
     }
 
@@ -517,14 +514,53 @@ class EnterEncryptedMode : ServerPacket
 }
 
 //Structs
-public class AuthWaitInfo
+public sealed class AuthWaitInfo
 {
-    public void Write(WorldPacket data)
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, and the client's reader) adds a uint32
+    /// AllowedFactionGroupForCharacterCreate after the wait time and a second bit,
+    /// CanCreateOnlyIfExisting. Without them a queued login read its flag bit four bytes early.
+    /// </summary>
+    internal sealed class Shape(bool factionGroup)
+    {
+        public bool FactionGroup { get; } = factionGroup;
+    }
+
+    internal static readonly ServerPacketLayouts<Shape> Shapes = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new Shape(factionGroup: false)),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new Shape(factionGroup: true)));
+
+    private static readonly Shape Running = Shapes.ForRunningClient();
+
+    // 3 uints(12) + 1 byte of bits, from 4.4.2
+    internal const int MaxSize = 13;
+
+    public void Write(WorldPacket data) => Write(data, Running);
+
+    internal void Write(WorldPacket data, Shape shape)
     {
         data.WriteUInt32(WaitCount);
         data.WriteUInt32(WaitTime);
+        if (shape.FactionGroup)
+            data.WriteUInt32(0);
         data.WriteBit(HasFCM);
+        if (shape.FactionGroup)
+            data.WriteBit(false);
         data.FlushBits();
+    }
+
+    internal void Write(ref SpanPacketWriter writer) => Write(ref writer, Running);
+
+    internal void Write(ref SpanPacketWriter writer, Shape shape)
+    {
+        writer.WriteUInt32(WaitCount);
+        writer.WriteUInt32(WaitTime);
+        if (shape.FactionGroup)
+            writer.WriteUInt32(0);
+        writer.WriteBit(HasFCM);
+        if (shape.FactionGroup)
+            writer.WriteBit(false);
+        writer.FlushBits();
     }
 
     public uint WaitCount; // position of the account in the login queue

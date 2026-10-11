@@ -1446,9 +1446,31 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_PLAY_SPELL_VISUAL)]
     internal void HandlePlaySpellVisualKit(WorldPacket packet)
     {
+        // On 4.3.4 this opcode is the missile visual between two units, a different packet;
+        // the kit on a unit that 3.3.5a sends here has its own opcode there (below).
+        if (IsCataLegacy)
+            return;
+
         PlaySpellVisualKit spell = new();
         spell.Unit = packet.ReadGuid().To128(GetSession().GameState);
         spell.KitRecID = packet.ReadUInt32();
+        SendPacketToClient(spell);
+    }
+
+    /// <summary>TrinityCore 4.3.4 PlaySpellVisualKit::Write: three ints, then the masked unit GUID.</summary>
+    [HandlesSmsg(Opcode.SMSG_PLAY_SPELL_VISUAL_KIT)]
+    internal void HandlePlaySpellVisualKitCata(WorldPacket packet)
+    {
+        PlaySpellVisualKit spell = new();
+        spell.Duration = packet.ReadUInt32();
+        spell.KitRecID = packet.ReadUInt32();
+        spell.KitType = packet.ReadUInt32();
+
+        Span<bool> mask = stackalloc bool[8];
+        Span<byte> guid = stackalloc byte[8];
+        MaskedGuid.ReadMaskBits(packet, mask, [4, 7, 5, 3, 1, 2, 0, 6]);
+        MaskedGuid.ReadBytes(packet, mask, guid, [0, 4, 1, 6, 7, 2, 3, 5]);
+        spell.Unit = new WowGuid64(MaskedGuid.ToUInt64(guid)).To128(GetSession().GameState);
         SendPacketToClient(spell);
     }
 
@@ -1906,6 +1928,12 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_SET_PCT_SPELL_MODIFIER)]
     internal void HandleSetSpellModifier(WorldPacket packet)
     {
+        if (IsCataLegacy)
+        {
+            HandleSetSpellModifierCata(packet);
+            return;
+        }
+
         byte classIndex = packet.ReadUInt8();
         byte modIndex = packet.ReadUInt8();
         int modValue = packet.ReadInt32();
@@ -1927,6 +1955,41 @@ public partial class WorldClient
             GetSession().GameState.SetFlatSpellMod(modIndex, classIndex, modValue);
         else
             GetSession().GameState.SetPctSpellMod(modIndex, classIndex, modValue);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 SetSpellModifier::Write: every modifier of a kind in one packet, grouped
+    /// by modifier index, each value a float. That is the modern packet's own shape; 3.3.5a
+    /// sends one (class index, modifier index, int32) per packet.
+    /// </summary>
+    void HandleSetSpellModifierCata(WorldPacket packet)
+    {
+        Opcode opcode = packet.GetUniversalOpcode(false);
+        bool flat = opcode == Opcode.SMSG_SET_FLAT_SPELL_MODIFIER;
+        SetSpellModifier spell = new SetSpellModifier(opcode);
+
+        uint modifierCount = packet.ReadUInt32();
+        for (uint i = 0; i < modifierCount; i++)
+        {
+            uint dataCount = packet.ReadUInt32();
+            SpellModifierInfo mod = new SpellModifierInfo { ModIndex = packet.ReadUInt8() };
+            for (uint j = 0; j < dataCount; j++)
+            {
+                SpellModifierData data = new SpellModifierData();
+                data.ClassIndex = packet.ReadUInt8();
+                data.ModifierValue = (int)packet.ReadFloat();
+                mod.ModifierData.Add(data);
+
+                if (flat)
+                    GetSession().GameState.SetFlatSpellMod(mod.ModIndex, data.ClassIndex, data.ModifierValue);
+                else
+                    GetSession().GameState.SetPctSpellMod(mod.ModIndex, data.ClassIndex, data.ModifierValue);
+            }
+            spell.Modifiers.Add(mod);
+        }
+
+        if (GetSession().GameState.CurrentPlayerCreateTime != 0)
+            SendPacketToClient(spell);
     }
 
     /// <summary>

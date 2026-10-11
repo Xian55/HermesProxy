@@ -1,5 +1,6 @@
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Client;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
@@ -89,6 +90,10 @@ public static class AuctionSystem
 
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
+            // TrinityCore 4.3.4 HandleAuctionListItems reads a getAll byte before this one.
+            // Without it the sort count was read from the first sort and the search was dropped.
+            if (WorldClient.IsCataLegacy)
+                packet.WriteBool(false);
             packet.WriteBool(auction.ExactMatch);
             packet.WriteUInt8((byte)auction.Sorts.Count);
 
@@ -124,10 +129,70 @@ public static class AuctionSystem
         return -1;
     }
 
+    // ---- the 4.4.2 client's retail-style auction house; RetailAuctionHouse answers these ----
+
+    [HandlesCmsg(Opcode.CMSG_AUCTION_BROWSE_QUERY)]
+    public static void HandleAuctionBrowseQuery(in AuctionBrowseQuery query, in SessionContext ctx)
+        => ctx.GameState.RetailAuctions.Browse(query);
+
+    [HandlesCmsg(Opcode.CMSG_AUCTION_LIST_ITEMS_BY_BUCKET_KEY)]
+    public static void HandleAuctionListItemsByBucketKey(in AuctionListItemsByBucketKey request, in SessionContext ctx)
+        => ctx.GameState.RetailAuctions.ListItems(request.Auctioneer, request.BucketKey, keyOnItems: false);
+
+    [HandlesCmsg(Opcode.CMSG_AUCTION_LIST_ITEMS_BY_ITEM_ID)]
+    public static void HandleAuctionListItemsByItemID(in AuctionListItemsByItemID request, in SessionContext ctx)
+    {
+        // The answer names the item and no row of it, as TrinityCore's does.
+        var key = new AuctionBucketKey
+        {
+            ItemID = request.ItemID,
+            BattlePetSpeciesID = null,
+            SuffixItemNameDescriptionID = null,
+        };
+        ctx.GameState.RetailAuctions.ListItems(request.Auctioneer, key, keyOnItems: true);
+    }
+
+    [HandlesCmsg(Opcode.CMSG_AUCTION_LIST_BUCKETS_BY_BUCKET_KEYS)]
+    public static void HandleAuctionListBucketsByBucketKeys(in AuctionListBucketsByBucketKeys request, in SessionContext ctx)
+        => ctx.GameState.RetailAuctions.ListBucketsByKeys();
+
+    [HandlesCmsg(Opcode.CMSG_AUCTION_GET_COMMODITY_QUOTE)]
+    public static void HandleAuctionGetCommodityQuote(in AuctionGetCommodityQuote request, in SessionContext ctx)
+        => ctx.GameState.RetailAuctions.GetCommodityQuote(request.Auctioneer, request.ItemID, request.Quantity);
+
+    [HandlesCmsg(Opcode.CMSG_AUCTION_CONFIRM_COMMODITIES_PURCHASE)]
+    public static void HandleAuctionConfirmCommoditiesPurchase(in AuctionConfirmCommoditiesPurchase request, in SessionContext ctx)
+        => ctx.GameState.RetailAuctions.ConfirmCommodityPurchase(request.Auctioneer, request.ItemID);
+
+    [HandlesCmsg(Opcode.CMSG_AUCTION_CANCEL_COMMODITIES_PURCHASE)]
+    public static void HandleAuctionCancelCommoditiesPurchase(in AuctionCancelCommoditiesPurchase request, in SessionContext ctx)
+        => ctx.GameState.RetailAuctions.CancelCommodityPurchase();
+
+    /// <remarks>
+    /// A legacy server has no price per piece and no auction larger than a stack. Each stack the
+    /// client offers becomes an auction of its own, bid and buyout both at its price, so that a
+    /// commodity search finds every one of them buyable.
+    /// </remarks>
+    [HandlesCmsg(Opcode.CMSG_AUCTION_SELL_COMMODITY)]
+    public static void HandleAuctionSellCommodity(in AuctionSellCommodity sale, in SessionContext ctx)
+    {
+        foreach (AuctionItemForSale item in sale.Items)
+        {
+            ulong price = sale.UnitPrice * item.UseCount;
+            HandleAuctionSellItem(
+                new AuctionSellItem(sale.Auctioneer, price, price, sale.RunTime, TaintedBy: null, [item]), ctx);
+        }
+    }
+
     [HandlesCmsg(Opcode.CMSG_AUCTION_SELL_ITEM)]
     public static void HandleAuctionSellItem(in AuctionSellItem auction, in SessionContext ctx)
     {
         uint expireTime = auction.ExpireTime;
+
+        // A legacy server drops a sale with no opening bid without a word (TrinityCore
+        // HandleAuctionSellItem: "if (!bid || !etime) return"). The retail-style window lets a
+        // sale name only a buyout, which then is the bid as well.
+        ulong minBid = auction.MinBid != 0 ? auction.MinBid : auction.BuyoutPrice;
 
         // auction durations were increased in tbc
         // server ignores packet if you send wrong duration
@@ -187,7 +252,7 @@ public static class AuctionSystem
             new PartialStackAuctionPost(
                 session.ToServer,
                 new SessionAuctionInventory(session),
-                auction.Auctioneer, auction.MinBid, auction.BuyoutPrice, expireTime,
+                auction.Auctioneer, minBid, auction.BuyoutPrice, expireTime,
                 [.. auction.Items]).Start();
         }
         else
@@ -200,8 +265,17 @@ public static class AuctionSystem
                 packet.WriteGuid(item.Guid.To64());
                 packet.WriteUInt32(item.UseCount);
             }
-            packet.WriteUInt32((uint)auction.MinBid);
-            packet.WriteUInt32((uint)auction.BuyoutPrice);
+            // TrinityCore 4.3.4 HandleAuctionSellItem: bid and buyout are uint64.
+            if (WorldClient.IsCataLegacy)
+            {
+                packet.WriteUInt64(minBid);
+                packet.WriteUInt64(auction.BuyoutPrice);
+            }
+            else
+            {
+                packet.WriteUInt32((uint)minBid);
+                packet.WriteUInt32((uint)auction.BuyoutPrice);
+            }
             packet.WriteUInt32(expireTime);
             ctx.SendPacketToServer(packet);
         }
@@ -222,7 +296,11 @@ public static class AuctionSystem
         WorldPacket packet = new WorldPacket(Opcode.CMSG_AUCTION_PLACE_BID);
         packet.WriteGuid(auction.Auctioneer.To64());
         packet.WriteUInt32(auction.AuctionID);
-        packet.WriteUInt32((uint)auction.BidAmount);
+        // TrinityCore 4.3.4 HandleAuctionPlaceBid: the price is a uint64.
+        if (WorldClient.IsCataLegacy)
+            packet.WriteUInt64(auction.BidAmount);
+        else
+            packet.WriteUInt32((uint)auction.BidAmount);
         ctx.SendPacketToServer(packet);
     }
 }

@@ -4073,6 +4073,77 @@ public partial class WorldClient
                     }
                 }
             }
+            // TrinityCore 4.3.4 keeps a skill in six arrays, two 16-bit slots to a field
+            // (Player::SetSkill), where earlier servers keep three fields per skill. Left unread,
+            // the 4.4.2 client had a profession's spells and no skill to go with them, and its
+            // GetProfessionInfo indexed the skill list with the "not found" it got back: a crash
+            // on opening the spellbook, and at every login once the character had a profession.
+            int PLAYER_SKILL_LINEID_0 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_SKILL_LINEID_0);
+            if (PLAYER_SKILL_LINEID_0 >= 0)
+            {
+                int PLAYER_SKILL_STEP_0 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_SKILL_STEP_0);
+                int PLAYER_SKILL_RANK_0 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_SKILL_RANK_0);
+                int PLAYER_SKILL_MAX_RANK_0 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_SKILL_MAX_RANK_0);
+                int PLAYER_SKILL_MODIFIER_0 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_SKILL_MODIFIER_0);
+                int PLAYER_SKILL_TALENT_0 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_SKILL_TALENT_0);
+
+                for (int field = 0; field < 64; field++)
+                {
+                    int slot = field * 2;
+                    if (updateMaskArray[PLAYER_SKILL_LINEID_0 + field])
+                    {
+                        uint value = updates[PLAYER_SKILL_LINEID_0 + field].UInt32Value;
+                        SkillInfo skill = updateData.EnsureActivePlayerData().EnsureSkill();
+                        skill.SkillLineID[slot] = (ushort)(value & 0xFFFF);
+                        skill.SkillLineID[slot + 1] = (ushort)(value >> 16);
+                    }
+                    if (updateMaskArray[PLAYER_SKILL_STEP_0 + field])
+                    {
+                        uint value = updates[PLAYER_SKILL_STEP_0 + field].UInt32Value;
+                        SkillInfo skill = updateData.EnsureActivePlayerData().EnsureSkill();
+                        skill.SkillStep[slot] = (ushort)(value & 0xFFFF);
+                        skill.SkillStep[slot + 1] = (ushort)(value >> 16);
+                    }
+                    if (updateMaskArray[PLAYER_SKILL_RANK_0 + field])
+                    {
+                        uint value = updates[PLAYER_SKILL_RANK_0 + field].UInt32Value;
+                        SkillInfo skill = updateData.EnsureActivePlayerData().EnsureSkill();
+                        skill.SkillRank[slot] = (ushort)(value & 0xFFFF);
+                        skill.SkillRank[slot + 1] = (ushort)(value >> 16);
+                    }
+                    if (updateMaskArray[PLAYER_SKILL_MAX_RANK_0 + field])
+                    {
+                        uint value = updates[PLAYER_SKILL_MAX_RANK_0 + field].UInt32Value;
+                        SkillInfo skill = updateData.EnsureActivePlayerData().EnsureSkill();
+                        skill.SkillMaxRank[slot] = (ushort)(value & 0xFFFF);
+                        skill.SkillMaxRank[slot + 1] = (ushort)(value >> 16);
+                    }
+                    if (updateMaskArray[PLAYER_SKILL_MODIFIER_0 + field])
+                    {
+                        uint value = updates[PLAYER_SKILL_MODIFIER_0 + field].UInt32Value;
+                        SkillInfo skill = updateData.EnsureActivePlayerData().EnsureSkill();
+                        skill.SkillTempBonus[slot] = (short)(value & 0xFFFF);
+                        skill.SkillTempBonus[slot + 1] = (short)(value >> 16);
+                    }
+                    if (updateMaskArray[PLAYER_SKILL_TALENT_0 + field])
+                    {
+                        uint value = updates[PLAYER_SKILL_TALENT_0 + field].UInt32Value;
+                        SkillInfo skill = updateData.EnsureActivePlayerData().EnsureSkill();
+                        skill.SkillPermBonus[slot] = (ushort)(value & 0xFFFF);
+                        skill.SkillPermBonus[slot + 1] = (ushort)(value >> 16);
+                    }
+                }
+            }
+            // The two primary professions, by skill line. Only 4.x servers have the field.
+            int PLAYER_PROFESSION_SKILL_LINE_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_PROFESSION_SKILL_LINE_1);
+            if (PLAYER_PROFESSION_SKILL_LINE_1 >= 0)
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    if (updateMaskArray[PLAYER_PROFESSION_SKILL_LINE_1 + i])
+                        updateData.EnsureActivePlayerData().ProfessionSkillLine[i] = updates[PLAYER_PROFESSION_SKILL_LINE_1 + i].Int32Value;
+                }
+            }
             int PLAYER_CHARACTER_POINTS1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_CHARACTER_POINTS1);
             if (PLAYER_CHARACTER_POINTS1 >= 0 && updateMaskArray[PLAYER_CHARACTER_POINTS1])
             {

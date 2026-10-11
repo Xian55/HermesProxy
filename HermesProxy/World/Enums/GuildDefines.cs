@@ -9,6 +9,12 @@ namespace HermesProxy.World.Enums;
 public class GuildConst
 {
     public const int MaxBankTabs = 6;
+
+    /// <summary>
+    /// Cataclysm has eight bank tabs. The 4.4.2 client's rank permissions carry eight pairs (its
+    /// name length sits at byte 77 = 1 + 3 * 4 + 8 * 8), where every earlier build carries six.
+    /// </summary>
+    public const int MaxBankTabsCata = 8;
 }
 
 public enum GuildCommandType

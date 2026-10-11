@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 
@@ -107,6 +108,7 @@ public static class GuildSetGuildMasterCodec
 
 // ---- ranks ----
 
+[PacketCodec(typeof(GuildSetRankPermissions), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
 public static class GuildSetRankPermissionsCodec
 {
     public static void Read(ref SpanPacketReader r, out GuildSetRankPermissions packet)
@@ -130,6 +132,34 @@ public static class GuildSetRankPermissionsCodec
         uint rankNameLen = r.ReadBits<uint>(7);
         string rankName = r.ReadString(rankNameLen);
 
+        packet = new GuildSetRankPermissions(
+            rankId, rankOrder, flags, withdrawGoldLimit, tabFlags, tabWithdrawItemLimit, oldFlags, rankName);
+    }
+}
+
+// 4.4.2 (TrinityCore cata_classic, and the client's writer): the rank id is a byte, there are
+// eight bank tabs, and the old flags come last, after the rank name. Read the 3.4.3 way, every field after the id was three
+// bytes off and the name length came from the old flags.
+[PacketCodec(typeof(GuildSetRankPermissions), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class GuildSetRankPermissionsCodecCataClassic
+{
+    public static void Read(ref SpanPacketReader r, out GuildSetRankPermissions packet)
+    {
+        uint rankId = r.ReadUInt8();
+        uint rankOrder = r.ReadUInt32();
+        uint flags = r.ReadUInt32();
+        int withdrawGoldLimit = r.ReadInt32();
+        GuildBankTabLimits tabFlags = default;
+        GuildBankTabLimits tabWithdrawItemLimit = default;
+        for (byte i = 0; i < GuildConst.MaxBankTabsCata; i++)
+        {
+            tabFlags[i] = r.ReadUInt32();
+            tabWithdrawItemLimit[i] = r.ReadUInt32();
+        }
+        r.ResetBitPos();
+        uint rankNameLen = r.ReadBits<uint>(7);
+        string rankName = r.ReadString(rankNameLen);
+        uint oldFlags = r.ReadUInt32();
         packet = new GuildSetRankPermissions(
             rankId, rankOrder, flags, withdrawGoldLimit, tabFlags, tabWithdrawItemLimit, oldFlags, rankName);
     }

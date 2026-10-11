@@ -21,10 +21,11 @@ are therefore listed as suspect even when the logs are clean.
 
 Usage
 -----
-    python scripts/cata-progress.py --wpp <WowPacketParser checkout>
+    python scripts/cata-progress.py --wpp <WowPacketParser checkout> --tc-cata <TrinityCore cata_classic checkout>
     python scripts/cata-progress.py --wpp <...> --logs HermesProxy/bin/Release/Logs --out docs/cata-progress.md
 
-The WowPacketParser path can also come from HERMES_WPP_DIR.
+The checkouts can also come from HERMES_WPP_DIR and HERMES_TC_CATA_DIR. Both are optional: without
+one, the column it feeds reads "?".
 """
 from __future__ import annotations
 
@@ -202,6 +203,7 @@ class LogEvidence:
     smsg: dict[str, Seen] = field(default_factory=dict)       # legacy server -> proxy
     cmsg: dict[str, Seen] = field(default_factory=dict)       # proxy -> legacy server
     client_errors: dict[str, Seen] = field(default_factory=dict)  # 4.4.2 client side
+    unanswered: dict[str, Seen] = field(default_factory=dict)     # client requests with no handler
 
 
 RECV = re.compile(r'\| C P<S \| Received opcode "([A-Z0-9_]+)"')
@@ -211,6 +213,7 @@ CMSG_EXC = re.compile(r'C>P S \| Unhandled exception in handler for ((?:CMSG|MSG
 NO_LEGACY_MAP = re.compile(r'No ' + LEGACY_BUILD + r' opcode mapping for ([A-Z0-9_]+)')
 NO_MODERN_MAP = re.compile(r'No V\d_\d_\d_\d+ opcode mapping for ([A-Z0-9_]+)')
 NO_HANDLER = re.compile(r'C P<S \| No handler for opcode ([A-Z0-9_]+)')
+CLIENT_NO_HANDLER = re.compile(r'C>P S \| No handler for opcode ([A-Z0-9_]+) \((\d+)\)')
 
 
 def read_capture(path: Path, names: dict[int, list[str]]) -> tuple[dict[str, int], dict[str, int]]:
@@ -236,8 +239,22 @@ def read_capture(path: Path, names: dict[int, list[str]]) -> tuple[dict[str, int
     return smsg, cmsg
 
 
+def client_opcode_names() -> dict[int, str]:
+    """4.4.2 client opcode -> name, from docs/protocol: the log prints MSG_NULL_ACTION for a
+    request HermesProxy's table has no name for."""
+    out: dict[int, str] = {}
+    table = REPO / 'docs' / 'protocol' / '4.4.2.60895' / 'cmsg-opcodes.md'
+    if table.exists():
+        for line in table.read_text(encoding='utf-8').splitlines():
+            cells = [c.strip().strip('`') for c in line.strip().strip('|').split('|')]
+            if len(cells) >= 2 and cells[1].startswith('0x') and cells[0] not in ('—', '-'):
+                out[int(cells[1], 16)] = cells[0]
+    return out
+
+
 def read_logs(dirs: list[Path], names: dict[int, list[str]]) -> LogEvidence:
     ev = LogEvidence()
+    client_names = client_opcode_names()
     files = sorted({f for d in dirs for f in d.glob('hermes-*.log')}, key=lambda p: p.name)
     for f in files:
         with f.open(encoding='utf-8', errors='ignore') as fh:
@@ -249,6 +266,7 @@ def read_logs(dirs: list[Path], names: dict[int, list[str]]) -> LogEvidence:
             per_smsg: dict[str, Seen] = {}
             per_cmsg: dict[str, Seen] = {}
             per_client: dict[str, Seen] = {}
+            per_unanswered: dict[str, Seen] = {}
             fh.seek(0)
             for line in fh:
                 if (m := RECV.search(line)):
@@ -265,6 +283,11 @@ def read_logs(dirs: list[Path], names: dict[int, list[str]]) -> LogEvidence:
                     s = per_client.setdefault(m.group(1), Seen(session)); s.dropped += 1; s.sample = 'no 4.4.2 mapping'
                 elif (m := NO_HANDLER.search(line)):
                     s = per_smsg.setdefault(m.group(1), Seen(session)); s.unhandled += 1
+                elif (m := CLIENT_NO_HANDLER.search(line)):
+                    name = m.group(1)
+                    if name == 'MSG_NULL_ACTION':
+                        name = client_names.get(int(m.group(2)), f'0x{int(m.group(2)):x}')
+                    per_unanswered.setdefault(name, Seen(session)).count += 1
             for capture in sorted((f.parent.parent / 'PacketsLog').glob(f'legacy_*_{session}_*.pkt')):
                 smsg_counts, cmsg_counts = read_capture(capture, names)
                 for op, n in smsg_counts.items():
@@ -275,6 +298,7 @@ def read_logs(dirs: list[Path], names: dict[int, list[str]]) -> LogEvidence:
             ev.smsg.update(per_smsg)
             ev.cmsg.update(per_cmsg)
             ev.client_errors.update(per_client)
+            ev.unanswered.update(per_unanswered)
     return ev
 
 
@@ -345,6 +369,8 @@ def normalise(layout: str) -> str:
     string's bytes (the length already says whether there are any)."""
     layout = layout.replace('{', ' ').replace('}', ' ')
     layout = re.sub(r'opt\[\s*bytes\s*\]', 'bytes', layout)
+    # an alternative with nothing in it has no bytes
+    layout = re.sub(r'alt\[\s*\]', ' ', layout)
     # u32*3 and u32 u32 u32 are the same bytes
     layout = re.sub(r'\b(\w+)\*(\d+)\b', lambda m: ' '.join([m.group(1)] * int(m.group(2))), layout)
     return ' '.join(layout.split())
@@ -374,6 +400,12 @@ REVIEWED_OPCODES = {
                                'two bytes',
     'SMSG_PARTY_MEMBER_FULL_STATE': 'phase flags widen to u32; HermesProxy sends no phases',
     'SMSG_PARTY_MEMBER_PARTIAL_STATE': 'phase flags widen to u32; HermesProxy sends no phases',
+    'SMSG_GM_TICKET_CASE_STATUS': 'two more strings per case; HermesProxy always sends an empty case list',
+    'SMSG_AUTH_RESPONSE': 'the queue block gains a field, written by AuthWaitInfo.Shapes; the rest is notation',
+    'SMSG_WAIT_QUEUE_UPDATE': 'the queue block gains a field, written by AuthWaitInfo.Shapes',
+    'CMSG_PETITION_BUY': 'notation: a 7-bit title length in both; HermesProxy matches TrinityCore cata_classic',
+    'CMSG_PARTY_UNINVITE': 'notation: the 3.4.3 codec already reads what TrinityCore cata_classic reads',
+    'CMSG_SET_PLAYER_DECLINED_NAMES': 'notation: five 7-bit lengths, then five strings, in both',
     'CMSG_BANKER_ACTIVATE': '4.4.2 appends an int32 interaction type; HermesProxy reads the GUID and '
                             'nothing after it',
     'CMSG_TABARD_VENDOR_ACTIVATE': 'as CMSG_BANKER_ACTIVATE',
@@ -447,6 +479,47 @@ def cmsg_packet_types() -> dict[str, str]:
                 for opcode in re.findall(r'Opcode\.(\w+)', m.group(1)):
                     out[opcode] = param.group(1)
     return out
+
+
+def tc_cata_handlers(tc: Path | None) -> dict[str, bool]:
+    """Client opcode -> does TrinityCore cata_classic act on it. A native 4.4.2 server that
+    ignores a request is the evidence that the client does not wait for an answer to it."""
+    table = tc / 'src' / 'server' / 'game' / 'Server' / 'Protocol' / 'Opcodes.cpp' if tc else None
+    if not table or not table.exists():
+        return {}
+    out: dict[str, bool] = {}
+    for m in re.finditer(r'DEFINE_HANDLER\((CMSG_\w+),\s*(STATUS_\w+),\s*\w+,\s*&WorldSession::(\w+)\)',
+                         table.read_text(encoding='utf-8', errors='ignore')):
+        out[m.group(1)] = m.group(2) != 'STATUS_UNHANDLED' and m.group(3) != 'Handle_NULL'
+    return out
+
+
+def unanswered_section(unanswered: dict, tc: Path | None) -> list[str]:
+    """Requests the 4.4.2 client sent in a session that no handler took. The client holds some
+    of its windows until a request is answered (the auction house froze on one), so each is a
+    feature that may hang rather than merely be missing."""
+    handled = set(cmsg_packet_types())
+    tc_acts = tc_cata_handlers(tc)
+    rows = [(name, seen) for name, seen in unanswered.items() if name not in handled]
+    if not rows:
+        return []
+
+    def rank(row):
+        name, seen = row
+        return (0 if tc_acts.get(name) else 1 if name not in tc_acts else 2, -seen.count, name)
+
+    md = ['### Requests nothing answered', '',
+          'What the 4.4.2 client sent in a 4.3.4 session and no handler took, most recent session per '
+          'opcode; a request that has a handler by now is left out. The client holds some windows until a '
+          'request is answered, so these can hang a feature, not just lack one. "TrinityCore" says '
+          'whether the native 4.4.2 server acts on the request (cata_classic `Opcodes.cpp`): one it '
+          'ignores too is not waited for. Those it acts on are first.', '',
+          '| Opcode | TrinityCore cata_classic | Count | Session |', '|---|---|---:|---|']
+    for name, seen in sorted(rows, key=rank):
+        tc_says = '?' if name not in tc_acts else ('acts on it' if tc_acts[name] else 'ignores it')
+        md.append(f'| `{name}` | {tc_says} | {seen.count} | {seen.session} |')
+    md.append('')
+    return md
 
 
 def client_layout_section(log_dirs: list[Path], client_errors: dict) -> list[str]:
@@ -563,6 +636,8 @@ ICON = {'failing': '❌', 'unmapped': '🚫', 'todo': '⬜', 'suspect': '⚠️'
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--wpp', type=Path, default=os.environ.get('HERMES_WPP_DIR'))
+    ap.add_argument('--tc-cata', type=Path, default=os.environ.get('HERMES_TC_CATA_DIR'),
+                    help='TrinityCore cata_classic checkout, for the "Requests nothing answered" column')
     ap.add_argument('--logs', type=Path, action='append')
     ap.add_argument('--out', type=Path, default=REPO / 'docs' / 'cata-progress.md')
     args = ap.parse_args()
@@ -648,7 +723,10 @@ def main() -> None:
           f'| {ICON["seen ok"]} seen ok | {counts["seen ok"]} | ported or unchanged, and the latest session passed it cleanly |',
           '']
 
-    md += client_layout_section(logs, ev.client_errors)
+    client = client_layout_section(logs, ev.client_errors)
+    # After the session errors and before the layout tables: what hangs comes before what differs.
+    cut = next((i for i, line in enumerate(client) if line.startswith('Reading a change')), len(client))
+    md += client[:cut] + unanswered_section(ev.unanswered, Path(args.tc_cata) if args.tc_cata else None) + client[cut:]
 
     md += ['## Legacy side (4.3.4 server)', '',
            '| | Dir | Opcode | 4.3.4 branch | WPP 4.x layout | Last session | Seen | Errors | HP file |',

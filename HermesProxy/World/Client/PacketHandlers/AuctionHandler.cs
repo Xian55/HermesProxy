@@ -29,6 +29,13 @@ public partial class WorldClient
         SendPacketToServer(packet2);
     }
 
+    /// <summary>
+    /// A price in an auction packet: TrinityCore 4.3.4 sends every one as uint64, earlier servers
+    /// as uint32. Read as uint32 on 4.3.4, each price pushed everything after it four bytes off.
+    /// </summary>
+    static ulong ReadAuctionMoney(WorldPacket packet)
+        => IsCataLegacy ? packet.ReadUInt64() : packet.ReadUInt32();
+
     AuctionItem ReadAuctionItem(WorldPacket packet)
     {
         AuctionItem item = new AuctionItem();
@@ -37,7 +44,9 @@ public partial class WorldClient
         item.Item.ItemID = packet.ReadUInt32();
 
         byte enchantmentCount;
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
+        if (IsCataLegacy)
+            enchantmentCount = 10; // TrinityCore 4.3.4 BuildAuctionInfo: PROP_ENCHANTMENT_SLOT_0
+        else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             enchantmentCount = 7;
         else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             enchantmentCount = 6;
@@ -68,12 +77,12 @@ public partial class WorldClient
 
         item.Owner = packet.ReadGuid().To128(GetSession().GameState);
         item.OwnerAccountID = GetSession().GetGameAccountGuidForPlayer(item.Owner);
-        item.MinBid = packet.ReadUInt32();
-        item.MinIncrement = packet.ReadUInt32();
-        item.BuyoutPrice = packet.ReadUInt32();
+        item.MinBid = ReadAuctionMoney(packet);
+        item.MinIncrement = ReadAuctionMoney(packet);
+        item.BuyoutPrice = ReadAuctionMoney(packet);
         item.DurationLeft = packet.ReadInt32();
         item.Bidder = packet.ReadGuid().To128(GetSession().GameState);
-        item.BidAmount = packet.ReadUInt32();
+        item.BidAmount = ReadAuctionMoney(packet);
 
         if (item.Item.ItemID == 0)
             item.Item = null!;
@@ -112,6 +121,11 @@ public partial class WorldClient
         auction.TotalItemsCount = packet.ReadInt32();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_3_0_7561))
             auction.DesiredDelay = packet.ReadUInt32();
+
+        // A retail-style search reads the list page by page and answers the client itself.
+        if (GetSession().GameState.RetailAuctions.OnLegacyList(auction.Items, auction.TotalItemsCount, auction.DesiredDelay))
+            return;
+
         SendPacketToClient(auction);
     }
 
@@ -128,15 +142,15 @@ public partial class WorldClient
                 // The trailing outbid uint32 is optional — a buyout-success result omits it on
                 // some legacy cores (TC repack / AzerothCore), leaving a 12-byte packet (#85).
                 if (auction.Command == AuctionHouseAction.Bid && packet.CanRead(4))
-                   auction.MinIncrement = packet.ReadUInt32();
+                   auction.MinIncrement = ReadAuctionMoney(packet);
                 break;
             case AuctionHouseError.Inventory:
                 auction.BagResult = LegacyVersion.ConvertInventoryResult(packet.ReadUInt32());
                 break;
             case AuctionHouseError.HigherBid:
                 auction.Guid = packet.ReadGuid().To128(GetSession().GameState);
-                auction.Money = packet.ReadUInt32();
-                auction.MinIncrement = packet.ReadUInt32();
+                auction.Money = ReadAuctionMoney(packet);
+                auction.MinIncrement = ReadAuctionMoney(packet);
                 break;
         }
         SendPacketToClient(auction);
@@ -159,8 +173,8 @@ public partial class WorldClient
     {
         AuctionOwnerNotification info = new AuctionOwnerNotification();
         info.AuctionID = packet.ReadUInt32();
-        info.BidAmount = packet.ReadUInt32();
-        uint minIncrement = packet.ReadUInt32();
+        info.BidAmount = ReadAuctionMoney(packet);
+        ulong minIncrement = ReadAuctionMoney(packet);
         WowGuid64 buyer = packet.ReadGuid();
         info.Item.ItemID = packet.ReadUInt32();
         info.Item.RandomPropertiesID = packet.ReadUInt32();
@@ -199,8 +213,8 @@ public partial class WorldClient
         info.AuctionHouseID = packet.ReadUInt32();
         info.AuctionID = packet.ReadUInt32();
         info.Bidder = packet.ReadGuid().To128(GetSession().GameState);
-        uint bidAmount = packet.ReadUInt32();
-        uint minIncrement = packet.ReadUInt32();
+        ulong bidAmount = ReadAuctionMoney(packet);
+        ulong minIncrement = ReadAuctionMoney(packet);
         info.Item.ItemID = packet.ReadUInt32();
         info.Item.RandomPropertiesID = packet.ReadUInt32();
 

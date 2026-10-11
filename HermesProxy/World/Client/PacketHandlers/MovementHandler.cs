@@ -490,6 +490,23 @@ public partial class WorldClient
         SendPacketToClient(teleport);
     }
 
+    /// <summary>
+    /// TrinityCore 4.3.4 holds SMSG_NEW_WORLD until the client has answered this (Player::TeleportTo,
+    /// HandleSuspendTokenResponse); earlier servers have no such packet and send the new world
+    /// unasked. <see cref="HandleTransferPending"/> has already suspended the modern client with a
+    /// token of its own, so the server's is answered here and not passed on. Unanswered, a
+    /// teleport to another map never left the loading screen.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_SUSPEND_TOKEN)]
+    internal void HandleSuspendToken(WorldPacket packet)
+    {
+        uint sequenceIndex = packet.ReadUInt32();
+
+        WorldPacket response = new WorldPacket(Opcode.CMSG_SUSPEND_TOKEN_RESPONSE);
+        response.WriteUInt32(sequenceIndex);
+        SendPacketToServer(response);
+    }
+
     [HandlesSmsg(Opcode.SMSG_TRANSFER_PENDING)]
     internal void HandleTransferPending(WorldPacket packet)
     {
@@ -500,27 +517,51 @@ public partial class WorldClient
         }
 
         TransferPending transfer = new TransferPending();
-        transfer.MapID = GetSession().GameState.PendingTransferMapId = packet.ReadUInt32();
         transfer.OldMapPosition = Vector3.Zero;
 
-        // A map change driven by a transport carries the transport's entry and the map it
-        // is leaving (AzerothCore Player.cpp:1609-1613). Without it the modern client
-        // treats this as an ordinary teleport, so it detaches the player from the deck and
-        // they arrive in freefall.
-        if (packet.CanRead(8))
+        if (IsCataLegacy)
         {
-            transfer.Ship = new TransferPending.ShipTransferPending
+            // TrinityCore 4.3.4 TransferPending::Write: two presence bits, the ship, the spell,
+            // and the map last. Read the 3.3.5a way the map id came from the bits and the ship.
+            bool hasTransferSpell = packet.HasBit();
+            bool hasShip = packet.HasBit();
+            if (hasShip)
             {
-                Id = packet.ReadUInt32(),
-                OriginMapID = packet.ReadInt32(),
-            };
-            GetSession().GameState.TransferPendingShipEntry = transfer.Ship.Id;
-            Log.Print(LogType.Trace,
-                $"[Transport] SMSG_TRANSFER_PENDING on transport entry={transfer.Ship.Id} " +
-                $"fromMap={transfer.Ship.OriginMapID} toMap={transfer.MapID}");
+                int originMap = packet.ReadInt32();
+                transfer.Ship = new TransferPending.ShipTransferPending
+                {
+                    Id = packet.ReadUInt32(),
+                    OriginMapID = originMap,
+                };
+            }
+            if (hasTransferSpell)
+                transfer.TransferSpellID = packet.ReadInt32();
+            transfer.MapID = GetSession().GameState.PendingTransferMapId = packet.ReadUInt32();
+            GetSession().GameState.TransferPendingShipEntry = transfer.Ship?.Id ?? 0;
         }
         else
-            GetSession().GameState.TransferPendingShipEntry = 0;
+        {
+            transfer.MapID = GetSession().GameState.PendingTransferMapId = packet.ReadUInt32();
+
+            // A map change driven by a transport carries the transport's entry and the map it
+            // is leaving (AzerothCore Player.cpp:1609-1613). Without it the modern client
+            // treats this as an ordinary teleport, so it detaches the player from the deck and
+            // they arrive in freefall.
+            if (packet.CanRead(8))
+            {
+                transfer.Ship = new TransferPending.ShipTransferPending
+                {
+                    Id = packet.ReadUInt32(),
+                    OriginMapID = packet.ReadInt32(),
+                };
+                GetSession().GameState.TransferPendingShipEntry = transfer.Ship.Id;
+                Log.Print(LogType.Trace,
+                    $"[Transport] SMSG_TRANSFER_PENDING on transport entry={transfer.Ship.Id} " +
+                    $"fromMap={transfer.Ship.OriginMapID} toMap={transfer.MapID}");
+            }
+            else
+                GetSession().GameState.TransferPendingShipEntry = 0;
+        }
 
         SendPacketToClient(transfer);
         GetSession().GameState.IsFirstEnterWorld = false;
@@ -561,9 +602,21 @@ public partial class WorldClient
     internal void HandleNewWorld(WorldPacket packet)
     {
         NewWorld teleport = new NewWorld();
-        GetSession().GameState.CurrentMapId = teleport.MapID = packet.ReadUInt32();
-        teleport.Position = packet.ReadVector3();
-        teleport.Orientation = packet.ReadFloat();
+        if (IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 NewWorld::Write: X, orientation, Z, the map, then Y.
+            float x = packet.ReadFloat();
+            teleport.Orientation = packet.ReadFloat();
+            float z = packet.ReadFloat();
+            GetSession().GameState.CurrentMapId = teleport.MapID = packet.ReadUInt32();
+            teleport.Position = new Vector3(x, packet.ReadFloat(), z);
+        }
+        else
+        {
+            GetSession().GameState.CurrentMapId = teleport.MapID = packet.ReadUInt32();
+            teleport.Position = packet.ReadVector3();
+            teleport.Orientation = packet.ReadFloat();
+        }
         teleport.Reason = 4;
         GetSession().GameState.IsFirstEnterWorld = false;
         // Same reasoning as HandleMoveTeleportAck: a map change ends any pending taxi start.

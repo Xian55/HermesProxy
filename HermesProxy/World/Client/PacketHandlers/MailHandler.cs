@@ -146,6 +146,9 @@ public partial class WorldClient
             if (mail.SenderType == MailType.Calendar && LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 mail.Subject = CalendarMailSubject.ToClient(mail.Subject, guid => guid.To128(GetSession().GameState));
 
+            if (mail.SenderType == MailType.Auction)
+                mail.Auction = AuctionMailRecord.FromLegacy(mail.Subject, mail.Body, guid => guid.To128(GetSession().GameState));
+
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             {
                 byte itemsCount = packet.ReadUInt8();

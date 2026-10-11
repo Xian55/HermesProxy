@@ -16,8 +16,18 @@ public partial class WorldClient
     {
         TaxiNodeStatusPkt taxi = new();
         taxi.FlightMaster = packet.ReadGuid().To128(GetSession().GameState);
-        bool learned = packet.ReadBool();
-        taxi.Status = learned ? TaxiNodeStatus.Learned : TaxiNodeStatus.Unlearned;
+        if (IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 SendTaxiStatus sends the status itself, 1 learned or 2 unlearned,
+            // where earlier servers send a known flag. Read as a flag, 2 said "learned" and the
+            // undiscovered flight master showed no marker.
+            taxi.Status = (TaxiNodeStatus)packet.ReadUInt8();
+        }
+        else
+        {
+            bool learned = packet.ReadBool();
+            taxi.Status = learned ? TaxiNodeStatus.Learned : TaxiNodeStatus.Unlearned;
+        }
         SendPacketToClient(taxi);
     }
     [HandlesSmsg(Opcode.SMSG_SHOW_TAXI_NODES)]
@@ -39,6 +49,10 @@ public partial class WorldClient
             taxi.WindowInfo.UnitGUID = packet.ReadGuid().To128(GetSession().GameState);
             taxi.WindowInfo.CurrentNode = GetSession().GameState.CurrentTaxiNode = packet.ReadUInt32();
         }
+        // TrinityCore 4.3.4 PlayerTaxi::AppendTaximaskTo: the mask's size in bytes comes first.
+        // Read as mask, those four bytes shifted every flight node by 32.
+        if (IsCataLegacy)
+            packet.ReadUInt32();
         while (packet.CanRead())
         {
             byte nodesMask = packet.ReadUInt8();

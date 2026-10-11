@@ -443,6 +443,313 @@ public sealed class CataClassicFieldWidthLayoutTests
         Assert.Equal(expected.GetDataSpan().ToArray(), data.GetDataSpan().ToArray());
     }
 
+    // ---- SMSG_AUCTION_LIST_ITEMS_RESULT / OWNED / BIDDED ----
+
+    private static AuctionItem Lot() => new()
+    {
+        Count = 2,
+        AuctionID = 7,
+        Owner = Player,
+        DurationLeft = 3600,
+        CensorServerSideInfo = true,
+        CensorBidInfo = true,
+    };
+
+    private static byte[] Bytes(Action<WorldPacket> write)
+    {
+        using var data = new WorldPacket(1u);
+        write(data);
+        return data.GetDataSpan().ToArray();
+    }
+
+    [Fact]
+    public void AuctionItem_CataClassic_AddsAnIntAfterTheDeleteReason()
+    {
+        var lot = Lot();
+        byte[] old = Bytes(lot.Write);
+        byte[] cata = Bytes(d => lot.Write(d, cataClassic: true));
+
+        // bits (2), Count, Charges, Flags, AuctionID, Owner, DurationLeft, DeleteReason
+        int at = 2 + 4 * 4 + Bytes(d => d.WritePackedGuid128(Player)).Length + 4 + 1;
+        Assert.Equal(old.Length + 4, cata.Length);
+        Assert.Equal(old[..at], cata[..at]);
+        Assert.Equal(new byte[4], cata[at..(at + 4)]);
+        Assert.Equal(old[at..], cata[(at + 4)..]);
+    }
+
+    [Fact]
+    public void AuctionListItemsResult_3_4_3_MatchesTheOldWriter()
+    {
+        var p = new AuctionListItemsResult { TotalItemsCount = 9, OnlyUsable = true };
+        p.Items.Add(Lot());
+
+        byte[] old = Bytes(d =>
+        {
+            d.WriteInt32(1);
+            d.WriteInt32(9);
+            d.WriteUInt32(300);
+            d.WriteBool(true);
+            Lot().Write(d);
+        });
+        Assert.Equal(old, Bytes(d => AuctionListItemsResult.Layouts.For(ClientVersionBuild.V3_4_3_54261).Write(p, d)));
+    }
+
+    [Fact]
+    public void AuctionListItemsResult_4_4_2_EndsWithTheBucketKeyAndTheTotal()
+    {
+        var p = new AuctionListItemsResult { TotalItemsCount = 9, OnlyUsable = true };
+        p.Items.Add(Lot());
+
+        byte[] expected = Bytes(d =>
+        {
+            d.WriteInt32(1);
+            d.WriteInt32(0);
+            d.WriteUInt32(300);
+            Lot().Write(d, cataClassic: true);
+            d.WriteUInt8(0b1010_0000);              // ListType Items, HasMoreResults: 1 of 9
+            d.WriteBytes(new byte[5]);              // an empty bucket key: 33 bits
+            d.WriteInt32(9);
+        });
+        Assert.Equal(expected, Bytes(d => AuctionListItemsResult.Layouts.For(ClientVersionBuild.V4_4_2_60895).Write(p, d)));
+    }
+
+    [Fact]
+    public void AuctionListItemsResult_4_4_2_NamesItsBucketAndListType()
+    {
+        var p = new AuctionListItemsResult
+        {
+            TotalItemsCount = 25,
+            DesiredDelay = 0,
+            ListType = AuctionHouseListType.Commodities,
+            HasMoreResults = false,
+            BucketKey = new AuctionBucketKey { ItemID = 2589, ItemLevel = 5, BattlePetSpeciesID = null, SuffixItemNameDescriptionID = null },
+        };
+
+        Assert.Equal(
+            "00000000" + "00000000" + "00000000"    // no auctions, the unused int, the delay
+            + "40"                                  // ListType Commodities, no more results
+            + "00A1D00500"                          // item 2589 in 20 bits, no pet, level 5 in 11, no suffix
+            + "19000000",
+            Convert.ToHexString(Bytes(d => AuctionListItemsResult.Layouts.For(ClientVersionBuild.V4_4_2_60895).Write(p, d))));
+    }
+
+    [Fact]
+    public void AuctionBucketKey_ReadsWhatItWrites()
+    {
+        using var data = new WorldPacket(1u);
+        new AuctionBucketKey { ItemID = 2589, ItemLevel = 5, BattlePetSpeciesID = null, SuffixItemNameDescriptionID = 77 }.Write(data);
+        byte[] bytes = data.GetDataSpan().ToArray();
+        Assert.Equal("00A1D005804D00", Convert.ToHexString(bytes));
+
+        var reader = new SpanPacketReader(bytes);
+        AuctionBucketKey key = AuctionBucketKey.Read(ref reader);
+        Assert.Equal(2589u, key.ItemID);
+        Assert.Equal(5, key.ItemLevel);
+        Assert.Null(key.BattlePetSpeciesID);
+        Assert.Equal((ushort)77, key.SuffixItemNameDescriptionID);
+        Assert.Equal(0, reader.Remaining);
+    }
+
+    // TrinityCore cata_classic AuctionListBucketsResult::Write and BucketInfo, which the client's
+    // reader in docs/protocol/4.4.2.60895 matches field for field.
+    [Fact]
+    public void AuctionListBucketsResult_WritesOneRowPerItem()
+    {
+        var p = new AuctionBucketList { DesiredDelay = 300, HasMoreResults = true };
+        p.Buckets.Add(new AuctionBucketInfo
+        {
+            Key = new AuctionBucketKey { ItemID = 2589, ItemLevel = 5, BattlePetSpeciesID = null, SuffixItemNameDescriptionID = null },
+            TotalQuantity = 25,
+            RequiredLevel = 3,
+            MinPrice = 80,
+            ContainsOwnerItem = true,
+        });
+
+        Assert.Equal(
+            "01000000" + "2C010000" + "00000000" + "00000000"
+            + "40"                                  // BrowseMode Search, HasMoreResults
+            + "00A1D00500"                          // the key
+            + "19000000" + "03000000" + "5000000000000000"
+            + "00000000"                            // no appearances
+            + "0C",                                 // no pet fields; has the player's own; all appearances collected
+            Convert.ToHexString(Bytes(p.Write)));
+    }
+
+    [Theory]
+    [InlineData(true, "E0" + "1D0A0000" + "2C010000" + "6009000000000000" + "08000000" + "3075000000000000")]
+    [InlineData(false, "00" + "1D0A0000" + "2C010000")]
+    public void AuctionGetCommodityQuoteResult_APriceOrNone(bool quoted, string expectedHex)
+    {
+        var p = new AuctionCommodityQuote { ItemID = 2589, DesiredDelay = 300 };
+        if (quoted)
+        {
+            p.TotalPrice = 2400;
+            p.Quantity = 8;
+            p.QuoteDuration = 30000;
+        }
+
+        Assert.Equal(expectedHex, Convert.ToHexString(Bytes(p.Write)));
+    }
+
+    // The retail-style window files every auction of the player's under its item's key, and
+    // takes a price that is present as a price, 0 included.
+    [Fact]
+    public void AuctionListMyItemsResult_4_4_2_KeysEachAuctionAndDropsThePricesItLacks()
+    {
+        const uint unknownItem = 0xF_FFFF;
+        AuctionItem Posted() => new()
+        {
+            Item = new ItemInstance { ItemID = unknownItem },
+            Count = 1,
+            AuctionID = 7,
+            Owner = Player,
+            DurationLeft = 3600,
+            MinBid = 100,
+            MinIncrement = 0,
+            BuyoutPrice = 0,
+            BidAmount = 0,
+        };
+
+        var p = new AuctionListMyItemsResult(Opcode.SMSG_AUCTION_LIST_BIDDED_ITEMS_RESULT) { TotalItemsCount = 1 };
+        p.Items.Add(Posted());
+
+        AuctionItem shaped = Posted();
+        shaped.MinIncrement = null;
+        shaped.BuyoutPrice = null;
+        shaped.BidAmount = null;
+        shaped.AuctionBucketKey = new AuctionBucketKey { ItemID = unknownItem, BattlePetSpeciesID = null, SuffixItemNameDescriptionID = null };
+
+        byte[] expected = Bytes(d =>
+        {
+            d.WriteInt32(1);
+            d.WriteUInt32(300);
+            d.WriteUInt8(0);                        // HasMoreResults
+            shaped.Write(d, cataClassic: true);
+        });
+        Assert.Equal(expected, Bytes(d => AuctionListMyItemsResult.Layouts.For(ClientVersionBuild.V4_4_2_60895).Write(p, d)));
+    }
+
+    [Theory]
+    [InlineData(Opcode.SMSG_AUCTION_LIST_OWNED_ITEMS_RESULT)]
+    [InlineData(Opcode.SMSG_AUCTION_LIST_BIDDED_ITEMS_RESULT)]
+    public void AuctionListMyItemsResult_3_4_3_MatchesTheOldWriter(Opcode opcode)
+    {
+        var p = new AuctionListMyItemsResult(opcode) { TotalItemsCount = 1 };
+        p.Items.Add(Lot());
+
+        byte[] old = Bytes(d =>
+        {
+            d.WriteInt32(1);
+            d.WriteInt32(1);
+            d.WriteUInt32(300);
+            Lot().Write(d);
+        });
+        Assert.Equal(old, Bytes(d => AuctionListMyItemsResult.Layouts.For(ClientVersionBuild.V3_4_3_54261).Write(p, d)));
+    }
+
+    [Theory]
+    [InlineData(Opcode.SMSG_AUCTION_LIST_OWNED_ITEMS_RESULT, true)]
+    [InlineData(Opcode.SMSG_AUCTION_LIST_BIDDED_ITEMS_RESULT, false)]
+    public void AuctionListMyItemsResult_4_4_2_DropsTheTotalAndOnlyTheOwnedListCountsSoldItems(Opcode opcode, bool soldCount)
+    {
+        var p = new AuctionListMyItemsResult(opcode) { TotalItemsCount = 1 };
+        p.Items.Add(Lot());
+
+        byte[] expected = Bytes(d =>
+        {
+            d.WriteInt32(1);
+            if (soldCount)
+                d.WriteInt32(0);
+            d.WriteUInt32(300);
+            d.WriteUInt8(0);                        // HasMoreResults
+            Lot().Write(d, cataClassic: true);
+        });
+        Assert.Equal(expected, Bytes(d => AuctionListMyItemsResult.Layouts.For(ClientVersionBuild.V4_4_2_60895).Write(p, d)));
+    }
+
+    // ---- auction house mail: the text record in the body ----
+
+    // Taken from a 4.3.4 server's mail list: the buyer's GUID in a 16-wide hex field.
+    private const string LegacyAuctionBody = "               3:20000:20000:100:1000";
+
+    private static MailListEntry AuctionMail(string subject) => new()
+    {
+        SenderType = MailType.Auction,
+        Subject = subject,
+        Body = LegacyAuctionBody,
+        DaysLeft = 3600f / 86400f,
+        Auction = AuctionMailRecord.FromLegacy(subject, LegacyAuctionBody, _ => Player),
+    };
+
+    [Fact]
+    public void AuctionMailRecord_ReadsTheLegacyBody()
+    {
+        WowGuid64 seen = default;
+        var record = AuctionMailRecord.FromLegacy("3300:0:6:8:2", LegacyAuctionBody, guid => { seen = guid; return Player; });
+
+        Assert.Equal(new AuctionMailRecord(AuctionMailRecord.SalePending, Player, 20000, 20000, 100, 1000, 0, 0), record);
+        Assert.Equal(new WowGuid64(3), seen);
+        Assert.Null(AuctionMailRecord.FromLegacy("Hello", "there", _ => Player));
+    }
+
+    [Fact]
+    public void AuctionMailBody_UpTo3_4_3_IsTheLegacyRecord()
+    {
+        Assert.Equal(LegacyAuctionBody,
+            AuctionMailBody.Shapes.For(ClientVersionBuild.V3_4_3_54261).Of(AuctionMail("3300:0:6:8:2"), now: 1000));
+    }
+
+    [Theory]
+    [InlineData("3300:0:1:8:2", "Player-1-00000BDF:20000:20000:0")]                 // won
+    [InlineData("3300:0:2:8:2", "Player-1-00000BDF:20000:20000:100:1000:0")]        // sold
+    [InlineData("3300:0:0:8:2", "")]                                                // outbid: no body
+    public void AuctionMailBody_4_4_2_IsTheClientsOwnRecord(string subject, string expected)
+    {
+        Assert.Equal(expected, AuctionMailBody.Shapes.For(ClientVersionBuild.V4_4_2_60895).Of(AuctionMail(subject), now: 1000));
+    }
+
+    [Fact]
+    public void AuctionMailBody_4_4_2_PendingSale_GetsTheDelayFromWhatTheNoticeHasLeft()
+    {
+        const long now = 1_800_000_000;
+        uint eta = Time.GetPackedTimeFromUnixTime(now + 3600);
+
+        Assert.Equal($"Player-1-00000BDF:20000:20000:100:1000:3600:{eta}:0",
+            AuctionMailBody.Shapes.For(ClientVersionBuild.V4_4_2_60895).Of(AuctionMail("3300:0:6:8:2"), now));
+    }
+
+    [Fact]
+    public void MailListEntry_OnlyAnAuctionMailHasItsBodyRewritten()
+    {
+        var letter = new MailListEntry { SenderType = MailType.Normal, Body = LegacyAuctionBody, Auction = AuctionMail("3300:0:2:8:2").Auction };
+        Assert.Equal(LegacyAuctionBody, AuctionMailBody.Shapes.For(ClientVersionBuild.V3_4_3_54261).Of(letter, 0));
+
+        // No record read: whatever the body is goes out as it came.
+        var odd = new MailListEntry { SenderType = MailType.Auction, Body = "not a record" };
+        Assert.Equal("not a record", AuctionMailBody.Shapes.For(ClientVersionBuild.V4_4_2_60895).Of(odd, 0));
+    }
+
+    // ---- AuthWaitInfo: SMSG_AUTH_RESPONSE's queue block and SMSG_WAIT_QUEUE_UPDATE ----
+
+    [Theory]
+    [InlineData(ClientVersionBuild.V3_4_3_54261, "07000000" + "03000000" + "80")]
+    [InlineData(ClientVersionBuild.V4_4_2_60895, "07000000" + "03000000" + "00000000" + "80")]
+    public void AuthWaitInfo_WritesTheShapeOfTheBuild(ClientVersionBuild build, string expectedHex)
+    {
+        var info = new AuthWaitInfo { WaitCount = 7, WaitTime = 3, HasFCM = true };
+        var shape = AuthWaitInfo.Shapes.For(build);
+        byte[] expected = Convert.FromHexString(expectedHex);
+
+        using var data = new WorldPacket(1u);
+        info.Write(data, shape);
+        Assert.Equal(expected, data.GetDataSpan().ToArray());
+
+        Span<byte> buffer = stackalloc byte[AuthWaitInfo.MaxSize];
+        var writer = new SpanPacketWriter(buffer);
+        info.Write(ref writer, shape);
+        Assert.Equal(expected, buffer[..writer.Position].ToArray());
+    }
+
     // ---- CMSG_SET_FACTION_AT_WAR / NOT_AT_WAR ----
 
     [Fact]

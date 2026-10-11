@@ -82,6 +82,35 @@ public readonly record struct AuctionListBidderItems(
 
 public readonly record struct AuctionListOwnerItems(WowGuid128 Auctioneer, uint Offset);
 
+// ---- the 4.4.2 client's retail-style auction house; answered by Systems/RetailAuctionHouse ----
+
+/// <summary>CMSG_AUCTION_BROWSE_QUERY: the Buy tab's search, answered with one row per item.</summary>
+public readonly record struct AuctionBrowseQuery(
+    WowGuid128 Auctioneer, uint Offset, byte MinLevel, byte MaxLevel, AuctionHouseFilterMask Filters,
+    string Name, List<ClassFilter> ClassFilters);
+
+/// <summary>CMSG_AUCTION_LIST_ITEMS_BY_BUCKET_KEY: the auctions behind one row.</summary>
+public readonly record struct AuctionListItemsByBucketKey(
+    WowGuid128 Auctioneer, uint Offset, AuctionBucketKey BucketKey);
+
+/// <summary>CMSG_AUCTION_LIST_ITEMS_BY_ITEM_ID: every auction of an item, whatever its row.</summary>
+public readonly record struct AuctionListItemsByItemID(
+    WowGuid128 Auctioneer, uint ItemID, uint SuffixItemNameDescriptionID, uint Offset);
+
+/// <summary>CMSG_AUCTION_LIST_BUCKETS_BY_BUCKET_KEYS: the rows of keys the client kept, such as favourites.</summary>
+public readonly record struct AuctionListBucketsByBucketKeys(
+    WowGuid128 Auctioneer, List<AuctionBucketKey> BucketKeys);
+
+/// <summary>CMSG_AUCTION_SELL_COMMODITY: stackable items, sold at a price each.</summary>
+public readonly record struct AuctionSellCommodity(
+    WowGuid128 Auctioneer, ulong UnitPrice, uint RunTime, List<AuctionItemForSale> Items);
+
+public readonly record struct AuctionGetCommodityQuote(WowGuid128 Auctioneer, uint ItemID, uint Quantity);
+
+public readonly record struct AuctionConfirmCommoditiesPurchase(WowGuid128 Auctioneer, uint ItemID, uint Quantity);
+
+public readonly record struct AuctionCancelCommoditiesPurchase(WowGuid128 Auctioneer);
+
 public readonly record struct AuctionListItems(
     uint Offset, WowGuid128 Auctioneer, byte MinLevel, byte MaxLevel, int Quality,
     byte MaxPetLevel, List<byte> KnownPets, string Name, bool OnlyUsable, bool ExactMatch,
@@ -98,18 +127,63 @@ public readonly record struct ClassFilter(int ItemClass, List<SubClassFilter> Su
 /// </remarks>
 public readonly record struct SubClassFilter(int ItemSubclass, uint InvTypeMask);
 
-public class AuctionListMyItemsResult : ServerPacket
+/// <summary>The player's own auctions, or the ones they bid on; the opcode says which.</summary>
+public sealed class AuctionListMyItemsResult : ServerPacket
 {
-    public AuctionListMyItemsResult(Opcode opcode) : base(opcode) { }
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<AuctionListMyItemsResult>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new TotalCountLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new MoreResultsLayout()));
 
-    public override void Write()
+    private static readonly ServerPacketLayout<AuctionListMyItemsResult> Layout = Layouts.ForRunningClient();
+
+    private readonly bool _owned;
+
+    public AuctionListMyItemsResult(Opcode opcode) : base(opcode)
     {
-        _worldPacket.WriteInt32(Items.Count);
-        _worldPacket.WriteInt32(TotalItemsCount);
-        _worldPacket.WriteUInt32(DesiredDelay);
+        _owned = opcode == Opcode.SMSG_AUCTION_LIST_OWNED_ITEMS_RESULT;
+    }
 
-        foreach (AuctionItem item in Items)
-            item.Write(_worldPacket);
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>Up to 3.4.3: both lists are (count, total, delay, items).</summary>
+    internal sealed class TotalCountLayout : ServerPacketLayout<AuctionListMyItemsResult>
+    {
+        public override void Write(AuctionListMyItemsResult packet, WorldPacket data)
+        {
+            data.WriteInt32(packet.Items.Count);
+            data.WriteInt32(packet.TotalItemsCount);
+            data.WriteUInt32(packet.DesiredDelay);
+
+            foreach (AuctionItem item in packet.Items)
+                item.Write(data);
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, WowPacketParser, and the client's readers): the total is
+    /// gone and a HasMoreResults bit follows the delay. The owned list carries a count of sold
+    /// items after its own, and those items after the others; the bid list has neither.
+    /// </summary>
+    internal sealed class MoreResultsLayout : ServerPacketLayout<AuctionListMyItemsResult>
+    {
+        public override void Write(AuctionListMyItemsResult packet, WorldPacket data)
+        {
+            data.WriteInt32(packet.Items.Count);
+            if (packet._owned)
+                data.WriteInt32(0); // sold items
+            data.WriteUInt32(packet.DesiredDelay);
+            data.WriteBit(packet.Items.Count < packet.TotalItemsCount);
+            data.FlushBits();
+
+            foreach (AuctionItem item in packet.Items)
+            {
+                // The retail-style window files each auction under its item's key.
+                AuctionItem shaped = item.Item is null
+                    ? item
+                    : RetailAuctionShape.ForOwnList(item, AuctionItemFacts.Of(item.Item.ItemID));
+                shaped.Write(data, cataClassic: true);
+            }
+        }
     }
 
     public List<AuctionItem> Items = new();
@@ -117,32 +191,383 @@ public class AuctionListMyItemsResult : ServerPacket
     public uint DesiredDelay = 300;
 }
 
-public class AuctionListItemsResult : ServerPacket
+public sealed class AuctionListItemsResult : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<AuctionListItemsResult>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new OnlyUsableLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new BucketKeyLayout()));
+
+    private static readonly ServerPacketLayout<AuctionListItemsResult> Layout = Layouts.ForRunningClient();
+
     public AuctionListItemsResult() : base(Opcode.SMSG_AUCTION_LIST_ITEMS_RESULT) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>Up to 3.4.3: an OnlyUsable byte follows the header when there are items.</summary>
+    internal sealed class OnlyUsableLayout : ServerPacketLayout<AuctionListItemsResult>
     {
-        _worldPacket.WriteInt32(Items.Count);
-        _worldPacket.WriteInt32(TotalItemsCount);
-        _worldPacket.WriteUInt32(DesiredDelay);
+        public override void Write(AuctionListItemsResult packet, WorldPacket data)
+        {
+            data.WriteInt32(packet.Items.Count);
+            data.WriteInt32(packet.TotalItemsCount);
+            data.WriteUInt32(packet.DesiredDelay);
 
-        if (Items.Count > 0)
-            _worldPacket.WriteBool(OnlyUsable);
+            if (packet.Items.Count > 0)
+                data.WriteBool(packet.OnlyUsable);
 
-        foreach (AuctionItem item in Items)
-            item.Write(_worldPacket);
+            foreach (AuctionItem item in packet.Items)
+                item.Write(data);
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, WowPacketParser, and the client's reader): OnlyUsable is
+    /// gone and so is the total after the count, which TrinityCore leaves 0. After the items come
+    /// the list type, HasMoreResults, the key of the bucket the list is of, and a total: of items,
+    /// not auctions.
+    /// </summary>
+    internal sealed class BucketKeyLayout : ServerPacketLayout<AuctionListItemsResult>
+    {
+        // The key's optionals default to present-and-zero, so say they are absent.
+        private static readonly AuctionBucketKey NoBucket = new() { BattlePetSpeciesID = null, SuffixItemNameDescriptionID = null };
+
+        public override void Write(AuctionListItemsResult packet, WorldPacket data)
+        {
+            data.WriteInt32(packet.Items.Count);
+            data.WriteInt32(0);
+            data.WriteUInt32(packet.DesiredDelay);
+
+            foreach (AuctionItem item in packet.Items)
+                item.Write(data, cataClassic: true);
+
+            data.WriteBits((uint)packet.ListType, 2);
+            data.WriteBit(packet.HasMoreResults ?? packet.Items.Count < packet.TotalItemsCount);
+            data.FlushBits();
+            (packet.BucketKey ?? NoBucket).Write(data);
+            data.WriteInt32(packet.TotalItemsCount);
+        }
     }
 
     public List<AuctionItem> Items = new();
     public int TotalItemsCount;
     public uint DesiredDelay = 300;
     public bool OnlyUsable;
+
+    // 4.4.2 only. HasMoreResults unset: more when the server holds more than this page.
+    public AuctionHouseListType ListType = AuctionHouseListType.Items;
+    public AuctionBucketKey? BucketKey;
+    public bool? HasMoreResults;
+}
+
+/// <summary>
+/// 4.4.2: the Buy tab's rows, one per item rather than one per auction (TrinityCore cata_classic
+/// AuctionListBucketsResult, and the client's reader).
+/// </summary>
+/// <remarks>
+/// Only 4.4.2 has the opcode, so the packet cannot be made under another client build. What it
+/// carries is <see cref="AuctionBucketList"/>, which can.
+/// </remarks>
+public sealed class AuctionListBucketsResult(AuctionBucketList list) : ServerPacket(Opcode.SMSG_AUCTION_LIST_BUCKETS_RESULT)
+{
+    public override void Write() => list.Write(_worldPacket);
+}
+
+public sealed class AuctionBucketList
+{
+    public void Write(WorldPacket data)
+    {
+        data.WriteInt32(Buckets.Count);
+        data.WriteUInt32(DesiredDelay);
+        data.WriteInt32(0); // Unknown830_0
+        data.WriteInt32(0); // Unknown830_1
+        data.WriteBits((uint)BrowseMode, 1);
+        data.WriteBit(HasMoreResults);
+        data.FlushBits();
+
+        foreach (AuctionBucketInfo bucket in Buckets)
+            bucket.Write(data);
+    }
+
+    public List<AuctionBucketInfo> Buckets = new();
+    public uint DesiredDelay;
+    public AuctionHouseBrowseMode BrowseMode;
+    public bool HasMoreResults;
+}
+
+public sealed class AuctionBucketInfo
+{
+    public void Write(WorldPacket data)
+    {
+        Key.Write(data);
+        data.WriteInt32(TotalQuantity);
+        data.WriteInt32(RequiredLevel);
+        data.WriteUInt64(MinPrice);
+        data.WriteInt32(0);     // ItemModifiedAppearanceIDs
+        data.WriteBit(false);   // MaxBattlePetQuality
+        data.WriteBit(false);   // MaxBattlePetLevel
+        data.WriteBit(false);   // BattlePetBreedID
+        data.WriteBit(false);   // BattlePetLevelMask
+        data.WriteBit(ContainsOwnerItem);
+        data.WriteBit(true);    // ContainsOnlyCollectedAppearances
+        data.FlushBits();
+    }
+
+    public AuctionBucketKey Key = null!;
+    public int TotalQuantity;
+    public int RequiredLevel;
+    public ulong MinPrice;
+    public bool ContainsOwnerItem;
+}
+
+/// <summary>
+/// 4.4.2: what a quantity of a commodity costs right now. A quote with no price tells the client
+/// the quantity cannot be had. Like <see cref="AuctionListBucketsResult"/>, a 4.4.2-only packet
+/// around a body that is not.
+/// </summary>
+public sealed class AuctionGetCommodityQuoteResult(AuctionCommodityQuote quote) : ServerPacket(Opcode.SMSG_AUCTION_GET_COMMODITY_QUOTE_RESULT)
+{
+    public override void Write() => quote.Write(_worldPacket);
+}
+
+public sealed class AuctionCommodityQuote
+{
+    public void Write(WorldPacket data)
+    {
+        data.WriteBit(TotalPrice.HasValue);
+        data.WriteBit(Quantity.HasValue);
+        data.WriteBit(QuoteDuration.HasValue);
+        data.FlushBits();
+        data.WriteUInt32(ItemID);
+        data.WriteUInt32(DesiredDelay);
+
+        if (TotalPrice.HasValue)
+            data.WriteUInt64(TotalPrice.Value);
+
+        if (Quantity.HasValue)
+            data.WriteUInt32(Quantity.Value);
+
+        if (QuoteDuration.HasValue)
+            data.WriteInt64(QuoteDuration.Value);
+    }
+
+    public uint ItemID;
+    public uint DesiredDelay;
+    public ulong? TotalPrice;
+    public uint? Quantity;
+    public long? QuoteDuration; // milliseconds
+}
+
+/// <summary>
+/// What the retail-style auction house has to know of an item. It comes from the client's own
+/// Item and ItemSparse tables, which the *4 CSVs carry whole; -1 stands for a fact that is not
+/// known, and an unknown item passes every filter.
+/// </summary>
+internal readonly record struct AuctionItemFacts(
+    string Name, int MaxStack, ushort ItemLevel, int RequiredLevel, int Quality,
+    int ItemClass, int ItemSubclass, int InventoryType)
+{
+    public static readonly AuctionItemFacts Unknown = new(string.Empty, 1, 0, 0, -1, -1, -1, -1);
+
+    /// <summary>The client sells and buys anything that stacks by the piece.</summary>
+    public bool IsCommodity => MaxStack > 1;
+
+    public static AuctionItemFacts Of(uint itemId)
+    {
+        GameData.ItemSparseRecordsStore.TryGetValue(itemId, out var sparse);
+        GameData.ItemRecordsStore.TryGetValue(itemId, out var record);
+
+        // A legacy server can only be asked for an item by name, so its own name comes first.
+        string name = GameData.GetItemName(itemId);
+        if (name.Length == 0 && sparse != null)
+            name = sparse.Name1;
+
+        return new AuctionItemFacts(
+            name,
+            sparse?.Stackable ?? 1,
+            sparse?.ItemLevel ?? 0,
+            sparse?.RequiredLevel ?? 0,
+            sparse?.OverallQualityId ?? -1,
+            record?.ClassId ?? -1,
+            record?.SubclassId ?? -1,
+            record?.InventoryType ?? -1);
+    }
+}
+
+/// <summary>
+/// A legacy auction, described the way the 4.4.2 client's retail-style auction house reads one
+/// (TrinityCore cata_classic AuctionPosting::BuildAuctionItem).
+/// </summary>
+internal static class RetailAuctionShape
+{
+    private const int QualityShift = 6; // AuctionHouseFilterMask.PoorQuality
+    private const uint AllQualities = 0x7F;
+
+    /// <summary>
+    /// An item's row. The key has no suffix: a legacy random property has no ItemNameDescription
+    /// id to put there, so the variants of an item share its row, and each auction still shows
+    /// its own stats.
+    /// </summary>
+    public static AuctionBucketKey KeyFor(uint itemId, in AuctionItemFacts facts) => new()
+    {
+        ItemID = itemId,
+        ItemLevel = facts.ItemLevel,
+        BattlePetSpeciesID = null,
+        SuffixItemNameDescriptionID = null,
+    };
+
+    public static bool HasName(in AuctionItemFacts facts, string name)
+        => facts.Name.Length == 0 || string.Equals(facts.Name, name, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Bit n set: quality n is wanted. None and all both mean no filter.</summary>
+    public static uint QualityMask(AuctionHouseFilterMask filters) => ((uint)filters >> QualityShift) & AllQualities;
+
+    public static bool MatchesQuality(in AuctionItemFacts facts, AuctionHouseFilterMask filters)
+    {
+        uint qualities = QualityMask(filters);
+        if (qualities is 0 or AllQualities || facts.Quality < 0)
+            return true;
+
+        return facts.Quality < 7 && (qualities & (1u << facts.Quality)) != 0;
+    }
+
+    public static bool MatchesClasses(in AuctionItemFacts facts, List<ClassFilter> filters)
+    {
+        if (filters.Count == 0 || facts.ItemClass < 0)
+            return true;
+
+        foreach (ClassFilter classFilter in filters)
+        {
+            if (classFilter.ItemClass != facts.ItemClass)
+                continue;
+
+            if (classFilter.SubClassFilters.Count == 0)
+                return true;
+
+            foreach (SubClassFilter subClass in classFilter.SubClassFilters)
+            {
+                if (subClass.ItemSubclass != facts.ItemSubclass)
+                    continue;
+
+                if (subClass.InvTypeMask == 0 || facts.InventoryType is < 0 or > 31 ||
+                    (subClass.InvTypeMask & (1u << facts.InventoryType)) != 0)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>What an auction costs to take: its buyout, else the standing bid, else the opening bid.</summary>
+    public static ulong Price(AuctionItem auction)
+    {
+        if (auction.BuyoutPrice > 0)
+            return auction.BuyoutPrice.Value;
+
+        if (auction.BidAmount > 0)
+            return auction.BidAmount.Value;
+
+        return auction.MinBid ?? 0;
+    }
+
+    /// <summary>A stack's price per piece, rounded up: a stack is never shown cheaper than it is.</summary>
+    public static ulong UnitPrice(ulong stackPrice, int count)
+        => count > 1 ? (stackPrice + (ulong)count - 1) / (ulong)count : stackPrice;
+
+    /// <summary>
+    /// For the player's own auctions and bids: the item and its key, always. A commodity has a
+    /// unit price and nothing else; anything else has the prices it was posted with.
+    /// </summary>
+    public static AuctionItem ForOwnList(AuctionItem auction, in AuctionItemFacts facts)
+    {
+        AuctionItem shaped = Copy(auction);
+        shaped.AuctionBucketKey = KeyFor(auction.Item.ItemID, facts);
+        shaped.CensorServerSideInfo = auction.CensorServerSideInfo;
+        shaped.CensorBidInfo = false;
+        CopyBid(auction, shaped);
+
+        if (facts.IsCommodity)
+            shaped.UnitPrice = UnitPrice(Price(auction), auction.Count);
+        else
+            CopyPrices(auction, shaped);
+
+        return shaped;
+    }
+
+    /// <summary>For the auctions behind a row. Server-side fields only on the player's own.</summary>
+    public static AuctionItem ForItemList(AuctionItem auction, in AuctionItemFacts facts, WowGuid128 player, bool withKey)
+    {
+        AuctionItem shaped = Copy(auction);
+        CopyPrices(auction, shaped);
+        shaped.CensorServerSideInfo = auction.Owner != player;
+        shaped.CensorBidInfo = auction.Bidder.IsEmpty();
+        CopyBid(auction, shaped);
+        if (withKey)
+            shaped.AuctionBucketKey = KeyFor(auction.Item.ItemID, facts);
+
+        return shaped;
+    }
+
+    /// <summary>For a commodity's price list: a quantity at a unit price, and no item.</summary>
+    public static AuctionItem ForCommodityList(AuctionItem auction, in AuctionItemFacts facts, WowGuid128 player, bool withKey)
+    {
+        AuctionItem shaped = Copy(auction);
+        shaped.Item = null!;
+        shaped.Charges = 0;
+        shaped.Enchantments = [];
+        shaped.Gems = [];
+        shaped.ItemGuid = WowGuid128.Empty;
+        shaped.UnitPrice = UnitPrice(Price(auction), auction.Count);
+        shaped.CensorServerSideInfo = auction.Owner != player;
+        shaped.CensorBidInfo = true;
+        if (withKey)
+            shaped.AuctionBucketKey = KeyFor(auction.Item.ItemID, facts);
+
+        return shaped;
+    }
+
+    // Everything but the prices and the bid, which each list states its own way. The legacy
+    // reader fills every price, 0 for none; this client takes a present 0 as a price.
+    private static AuctionItem Copy(AuctionItem auction) => new()
+    {
+        Item = auction.Item,
+        Count = auction.Count,
+        Charges = auction.Charges,
+        Enchantments = auction.Enchantments,
+        Gems = auction.Gems,
+        Flags = auction.Flags,
+        AuctionID = auction.AuctionID,
+        Owner = auction.Owner,
+        DurationLeft = auction.DurationLeft,
+        DeleteReason = auction.DeleteReason,
+        ItemGuid = auction.ItemGuid,
+        OwnerAccountID = auction.OwnerAccountID,
+        EndTime = auction.EndTime,
+        Creator = auction.Creator,
+    };
+
+    private static void CopyPrices(AuctionItem auction, AuctionItem shaped)
+    {
+        shaped.MinBid = auction.MinBid > 0 ? auction.MinBid : null;
+        shaped.MinIncrement = auction.MinIncrement > 0 ? auction.MinIncrement : null;
+        shaped.BuyoutPrice = auction.BuyoutPrice > 0 ? auction.BuyoutPrice : null;
+    }
+
+    private static void CopyBid(AuctionItem auction, AuctionItem shaped)
+    {
+        if (auction.Bidder.IsEmpty())
+            return;
+
+        shaped.Bidder = auction.Bidder;
+        shaped.BidAmount = auction.BidAmount;
+    }
 }
 
 public class AuctionItem
 {
-    public void Write(WorldPacket data)
+    public void Write(WorldPacket data) => Write(data, cataClassic: false);
+
+    /// <param name="cataClassic">4.4.2 has an int32 after DeleteReason that earlier builds lack.</param>
+    public void Write(WorldPacket data, bool cataClassic)
     {
         data.WriteBit(Item != null);
         data.WriteBits(Enchantments.Count, 4);
@@ -173,6 +598,8 @@ public class AuctionItem
         data.WritePackedGuid128(Owner);
         data.WriteInt32(DurationLeft);
         data.WriteUInt8(DeleteReason);
+        if (cataClassic)
+            data.WriteInt32(0);
 
         foreach (ItemEnchantData enchant in Enchantments)
             enchant.Write(data);
@@ -262,6 +689,28 @@ public class AuctionBucketKey
 
         if (SuffixItemNameDescriptionID.HasValue)
             SuffixItemNameDescriptionID = data.ReadUInt16();
+    }
+
+    /// <summary>Span-reader twin of the <see cref="WorldPacket"/> constructor.</summary>
+    public static AuctionBucketKey Read(ref SpanPacketReader data)
+    {
+        data.ResetBitReader();
+        uint itemId = data.ReadBits<uint>(20);
+        bool hasBattlePetSpecies = data.HasBit();
+        ushort itemLevel = data.ReadBits<ushort>(11);
+        bool hasSuffix = data.HasBit();
+        data.ResetBitReader();
+
+        ushort? battlePetSpecies = hasBattlePetSpecies ? data.ReadUInt16() : null;
+        ushort? suffix = hasSuffix ? data.ReadUInt16() : null;
+
+        return new AuctionBucketKey
+        {
+            ItemID = itemId,
+            ItemLevel = itemLevel,
+            BattlePetSpeciesID = battlePetSpecies,
+            SuffixItemNameDescriptionID = suffix,
+        };
     }
 
     public void Write(WorldPacket data)

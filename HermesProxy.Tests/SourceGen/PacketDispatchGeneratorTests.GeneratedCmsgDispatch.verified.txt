@@ -193,16 +193,52 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.CombatSystem.HandleAttackSwing(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionBrowseQuery_CMSG_AUCTION_BROWSE_QUERY(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.AuctionBrowseQueryCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionBrowseQuery(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionCancelCommoditiesPurchase_CMSG_AUCTION_CANCEL_COMMODITIES_PURCHASE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.AuctionCancelCommoditiesPurchaseCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionCancelCommoditiesPurchase(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionConfirmCommoditiesPurchase_CMSG_AUCTION_CONFIRM_COMMODITIES_PURCHASE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.AuctionConfirmCommoditiesPurchaseCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionConfirmCommoditiesPurchase(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionGetCommodityQuote_CMSG_AUCTION_GET_COMMODITY_QUOTE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.AuctionGetCommodityQuoteCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionGetCommodityQuote(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionHelloRequest_CMSG_AUCTION_HELLO_REQUEST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.InteractWithNPCCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionHelloRequest(in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListBidderItems_CMSG_AUCTION_LIST_BIDDED_ITEMS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListBidderItems_CMSG_AUCTION_LIST_BIDDED_ITEMS_AuctionListBidderItemsCodec(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.AuctionListBidderItemsCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionListBidderItems(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListBidderItems_CMSG_AUCTION_LIST_BIDDED_ITEMS_AuctionListBidderItemsCodecCataClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.AuctionListBidderItemsCodecCataClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionListBidderItems(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListBucketsByBucketKeys_CMSG_AUCTION_LIST_BUCKETS_BY_BUCKET_KEYS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.AuctionListBucketsByBucketKeysCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionListBucketsByBucketKeys(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListItems_CMSG_AUCTION_LIST_ITEMS_AuctionListItemsCodecPreWotLKClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -217,9 +253,27 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionListItems(in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListOwnerItems_CMSG_AUCTION_LIST_OWNED_ITEMS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListItemsByBucketKey_CMSG_AUCTION_LIST_ITEMS_BY_BUCKET_KEY(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.AuctionListItemsByBucketKeyCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionListItemsByBucketKey(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListItemsByItemID_CMSG_AUCTION_LIST_ITEMS_BY_ITEM_ID(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.AuctionListItemsByItemIDCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionListItemsByItemID(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListOwnerItems_CMSG_AUCTION_LIST_OWNED_ITEMS_AuctionListOwnerItemsCodec(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.AuctionListOwnerItemsCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionListOwnerItems(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListOwnerItems_CMSG_AUCTION_LIST_OWNED_ITEMS_AuctionListOwnerItemsCodecCataClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.AuctionListOwnerItemsCodecCataClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionListOwnerItems(in packet, in ctx);
     }
 
@@ -239,6 +293,12 @@ internal static unsafe class GeneratedCmsgDispatch
     {
         global::HermesProxy.World.Server.Packets.AuctionRemoveItemCodecCataClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionRemoveItem(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionSellCommodity_CMSG_AUCTION_SELL_COMMODITY(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.AuctionSellCommodityCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.AuctionSystem.HandleAuctionSellCommodity(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionSellItem_CMSG_AUCTION_SELL_ITEM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -1183,9 +1243,15 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.GuildSystem.HandleGuildSetMemberNote(in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildSetRankPermissions_CMSG_GUILD_SET_RANK_PERMISSIONS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildSetRankPermissions_CMSG_GUILD_SET_RANK_PERMISSIONS_GuildSetRankPermissionsCodec(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.GuildSetRankPermissionsCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.GuildSystem.HandleGuildSetRankPermissions(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildSetRankPermissions_CMSG_GUILD_SET_RANK_PERMISSIONS_GuildSetRankPermissionsCodecCataClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.GuildSetRankPermissionsCodecCataClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.GuildSystem.HandleGuildSetRankPermissions(in packet, in ctx);
     }
 
@@ -2796,15 +2862,32 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ARENA_TEAM_ROSTER] = &Thunk_HermesProxy_World_Server_Systems_ArenaSystem_HandleArenaTeamRoster_CMSG_ARENA_TEAM_ROSTER;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ATTACK_STOP] = &Thunk_HermesProxy_World_Server_Systems_CombatSystem_HandleAttackStop_CMSG_ATTACK_STOP;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ATTACK_SWING] = &Thunk_HermesProxy_World_Server_Systems_CombatSystem_HandleAttackSwing_CMSG_ATTACK_SWING;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_BROWSE_QUERY] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionBrowseQuery_CMSG_AUCTION_BROWSE_QUERY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_CANCEL_COMMODITIES_PURCHASE] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionCancelCommoditiesPurchase_CMSG_AUCTION_CANCEL_COMMODITIES_PURCHASE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_CONFIRM_COMMODITIES_PURCHASE] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionConfirmCommoditiesPurchase_CMSG_AUCTION_CONFIRM_COMMODITIES_PURCHASE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_GET_COMMODITY_QUOTE] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionGetCommodityQuote_CMSG_AUCTION_GET_COMMODITY_QUOTE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_HELLO_REQUEST] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionHelloRequest_CMSG_AUCTION_HELLO_REQUEST;
-        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_BIDDED_ITEMS] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListBidderItems_CMSG_AUCTION_LIST_BIDDED_ITEMS;
+        {
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(4, 4, 2))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_BIDDED_ITEMS] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListBidderItems_CMSG_AUCTION_LIST_BIDDED_ITEMS_AuctionListBidderItemsCodec;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(4, 4, 2))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_BIDDED_ITEMS] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListBidderItems_CMSG_AUCTION_LIST_BIDDED_ITEMS_AuctionListBidderItemsCodecCataClassic;
+        }
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_BUCKETS_BY_BUCKET_KEYS] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListBucketsByBucketKeys_CMSG_AUCTION_LIST_BUCKETS_BY_BUCKET_KEYS;
         {
             if (!global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_ITEMS] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListItems_CMSG_AUCTION_LIST_ITEMS_AuctionListItemsCodecPreWotLKClassic;
             else if (global::HermesProxy.ModernVersion.AddedInVersion(3, 4, 3))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_ITEMS] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListItems_CMSG_AUCTION_LIST_ITEMS_AuctionListItemsCodecWotLKClassic;
         }
-        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_OWNED_ITEMS] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListOwnerItems_CMSG_AUCTION_LIST_OWNED_ITEMS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_ITEMS_BY_BUCKET_KEY] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListItemsByBucketKey_CMSG_AUCTION_LIST_ITEMS_BY_BUCKET_KEY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_ITEMS_BY_ITEM_ID] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListItemsByItemID_CMSG_AUCTION_LIST_ITEMS_BY_ITEM_ID;
+        {
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(4, 4, 2))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_OWNED_ITEMS] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListOwnerItems_CMSG_AUCTION_LIST_OWNED_ITEMS_AuctionListOwnerItemsCodec;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(4, 4, 2))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_OWNED_ITEMS] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionListOwnerItems_CMSG_AUCTION_LIST_OWNED_ITEMS_AuctionListOwnerItemsCodecCataClassic;
+        }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_PLACE_BID] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionPlaceBId_CMSG_AUCTION_PLACE_BID;
         {
             if (!global::HermesProxy.ModernVersion.AddedInVersion(4, 4, 2))
@@ -2812,6 +2895,7 @@ internal static unsafe class GeneratedCmsgDispatch
             else if (global::HermesProxy.ModernVersion.AddedInVersion(4, 4, 2))
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_REMOVE_ITEM] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionRemoveItem_CMSG_AUCTION_REMOVE_ITEM_AuctionRemoveItemCodecCataClassic;
         }
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_SELL_COMMODITY] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionSellCommodity_CMSG_AUCTION_SELL_COMMODITY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_SELL_ITEM] = &Thunk_HermesProxy_World_Server_Systems_AuctionSystem_HandleAuctionSellItem_CMSG_AUCTION_SELL_ITEM;
         {
             if (!global::HermesProxy.ModernVersion.AddedInVersion(4, 4, 2))
@@ -3058,7 +3142,12 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_PROMOTE_MEMBER] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildPromoteMember_CMSG_GUILD_PROMOTE_MEMBER;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_SET_GUILD_MASTER] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildSetGuildMaster_CMSG_GUILD_SET_GUILD_MASTER;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_SET_MEMBER_NOTE] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildSetMemberNote_CMSG_GUILD_SET_MEMBER_NOTE;
-        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_SET_RANK_PERMISSIONS] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildSetRankPermissions_CMSG_GUILD_SET_RANK_PERMISSIONS;
+        {
+            if (!global::HermesProxy.ModernVersion.AddedInVersion(4, 4, 2))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_SET_RANK_PERMISSIONS] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildSetRankPermissions_CMSG_GUILD_SET_RANK_PERMISSIONS_GuildSetRankPermissionsCodec;
+            else if (global::HermesProxy.ModernVersion.AddedInVersion(4, 4, 2))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_SET_RANK_PERMISSIONS] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildSetRankPermissions_CMSG_GUILD_SET_RANK_PERMISSIONS_GuildSetRankPermissionsCodecCataClassic;
+        }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_UPDATE_INFO_TEXT] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildUpdateInfoText_CMSG_GUILD_UPDATE_INFO_TEXT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_UPDATE_MOTD_TEXT] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildUpdateMotdText_CMSG_GUILD_UPDATE_MOTD_TEXT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_HOTFIX_REQUEST] = &Thunk_HermesProxy_World_Server_Systems_HotfixSystem_HandleHotfixRequest_CMSG_HOTFIX_REQUEST;
@@ -3440,12 +3529,20 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_ARENA_TEAM_ROSTER,
             global::HermesProxy.World.Enums.Opcode.CMSG_ATTACK_STOP,
             global::HermesProxy.World.Enums.Opcode.CMSG_ATTACK_SWING,
+            global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_BROWSE_QUERY,
+            global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_CANCEL_COMMODITIES_PURCHASE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_CONFIRM_COMMODITIES_PURCHASE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_GET_COMMODITY_QUOTE,
             global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_HELLO_REQUEST,
             global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_BIDDED_ITEMS,
+            global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_BUCKETS_BY_BUCKET_KEYS,
             global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_ITEMS,
+            global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_ITEMS_BY_BUCKET_KEY,
+            global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_ITEMS_BY_ITEM_ID,
             global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_LIST_OWNED_ITEMS,
             global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_PLACE_BID,
             global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_REMOVE_ITEM,
+            global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_SELL_COMMODITY,
             global::HermesProxy.World.Enums.Opcode.CMSG_AUCTION_SELL_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_AUTOBANK_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_AUTOSTORE_BANK_ITEM,

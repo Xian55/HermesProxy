@@ -30,8 +30,12 @@ public class OpcodeTableV4_4_2Tests
     [InlineData(Opcode.SMSG_COMPRESSED_PACKET, 0x42000Au)]
     [InlineData(Opcode.SMSG_AUTH_RESPONSE, 0x3B0001u)]
     [InlineData(Opcode.SMSG_UPDATE_OBJECT, 0x4B0000u)]
-    // The 3.4.3 request HermesProxy calls OWNED has the layout of 4.4.2's OWNER request.
-    [InlineData(Opcode.CMSG_AUCTION_LIST_OWNED_ITEMS, 0x350059u)]
+    // 4.4.2 has the 3.4.3 request (there OWNED, here OWNER at 0x350059) and a retail-style one of
+    // the same name. Its auction house sends only the retail-style one.
+    [InlineData(Opcode.CMSG_AUCTION_LIST_OWNED_ITEMS, 0x35005Fu)]
+    [InlineData(Opcode.CMSG_AUCTION_LIST_BIDDED_ITEMS, 0x350060u)]
+    [InlineData(Opcode.CMSG_AUCTION_BROWSE_QUERY, 0x35005Cu)]
+    [InlineData(Opcode.SMSG_AUCTION_LIST_BUCKETS_RESULT, 0x3B02E5u)]
     public void MapsBothWays(Opcode universal, uint current)
     {
         Assert.True(GeneratedOpcodeTables.TryGet(ClientVersionBuild.V4_4_2_60895, out Opcode[][] groups, out uint[] universalToCurrent, out _));
@@ -40,11 +44,31 @@ public class OpcodeTableV4_4_2Tests
         Assert.Equal(universal, groups[current >> 16][current & 0xFFFF]);
     }
 
+    /// <summary>
+    /// The table is the 3.4.3 one revalued, so that a packet both builds have takes the same
+    /// handler. What 4.4.2 has beyond it is listed here by hand: the retail-style auction house.
+    /// </summary>
     [Fact]
-    public void HasThe3_4_3Names()
+    public void HasThe3_4_3Names_AndTheRetailStyleAuctionHouse()
     {
+        string[] only442 =
+        [
+            "CMSG_AUCTION_BROWSE_QUERY",
+            "CMSG_AUCTION_LIST_ITEMS_BY_BUCKET_KEY",
+            "CMSG_AUCTION_LIST_ITEMS_BY_ITEM_ID",
+            "CMSG_AUCTION_LIST_BUCKETS_BY_BUCKET_KEYS",
+            "CMSG_AUCTION_GET_COMMODITY_QUOTE",
+            "CMSG_AUCTION_CONFIRM_COMMODITIES_PURCHASE",
+            "CMSG_AUCTION_CANCEL_COMMODITIES_PURCHASE",
+            "CMSG_AUCTION_SELL_COMMODITY",
+            "CMSG_AUCTION_SET_FAVORITE_ITEM",
+            "SMSG_AUCTION_LIST_BUCKETS_RESULT",
+            "SMSG_AUCTION_GET_COMMODITY_QUOTE_RESULT",
+            "SMSG_AUCTION_FAVORITE_LIST",
+        ];
+
         Assert.Equal(
-            Enum.GetNames<global::HermesProxy.World.Enums.V3_4_3_54261.Opcode>().Order(),
+            Enum.GetNames<global::HermesProxy.World.Enums.V3_4_3_54261.Opcode>().Concat(only442).Order(),
             Enum.GetNames<global::HermesProxy.World.Enums.V4_4_2_60895.Opcode>().Order());
     }
 

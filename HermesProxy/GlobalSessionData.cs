@@ -193,6 +193,12 @@ public sealed class GameSessionData
     public uint CurrentGuildCreateTime;
     public uint CurrentGuildNumAccounts;
     public WowGuid128 CurrentInteractedWithNPC;
+
+    private World.Server.Systems.RetailAuctionHouse? _retailAuctions;
+
+    /// <summary>The 4.4.2 client's auction house searches. Created on its first request.</summary>
+    internal World.Server.Systems.RetailAuctionHouse RetailAuctions
+        => _retailAuctions ??= new(new World.Server.Systems.SessionRetailAuctionWire(GlobalSession));
     public readonly Dictionary<uint, int> GossipQuestTypesById = new();
     public uint AwaitingQuestRewardId;
     public WowGuid128 AwaitingQuestGiver = WowGuid128.Empty;

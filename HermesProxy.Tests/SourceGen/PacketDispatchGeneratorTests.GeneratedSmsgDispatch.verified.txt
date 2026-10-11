@@ -1957,6 +1957,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandlePlaySpellVisualKit(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandlePlaySpellVisualKitCata_SMSG_PLAY_SPELL_VISUAL_KIT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandlePlaySpellVisualKitCata(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandlePingResponse_SMSG_PONG(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandlePingResponse(packet);
@@ -2345,6 +2350,11 @@ internal static unsafe class GeneratedSmsgDispatch
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleSupercededSpells_SMSG_SUPERCEDED_SPELLS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleSupercededSpells(packet);
+    }
+
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleSuspendToken_SMSG_SUSPEND_TOKEN(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleSuspendToken(packet);
     }
 
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleTaxiNodeStatus_SMSG_TAXI_NODE_STATUS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
@@ -2937,6 +2947,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_OBJECT_SOUND] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlayObjectSound_SMSG_PLAY_OBJECT_SOUND;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_SOUND] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlaySound_SMSG_PLAY_SOUND;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_SPELL_VISUAL] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlaySpellVisualKit_SMSG_PLAY_SPELL_VISUAL;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_SPELL_VISUAL_KIT] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePlaySpellVisualKitCata_SMSG_PLAY_SPELL_VISUAL_KIT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PONG] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePingResponse_SMSG_PONG;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_POWER_UPDATE] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePowerUpdate_SMSG_POWER_UPDATE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PRE_RESSURECT] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePreRessurect_SMSG_PRE_RESSURECT;
@@ -3015,6 +3026,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_STOP_MIRROR_TIMER] = &Thunk_HermesProxy_World_Client_WorldClient_HandleStopMirrorTimer_SMSG_STOP_MIRROR_TIMER;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SUMMON_REQUEST] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSummonRequest_SMSG_SUMMON_REQUEST;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SUPERCEDED_SPELLS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSupercededSpells_SMSG_SUPERCEDED_SPELLS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SUSPEND_TOKEN] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSuspendToken_SMSG_SUSPEND_TOKEN;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_TAXI_NODE_STATUS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleTaxiNodeStatus_SMSG_TAXI_NODE_STATUS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_TEXT_EMOTE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleTextEmote_SMSG_TEXT_EMOTE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_THREAT_CLEAR] = &Thunk_HermesProxy_World_Client_WorldClient_HandleThreatClear_SMSG_THREAT_CLEAR;
@@ -3420,6 +3432,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_OBJECT_SOUND,
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_SOUND,
             global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_SPELL_VISUAL,
+            global::HermesProxy.World.Enums.Opcode.SMSG_PLAY_SPELL_VISUAL_KIT,
             global::HermesProxy.World.Enums.Opcode.SMSG_PONG,
             global::HermesProxy.World.Enums.Opcode.SMSG_POWER_UPDATE,
             global::HermesProxy.World.Enums.Opcode.SMSG_PRE_RESSURECT,
@@ -3498,6 +3511,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_STOP_MIRROR_TIMER,
             global::HermesProxy.World.Enums.Opcode.SMSG_SUMMON_REQUEST,
             global::HermesProxy.World.Enums.Opcode.SMSG_SUPERCEDED_SPELLS,
+            global::HermesProxy.World.Enums.Opcode.SMSG_SUSPEND_TOKEN,
             global::HermesProxy.World.Enums.Opcode.SMSG_TAXI_NODE_STATUS,
             global::HermesProxy.World.Enums.Opcode.SMSG_TEXT_EMOTE,
             global::HermesProxy.World.Enums.Opcode.SMSG_THREAT_CLEAR,
