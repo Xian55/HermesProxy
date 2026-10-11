@@ -161,38 +161,56 @@ class PartyInvite : ServerPacket
 
 public readonly record struct PartyInviteResponse(byte PartyIndex, bool Accept, uint? RolesDesired);
 
-public class PartyUpdate : ServerPacket
+public sealed class PartyUpdate : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<PartyUpdate>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new HeaderLayout(pingRestriction: false)),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new HeaderLayout(pingRestriction: true)));
+
+    private static readonly ServerPacketLayout<PartyUpdate> Layout = Layouts.ForRunningClient();
+
     public PartyUpdate() : base(Opcode.SMSG_PARTY_UPDATE) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>
+    /// From 4.4.2 (TrinityCore cata_classic, and the client's reader) an int32 PingRestriction
+    /// follows the leader's faction group. Without it the client took the first bytes of it for
+    /// the member count.
+    /// </summary>
+    internal sealed class HeaderLayout(bool pingRestriction) : ServerPacketLayout<PartyUpdate>
     {
-        _worldPacket.WriteUInt16((ushort)PartyFlags);
-        _worldPacket.WriteUInt8(PartyIndex);
-        _worldPacket.WriteUInt8((byte)PartyType);
-        _worldPacket.WriteInt32(MyIndex);
-        _worldPacket.WritePackedGuid128(PartyGUID);
-        _worldPacket.WriteInt32(SequenceNum);
-        _worldPacket.WritePackedGuid128(LeaderGUID);
-        if (ModernVersion.IsWotLKClassicOrLater)
-            _worldPacket.WriteUInt8(LeaderFactionGroup);
-        _worldPacket.WriteInt32(PlayerList.Count);
-        _worldPacket.WriteBit(LfgInfos != null);
-        _worldPacket.WriteBit(LootSettings != null);
-        _worldPacket.WriteBit(DifficultySettings != null);
-        _worldPacket.FlushBits();
+        public override void Write(PartyUpdate packet, WorldPacket data)
+        {
+            data.WriteUInt16((ushort)packet.PartyFlags);
+            data.WriteUInt8(packet.PartyIndex);
+            data.WriteUInt8((byte)packet.PartyType);
+            data.WriteInt32(packet.MyIndex);
+            data.WritePackedGuid128(packet.PartyGUID);
+            data.WriteInt32(packet.SequenceNum);
+            data.WritePackedGuid128(packet.LeaderGUID);
+            if (ModernVersion.IsWotLKClassicOrLater)
+                data.WriteUInt8(packet.LeaderFactionGroup);
+            if (pingRestriction)
+                data.WriteInt32(0);
+            data.WriteInt32(packet.PlayerList.Count);
+            data.WriteBit(packet.LfgInfos != null);
+            data.WriteBit(packet.LootSettings != null);
+            data.WriteBit(packet.DifficultySettings != null);
+            data.FlushBits();
 
-        foreach (var playerInfo in PlayerList)
-            playerInfo.Write(_worldPacket);
+            foreach (var playerInfo in packet.PlayerList)
+                playerInfo.Write(data);
 
-        if (LootSettings != null)
-            LootSettings.Write(_worldPacket);
+            if (packet.LootSettings != null)
+                packet.LootSettings.Write(data);
 
-        if (DifficultySettings != null)
-            DifficultySettings.Write(_worldPacket);
+            if (packet.DifficultySettings != null)
+                packet.DifficultySettings.Write(data);
 
-        if (LfgInfos != null)
-            LfgInfos.Write(_worldPacket);
+            if (packet.LfgInfos != null)
+                packet.LfgInfos.Write(data);
+        }
     }
 
     public GroupFlags PartyFlags;

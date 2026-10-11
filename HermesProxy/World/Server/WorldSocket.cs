@@ -35,6 +35,7 @@ using HermesProxy.Configuration.Options;
 using HermesProxy.Enums;
 using Microsoft.Extensions.Options;
 using Framework.Realm;
+using HermesProxy.World.Client;
 using HermesProxy.World.Dispatch;
 
 using HermesProxy.World.Enums;
@@ -1126,8 +1127,13 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         if (code == BattlenetRpcErrorCode.Ok)
         {
             response.SuccessInfo = new AuthResponse.AuthSuccessInfo();
-            response.SuccessInfo.ActiveExpansionLevel = (byte)LegacyVersion.ExpansionVersion;
-            response.SuccessInfo.AccountExpansionLevel = (byte)LegacyVersion.ExpansionVersion;
+            // Expansion levels count from 0 (Cataclysm is 3) and ExpansionVersion from 1, so the
+            // older backends have always been announced one expansion higher than they are, which
+            // their clients accept. A 4.3.4 backend announced that way is Mists of Pandaria, which
+            // the 4.4.2 client has no level cap for: its reputation bar compares against nil.
+            byte expansionLevel = (byte)(WorldClient.IsCataLegacy ? LegacyVersion.ExpansionVersion - 1 : LegacyVersion.ExpansionVersion);
+            response.SuccessInfo.ActiveExpansionLevel = expansionLevel;
+            response.SuccessInfo.AccountExpansionLevel = expansionLevel;
             response.SuccessInfo.VirtualRealmAddress = _realmId.GetAddress();
             response.SuccessInfo.Time = (uint)Time.UnixTime;
 

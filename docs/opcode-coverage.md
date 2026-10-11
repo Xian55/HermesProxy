@@ -86,14 +86,22 @@ Each of these has more than one codec, chosen by build range at table-build time
 anyone adding a client this is the short list worth checking first: a layout that already
 changed once is the most likely to have changed again.
 
-29 packets across 59 codecs.
+39 packets across 79 codecs.
 
 | packet | codec | axis | added in | removed in |
 |---|---|---|---|---|
+| `AlterAppearance` | `AlterAppearanceCodec` | modern | — | `V4_4_2_60895` |
+| `AlterAppearance` | `AlterAppearanceCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `AuctionListItems` | `AuctionListItemsCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `AuctionListItems` | `AuctionListItemsCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `AuctionRemoveItem` | `AuctionRemoveItemCodec` | modern | — | `V4_4_2_60895` |
+| `AuctionRemoveItem` | `AuctionRemoveItemCodecCataClassic` | modern | `V4_4_2_60895` | — |
+| `AutoBankItem` | `AutoBankItemCodec` | modern | — | `V4_4_2_60895` |
+| `AutoBankItem` | `AutoBankItemCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `BuyItem` | `BuyItemCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `BuyItem` | `BuyItemCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `CastSpell` | `CastSpellCodec` | modern | — | `V4_4_2_60895` |
+| `CastSpell` | `CastSpellCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `ChangeSubGroup` | `ChangeSubGroupCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `ChangeSubGroup` | `ChangeSubGroupCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `ChatMessage` | `ChatMessageCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
@@ -133,6 +141,8 @@ changed once is the most likely to have changed again.
 | `PartyInviteResponse` | `PartyInviteResponseCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `PartyUninvite` | `PartyUninviteCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `PartyUninvite` | `PartyUninviteCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `PetCastSpell` | `PetCastSpellCodec` | modern | — | `V4_4_2_60895` |
+| `PetCastSpell` | `PetCastSpellCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `RandomRollClient` | `RandomRollClientCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `RandomRollClient` | `RandomRollClientCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `ReadyCheckResponseClient` | `ReadyCheckResponseClientCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
@@ -143,10 +153,20 @@ changed once is the most likely to have changed again.
 | `SetAssistantLeader` | `SetAssistantLeaderCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `SetEveryoneIsAssistant` | `SetEveryoneIsAssistantCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `SetEveryoneIsAssistant` | `SetEveryoneIsAssistantCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `SetFactionAtWar` | `SetFactionAtWarCodec` | modern | — | `V4_4_2_60895` |
+| `SetFactionAtWar` | `SetFactionAtWarCodecCataClassic` | modern | `V4_4_2_60895` | — |
+| `SetFactionNotAtWar` | `SetFactionNotAtWarCodec` | modern | — | `V4_4_2_60895` |
+| `SetFactionNotAtWar` | `SetFactionNotAtWarCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `SetRole` | `SetRoleCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `SetRole` | `SetRoleCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `StandStateChange` | `StandStateChangeCodec` | modern | — | `V4_4_2_60895` |
+| `StandStateChange` | `StandStateChangeCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `SwapSubGroups` | `SwapSubGroupsCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `SwapSubGroups` | `SwapSubGroupsCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `UseItem` | `UseItemCodec` | modern | — | `V4_4_2_60895` |
+| `UseItem` | `UseItemCodecCataClassic` | modern | `V4_4_2_60895` | — |
+| `UseToy` | `UseToyCodec` | modern | — | `V4_4_2_60895` |
+| `UseToy` | `UseToyCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `UserClientUpdateAccountData` | `UserClientUpdateAccountDataCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `UserClientUpdateAccountData` | `UserClientUpdateAccountDataCodecPreCataClassic` | modern | — | `V4_4_2_60895` |
 
@@ -182,15 +202,15 @@ silently wrong wherever it does not. Check each against the 4.4.2 client
 (`docs/protocol/4.4.2.60895`) before 4.4.2 becomes a supported build; where it differs, the
 site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a narrower check.
 
-198 sites across 56 files.
+192 sites across 57 files.
 
 | file | sites |
 |---|---:|
 | `HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs` | 21 |
 | `HermesProxy/World/GameData.cs` | 15 |
-| `HermesProxy/World/Server/Packets/SpellPackets.cs` | 15 |
 | `HermesProxy/World/Server/Packets/NPCPackets.cs` | 11 |
 | `HermesProxy/World/Client/PacketHandlers/PetHandler.cs` | 8 |
+| `HermesProxy/World/Server/Packets/SpellPackets.cs` | 8 |
 | `HermesProxy/World/Client/PacketHandlers/QueryHandler.cs` | 7 |
 | `HermesProxy/World/Client/PacketHandlers/SpellHandler.cs` | 7 |
 | `HermesProxy/World/Client/PacketHandlers/MovementHandler.cs` | 6 |
@@ -229,6 +249,7 @@ site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a n
 | `HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs` | 1 |
 | `HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs` | 1 |
 | `HermesProxy/World/Client/PacketHandlers/TradeHandler.cs` | 1 |
+| `HermesProxy/World/Client/PacketHandlers/UpdateHandlerCata.cs` | 1 |
 | `HermesProxy/World/Client/SeatGravity.cs` | 1 |
 | `HermesProxy/World/Server/Packets/ArenaPackets.cs` | 1 |
 | `HermesProxy/World/Server/Packets/ChatPackets.cs` | 1 |

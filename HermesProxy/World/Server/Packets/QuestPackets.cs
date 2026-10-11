@@ -1290,31 +1290,76 @@ public class QuestGiverQuestComplete : ServerPacket
     public ItemInstance ItemReward = new();
 }
 
-public class DisplayToast : ServerPacket
+public sealed class DisplayToast : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<DisplayToast>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new ByteMethodLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new IntMethodLayout()));
+
+    private static readonly ServerPacketLayout<DisplayToast> Layout = Layouts.ForRunningClient();
+
     public DisplayToast() : base(Opcode.SMSG_DISPLAY_TOAST, ConnectionType.Instance) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>Up to 3.4.3; the bits and the item trailer differ from the client's reader there too, see #360.</summary>
+    internal sealed class ByteMethodLayout : ServerPacketLayout<DisplayToast>
     {
-        _worldPacket.WriteUInt64(Quantity);
-        _worldPacket.WriteUInt8(DisplayToastMethod);
-        _worldPacket.WriteUInt32(QuestID);
-        _worldPacket.WriteBit(Mailed);
-        _worldPacket.WriteBits(Type, 2);
-
-        if (Type == 0)
+        public override void Write(DisplayToast packet, WorldPacket data)
         {
-            _worldPacket.WriteBit(BonusRoll);
-            _worldPacket.FlushBits();
-            ItemReward.Write(_worldPacket);
-            _worldPacket.WriteUInt32(SpecializationID);
-            _worldPacket.WriteUInt32(ItemQuantity);
-        }
-        else
-            _worldPacket.FlushBits();
+            data.WriteUInt64(packet.Quantity);
+            data.WriteUInt8(packet.DisplayToastMethod);
+            data.WriteUInt32(packet.QuestID);
+            data.WriteBit(packet.Mailed);
+            data.WriteBits(packet.Type, 2);
 
-        if (Type == 1)
-            _worldPacket.WriteUInt32(CurrencyID);
+            if (packet.Type == 0)
+            {
+                data.WriteBit(packet.BonusRoll);
+                data.FlushBits();
+                packet.ItemReward.Write(data);
+                data.WriteUInt32(packet.SpecializationID);
+                data.WriteUInt32(packet.ItemQuantity);
+            }
+            else
+                data.FlushBits();
+
+            if (packet.Type == 1)
+                data.WriteUInt32(packet.CurrencyID);
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, and the client's reader): the method is a uint32, an
+    /// IsSecondaryResult bit follows the type, and an item toast ends with (LootSpec int32,
+    /// Gender int8). Written the 3.4.3 way, every quest turn-in toast read its quest id three
+    /// bytes early.
+    /// </summary>
+    internal sealed class IntMethodLayout : ServerPacketLayout<DisplayToast>
+    {
+        public override void Write(DisplayToast packet, WorldPacket data)
+        {
+            data.WriteUInt64(packet.Quantity);
+            data.WriteUInt32(packet.DisplayToastMethod);
+            data.WriteUInt32(packet.QuestID);
+            data.WriteBit(packet.Mailed);
+            data.WriteBits(packet.Type, 2);
+            data.WriteBit(false);               // IsSecondaryResult
+
+            if (packet.Type == 0)
+            {
+                data.WriteBit(packet.BonusRoll);
+                data.FlushBits();
+                packet.ItemReward.Write(data);
+                data.WriteInt32((int)packet.SpecializationID);
+                data.WriteInt8(0);              // Gender
+            }
+            else
+                data.FlushBits();
+
+            if (packet.Type == 1)
+                data.WriteUInt32(packet.CurrencyID);
+        }
     }
 
     public ulong Quantity;

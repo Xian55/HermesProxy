@@ -18,7 +18,7 @@ public static class WowGuid64Extensions
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public HighGuidType GetHighType() => HighGuid.FromLegacy(guid.GetHighGuidTypeLegacy());
 
-        public ulong GetCounter() => guid.HasEntry()
+        public ulong GetCounter() => guid.HasEntry() && !WowGuid64.IsCataLayout
                 ? (uint)(guid.Low & 0x0000000000FFFFFFul)
                 : (uint)(guid.Low & 0x00000000FFFFFFFFul);
 
@@ -27,7 +27,9 @@ public static class WowGuid64Extensions
             if (!guid.HasEntry())
                 return 0;
 
-            return (uint)((guid.Low >> 24) & 0x0000000000FFFFFFul);
+            return WowGuid64.IsCataLayout
+                ? (uint)((guid.Low >> 32) & 0x00000000000FFFFFul)
+                : (uint)((guid.Low >> 24) & 0x0000000000FFFFFFul);
         }
 
         public bool HasEntry() => guid.GetHighType() switch

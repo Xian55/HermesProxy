@@ -226,6 +226,11 @@ public static class CharacterSystem
         ctx.GetSession().GameState.IsFirstEnterWorld = true;
         ctx.GetSession().GameState.CurrentPlayerGuid = playerLogin.Guid;
         ctx.GetSession().GameState.CurrentPlayerInfo = ownCharacter;
+        // TrinityCore 4.3.4 sends the first SMSG_UPDATE_OBJECT before SMSG_LOGIN_VERIFY_WORLD, and
+        // the loading-screen notify cannot stand in for it on map 0 (HandleLoadScreen drops that
+        // value). Without a map the player's own create threw and the client sat on the loading
+        // screen. The character list knows where the character is.
+        ctx.GetSession().GameState.CurrentMapId = ownCharacter.MapId;
         ctx.GetSession().GameState.CurrentPlayerStorage.LoadCurrentPlayer();
 
         // V3_4_3-only: DKs need rune state in ActivePlayerData CREATE. Without it

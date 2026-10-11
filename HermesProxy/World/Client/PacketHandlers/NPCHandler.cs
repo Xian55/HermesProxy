@@ -129,13 +129,23 @@ public partial class WorldClient
     internal void HandleVendorInventory(WorldPacket packet)
     {
         VendorInventory vendor = new VendorInventory();
-        vendor.VendorGUID = packet.ReadGuid().To128(GetSession().GameState);
+        int itemsCount;
+        if (IsCataLegacy)
+        {
+            ReadVendorInventoryCata(packet, vendor);
+            itemsCount = vendor.Items.Count;
+        }
+        else
+        {
+            vendor.VendorGUID = packet.ReadGuid().To128(GetSession().GameState);
+            itemsCount = packet.ReadUInt8();
+        }
         GetSession().GameState.CurrentInteractedWithNPC = vendor.VendorGUID;
-        byte itemsCount = packet.ReadUInt8();
 
         if (itemsCount == 0)
         {
-            vendor.Reason = packet.ReadUInt8();
+            if (!IsCataLegacy)
+                vendor.Reason = packet.ReadUInt8();
             // cMaNGOS class-filters a vendor's whole stock server-side (e.g. Cylina Darkheart, a
             // warlock-only vendor, sends 0 items to non-warlocks). The modern client opens the
             // merchant frame only when the list has >=1 item and Reason==0, so otherwise the player
@@ -154,7 +164,7 @@ public partial class WorldClient
             return;
         }
 
-        for (byte i = 0; i < itemsCount; i++)
+        for (int i = 0; i < itemsCount && !IsCataLegacy; i++)
         {
             VendorItem vendorItem = new();
             vendorItem.Slot = packet.ReadInt32();
@@ -175,6 +185,54 @@ public partial class WorldClient
         SendPacketToClient(vendor);
     }
 
+    /// <summary>
+    /// TrinityCore 4.3.4 VendorInventory::Write: a masked vendor GUID, a 21-bit item count and
+    /// two optional-field bits per item in the bit section; each item then carries its own slot
+    /// (MuID), currency-or-item type and display, and the reason byte sits between the GUID bytes.
+    /// </summary>
+    void ReadVendorInventoryCata(WorldPacket packet, VendorInventory vendor)
+    {
+        Span<bool> mask = stackalloc bool[8];
+        Span<byte> guid = stackalloc byte[8];
+        MaskedGuid.ReadMaskBits(packet, mask, [1, 0]);
+        int count = (int)packet.ReadBits<uint>(21);
+        MaskedGuid.ReadMaskBits(packet, mask, [3, 6, 5, 2, 7]);
+        var hasExtendedCost = new bool[count];
+        var hasCondition = new bool[count];
+        for (int i = 0; i < count; i++)
+        {
+            hasExtendedCost[i] = !packet.HasBit();
+            hasCondition[i] = !packet.HasBit();
+        }
+        MaskedGuid.ReadMaskBits(packet, mask, [4]);
+        packet.ResetBitPos();
+
+        for (int i = 0; i < count; i++)
+        {
+            VendorItem item = new();
+            item.MuID = packet.ReadUInt32();
+            item.Slot = (int)item.MuID;
+            item.Durability = packet.ReadInt32();
+            if (hasExtendedCost[i])
+                item.ExtendedCostID = packet.ReadInt32();
+            item.Item.ItemID = packet.ReadUInt32();
+            item.Type = packet.ReadInt32();
+            item.Price = packet.ReadUInt32();
+            packet.ReadUInt32();                // ItemDisplayInfoID
+            if (hasCondition[i])
+                item.PlayerConditionFailed = packet.ReadInt32();
+            item.Quantity = packet.ReadInt32();
+            item.StackCount = packet.ReadUInt32();
+            GetSession().GameState.SetItemBuyCount(item.Item.ItemID, item.StackCount);
+            vendor.Items.Add(item);
+        }
+
+        MaskedGuid.ReadBytes(packet, mask, guid, [5, 4, 1, 0, 6]);
+        vendor.Reason = packet.ReadUInt8();
+        MaskedGuid.ReadBytes(packet, mask, guid, [2, 3, 7]);
+        vendor.VendorGUID = new WowGuid64(MaskedGuid.ToUInt64(guid)).To128(GetSession().GameState);
+    }
+
     [HandlesSmsg(Opcode.SMSG_SHOW_BANK)]
     internal void HandleShowBank(WorldPacket packet)
     {
@@ -192,6 +250,9 @@ public partial class WorldClient
         GetSession().GameState.CurrentInteractedWithNPC = trainer.TrainerGUID;
         trainer.TrainerID = trainer.TrainerGUID.GetEntry();
         trainer.TrainerType = packet.ReadInt32();
+        // TrinityCore 4.3.4 sends its trainer id, which CMSG_TRAINER_BUY_SPELL has to echo back.
+        if (IsCataLegacy)
+            trainer.TrainerID = packet.ReadUInt32();
         int count = packet.ReadInt32();
         for (int i = 0; i < count; ++i)
         {
@@ -214,6 +275,21 @@ public partial class WorldClient
             TrainerSpellStateModern stateNew = stateOld.CastEnum<TrainerSpellStateModern>();
             spell.Usable = stateNew;
             spell.MoneyCost = packet.ReadUInt32();
+            if (IsCataLegacy)
+            {
+                // TrinityCore 4.3.4 TrainerList::Write: the profession dialog and button move to
+                // the end, and only two required abilities. Read the 3.3.5a way, the first spell
+                // ran into the second and the trainer window never opened.
+                spell.ReqLevel = packet.ReadUInt8();
+                spell.ReqSkillLine = packet.ReadUInt32();
+                spell.ReqSkillRank = packet.ReadUInt32();
+                spell.ReqAbility[0] = packet.ReadUInt32();
+                spell.ReqAbility[1] = packet.ReadUInt32();
+                packet.ReadInt32(); // Profession Dialog
+                packet.ReadInt32(); // Profession Button
+                trainer.Spells.Add(spell);
+                continue;
+            }
             packet.ReadInt32(); // Profession Dialog
             packet.ReadInt32(); // Profession Button
             spell.ReqLevel = packet.ReadUInt8();

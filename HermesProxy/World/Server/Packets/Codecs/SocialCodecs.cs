@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 
@@ -72,6 +73,7 @@ public static class SetContactNotesCodec
 
 // ---- reputation ----
 
+[PacketCodec(typeof(SetFactionAtWar), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
 public static class SetFactionAtWarCodec
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -79,11 +81,30 @@ public static class SetFactionAtWarCodec
         => packet = new SetFactionAtWar(r.ReadUInt8());
 }
 
+// 4.4.2 sends the reputation index as a uint16 (the client's writer, and TrinityCore
+// cata_classic). Every index the client has still fits a byte.
+[PacketCodec(typeof(SetFactionAtWar), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class SetFactionAtWarCodecCataClassic
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out SetFactionAtWar packet)
+        => packet = new SetFactionAtWar((byte)r.ReadUInt16());
+}
+
+[PacketCodec(typeof(SetFactionNotAtWar), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
 public static class SetFactionNotAtWarCodec
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Read(ref SpanPacketReader r, out SetFactionNotAtWar packet)
         => packet = new SetFactionNotAtWar(r.ReadUInt8());
+}
+
+[PacketCodec(typeof(SetFactionNotAtWar), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class SetFactionNotAtWarCodecCataClassic
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out SetFactionNotAtWar packet)
+        => packet = new SetFactionNotAtWar((byte)r.ReadUInt16());
 }
 
 public static class SetFactionInactiveCodec
@@ -139,12 +160,24 @@ public static class AddToyCodec
         => packet = new AddToy(r.ReadPackedGuid128());
 }
 
+[PacketCodec(typeof(UseToy), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
 public static class UseToyCodec
 {
     public static void Read(ref SpanPacketReader r, out UseToy packet)
     {
         var cast = new SpellCastRequest();
         cast.Read(ref r);
+        packet = new UseToy(cast);
+    }
+}
+
+[PacketCodec(typeof(UseToy), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class UseToyCodecCataClassic
+{
+    public static void Read(ref SpanPacketReader r, out UseToy packet)
+    {
+        var cast = new SpellCastRequest();
+        cast.Read(ref r, SpellCastRequestShape.CataClassic);
         packet = new UseToy(cast);
     }
 }

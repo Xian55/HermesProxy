@@ -416,9 +416,25 @@ public partial class WorldClient
         return reused;
     }
 
+    // A 4.3.4 power field is the class's slot, not the power type; see LegacyPowerSlotsCata.
+    PowerType LegacyPowerTypeAt(WowGuid128 guid, ObjectUpdate updateData, int slot)
+    {
+        var state = GetSession().GameState;
+        if (state.HunterPetGuids.Contains(guid))
+            return LegacyPowerSlotsCata.PetTypeAt(slot);
+
+        Class classId = updateData.UnitData.ClassId != null
+            ? (Class)updateData.UnitData.ClassId
+            : state.GetUnitClass(guid);
+        return LegacyPowerSlotsCata.TypeAt(classId, slot);
+    }
+
     [HandlesSmsg(Opcode.SMSG_UPDATE_OBJECT)]
     internal void HandleUpdateObject(WorldPacket packet)
     {
+        // 4.3.4 leads with the map id (TrinityCore 4.3.4 UpdateData::BuildPacket).
+        if (IsCataLegacy)
+            packet.ReadUInt16();
         var count = packet.ReadUInt32();
         PrintString($"Updates Count = {count}");
 
@@ -432,7 +448,7 @@ public partial class WorldClient
 
         for (var i = 0; i < count; i++)
         {
-            UpdateTypeLegacy type = (UpdateTypeLegacy)packet.ReadUInt8();
+            UpdateTypeLegacy type = IsCataLegacy ? ReadUpdateTypeCata(packet) : (UpdateTypeLegacy)packet.ReadUInt8();
             PrintString($"Update Type = {type}", i);
 
             switch (type)
@@ -584,7 +600,7 @@ public partial class WorldClient
                         // re-read once the object it names actually exists.
                         GetSession().GameState.InventoryChangedSinceQuestResync = true;
 
-                        if (updateData.ObjectData.EntryID != null &&
+                        if (LegacyHasItemQuery && updateData.ObjectData.EntryID != null &&
                             !GameData.ItemTemplates.ContainsKey((uint)updateData.ObjectData.EntryID))
                         {
                             (missingItemTemplates ??= []).Add((uint)updateData.ObjectData.EntryID);
@@ -674,7 +690,7 @@ public partial class WorldClient
                         // re-read once the object it names actually exists.
                         GetSession().GameState.InventoryChangedSinceQuestResync = true;
 
-                        if (updateData.ObjectData.EntryID != null &&
+                        if (LegacyHasItemQuery && updateData.ObjectData.EntryID != null &&
                             !GameData.ItemTemplates.ContainsKey((uint)updateData.ObjectData.EntryID))
                         {
                             (missingItemTemplates ??= []).Add((uint)updateData.ObjectData.EntryID);
@@ -877,7 +893,7 @@ public partial class WorldClient
             }
 
             var playerUpdate = updateObject.ObjectUpdates[activePlayerUpdateIndex];
-            if (playerUpdate.PlayerData != null)
+            if (LegacyHasItemQuery && playerUpdate.PlayerData != null)
             {
                 foreach (var visible in playerUpdate.PlayerData.VisibleItems)
                 {
@@ -1819,6 +1835,12 @@ public partial class WorldClient
 
     void ReadMovementUpdateBlock(WorldPacket packet, WowGuid128 guid, ObjectUpdate? updateData, int index)
     {
+        if (IsCataLegacy)
+        {
+            ReadMovementUpdateBlockCata(packet, guid, updateData);
+            return;
+        }
+
         MovementInfo? moveInfo = null;
         MovementSpeeds speeds = default;
         bool playHoverAnim = false;
@@ -3058,13 +3080,17 @@ public partial class WorldClient
                 {
                     if (updateMaskArray[UNIT_FIELD_POWER1 + i])
                     {
+                        PowerType power = IsCataLegacy ? LegacyPowerTypeAt(guid, updateData, i) : (PowerType)i;
+                        if (power == PowerType.Invalid)
+                            continue;
+
                         if (powerUpdate != null &&
                            (guid == GetSession().GameState.CurrentPlayerGuid || guid == GetSession().GameState.CurrentPetGuid))
-                            powerUpdate.Powers.Add(new PowerUpdatePower(updates[UNIT_FIELD_POWER1 + i].Int32Value, (byte)i));
+                            powerUpdate.Powers.Add(new PowerUpdatePower(updates[UNIT_FIELD_POWER1 + i].Int32Value, (byte)power));
 
                         sbyte powerSlot;
                         if (GetSession().GameState.HunterPetGuids.Contains(guid))
-                            powerSlot = ClassPowerTypes.GetPowerSlotForPet((PowerType)i);
+                            powerSlot = ClassPowerTypes.GetPowerSlotForPet(power);
                         else
                         {
                             Class classId;
@@ -3072,7 +3098,7 @@ public partial class WorldClient
                                 classId = (Class)updateData.UnitData.ClassId;
                             else
                                 classId = GetSession().GameState.GetUnitClass(guid.To128(GetSession().GameState));
-                            powerSlot = ClassPowerTypes.GetPowerSlotForClass(classId, (PowerType)i);
+                            powerSlot = ClassPowerTypes.GetPowerSlotForClass(classId, power);
                         }
                             
                         if (powerSlot >= 0)
@@ -3087,6 +3113,10 @@ public partial class WorldClient
                 {
                     if (updateMaskArray[UNIT_FIELD_MAXPOWER1 + i])
                     {
+                        PowerType power = IsCataLegacy ? LegacyPowerTypeAt(guid, updateData, i) : (PowerType)i;
+                        if (power == PowerType.Invalid)
+                            continue;
+
                         Class classId;
                         if (updateData.UnitData.ClassId != null)
                             classId = (Class)updateData.UnitData.ClassId;
@@ -3095,14 +3125,14 @@ public partial class WorldClient
 
                         sbyte powerSlot;
                         if (GetSession().GameState.HunterPetGuids.Contains(guid))
-                            powerSlot = ClassPowerTypes.GetPowerSlotForPet((PowerType)i);
+                            powerSlot = ClassPowerTypes.GetPowerSlotForPet(power);
                         else
-                            powerSlot = ClassPowerTypes.GetPowerSlotForClass(classId, (PowerType)i);
+                            powerSlot = ClassPowerTypes.GetPowerSlotForClass(classId, power);
 
                         if (powerSlot >= 0)
                             updateData.UnitData.EnsureMaxPower()[powerSlot] = updates[UNIT_FIELD_MAXPOWER1 + i].Int32Value;
 
-                        if (i == (byte)PowerType.Energy)
+                        if (power == PowerType.Energy)
                         {
                             powerSlot = ClassPowerTypes.GetPowerSlotForClass(classId, PowerType.ComboPoints);
                             if (powerSlot >= 0)

@@ -27,59 +27,146 @@ using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets;
 
-public class InitializeFactions : ServerPacket, ISpanWritable
+public sealed class InitializeFactions : ServerPacket, ISpanWritable
 {
     // Per-build entry count. WotLK Classic 3.4.3 expects 1000; legacy modern builds (V1_14, V2_5) keep 400.
     // Reference: HermesProxy-WOTLK fork InitializeFactions.cs:16-19, WPP V3_4_0 ReputationHandler.cs:9.
     private const ushort MaxFactionCount = 1000;
+
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<InitializeFactions>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new IndexedLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new FactionIdLayout()));
+
+    private static readonly ServerPacketLayout<InitializeFactions> Layout = Layouts.ForRunningClient();
 
     public InitializeFactions() : base(Opcode.SMSG_INITIALIZE_FACTIONS, ConnectionType.Instance) { }
 
     private static ushort GetFactionCount() =>
         (ushort)(ModernVersion.ExpansionVersion >= 3 ? 1000 : 400);
 
-    public override void Write()
-    {
-        ushort count = GetFactionCount();
-        bool wide = ModernVersion.ExpansionVersion >= 3;
-        for (ushort i = 0; i < count; ++i)
-        {
-            if (wide)
-                _worldPacket.WriteUInt16((ushort)FactionFlags[i]);
-            else
-                _worldPacket.WriteUInt8((byte)((ushort)FactionFlags[i] & 0xFF));
-            _worldPacket.WriteInt32(FactionStandings[i]);
-        }
-
-        for (ushort i = 0; i < count; ++i)
-            _worldPacket.WriteBit(FactionHasBonus[i]);
-
-        _worldPacket.FlushBits();
-    }
+    public override void Write() => Layout.Write(this, _worldPacket);
 
     // V3_4_3: 1000 × (UInt16 + Int32) + 1000 bits = 6000 + 125 = 6125 bytes max.
-    public int MaxSize => MaxFactionCount * 6 + (MaxFactionCount + 7) / 8;
+    // 4.4.2: two counts, then per faction (Int32 + UInt16 + Int32) and (Int32 + one flushed bit).
+    public int MaxSize => 8 + MaxFactionCount * (10 + 5);
 
-    public int WriteToSpan(Span<byte> buffer)
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>Up to 3.4.3: one entry per reputation list index, the whole list every time.</summary>
+    internal sealed class IndexedLayout : ServerPacketLayout<InitializeFactions>
     {
-        var writer = new SpanPacketWriter(buffer);
-
-        ushort count = GetFactionCount();
-        bool wide = ModernVersion.ExpansionVersion >= 3;
-        for (ushort i = 0; i < count; ++i)
+        public override void Write(InitializeFactions packet, WorldPacket data)
         {
-            if (wide)
-                writer.WriteUInt16((ushort)FactionFlags[i]);
-            else
-                writer.WriteUInt8((byte)((ushort)FactionFlags[i] & 0xFF));
-            writer.WriteInt32(FactionStandings[i]);
+            ushort count = GetFactionCount();
+            bool wide = ModernVersion.ExpansionVersion >= 3;
+            for (ushort i = 0; i < count; ++i)
+            {
+                if (wide)
+                    data.WriteUInt16((ushort)packet.FactionFlags[i]);
+                else
+                    data.WriteUInt8((byte)((ushort)packet.FactionFlags[i] & 0xFF));
+                data.WriteInt32(packet.FactionStandings[i]);
+            }
+
+            for (ushort i = 0; i < count; ++i)
+                data.WriteBit(packet.FactionHasBonus[i]);
+
+            data.FlushBits();
         }
 
-        for (ushort i = 0; i < count; ++i)
-            writer.WriteBit(FactionHasBonus[i]);
+        public override int WriteToSpan(InitializeFactions packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
 
-        writer.FlushBits();
-        return writer.Position;
+            ushort count = GetFactionCount();
+            bool wide = ModernVersion.ExpansionVersion >= 3;
+            for (ushort i = 0; i < count; ++i)
+            {
+                if (wide)
+                    writer.WriteUInt16((ushort)packet.FactionFlags[i]);
+                else
+                    writer.WriteUInt8((byte)((ushort)packet.FactionFlags[i] & 0xFF));
+                writer.WriteInt32(packet.FactionStandings[i]);
+            }
+
+            for (ushort i = 0; i < count; ++i)
+                writer.WriteBit(packet.FactionHasBonus[i]);
+
+            writer.FlushBits();
+            return writer.Position;
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, and the client's reader): a faction count and a bonus
+    /// count, then (FactionID, Flags, Standing) per faction and (FactionID, one flushed bit) per
+    /// bonus. Faction ids, not list indexes; written as the 3.4.3 array, the client read the first
+    /// two flags as counts and the reputation window stayed empty.
+    /// </summary>
+    internal sealed class FactionIdLayout : ServerPacketLayout<InitializeFactions>
+    {
+        public override void Write(InitializeFactions packet, WorldPacket data)
+        {
+            int count = CountKnown();
+            data.WriteInt32(count);
+            data.WriteInt32(count);
+            for (int i = 0; i < MaxFactionCount; ++i)
+            {
+                int factionId = GameData.GetFactionIdForReputationIndex(i);
+                if (factionId == 0)
+                    continue;
+                data.WriteInt32(factionId);
+                data.WriteUInt16((ushort)packet.FactionFlags[i]);
+                data.WriteInt32(packet.FactionStandings[i]);
+            }
+
+            for (int i = 0; i < MaxFactionCount; ++i)
+            {
+                int factionId = GameData.GetFactionIdForReputationIndex(i);
+                if (factionId == 0)
+                    continue;
+                data.WriteInt32(factionId);
+                data.WriteBit(packet.FactionHasBonus[i]);
+                data.FlushBits();
+            }
+        }
+
+        public override int WriteToSpan(InitializeFactions packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            int count = CountKnown();
+            writer.WriteInt32(count);
+            writer.WriteInt32(count);
+            for (int i = 0; i < MaxFactionCount; ++i)
+            {
+                int factionId = GameData.GetFactionIdForReputationIndex(i);
+                if (factionId == 0)
+                    continue;
+                writer.WriteInt32(factionId);
+                writer.WriteUInt16((ushort)packet.FactionFlags[i]);
+                writer.WriteInt32(packet.FactionStandings[i]);
+            }
+
+            for (int i = 0; i < MaxFactionCount; ++i)
+            {
+                int factionId = GameData.GetFactionIdForReputationIndex(i);
+                if (factionId == 0)
+                    continue;
+                writer.WriteInt32(factionId);
+                writer.WriteBit(packet.FactionHasBonus[i]);
+                writer.FlushBits();
+            }
+            return writer.Position;
+        }
+
+        private static int CountKnown()
+        {
+            int count = 0;
+            for (int i = 0; i < MaxFactionCount; ++i)
+                if (GameData.GetFactionIdForReputationIndex(i) != 0)
+                    count++;
+            return count;
+        }
     }
 
     public int[] FactionStandings = new int[MaxFactionCount];
@@ -87,8 +174,14 @@ public class InitializeFactions : ServerPacket, ISpanWritable
     public ReputationFlags[] FactionFlags = new ReputationFlags[MaxFactionCount];
 }
 
-class SetFactionStanding : ServerPacket, ISpanWritable
+sealed class SetFactionStanding : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<SetFactionStanding>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new IndexLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new FactionIdLayout()));
+
+    private static readonly ServerPacketLayout<SetFactionStanding> Layout = Layouts.ForRunningClient();
+
     public SetFactionStanding() : base(Opcode.SMSG_SET_FACTION_STANDING, ConnectionType.Instance) { }
 
     /// <summary>
@@ -102,43 +195,92 @@ class SetFactionStanding : ServerPacket, ISpanWritable
     /// </summary>
     private static bool HasReferAFriendBonus => !ModernVersion.IsWotLKClassicOrLater;
 
-    public override void Write()
-    {
-        if (HasReferAFriendBonus)
-            _worldPacket.WriteFloat(ReferAFriendBonus);
-        _worldPacket.WriteFloat(BonusFromAchievementSystem);
-
-        _worldPacket.WriteInt32(Factions.Count);
-        foreach (FactionStandingData factionStanding in Factions)
-            factionStanding.Write(_worldPacket);
-
-        _worldPacket.WriteBit(ShowVisual);
-        _worldPacket.FlushBits();
-    }
+    public override void Write() => Layout.Write(this, _worldPacket);
 
     // Cap for faction standing changes - usually just a few at once
     private const int MaxFactions = 16;
-    // up to 2 floats(8) + count(4) + factions(8 each) + 1 bit
-    public int MaxSize => 8 + 4 + MaxFactions * 8 + 1;
+    // up to 2 floats(8) + count(4) + factions(12 each from 4.4.2) + 1 bit
+    public int MaxSize => 8 + 4 + MaxFactions * 12 + 1;
 
-    public int WriteToSpan(Span<byte> buffer)
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>Up to 3.4.3: each entry is (Index, Standing).</summary>
+    internal sealed class IndexLayout : ServerPacketLayout<SetFactionStanding>
     {
-        if (Factions.Count > MaxFactions)
-            return -1;
-
-        var writer = new SpanPacketWriter(buffer);
-        if (HasReferAFriendBonus)
-            writer.WriteFloat(ReferAFriendBonus);
-        writer.WriteFloat(BonusFromAchievementSystem);
-        writer.WriteInt32(Factions.Count);
-        foreach (FactionStandingData factionStanding in Factions)
+        public override void Write(SetFactionStanding packet, WorldPacket data)
         {
-            writer.WriteInt32(factionStanding.Index);
-            writer.WriteInt32(factionStanding.Standing);
+            if (HasReferAFriendBonus)
+                data.WriteFloat(packet.ReferAFriendBonus);
+            data.WriteFloat(packet.BonusFromAchievementSystem);
+
+            data.WriteInt32(packet.Factions.Count);
+            foreach (FactionStandingData factionStanding in packet.Factions)
+                factionStanding.Write(data);
+
+            data.WriteBit(packet.ShowVisual);
+            data.FlushBits();
         }
-        writer.WriteBit(ShowVisual);
-        writer.FlushBits();
-        return writer.Position;
+
+        public override int WriteToSpan(SetFactionStanding packet, Span<byte> buffer)
+        {
+            if (packet.Factions.Count > MaxFactions)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            if (HasReferAFriendBonus)
+                writer.WriteFloat(packet.ReferAFriendBonus);
+            writer.WriteFloat(packet.BonusFromAchievementSystem);
+            writer.WriteInt32(packet.Factions.Count);
+            foreach (FactionStandingData factionStanding in packet.Factions)
+            {
+                writer.WriteInt32(factionStanding.Index);
+                writer.WriteInt32(factionStanding.Standing);
+            }
+            writer.WriteBit(packet.ShowVisual);
+            writer.FlushBits();
+            return writer.Position;
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, and the client's reader): each entry adds the faction id
+    /// after (Index, Standing).
+    /// </summary>
+    internal sealed class FactionIdLayout : ServerPacketLayout<SetFactionStanding>
+    {
+        public override void Write(SetFactionStanding packet, WorldPacket data)
+        {
+            data.WriteFloat(packet.BonusFromAchievementSystem);
+            data.WriteInt32(packet.Factions.Count);
+            foreach (FactionStandingData factionStanding in packet.Factions)
+            {
+                data.WriteInt32(factionStanding.Index);
+                data.WriteInt32(factionStanding.Standing);
+                data.WriteInt32(GameData.GetFactionIdForReputationIndex(factionStanding.Index));
+            }
+
+            data.WriteBit(packet.ShowVisual);
+            data.FlushBits();
+        }
+
+        public override int WriteToSpan(SetFactionStanding packet, Span<byte> buffer)
+        {
+            if (packet.Factions.Count > MaxFactions)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteFloat(packet.BonusFromAchievementSystem);
+            writer.WriteInt32(packet.Factions.Count);
+            foreach (FactionStandingData factionStanding in packet.Factions)
+            {
+                writer.WriteInt32(factionStanding.Index);
+                writer.WriteInt32(factionStanding.Standing);
+                writer.WriteInt32(GameData.GetFactionIdForReputationIndex(factionStanding.Index));
+            }
+            writer.WriteBit(packet.ShowVisual);
+            writer.FlushBits();
+            return writer.Position;
+        }
     }
 
     public float ReferAFriendBonus;

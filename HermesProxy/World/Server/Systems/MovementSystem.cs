@@ -141,9 +141,14 @@ public static class MovementSystem
         }
 
         WorldPacket packet = new WorldPacket(legacyOpcode);
-        if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
-            packet.WritePackedGuid(movement.Guid.To64());
-        SeatGravity.WriteClientMovement(packet, in moveInfo, gameState);
+        if (WorldClient.IsCataLegacy)
+            LegacyMovementCata.TryWrite(packet, LegacyVersion.GetUniversalOpcode(legacyOpcode), movement.Guid.To64(), in moveInfo);
+        else
+        {
+            if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
+                packet.WritePackedGuid(movement.Guid.To64());
+            SeatGravity.WriteClientMovement(packet, in moveInfo, gameState);
+        }
         ctx.SendPacketToServer(packet);
 
         if (takesSeatFromTransport)
@@ -250,6 +255,16 @@ public static class MovementSystem
     public static void HandleMoveTeleportAck(in MoveTeleportAck teleport, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.MSG_MOVE_TELEPORT_ACK);
+        if (WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 MoveTeleportAck::Read: the counters first, then a masked GUID.
+            packet.WriteUInt32(teleport.MoveCounter);
+            packet.WriteUInt32(teleport.MoveTime);
+            MaskedGuid.Write(packet, teleport.MoverGUID.To64().Low, [5, 0, 1, 6, 3, 7, 2, 4], [4, 2, 7, 6, 5, 1, 3, 0]);
+            ctx.SendPacketToServer(packet);
+            return;
+        }
+
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(teleport.MoverGUID.To64());
         else
@@ -284,6 +299,14 @@ public static class MovementSystem
             return; // This is probably an ack by our swim to fly speed change for vanilla
 
         WorldPacket packet = new WorldPacket(opcode);
+        if (WorldClient.IsCataLegacy)
+        {
+            // The new speed is the sequence's extra element (TrinityCore 4.3.4 HandleForceSpeedChangeAck).
+            if (LegacyMovementCata.TryWrite(packet, opcode, speed.MoverGUID.To64(), speed.Ack.MoveInfo, speed.Ack.MoveCounter, speed.Speed))
+                ctx.SendPacketToServer(packet);
+            return;
+        }
+
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(speed.MoverGUID.To64());
         else
@@ -301,6 +324,14 @@ public static class MovementSystem
     public static void HandleMoveForceAck1(Opcode opcode, in MovementAckMessage movementAck, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(opcode);
+        if (WorldClient.IsCataLegacy)
+        {
+            // 4.3.4 says applied or not through the movement flags alone; there is no trailing int.
+            if (LegacyMovementCata.TryWrite(packet, opcode, movementAck.MoverGUID.To64(), movementAck.Ack.MoveInfo, movementAck.Ack.MoveCounter))
+                ctx.SendPacketToServer(packet);
+            return;
+        }
+
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(movementAck.MoverGUID.To64());
         else
@@ -324,6 +355,13 @@ public static class MovementSystem
             return;
 
         WorldPacket packet = new WorldPacket(opcode);
+        if (WorldClient.IsCataLegacy)
+        {
+            if (LegacyMovementCata.TryWrite(packet, opcode, movementAck.MoverGUID.To64(), movementAck.Ack.MoveInfo, movementAck.Ack.MoveCounter))
+                ctx.SendPacketToServer(packet);
+            return;
+        }
+
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(movementAck.MoverGUID.To64());
         else
@@ -346,7 +384,7 @@ public static class MovementSystem
     public static void HandleMoveSetActiveMover(in SetActiveMover move, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_ACTIVE_MOVER);
-        packet.WriteGuid(move.MoverGUID.To64());
+        WriteActiveMover(packet, move.MoverGUID.To64());
         ctx.SendPacketToServer(packet);
     }
 
@@ -354,14 +392,34 @@ public static class MovementSystem
     public static void HandleMoveInitActiveMoverComplete(in InitActiveMoverComplete move, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_ACTIVE_MOVER);
-        packet.WriteGuid(ctx.GetSession().GameState.CurrentPlayerGuid.To64());
+        WriteActiveMover(packet, ctx.GetSession().GameState.CurrentPlayerGuid.To64());
         ctx.SendPacketToServer(packet);
+    }
+
+    // 4.3.4 reads the mover as a masked GUID (TrinityCore 4.3.4 SetActiveMover::Read). Sent the
+    // 3.3.5a way it named no unit, so the server had no actively moved unit and silently ignored
+    // every cast and movement packet after it.
+    static void WriteActiveMover(WorldPacket packet, WowGuid64 mover)
+    {
+        if (WorldClient.IsCataLegacy)
+            MaskedGuid.Write(packet, mover.Low, [7, 2, 1, 0, 4, 5, 6, 3], [3, 2, 4, 0, 5, 1, 6, 7]);
+        else
+            packet.WriteGuid(mover);
     }
 
     [HandlesCmsg(Opcode.CMSG_MOVE_SPLINE_DONE)]
     public static void HandleMoveSplineDone(in MoveSplineDone movement, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MOVE_SPLINE_DONE);
+        if (WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 HandleMoveSplineDoneOpcode: the spline id, then the movement block.
+            packet.WriteInt32(movement.SplineID);
+            if (LegacyMovementCata.TryWrite(packet, Opcode.CMSG_MOVE_SPLINE_DONE, movement.Guid.To64(), movement.MoveInfo))
+                ctx.SendPacketToServer(packet);
+            return;
+        }
+
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(movement.Guid.To64());
         SeatGravity.WriteClientMovement(packet, movement.MoveInfo, ctx.GetSession().GameState);
@@ -375,6 +433,15 @@ public static class MovementSystem
     public static void HandleMoveTimeSkipped(in MoveTimeSkipped movement, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MOVE_TIME_SKIPPED);
+        if (WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 HandleMoveTimeSkippedOpcode: the time, then a masked GUID.
+            packet.WriteUInt32(movement.TimeSkipped);
+            MaskedGuid.Write(packet, movement.MoverGUID.To64().Low, [5, 1, 3, 7, 6, 0, 4, 2], [7, 1, 2, 4, 3, 6, 0, 5]);
+            ctx.SendPacketToServer(packet);
+            return;
+        }
+
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(movement.MoverGUID.To64());
         else

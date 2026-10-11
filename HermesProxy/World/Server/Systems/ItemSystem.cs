@@ -1,6 +1,7 @@
 using Framework.Constants;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Client;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
@@ -37,12 +38,29 @@ public static class ItemSystem
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_BUY_ITEM);
         packet.WriteGuid(item.VendorGUID.To64());
-        packet.WriteUInt32(item.Item.ItemID);
         uint quantity = item.Quantity / ctx.GetSession().GameState.GetItemBuyCount(item.Item.ItemID);
 
         ItemLogMessages.VendorBuyItemForward(_melServerItem, _logSourceItem,
             item.VendorGUID.Low, item.VendorGUID.High, item.Item.ItemID, quantity,
             item.Quantity, (uint)item.MuID, (uint)item.Slot, (uint)item.BagSlot, (uint)item.ItemType);
+
+        if (WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 HandleBuyItemOpcode: the item-or-currency type first, and the bag
+            // as a GUID ahead of its slot. The vendor slot is the 1-based MuID. The target slot is
+            // the client's Slot, 255 for "anywhere": with no bag that pair is the only one the
+            // server auto-stores, and any other slot fails as a wrong slot.
+            packet.WriteUInt8((byte)item.ItemType);
+            packet.WriteUInt32(item.Item.ItemID);
+            packet.WriteUInt32(item.MuID);
+            packet.WriteUInt32(quantity);
+            packet.WriteGuid(item.ContainerGUID.To64());
+            packet.WriteUInt8((byte)item.Slot);
+            ctx.SendPacketToServer(packet);
+            return;
+        }
+
+        packet.WriteUInt32(item.Item.ItemID);
 
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
         {
@@ -161,9 +179,12 @@ public static class ItemSystem
         ctx.SendPacketToServer(packet);
     }
 
+    [HandlesCmsg(Opcode.CMSG_AUTOBANK_ITEM)]
+    public static void HandleAutoBankItem(in AutoBankItem item, in SessionContext ctx)
+        => HandleAutoEquipItem(Opcode.CMSG_AUTOBANK_ITEM, new AutoEquipItem(item.Inv, item.PackSlot, item.Slot), in ctx);
+
     [HandlesCmsg(Opcode.CMSG_AUTO_EQUIP_ITEM)]
     [HandlesCmsg(Opcode.CMSG_AUTOSTORE_BANK_ITEM)]
-    [HandlesCmsg(Opcode.CMSG_AUTOBANK_ITEM)]
     public static void HandleAutoEquipItem(Opcode opcode, in AutoEquipItem item, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(opcode);

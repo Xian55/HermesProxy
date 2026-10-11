@@ -133,6 +133,8 @@ public partial class WorldClient
         WorldPacket cast = new WorldPacket(Opcode.CMSG_CAST_SPELL);
         cast.WriteUInt8(0);
         cast.WriteUInt32(spellId);
+        if (IsCataLegacy)
+            cast.WriteUInt32(0);                // Misc
         cast.WriteUInt8(0);
         cast.WriteUInt32(0);
         SendPacketToServer(cast);
@@ -721,6 +723,8 @@ public partial class WorldClient
         else
             flags = packet.ReadUInt16();
         dbdata.CastFlags = flags;
+        if (IsCataLegacy)
+            packet.ReadUInt32();                // CastFlagsEx
 
         if (!isSpellGo || LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             dbdata.CastTime = packet.ReadUInt32();
@@ -1032,6 +1036,32 @@ public partial class WorldClient
         WowGuid64 guid = packet.ReadGuid();
         cooldown.IsPet = guid.GetHighType() == HighGuidType.Pet;
         SendPacketToClient(cooldown);
+    }
+
+    /// <summary>
+    /// 4.3.4 clears a batch of cooldowns in one packet where 3.3.5a sent one SMSG_CLEAR_COOLDOWN
+    /// per spell (TrinityCore 4.3.4 ClearCooldowns::Write: a masked GUID with a 24-bit count in
+    /// its bit section, the spell ids between its bytes). Each spell goes on as its own clear.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_CLEAR_COOLDOWNS)]
+    internal void HandleClearCooldowns(WorldPacket packet)
+    {
+        Span<bool> mask = stackalloc bool[8];
+        Span<byte> guid = stackalloc byte[8];
+        MaskedGuid.ReadMaskBits(packet, mask, [1, 3, 6]);
+        uint count = packet.ReadBits<uint>(24);
+        MaskedGuid.ReadMaskBits(packet, mask, [7, 5, 2, 4, 0]);
+        packet.ResetBitPos();
+        MaskedGuid.ReadBytes(packet, mask, guid, [7, 2, 4, 5, 1, 3]);
+
+        uint[] spells = new uint[Math.Min(count, (uint)packet.GetRemainingSpan().Length / sizeof(uint))];
+        for (int i = 0; i < spells.Length; i++)
+            spells[i] = packet.ReadUInt32();
+        MaskedGuid.ReadBytes(packet, mask, guid, [0, 6]);
+
+        bool isPet = new WowGuid64(MaskedGuid.ToUInt64(guid)).GetHighType() == HighGuidType.Pet;
+        foreach (uint spell in spells)
+            SendPacketToClient(new ClearCooldown { SpellID = spell, IsPet = isPet });
     }
 
     [HandlesSmsg(Opcode.SMSG_COOLDOWN_CHEAT)]
@@ -1634,7 +1664,8 @@ public partial class WorldClient
             SpellXSpellVisualID = GameData.GetSpellVisual(spellId),
         };
 
-        var legacyFlags = (AuraFlagsWotLK)packet.ReadUInt8();
+        // 4.3.4 widened the flags to 16 bits; the 3.3.5a ones keep their values.
+        var legacyFlags = (AuraFlagsWotLK)(IsCataLegacy ? packet.ReadUInt16() : packet.ReadUInt8());
         data.CastLevel = packet.ReadUInt8();
         data.Applications = packet.ReadUInt8();
 
@@ -1687,15 +1718,18 @@ public partial class WorldClient
         if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.Scalable))
         {
             var points = ImmutableArray.CreateBuilder<float>(3);
-            if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.EffectIndex0)) points.Add(packet.ReadFloat());
-            if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.EffectIndex1)) points.Add(packet.ReadFloat());
-            if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.EffectIndex2)) points.Add(packet.ReadFloat());
+            if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.EffectIndex0)) points.Add(ReadAuraPoints(packet));
+            if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.EffectIndex1)) points.Add(ReadAuraPoints(packet));
+            if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.EffectIndex2)) points.Add(ReadAuraPoints(packet));
             data.Points = points.ToImmutable();
         }
 
         aura.AuraData = data;
         update.Auras.Add(aura);
     }
+
+    // 4.3.4 sends an effect's amount as an int32.
+    private static float ReadAuraPoints(WorldPacket packet) => IsCataLegacy ? packet.ReadInt32() : packet.ReadFloat();
 
     // Legacy 3.3.5a SMSG_HEALTH_UPDATE wire format: PackedGuid + uint32 health.
     // Modern V3_4_3 expects: PackedGuid128 + int64 health.
@@ -1722,6 +1756,12 @@ public partial class WorldClient
     internal void HandlePowerUpdate(WorldPacket packet)
     {
         WowGuid128 guid = packet.ReadPackedGuid().To128(GetSession().GameState);
+        if (IsCataLegacy)
+        {
+            HandlePowerUpdateCata(packet, guid);
+            return;
+        }
+
         byte powerType = packet.ReadUInt8();
         int power = (int)packet.ReadUInt32();
 
@@ -1738,6 +1778,22 @@ public partial class WorldClient
         {
             runeState.LastRunicPower = power;
         }
+    }
+
+    // 4.3.4 sends a count and a list of (type, value) pairs (TrinityCore 4.3.4 PowerUpdate),
+    // which is the modern shape. Read the 3.3.5a way, the count's low byte came out as the power
+    // type, so every unit's update named Rage with a garbage value.
+    void HandlePowerUpdateCata(WorldPacket packet, WowGuid128 guid)
+    {
+        PowerUpdate update = new PowerUpdate(guid);
+        uint count = packet.ReadUInt32();
+        for (uint i = 0; i < count; i++)
+        {
+            byte powerType = packet.ReadUInt8();
+            int power = packet.ReadInt32();
+            update.Powers.Add(new PowerUpdatePower(power, powerType));
+        }
+        SendPacketToClient(update);
     }
 
     // V3_4_3 DK rune-state legacy handlers. Older modern targets (V1_14 / V2_5) pre-date

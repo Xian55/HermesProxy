@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 
@@ -58,11 +59,22 @@ public static class ReclaimCorpseCodec
         => packet = new ReclaimCorpse(r.ReadPackedGuid128());
 }
 
+[PacketCodec(typeof(StandStateChange), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
 public static class StandStateChangeCodec
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Read(ref SpanPacketReader r, out StandStateChange packet)
         => packet = new StandStateChange(r.ReadUInt32());
+}
+
+// 4.4.2 sends the stand state as one byte (seen on the wire: opcode then 0x01 for sitting). Read
+// as a uint32 it ran off the end and the sit never reached the server.
+[PacketCodec(typeof(StandStateChange), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class StandStateChangeCodecCataClassic
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out StandStateChange packet)
+        => packet = new StandStateChange(r.ReadUInt8());
 }
 
 public static class ClientCinematicPktCodec

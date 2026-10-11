@@ -217,12 +217,34 @@ public static class AuctionSellItemCodec
     }
 }
 
+[PacketCodec(typeof(AuctionRemoveItem), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
 public static class AuctionRemoveItemCodec
 {
     public static void Read(ref SpanPacketReader r, out AuctionRemoveItem packet)
     {
         WowGuid128 auctioneer = r.ReadPackedGuid128();
         uint auctionId = r.ReadUInt32();
+
+        AddOnInfo? taintedBy = null;
+        if (r.HasBit())
+            taintedBy = new AddOnInfo();
+        if (taintedBy != null)
+            taintedBy.Read(ref r);
+
+        packet = new AuctionRemoveItem(auctioneer, auctionId, taintedBy);
+    }
+}
+
+// 4.4.2 (TrinityCore cata_classic, and the client's writer) sends the item id after the auction
+// id. Read the 3.4.3 way, its first byte became the TaintedBy bit.
+[PacketCodec(typeof(AuctionRemoveItem), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class AuctionRemoveItemCodecCataClassic
+{
+    public static void Read(ref SpanPacketReader r, out AuctionRemoveItem packet)
+    {
+        WowGuid128 auctioneer = r.ReadPackedGuid128();
+        uint auctionId = r.ReadUInt32();
+        r.ReadInt32();                          // ItemID
 
         AddOnInfo? taintedBy = null;
         if (r.HasBit())

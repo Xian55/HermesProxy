@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
 using Framework.Constants;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Client;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Outbox;
@@ -93,12 +95,19 @@ public static class MailSystem
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MAIL_TAKE_MONEY);
         packet.WriteGuid(mail.Mailbox.To64());
         packet.WriteUInt32((uint)mail.MailID);
+        // TrinityCore 4.3.4 HandleMailTakeMoney reads the amount too, and refuses a non-zero one
+        // that differs from the mail's. Without it the read ran off the end and nothing happened.
+        if (WorldClient.IsCataLegacy)
+            packet.WriteInt64(mail.Money);
         ctx.SendPacketToServer(packet);
     }
 
     static WorldPacket BuildSendMail(in SendMail mail, long sendMoney, long cod,
         List<MailAttachment> attachments)
     {
+        if (WorldClient.IsCataLegacy)
+            return BuildSendMailCata(in mail, sendMoney, cod, attachments);
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SEND_MAIL);
         packet.WriteGuid(mail.Mailbox.To64());
         packet.WriteCString(LegacyPlayerName.StripRealmSuffix(mail.Target));
@@ -128,6 +137,50 @@ public static class MailSystem
         packet.WriteUInt32((uint)cod);
         packet.WriteUInt64(0); // unk
         packet.WriteUInt8(0); // unk
+        return packet;
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 HandleSendMail: 64-bit money and COD, bit-packed lengths, a masked mailbox
+    /// GUID interleaved with the attachments' masked GUIDs, and unterminated strings. Sent the
+    /// 3.3.5a way the server read nonsense and dropped the mail without a reply.
+    /// </summary>
+    static WorldPacket BuildSendMailCata(in SendMail mail, long sendMoney, long cod,
+        List<MailAttachment> attachments)
+    {
+        ulong mailbox = mail.Mailbox.To64().Low;
+        string receiver = LegacyPlayerName.StripRealmSuffix(mail.Target).ToString();
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_SEND_MAIL);
+        packet.WriteUInt32(0); // package
+        packet.WriteInt32(mail.StationeryID);
+        packet.WriteInt64(cod);
+        packet.WriteInt64(sendMoney);
+        packet.WriteBits((uint)Encoding.UTF8.GetByteCount(mail.Body), 12);
+        packet.WriteBits((uint)Encoding.UTF8.GetByteCount(mail.Subject), 9);
+        packet.WriteBits((uint)attachments.Count, 5);
+        MaskedGuid.WriteMaskBits(packet, mailbox, [0]);
+        foreach (var item in attachments)
+            MaskedGuid.WriteMaskBits(packet, item.ItemGUID.To64().Low, [2, 6, 3, 7, 1, 0, 4, 5]);
+        MaskedGuid.WriteMaskBits(packet, mailbox, [3, 4]);
+        packet.WriteBits((uint)Encoding.UTF8.GetByteCount(receiver), 7);
+        MaskedGuid.WriteMaskBits(packet, mailbox, [2, 6, 1, 7, 5]);
+        packet.FlushBits();
+
+        MaskedGuid.WriteBytes(packet, mailbox, [4]);
+        foreach (var item in attachments)
+        {
+            ulong guid = item.ItemGUID.To64().Low;
+            MaskedGuid.WriteBytes(packet, guid, [6, 1, 7, 2]);
+            packet.WriteUInt8(item.AttachPosition);
+            MaskedGuid.WriteBytes(packet, guid, [3, 0, 4, 5]);
+        }
+        MaskedGuid.WriteBytes(packet, mailbox, [7, 3, 6, 5]);
+        packet.WriteString(mail.Subject);
+        packet.WriteString(receiver);
+        MaskedGuid.WriteBytes(packet, mailbox, [2, 0]);
+        packet.WriteString(mail.Body);
+        MaskedGuid.WriteBytes(packet, mailbox, [1]);
         return packet;
     }
 

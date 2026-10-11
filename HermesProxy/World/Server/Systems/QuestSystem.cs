@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Framework.Constants;
 using Framework.Logging;
+using HermesProxy.World.Client;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
@@ -288,6 +289,10 @@ public static class QuestSystem
         WorldPacket packet = new WorldPacket(opcode);
         packet.WriteGuid(quest.QuestGiverGUID.To64());
         packet.WriteUInt32(quest.QuestID);
+        // 4.3.4 reads FromScript after the quest (TrinityCore 4.3.4 QuestGiverCompleteQuest::Read);
+        // without it the read runs short and the turn-in click does nothing.
+        if (WorldClient.IsCataLegacy && opcode == Opcode.CMSG_QUEST_GIVER_COMPLETE_QUEST)
+            packet.WriteBool(quest.FromScript);
         ctx.SendPacketToServer(packet);
     }
 

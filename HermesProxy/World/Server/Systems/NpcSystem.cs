@@ -2,6 +2,7 @@ using System;
 using Framework.Constants;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Client;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
@@ -104,6 +105,9 @@ public static class NpcSystem
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_TRAINER_BUY_SPELL);
         packet.WriteGuid(buy.TrainerGUID.To64());
+        // TrinityCore 4.3.4 TrainerBuySpell::Read: the trainer id from SMSG_TRAINER_LIST.
+        if (WorldClient.IsCataLegacy)
+            packet.WriteUInt32(buy.TrainerID);
         // The class this replaced overwrote its own SpellID field here. A data-only packet is
         // readonly, so the remapped id lives in a local; nothing else about the body changed.
         uint spellId = buy.SpellID;

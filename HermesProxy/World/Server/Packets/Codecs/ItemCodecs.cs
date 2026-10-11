@@ -169,6 +169,33 @@ public static class AutoEquipItemCodec
     }
 }
 
+[PacketCodec(typeof(AutoBankItem), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class AutoBankItemCodec
+{
+    public static void Read(ref SpanPacketReader r, out AutoBankItem packet)
+    {
+        InvUpdateCodec.Read(ref r, out var inv);
+        byte packSlot = r.ReadUInt8();
+        byte slot = r.ReadUInt8();
+        packet = new AutoBankItem(inv, packSlot, slot);
+    }
+}
+
+// 4.4.2 (TrinityCore cata_classic, and the client's writer): a BankType byte comes first. Read
+// the 3.4.3 way, the bank type became the bag and the bag the slot.
+[PacketCodec(typeof(AutoBankItem), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class AutoBankItemCodecCataClassic
+{
+    public static void Read(ref SpanPacketReader r, out AutoBankItem packet)
+    {
+        InvUpdateCodec.Read(ref r, out var inv);
+        r.ReadUInt8();                          // BankType
+        byte packSlot = r.ReadUInt8();
+        byte slot = r.ReadUInt8();
+        packet = new AutoBankItem(inv, packSlot, slot);
+    }
+}
+
 public static class AutoEquipItemSlotCodec
 {
     public static void Read(ref SpanPacketReader r, out AutoEquipItemSlot packet)

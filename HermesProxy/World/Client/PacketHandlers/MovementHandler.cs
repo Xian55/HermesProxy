@@ -192,6 +192,14 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.MSG_MOVE_WATER_WALK)]
     internal void HandleMovementMessages(WorldPacket packet)
     {
+        // 4.3.4 sends the player's own teleport under this opcode, in its own layout; the moves
+        // of other units arrive as SMSG_MOVE_UPDATE_* instead.
+        if (IsCataLegacy && packet.GetUniversalOpcode(false) == Opcode.MSG_MOVE_TELEPORT)
+        {
+            HandleMoveTeleportCata(packet);
+            return;
+        }
+
         var gameState = GetSession().GameState;
         WowGuid128 mover = packet.ReadPackedGuid().To128(gameState);
         // Looked at before the block is read, and only where there is anything to drop: a dropped
@@ -223,6 +231,42 @@ public partial class WorldClient
         VersionChecker.IsWotLKClassicOrLater(modernBuild) &&
         legacyFlags.HasAnyFlag((uint)MovementFlagWotLK.SplineEnabled);
 
+    /// <summary>
+    /// Other units' movement on a 4.3.4 server: SMSG_MOVE_UPDATE and its knockback and speed
+    /// variants replace 3.3.5a's relayed MSG_MOVE_*, already under their modern names, each a
+    /// movement sequence (with the new speed as the extra element of the speed ones).
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE_KNOCK_BACK)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE_WALK_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE_RUN_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE_RUN_BACK_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE_SWIM_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE_SWIM_BACK_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE_FLIGHT_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE_FLIGHT_BACK_SPEED)]
+    internal void HandleMoveUpdateCata(WorldPacket packet)
+    {
+        Opcode opcode = packet.GetUniversalOpcode(false);
+        var gameState = GetSession().GameState;
+        if (!LegacyMovementCata.TryRead(packet, opcode, gameState, out ulong mover, out MovementInfo info, out _, out float speed))
+            return;
+
+        WowGuid128 guid = new WowGuid64(mover).To128(gameState);
+        switch (opcode)
+        {
+            case Opcode.SMSG_MOVE_UPDATE:
+                SendPacketToClient(new MoveUpdate { MoverGUID = guid, MoveInfo = info });
+                break;
+            case Opcode.SMSG_MOVE_UPDATE_KNOCK_BACK:
+                SendPacketToClient(new MoveUpdateKnockBack { MoverGUID = guid, MoveInfo = info });
+                break;
+            default:
+                SendPacketToClient(new MoveUpdateSpeed(opcode) { MoverGUID = guid, MoveInfo = info, Speed = speed });
+                break;
+        }
+    }
+
     [HandlesSmsg(Opcode.MSG_MOVE_KNOCK_BACK)]
     internal void HandleMoveKnockBack(WorldPacket packet)
     {
@@ -240,12 +284,40 @@ public partial class WorldClient
     internal void HandleMoveForceKnockBack(WorldPacket packet)
     {
         MoveKnockBack knockback = new MoveKnockBack();
+        if (IsCataLegacy)
+        {
+            ReadMoveKnockBackCata(packet, knockback);
+            SendPacketToClient(knockback);
+            return;
+        }
+
         knockback.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
         knockback.MoveCounter = packet.ReadUInt32();
         knockback.Direction = packet.ReadVector2();
         knockback.HorizontalSpeed = packet.ReadFloat();
         knockback.VerticalSpeed = packet.ReadFloat();
         SendPacketToClient(knockback);
+    }
+
+    // TrinityCore 4.3.4 MoveKnockBack::Write: a masked GUID with its bytes between the fields.
+    // Read the 3.3.5a way the mover came out as an unknown high-guid and the client was knocked
+    // back nothing — Rocket Jump cast, but the player never left the ground.
+    void ReadMoveKnockBackCata(WorldPacket packet, MoveKnockBack knockback)
+    {
+        Span<bool> mask = stackalloc bool[8];
+        Span<byte> guid = stackalloc byte[8];
+        MaskedGuid.ReadMaskBits(packet, mask, [0, 3, 6, 7, 2, 5, 1, 4]);
+        MaskedGuid.ReadByte(packet, mask, guid, 1);
+        float directionY = packet.ReadFloat();
+        knockback.MoveCounter = packet.ReadUInt32();
+        MaskedGuid.ReadBytes(packet, mask, guid, [6, 7]);
+        knockback.HorizontalSpeed = packet.ReadFloat();
+        MaskedGuid.ReadBytes(packet, mask, guid, [4, 5, 3]);
+        knockback.VerticalSpeed = packet.ReadFloat();
+        float directionX = packet.ReadFloat();
+        MaskedGuid.ReadBytes(packet, mask, guid, [2, 0]);
+        knockback.Direction = new Vector2(directionX, directionY);
+        knockback.MoverGUID = new WowGuid64(MaskedGuid.ToUInt64(guid)).To128(GetSession().GameState);
     }
 
     [HandlesSmsg(Opcode.SMSG_CONTROL_UPDATE)]
@@ -273,24 +345,7 @@ public partial class WorldClient
     internal void HandleMoveTeleportAck(WorldPacket packet)
     {
         WowGuid128 guid = packet.ReadPackedGuid().To128(GetSession().GameState);
-
-        if (GetSession().GameState.CurrentPlayerGuid == guid)
-        {
-            if (GetSession().GameState.IsInTaxiFlight)
-            {
-                ControlUpdate control = new ControlUpdate();
-                control.Guid = guid;
-                control.HasControl = true;
-                SendPacketToClient(control);
-                GetSession().GameState.IsInTaxiFlight = false;
-            }
-
-            // A taxi start that never materialised cannot arrive after the player has been moved
-            // somewhere else. Leaving the flag set turns the next server-driven flying spline for
-            // this player into a bogus taxi start, complete with two stop splines and a
-            // CONTROL_UPDATE that takes control away for good.
-            GetSession().GameState.IsWaitingForTaxiStart = false;
-        }
+        NoteTeleport(guid);
 
         MoveTeleport teleport = new MoveTeleport();
         teleport.MoverGUID = guid;
@@ -316,6 +371,81 @@ public partial class WorldClient
             teleport.Vehicle = new();
             teleport.Vehicle.VehicleSeatIndex = seated.Seat;
         }
+        SendPacketToClient(teleport);
+    }
+
+    void NoteTeleport(WowGuid128 guid)
+    {
+        if (GetSession().GameState.CurrentPlayerGuid != guid)
+            return;
+
+        if (GetSession().GameState.IsInTaxiFlight)
+        {
+            ControlUpdate control = new ControlUpdate();
+            control.Guid = guid;
+            control.HasControl = true;
+            SendPacketToClient(control);
+            GetSession().GameState.IsInTaxiFlight = false;
+        }
+
+        // A taxi start that never materialised cannot arrive after the player has been moved
+        // somewhere else. Leaving the flag set turns the next server-driven flying spline for
+        // this player into a bogus taxi start, complete with two stop splines and a
+        // CONTROL_UPDATE that takes control away for good.
+        GetSession().GameState.IsWaitingForTaxiStart = false;
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 MoveTeleport::Write: the player's own teleport (a same-map hearthstone,
+    /// a summon), a masked GUID with the optional vehicle and transport parts in the bit section
+    /// and the position scattered between the GUID bytes. Positions on a transport are already
+    /// deck-relative there.
+    /// </summary>
+    void HandleMoveTeleportCata(WorldPacket packet)
+    {
+        Span<bool> mask = stackalloc bool[8];
+        Span<byte> guid = stackalloc byte[8];
+        Span<bool> transportMask = stackalloc bool[8];
+        Span<byte> transportGuid = stackalloc byte[8];
+
+        MaskedGuid.ReadMaskBits(packet, mask, [6, 0, 3, 2]);
+        bool hasVehicle = packet.HasBit();
+        bool exitVoluntary = hasVehicle && packet.HasBit();
+        bool exitTeleport = hasVehicle && packet.HasBit();
+        bool hasTransport = packet.HasBit();
+        MaskedGuid.ReadMaskBits(packet, mask, [1]);
+        if (hasTransport)
+            MaskedGuid.ReadMaskBits(packet, transportMask, [1, 3, 2, 5, 0, 7, 6, 4]);
+        MaskedGuid.ReadMaskBits(packet, mask, [4, 7, 5]);
+        packet.ResetBitPos();
+
+        if (hasTransport)
+            MaskedGuid.ReadBytes(packet, transportMask, transportGuid, [5, 6, 1, 7, 0, 2, 4, 3]);
+
+        MoveTeleport teleport = new MoveTeleport();
+        teleport.MoveCounter = packet.ReadUInt32();
+        MaskedGuid.ReadBytes(packet, mask, guid, [1, 2, 3, 5]);
+        float x = packet.ReadFloat();
+        MaskedGuid.ReadByte(packet, mask, guid, 4);
+        teleport.Orientation = packet.ReadFloat();
+        MaskedGuid.ReadByte(packet, mask, guid, 7);
+        float z = packet.ReadFloat();
+        if (hasVehicle)
+        {
+            teleport.Vehicle = new();
+            teleport.Vehicle.VehicleSeatIndex = (sbyte)packet.ReadUInt32();
+            teleport.Vehicle.VehicleExitVoluntary = exitVoluntary;
+            teleport.Vehicle.VehicleExitTeleport = exitTeleport;
+        }
+        MaskedGuid.ReadBytes(packet, mask, guid, [0, 6]);
+        float y = packet.ReadFloat();
+
+        teleport.MoverGUID = new WowGuid64(MaskedGuid.ToUInt64(guid)).To128(GetSession().GameState);
+        teleport.Position = new Vector3(x, y, z);
+        if (hasTransport)
+            teleport.TransportGUID = new WowGuid64(MaskedGuid.ToUInt64(transportGuid)).To128(GetSession().GameState);
+
+        NoteTeleport(teleport.MoverGUID);
         SendPacketToClient(teleport);
     }
 
@@ -464,6 +594,18 @@ public partial class WorldClient
     internal void HandleMoveSplineSetSpeed(WorldPacket packet)
     {
         MoveSplineSetSpeed speed = new MoveSplineSetSpeed(packet.GetUniversalOpcode(false));
+        if (IsCataLegacy)
+        {
+            // 4.3.4: a per-opcode sequence with the speed as its extra element.
+            if (!LegacyMovementCata.TryRead(packet, packet.GetUniversalOpcode(false), GetSession().GameState,
+                    out ulong mover, out _, out _, out float value))
+                return;
+            speed.MoverGUID = new WowGuid64(mover).To128(GetSession().GameState);
+            speed.Speed = value;
+            SendPacketToClient(speed);
+            return;
+        }
+
         speed.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
         speed.Speed = packet.ReadFloat();
         SendPacketToClient(speed);
@@ -558,6 +700,31 @@ public partial class WorldClient
         }
     }
 
+    // 4.3.4 replaced SMSG_FORCE_*_SPEED_CHANGE with these, already under their modern names, each
+    // a movement sequence carrying the move counter and the new speed as its extra element.
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_WALK_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_RUN_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_RUN_BACK_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_SWIM_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_SWIM_BACK_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_TURN_RATE)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_FLIGHT_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_FLIGHT_BACK_SPEED)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_PITCH_RATE)]
+    internal void HandleMoveSetSpeedCata(WorldPacket packet)
+    {
+        Opcode opcode = packet.GetUniversalOpcode(false);
+        if (!LegacyMovementCata.TryRead(packet, opcode, GetSession().GameState,
+                out ulong mover, out _, out uint counter, out float value))
+            return;
+
+        MoveSetSpeed speed = new MoveSetSpeed(opcode);
+        speed.MoverGUID = new WowGuid64(mover).To128(GetSession().GameState);
+        speed.MoveCounter = counter;
+        speed.Speed = value;
+        SendPlayerMovementPacket(speed, speed.MoverGUID);
+    }
+
     // for other players
     [HandlesSmsg(Opcode.MSG_MOVE_SET_FLIGHT_BACK_SPEED)]
     [HandlesSmsg(Opcode.MSG_MOVE_SET_FLIGHT_SPEED)]
@@ -611,7 +778,16 @@ public partial class WorldClient
     internal void HandleSplineMovementMessages(WorldPacket packet)
     {
         MoveSplineSetFlag spline = new MoveSplineSetFlag(packet.GetUniversalOpcode(false));
-        spline.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
+        if (IsCataLegacy)
+        {
+            // 4.3.4 sends only the masked GUID, in a per-opcode order.
+            if (!LegacyMovementCata.TryRead(packet, packet.GetUniversalOpcode(false), GetSession().GameState,
+                    out ulong mover, out _, out _, out _))
+                return;
+            spline.MoverGUID = new WowGuid64(mover).To128(GetSession().GameState);
+        }
+        else
+            spline.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
         SendPacketToClient(spline);
     }
 
@@ -633,8 +809,20 @@ public partial class WorldClient
     {
         Opcode opcode = packet.GetUniversalOpcode(false);
         MoveSetFlag flag = new MoveSetFlag(opcode);
-        flag.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
-        flag.MoveCounter = packet.ReadUInt32();
+        if (IsCataLegacy)
+        {
+            // 4.3.4: the masked GUID and the move counter, in a per-opcode order.
+            if (!LegacyMovementCata.TryRead(packet, opcode, GetSession().GameState,
+                    out ulong mover, out _, out uint counter, out _))
+                return;
+            flag.MoverGUID = new WowGuid64(mover).To128(GetSession().GameState);
+            flag.MoveCounter = counter;
+        }
+        else
+        {
+            flag.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
+            flag.MoveCounter = packet.ReadUInt32();
+        }
         if (flag.MoverGUID == GetSession().GameState.CurrentPlayerGuid)
             TrackOwnMoveFlagChange(opcode);
         SendPacketToClient(flag);
@@ -760,6 +948,21 @@ public partial class WorldClient
             }
             else
                 moveSpline.SplineFlags = splineFlags.CastFlags<SplineFlagTBC, SplineFlagModern>();
+        }
+        else if (IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 writes every field below in the 3.3.5a order; only the flag bits
+            // moved. An uncompressed path carries all its points, as a 3.3.5a CatmullRom one does.
+            uint splineFlags = packet.ReadUInt32();
+            hasAnimTier = (splineFlags & SplineFlagAnimationCata) != 0;
+            hasTrajectory = (splineFlags & SplineFlagParabolicCata) != 0;
+            hasCatmullRom = (splineFlags & (uint)SplineFlagModern.UncompressedPath) != 0;
+            isFlyingSpline = (splineFlags & (uint)SplineFlagModern.Flying) != 0;
+            takesSeat = (splineFlags & (uint)SplineFlagModern.TransportEnter) != 0;
+            leavesSeat = (splineFlags & (uint)SplineFlagModern.TransportExit) != 0;
+            moveSpline.SplineFlags = ConvertSplineFlagsCata(splineFlags);
+            if (takesSeat || leavesSeat)
+                moveSpline.SplineFlags |= SplineFlagModern.SmoothGroundPath | SplineFlagModern.CanSwim;
         }
         else
         {

@@ -1060,34 +1060,80 @@ class SpecialMountAnim : ServerPacket, ISpanWritable
     public int SequenceVariation;
 }
 
-public class StartMirrorTimer : ServerPacket, ISpanWritable
+public sealed class StartMirrorTimer : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<StartMirrorTimer>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new IntTimerLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new ByteTimerLayout()));
+
+    private static readonly ServerPacketLayout<StartMirrorTimer> Layout = Layouts.ForRunningClient();
+
     public StartMirrorTimer() : base(Opcode.SMSG_START_MIRROR_TIMER) { }
 
-    public override void Write()
-    {
-        _worldPacket.WriteInt32((int)Timer);
-        _worldPacket.WriteInt32(Value);
-        _worldPacket.WriteInt32(MaxValue);
-        _worldPacket.WriteInt32(Scale);
-        _worldPacket.WriteInt32(SpellID);
-        _worldPacket.WriteBit(Paused);
-        _worldPacket.FlushBits();
-    }
+    public override void Write() => Layout.Write(this, _worldPacket);
 
     public int MaxSize => 21; // 5 ints + 1 byte for bit
 
-    public int WriteToSpan(Span<byte> buffer)
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>Up to 3.4.3: the timer type is a uint32.</summary>
+    internal sealed class IntTimerLayout : ServerPacketLayout<StartMirrorTimer>
     {
-        var writer = new SpanPacketWriter(buffer);
-        writer.WriteInt32((int)Timer);
-        writer.WriteInt32(Value);
-        writer.WriteInt32(MaxValue);
-        writer.WriteInt32(Scale);
-        writer.WriteInt32(SpellID);
-        writer.WriteBit(Paused);
-        writer.FlushBits();
-        return writer.Position;
+        public override void Write(StartMirrorTimer packet, WorldPacket data)
+        {
+            data.WriteInt32((int)packet.Timer);
+            data.WriteInt32(packet.Value);
+            data.WriteInt32(packet.MaxValue);
+            data.WriteInt32(packet.Scale);
+            data.WriteInt32(packet.SpellID);
+            data.WriteBit(packet.Paused);
+            data.FlushBits();
+        }
+
+        public override int WriteToSpan(StartMirrorTimer packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32((int)packet.Timer);
+            writer.WriteInt32(packet.Value);
+            writer.WriteInt32(packet.MaxValue);
+            writer.WriteInt32(packet.Scale);
+            writer.WriteInt32(packet.SpellID);
+            writer.WriteBit(packet.Paused);
+            writer.FlushBits();
+            return writer.Position;
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, and the client's reader): the timer type is a byte.
+    /// Written as a uint32, the breath and fatigue bars read their value from the type's high
+    /// bytes.
+    /// </summary>
+    internal sealed class ByteTimerLayout : ServerPacketLayout<StartMirrorTimer>
+    {
+        public override void Write(StartMirrorTimer packet, WorldPacket data)
+        {
+            data.WriteUInt8((byte)packet.Timer);
+            data.WriteInt32(packet.Value);
+            data.WriteInt32(packet.MaxValue);
+            data.WriteInt32(packet.Scale);
+            data.WriteInt32(packet.SpellID);
+            data.WriteBit(packet.Paused);
+            data.FlushBits();
+        }
+
+        public override int WriteToSpan(StartMirrorTimer packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt8((byte)packet.Timer);
+            writer.WriteInt32(packet.Value);
+            writer.WriteInt32(packet.MaxValue);
+            writer.WriteInt32(packet.Scale);
+            writer.WriteInt32(packet.SpellID);
+            writer.WriteBit(packet.Paused);
+            writer.FlushBits();
+            return writer.Position;
+        }
     }
 
     public MirrorTimerType Timer;
@@ -1098,26 +1144,60 @@ public class StartMirrorTimer : ServerPacket, ISpanWritable
     public bool Paused;
 }
 
-public class PauseMirrorTimer : ServerPacket, ISpanWritable
+public sealed class PauseMirrorTimer : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<PauseMirrorTimer>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new IntTimerLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new ByteTimerLayout()));
+
+    private static readonly ServerPacketLayout<PauseMirrorTimer> Layout = Layouts.ForRunningClient();
+
     public PauseMirrorTimer() : base(Opcode.SMSG_PAUSE_MIRROR_TIMER) { }
 
-    public override void Write()
-    {
-        _worldPacket.WriteInt32((int)Timer);
-        _worldPacket.WriteBit(Paused);
-        _worldPacket.FlushBits();
-    }
+    public override void Write() => Layout.Write(this, _worldPacket);
 
     public int MaxSize => 5; // int + 1 byte for bit
 
-    public int WriteToSpan(Span<byte> buffer)
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>Up to 3.4.3: the timer type is a uint32.</summary>
+    internal sealed class IntTimerLayout : ServerPacketLayout<PauseMirrorTimer>
     {
-        var writer = new SpanPacketWriter(buffer);
-        writer.WriteInt32((int)Timer);
-        writer.WriteBit(Paused);
-        writer.FlushBits();
-        return writer.Position;
+        public override void Write(PauseMirrorTimer packet, WorldPacket data)
+        {
+            data.WriteInt32((int)packet.Timer);
+            data.WriteBit(packet.Paused);
+            data.FlushBits();
+        }
+
+        public override int WriteToSpan(PauseMirrorTimer packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32((int)packet.Timer);
+            writer.WriteBit(packet.Paused);
+            writer.FlushBits();
+            return writer.Position;
+        }
+    }
+
+    /// <summary>4.4.2 (TrinityCore cata_classic, and the client's reader): the timer type is a byte.</summary>
+    internal sealed class ByteTimerLayout : ServerPacketLayout<PauseMirrorTimer>
+    {
+        public override void Write(PauseMirrorTimer packet, WorldPacket data)
+        {
+            data.WriteUInt8((byte)packet.Timer);
+            data.WriteBit(packet.Paused);
+            data.FlushBits();
+        }
+
+        public override int WriteToSpan(PauseMirrorTimer packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt8((byte)packet.Timer);
+            writer.WriteBit(packet.Paused);
+            writer.FlushBits();
+            return writer.Position;
+        }
     }
 
     public MirrorTimerType Timer;

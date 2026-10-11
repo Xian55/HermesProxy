@@ -885,30 +885,71 @@ public class MoveSetActiveMover : ServerPacket
     public WowGuid128 MoverGUID;
 }
 
-public class PhaseShiftChange : ServerPacket
+public sealed class PhaseShiftChange : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<PhaseShiftChange>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new ShortFlagsLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new IntFlagsLayout()));
+
+    private static readonly ServerPacketLayout<PhaseShiftChange> Layout = Layouts.ForRunningClient();
+
     public PhaseShiftChange() : base(Opcode.SMSG_PHASE_SHIFT_CHANGE, ConnectionType.Instance) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    private static void WriteHeader(PhaseShiftChange packet, WorldPacket data)
     {
-        _worldPacket.WritePackedGuid128(Client);
-        _worldPacket.WriteUInt32(PhaseShiftFlags);
-        _worldPacket.WriteUInt32((uint)Phases.Count);
-        _worldPacket.WritePackedGuid128(PersonalGUID);
-        foreach (var phase in Phases)
+        data.WritePackedGuid128(packet.Client);
+        data.WriteUInt32(packet.PhaseShiftFlags);
+        data.WriteUInt32((uint)packet.Phases.Count);
+        data.WritePackedGuid128(packet.PersonalGUID);
+    }
+
+    private static void WriteMapLists(PhaseShiftChange packet, WorldPacket data)
+    {
+        data.WriteUInt32((uint)packet.VisibleMapIDs.Count);
+        foreach (var mapId in packet.VisibleMapIDs)
+            data.WriteUInt16(mapId);
+        data.WriteUInt32((uint)packet.PreloadMapIDs.Count);
+        foreach (var mapId in packet.PreloadMapIDs)
+            data.WriteUInt16(mapId);
+        data.WriteUInt32((uint)packet.UiMapPhaseIDs.Count);
+        foreach (var uiMapPhase in packet.UiMapPhaseIDs)
+            data.WriteUInt16(uiMapPhase);
+    }
+
+    /// <summary>Up to 3.4.3: each phase is (u16 Flags, u16 Id).</summary>
+    internal sealed class ShortFlagsLayout : ServerPacketLayout<PhaseShiftChange>
+    {
+        public override void Write(PhaseShiftChange packet, WorldPacket data)
         {
-            _worldPacket.WriteUInt16(phase.Flags);
-            _worldPacket.WriteUInt16(phase.Id);
+            WriteHeader(packet, data);
+            foreach (var phase in packet.Phases)
+            {
+                data.WriteUInt16(phase.Flags);
+                data.WriteUInt16(phase.Id);
+            }
+            WriteMapLists(packet, data);
         }
-        _worldPacket.WriteUInt32((uint)VisibleMapIDs.Count);
-        foreach (var mapId in VisibleMapIDs)
-            _worldPacket.WriteUInt16(mapId);
-        _worldPacket.WriteUInt32((uint)PreloadMapIDs.Count);
-        foreach (var mapId in PreloadMapIDs)
-            _worldPacket.WriteUInt16(mapId);
-        _worldPacket.WriteUInt32((uint)UiMapPhaseIDs.Count);
-        foreach (var uiMapPhase in UiMapPhaseIDs)
-            _worldPacket.WriteUInt16(uiMapPhase);
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, and the client's reader): each phase is (u32 Flags,
+    /// u16 Id). Written the 3.4.3 way every phase after the first came out shifted, which matters
+    /// as soon as a 4.3.4 server puts the player in one.
+    /// </summary>
+    internal sealed class IntFlagsLayout : ServerPacketLayout<PhaseShiftChange>
+    {
+        public override void Write(PhaseShiftChange packet, WorldPacket data)
+        {
+            WriteHeader(packet, data);
+            foreach (var phase in packet.Phases)
+            {
+                data.WriteUInt32(phase.Flags);
+                data.WriteUInt16(phase.Id);
+            }
+            WriteMapLists(packet, data);
+        }
     }
 
     public WowGuid128 Client;

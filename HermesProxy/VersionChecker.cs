@@ -347,6 +347,7 @@ public static class LegacyVersion
                 or ClientVersionBuild.V1_12_3_6141 => ClientVersionBuild.V1_12_1_5875,
             ClientVersionBuild.V2_4_3_8606 => ClientVersionBuild.V2_4_3_8606,
             ClientVersionBuild.V3_3_5a_12340 => ClientVersionBuild.V3_3_5a_12340,
+            ClientVersionBuild.V4_3_4_15595 => ClientVersionBuild.V4_3_4_15595,
             _ => ClientVersionBuild.Zero,
         };
 
@@ -480,7 +481,8 @@ public static class LegacyVersion
 
     public static int GetPowersCount()
     {
-        if (RemovedInVersion(ClientVersionBuild.V3_0_2_9056))
+        // 4.x indexes powers by class slot and has five of them (UNIT_FIELD_POWER1..5).
+        if (RemovedInVersion(ClientVersionBuild.V3_0_2_9056) || ExpansionVersion >= 4)
             return 5;
 
         return 7;
@@ -513,6 +515,8 @@ public static class LegacyVersion
         // — Bear Form / shapeshift cast errors displayed as flight-related text.
         if (ModernVersion.IsWotLKClassicOrLater)
         {
+            if (ExpansionVersion >= 4)
+                return (uint)((SpellCastResultCata)result).CastEnum<SpellCastResultV343>();
             if (AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 return (uint)((SpellCastResultWotLK)result).CastEnum<SpellCastResultV343>();
             else if (AddedInVersion(ClientVersionBuild.V2_0_1_6180))

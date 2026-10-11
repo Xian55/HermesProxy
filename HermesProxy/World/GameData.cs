@@ -716,6 +716,7 @@ public static partial class GameData
             LoadTaxiPathNodesGraph,
             LoadQuestBits,
             LoadWorldMapAreaIDToUiMapID,
+            LoadFactionReputation,
             LoadHotfixes
         );
 
@@ -2272,6 +2273,35 @@ public static partial class GameData
     /// </summary>
     public static int GetUiMapId(int worldMapAreaId) =>
         WorldMapAreaIDToUiMapID.TryGetValue(worldMapAreaId, out int uiMapId) ? uiMapId : worldMapAreaId;
+
+    /// <summary>
+    /// Faction id by reputation list index, from the client's Faction table. Legacy servers name a
+    /// reputation by its list index; from 4.4.2 the client names it by faction id. Empty for
+    /// builds without the file, which do not need it.
+    /// </summary>
+    public static int[] FactionIdByReputationIndex = [];
+
+    public static void LoadFactionReputation()
+    {
+        var path = Path.Combine("CSV", $"FactionReputation{ModernVersion.ExpansionVersion}.csv");
+        if (!File.Exists(path))
+            return;
+
+        using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+
+        Dictionary<int, int> byIndex = [];
+        foreach (var row in reader)
+            byIndex[int.Parse(row[1].Span)] = int.Parse(row[0].Span);
+
+        int[] table = new int[byIndex.Count == 0 ? 0 : byIndex.Keys.Max() + 1];
+        foreach (var (index, factionId) in byIndex)
+            table[index] = factionId;
+        FactionIdByReputationIndex = table;
+    }
+
+    /// <summary>The faction id for a reputation list index, or 0 when the client has none.</summary>
+    public static int GetFactionIdForReputationIndex(int index) =>
+        (uint)index < (uint)FactionIdByReputationIndex.Length ? FactionIdByReputationIndex[index] : 0;
 
     #endregion
     #region HotFixes
