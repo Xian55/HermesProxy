@@ -53,6 +53,17 @@ public class GuildCodecEquivalenceTests
         Assert.Equal(o.Remaining(), r.Remaining);
     }
 
+    // New with the codec, so there is no frozen Read() to compare with: the client's layout is the
+    // guild's GUID and nothing else (docs/protocol, 3.4.3 and 4.4.2).
+    [Fact]
+    public void GuildGetRanks_ReadsTheGuildGuid()
+    {
+        var (_, f) = Build(w => w.WritePackedGuid128(Guid));
+        var r = ReaderOver(f); GuildGetRanksCodec.Read(ref r, out var a);
+        Assert.Equal(Guid, a.GuildGuid);
+        Assert.Equal(0, r.Remaining);
+    }
+
     // ---- guild text: an 11-bit length then the bytes ----
 
     [Theory]

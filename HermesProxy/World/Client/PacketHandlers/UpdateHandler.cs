@@ -3732,10 +3732,28 @@ public partial class WorldClient
                 GetSession().GameState.StorePlayerGuildId(guid, updates[PLAYER_GUILDID].UInt32Value);
                 updateData.UnitData.GuildGUID = WowGuid128.CreateGuildOrEmpty(updates[PLAYER_GUILDID].UInt32Value);
             }
+            // 4.3.4 has no PLAYER_GUILDID. A player's guild is the object's DATA field, a whole
+            // guild GUID whose low half is the guild id (TrinityCore 4.3.4 Player::SetInGuild),
+            // and the guild's level is a field of its own.
+            if (IsCataLegacy)
+            {
+                int OBJECT_FIELD_DATA = LegacyVersion.GetUpdateField(ObjectField.OBJECT_FIELD_DATA);
+                if (OBJECT_FIELD_DATA >= 0 && updateMaskArray[OBJECT_FIELD_DATA])
+                {
+                    uint guildId = updates[OBJECT_FIELD_DATA].UInt32Value;
+                    GetSession().GameState.StorePlayerGuildId(guid, guildId);
+                    updateData.UnitData.GuildGUID = WowGuid128.CreateGuildOrEmpty(guildId);
+                }
+                int PLAYER_GUILDLEVEL = LegacyVersion.GetUpdateField(PlayerField.PLAYER_GUILDLEVEL);
+                if (PLAYER_GUILDLEVEL >= 0 && updateMaskArray[PLAYER_GUILDLEVEL])
+                    updateData.EnsurePlayerData().GuildLevel = updates[PLAYER_GUILDLEVEL].Int32Value;
+            }
             int PLAYER_GUILDRANK = LegacyVersion.GetUpdateField(PlayerField.PLAYER_GUILDRANK);
             if (PLAYER_GUILDRANK >= 0 && updateMaskArray[PLAYER_GUILDRANK])
             {
-                updateData.EnsurePlayerData().GuildLevel = 25;
+                // the older servers have no guild levels; 4.3.4 sends the real one above
+                if (!IsCataLegacy)
+                    updateData.EnsurePlayerData().GuildLevel = 25;
                 updateData.EnsurePlayerData().GuildRankID = updates[PLAYER_GUILDRANK].UInt32Value;
             }
             int PLAYER_GUILD_TIMESTAMP = LegacyVersion.GetUpdateField(PlayerField.PLAYER_GUILD_TIMESTAMP);

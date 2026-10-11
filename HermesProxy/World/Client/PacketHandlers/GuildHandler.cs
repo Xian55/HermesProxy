@@ -14,7 +14,10 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Handlers for SMSG opcodes coming the legacy world server
+    // TrinityCore 4.3.4 sends its results as the second opcode (GuildCommandResult is
+    // SMSG_GUILD_COMMAND_RESULT_2 there), in the layout the first one always had.
     [HandlesSmsg(Opcode.SMSG_GUILD_COMMAND_RESULT)]
+    [HandlesSmsg(Opcode.SMSG_GUILD_COMMAND_RESULT_2)]
     internal void HandleGuildCommandResult(WorldPacket packet)
     {
         GuildCommandResult result = new();
@@ -49,10 +52,73 @@ public partial class WorldClient
         SendPacketToClient(result);
     }
 
+    /// <summary>
+    /// TrinityCore 4.3.4 Guild::SendPermissions: the rank, the tabs bought, the rank's rights and
+    /// daily gold, then a bit-counted list of tab rights.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_PERMISSIONS_QUERY_RESULTS)]
+    internal void HandleGuildPermissionsQueryResults(WorldPacket packet)
+    {
+        GuildPermissionsQueryResults result = new();
+        result.RankID = packet.ReadUInt32();
+        result.NumTabs = (int)packet.ReadUInt32();
+        result.Flags = (int)packet.ReadUInt32();
+        result.WithdrawGoldLimit = (int)packet.ReadUInt32();
+        uint count = packet.ReadBits<uint>(23);
+        if (count > GuildConst.MaxBankTabsCata)
+            return; // a bank has eight tabs; anything larger is not this layout
+
+        for (int i = 0; i < count; i++)
+        {
+            GuildRankTabPermissions tab = new();
+            tab.Flags = packet.ReadInt32();
+            tab.WithdrawItemLimit = packet.ReadInt32();
+            result.Tab.Add(tab);
+        }
+        SendPacketToClient(result);
+    }
+
+    /// <summary>TrinityCore 4.3.4 Guild::SendMoneyInfo.</summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_BANK_REMAINING_WITHDRAW_MONEY)]
+    internal void HandleGuildBankRemainingWithdrawMoney(WorldPacket packet)
+    {
+        GuildBankRemainingWithdrawMoney result = new();
+        result.RemainingWithdrawMoney = packet.ReadInt64();
+        SendPacketToClient(result);
+    }
+
+    /// <summary>TrinityCore 4.3.4 Guild::SendMemberUpdateNote.</summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_MEMBER_UPDATE_NOTE)]
+    internal void HandleGuildMemberUpdateNote(WorldPacket packet)
+    {
+        Span<bool> mask = stackalloc bool[8];
+        MaskedGuid.ReadMaskBits(packet, mask, [7, 2, 3]);
+        uint noteLength = packet.ReadBits<uint>(8);
+        MaskedGuid.ReadMaskBits(packet, mask, [5, 0, 6, 4]);
+        bool isPublic = packet.HasBit();
+        MaskedGuid.ReadMaskBits(packet, mask, [1]);
+
+        Span<byte> guidBytes = stackalloc byte[8];
+        MaskedGuid.ReadBytes(packet, mask, guidBytes, [3, 0, 2, 5]);
+        string note = packet.ReadString(noteLength);
+        MaskedGuid.ReadBytes(packet, mask, guidBytes, [7, 6, 1, 4]);
+
+        GuildMemberUpdateNote update = new();
+        update.Member = new WowGuid64(MaskedGuid.ToUInt64(guidBytes)).To128(GetSession().GameState);
+        update.Note = note;
+        update.IsPublic = isPublic;
+        SendPacketToClient(update);
+    }
+
     [HandlesSmsg(Opcode.SMSG_GUILD_EVENT)]
     internal void HandleGuildEvent(WorldPacket packet)
     {
         GuildEventType eventType = (GuildEventType)packet.ReadUInt8();
+        if (IsCataLegacy)
+        {
+            if (!TryGuildEventFromCata((byte)eventType, out eventType))
+                return;
+        }
 
         var size = packet.ReadUInt8();
         string[] strings = new string[size];
@@ -223,9 +289,277 @@ public partial class WorldClient
         }
     }
 
+    /// <summary>
+    /// 4.3.4 counts guild events from 1 and has some the older servers lack (TrinityCore 4.3.4
+    /// Guild.h GuildEvents). The three rank events are all "the ranks changed" to this handler;
+    /// the founder and the mobile sign-on have nothing to be turned into.
+    /// </summary>
+    private static bool TryGuildEventFromCata(byte cataEvent, out GuildEventType eventType)
+    {
+        eventType = cataEvent switch
+        {
+            >= 1 and <= 11 => (GuildEventType)(cataEvent - 1),
+            12 or 13 or 14 => GuildEventType.RankUpdated,
+            16 => GuildEventType.PlayerSignedOn,
+            17 => GuildEventType.PlayerSignedOff,
+            18 => GuildEventType.BankBagSlotsChanged,
+            19 => GuildEventType.BankTabPurchased,
+            20 => GuildEventType.BankTabUpdated,
+            21 => GuildEventType.BankMoneyUpdate,
+            22 => GuildEventType.BankMoneyWithdraw,
+            23 => GuildEventType.BankTextChanged,
+            _ => GuildEventType.Unk11,
+        };
+        return eventType != GuildEventType.Unk11;
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 QueryGuildInfoResponse::Write: the guild's whole GUID, the name, ten rank
+    /// names, their orders and their ids, the emblem, and how many of the ten are in use.
+    /// </summary>
+    private void HandleQueryGuildInfoResponseCata(WorldPacket packet)
+    {
+        const int MaxRanks = 10;
+
+        QueryGuildInfoResponse guild = new();
+        uint guildId = (uint)packet.ReadUInt64();
+        guild.GuildGUID = WowGuid128.Create(HighGuidType703.Guild, guildId);
+        guild.PlayerGuid = GetSession().GameState.CurrentPlayerGuid;
+        guild.HasGuildInfo = true;
+        guild.Info = new QueryGuildInfoResponse.GuildInfo();
+        guild.Info.GuildGuid = guild.GuildGUID;
+        guild.Info.VirtualRealmAddress = GetSession().RealmId.GetAddress();
+
+        guild.Info.GuildName = packet.ReadCString();
+        GetSession().StoreGuildGuidAndName(guild.GuildGUID, guild.Info.GuildName);
+
+        string[] names = new string[MaxRanks];
+        for (int i = 0; i < MaxRanks; i++)
+            names[i] = packet.ReadCString();
+        Span<uint> orders = stackalloc uint[MaxRanks];
+        for (int i = 0; i < MaxRanks; i++)
+            orders[i] = packet.ReadUInt32();
+        Span<uint> ids = stackalloc uint[MaxRanks];
+        for (int i = 0; i < MaxRanks; i++)
+            ids[i] = packet.ReadUInt32();
+
+        guild.Info.EmblemStyle = packet.ReadUInt32();
+        guild.Info.EmblemColor = packet.ReadUInt32();
+        guild.Info.BorderStyle = packet.ReadUInt32();
+        guild.Info.BorderColor = packet.ReadUInt32();
+        guild.Info.BackgroundColor = packet.ReadUInt32();
+
+        uint ranksInUse = Math.Min(packet.ReadUInt32(), MaxRanks);
+        List<string> rankNames = new List<string>();
+        for (int i = 0; i < ranksInUse; i++)
+        {
+            RankInfo rank = new RankInfo();
+            rank.RankID = ids[i];
+            rank.RankOrder = orders[i];
+            rank.RankName = names[i];
+            rankNames.Add(names[i]);
+            guild.Info.Ranks.Add(rank);
+        }
+        GetSession().StoreGuildRankNames(guildId, rankNames);
+
+        SendPacketToClient(guild);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 GuildRanks::Write, the answer to CMSG_GUILD_GET_RANKS. The older servers
+    /// send the ranks inside the roster.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_RANKS)]
+    internal void HandleGuildRanks(WorldPacket packet)
+    {
+        int count = (int)packet.ReadBits<uint>(18);
+        if (count > 64)
+            return; // a guild has ten ranks; anything larger is not this layout
+
+        Span<int> nameLengths = stackalloc int[count];
+        for (int i = 0; i < count; i++)
+            nameLengths[i] = (int)packet.ReadBits<uint>(7);
+
+        GuildRanks ranks = new GuildRanks();
+        List<string> rankNames = new List<string>();
+        for (int i = 0; i < count; i++)
+        {
+            GuildRankData rank = new GuildRankData();
+            rank.RankID = (byte)packet.ReadInt32();
+            for (int tab = 0; tab < GuildConst.MaxBankTabsCata; tab++)
+            {
+                rank.TabWithdrawItemLimit[tab] = (uint)packet.ReadInt32();
+                rank.TabFlags[tab] = (uint)packet.ReadInt32();
+            }
+            rank.WithdrawGoldLimit = packet.ReadInt32();
+            rank.Flags = (uint)packet.ReadInt32();
+            rank.RankName = packet.ReadString((uint)nameLengths[i]);
+            rank.RankOrder = (uint)packet.ReadInt32();
+            rankNames.Add(rank.RankName);
+            ranks.Ranks.Add(rank);
+        }
+        GetSession().StoreGuildRankNames(GetSession().GameState.GetPlayerGuildId(GetSession().GameState.CurrentPlayerGuid), rankNames);
+        SendPacketToClient(ranks);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 GuildRoster::Write: every member's GUID mask and string lengths as bits
+    /// first, then the members with the GUID bytes strewn among their fields, then the guild's
+    /// own texts and numbers.
+    /// </summary>
+    private void HandleGuildRosterCata(WorldPacket packet)
+    {
+        GuildRoster guild = new();
+        uint welcomeLength = packet.ReadBits<uint>(11);
+        int count = (int)packet.ReadBits<uint>(18);
+        if (count > 2000)
+            return; // far past any guild; not this layout
+
+        bool[] masks = new bool[count * 8];
+        bool[] authenticated = new bool[count];
+        bool[] sorEligible = new bool[count];
+        int[] noteLengths = new int[count];
+        int[] officerNoteLengths = new int[count];
+        int[] nameLengths = new int[count];
+        for (int i = 0; i < count; i++)
+        {
+            Span<bool> mask = masks.AsSpan(i * 8, 8);
+            MaskedGuid.ReadMaskBits(packet, mask, [3, 4]);
+            authenticated[i] = packet.HasBit();
+            sorEligible[i] = packet.HasBit();
+            noteLengths[i] = (int)packet.ReadBits<uint>(8);
+            officerNoteLengths[i] = (int)packet.ReadBits<uint>(8);
+            MaskedGuid.ReadMaskBits(packet, mask, [0]);
+            nameLengths[i] = (int)packet.ReadBits<uint>(7);
+            MaskedGuid.ReadMaskBits(packet, mask, [1, 2, 6, 5, 7]);
+        }
+        uint infoLength = packet.ReadBits<uint>(12);
+
+        Span<byte> guidBytes = stackalloc byte[8];
+        for (int i = 0; i < count; i++)
+        {
+            ReadOnlySpan<bool> mask = masks.AsSpan(i * 8, 8);
+            guidBytes.Clear();
+
+            GuildRosterMemberData member = new GuildRosterMemberData();
+            PlayerCache cache = new PlayerCache();
+            member.VirtualRealmAddress = GetSession().RealmId.GetAddress();
+            member.Authenticated = authenticated[i];
+            member.SorEligible = sorEligible[i];
+
+            member.ClassID = cache.ClassId = (Class)packet.ReadUInt8();
+            member.GuildReputation = (int)packet.ReadUInt32();
+            MaskedGuid.ReadBytes(packet, mask, guidBytes, [0]);
+            member.WeeklyXP = (long)packet.ReadUInt64();
+            member.RankID = (int)packet.ReadUInt32();
+            member.PersonalAchievementPoints = (int)packet.ReadUInt32();
+            for (int profession = 0; profession < 2; profession++)
+            {
+                member.Profession[profession].Step = (int)packet.ReadUInt32();
+                member.Profession[profession].Rank = (int)packet.ReadUInt32();
+                member.Profession[profession].DbID = (int)packet.ReadUInt32();
+            }
+            MaskedGuid.ReadBytes(packet, mask, guidBytes, [2]);
+            member.Status = packet.ReadUInt8();
+            member.AreaID = (int)packet.ReadUInt32();
+            member.TotalXP = (long)packet.ReadUInt64();
+            MaskedGuid.ReadBytes(packet, mask, guidBytes, [7]);
+            member.GuildRepToCap = (int)packet.ReadUInt32();
+            member.Note = packet.ReadString((uint)noteLengths[i]);
+            MaskedGuid.ReadBytes(packet, mask, guidBytes, [3]);
+            member.Level = cache.Level = packet.ReadUInt8();
+            packet.ReadInt32();                     // VirtualRealmAddress: the proxy's own realm stands
+            MaskedGuid.ReadBytes(packet, mask, guidBytes, [5, 4]);
+            member.SexID = cache.SexId = (Gender)packet.ReadUInt8();
+            MaskedGuid.ReadBytes(packet, mask, guidBytes, [1]);
+            member.LastSave = packet.ReadFloat();
+            member.OfficerNote = packet.ReadString((uint)officerNoteLengths[i]);
+            MaskedGuid.ReadBytes(packet, mask, guidBytes, [6]);
+            member.Name = cache.Name = packet.ReadString((uint)nameLengths[i]);
+
+            member.Guid = new WowGuid64(MaskedGuid.ToUInt64(guidBytes)).To128(GetSession().GameState);
+            if (GetSession().GameState.CachedPlayers.TryGetValue(member.Guid, out var existing)
+                && existing.RaceId != Race.None)
+                member.RaceID = existing.RaceId;
+            GetSession().GameState.UpdatePlayerCache(member.Guid, cache);
+            guild.MemberData.Add(member);
+        }
+
+        guild.InfoText = packet.ReadString(infoLength);
+        guild.WelcomeText = packet.ReadString(welcomeLength);
+        guild.NumAccounts = packet.ReadUInt32();
+        packet.ReadUInt32();                        // WeeklyRepCap
+        guild.CreateDate = packet.ReadPackedTime();
+        guild.GuildFlags = (int)packet.ReadUInt32();
+        SendPacketToClient(guild);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 Guild::SendInvite: the guild's level and emblem, then the new and the
+    /// old guild's GUID masks with three name lengths among them, then the bytes and the names.
+    /// </summary>
+    private void HandleGuildInviteCata(WorldPacket packet)
+    {
+        GuildInvite invite = new();
+        packet.ReadUInt32();                        // guild level
+        invite.BorderStyle = packet.ReadUInt32();
+        invite.BorderColor = packet.ReadUInt32();
+        invite.EmblemStyle = packet.ReadUInt32();
+        invite.BackgroundColor = packet.ReadUInt32();
+        invite.EmblemColor = packet.ReadUInt32();
+
+        Span<bool> newMask = stackalloc bool[8];
+        Span<bool> oldMask = stackalloc bool[8];
+        MaskedGuid.ReadMaskBits(packet, newMask, [3, 2]);
+        uint oldGuildNameLength = packet.ReadBits<uint>(8);
+        MaskedGuid.ReadMaskBits(packet, newMask, [1]);
+        MaskedGuid.ReadMaskBits(packet, oldMask, [6, 4, 1, 5, 7, 2]);
+        MaskedGuid.ReadMaskBits(packet, newMask, [7, 0, 6]);
+        uint guildNameLength = packet.ReadBits<uint>(8);
+        MaskedGuid.ReadMaskBits(packet, oldMask, [3, 0]);
+        MaskedGuid.ReadMaskBits(packet, newMask, [5]);
+        uint inviterNameLength = packet.ReadBits<uint>(7);
+        MaskedGuid.ReadMaskBits(packet, newMask, [4]);
+
+        Span<byte> newBytes = stackalloc byte[8];
+        Span<byte> oldBytes = stackalloc byte[8];
+        MaskedGuid.ReadBytes(packet, newMask, newBytes, [1]);
+        MaskedGuid.ReadBytes(packet, oldMask, oldBytes, [3]);
+        MaskedGuid.ReadBytes(packet, newMask, newBytes, [6]);
+        MaskedGuid.ReadBytes(packet, oldMask, oldBytes, [2, 1]);
+        MaskedGuid.ReadBytes(packet, newMask, newBytes, [0]);
+        invite.OldGuildName = packet.ReadString(oldGuildNameLength);
+        MaskedGuid.ReadBytes(packet, newMask, newBytes, [7, 2]);
+        invite.InviterName = packet.ReadString(inviterNameLength);
+        MaskedGuid.ReadBytes(packet, oldMask, oldBytes, [7, 6, 5, 0]);
+        MaskedGuid.ReadBytes(packet, newMask, newBytes, [4]);
+        invite.GuildName = packet.ReadString(guildNameLength);
+        MaskedGuid.ReadBytes(packet, newMask, newBytes, [5, 3]);
+        MaskedGuid.ReadBytes(packet, oldMask, oldBytes, [4]);
+
+        uint realm = GetSession().RealmId.GetAddress();
+        invite.InviterVirtualRealmAddress = realm;
+        invite.GuildVirtualRealmAddress = realm;
+        invite.OldGuildVirtualRealmAddress = realm;
+        // the low half of a 4.3.4 guild GUID is the guild id
+        uint newGuildId = (uint)MaskedGuid.ToUInt64(newBytes);
+        uint oldGuildId = (uint)MaskedGuid.ToUInt64(oldBytes);
+        invite.GuildGUID = WowGuid128.Create(HighGuidType703.Guild, newGuildId);
+        if (oldGuildId != 0)
+            invite.OldGuildGUID = WowGuid128.Create(HighGuidType703.Guild, oldGuildId);
+        GetSession().StoreGuildGuidAndName(invite.GuildGUID, invite.GuildName);
+        SendPacketToClient(invite);
+    }
+
     [HandlesSmsg(Opcode.SMSG_QUERY_GUILD_INFO_RESPONSE)]
     internal void HandleQueryGuildInfoResponse(WorldPacket packet)
     {
+        if (IsCataLegacy)
+        {
+            HandleQueryGuildInfoResponseCata(packet);
+            return;
+        }
+
         QueryGuildInfoResponse guild = new();
         uint guildId = packet.ReadUInt32();
         guild.GuildGUID = WowGuid128.Create(HighGuidType703.Guild, guildId);
@@ -296,6 +630,12 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_GUILD_ROSTER)]
     internal void HandleGuildRoster(WorldPacket packet)
     {
+        if (IsCataLegacy)
+        {
+            HandleGuildRosterCata(packet);
+            return;
+        }
+
         GuildRoster guild = new();
         var membersCount = packet.ReadUInt32();
 
@@ -374,6 +714,12 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_GUILD_INVITE)]
     internal void HandleGuildInvite(WorldPacket packet)
     {
+        if (IsCataLegacy)
+        {
+            HandleGuildInviteCata(packet);
+            return;
+        }
+
         GuildInvite invite = new();
         invite.InviterName = packet.ReadCString();
         invite.InviterVirtualRealmAddress = GetSession().RealmId.GetAddress();

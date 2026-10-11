@@ -29,6 +29,14 @@ public static class QueryGuildInfoCodec
     }
 }
 
+// The client's layout for both 3.4.3 and 4.4.2 is the guild's GUID and nothing else (docs/protocol).
+public static class GuildGetRanksCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out GuildGetRanks packet)
+        => packet = new GuildGetRanks(r.ReadPackedGuid128());
+}
+
 // ---- guild text ----
 
 public static class GuildUpdateMotdTextCodec

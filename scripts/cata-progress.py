@@ -31,8 +31,10 @@ from __future__ import annotations
 
 import argparse
 import glob
+import hashlib
 import os
 import re
+import subprocess
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -155,6 +157,54 @@ def touched_files(rel: str, body: str, methods: dict[str, list[tuple[str, str]]]
 
 def session_time(session: str) -> float:
     return datetime.strptime(session, '%Y%m%d_%H%M%S').timestamp()
+
+
+SOURCES_MARK = '<!-- sources'
+
+
+def content_hash(data: bytes) -> str:
+    """A file's content whatever its line endings, which a checkout may rewrite."""
+    return hashlib.sha1(data.replace(b'\r\n', b'\n')).hexdigest()[:16]
+
+
+def previous_page(out: Path, icons: dict[str, str]) -> tuple[dict[tuple[str, str], tuple[str, str]], dict[str, str] | None]:
+    """What the page said when it was last generated, and the sources it said it about.
+
+    Rows: (direction, opcode) -> (status, last session). Sources: file -> content hash, from the
+    block the page ends with; None for a page written before it had one.
+    """
+    if not out.exists():
+        return {}, {}
+    text = out.read_text(encoding='utf-8')
+    by_icon = {icon: name for name, icon in icons.items()}
+    rows = {}
+    for m in re.finditer(r'^\| (\S+) \| ([CS]) \| `([A-Z0-9_]+)` \|[^|]*\|[^|]*\| ([0-9_]*) \|', text, re.M):
+        if m.group(1) in by_icon:
+            rows[(m.group(2), m.group(3))] = (by_icon[m.group(1)], m.group(4))
+    block = re.search(re.escape(SOURCES_MARK) + r'(.*?)-->', text, re.S)
+    if not block:
+        return rows, None
+    return rows, dict(line.split() for line in block.group(1).strip().splitlines())
+
+
+def sources_at_page_commit(out: Path, files: list[str]) -> dict[str, str]:
+    """For a page without a sources block: the files as of the commit that last touched it."""
+    def git(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(['git', '-C', str(REPO), *args], capture_output=True)
+
+    try:
+        rel = out.resolve().relative_to(REPO).as_posix()
+    except ValueError:
+        return {}
+    commit = git('log', '-1', '--format=%H', '--', rel).stdout.decode().strip()
+    if not commit:
+        return {}
+    hashes = {}
+    for f in files:
+        blob = git('show', f'{commit}:{f}')
+        if blob.returncode == 0:
+            hashes[f] = content_hash(blob.stdout)
+    return hashes
 
 
 def send_segment(body: str, opcode: str) -> str:
@@ -642,6 +692,11 @@ LEGACY_REVIEWED = {
     ('S', 'SMSG_PLAY_MUSIC'): 'PlayMusic::Write: a source GUID after the sound, which the modern packet has no place for',
     ('S', 'SMSG_RESURRECT_REQUEST'): 'ResurrectRequest::Write: the spell id after everything read',
     ('S', 'SMSG_SPELL_DAMAGE_SHIELD'): 'SpellDamageShield::Write: the absorbed amount after everything read',
+    ('C', 'CMSG_GUILD_DECLINE_INVITATION'): 'HandleGuildDeclineOpcode: empty, as in 3.3.5a',
+    ('C', 'CMSG_GUILD_GET_ROSTER'): 'HandleGuildRosterOpcode: empty, as in 3.3.5a; the roster opened on both clients in play',
+    ('C', 'CMSG_GUILD_LEAVE'): 'HandleGuildLeaveOpcode: empty, as in 3.3.5a; a member left in play',
+    ('S', 'SMSG_GUILD_COMMAND_RESULT'): 'GuildCommandResult::Write: command, name, result, as in 3.3.5a; '
+                                        '4.3.4 sends it as SMSG_GUILD_COMMAND_RESULT_2, which the same handler takes',
 }
 
 
@@ -722,14 +777,26 @@ def main() -> None:
             files |= {movement_writer, os.path.relpath(sequences_file, REPO).replace(os.sep, '/')}
         rows.append(('C', op, op in v434, is_ported, wpp.get(op, '?'), ev.cmsg.get(op), where, files))
 
-    def changed_since(seen: Seen | None, files: set[str]) -> bool:
+    all_files = sorted(set().union(*(r[7] for r in rows)))
+    current = {f: content_hash((REPO / f).read_bytes()) for f in all_files}
+    previous_rows, previous_sources = previous_page(args.out, ICON)
+    if previous_sources is None:
+        previous_sources = sources_at_page_commit(args.out, all_files)
+
+    # The time on a file says when it was last written, and a checkout or a rebase writes files
+    # whose content it does not change. So the time only counts for a file that differs from what
+    # the page was last generated from; for the others, what the page said then still holds.
+    def changed_since(key: tuple[str, str], seen: Seen | None, files: set[str]) -> bool:
         if not seen or not files:
             return False
-        return max((REPO / f).stat().st_mtime for f in files) > session_time(seen.session)
+        changed = [f for f in files if current[f] != previous_sources.get(f)]
+        if changed:
+            return max((REPO / f).stat().st_mtime for f in changed) > session_time(seen.session)
+        return previous_rows.get(key) == ('retest', seen.session)
 
     rows = [(d, op, mp, po, 'reviewed' if lay == 'changed' and not po and (d, op) in LEGACY_REVIEWED else lay,
              seen, where, files) for d, op, mp, po, lay, seen, where, files in rows]
-    graded = [(status(d, mp, po, lay, seen, changed_since(seen, files)), d, op, po, lay, seen, where)
+    graded = [(status(d, mp, po, lay, seen, changed_since((d, op), seen, files)), d, op, po, lay, seen, where)
               for d, op, mp, po, lay, seen, where, files in rows]
     graded.sort(key=lambda r: (ORDER.index(r[0]), r[1], r[2]))
     counts = defaultdict(int)
@@ -773,11 +840,12 @@ def main() -> None:
         n = seen.count if seen else ''
         err = (seen.errors + seen.dropped) if seen and (seen.errors or seen.dropped) else ''
         md.append(f'| {ICON[st]} | {d} | `{op}` | {"yes" if po else ""} | {lay} | {last} | {n} | {err} | {where} |')
-    md.append('')
+    # What the rows above were read from, for the next run to tell a changed file from a rewritten one.
+    md += ['', SOURCES_MARK] + [f'{f} {current[f]}' for f in all_files] + ['-->', '']
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text('\n'.join(md), encoding='utf-8')
-    print(f'wrote {os.path.relpath(args.out, REPO)}: ' + ', '.join(f'{k} {counts[k]}' for k in ORDER))
+    print(f'wrote {args.out}: ' + ', '.join(f'{k} {counts[k]}' for k in ORDER))
 
 
 if __name__ == '__main__':

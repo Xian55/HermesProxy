@@ -1796,6 +1796,25 @@ public sealed class GameSessionData
     {
         return PlayerGuildIds.TryGetValue(guid, out var value) ? value : 0u;
     }
+
+    /// <summary>
+    /// A player known to be in that guild: the session's own character first, else anyone seen
+    /// wearing it. Empty when nobody is. A guild query is rare (the client keeps the answer), so
+    /// the scan is not on a hot path.
+    /// </summary>
+    public WowGuid128 GetKnownGuildMember(uint guildId)
+    {
+        if (guildId == 0)
+            return WowGuid128.Empty;
+        if (GetPlayerGuildId(CurrentPlayerGuid) == guildId)
+            return CurrentPlayerGuid;
+        foreach (var pair in PlayerGuildIds)
+        {
+            if (pair.Value == guildId)
+                return pair.Key;
+        }
+        return WowGuid128.Empty;
+    }
     public uint[]? GetGemsForItem(WowGuid128 guid)
     {
         return ItemGems.TryGetValue(guid, out var gems) ? gems : null;

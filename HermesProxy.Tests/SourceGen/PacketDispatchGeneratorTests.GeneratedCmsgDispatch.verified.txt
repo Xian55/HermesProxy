@@ -1201,6 +1201,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.GuildSystem.HandleGuildDemoteMember(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildGetRanks_CMSG_GUILD_GET_RANKS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.GuildGetRanksCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.GuildSystem.HandleGuildGetRanks(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildGetRoster_CMSG_GUILD_GET_ROSTER(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
@@ -3145,6 +3151,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_DELETE] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildDelete_CMSG_GUILD_DELETE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_DELETE_RANK] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildDeleteRank_CMSG_GUILD_DELETE_RANK;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_DEMOTE_MEMBER] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildDemoteMember_CMSG_GUILD_DEMOTE_MEMBER;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_GET_RANKS] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildGetRanks_CMSG_GUILD_GET_RANKS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_GET_ROSTER] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildGetRoster_CMSG_GUILD_GET_ROSTER;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_INVITE_BY_NAME] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildInviteByName_CMSG_GUILD_INVITE_BY_NAME;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_LEAVE] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildLeave_CMSG_GUILD_LEAVE;
@@ -3680,6 +3687,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_DELETE,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_DELETE_RANK,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_DEMOTE_MEMBER,
+            global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_GET_RANKS,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_GET_ROSTER,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_INVITE_BY_NAME,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_LEAVE,

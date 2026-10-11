@@ -62,6 +62,8 @@ public class GuildCommandResult : ServerPacket, ISpanWritable
 
 public readonly record struct QueryGuildInfo(WowGuid128 GuildGuid, WowGuid128 PlayerGuid);
 
+public readonly record struct GuildGetRanks(WowGuid128 GuildGuid);
+
 public class QueryGuildInfoResponse : ServerPacket
 {
     public QueryGuildInfoResponse() : base(Opcode.SMSG_QUERY_GUILD_INFO_RESPONSE) { }
@@ -174,20 +176,58 @@ public class GuildRoster : ServerPacket
 {
     public GuildRoster() : base(Opcode.SMSG_GUILD_ROSTER) { }
 
-    public override void Write()
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<GuildRoster>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new EarlierLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
+
+    private static readonly ServerPacketLayout<GuildRoster> Layout = Layouts.ForRunningClient();
+
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>Up to 3.4.3: the writer this packet had before it had layouts, as it was.</summary>
+    internal sealed class EarlierLayout : ServerPacketLayout<GuildRoster>
     {
-        _worldPacket.WriteUInt32(NumAccounts);
-        _worldPacket.WritePackedTime(CreateDate);
-        _worldPacket.WriteInt32(GuildFlags);
-        _worldPacket.WriteInt32(MemberData.Count);
-        _worldPacket.WriteBits(WelcomeText.GetByteCount(), 11);
-        _worldPacket.WriteBits(InfoText.GetByteCount(), 11);
-        _worldPacket.FlushBits();
+        public override void Write(GuildRoster packet, WorldPacket data)
+        {
+            data.WriteUInt32(packet.NumAccounts);
+            data.WritePackedTime(packet.CreateDate);
+            data.WriteInt32(packet.GuildFlags);
+            data.WriteInt32(packet.MemberData.Count);
+            data.WriteBits(packet.WelcomeText.GetByteCount(), 11);
+            data.WriteBits(packet.InfoText.GetByteCount(), 11);
+            data.FlushBits();
 
-        MemberData.ForEach(p => p.Write(_worldPacket));
+            foreach (GuildRosterMemberData member in packet.MemberData)
+                member.Write(data);
 
-        _worldPacket.WriteString(WelcomeText);
-        _worldPacket.WriteString(InfoText);
+            data.WriteString(packet.WelcomeText);
+            data.WriteString(packet.InfoText);
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2 (docs/protocol, read from the client, and TrinityCore cata_classic
+    /// GuildRosterMemberData): the packet is the same, a member is not. It has no SorEligible bit
+    /// and carries a dungeon score summary, empty here, between its bit fields and its strings.
+    /// </summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<GuildRoster>
+    {
+        public override void Write(GuildRoster packet, WorldPacket data)
+        {
+            data.WriteUInt32(packet.NumAccounts);
+            data.WritePackedTime(packet.CreateDate);
+            data.WriteInt32(packet.GuildFlags);
+            data.WriteInt32(packet.MemberData.Count);
+            data.WriteBits(packet.WelcomeText.GetByteCount(), 11);
+            data.WriteBits(packet.InfoText.GetByteCount(), 11);
+            data.FlushBits();
+
+            foreach (GuildRosterMemberData member in packet.MemberData)
+                member.WriteCataClassic(data);
+
+            data.WriteString(packet.WelcomeText);
+            data.WriteString(packet.InfoText);
+        }
     }
 
     public List<GuildRosterMemberData> MemberData = new List<GuildRosterMemberData>();
@@ -240,6 +280,42 @@ public class GuildRosterMemberData
         data.WriteString(OfficerNote);
     }
 
+    /// <summary>The 4.4.2 member, see <see cref="GuildRoster.CataClassicLayout"/>.</summary>
+    internal void WriteCataClassic(WorldPacket data)
+    {
+        data.WritePackedGuid128(Guid);
+        data.WriteInt32(RankID);
+        data.WriteInt32(AreaID);
+        data.WriteInt32(PersonalAchievementPoints);
+        data.WriteInt32(GuildReputation);
+        data.WriteFloat(LastSave);
+
+        for (byte i = 0; i < 2; i++)
+            Profession[i].Write(data);
+
+        data.WriteUInt32(VirtualRealmAddress);
+        data.WriteUInt8(Status);
+        data.WriteUInt8(Level);
+        data.WriteUInt8((byte)ClassID);
+        data.WriteUInt8((byte)SexID);
+        data.WriteUInt64(GuildClubMemberID);
+        data.WriteUInt8((byte)RaceID);
+
+        data.WriteBits(Name.GetByteCount(), 6);
+        data.WriteBits(Note.GetByteCount(), 8);
+        data.WriteBits(OfficerNote.GetByteCount(), 8);
+        data.WriteBit(Authenticated);
+        data.FlushBits();
+
+        data.WriteFloat(0);                         // DungeonScore.OverallScoreCurrentSeason
+        data.WriteFloat(0);                         // DungeonScore.LadderScoreCurrentSeason
+        data.WriteUInt32(0);                        // DungeonScore.Runs
+
+        data.WriteString(Name);
+        data.WriteString(Note);
+        data.WriteString(OfficerNote);
+    }
+
     public WowGuid128 Guid;
     public long WeeklyXP;
     public long TotalXP;
@@ -282,11 +358,34 @@ public class GuildRanks : ServerPacket
 {
     public GuildRanks() : base(Opcode.SMSG_GUILD_RANKS) { }
 
-    public override void Write()
-    {
-        _worldPacket.WriteInt32(Ranks.Count);
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<GuildRanks>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new EarlierLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
 
-        Ranks.ForEach(p => p.Write(_worldPacket));
+    private static readonly ServerPacketLayout<GuildRanks> Layout = Layouts.ForRunningClient();
+
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>Up to 3.4.3: six bank tabs a rank.</summary>
+    internal sealed class EarlierLayout : ServerPacketLayout<GuildRanks>
+    {
+        public override void Write(GuildRanks packet, WorldPacket data)
+        {
+            data.WriteInt32(packet.Ranks.Count);
+            foreach (GuildRankData rank in packet.Ranks)
+                rank.Write(data, GuildConst.MaxBankTabs);
+        }
+    }
+
+    /// <summary>4.4.2: a Cataclysm guild bank has eight tabs (TrinityCore cata_classic GuildRankData).</summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<GuildRanks>
+    {
+        public override void Write(GuildRanks packet, WorldPacket data)
+        {
+            data.WriteInt32(packet.Ranks.Count);
+            foreach (GuildRankData rank in packet.Ranks)
+                rank.Write(data, GuildConst.MaxBankTabsCata);
+        }
     }
 
     public List<GuildRankData> Ranks = new List<GuildRankData>();
@@ -294,14 +393,14 @@ public class GuildRanks : ServerPacket
 
 public class GuildRankData
 {
-    public void Write(WorldPacket data)
+    public void Write(WorldPacket data, int bankTabs)
     {
         data.WriteUInt8(RankID);
         data.WriteUInt32(RankOrder);
         data.WriteUInt32(Flags);
         data.WriteInt32(WithdrawGoldLimit);
 
-        for (byte i = 0; i < GuildConst.MaxBankTabs; i++)
+        for (byte i = 0; i < bankTabs; i++)
         {
             data.WriteUInt32(TabFlags[i]);
             data.WriteUInt32(TabWithdrawItemLimit[i]);
@@ -316,8 +415,31 @@ public class GuildRankData
     public uint Flags;
     public int WithdrawGoldLimit;
     public string RankName = string.Empty;
-    public uint[] TabFlags = new uint[GuildConst.MaxBankTabs];
-    public uint[] TabWithdrawItemLimit = new uint[GuildConst.MaxBankTabs];
+    // Room for the eight tabs of a Cataclysm bank; the older layouts write the first six.
+    public uint[] TabFlags = new uint[GuildConst.MaxBankTabsCata];
+    public uint[] TabWithdrawItemLimit = new uint[GuildConst.MaxBankTabsCata];
+}
+
+/// <summary>
+/// A member's note changed. Only a 4.3.4 server says so; the older ones leave it to the next
+/// roster. Layout from the 4.4.2 client (docs/protocol) and TrinityCore cata_classic.
+/// </summary>
+public sealed class GuildMemberUpdateNote : ServerPacket
+{
+    public GuildMemberUpdateNote() : base(Opcode.SMSG_GUILD_MEMBER_UPDATE_NOTE) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(Member);
+        _worldPacket.WriteBits(Note.GetByteCount(), 8);
+        _worldPacket.WriteBit(IsPublic);
+        _worldPacket.FlushBits();
+        _worldPacket.WriteString(Note);
+    }
+
+    public WowGuid128 Member;
+    public string Note = "";
+    public bool IsPublic;
 }
 
 public class GuildSendRankChange : ServerPacket, ISpanWritable

@@ -48,6 +48,7 @@ public class OpcodeTableV4_4_2Tests
     /// The table is the 3.4.3 one revalued, so that a packet both builds have takes the same
     /// handler. What 4.4.2 has beyond it is listed here by hand: the retail-style auction house,
     /// and the addon message with a target, which 3.4.3 sends through the plain addon opcode.
+    /// The member note update is one only a 4.3.4 server sends, so only this table needs it.
     /// </summary>
     [Fact]
     public void HasThe3_4_3Names_AndTheRetailStyleAuctionHouse()
@@ -66,6 +67,7 @@ public class OpcodeTableV4_4_2Tests
             "SMSG_AUCTION_LIST_BUCKETS_RESULT",
             "SMSG_AUCTION_GET_COMMODITY_QUOTE_RESULT",
             "SMSG_AUCTION_FAVORITE_LIST",
+            "SMSG_GUILD_MEMBER_UPDATE_NOTE",
         ];
 
         Assert.Equal(
