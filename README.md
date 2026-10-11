@@ -12,6 +12,8 @@ There are 4 major components to the application:
 
 HermesProxy translates between modern WoW Classic clients and legacy private server emulators. **WotLK Classic (3.4.3 → 3.3.5a) support is in beta.** Most of the game works, but rather than summarise that here, what has actually been verified — and on which backend — is tracked subsystem by subsystem in the [status matrix](wotlk.md).
 
+**Cataclysm Classic (4.4.2 → 4.3.4) is an early preview, very much a work in progress.** A 4.4.2 client logs in, enters the world and plays solo content — combat, quests, loot, vendors, trainers, the bank, mail — but groups, guilds, the auction house, LFG and PvP are untested or known to be incomplete. What is done and what is still open is generated into [docs/cata-progress.md](docs/cata-progress.md); progress is tracked in [#202](https://github.com/Xian55/HermesProxy/issues/202).
+
 ### Modern Client Versions (What You Play With)
 
 These are the Blizzard WoW Classic client versions you can use:
@@ -24,6 +26,7 @@ These are the Blizzard WoW Classic client versions you can use:
 | 2.5.2   | TBC Classic    | 39570 - 41510     |                          |
 | 2.5.3   | TBC Classic    | 41402 - 42598     |                          |
 | 3.4.3   | WotLK Classic  | 54261             | Beta — `V3_4_3_54261` is the only supported build |
+| 4.4.2   | Cataclysm Classic | 60895          | Early preview — `V4_4_2_60895` only, see [docs/cata-progress.md](docs/cata-progress.md) |
 
 ### Legacy Server Versions (What Emulators Run)
 
@@ -36,6 +39,7 @@ These are the private server versions HermesProxy can connect to:
 | 1.12.3  | Vanilla   | 6141  | CMaNGOS, VMaNGOS, etc.   |
 | 2.4.3   | TBC       | 8606  | CMaNGOS, etc.            |
 | 3.3.5a  | WotLK     | 12340 | [TrinityCore](https://github.com/TrinityCore/TrinityCore/tree/3.3.5), [AzerothCore](https://github.com/azerothcore/azerothcore-wotlk), CMaNGOS |
+| 4.3.4   | Cataclysm | 15595 | [TrinityCore, Cataclysm Preservation Project](https://github.com/The-Cataclysm-Preservation-Project/TrinityCore) (preview) |
 
 #### WotLK backend coverage
 
@@ -51,6 +55,10 @@ The 3.4.3 work was developed and playtested against these cores, in this order o
 
 Read ❓ as "unknown", not "broken". A row that is ✅ only under AzerothCore means it has not been exercised on TrinityCore — not that it fails there. Wintergrasp, group and master loot, and the Toy Box are currently in that position.
 
+#### Cataclysm backend coverage
+
+The 4.4.2 work is playtested against the Cataclysm Preservation Project's TrinityCore 4.3.4, with AzerothCore 3.3.5a as an earlier protocol test bed (`LegacyServerOptions:Build=V3_3_5a_12340`). The 4.3.4 server moves each player to a second connection at character login by default; HermesProxy stays on one, so set `LegacyConnectionModeEnabled = 1` in its `worldserver.conf`. A ready server is [Xian55/TrinityCore-docker](https://github.com/Xian55/TrinityCore-docker), branch `4.3.4`, where that is `TC_LEGACY_CONNECTION_MODE_ENABLED=1` in `tc.env`.
+
 ### Version Mapping
 
 The proxy automatically selects the best legacy version based on your client:
@@ -60,6 +68,7 @@ The proxy automatically selects the best legacy version based on your client:
 | 1.14.x        | 1.12.x (Vanilla) |
 | 2.5.x         | 2.4.3 (TBC)    |
 | 3.4.x         | 3.3.5a (WotLK) |
+| 4.4.x         | 4.3.4 (Cataclysm) |
 
 ## Download HermesProxy
 
@@ -73,7 +82,9 @@ Stable Downloads: [Releases](https://github.com/Xian55/HermesProxy/releases)
    - Vanilla `--staticseed --version=ClassicEra`
    - TBC `--staticseed --version=Classic`
    - WotLK `--staticseed --version=Classic` (Arctium reuses the same flag as TBC)
+   - Cataclysm Classic: the Arctium **Game** Launcher (tested with 1.5.0), `--version=Classic`
 - Start the proxy app and login through the game with your usual credentials.
+- Cataclysm Classic 4.4.x logs in with SRP and never sends its password, so the proxy needs the legacy account's password to log in on your behalf: set the `HERMES_LegacyServerOptions__Password` environment variable, or leave it unset and type it when the proxy asks at startup. Don't put it in a config file.
 
 ## Ingame Settings
 
@@ -158,7 +169,7 @@ Primary config is `appsettings.json` (loaded from the working directory, require
 
 | Key                | Default                            | Description                                                                                |
 |--------------------|------------------------------------|--------------------------------------------------------------------------------------------|
-| `ClientBuild`      | `V2_5_2_40892`                     | `ClientVersionBuild` enum value: `V1_14_0_40618`, `V1_14_1_41794`, `V1_14_2_42597`, `V2_5_2_40892`, `V2_5_3_42328`, `V3_4_3_54261` (beta). |
+| `ClientBuild`      | `V2_5_2_40892`                     | `ClientVersionBuild` enum value: `V1_14_0_40618`, `V1_14_1_41794`, `V1_14_2_42597`, `V2_5_2_40892`, `V2_5_3_42328`, `V3_4_3_54261` (beta), `V4_4_2_60895` (preview). |
 | `SeedHex`          | `179D3DC3235629D07113A9B3867F97A7` | 32-character hex string (16 bytes).                                                        |
 | `ReportedOS`       | `OSX`                              | OS identifier sent to the legacy server (`OSX`, `Win`, etc.).                              |
 | `ReportedPlatform` | `x86`                              | Platform identifier sent to legacy server (`x86`, `x64`).                                  |
@@ -167,9 +178,10 @@ Primary config is `appsettings.json` (loaded from the working directory, require
 
 | Key       | Default     | Description                                                                                       |
 |-----------|-------------|---------------------------------------------------------------------------------------------------|
-| `Build`   | `auto`      | Legacy server build to target. `auto`, `V1_12_1_5875`, `V2_4_3_8606`, `V3_3_5a_12340`.            |
+| `Build`   | `auto`      | Legacy server build to target. `auto`, `V1_12_1_5875`, `V2_4_3_8606`, `V3_3_5a_12340`, `V4_3_4_15595`. |
 | `Address` | `127.0.0.1` | Address of the legacy realmd (what you'd use in `SET REALMLIST`).                                 |
 | `Port`    | `3724`      | Port of the legacy authentication server.                                                         |
+| `Password` | *(empty)*  | Legacy account password, needed only by clients that log in with SRP (Cataclysm Classic 4.4.x). Set it through `HERMES_LegacyServerOptions__Password`, never in a file; empty means the proxy asks at startup. |
 
 ### ProxyNetworkOptions
 
@@ -286,3 +298,8 @@ The 3.4.3 → 3.3.5a port leans heavily on the following projects:
 - [HermesProxy-WOTLK](https://github.com/advocaite/HermesProxy-WOTLK) — upstream WotLK Classic fork; reference for V3_4_3 field descriptors and packet layouts.
 - [lineagedr/3.4.3_Source](https://github.com/lineagedr/3.4.3_Source/) — native 3.4.3 server source, used as a behavioral oracle for V3_4_3 protocol semantics.
 - [RioMcBoo/CypherCoreClassicWOTLK](https://github.com/RioMcBoo/CypherCoreClassicWOTLK) — CypherCore branch targeting 3.4.3, used as a secondary oracle for server-side packet shapes.
+
+### Cataclysm Classic References
+
+- [The Cataclysm Preservation Project's TrinityCore](https://github.com/The-Cataclysm-Preservation-Project/TrinityCore) — the 4.3.4 server, and the reference for every 4.3.4 packet and movement layout on the legacy side.
+- [TrinityCore `cata_classic`](https://github.com/TrinityCore/TrinityCore/tree/cata_classic) — native 4.4.2 server, used for plaintext captures and as a second opinion on 4.4.2 packet shapes, after the client's own readers in [docs/protocol/4.4.2.60895](docs/protocol/4.4.2.60895).
