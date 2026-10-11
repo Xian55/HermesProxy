@@ -126,8 +126,9 @@ public static class ChatMessageWhisperCodecPreWotLKClassic
 }
 
 // 4.4.2 (TrinityCore cata_classic, and the client's writer): the target's GUID and realm come
-// first, the name length shrank to 7 bits, and both lengths count a trailing NUL that is on the
-// wire. A length of 0 or 1 means no string at all.
+// first, and both lengths count a trailing NUL that is on the wire. A length of 0 or 1 means no
+// string at all. The lengths are 9 and 11 bits as in 3.4.3: a captured whisper to "Mirabilis"
+// has 05 00 70 there, which is 10 and 7. Read as 7 and 11, the text length came out as 1025.
 [PacketCodec(typeof(ChatMessageWhisper), AddedIn = ClientVersionBuild.V4_4_2_60895)]
 public static class ChatMessageWhisperCodecCataClassic
 {
@@ -136,7 +137,7 @@ public static class ChatMessageWhisperCodecCataClassic
         uint language = r.ReadUInt32();
         WowGuid128 targetGuid = r.ReadPackedGuid128();
         r.ReadUInt32();                             // TargetVirtualRealmAddress
-        uint targetLen = r.ReadBits<uint>(7);
+        uint targetLen = r.ReadBits<uint>(9);
         uint textLen = r.ReadBits<uint>(11);
         string target = ReadTerminated(ref r, targetLen);
         string text = ReadTerminated(ref r, textLen);

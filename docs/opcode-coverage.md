@@ -27,10 +27,10 @@ the proxy has no reason to translate.
 
 | build | defined | handled | gap |
 |---|---:|---:|---:|
-| `V1_14_1_40688` | 692 | 391 | 301 |
-| `V2_5_2_39570` | 691 | 392 | 299 |
-| `V2_5_3_41750` | 694 | 393 | 301 |
-| `V3_4_3_54261` | 454 | 397 | 57 |
+| `V1_14_1_40688` | 692 | 392 | 300 |
+| `V2_5_2_39570` | 691 | 393 | 298 |
+| `V2_5_3_41750` | 694 | 394 | 300 |
+| `V3_4_3_54261` | 454 | 398 | 56 |
 
 ### Server to proxy (SMSG), by emulator build
 
@@ -86,7 +86,7 @@ Each of these has more than one codec, chosen by build range at table-build time
 anyone adding a client this is the short list worth checking first: a layout that already
 changed once is the most likely to have changed again.
 
-42 packets across 85 codecs.
+43 packets across 87 codecs.
 
 | packet | codec | axis | added in | removed in |
 |---|---|---|---|---|
@@ -108,6 +108,8 @@ changed once is the most likely to have changed again.
 | `CastSpell` | `CastSpellCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `ChangeSubGroup` | `ChangeSubGroupCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `ChangeSubGroup` | `ChangeSubGroupCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `ChatAddonMessageTargeted` | `ChatAddonMessageTargetedCodecCataClassic` | modern | `V4_4_2_60895` | — |
+| `ChatAddonMessageTargeted` | `ChatAddonMessageTargetedCodecPreCataClassic` | modern | — | `V4_4_2_60895` |
 | `ChatMessage` | `ChatMessageCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `ChatMessage` | `ChatMessageCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 | `ChatMessageAFK` | `ChatMessageAFKCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
@@ -208,7 +210,7 @@ silently wrong wherever it does not. Check each against the 4.4.2 client
 (`docs/protocol/4.4.2.60895`) before 4.4.2 becomes a supported build; where it differs, the
 site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a narrower check.
 
-192 sites across 57 files.
+193 sites across 57 files.
 
 | file | sites |
 |---|---:|
@@ -217,9 +219,9 @@ site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a n
 | `HermesProxy/World/Server/Packets/NPCPackets.cs` | 11 |
 | `HermesProxy/World/Client/PacketHandlers/PetHandler.cs` | 8 |
 | `HermesProxy/World/Server/Packets/SpellPackets.cs` | 8 |
+| `HermesProxy/World/Client/PacketHandlers/MovementHandler.cs` | 7 |
 | `HermesProxy/World/Client/PacketHandlers/QueryHandler.cs` | 7 |
 | `HermesProxy/World/Client/PacketHandlers/SpellHandler.cs` | 7 |
-| `HermesProxy/World/Client/PacketHandlers/MovementHandler.cs` | 6 |
 | `HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs` | 5 |
 | `HermesProxy/World/Server/Packets/BattleGroundPackets.cs` | 5 |
 | `HermesProxy/World/Server/Packets/GroupPackets.cs` | 5 |

@@ -103,7 +103,7 @@ public class ConfigChatBatchCodecEquivalenceTests
         });
 
         var e = new Frozen.ChatAddonMessageTargeted(); e.Read(o);
-        var r = ReaderOver(f); ChatAddonMessageTargetedCodec.Read(ref r, out var a);
+        var r = ReaderOver(f); ChatAddonMessageTargetedCodecPreCataClassic.Read(ref r, out var a);
 
         Assert.Equal(e.Params.Prefix, a.Params.Prefix);
         Assert.Equal(e.Params.Text, a.Params.Text);
@@ -127,7 +127,7 @@ public class ConfigChatBatchCodecEquivalenceTests
             Opcodes.GetUniversalOpcode(0x37EFu, ClientVersionBuild.V3_4_3_54261));
 
         byte[] framed = [0, 0, .. Convert.FromHexString("0100185807000000485054776869737065722D3334330000446B")];
-        var r = ReaderOver(framed); ChatAddonMessageTargetedCodec.Read(ref r, out var a);
+        var r = ReaderOver(framed); ChatAddonMessageTargetedCodecPreCataClassic.Read(ref r, out var a);
 
         Assert.Equal("HPT", a.Params.Prefix);
         Assert.Equal("whisper-343", a.Params.Text);

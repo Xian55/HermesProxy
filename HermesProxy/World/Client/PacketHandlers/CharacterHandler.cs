@@ -517,6 +517,18 @@ public partial class WorldClient
         response.Data.BnetAccountID = GetSession().GetBnetAccountGuidForPlayer(response.Player);
         response.Data.VirtualRealmAddress = GetSession().RealmId.GetAddress();
         SendPacketToClient(response);
+
+        // A client that reads the name from the player object was given none when the player was
+        // created, unless this answer had come before. It takes the name as a change.
+        if (ModernVersion.PlayerObjectCarriesName && response.Player != GetSession().GameState.CurrentPlayerGuid
+            && cache.Name.Length > 0)
+        {
+            ObjectUpdate named = new ObjectUpdate(response.Player, UpdateTypeModern.Values, GetSession());
+            named.EnsurePlayerData().Name = cache.Name;
+            UpdateObject updatePacket = new UpdateObject(GetSession().GameState);
+            updatePacket.ObjectUpdates.Add(named);
+            SendPacketToClient(updatePacket);
+        }
     }
 
     [HandlesSmsg(Opcode.SMSG_LOGIN_VERIFY_WORLD)]
@@ -805,7 +817,10 @@ public partial class WorldClient
         info.Level = packet.ReadInt32();
         info.HealthDelta = packet.ReadInt32();
 
-        for (var i = 0; i < LegacyVersion.GetPowersCount(); i++)
+        // TrinityCore 4.3.4 LevelUpInfo::Write sends six power deltas, one more than a 4.x unit
+        // has power fields. Read as five, every stat gain was taken from the slot before its own.
+        int powerDeltas = IsCataLegacy ? 6 : LegacyVersion.GetPowersCount();
+        for (var i = 0; i < powerDeltas; i++)
             info.PowerDelta[i] = packet.ReadInt32();
 
         for (var i = 0; i < 5; i++)
@@ -840,7 +855,9 @@ public partial class WorldClient
     internal void HandleInspectResult(WorldPacket packet)
     {
         InspectResult inspect = new InspectResult();
-        if (packet.GetUniversalOpcode(false) == Opcode.SMSG_INSPECT_RESULT)
+        // TrinityCore 4.3.4 HandleInspectOpcode writes the GUID whole; 3.x packs it. Read packed
+        // on 4.3.4, it named no player the proxy knew and the inspect was dropped without a word.
+        if (packet.GetUniversalOpcode(false) == Opcode.SMSG_INSPECT_RESULT || IsCataLegacy)
             inspect.DisplayInfo.GUID = packet.ReadGuid().To128(GetSession().GameState);
         else
             inspect.DisplayInfo.GUID = packet.ReadPackedGuid().To128(GetSession().GameState);
@@ -919,6 +936,14 @@ public partial class WorldClient
 
             for (byte specIdx = 0; specIdx < specsCount; ++specIdx)
             {
+                // 4.3.4 Player::BuildPlayerTalentsInfoData: each group starts with its primary tree.
+                if (IsCataLegacy)
+                {
+                    uint primaryTree = packet.ReadUInt32();
+                    if (specIdx == activeSpec)
+                        inspect.PrimaryTalentTree = primaryTree;
+                }
+
                 byte talentCount = packet.ReadUInt8();
                 for (byte t = 0; t < talentCount; ++t)
                 {
@@ -930,7 +955,11 @@ public partial class WorldClient
 
                 byte glyphSlots = packet.ReadUInt8();
                 for (byte g = 0; g < glyphSlots; ++g)
-                    packet.ReadUInt16();
+                {
+                    ushort glyph = packet.ReadUInt16();
+                    if (IsCataLegacy && specIdx == activeSpec)
+                        inspect.Glyphs.Add(glyph);
+                }
 
                 totalTalents += talentCount;
             }

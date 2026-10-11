@@ -45,9 +45,58 @@ public partial class WorldClient
         SendPacketToClient(new GroupDestroyed());
     }
 
+    /// <summary>
+    /// TrinityCore 4.3.4 PartyInvite::Write: the inviter's GUID masked, with the flags, the two
+    /// name lengths and the dungeon count among its bits; then the strings without terminators.
+    /// Read the 3.3.5a way it threw, and the invited player was never asked.
+    /// </summary>
+    private void HandleGroupInviteCata(WorldPacket packet)
+    {
+        PartyInvite party = new PartyInvite();
+        Span<bool> mask = stackalloc bool[8];
+        Span<byte> guid = stackalloc byte[8];
+
+        party.MustBeBNetFriend = packet.HasBit();
+        MaskedGuid.ReadMaskBits(packet, mask, [0, 3, 2]);
+        party.CanAccept = packet.HasBit();
+        MaskedGuid.ReadMaskBits(packet, mask, [6, 5]);
+        uint realmLength = packet.ReadBits<uint>(9);
+        MaskedGuid.ReadMaskBits(packet, mask, [4]);
+        uint nameLength = packet.ReadBits<uint>(7);
+        uint lfgSlots = packet.ReadBits<uint>(24);
+        party.IsXRealm = packet.HasBit();
+        MaskedGuid.ReadMaskBits(packet, mask, [1, 7]);
+
+        MaskedGuid.ReadBytes(packet, mask, guid, [1, 4]);
+        packet.ReadUInt32();                        // Timestamp
+        party.ProposedRoles = packet.ReadUInt32();
+        party.LfgCompletedMask = packet.ReadInt32();
+        MaskedGuid.ReadBytes(packet, mask, guid, [6, 0, 2, 3]);
+        if (lfgSlots > 64)
+            return; // a count no invite carries: not this layout
+        for (uint i = 0; i < lfgSlots; i++)
+            party.LfgSlots.Add(packet.ReadInt32());
+        MaskedGuid.ReadBytes(packet, mask, guid, [5]);
+        packet.ReadString(realmLength);             // the inviter's realm, by the server's name for it
+        MaskedGuid.ReadBytes(packet, mask, guid, [7]);
+        party.InviterName = packet.ReadString(nameLength);
+
+        var realm = GetSession().RealmManager.GetRealm(GetSession().RealmId)!;
+        party.InviterRealm = new VirtualRealmInfo(realm.Id.GetAddress(), true, false, realm.Name, realm.NormalizedName);
+        party.InviterGUID = new WowGuid64(MaskedGuid.ToUInt64(guid)).To128(GetSession().GameState);
+        party.InviterBNetAccountId = GetSession().GetBnetAccountGuidForPlayer(party.InviterGUID);
+        SendPacketToClient(party);
+    }
+
     [HandlesSmsg(Opcode.SMSG_PARTY_INVITE)]
     internal void HandleGroupInvite(WorldPacket packet)
     {
+        if (IsCataLegacy)
+        {
+            HandleGroupInviteCata(packet);
+            return;
+        }
+
         PartyInvite party = new PartyInvite();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             party.CanAccept = packet.ReadBool();
@@ -220,6 +269,8 @@ public partial class WorldClient
             // GetDungeon(guid, asId: true) — a BARE dungeon ID, not a full LFG slot.
             lfgDungeonStatus = packet.ReadUInt8();
             lfgDungeonId = packet.ReadUInt32();
+            if (IsCataLegacy)
+                packet.ReadUInt8(); // TrinityCore 4.3.4 Group::SendUpdateToPlayer: one more byte here
         }
         party.PartyIndex = (byte)(isBattleground ? 1 : 0);
         party.PartyGUID = packet.ReadGuid().To128(GetSession().GameState);
@@ -266,6 +317,13 @@ public partial class WorldClient
 
         var uniqueMembers = new HashSet<WowGuid128>();
         uint membersCount = packet.ReadUInt32();
+        // A 4.3.4 server makes the group at the first invite and lists it at once, with nobody in
+        // it yet; earlier servers list a group once someone has joined, and one of none only to
+        // say it is gone. A list of none that still names a group is that group waiting for its
+        // first member: passed on as a group gone, the inviter was told they had been removed.
+        if (membersCount == 0 && IsCataLegacy && !party.PartyGUID.IsEmpty())
+            return;
+
         if (membersCount > 0)
         {
             // A legacy group can MOVE between party categories mid-life — a premade party sits
@@ -363,8 +421,8 @@ public partial class WorldClient
                 // match no row in the WotLK raid dropdown.
                 party.DifficultySettings.RaidDifficultyID = RaidDifficulties.ToLegacyId(acRaid);
                 party.DifficultySettings.LegacyRaidDifficultyID = DifficultyModern.Raid10N;
-                if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
-                    packet.ReadUInt8(); // 3.3 dynamic heroic bit
+                if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958) && !IsCataLegacy)
+                    packet.ReadUInt8(); // 3.3 dynamic heroic bit; gone again in 4.3.4
             }
             else if (ModernVersion.ExpansionVersion > 1)
                 party.DifficultySettings.RaidDifficultyID = DifficultyModern.Raid25N;

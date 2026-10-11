@@ -98,7 +98,11 @@ public static class LootSystem
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
             WorldPacket packet = new WorldPacket(Opcode.CMSG_OPT_OUT_OF_LOOT);
-            packet.WriteInt32(loot.PassOnLoot ? 1 : 0);
+            // TrinityCore 4.3.4 HandleOptOutOfLootOpcode reads one byte; 3.3.5a reads four.
+            if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+                packet.WriteUInt8((byte)(loot.PassOnLoot ? 1 : 0));
+            else
+                packet.WriteInt32(loot.PassOnLoot ? 1 : 0);
             ctx.SendPacketToServer(packet);
         }
         else

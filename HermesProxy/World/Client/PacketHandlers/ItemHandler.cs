@@ -183,7 +183,8 @@ public partial class WorldClient
     internal void HandleDurabilityDamageDeath(WorldPacket packet)
     {
         DurabilityDamageDeath death = new DurabilityDamageDeath();
-        death.Percent = 10;
+        // 4.3.4 DurabilityDamageDeath::Write carries the percentage; earlier servers send nothing.
+        death.Percent = IsCataLegacy ? packet.ReadUInt32() : 10;
         SendPacketToClient(death);
     }
     [HandlesSmsg(Opcode.SMSG_ITEM_COOLDOWN)]

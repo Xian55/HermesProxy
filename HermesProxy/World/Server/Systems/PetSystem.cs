@@ -63,6 +63,14 @@ public static class PetSystem
         packet.WriteUInt32(legacyAction);
         // The target can itself be a pet, so it needs the same reverse-resolution as PetGUID.
         packet.WriteGuid(act.TargetGUID.To64(ctx.GetSession().GameState));
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 HandlePetAction reads a position after the target ("move to").
+            // Without it the read runs off the end and the server skips every pet command.
+            packet.WriteFloat(act.ActionPosition.X);
+            packet.WriteFloat(act.ActionPosition.Y);
+            packet.WriteFloat(act.ActionPosition.Z);
+        }
         ctx.SendPacketToServer(packet);
     }
 

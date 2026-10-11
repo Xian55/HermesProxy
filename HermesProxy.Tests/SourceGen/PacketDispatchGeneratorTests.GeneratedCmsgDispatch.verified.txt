@@ -559,9 +559,15 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleAddonMessage(in packet, in ctx);
     }
 
-    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleAddonMessageTargeted_CMSG_CHAT_ADDON_MESSAGE_TARGETED(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleAddonMessageTargeted_CMSG_CHAT_ADDON_MESSAGE_TARGETED_ChatAddonMessageTargetedCodecCataClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
-        global::HermesProxy.World.Server.Packets.ChatAddonMessageTargetedCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Packets.ChatAddonMessageTargetedCodecCataClassic.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ChatSystem.HandleAddonMessageTargeted(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleAddonMessageTargeted_CMSG_CHAT_ADDON_MESSAGE_TARGETED_ChatAddonMessageTargetedCodecPreCataClassic(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ChatAddonMessageTargetedCodecPreCataClassic.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleAddonMessageTargeted(in packet, in ctx);
     }
 
@@ -2951,7 +2957,12 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHARACTER_RENAME_REQUEST] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleCharacterRenameRequest_CMSG_CHARACTER_RENAME_REQUEST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAR_DELETE] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleCharDelete_CMSG_CHAR_DELETE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_ADDON_MESSAGE] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleAddonMessage_CMSG_CHAT_ADDON_MESSAGE;
-        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_ADDON_MESSAGE_TARGETED] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleAddonMessageTargeted_CMSG_CHAT_ADDON_MESSAGE_TARGETED;
+        {
+            if (global::HermesProxy.ModernVersion.AddedInVersion(4, 4, 2))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_ADDON_MESSAGE_TARGETED] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleAddonMessageTargeted_CMSG_CHAT_ADDON_MESSAGE_TARGETED_ChatAddonMessageTargetedCodecCataClassic;
+            else if (!global::HermesProxy.ModernVersion.AddedInVersion(4, 4, 2))
+                table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_ADDON_MESSAGE_TARGETED] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleAddonMessageTargeted_CMSG_CHAT_ADDON_MESSAGE_TARGETED_ChatAddonMessageTargetedCodecPreCataClassic;
+        }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_ANNOUNCEMENTS] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelCommand_CMSG_CHAT_CHANNEL_ANNOUNCEMENTS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_BAN] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelPlayerCommand_CMSG_CHAT_CHANNEL_BAN;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_CHANNEL_DECLINE_INVITE] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatChannelDeclineInvite_CMSG_CHAT_CHANNEL_DECLINE_INVITE;

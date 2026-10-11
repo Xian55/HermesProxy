@@ -61,6 +61,18 @@ public static class ChatSystem
     public static void HandleChatChannelPassword(in ChannelPassword command, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CHAT_CHANNEL_PASSWORD);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 HandleChannelPassword: an 8-bit and a 7-bit length, then the
+            // two strings without terminators.
+            packet.WriteBits((uint)Encoding.UTF8.GetByteCount(command.ChannelName), 8);
+            packet.WriteBits((uint)Encoding.UTF8.GetByteCount(command.Password), 7);
+            packet.FlushBits();
+            packet.WriteString(command.ChannelName);
+            packet.WriteString(command.Password);
+            ctx.SendPacketToServer(packet);
+            return;
+        }
         packet.WriteCString(command.ChannelName);
         packet.WriteCString(command.Password);
         ctx.SendPacketToServer(packet);
@@ -340,6 +352,22 @@ public static class ChatSystem
     {
         foreach (var prefix in addons.Prefixes)
             ctx.GetSession().GameState.AddonPrefixes.Add(prefix);
+
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy || addons.Prefixes.Count == 0)
+            return;
+
+        // A 4.3.4 server delivers an addon message only to sessions that registered its prefix
+        // (TrinityCore 4.3.4 HandleAddonRegisteredPrefixesOpcode: a 25-bit count, a 5-bit length
+        // each, then the prefixes without terminators). Kept to the proxy alone, a server that
+        // filters from the start sent this client no addon message at all.
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_ADDON_REGISTERED_PREFIXES);
+        packet.WriteBits((uint)addons.Prefixes.Count, 25);
+        foreach (var prefix in addons.Prefixes)
+            packet.WriteBits((uint)Encoding.UTF8.GetByteCount(prefix), 5);
+        packet.FlushBits();
+        foreach (var prefix in addons.Prefixes)
+            packet.WriteString(prefix);
+        ctx.SendPacketToServer(packet);
     }
 
     /// <summary>
@@ -396,5 +424,8 @@ public static class ChatSystem
     public static void HandleChatUnregisterAllAddonPrefixes(in EmptyClientPacket addons, in SessionContext ctx)
     {
         ctx.GetSession().GameState.AddonPrefixes.Clear();
+
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_CHAT_UNREGISTER_ALL_ADDON_PREFIXES));
     }
 }

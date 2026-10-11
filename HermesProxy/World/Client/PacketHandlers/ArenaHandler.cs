@@ -157,10 +157,25 @@ public partial class WorldClient
     internal void HandleArenaTeamCommandResult(WorldPacket packet)
     {
         ArenaTeamCommandResult arena = new ArenaTeamCommandResult();
+        ArenaTeamCommandErrorLegacy errorType;
+        if (IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 SendArenaTeamCommandResult: both lengths first, as bits, then
+            // player, action, error, team, the strings without terminators.
+            uint playerLength = packet.ReadBits<uint>(7);
+            uint teamLength = packet.ReadBits<uint>(8);
+            arena.PlayerName = packet.ReadString(playerLength);
+            arena.Action = (ArenaTeamCommandType)packet.ReadUInt32();
+            errorType = (ArenaTeamCommandErrorLegacy)packet.ReadUInt32();
+            arena.TeamName = packet.ReadString(teamLength);
+            arena.Error = errorType.CastEnum<ArenaTeamCommandErrorModern>();
+            SendPacketToClient(arena);
+            return;
+        }
         arena.Action = (ArenaTeamCommandType)packet.ReadUInt32();
         arena.TeamName = packet.ReadCString();
         arena.PlayerName = packet.ReadCString();
-        var errorType = (ArenaTeamCommandErrorLegacy)packet.ReadUInt32();
+        errorType = (ArenaTeamCommandErrorLegacy)packet.ReadUInt32();
         arena.Error = errorType.CastEnum<ArenaTeamCommandErrorModern>();
         SendPacketToClient(arena);
     }

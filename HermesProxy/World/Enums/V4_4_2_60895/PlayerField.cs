@@ -172,6 +172,15 @@ public enum PlayerField
     [DescriptorUpdateField(nameof(PlayerData.HonorLevel), DescriptorType.Int32, bit: 29, ParentBit = 0)]
     PLAYER_HONOR_LEVEL,
 
+    // The name is an update field too (TrinityCore cata_classic PlayerData::WriteUpdate, bit 31):
+    // a 6-bit length among the bit fields, the string after them. HermesProxy sets nothing that
+    // is written between the two, so one writer does both. A legacy server gives a name only in
+    // answer to a name query, which comes after the player was created.
+    [DescriptorUpdateField(nameof(PlayerData.Name), DescriptorType.UInt8, bit: 31, ParentBit = 0,
+        CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdatePlayerName),
+        CustomPredicate = "src.Name != null")]
+    PLAYER_NAME,
+
     // LogoutTime — owner-only Int64 UnixTime, else 0L.
     [DescriptorCreatePlaceholder(DescriptorType.Int64, CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteCreatePlayerLogoutTime))]
     PLAYER_LOGOUT_TIME_CUSTOM,

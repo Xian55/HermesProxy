@@ -222,6 +222,13 @@ public partial class WorldClient
         PlaySound sound = new();
         sound.SoundEntryID = packet.ReadUInt32();
         sound.SourceObjectGuid = GetSession().GameState.CurrentPlayerGuid;
+        if (IsCataLegacy)
+        {
+            // 4.3.4 PlaySound::Write names the source; earlier servers leave it out.
+            WowGuid64 source = packet.ReadGuid();
+            if (!source.IsEmpty())
+                sound.SourceObjectGuid = source.To128(GetSession().GameState);
+        }
         SendPacketToClient(sound);
     }
 
@@ -232,6 +239,9 @@ public partial class WorldClient
         sound.SoundEntryID = packet.ReadUInt32();
         sound.SourceObjectGUID = packet.ReadGuid().To128(GetSession().GameState);
         sound.TargetObjectGUID = sound.SourceObjectGUID;
+        // 4.3.4 PlayObjectSound::Write names the target as well: the one a creature whispers to.
+        if (IsCataLegacy)
+            sound.TargetObjectGUID = packet.ReadGuid().To128(GetSession().GameState);
         SendPacketToClient(sound);
     }
 

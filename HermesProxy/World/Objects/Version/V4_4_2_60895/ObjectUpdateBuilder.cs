@@ -981,6 +981,13 @@ public partial class ObjectUpdateBuilder
     internal void WriteCreatePlayerName(WorldPacket data, PlayerData src)
         => data.WriteString(PlayerName);
 
+    internal void WriteUpdatePlayerName(WorldPacket data, PlayerData src)
+    {
+        data.WriteBits(System.Text.Encoding.UTF8.GetByteCount(src.Name!), 6);
+        data.FlushBits();
+        data.WriteString(src.Name!);
+    }
+
     internal void WriteUpdatePlayerQuestLogEntry(WorldPacket data, ReadOnlySpan<QuestLog> arr, int i)
     {
         // Per-element write at bit 36+i. Same shape as hand-port file:1576-1583 — uses

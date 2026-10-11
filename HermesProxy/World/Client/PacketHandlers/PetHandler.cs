@@ -284,6 +284,9 @@ public partial class WorldClient
         for (byte i = 0; i < count; i++)
         {
             PetStableInfo pet = new PetStableInfo();
+            // TrinityCore 4.3.4 SendStablePet: each pet starts with the slot it sits in.
+            if (IsCataLegacy)
+                packet.ReadInt32();
             pet.PetNumber = packet.ReadUInt32();
             pet.CreatureID = packet.ReadUInt32();
             pet.ExperienceLevel = packet.ReadUInt32();

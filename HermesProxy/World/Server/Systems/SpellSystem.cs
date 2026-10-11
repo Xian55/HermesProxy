@@ -395,6 +395,9 @@ public static class SpellSystem
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_TOTEM_DESTROYED);
         packet.WriteUInt8(totem.Slot);
+        // TrinityCore 4.3.4 TotemDestroyed::Read: the totem's GUID follows the slot.
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            packet.WriteGuid(totem.Guid.To64(ctx.GetSession().GameState));
         ctx.SendPacketToServer(packet);
     }
 

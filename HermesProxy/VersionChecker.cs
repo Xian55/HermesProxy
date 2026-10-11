@@ -594,6 +594,13 @@ public static class ModernVersion
     /// <summary>See <see cref="VersionChecker.IsWotLKClassicOrLater"/>.</summary>
     public static readonly bool IsWotLKClassicOrLater = VersionChecker.IsWotLKClassicOrLater(Build);
 
+    /// <summary>
+    /// From 4.4.2 on a player's name is part of its object, and the client reads it there: a
+    /// player created without one shows no name anywhere and cannot be invited. Earlier clients
+    /// ask for the name themselves.
+    /// </summary>
+    public static readonly bool PlayerObjectCarriesName = ExpansionVersion >= 4;
+
     public static int BuildInt => (int)Build;
     public static string VersionString => Build.ToString();
 

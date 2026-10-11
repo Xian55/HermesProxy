@@ -613,6 +613,38 @@ def client_layout_section(log_dirs: list[Path], client_errors: dict) -> list[str
     return md
 
 
+# Legacy opcodes the shared parser calls "changed" whose 4.3.4 layout was read in TrinityCore
+# 4.3.4 and is what HermesProxy reads or writes already: the change is elsewhere in the family,
+# or trails what HermesProxy takes. (direction, opcode) -> what was read. Shown as "reviewed".
+LEGACY_REVIEWED = {
+    ('C', 'CMSG_MAIL_MARK_AS_READ'): 'HandleMailMarkAsRead: mailbox, mail id; 12 bytes captured',
+    ('C', 'CMSG_QUEST_GIVER_COMPLETE_QUEST'): 'QuestGiverCompleteQuest::Read: giver, quest, FromScript',
+    ('C', 'CMSG_QUEST_POI_QUERY'): 'QuestPOIQuery::Read: count, quest ids',
+    ('C', 'CMSG_TIME_SYNC_RESPONSE'): 'HandleTimeSyncResp: counter, client time',
+    ('S', 'SMSG_ATTACKER_STATE_UPDATE'): 'captured swings, with and without a block, parse as 3.3.5a to the last byte',
+    ('S', 'SMSG_BUY_FAILED'): 'Player::SendBuyError: vendor, item, reason',
+    ('S', 'SMSG_FEATURE_SYSTEM_STATUS'): 'not read: HermesProxy builds its own',
+    ('S', 'SMSG_GOSSIP_MESSAGE'): 'captured menus, one with an option and one with a quest, parse as 3.3.5a',
+    ('S', 'SMSG_LOOT_MONEY_NOTIFY'): 'LootMoneyNotify::Write: money, sole looter',
+    ('S', 'SMSG_PARTY_COMMAND_RESULT'): 'PartyCommandResult::Write: a GUID added after everything read',
+    ('S', 'SMSG_QUEST_UPDATE_COMPLETE'): 'quest id alone; 4 bytes captured',
+    ('S', 'SMSG_TRAINER_BUY_FAILED'): 'TrainerBuyFailed::Write: trainer, spell, reason',
+    ('C', 'CMSG_BEGIN_TRADE'): 'empty, as in 3.3.5a; the trade window opened on both clients in play',
+    ('S', 'SMSG_LEARNED_SPELL'): 'Player::LearnSpell: the spell id first, then a uint32 nothing reads',
+    ('C', 'CMSG_CLEAR_TRADE_ITEM'): 'ClearTradeItem::Read: the trade slot, one byte',
+    ('C', 'MSG_LIST_STABLED_PETS'): 'HandleListStabledPetsOpcode: the stable master, nothing else',
+    ('S', 'MSG_CHANNEL_START'): 'ChannelStart::Write: two flags and what they announce, after everything read',
+    ('S', 'MSG_MOVE_TELEPORT_ACK'): 'client to server only on 4.3.4; the teleport itself is MSG_MOVE_TELEPORT, ported',
+    ('S', 'SMSG_DUEL_WINNER'): 'Player::DuelComplete: fled byte, loser, winner',
+    ('S', 'SMSG_LFG_DISABLED'): 'empty',
+    ('S', 'SMSG_LFG_OFFER_CONTINUE'): 'LFGOfferContinue::Write: the slot',
+    ('S', 'SMSG_LOOT_START_ROLL'): 'Group::SendLootStartRoll: a player count after everything read',
+    ('S', 'SMSG_PLAY_MUSIC'): 'PlayMusic::Write: a source GUID after the sound, which the modern packet has no place for',
+    ('S', 'SMSG_RESURRECT_REQUEST'): 'ResurrectRequest::Write: the spell id after everything read',
+    ('S', 'SMSG_SPELL_DAMAGE_SHIELD'): 'SpellDamageShield::Write: the absorbed amount after everything read',
+}
+
+
 def status(direction: str, mapped: bool, is_ported: bool, layout: str, seen: Seen | None, changed_since: bool) -> str:
     if not mapped:
         return 'unmapped'
@@ -695,6 +727,8 @@ def main() -> None:
             return False
         return max((REPO / f).stat().st_mtime for f in files) > session_time(seen.session)
 
+    rows = [(d, op, mp, po, 'reviewed' if lay == 'changed' and not po and (d, op) in LEGACY_REVIEWED else lay,
+             seen, where, files) for d, op, mp, po, lay, seen, where, files in rows]
     graded = [(status(d, mp, po, lay, seen, changed_since(seen, files)), d, op, po, lay, seen, where)
               for d, op, mp, po, lay, seen, where, files in rows]
     graded.sort(key=lambda r: (ORDER.index(r[0]), r[1], r[2]))
@@ -729,6 +763,9 @@ def main() -> None:
     md += client[:cut] + unanswered_section(ev.unanswered, Path(args.tc_cata) if args.tc_cata else None) + client[cut:]
 
     md += ['## Legacy side (4.3.4 server)', '',
+           '"reviewed" in the layout column: the shared parser has a 4.x branch, and TrinityCore 4.3.4 '
+           'was read to see that it does not touch what HermesProxy reads or writes (LEGACY_REVIEWED '
+           'in the script, with what was read).', '',
            '| | Dir | Opcode | 4.3.4 branch | WPP 4.x layout | Last session | Seen | Errors | HP file |',
            '|---|---|---|---|---|---|---:|---:|---|']
     for st, d, op, po, lay, seen, where in graded:

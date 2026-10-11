@@ -57,6 +57,10 @@ public class PlayerData
     public float?[] AvgItemLevel { get; } = new float?[6];
     public uint? CurrentBattlePetBreedQuality;
     public int? HonorLevel;
+
+    /// <summary>The character's name, for a client whose player object carries it (4.4.2 on). Set
+    /// only to send it as a change; a create takes the name from the session's player cache.</summary>
+    public string? Name;
     private ChrCustomizationChoice[]? _customizations;
     public ReadOnlySpan<ChrCustomizationChoice> Customizations => _customizations ?? _emptyCustomizations36;
     public ChrCustomizationChoice[] EnsureCustomizations() => _customizations ??= new ChrCustomizationChoice[36];

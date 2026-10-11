@@ -30,6 +30,45 @@ public sealed class CataClassicCodecTests
     private static SpanPacketReader ReaderOver(byte[] framed)
         => new(new WorldPacket(framed).GetRemainingSpan());
 
+    // Captured from the 4.4.2 client: "gooday" whispered to Mirabilis.
+    [Fact]
+    public void ChatMessageWhisper_CataClassic_ReadsACapturedWhisper()
+    {
+        byte[] payload = Convert.FromHexString(
+            "07000000" + "03A095210408" + "01000101" + "050070" + "4D69726162696C697300" + "676F6F64617900");
+        byte[] framed = new byte[payload.Length + 2];
+        payload.CopyTo(framed, 2);
+
+        var r = ReaderOver(framed);
+        ChatMessageWhisperCodecCataClassic.Read(ref r, out var packet);
+        Assert.Equal(7u, packet.Language);
+        Assert.Equal("Mirabilis", packet.Target);
+        Assert.Equal("gooday", packet.Text);
+        Assert.False(packet.TargetGUID.IsEmpty());
+        Assert.Equal(0, r.Remaining);
+    }
+
+    // Captured from the 4.4.2 client: C_ChatInfo.SendAddonMessage("HP", "hello", "WHISPER",
+    // "Elpriest"). No channel, the target by GUID and by name, the name's length with its NUL.
+    [Fact]
+    public void ChatAddonMessageTargeted_CataClassic_ReadsACapturedWhisper()
+    {
+        byte[] payload = Convert.FromHexString(
+            "1028" + "07000000" + "4850" + "68656C6C6F" + "0000" + "03A025220408" + "01000101"
+            + "048000" + "456C70726965737400");
+        byte[] f = new byte[payload.Length + 2];
+        payload.CopyTo(f, 2);
+
+        var r = ReaderOver(f);
+        ChatAddonMessageTargetedCodecCataClassic.Read(ref r, out var packet);
+        Assert.Equal("HP", packet.Params.Prefix);
+        Assert.Equal("hello", packet.Params.Text);
+        Assert.Equal(ChatMessageTypeModern.Whisper, packet.Params.Type);
+        Assert.Equal("Elpriest", packet.Target);
+        Assert.True(packet.ChannelGuid.IsEmpty());
+        Assert.Equal(0, r.Remaining);
+    }
+
     [Fact]
     public void AutoBankItem_CataClassic_SkipsTheBankType()
     {

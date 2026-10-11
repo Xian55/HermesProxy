@@ -1197,7 +1197,91 @@ public class InspectResult : ServerPacket
 {
     public InspectResult() : base(Opcode.SMSG_INSPECT_RESULT) { }
 
-    public override void Write()
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<InspectResult>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new EarlierLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
+
+    private static readonly ServerPacketLayout<InspectResult> Layout = Layouts.ForRunningClient();
+
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>Up to 3.4.3: the writers this packet had before it had layouts, as they were.</summary>
+    internal sealed class EarlierLayout : ServerPacketLayout<InspectResult>
+    {
+        public override void Write(InspectResult packet, WorldPacket data) => packet.WriteEarlier();
+    }
+
+    /// <summary>
+    /// 4.4.2 (docs/protocol, read from the client, and TrinityCore cata_classic InspectResult::Write):
+    /// one talent group with its counts twice over, the tree the player specialised in, ranks as
+    /// uint32; nine PvP brackets; and a trait block, which is empty here.
+    /// </summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<InspectResult>
+    {
+        internal const int Brackets = 9;
+
+        public override void Write(InspectResult packet, WorldPacket data)
+        {
+            packet.DisplayInfo.Write(data);
+
+            data.WriteUInt32(0);                    // PvpTalents
+            data.WriteInt32(packet.ItemLevel);
+            data.WriteUInt8(packet.LifetimeMaxRank);
+            data.WriteUInt16(packet.TodayHK);
+            data.WriteUInt16(packet.YesterdayHK);
+            data.WriteUInt32(packet.LifetimeHK);
+            data.WriteUInt32(packet.HonorLevel);
+
+            data.WriteUInt32(0);                    // UnspentTalentPoints
+            data.WriteUInt8(0);                     // ActiveGroup
+            data.WriteUInt32(1);                    // talent groups: the active one
+            data.WriteUInt8((byte)packet.InspectedTalents.Count);
+            data.WriteUInt32((uint)packet.InspectedTalents.Count);
+            data.WriteUInt8((byte)packet.Glyphs.Count);
+            data.WriteUInt32((uint)packet.Glyphs.Count);
+            data.WriteUInt8(0);                     // SpecID
+            data.WriteUInt32(packet.PrimaryTalentTree);
+            foreach (TalentEntry talent in packet.InspectedTalents)
+            {
+                data.WriteUInt32(talent.TalentID);
+                data.WriteUInt32(talent.Rank);
+            }
+            foreach (ushort glyph in packet.Glyphs)
+                data.WriteUInt16(glyph);
+            data.WriteBit(false);                   // IsPetTalents
+            data.FlushBits();
+
+            data.WriteBit(packet.GuildData != null);
+            data.WriteBit(packet.AzeriteLevel.HasValue);
+            data.FlushBits();
+
+            for (byte bracket = 0; bracket < Brackets; bracket++)
+            {
+                data.WriteUInt8(bracket);
+                for (int i = 0; i < 17; i++)
+                    data.WriteInt32(0);
+                data.WriteBit(false);               // Disqualified
+                data.FlushBits();
+            }
+
+            if (packet.GuildData != null)
+                packet.GuildData.Write(data);
+
+            if (packet.AzeriteLevel.HasValue)
+                data.WriteUInt32(packet.AzeriteLevel.Value);
+
+            data.WriteInt32(0);                     // TalentTraits.Level
+            data.WriteInt32(0);                     // TalentTraits.ChrSpecializationID
+            data.WriteInt32(0);                     // TraitConfig.ID
+            data.WriteInt32(0);                     // TraitConfig.Type
+            data.WriteUInt32(0);                    // TraitConfig.Entries
+            data.WriteUInt32(0);                    // TraitConfig.SubTrees
+            data.WriteBits(0u, 9);                  // TraitConfig.Name
+            data.FlushBits();
+        }
+    }
+
+    private void WriteEarlier()
     {
         DisplayInfo.Write(_worldPacket);
 
@@ -1277,6 +1361,7 @@ public class InspectResult : ServerPacket
     public List<ushort> Glyphs = new();
     public List<byte> Talents = new();
     public List<TalentEntry> InspectedTalents = new();
+    public uint PrimaryTalentTree; // 4.x: the talent tab the inspected player specialised in
     public InspectGuildData GuildData = null!;
     public PVPBracketData[] Bracket = new PVPBracketData[6];
     public uint? AzeriteLevel;

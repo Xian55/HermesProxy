@@ -130,8 +130,8 @@ public partial class WorldClient
         packet.WriteUInt32(_realm.Id.Region);       // RegionID
         packet.WriteUInt8(digest[14]);
         packet.WriteUInt8(digest[13]);
-        packet.WriteUInt32((uint)EmptyAddonInfoBlob.Length);
-        packet.WriteBytes(EmptyAddonInfoBlob);
+        packet.WriteUInt32((uint)EmptyAddonInfoBlobCata.Length);
+        packet.WriteBytes(EmptyAddonInfoBlobCata);
         packet.WriteBit(false);                     // UseIPv6
         packet.WriteBits(account.Length, 12);
         packet.FlushBits();

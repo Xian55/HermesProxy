@@ -36,6 +36,28 @@ public static class GroupSystem
     public static void HandlePartyInvite(in PartyInviteClient invite, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PARTY_INVITE);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 PartyInviteClient::Read: the realm id and the roles, then the
+            // target's GUID masked around the two string lengths. Sent the 3.3.5a way, as a
+            // C string, the server could not read it and the invite went nowhere.
+            ulong target = invite.TargetGUID.IsEmpty() ? 0 : invite.TargetGUID.To64().Low;
+            packet.WriteUInt32(0);                  // TargetCfgRealmID
+            packet.WriteUInt32(0);                  // ProposedRoles
+            MaskedGuid.WriteMaskBits(packet, target, [2, 7]);
+            packet.WriteBits((uint)System.Text.Encoding.UTF8.GetByteCount(invite.TargetRealm), 9);
+            MaskedGuid.WriteMaskBits(packet, target, [3]);
+            packet.WriteBits((uint)System.Text.Encoding.UTF8.GetByteCount(invite.TargetName), 10);
+            MaskedGuid.WriteMaskBits(packet, target, [5, 4, 6, 0, 1]);
+            packet.FlushBits();
+            MaskedGuid.WriteBytes(packet, target, [4, 7, 6]);
+            packet.WriteString(invite.TargetName);
+            packet.WriteString(invite.TargetRealm);
+            MaskedGuid.WriteBytes(packet, target, [1, 0, 5, 3, 2]);
+            ctx.SendPacketToServer(packet);
+            return;
+        }
+
         packet.WriteCString(invite.TargetName);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             packet.WriteUInt32(0);
@@ -45,6 +67,20 @@ public static class GroupSystem
     [HandlesCmsg(Opcode.CMSG_PARTY_INVITE_RESPONSE)]
     public static void HandlePartyInviteResponse(in PartyInviteResponse invite, in SessionContext ctx)
     {
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            // 4.3.4 answers an invite with one opcode, as the modern client does (TrinityCore
+            // 4.3.4 PartyInviteResponse::Read); the accept and decline opcodes of 3.3.5a are gone.
+            WorldPacket response = new WorldPacket(Opcode.CMSG_GROUP_INVITE_RESPONSE);
+            response.WriteBit(invite.RolesDesired.HasValue);
+            response.WriteBit(invite.Accept);
+            response.FlushBits();
+            if (invite.RolesDesired.HasValue)
+                response.WriteUInt32(invite.RolesDesired.Value);
+            ctx.SendPacketToServer(response);
+            return;
+        }
+
         if (invite.Accept)
         {
             WorldPacket packet = new WorldPacket(Opcode.CMSG_GROUP_ACCEPT);

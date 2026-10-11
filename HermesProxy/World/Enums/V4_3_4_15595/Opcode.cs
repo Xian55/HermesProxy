@@ -438,6 +438,7 @@ public enum Opcode : uint
     CMSG_SET_FACTION_AT_WAR                               = 0x0706,
     CMSG_SET_FACTION_INACTIVE                             = 0x0E37,
     CMSG_SET_LOOT_METHOD                                  = 0x2F24,
+    CMSG_SET_PARTY_LEADER                                 = 0x4C17, // TrinityCore 4.3.4: CMSG_GROUP_SET_LEADER
     CMSG_SET_PET_SLOT                                     = 0x3A04,
     CMSG_SET_PLAYER_DECLINED_NAMES                        = 0x6316,
     CMSG_SET_PREFERRED_CEMETERY                           = 0x311E,

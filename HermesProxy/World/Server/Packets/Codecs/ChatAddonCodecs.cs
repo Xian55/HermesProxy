@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 
@@ -38,7 +39,8 @@ public static class ChatAddonMessageCodec
     }
 }
 
-public static class ChatAddonMessageTargetedCodec
+[PacketCodec(typeof(ChatAddonMessageTargeted), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class ChatAddonMessageTargetedCodecPreCataClassic
 {
     /// <remarks>
     /// The target length is read first and the target string last, with the whole params block and
@@ -51,6 +53,39 @@ public static class ChatAddonMessageTargetedCodec
         ChatAddonMessageParamsCodec.Read(ref r, out var p);
         WowGuid128 channelGuid = r.ReadPackedGuid128();
         packet = new ChatAddonMessageTargeted(p, channelGuid, r.ReadString(targetLen));
+    }
+}
+
+// 4.4.2 (docs/protocol, and a captured addon whisper): the params come first, then the channel's
+// GUID, the target's GUID and realm, and two 9-bit lengths that count a trailing NUL which is on
+// the wire, as in this build's whisper. TrinityCore cata_classic reads two 7-bit lengths; the
+// captured packet has 04 80 00 there for "Elpriest", which is 9 and 0 in 9 bits each and makes
+// no sense in 7. The opcode is this build's own as well: 3.4.3 sends an addon whisper through
+// the plain addon opcode.
+[PacketCodec(typeof(ChatAddonMessageTargeted), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class ChatAddonMessageTargetedCodecCataClassic
+{
+    public static void Read(ref SpanPacketReader r, out ChatAddonMessageTargeted packet)
+    {
+        ChatAddonMessageParamsCodec.Read(ref r, out var p);
+        WowGuid128 channelGuid = r.ReadPackedGuid128();
+        r.ReadPackedGuid128();                      // PlayerGUID
+        r.ReadUInt32();                             // PlayerVirtualRealmAddress
+        uint targetLen = r.ReadBits<uint>(9);
+        uint channelLen = r.ReadBits<uint>(9);
+        string target = ReadTerminated(ref r, targetLen);
+        ReadTerminated(ref r, channelLen);          // the channel is found by its GUID
+        packet = new ChatAddonMessageTargeted(p, channelGuid, target);
+    }
+
+    private static string ReadTerminated(ref SpanPacketReader r, uint len)
+    {
+        if (len <= 1)
+            return "";
+
+        string value = r.ReadString(len - 1);
+        r.ReadUInt8();                              // NUL
+        return value;
     }
 }
 

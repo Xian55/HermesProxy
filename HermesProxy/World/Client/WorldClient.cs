@@ -35,11 +35,16 @@ public partial class WorldClient
 
     // Minimal WotLK 3.3.5a CMSG_AUTH_SESSION addon payload: [uncompressedSize=4][zlib(addonsCount=0)].
     // Built once; mangos-wotlk accepts a zero-addon-list as valid.
-    private static readonly byte[] EmptyAddonInfoBlob = BuildEmptyAddonInfoBlob();
+    private static readonly byte[] EmptyAddonInfoBlob = BuildAddonInfoBlob([0, 0, 0, 0]); // uint32 addonsCount = 0
 
-    private static byte[] BuildEmptyAddonInfoBlob()
+    // The 4.3.4 client ends its addon list with a uint32, the time of the last banned addon it
+    // knows of, and a server reads it after the addons. TrinityCore 4.3.4 parses the list inside
+    // a try block and so took the list without it; a 4.3.4 core without that guard read past
+    // the end, which ended its whole worldserver on the first CMSG_AUTH_SESSION.
+    private static readonly byte[] EmptyAddonInfoBlobCata = BuildAddonInfoBlob([0, 0, 0, 0, 0, 0, 0, 0]);
+
+    private static byte[] BuildAddonInfoBlob(ReadOnlySpan<byte> uncompressed)
     {
-        ReadOnlySpan<byte> uncompressed = [0, 0, 0, 0]; // uint32 addonsCount = 0
         using var compressed = new System.IO.MemoryStream();
         using (var deflate = new System.IO.Compression.ZLibStream(compressed, System.IO.Compression.CompressionLevel.Fastest, leaveOpen: true))
             deflate.Write(uncompressed);
@@ -889,8 +894,20 @@ public partial class WorldClient
             return;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PING);
-        packet.WriteUInt32(ping);
-        packet.WriteUInt32(latency);
+        if (IsCataLegacy)
+        {
+            // 4.3.4 has the two the other way round (TrinityCore 4.3.4 WorldPackets::Auth::Ping).
+            // Written the 3.3.5a way, the keep-alive's serial, which has its top bit set, was
+            // taken for a latency of 2^31 ms; a server that stores the latency with the
+            // character then failed every save of it.
+            packet.WriteUInt32(latency);
+            packet.WriteUInt32(ping);
+        }
+        else
+        {
+            packet.WriteUInt32(ping);
+            packet.WriteUInt32(latency);
+        }
         SendPacket(packet);
     }
 

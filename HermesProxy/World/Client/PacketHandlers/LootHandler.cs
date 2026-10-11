@@ -259,6 +259,25 @@ public partial class WorldClient
         loot.Item.Loot.RandomPropertiesSeed = packet.ReadUInt32();
         loot.Item.Loot.RandomPropertiesID = packet.ReadUInt32();
         loot.Item.Quantity = 1;
+        if (IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 Group::SendLootRoll: the roll is an int32, and a choice just made
+            // is a negative one (-1 pass, -7 greed, -8 disenchant; need is 0 with type 0) where
+            // 3.3.5a sent 128. Read as a byte, the type came out of the middle of the number.
+            int rollNumber = packet.ReadInt32();
+            byte cataRollType = packet.ReadUInt8();
+            if (rollNumber == -1)
+                loot.RollType = RollType.Pass;
+            else if (rollNumber == 0 && cataRollType == 0)
+                loot.RollType = RollType.Need;
+            else
+                loot.RollType = (RollType)cataRollType;
+            loot.Roll = rollNumber > 0 ? rollNumber : 0;
+            loot.Autopassed = packet.ReadBool();
+            SendPacketToClient(loot);
+            return;
+        }
+
         loot.Roll = packet.ReadUInt8();
 
         byte rollType = packet.ReadUInt8();
@@ -291,7 +310,8 @@ public partial class WorldClient
         loot.Item.Loot.RandomPropertiesID = packet.ReadUInt32();
         loot.Item.Quantity = 1;
         loot.Winner = packet.ReadGuid().To128(GetSession().GameState);
-        loot.Roll = packet.ReadUInt8();
+        // 4.3.4 Group::SendLootRollWon: the roll is an int32 here too.
+        loot.Roll = IsCataLegacy ? packet.ReadInt32() : packet.ReadUInt8();
         loot.RollType = (RollType)packet.ReadUInt8();
         if (loot.RollType == RollType.Need)
             loot.MainSpec = 128;

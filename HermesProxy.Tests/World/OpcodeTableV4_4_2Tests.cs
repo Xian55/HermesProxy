@@ -46,7 +46,8 @@ public class OpcodeTableV4_4_2Tests
 
     /// <summary>
     /// The table is the 3.4.3 one revalued, so that a packet both builds have takes the same
-    /// handler. What 4.4.2 has beyond it is listed here by hand: the retail-style auction house.
+    /// handler. What 4.4.2 has beyond it is listed here by hand: the retail-style auction house,
+    /// and the addon message with a target, which 3.4.3 sends through the plain addon opcode.
     /// </summary>
     [Fact]
     public void HasThe3_4_3Names_AndTheRetailStyleAuctionHouse()

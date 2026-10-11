@@ -376,6 +376,13 @@ public partial class WorldClient
                 break;
         }
 
+        // TrinityCore 4.3.4 BuildChatPacket: an addon message carries its prefix here, on its
+        // own; 3.3.5a has it at the front of the text, before a tab. Left unread, its first four
+        // bytes were taken for the length of the text.
+        string? cataAddonPrefix = null;
+        if (IsCataLegacy && language == (uint)Language.Addon)
+            cataAddonPrefix = packet.ReadCString();
+
         uint textLength = packet.ReadUInt32();
         string text = packet.ReadString(textLength);
         // Legacy 3.3.5a SMSG_CHAT / SMSG_GM_MESSAGECHAT include the trailing
@@ -411,7 +418,14 @@ public partial class WorldClient
         }
 
         string addonPrefix = "";
-        if (!ChatPkt.CheckAddonPrefix(GetSession().GameState.AddonPrefixes, ref language, ref text, ref addonPrefix))
+        if (cataAddonPrefix != null)
+        {
+            if (!GetSession().GameState.AddonPrefixes.Contains(cataAddonPrefix))
+                return;
+            addonPrefix = cataAddonPrefix;
+            language = (uint)Language.AddonBfA;
+        }
+        else if (!ChatPkt.CheckAddonPrefix(GetSession().GameState.AddonPrefixes, ref language, ref text, ref addonPrefix))
             return;
 
         // Counterpart to the outbound rewrite: the server broadcasts links in the legacy
@@ -601,6 +615,12 @@ public partial class WorldClient
     /// </summary>
     private void SendMessageChatCata(ChatMessageTypeWotLK type, uint lang, string msg, string channel, string to)
     {
+        if (lang == (uint)Language.Addon)
+        {
+            SendAddonMessageCata(type, msg, to);
+            return;
+        }
+
         Opcode opcode = type switch
         {
             ChatMessageTypeWotLK.Say => Opcode.CMSG_CHAT_MESSAGE_SAY,
@@ -650,6 +670,83 @@ public partial class WorldClient
         }
 
         SendPacket(packet);
+    }
+
+    /// <summary>
+    /// 4.3.4 sends addon messages through opcodes of their own, one per destination, with the
+    /// prefix apart from the text (TrinityCore 4.3.4 WorldSession::HandleAddonMessagechatOpcode);
+    /// each orders its two lengths and its strings its own way. Sent as chat in the addon
+    /// language, the server answers that it does not know the language. There is no addon
+    /// opcode for say, yell or a channel.
+    /// </summary>
+    private void SendAddonMessageCata(ChatMessageTypeWotLK type, string prefixedText, string to)
+    {
+        int tab = prefixedText.IndexOf('\t');
+        if (tab <= 0)
+            return;
+
+        string prefix = prefixedText[..tab];
+        string text = prefixedText[(tab + 1)..];
+        int prefixLength = System.Text.Encoding.UTF8.GetByteCount(prefix);
+        int textLength = System.Text.Encoding.UTF8.GetByteCount(text);
+        if (prefixLength > 16 || textLength > 511)
+            return; // the server drops a longer prefix, and nine bits hold no longer text
+
+        switch (type)
+        {
+            case ChatMessageTypeWotLK.Whisper:
+            {
+                WorldPacket packet = new WorldPacket(Opcode.CMSG_CHAT_ADDON_MESSAGE_WHISPER);
+                packet.WriteBits(textLength, 9);
+                packet.WriteBits(prefixLength, 5);
+                packet.WriteBits(System.Text.Encoding.UTF8.GetByteCount(to), 10);
+                packet.FlushBits();
+                packet.WriteString(text);
+                packet.WriteString(prefix);
+                packet.WriteString(to);
+                SendPacket(packet);
+                break;
+            }
+            case ChatMessageTypeWotLK.Raid:
+            case ChatMessageTypeWotLK.RaidLeader:
+            case ChatMessageTypeWotLK.Battleground:
+            case ChatMessageTypeWotLK.BattlegroundLeader:
+            {
+                bool raid = type is ChatMessageTypeWotLK.Raid or ChatMessageTypeWotLK.RaidLeader;
+                WorldPacket packet = new WorldPacket(raid ? Opcode.CMSG_CHAT_ADDON_MESSAGE_RAID : Opcode.CMSG_CHAT_ADDON_MESSAGE_BATTLEGROUND);
+                packet.WriteBits(prefixLength, 5);
+                packet.WriteBits(textLength, 9);
+                packet.FlushBits();
+                packet.WriteString(prefix);
+                packet.WriteString(text);
+                SendPacket(packet);
+                break;
+            }
+            case ChatMessageTypeWotLK.Party:
+            case ChatMessageTypeWotLK.PartyLeader:
+            case ChatMessageTypeWotLK.Officer:
+            {
+                WorldPacket packet = new WorldPacket(type == ChatMessageTypeWotLK.Officer ? Opcode.CMSG_CHAT_ADDON_MESSAGE_OFFICER : Opcode.CMSG_CHAT_ADDON_MESSAGE_PARTY);
+                packet.WriteBits(prefixLength, 5);
+                packet.WriteBits(textLength, 9);
+                packet.FlushBits();
+                packet.WriteString(text);
+                packet.WriteString(prefix);
+                SendPacket(packet);
+                break;
+            }
+            case ChatMessageTypeWotLK.Guild:
+            {
+                WorldPacket packet = new WorldPacket(Opcode.CMSG_CHAT_ADDON_MESSAGE_GUILD);
+                packet.WriteBits(textLength, 9);
+                packet.WriteBits(prefixLength, 5);
+                packet.FlushBits();
+                packet.WriteString(text);
+                packet.WriteString(prefix);
+                SendPacket(packet);
+                break;
+            }
+        }
     }
 
     [HandlesSmsg(Opcode.SMSG_EMOTE)]

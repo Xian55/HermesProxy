@@ -36,6 +36,13 @@ public static class TradeSystem
     public static void HandleInitiateTrade(in InitiateTrade trade, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_INITIATE_TRADE);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 InitiateTrade::Read: the GUID masked.
+            MaskedGuid.Write(packet, trade.Guid.To64().Low, [0, 3, 5, 1, 4, 6, 7, 2], [7, 4, 3, 5, 1, 2, 6, 0]);
+            ctx.SendPacketToServer(packet);
+            return;
+        }
         packet.WriteGuid(trade.Guid.To64());
         ctx.SendPacketToServer(packet);
     }
@@ -52,7 +59,10 @@ public static class TradeSystem
         tradeSession.ClientStateIndex++;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_TRADE_GOLD);
-        packet.WriteInt32((int)trade.Coinage);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            packet.WriteUInt64(trade.Coinage);      // 4.3.4 SetTradeGold::Read: uint64
+        else
+            packet.WriteInt32((int)trade.Coinage);
         ctx.SendPacketToServer(packet);
     }
 
@@ -92,11 +102,21 @@ public static class TradeSystem
         tradeSession.ClientStateIndex++;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_TRADE_ITEM);
-        packet.WriteUInt8(trade.TradeSlot);
         byte containerSlot = trade.PackSlot != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(trade.PackSlot) : trade.PackSlot;
         byte slot = trade.PackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(trade.ItemSlotInPack) : trade.ItemSlotInPack;
-        packet.WriteUInt8(containerSlot);
-        packet.WriteUInt8(slot);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            // 4.3.4 SetTradeItem::Read: the slot in the bag, the trade slot, the bag.
+            packet.WriteUInt8(slot);
+            packet.WriteUInt8(trade.TradeSlot);
+            packet.WriteUInt8(containerSlot);
+        }
+        else
+        {
+            packet.WriteUInt8(trade.TradeSlot);
+            packet.WriteUInt8(containerSlot);
+            packet.WriteUInt8(slot);
+        }
         ctx.SendPacketToServer(packet);
     }
 

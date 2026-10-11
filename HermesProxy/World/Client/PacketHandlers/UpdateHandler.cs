@@ -2753,6 +2753,17 @@ public partial class WorldClient
 
     private void StoreObjectUpdateInternal(ref WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData)
     {
+        // The create goes out now, with whatever name is known; an unknown one is asked for here
+        // and follows as a change (HandleQueryPlayerNameResponse).
+        if (isCreate && ModernVersion.PlayerObjectCarriesName && objectType == ObjectType.Player
+            && guid != GetSession().GameState.CurrentPlayerGuid
+            && GetSession().GameState.GetPlayerName(guid).Length == 0)
+        {
+            WorldPacket nameQuery = new WorldPacket(Opcode.CMSG_NAME_QUERY);
+            nameQuery.WriteGuid(guid.To64());
+            SendPacketToServer(nameQuery);
+        }
+
         // Object Fields
         int OBJECT_FIELD_GUID = LegacyVersion.GetUpdateField(ObjectField.OBJECT_FIELD_GUID);
         if (OBJECT_FIELD_GUID >= 0 && updateMaskArray[OBJECT_FIELD_GUID])
@@ -3923,9 +3934,11 @@ public partial class WorldClient
                 var cached = GetSession().GameState.GetCachedObjectFieldsLegacy(guid.To128(GetSession().GameState));
                 if (cached != null)
                 {
+                    // A field that is 0 was never sent, so it is not in the cache either: a character
+                    // with the first skin, face and hair of its race has no PLAYER_BYTES at all.
                     if (skin == null && PLAYER_BYTES >= 0)
                     {
-                        uint bytes = cached[PLAYER_BYTES].UInt32Value;
+                        uint bytes = cached.TryGetValue(PLAYER_BYTES, out var bytesField) ? bytesField.UInt32Value : 0;
                         skin = (byte)(bytes & 0xFF);
                         face = (byte)((bytes >> 8) & 0xFF);
                         hairStyle = (byte)((bytes >> 16) & 0xFF);
@@ -3933,7 +3946,7 @@ public partial class WorldClient
                     }
                     else if (facialHair == null && PLAYER_BYTES_2 >= 0)
                     {
-                        facialHair = (byte)(cached[PLAYER_BYTES_2].UInt32Value & 0xFF);
+                        facialHair = (byte)((cached.TryGetValue(PLAYER_BYTES_2, out var bytes2Field) ? bytes2Field.UInt32Value : 0) & 0xFF);
                     }
                 }
             }

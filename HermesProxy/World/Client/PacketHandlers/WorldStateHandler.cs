@@ -83,6 +83,8 @@ public partial class WorldClient
         UpdateWorldState update = new UpdateWorldState();
         update.VariableID = packet.ReadUInt32();
         update.Value = packet.ReadInt32();
+        if (IsCataLegacy)
+            update.Hidden = packet.ReadBool(); // 4.3.4 UpdateWorldState::Write ends with it
         SendPacketToClient(update);
 
         if (update.VariableID == (uint)WorldStates.WsgFlagStateAlliance)

@@ -25,7 +25,8 @@ public partial class WorldClient
         pending.TimeUntilLock = (int)packet.ReadUInt32();
         pending.CompletedMask = packet.ReadUInt32();
         pending.Extending = packet.ReadUInt8() != 0;
-        pending.WarningOnly = false; // legacy has no equivalent; it only asks when a bind is pending
+        // 3.3.5a has no equivalent, it only asks when a bind is pending; 4.3.4 PendingRaidLock says.
+        pending.WarningOnly = IsCataLegacy && packet.ReadBool();
         SendPacketToClient(pending);
     }
 
@@ -110,10 +111,17 @@ public partial class WorldClient
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             {
+                // TrinityCore 4.3.4 InstanceLock: a heroic flag before the instance id and the
+                // bosses killed after the time. Without them every lock after the first is read
+                // from the middle of the one before.
+                if (IsCataLegacy)
+                    packet.ReadUInt32(); // Heroic
                 instance.InstanceID = packet.ReadUInt64();
                 instance.Locked = packet.ReadBool();
                 instance.Extended = packet.ReadBool();
                 instance.TimeRemaining = packet.ReadInt32();
+                if (IsCataLegacy)
+                    instance.CompletedMask = packet.ReadUInt32();
             }
             else
             {
