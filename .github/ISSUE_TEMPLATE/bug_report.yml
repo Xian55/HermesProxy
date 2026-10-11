@@ -50,6 +50,7 @@ body:
       - 2.5.2 TBC Classic (build 40892)
       - 2.5.3 TBC Classic (build 42328)
       - 3.4.3 WotLK Classic (build 54261)
+      - 4.4.2 Cataclysm Classic (build 60895) — preview
       - Other
   validations:
     required: true
@@ -64,6 +65,7 @@ body:
       - VMaNGOS
       - TrinityCore
       - AzerothCore
+      - TrinityCore 4.3.4 (Cataclysm Preservation Project)
       - ChromieCraft
       - Solocraft
       - Kronos
