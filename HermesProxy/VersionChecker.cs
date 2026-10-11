@@ -142,6 +142,7 @@ public static class VersionChecker
             1 => ClientVersionBuild.V1_12_1_5875,
             2 => ClientVersionBuild.V2_4_3_8606,
             3 => ClientVersionBuild.V3_3_5a_12340,
+            4 => ClientVersionBuild.V4_3_4_15595,
             _ => ClientVersionBuild.Zero,
         };
     }
