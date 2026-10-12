@@ -29,13 +29,19 @@ public partial class WorldClient
     private const uint SplineFlagAnimationCata = 0x01000000;
     private const uint SplineFlagParabolicCata = 0x02000000;
 
-    private static SplineFlagModern ConvertSplineFlagsCata(uint flags)
+    /// <remarks>
+    /// Parabolic is left out on purpose. With it the client computes the arc from the spline's
+    /// jump data (gravity, start time), which the modern writers here never send, and the 4.4.2
+    /// client reads that data without checking it is there: an access violation at null + 4 in
+    /// its spline code, on the first leap in sight (Heroic Leap, a charge, a knockback; three
+    /// crashes at a battleground's opening). Without the flag a leap is drawn as a move along
+    /// the ground, as the older clients have always drawn it.
+    /// </remarks>
+    internal static SplineFlagModern ConvertSplineFlagsCata(uint flags)
     {
         var modern = (SplineFlagModern)(flags & SplineFlagsSharedWithModern);
         if ((flags & SplineFlagAnimationCata) != 0)
             modern |= SplineFlagModern.Animation;
-        if ((flags & SplineFlagParabolicCata) != 0)
-            modern |= SplineFlagModern.Parabolic;
         return modern;
     }
 
