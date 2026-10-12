@@ -652,6 +652,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleBattlefieldMgrQueueRequestResponse(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleBattlegroundPlayerPositionsCata_SMSG_BATTLEFIELD_PLAYER_POSITIONS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleBattlegroundPlayerPositionsCata(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleBattlefieldStatusTBC_SMSG_BATTLEFIELD_STATUS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleBattlefieldStatusTBC(packet);
@@ -660,6 +665,21 @@ internal static unsafe class GeneratedSmsgDispatch
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleBattlefieldStatusVanilla_SMSG_BATTLEFIELD_STATUS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleBattlefieldStatusVanilla(packet);
+    }
+
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleBattlefieldStatusActiveCata_SMSG_BATTLEFIELD_STATUS_ACTIVE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleBattlefieldStatusActiveCata(packet);
+    }
+
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleBattlefieldStatusFailedCata_SMSG_BATTLEFIELD_STATUS_FAILED(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleBattlefieldStatusFailedCata(packet);
+    }
+
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleBattlefieldStatusNeedConfirmationCata_SMSG_BATTLEFIELD_STATUS_NEED_CONFIRMATION(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleBattlefieldStatusNeedConfirmationCata(packet);
     }
 
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleGroupJoinedBattleground_SMSG_BATTLEFIELD_STATUS_QUEUED(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
@@ -2022,6 +2042,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandlePvPCredit(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandlePvPLogDataCata_SMSG_PVP_LOG_DATA(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandlePvPLogDataCata(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleQueryCreatureResponse_SMSG_QUERY_CREATURE_RESPONSE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleQueryCreatureResponse(packet);
@@ -2372,6 +2397,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleStartMirrorTimer(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleStartTimer_SMSG_START_TIMER(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleStartTimer(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleStopMirrorTimer_SMSG_STOP_MIRROR_TIMER(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleStopMirrorTimer(packet);
@@ -2690,12 +2720,16 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_MGR_ENTRY_INVITE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBattlefieldMgrEntryInvite_SMSG_BATTLEFIELD_MGR_ENTRY_INVITE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_MGR_QUEUE_INVITE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBattlefieldMgrQueueInvite_SMSG_BATTLEFIELD_MGR_QUEUE_INVITE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_MGR_QUEUE_REQUEST_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBattlefieldMgrQueueRequestResponse_SMSG_BATTLEFIELD_MGR_QUEUE_REQUEST_RESPONSE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_PLAYER_POSITIONS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBattlegroundPlayerPositionsCata_SMSG_BATTLEFIELD_PLAYER_POSITIONS;
         {
             if (global::HermesProxy.LegacyVersion.AddedInVersion(global::HermesProxy.Enums.ClientVersionBuild.V2_0_1_6180))
                 table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_STATUS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBattlefieldStatusTBC_SMSG_BATTLEFIELD_STATUS;
             else if (global::HermesProxy.LegacyVersion.RemovedInVersion(global::HermesProxy.Enums.ClientVersionBuild.V2_0_1_6180))
                 table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_STATUS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBattlefieldStatusVanilla_SMSG_BATTLEFIELD_STATUS;
         }
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_STATUS_ACTIVE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBattlefieldStatusActiveCata_SMSG_BATTLEFIELD_STATUS_ACTIVE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_STATUS_FAILED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBattlefieldStatusFailedCata_SMSG_BATTLEFIELD_STATUS_FAILED;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_STATUS_NEED_CONFIRMATION] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBattlefieldStatusNeedConfirmationCata_SMSG_BATTLEFIELD_STATUS_NEED_CONFIRMATION;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_STATUS_QUEUED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGroupJoinedBattleground_SMSG_BATTLEFIELD_STATUS_QUEUED;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEGROUND_PLAYER_JOINED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBattlegroundPlayerLeftOrJoined_SMSG_BATTLEGROUND_PLAYER_JOINED;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEGROUND_PLAYER_LEFT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBattlegroundPlayerLeftOrJoined_SMSG_BATTLEGROUND_PLAYER_LEFT;
@@ -2995,6 +3029,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PRE_RESSURECT] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePreRessurect_SMSG_PRE_RESSURECT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PRINT_NOTIFICATION] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePrintNotification_SMSG_PRINT_NOTIFICATION;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PVP_CREDIT] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePvPCredit_SMSG_PVP_CREDIT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PVP_LOG_DATA] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePvPLogDataCata_SMSG_PVP_LOG_DATA;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_QUERY_CREATURE_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleQueryCreatureResponse_SMSG_QUERY_CREATURE_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_QUERY_GAME_OBJECT_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleQueryGameObjectResposne_SMSG_QUERY_GAME_OBJECT_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_QUERY_GUILD_INFO_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleQueryGuildInfoResponse_SMSG_QUERY_GUILD_INFO_RESPONSE;
@@ -3065,6 +3100,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SPIRIT_HEALER_CONFIRM] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSpiritHealerConfirm_SMSG_SPIRIT_HEALER_CONFIRM;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_STAND_STATE_UPDATE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleStandStateUpdate_SMSG_STAND_STATE_UPDATE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_START_MIRROR_TIMER] = &Thunk_HermesProxy_World_Client_WorldClient_HandleStartMirrorTimer_SMSG_START_MIRROR_TIMER;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_START_TIMER] = &Thunk_HermesProxy_World_Client_WorldClient_HandleStartTimer_SMSG_START_TIMER;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_STOP_MIRROR_TIMER] = &Thunk_HermesProxy_World_Client_WorldClient_HandleStopMirrorTimer_SMSG_STOP_MIRROR_TIMER;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SUMMON_REQUEST] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSummonRequest_SMSG_SUMMON_REQUEST;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SUPERCEDED_SPELLS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSupercededSpells_SMSG_SUPERCEDED_SPELLS;
@@ -3220,7 +3256,11 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_MGR_ENTRY_INVITE,
             global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_MGR_QUEUE_INVITE,
             global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_MGR_QUEUE_REQUEST_RESPONSE,
+            global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_PLAYER_POSITIONS,
             global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_STATUS,
+            global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_STATUS_ACTIVE,
+            global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_STATUS_FAILED,
+            global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_STATUS_NEED_CONFIRMATION,
             global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEFIELD_STATUS_QUEUED,
             global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEGROUND_PLAYER_JOINED,
             global::HermesProxy.World.Enums.Opcode.SMSG_BATTLEGROUND_PLAYER_LEFT,
@@ -3487,6 +3527,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_PRE_RESSURECT,
             global::HermesProxy.World.Enums.Opcode.SMSG_PRINT_NOTIFICATION,
             global::HermesProxy.World.Enums.Opcode.SMSG_PVP_CREDIT,
+            global::HermesProxy.World.Enums.Opcode.SMSG_PVP_LOG_DATA,
             global::HermesProxy.World.Enums.Opcode.SMSG_QUERY_CREATURE_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.SMSG_QUERY_GAME_OBJECT_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.SMSG_QUERY_GUILD_INFO_RESPONSE,
@@ -3557,6 +3598,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_SPIRIT_HEALER_CONFIRM,
             global::HermesProxy.World.Enums.Opcode.SMSG_STAND_STATE_UPDATE,
             global::HermesProxy.World.Enums.Opcode.SMSG_START_MIRROR_TIMER,
+            global::HermesProxy.World.Enums.Opcode.SMSG_START_TIMER,
             global::HermesProxy.World.Enums.Opcode.SMSG_STOP_MIRROR_TIMER,
             global::HermesProxy.World.Enums.Opcode.SMSG_SUMMON_REQUEST,
             global::HermesProxy.World.Enums.Opcode.SMSG_SUPERCEDED_SPELLS,

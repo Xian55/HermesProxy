@@ -29,6 +29,14 @@ public partial class WorldClient
     internal static bool LegacyHasItemQuery => !IsCataLegacy;
 
     /// <summary>
+    /// What asks the server where the flag carriers are. The older servers answer the opcode they
+    /// are asked with; 4.x has a request and an answer.
+    /// </summary>
+    internal static Opcode BattlegroundPlayerPositionsRequest => IsCataLegacy
+        ? Opcode.CMSG_BATTLEGROUND_PLAYER_POSITIONS
+        : Opcode.MSG_BATTLEGROUND_PLAYER_POSITIONS;
+
+    /// <summary>
     /// Reads the server's greeting and answers with the client's. Each is a big-endian uint16 length
     /// and the text, with no opcode and no encryption; the server sends its auth challenge only
     /// after the answer.

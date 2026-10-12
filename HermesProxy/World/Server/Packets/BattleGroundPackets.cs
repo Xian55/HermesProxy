@@ -493,6 +493,42 @@ public class BattlegroundInit : ServerPacket, ISpanWritable
     public ushort BattlegroundPoints;
 }
 
+/// <summary>
+/// The countdown to a battle's start, shown as a bar at the top of the screen. Only a 4.3.4 server
+/// sends one, so the layout is the 4.4.2 client's: seconds as 64 bits around the type, then a
+/// player the server may name.
+/// </summary>
+public sealed class StartTimer : ServerPacket, ISpanWritable
+{
+    public StartTimer() : base(Opcode.SMSG_START_TIMER) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt64(TotalTime);
+        _worldPacket.WriteUInt32(Type);
+        _worldPacket.WriteInt64(TimeLeft);
+        _worldPacket.WriteBit(false); // has a player
+        _worldPacket.FlushBits();
+    }
+
+    public int MaxSize => 21; // 2 longs + uint + 1 byte for the bit
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteInt64(TotalTime);
+        writer.WriteUInt32(Type);
+        writer.WriteInt64(TimeLeft);
+        writer.WriteBit(false);
+        writer.FlushBits();
+        return writer.Position;
+    }
+
+    public long TotalTime;
+    public uint Type;
+    public long TimeLeft;
+}
+
 public readonly record struct RequestBattlefieldStatus;
 
 public readonly record struct PVPLogDataRequest;

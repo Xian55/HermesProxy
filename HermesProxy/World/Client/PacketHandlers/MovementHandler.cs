@@ -610,6 +610,8 @@ public partial class WorldClient
             float z = packet.ReadFloat();
             GetSession().GameState.CurrentMapId = teleport.MapID = packet.ReadUInt32();
             teleport.Position = new Vector3(x, packet.ReadFloat(), z);
+            if (GameData.GetBattlegroundIdFromMapId(teleport.MapID) == 0)
+                EndBattlegroundRaidLeftBehind();
         }
         else
         {

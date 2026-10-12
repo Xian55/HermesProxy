@@ -130,6 +130,8 @@ public enum HoldKeyKind : ushort
     PlayerSpawnCanFly = 13,
     /// <summary>A = guid low, B = guid high. V3_4_3 another player's collision height, held for its next movement.</summary>
     RemoteCollisionHeight = 14,
+    /// <summary>The next minute of a 4.3.4 battleground's clock, see <c>BattlegroundClock</c>.</summary>
+    BattlegroundClock = 15,
 }
 
 /// <summary>How a hold behaves while it waits.</summary>

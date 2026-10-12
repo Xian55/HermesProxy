@@ -24,6 +24,21 @@ public class GroupListFlagFormatTests
         Assert.True(lfg);
     }
 
+    /// <summary>
+    /// TrinityCore Group::RemoveMember tells the one who left with a list whose type byte is 0x10.
+    /// It is all a battleground raid sends on the way out.
+    /// </summary>
+    [Theory]
+    [InlineData(0x10, true)]
+    [InlineData(0x03, false)]
+    [InlineData(0x00, false)]
+    public void PackedFormat_RemovalMarkIsBit0x10(byte groupType, bool expected)
+    {
+        using var packet = Packet(groupType);
+        WorldClient.ReadGroupTypeFlags(packet, packed: true, out bool removed);
+        Assert.Equal(expected, removed);
+    }
+
     [Fact]
     public void PackedFormat_NoBitsIsAHomeGroup()
     {

@@ -31,6 +31,22 @@ public static class BattlegroundSystem
     public static void HandleBattlefieldJoin(in BattlemasterJoin join, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_BATTLEMASTER_JOIN);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 HandleBattlemasterJoinOpcode: the battleground as a GUID and no
+            // battlemaster, since 4.x queues from anywhere.
+            ulong battleground = CataBattlegroundGuid(join.BattlefieldListId);
+            ctx.GetSession().GameState.BattlefieldJoinRoles = join.Roles;
+            packet.WriteInt32(join.BattlefieldInstanceID);
+            MaskedGuid.WriteMaskBits(packet, battleground, [2, 0, 3, 1, 5]);
+            packet.WriteBit(join.JoinAsGroup);
+            MaskedGuid.WriteMaskBits(packet, battleground, [4, 6, 7]);
+            packet.FlushBits();
+            MaskedGuid.WriteBytes(packet, battleground, [2, 6, 4, 3, 7, 0, 5, 1]);
+            ctx.SendPacketToServer(packet);
+            return;
+        }
+
         packet.WriteGuid(join.BattlemasterGuid.To64());
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
             packet.WriteUInt32(GameData.GetMapIdFromBattlegroundId(join.BattlefieldListId));
@@ -41,6 +57,21 @@ public static class BattlegroundSystem
         ctx.SendPacketToServer(packet);
     }
 
+    /// <summary>
+    /// A 4.3.4 battleground GUID: the battlemaster list id under the battleground high type
+    /// (TrinityCore 4.3.4 <c>ObjectGuid(HighGuid::BattleGround, id)</c>, 0x1F1 shifted by 52). The
+    /// modern client's queue id is the same number.
+    /// </summary>
+    internal static ulong CataBattlegroundGuid(uint battlefieldListId)
+        => battlefieldListId == 0 ? 0 : (0x1F1ul << 52) | battlefieldListId;
+
+    /// <summary>
+    /// The role an invitation names, from the roles its join was sent with: the Dungeon Finder's
+    /// mask in the join (tank 2, healer 4, damage 8), a number in the invitation (0, 1, 2).
+    /// </summary>
+    internal static byte InvitationRole(byte joinRoles)
+        => (joinRoles & 2) != 0 ? (byte)0 : (joinRoles & 4) != 0 ? (byte)1 : (byte)2;
+
     [HandlesCmsg(Opcode.CMSG_BATTLEFIELD_LIST)]
     public static void HandleBattlefieldList(in BattlefieldListRequest request, in SessionContext ctx)
     {
@@ -50,6 +81,14 @@ public static class BattlegroundSystem
             return;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_BATTLEFIELD_LIST);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 HandleBattlefieldListOpcode: the list id and nothing after it
+            packet.WriteUInt32((uint)request.ListID);
+            ctx.SendPacketToServer(packet);
+            return;
+        }
+
         if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
             packet.WriteUInt32(GameData.GetMapIdFromBattlegroundId((uint)request.ListID));
         else
@@ -85,6 +124,23 @@ public static class BattlegroundSystem
         }
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_BATTLEFIELD_PORT);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 HandleBattleFieldPortOpcode: the queue slot names the battle. The
+            // join time, the int after the slot and the GUID are read and not used.
+            uint queueSlot = port.Ticket.Id == 0 ? 0 : port.Ticket.Id - 1;
+            ulong player = ctx.GetSession().GameState.CurrentPlayerGuid.To64().Low;
+            packet.WriteUInt32(ctx.GetSession().GameState.GetBattleFieldQueueJoinTime(port.Ticket.Id));
+            packet.WriteUInt32(queueSlot);
+            packet.WriteUInt32(0);
+            MaskedGuid.WriteMaskBits(packet, player, [0, 1, 5, 6, 7, 4, 3, 2]);
+            packet.WriteBit(port.AcceptedInvite);
+            packet.FlushBits();
+            MaskedGuid.WriteBytes(packet, player, [1, 3, 5, 7, 0, 2, 6, 4]);
+            ctx.SendPacketToServer(packet);
+            return;
+        }
+
         uint bgTypeId = ctx.GetSession().GameState.GetBattleFieldQueueType(port.Ticket.Id);
 
         // arenatype byte. The legacy server derives BattlegroundQueueTypeId from
@@ -122,7 +178,10 @@ public static class BattlegroundSystem
     [HandlesCmsg(Opcode.CMSG_PVP_LOG_DATA)]
     public static void HandlePvPLogData(in PVPLogDataRequest log, in SessionContext ctx)
     {
-        WorldPacket packet = new WorldPacket(Opcode.MSG_PVP_LOG_DATA);
+        // 4.3.4 split the two-way opcode into a request and an answer
+        WorldPacket packet = new WorldPacket(HermesProxy.World.Client.WorldClient.IsCataLegacy
+            ? Opcode.CMSG_PVP_LOG_DATA
+            : Opcode.MSG_PVP_LOG_DATA);
         ctx.SendPacketToServer(packet);
     }
 
@@ -145,6 +204,14 @@ public static class BattlegroundSystem
         }
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_BATTLEFIELD_LEAVE);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 HandleBattlefieldLeaveOpcode reads nothing: the server takes the
+            // player out of the battleground they are in.
+            ctx.SendPacketToServer(packet);
+            return;
+        }
+
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
             uint bgTypeId = ctx.GetSession().GameState.GetBattleFieldQueueType(1);

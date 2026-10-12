@@ -474,6 +474,14 @@ public sealed class GameSessionData
     public Dictionary<uint, byte> BattleFieldQueueArenaTypes = [];
     public Dictionary<uint, byte> BattleFieldQueueBracketIds = [];
     public Dictionary<uint, long> BattleFieldQueueTimes = [];
+    public Dictionary<uint, uint> BattleFieldQueueJoinTimes = [];
+    // The roles the last battleground join was sent with: a 4.3.4 invitation does not say them back.
+    public byte BattlefieldJoinRoles;
+    // A 4.3.4 battleground's clock: when it runs out by the server's time, and on which map.
+    public long BattlegroundClockEnd;
+    public uint? BattlegroundClockMap;
+    // The legacy server's unix time minus this machine's, from the last time query that went by.
+    public long LegacyServerClockOffset;
     public Dictionary<uint, uint> DailyQuestsDone = [];
     public HashSet<WowGuid128> FlagCarrierGuids = [];
     public Dictionary<WowGuid64, ushort> ObjectSpawnCount = [];
@@ -1447,12 +1455,23 @@ public sealed class GameSessionData
     {
         return BattleFieldQueueBracketIds.TryGetValue(queueSlot, out var value) ? value : (byte)0;
     }
+    // A 4.3.4 server names the moment a slot was queued in every status packet, and its client
+    // sends that back in CMSG_BATTLEFIELD_PORT.
+    public void StoreBattleFieldQueueJoinTime(uint queueSlot, uint joinTime)
+    {
+        BattleFieldQueueJoinTimes[queueSlot] = joinTime;
+    }
+    public uint GetBattleFieldQueueJoinTime(uint queueSlot)
+    {
+        return BattleFieldQueueJoinTimes.TryGetValue(queueSlot, out var value) ? value : 0u;
+    }
     public void RemoveBattleFieldQueue(uint queueSlot)
     {
         BattleFieldQueueTypes.Remove(queueSlot);
         BattleFieldQueueArenaTypes.Remove(queueSlot);
         BattleFieldQueueBracketIds.Remove(queueSlot);
         BattleFieldQueueTimes.Remove(queueSlot);
+        BattleFieldQueueJoinTimes.Remove(queueSlot);
     }
     public void StoreAuraDurationLeft(WowGuid128 guid, byte slot, int duration, int currentTime)
     {

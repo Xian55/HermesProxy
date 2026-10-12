@@ -237,10 +237,20 @@ public partial class WorldClient
     /// the end of the packet.
     /// </summary>
     internal static (bool IsRaid, bool IsBattleground, bool IsLfg) ReadGroupTypeFlags(WorldPacket packet, bool packed)
+        => ReadGroupTypeFlags(packet, packed, out _);
+
+    /// <param name="removed">
+    /// The packed byte carries 0x10: the list is the server telling the player they are no longer
+    /// in this group (TrinityCore <c>Group::RemoveMember</c> writes exactly that byte, then the
+    /// group's GUID and no members).
+    /// </param>
+    internal static (bool IsRaid, bool IsBattleground, bool IsLfg) ReadGroupTypeFlags(WorldPacket packet, bool packed, out bool removed)
     {
+        removed = false;
         if (packed)
         {
             byte groupType = packet.ReadUInt8();
+            removed = (groupType & 0x10) != 0;
             return ((groupType & 0x02) != 0, (groupType & 0x01) != 0, (groupType & 0x08) != 0);
         }
 
@@ -255,7 +265,7 @@ public partial class WorldClient
         PartyUpdate party = new PartyUpdate();
         party.SequenceNum = GetSession().GameState.GroupUpdateCounter++;
         var (isRaid, isBattleground, isLfg) =
-            ReadGroupTypeFlags(packet, LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958));
+            ReadGroupTypeFlags(packet, LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958), out bool removed);
         byte ownSubGroup = packet.ReadUInt8();
         byte ownGroupFlags = packet.ReadUInt8();
         byte ownRoles = 0;
@@ -321,10 +331,26 @@ public partial class WorldClient
         // it yet; earlier servers list a group once someone has joined, and one of none only to
         // say it is gone. A list of none that still names a group is that group waiting for its
         // first member: passed on as a group gone, the inviter was told they had been removed.
-        if (membersCount == 0 && IsCataLegacy && !party.PartyGUID.IsEmpty())
-            return;
+        //
+        // The one such list that must go through is the server taking the player out of the group
+        // of the instance category. A battleground's raid ends with nothing else: no removal
+        // packet as a party gets, only this list with the removal mark, and dropping it left the
+        // client in a raid of a battle it had left.
+        //
+        // And a battleground's raid begins the other way round: the player is put into it alone on
+        // entering, the others follow one list at a time. That list of none is a raid of one, and
+        // the client is in the battle's raid from the moment it is in the battle.
+        bool raidOfOne = membersCount == 0 && IsCataLegacy && isBattleground && !removed && !party.PartyGUID.IsEmpty();
+        bool leftInstanceGroup = false;
+        if (membersCount == 0 && IsCataLegacy && !party.PartyGUID.IsEmpty() && !raidOfOne)
+        {
+            var instanceGroup = GetSession().GameState.CurrentGroups[1];
+            leftInstanceGroup = removed && instanceGroup != null && instanceGroup.PartyGUID == party.PartyGUID;
+            if (!leftInstanceGroup)
+                return;
+        }
 
-        if (membersCount > 0)
+        if (membersCount > 0 || raidOfOne)
         {
             // A legacy group can MOVE between party categories mid-life — a premade party sits
             // in the home category and jumps to the instance category the moment it converts to
@@ -398,21 +424,35 @@ public partial class WorldClient
                 });
             }
 
-            if (allAssist)
+            if (allAssist && !raidOfOne)
                 party.PartyFlags |= GroupFlags.EveryoneAssistant;
 
             party.LeaderGUID = packet.ReadGuid().To128(GetSession().GameState);
 
             party.LootSettings = new PartyLootSettings();
-            party.LootSettings.Method = (LootMethod)packet.ReadUInt8();
-            party.LootSettings.LootMaster = packet.ReadGuid().To128(GetSession().GameState);
-            party.LootSettings.Threshold = packet.ReadUInt8();
-
             party.DifficultySettings = new PartyDifficultySettings();
-            int difficultyId = packet.ReadUInt8();
+            int difficultyId = 0;
+            if (raidOfOne)
+            {
+                // TrinityCore 4.3.4 Group::SendUpdateToPlayer writes loot and difficulty only for a
+                // group of more than one; the list ends with the leader.
+                party.LootSettings.LootMaster = WowGuid128.Empty;
+            }
+            else
+            {
+                party.LootSettings.Method = (LootMethod)packet.ReadUInt8();
+                party.LootSettings.LootMaster = packet.ReadGuid().To128(GetSession().GameState);
+                party.LootSettings.Threshold = packet.ReadUInt8();
+                difficultyId = packet.ReadUInt8();
+            }
             party.DifficultySettings.DungeonDifficultyID = ((DifficultyLegacy)difficultyId).CastEnum<DifficultyModern>();
 
-            if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
+            if (raidOfOne)
+            {
+                party.DifficultySettings.RaidDifficultyID = RaidDifficulties.ToLegacyId(0);
+                party.DifficultySettings.LegacyRaidDifficultyID = DifficultyModern.Raid10N;
+            }
+            else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             {
                 byte acRaid = packet.ReadUInt8();
                 // Native puts the active raid difficulty in RaidDifficultyID as 3-6 and leaves
@@ -457,7 +497,8 @@ public partial class WorldClient
             if (GetSession().GameState.CurrentGroups[0] == null && GetSession().GameState.CurrentGroups[1] == null)
                 GetSession().GameState.GroupAssignedRoles.Clear();
 
-            if (!GetSession().GameState.WeWantToLeaveGroup)
+            // leaving a battle is not being removed from a group; nothing to say
+            if (!GetSession().GameState.WeWantToLeaveGroup && !leftInstanceGroup)
                 SendPacketToClient(new GroupUninvite()); // Send kick message
         }
 
@@ -768,7 +809,7 @@ public partial class WorldClient
         {
             if (_requestBgPlayerPosCounter++ > 10) // don't spam every time somebody moves
             {
-                WorldPacket packet2 = new WorldPacket(Opcode.MSG_BATTLEGROUND_PLAYER_POSITIONS);
+                WorldPacket packet2 = new WorldPacket(BattlegroundPlayerPositionsRequest);
                 SendPacket(packet2);
                 _requestBgPlayerPosCounter = 0;
             }
@@ -970,7 +1011,7 @@ public partial class WorldClient
         {
             if (_requestBgPlayerPosCounter++ > 10) // don't spam every time somebody moves
             {
-                WorldPacket packet2 = new WorldPacket(Opcode.MSG_BATTLEGROUND_PLAYER_POSITIONS);
+                WorldPacket packet2 = new WorldPacket(BattlegroundPlayerPositionsRequest);
                 SendPacket(packet2);
                 _requestBgPlayerPosCounter = 0;
             }
@@ -1266,7 +1307,7 @@ public partial class WorldClient
         {
             if (_requestBgPlayerPosCounter++ > 10) // don't spam every time somebody moves
             {
-                WorldPacket packet2 = new WorldPacket(Opcode.MSG_BATTLEGROUND_PLAYER_POSITIONS);
+                WorldPacket packet2 = new WorldPacket(BattlegroundPlayerPositionsRequest);
                 SendPacket(packet2);
                 _requestBgPlayerPosCounter = 0;
             }
@@ -1477,7 +1518,7 @@ public partial class WorldClient
         {
             if (_requestBgPlayerPosCounter++ > 10) // don't spam every time somebody moves
             {
-                WorldPacket packet2 = new WorldPacket(Opcode.MSG_BATTLEGROUND_PLAYER_POSITIONS);
+                WorldPacket packet2 = new WorldPacket(BattlegroundPlayerPositionsRequest);
                 SendPacket(packet2);
                 _requestBgPlayerPosCounter = 0;
             }

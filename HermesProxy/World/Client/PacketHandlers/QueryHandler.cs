@@ -22,6 +22,7 @@ public partial class WorldClient
     {
         QueryTimeResponse response = new QueryTimeResponse();
         response.CurrentTime = packet.ReadInt32();
+        GetSession().GameState.LegacyServerClockOffset = response.CurrentTime - DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180) && packet.CanRead())
             packet.ReadInt32(); // Next Daily Quest Reset Time
         SendPacketToClient(response);
