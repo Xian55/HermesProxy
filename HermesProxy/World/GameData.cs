@@ -2448,31 +2448,58 @@ public static partial class GameData
                 // preceded it, so shipping a different subset silently re-keyed every
                 // record and defeated the diff. The AreaTrigger id space (max ~10546) fits
                 // inside this table's 100k window.
-                HotfixId = HotfixAreaTriggerBegin + at.Id
+                HotfixId = HotfixAreaTriggerBegin + at.Id + (AreaTriggerHasWideFields ? AreaTriggerWideFieldsIdShift : 0)
             };
             record.UniqueId = record.HotfixId;
             record.RecordId = at.Id;
             record.Status = HotfixStatus.Valid;
-            record.HotfixContent.WriteCString(at.Message);
-            record.HotfixContent.WriteFloat(at.PositionX);
-            record.HotfixContent.WriteFloat(at.PositionY);
-            record.HotfixContent.WriteFloat(at.PositionZ);
-            record.HotfixContent.WriteUInt32(at.Id);
-            record.HotfixContent.WriteUInt16(at.MapId);
-            record.HotfixContent.WriteUInt8(at.PhaseUseFlags);
-            record.HotfixContent.WriteUInt16(at.PhaseId);
-            record.HotfixContent.WriteUInt16(at.PhaseGroupId);
-            record.HotfixContent.WriteFloat(at.Radius);
-            record.HotfixContent.WriteFloat(at.BoxLength);
-            record.HotfixContent.WriteFloat(at.BoxWidth);
-            record.HotfixContent.WriteFloat(at.BoxHeight);
-            record.HotfixContent.WriteFloat(at.BoxYaw);
-            record.HotfixContent.WriteUInt8(at.ShapeType);
-            record.HotfixContent.WriteUInt16(at.ShapeId);
-            record.HotfixContent.WriteUInt16(at.ActionSetId);
-            record.HotfixContent.WriteUInt8(at.Flags);
+            WriteAreaTriggerRecord(record.HotfixContent, at, AreaTriggerHasWideFields);
             Hotfixes[record.HotfixId] = record;
         }
+    }
+
+    /// <summary>
+    /// The client's AreaTrigger record changed shape: layout B4ACA6C2, which Cataclysm Classic
+    /// has from its first build and the Wrath line took at 3.4.4, holds PhaseUseFlags and
+    /// AreaTriggerActionSetID as 32 bits where 3.4.3 and the older clients have 8 and 16.
+    /// </summary>
+    /// <remarks>
+    /// A row in the other shape is not refused. The 4.4.2 client stored the 3.4.3 one as valid and
+    /// read its radius and box from the wrong place, so none of the added triggers ever fired: no
+    /// way into the Dark Portal from the Blasted Lands, and no flag capture in Warsong Gulch.
+    /// </remarks>
+    public static bool AreaTriggerHasWideFields => ModernVersion.AddedInVersion(3, 4, 4);
+
+    // A client that was sent these rows in the wrong shape keeps them under their push ids and
+    // would not ask again. The rows in the right shape go out under ids it has not seen.
+    private const uint AreaTriggerWideFieldsIdShift = 20_000;
+
+    public static void WriteAreaTriggerRecord(ByteBuffer content, AreaTrigger at, bool wideFields)
+    {
+        content.WriteCString(at.Message);
+        content.WriteFloat(at.PositionX);
+        content.WriteFloat(at.PositionY);
+        content.WriteFloat(at.PositionZ);
+        content.WriteUInt32(at.Id);
+        content.WriteUInt16(at.MapId);
+        if (wideFields)
+            content.WriteUInt32(at.PhaseUseFlags);
+        else
+            content.WriteUInt8(at.PhaseUseFlags);
+        content.WriteUInt16(at.PhaseId);
+        content.WriteUInt16(at.PhaseGroupId);
+        content.WriteFloat(at.Radius);
+        content.WriteFloat(at.BoxLength);
+        content.WriteFloat(at.BoxWidth);
+        content.WriteFloat(at.BoxHeight);
+        content.WriteFloat(at.BoxYaw);
+        content.WriteUInt8(at.ShapeType);
+        content.WriteUInt16(at.ShapeId);
+        if (wideFields)
+            content.WriteUInt32(at.ActionSetId);
+        else
+            content.WriteUInt16(at.ActionSetId);
+        content.WriteUInt8(at.Flags);
     }
     public static void LoadSkillLineHotfixes()
     {
