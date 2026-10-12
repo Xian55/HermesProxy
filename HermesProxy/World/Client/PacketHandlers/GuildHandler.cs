@@ -272,7 +272,8 @@ public partial class WorldClient
             case GuildEventType.BankMoneyUpdate:
             {
                 GuildEventBankMoneyChanged money = new GuildEventBankMoneyChanged();
-                money.Money = (ulong)Int32.Parse(strings[0], System.Globalization.NumberStyles.HexNumber);
+                // sixteen hex digits on every server; a 4.3.4 bank can hold more than an int32 of copper
+                money.Money = UInt64.Parse(strings[0], System.Globalization.NumberStyles.HexNumber);
                 SendPacketToClient(money);
                 break;
             }
@@ -757,6 +758,12 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_GUILD_BANK_QUERY_RESULTS)]
     internal void HandleGuildBankQueryResults(WorldPacket packet)
     {
+        if (IsCataLegacy)
+        {
+            HandleGuildBankQueryResultsCata(packet);
+            return;
+        }
+
         GuildBankQueryResults result = new();
         result.Money = packet.ReadUInt64();
         result.Tab = packet.ReadUInt8();
@@ -836,6 +843,167 @@ public partial class WorldClient
             _melLog, _sourceFile, "C<P S", result.Tab, result.TabInfo.Count,
             result.ItemInfo.Count, result.FullUpdate, result.Money);
 
+        SendPacketToClient(result);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 GuildBankQueryResults::Write: counts and string lengths as bits, then the
+    /// tabs, the money, the items, and the tab the list is for. The server sends this shape both
+    /// for a tab's whole content and for the slots a move changed.
+    /// </summary>
+    private void HandleGuildBankQueryResultsCata(WorldPacket packet)
+    {
+        const int MaxSlots = 98;        // GUILD_BANK_MAX_SLOTS
+        const int MaxSockets = 3;
+
+        GuildBankQueryResults result = new();
+        result.FullUpdate = packet.HasBit();
+        int itemCount = (int)packet.ReadBits<uint>(20);
+        int tabCount = (int)packet.ReadBits<uint>(22);
+        if (itemCount > MaxSlots || tabCount > GuildConst.MaxBankTabsCata)
+            return; // more than a bank holds: not this layout
+
+        Span<bool> locked = stackalloc bool[itemCount];
+        Span<int> sockets = stackalloc int[itemCount];
+        for (int i = 0; i < itemCount; i++)
+        {
+            locked[i] = packet.HasBit();
+            sockets[i] = (int)packet.ReadBits<uint>(23);
+            if (sockets[i] > MaxSockets)
+                return;
+        }
+        Span<int> iconLengths = stackalloc int[tabCount];
+        Span<int> nameLengths = stackalloc int[tabCount];
+        for (int i = 0; i < tabCount; i++)
+        {
+            iconLengths[i] = (int)packet.ReadBits<uint>(9);
+            nameLengths[i] = (int)packet.ReadBits<uint>(7);
+        }
+
+        for (int i = 0; i < tabCount; i++)
+        {
+            GuildBankTabInfo tab = new GuildBankTabInfo();
+            tab.Icon = packet.ReadString((uint)iconLengths[i]);
+            tab.TabIndex = (int)packet.ReadUInt32();
+            tab.Name = packet.ReadString((uint)nameLengths[i]);
+            result.TabInfo.Add(tab);
+        }
+
+        result.Money = packet.ReadUInt64();
+
+        for (int i = 0; i < itemCount; i++)
+        {
+            GuildBankItemInfo item = new GuildBankItemInfo();
+            item.Locked = locked[i];
+            for (int socket = 0; socket < sockets[i]; socket++)
+            {
+                uint index = packet.ReadUInt32();
+                uint enchantId = packet.ReadUInt32();
+                uint gemItem = enchantId != 0 ? GameData.GetGemFromEnchantId(enchantId) : 0;
+                if (gemItem != 0)
+                {
+                    ItemGemData gem = new ItemGemData();
+                    gem.Slot = (byte)index;
+                    gem.Item.ItemID = gemItem;
+                    item.SocketEnchant.Add(gem);
+                }
+            }
+            item.EnchantmentID = packet.ReadInt32();
+            packet.ReadUInt32();                    // ReforgeEnchantmentID: the modern packet has no place for it
+            item.OnUseEnchantmentID = packet.ReadInt32();
+            item.Count = packet.ReadInt32();
+            item.Slot = packet.ReadInt32();
+            item.Flags = packet.ReadUInt32();
+            item.Item.ItemID = packet.ReadUInt32();
+            item.Item.RandomPropertiesID = packet.ReadUInt32();
+            item.Charges = packet.ReadInt32();
+            item.Item.RandomPropertiesSeed = packet.ReadUInt32();
+            result.ItemInfo.Add(item);
+        }
+
+        result.Tab = (int)packet.ReadUInt32();
+        result.WithdrawalsRemaining = packet.ReadInt32();
+
+        // Only a tab's whole content names the tabs; the list of changed slots has none and must
+        // not be taken for a bank without tabs. See HandleGuildBankQueryTab for what the count is for.
+        if (tabCount > 0)
+            GetSession().GameState.GuildBankPurchasedTabs = tabCount;
+
+        WorldClientLogMessages.GuildBankQueryResults(
+            _melLog, _sourceFile, "C<P S", result.Tab, result.TabInfo.Count,
+            result.ItemInfo.Count, result.FullUpdate, result.Money);
+
+        SendPacketToClient(result);
+    }
+
+    /// <summary>TrinityCore 4.3.4 GuildBankTextQueryResult::Write.</summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_BANK_TEXT_QUERY_RESULT)]
+    internal void HandleGuildBankTextQueryResult(WorldPacket packet)
+    {
+        uint length = packet.ReadBits<uint>(14);
+        GuildBankTextQueryResult result = new();
+        result.Tab = (int)packet.ReadUInt32();
+        result.Text = packet.ReadString(length);
+        SendPacketToClient(result);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 GuildBankLogQueryResults::Write: per entry which of money, item, count and
+    /// other tab it has, with the player's GUID mask among those bits, then the entries.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_BANK_LOG_QUERY_RESULTS)]
+    internal void HandleGuildBankLogQueryResults(WorldPacket packet)
+    {
+        bool hasWeeklyBonus = packet.HasBit();
+        int count = (int)packet.ReadBits<uint>(23);
+        if (count > 255)
+            return; // the server keeps 25 entries a tab; anything larger is not this layout
+
+        bool[] masks = new bool[count * 8];
+        bool[] hasMoney = new bool[count];
+        bool[] hasItem = new bool[count];
+        bool[] hasCount = new bool[count];
+        bool[] hasOtherTab = new bool[count];
+        for (int i = 0; i < count; i++)
+        {
+            Span<bool> mask = masks.AsSpan(i * 8, 8);
+            hasMoney[i] = packet.HasBit();
+            MaskedGuid.ReadMaskBits(packet, mask, [4, 1]);
+            hasItem[i] = packet.HasBit();
+            hasCount[i] = packet.HasBit();
+            MaskedGuid.ReadMaskBits(packet, mask, [2, 5, 3, 6, 0]);
+            hasOtherTab[i] = packet.HasBit();
+            MaskedGuid.ReadMaskBits(packet, mask, [7]);
+        }
+
+        GuildBankLogQueryResults result = new();
+        Span<byte> guidBytes = stackalloc byte[8];
+        for (int i = 0; i < count; i++)
+        {
+            ReadOnlySpan<bool> mask = masks.AsSpan(i * 8, 8);
+            guidBytes.Clear();
+
+            GuildBankLogEntry entry = new GuildBankLogEntry();
+            MaskedGuid.ReadBytes(packet, mask, guidBytes, [6, 1, 5]);
+            if (hasCount[i])
+                entry.Count = packet.ReadInt32();
+            entry.EntryType = packet.ReadInt8();
+            MaskedGuid.ReadBytes(packet, mask, guidBytes, [2, 4, 0, 7, 3]);
+            if (hasItem[i])
+                entry.ItemID = packet.ReadInt32();
+            entry.TimeOffset = packet.ReadUInt32();
+            if (hasMoney[i])
+                entry.Money = packet.ReadUInt64();
+            if (hasOtherTab[i])
+                entry.OtherTab = packet.ReadInt8();
+
+            entry.PlayerGUID = new WowGuid64(MaskedGuid.ToUInt64(guidBytes)).To128(GetSession().GameState);
+            result.Entry.Add(entry);
+        }
+
+        result.Tab = packet.ReadInt32();
+        if (hasWeeklyBonus)
+            result.WeeklyBonusMoney = packet.ReadUInt64();
         SendPacketToClient(result);
     }
 

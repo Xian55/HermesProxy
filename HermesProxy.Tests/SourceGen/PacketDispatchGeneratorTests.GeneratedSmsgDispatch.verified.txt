@@ -1172,6 +1172,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleGroupUninvite(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleGuildBankLogQueryResults_SMSG_GUILD_BANK_LOG_QUERY_RESULTS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleGuildBankLogQueryResults(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleGuildBankQueryResults_SMSG_GUILD_BANK_QUERY_RESULTS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleGuildBankQueryResults(packet);
@@ -1180,6 +1185,11 @@ internal static unsafe class GeneratedSmsgDispatch
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleGuildBankRemainingWithdrawMoney_SMSG_GUILD_BANK_REMAINING_WITHDRAW_MONEY(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleGuildBankRemainingWithdrawMoney(packet);
+    }
+
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleGuildBankTextQueryResult_SMSG_GUILD_BANK_TEXT_QUERY_RESULT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleGuildBankTextQueryResult(packet);
     }
 
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleGuildCommandResult_SMSG_GUILD_COMMAND_RESULT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
@@ -2799,8 +2809,10 @@ internal static unsafe class GeneratedSmsgDispatch
         }
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GROUP_NEW_LEADER] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGroupNewLeader_SMSG_GROUP_NEW_LEADER;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GROUP_UNINVITE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGroupUninvite_SMSG_GROUP_UNINVITE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_BANK_LOG_QUERY_RESULTS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildBankLogQueryResults_SMSG_GUILD_BANK_LOG_QUERY_RESULTS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_BANK_QUERY_RESULTS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildBankQueryResults_SMSG_GUILD_BANK_QUERY_RESULTS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_BANK_REMAINING_WITHDRAW_MONEY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildBankRemainingWithdrawMoney_SMSG_GUILD_BANK_REMAINING_WITHDRAW_MONEY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_BANK_TEXT_QUERY_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildBankTextQueryResult_SMSG_GUILD_BANK_TEXT_QUERY_RESULT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_COMMAND_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildCommandResult_SMSG_GUILD_COMMAND_RESULT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_COMMAND_RESULT_2] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildCommandResult_SMSG_GUILD_COMMAND_RESULT_2;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_EVENT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildEvent_SMSG_GUILD_EVENT;
@@ -3309,8 +3321,10 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_GROUP_LIST,
             global::HermesProxy.World.Enums.Opcode.SMSG_GROUP_NEW_LEADER,
             global::HermesProxy.World.Enums.Opcode.SMSG_GROUP_UNINVITE,
+            global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_BANK_LOG_QUERY_RESULTS,
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_BANK_QUERY_RESULTS,
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_BANK_REMAINING_WITHDRAW_MONEY,
+            global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_BANK_TEXT_QUERY_RESULT,
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_COMMAND_RESULT,
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_COMMAND_RESULT_2,
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_EVENT,

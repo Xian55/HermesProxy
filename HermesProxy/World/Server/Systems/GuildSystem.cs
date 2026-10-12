@@ -478,13 +478,26 @@ public static class GuildSystem
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_GUILD_BANK_DEPOSIT_MONEY);
         packet.WriteGuid(deposit.BankGuid.To64());
-        packet.WriteUInt32((uint)deposit.Money);
+        // 4.3.4 counts bank money in 64 bits (GuildBankDepositMoney::Read, and the withdrawal below).
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            packet.WriteUInt64(deposit.Money);
+        else
+            packet.WriteUInt32((uint)deposit.Money);
         ctx.SendPacketToServer(packet);
     }
 
     [HandlesCmsg(Opcode.CMSG_GUILD_BANK_TEXT_QUERY)]
     public static void HandleGuildBankTextQuery(in GuildBankTextQuery query, in SessionContext ctx)
     {
+        // 4.3.4 split the two-way opcode into a request and an answer (GuildBankTextQuery::Read).
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            WorldPacket cata = new WorldPacket(Opcode.CMSG_GUILD_BANK_TEXT_QUERY);
+            cata.WriteInt32(query.Tab);
+            ctx.SendPacketToServer(cata);
+            return;
+        }
+
         WorldPacket packet = new WorldPacket(Opcode.MSG_QUERY_GUILD_BANK_TEXT);
         packet.WriteUInt8((byte)query.Tab);
         ctx.SendPacketToServer(packet);
@@ -507,6 +520,15 @@ public static class GuildSystem
     [HandlesCmsg(Opcode.CMSG_GUILD_BANK_LOG_QUERY)]
     public static void HandleGuildBankLogQuery(in GuildBankLogQuery query, in SessionContext ctx)
     {
+        // 4.3.4 GuildBankLogQuery::Read: its own request, the tab as an int32.
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            WorldPacket cata = new WorldPacket(Opcode.CMSG_GUILD_BANK_LOG_QUERY);
+            cata.WriteInt32(query.Tab);
+            ctx.SendPacketToServer(cata);
+            return;
+        }
+
         WorldPacket packet = new WorldPacket(Opcode.MSG_GUILD_BANK_LOG_QUERY);
         packet.WriteUInt8((byte)query.Tab);
         ctx.SendPacketToServer(packet);
@@ -516,6 +538,14 @@ public static class GuildSystem
     public static void HandleGuildBankSetTabText(in GuildBankSetTabText query, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_GUILD_BANK_SET_TAB_TEXT);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            // 4.3.4 GuildBankSetTabText::Read: the tab as an int32, the text counted in 14 bits.
+            packet.WriteInt32(query.Tab);
+            WriteCataText(packet, query.TabText, 14);
+            ctx.SendPacketToServer(packet);
+            return;
+        }
         packet.WriteUInt8((byte)query.Tab);
         packet.WriteCString(query.TabText);
         ctx.SendPacketToServer(packet);
@@ -535,7 +565,10 @@ public static class GuildSystem
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_GUILD_BANK_WITHDRAW_MONEY);
         packet.WriteGuid(withdraw.BankGuid.To64());
-        packet.WriteUInt32((uint)withdraw.Money);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            packet.WriteUInt64(withdraw.Money);
+        else
+            packet.WriteUInt32((uint)withdraw.Money);
         ctx.SendPacketToServer(packet);
     }
 

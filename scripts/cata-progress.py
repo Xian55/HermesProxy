@@ -692,6 +692,7 @@ LEGACY_REVIEWED = {
     ('S', 'SMSG_PLAY_MUSIC'): 'PlayMusic::Write: a source GUID after the sound, which the modern packet has no place for',
     ('S', 'SMSG_RESURRECT_REQUEST'): 'ResurrectRequest::Write: the spell id after everything read',
     ('S', 'SMSG_SPELL_DAMAGE_SHIELD'): 'SpellDamageShield::Write: the absorbed amount after everything read',
+    ('C', 'CMSG_GUILD_BANK_QUERY_TAB'): 'GuildBankQueryTab::Read: vault, tab, full update, as in 3.3.5a; a bank opened in play',
     ('C', 'CMSG_GUILD_DECLINE_INVITATION'): 'HandleGuildDeclineOpcode: empty, as in 3.3.5a',
     ('C', 'CMSG_GUILD_GET_ROSTER'): 'HandleGuildRosterOpcode: empty, as in 3.3.5a; the roster opened on both clients in play',
     ('C', 'CMSG_GUILD_LEAVE'): 'HandleGuildLeaveOpcode: empty, as in 3.3.5a; a member left in play',
