@@ -152,81 +152,179 @@ public class CorpseReclaimDelay : ServerPacket, ISpanWritable
     public uint Remaining;
 }
 
-public class SetupCurrency : ServerPacket, ISpanWritable
+public sealed class SetupCurrency : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<SetupCurrency>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new FiveOptionalsLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new SevenOptionalsLayout()));
+
+    private static readonly ServerPacketLayout<SetupCurrency> Layout = Layouts.ForRunningClient();
+
     public SetupCurrency() : base(Opcode.SMSG_SETUP_CURRENCY, ConnectionType.Instance) { }
 
-    public override void Write()
-    {
-        _worldPacket.WriteInt32(Data.Count);
+    public override void Write() => Layout.Write(this, _worldPacket);
 
-        foreach (Record data in Data)
-        {
-            _worldPacket.WriteUInt32(data.Type);
-            _worldPacket.WriteUInt32(data.Quantity);
+    public int MaxSize => Layout.MaxSize;
 
-            _worldPacket.WriteBit(data.WeeklyQuantity.HasValue);
-            _worldPacket.WriteBit(data.MaxWeeklyQuantity.HasValue);
-            _worldPacket.WriteBit(data.TrackedQuantity.HasValue);
-            _worldPacket.WriteBit(data.MaxQuantity.HasValue);
-            _worldPacket.WriteBit(data.Unused901.HasValue);
-            _worldPacket.WriteBits(data.Flags, 5);
-            _worldPacket.FlushBits();
-
-            if (data.WeeklyQuantity.HasValue)
-                _worldPacket.WriteUInt32(data.WeeklyQuantity.Value);
-            if (data.MaxWeeklyQuantity.HasValue)
-                _worldPacket.WriteUInt32(data.MaxWeeklyQuantity.Value);
-            if (data.TrackedQuantity.HasValue)
-                _worldPacket.WriteUInt32(data.TrackedQuantity.Value);
-            if (data.MaxQuantity.HasValue)
-                _worldPacket.WriteInt32(data.MaxQuantity.Value);
-            if (data.Unused901.HasValue)
-                _worldPacket.WriteInt32(data.Unused901.Value);
-        }
-    }
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
 
     // WotLK's CurrencyTypes.db2 has 20 rows, and a full snapshot can carry every one of them
-    // (each item-backed currency stays in the set at zero once the client has seen it).
+    // (each item-backed currency stays in the set at zero once the client has seen it). A longer
+    // list goes through Write.
     private const int MaxCurrencies = 24;
     // Per currency max: 2 uints(8) + bits(2) + 5 optional uints(20) = 30 bytes
     private const int MaxRecordSize = 30;
-    // count(4) + currencies
-    public int MaxSize => 4 + MaxCurrencies * MaxRecordSize;
 
-    public int WriteToSpan(Span<byte> buffer)
+    /// <summary>Up to 3.4.3: five optional fields, a bit each, then five bits of flags.</summary>
+    internal sealed class FiveOptionalsLayout : ServerPacketLayout<SetupCurrency>
     {
-        if (Data.Count > MaxCurrencies)
-            return -1;
+        // count(4) + currencies
+        public override int MaxSize => 4 + MaxCurrencies * MaxRecordSize;
 
-        var writer = new SpanPacketWriter(buffer);
-        writer.WriteInt32(Data.Count);
-
-        foreach (Record data in Data)
+        public override void Write(SetupCurrency packet, WorldPacket data)
         {
-            writer.WriteUInt32(data.Type);
-            writer.WriteUInt32(data.Quantity);
+            data.WriteInt32(packet.Data.Count);
 
-            writer.WriteBit(data.WeeklyQuantity.HasValue);
-            writer.WriteBit(data.MaxWeeklyQuantity.HasValue);
-            writer.WriteBit(data.TrackedQuantity.HasValue);
-            writer.WriteBit(data.MaxQuantity.HasValue);
-            writer.WriteBit(data.Unused901.HasValue);
-            writer.WriteBits(data.Flags, 5);
-            writer.FlushBits();
+            foreach (Record record in packet.Data)
+            {
+                data.WriteUInt32(record.Type);
+                data.WriteUInt32(record.Quantity);
 
-            if (data.WeeklyQuantity.HasValue)
-                writer.WriteUInt32(data.WeeklyQuantity.Value);
-            if (data.MaxWeeklyQuantity.HasValue)
-                writer.WriteUInt32(data.MaxWeeklyQuantity.Value);
-            if (data.TrackedQuantity.HasValue)
-                writer.WriteUInt32(data.TrackedQuantity.Value);
-            if (data.MaxQuantity.HasValue)
-                writer.WriteInt32(data.MaxQuantity.Value);
-            if (data.Unused901.HasValue)
-                writer.WriteInt32(data.Unused901.Value);
+                data.WriteBit(record.WeeklyQuantity.HasValue);
+                data.WriteBit(record.MaxWeeklyQuantity.HasValue);
+                data.WriteBit(record.TrackedQuantity.HasValue);
+                data.WriteBit(record.MaxQuantity.HasValue);
+                data.WriteBit(record.Unused901.HasValue);
+                data.WriteBits(record.Flags, 5);
+                data.FlushBits();
+
+                if (record.WeeklyQuantity.HasValue)
+                    data.WriteUInt32(record.WeeklyQuantity.Value);
+                if (record.MaxWeeklyQuantity.HasValue)
+                    data.WriteUInt32(record.MaxWeeklyQuantity.Value);
+                if (record.TrackedQuantity.HasValue)
+                    data.WriteUInt32(record.TrackedQuantity.Value);
+                if (record.MaxQuantity.HasValue)
+                    data.WriteInt32(record.MaxQuantity.Value);
+                if (record.Unused901.HasValue)
+                    data.WriteInt32(record.Unused901.Value);
+            }
         }
-        return writer.Position;
+
+        public override int WriteToSpan(SetupCurrency packet, Span<byte> buffer)
+        {
+            if (packet.Data.Count > MaxCurrencies)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(packet.Data.Count);
+
+            foreach (Record record in packet.Data)
+            {
+                writer.WriteUInt32(record.Type);
+                writer.WriteUInt32(record.Quantity);
+
+                writer.WriteBit(record.WeeklyQuantity.HasValue);
+                writer.WriteBit(record.MaxWeeklyQuantity.HasValue);
+                writer.WriteBit(record.TrackedQuantity.HasValue);
+                writer.WriteBit(record.MaxQuantity.HasValue);
+                writer.WriteBit(record.Unused901.HasValue);
+                writer.WriteBits(record.Flags, 5);
+                writer.FlushBits();
+
+                if (record.WeeklyQuantity.HasValue)
+                    writer.WriteUInt32(record.WeeklyQuantity.Value);
+                if (record.MaxWeeklyQuantity.HasValue)
+                    writer.WriteUInt32(record.MaxWeeklyQuantity.Value);
+                if (record.TrackedQuantity.HasValue)
+                    writer.WriteUInt32(record.TrackedQuantity.Value);
+                if (record.MaxQuantity.HasValue)
+                    writer.WriteInt32(record.MaxQuantity.Value);
+                if (record.Unused901.HasValue)
+                    writer.WriteInt32(record.Unused901.Value);
+            }
+            return writer.Position;
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2: two more optional fields, the recharge times, each with a bit of its own ahead of the
+    /// flags. Nothing here ever has them, but the two bits must be written: without them the client
+    /// takes its last two presence bits from the flags.
+    /// </summary>
+    internal sealed class SevenOptionalsLayout : ServerPacketLayout<SetupCurrency>
+    {
+        // count(4) + currencies; seven bits and the flags still fit the same two bytes
+        public override int MaxSize => 4 + MaxCurrencies * MaxRecordSize;
+
+        public override void Write(SetupCurrency packet, WorldPacket data)
+        {
+            data.WriteInt32(packet.Data.Count);
+
+            foreach (Record record in packet.Data)
+            {
+                data.WriteUInt32(record.Type);
+                data.WriteUInt32(record.Quantity);
+
+                data.WriteBit(record.WeeklyQuantity.HasValue);
+                data.WriteBit(record.MaxWeeklyQuantity.HasValue);
+                data.WriteBit(record.TrackedQuantity.HasValue);
+                data.WriteBit(record.MaxQuantity.HasValue);
+                data.WriteBit(record.Unused901.HasValue);
+                data.WriteBit(false); // NextRechargeTime
+                data.WriteBit(false); // RechargeCycleStartTime
+                data.WriteBits(record.Flags, 5);
+                data.FlushBits();
+
+                if (record.WeeklyQuantity.HasValue)
+                    data.WriteUInt32(record.WeeklyQuantity.Value);
+                if (record.MaxWeeklyQuantity.HasValue)
+                    data.WriteUInt32(record.MaxWeeklyQuantity.Value);
+                if (record.TrackedQuantity.HasValue)
+                    data.WriteUInt32(record.TrackedQuantity.Value);
+                if (record.MaxQuantity.HasValue)
+                    data.WriteInt32(record.MaxQuantity.Value);
+                if (record.Unused901.HasValue)
+                    data.WriteInt32(record.Unused901.Value);
+            }
+        }
+
+        public override int WriteToSpan(SetupCurrency packet, Span<byte> buffer)
+        {
+            if (packet.Data.Count > MaxCurrencies)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(packet.Data.Count);
+
+            foreach (Record record in packet.Data)
+            {
+                writer.WriteUInt32(record.Type);
+                writer.WriteUInt32(record.Quantity);
+
+                writer.WriteBit(record.WeeklyQuantity.HasValue);
+                writer.WriteBit(record.MaxWeeklyQuantity.HasValue);
+                writer.WriteBit(record.TrackedQuantity.HasValue);
+                writer.WriteBit(record.MaxQuantity.HasValue);
+                writer.WriteBit(record.Unused901.HasValue);
+                writer.WriteBit(false); // NextRechargeTime
+                writer.WriteBit(false); // RechargeCycleStartTime
+                writer.WriteBits(record.Flags, 5);
+                writer.FlushBits();
+
+                if (record.WeeklyQuantity.HasValue)
+                    writer.WriteUInt32(record.WeeklyQuantity.Value);
+                if (record.MaxWeeklyQuantity.HasValue)
+                    writer.WriteUInt32(record.MaxWeeklyQuantity.Value);
+                if (record.TrackedQuantity.HasValue)
+                    writer.WriteUInt32(record.TrackedQuantity.Value);
+                if (record.MaxQuantity.HasValue)
+                    writer.WriteInt32(record.MaxQuantity.Value);
+                if (record.Unused901.HasValue)
+                    writer.WriteInt32(record.Unused901.Value);
+            }
+            return writer.Position;
+        }
     }
 
     public List<Record> Data = new();
@@ -242,6 +340,52 @@ public class SetupCurrency : ServerPacket, ISpanWritable
         public int? Unused901;
         public byte Flags;                      // 0 = none,
     }
+}
+
+/// <summary>
+/// One currency's new amount, as the 4.4.2 client reads it. Only a 4.3.4 server gives cause to
+/// send it: the older ones have no currency packets, and their list is published as a whole.
+/// </summary>
+public sealed class SetCurrency : ServerPacket
+{
+    public SetCurrency() : base(Opcode.SMSG_SET_CURRENCY, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteUInt32(Type);
+        _worldPacket.WriteUInt32(Quantity);
+        _worldPacket.WriteUInt32(Flags);
+        _worldPacket.WriteUInt32(0); // toasts
+
+        _worldPacket.WriteBit(WeeklyQuantity.HasValue);
+        _worldPacket.WriteBit(TrackedQuantity.HasValue);
+        _worldPacket.WriteBit(false); // MaxQuantity
+        _worldPacket.WriteBit(TotalEarned.HasValue);
+        _worldPacket.WriteBit(SuppressChatLog);
+        _worldPacket.WriteBit(false); // QuantityChange
+        _worldPacket.WriteBit(false); // QuantityGainSource
+        _worldPacket.WriteBit(false); // QuantityLostSource
+        _worldPacket.WriteBit(false); // FirstCraftOperationID
+        _worldPacket.WriteBit(false); // NextRechargeTime
+        _worldPacket.WriteBit(false); // RechargeCycleStartTime
+        _worldPacket.WriteBit(false); // OverflownCurrencyID
+        _worldPacket.FlushBits();
+
+        if (WeeklyQuantity.HasValue)
+            _worldPacket.WriteUInt32(WeeklyQuantity.Value);
+        if (TrackedQuantity.HasValue)
+            _worldPacket.WriteUInt32(TrackedQuantity.Value);
+        if (TotalEarned.HasValue)
+            _worldPacket.WriteUInt32(TotalEarned.Value);
+    }
+
+    public uint Type;
+    public uint Quantity;
+    public uint Flags;
+    public uint? WeeklyQuantity;
+    public uint? TrackedQuantity;
+    public uint? TotalEarned;
+    public bool SuppressChatLog;
 }
 
 class AllAccountCriteria : ServerPacket, ISpanWritable

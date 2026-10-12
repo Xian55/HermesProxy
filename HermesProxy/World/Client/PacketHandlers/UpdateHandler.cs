@@ -2662,6 +2662,12 @@ public partial class WorldClient
         if (ModernVersion.ExpansionVersion <= 1 || gameState.CurrentPlayerGuid.IsEmpty())
             return;
 
+        // A 4.3.4 server sends its currencies itself (HandleSetupCurrency). The list built here,
+        // from fields and items that server does not have, comes out empty, and an empty list sent
+        // after the server's clears the client's currency tab.
+        if (IsCataLegacy)
+            return;
+
         var snapshot = new Dictionary<uint, uint>();
 
         int honorField = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_HONOR_CURRENCY);

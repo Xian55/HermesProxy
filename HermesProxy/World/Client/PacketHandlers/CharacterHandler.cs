@@ -598,7 +598,9 @@ public partial class WorldClient
             // SMSG_ALL_ACHIEVEMENT_DATA arrives async from the legacy 3.3.5a server
             // and is translated by AchievementHandler.HandleAllAchievementData.
             SendPacketToClient(new EmptyAllAccountCriteria());
-            SendPacketToClient(new EmptySetupCurrency());
+            // A 4.3.4 server has sent its own list by now; an empty one after it clears the tab.
+            if (!IsCataLegacy)
+                SendPacketToClient(new EmptySetupCurrency());
             SendPacketToClient(new EmptySpellHistory());
             SendPacketToClient(new EmptySpellCharges());
             // Use cached talent state if the legacy server already pushed it (relog case);

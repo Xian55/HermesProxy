@@ -69,6 +69,7 @@ public class OpcodeTableV4_4_2Tests
             "SMSG_AUCTION_FAVORITE_LIST",
             "SMSG_GUILD_MEMBER_UPDATE_NOTE",
             "SMSG_START_TIMER",
+            "SMSG_SET_CURRENCY",
         ];
 
         Assert.Equal(

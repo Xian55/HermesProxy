@@ -2237,6 +2237,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleSendUnlearnSpells(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleSetupCurrency_SMSG_SETUP_CURRENCY(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleSetupCurrency(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleSetExtraAuraInfo_SMSG_SET_EXTRA_AURA_INFO(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleSetExtraAuraInfo(packet);
@@ -2520,6 +2525,11 @@ internal static unsafe class GeneratedSmsgDispatch
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleUpdateComboPoints_SMSG_UPDATE_COMBO_POINTS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleUpdateComboPoints(packet);
+    }
+
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleUpdateCurrency_SMSG_UPDATE_CURRENCY(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleUpdateCurrency(packet);
     }
 
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleUpdateInstanceOwnership_SMSG_UPDATE_INSTANCE_OWNERSHIP(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
@@ -3068,6 +3078,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SELL_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSellResponse_SMSG_SELL_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SEND_KNOWN_SPELLS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSendKnownSpells_SMSG_SEND_KNOWN_SPELLS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SEND_UNLEARN_SPELLS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSendUnlearnSpells_SMSG_SEND_UNLEARN_SPELLS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SETUP_CURRENCY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetupCurrency_SMSG_SETUP_CURRENCY;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SET_EXTRA_AURA_INFO] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetExtraAuraInfo_SMSG_SET_EXTRA_AURA_INFO;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SET_EXTRA_AURA_INFO_NEED_UPDATE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetExtraAuraInfo_SMSG_SET_EXTRA_AURA_INFO_NEED_UPDATE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SET_FACTION_STANDING] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetFactionStanding_SMSG_SET_FACTION_STANDING;
@@ -3125,6 +3136,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_ACTION_BUTTONS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleUpdateActionButtons_SMSG_UPDATE_ACTION_BUTTONS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_AURA_DURATION] = &Thunk_HermesProxy_World_Client_WorldClient_HandleUpdateAuraDuration_SMSG_UPDATE_AURA_DURATION;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_COMBO_POINTS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleUpdateComboPoints_SMSG_UPDATE_COMBO_POINTS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_CURRENCY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleUpdateCurrency_SMSG_UPDATE_CURRENCY;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_INSTANCE_OWNERSHIP] = &Thunk_HermesProxy_World_Client_WorldClient_HandleUpdateInstanceOwnership_SMSG_UPDATE_INSTANCE_OWNERSHIP;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_LAST_INSTANCE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleUpdateLastInstance_SMSG_UPDATE_LAST_INSTANCE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_OBJECT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleUpdateObject_SMSG_UPDATE_OBJECT;
@@ -3566,6 +3578,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_SELL_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.SMSG_SEND_KNOWN_SPELLS,
             global::HermesProxy.World.Enums.Opcode.SMSG_SEND_UNLEARN_SPELLS,
+            global::HermesProxy.World.Enums.Opcode.SMSG_SETUP_CURRENCY,
             global::HermesProxy.World.Enums.Opcode.SMSG_SET_EXTRA_AURA_INFO,
             global::HermesProxy.World.Enums.Opcode.SMSG_SET_EXTRA_AURA_INFO_NEED_UPDATE,
             global::HermesProxy.World.Enums.Opcode.SMSG_SET_FACTION_STANDING,
@@ -3623,6 +3636,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_ACTION_BUTTONS,
             global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_AURA_DURATION,
             global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_COMBO_POINTS,
+            global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_CURRENCY,
             global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_INSTANCE_OWNERSHIP,
             global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_LAST_INSTANCE,
             global::HermesProxy.World.Enums.Opcode.SMSG_UPDATE_OBJECT,
