@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using System.Text;
+using Framework.IO;
 using HermesProxy.Tests.Support;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
@@ -314,6 +315,46 @@ public sealed class CataSmallPacketTests
 
         Assert.Equal(3u, pending.NumPending);
         Assert.Equal(Convert.FromHexString(Ints(3)), Written(pending));
+    }
+
+    [Fact]
+    public void GuildSetAchievementTrackingCodec_ReadsACountAndTheIds()
+    {
+        var reader = new SpanPacketReader(Convert.FromHexString(Ints(2, 4860, 5014)));
+
+        GuildSetAchievementTrackingCodec.Read(ref reader, out var tracking);
+
+        Assert.Equal([4860u, 5014u], tracking.AchievementIds);
+    }
+
+    [Fact]
+    public void GuildSetAchievementTrackingCodec_RefusesACountThePacketCannotBack()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+        {
+            var reader = new SpanPacketReader(Convert.FromHexString(Ints(3, 4860)));
+            GuildSetAchievementTrackingCodec.Read(ref reader, out _);
+        });
+    }
+
+    [Fact]
+    public void SetCurrencyFlagsCodec_ReadsTheCurrencyThenTheFlags()
+    {
+        var reader = new SpanPacketReader(Convert.FromHexString(Ints(395, 4)));
+
+        SetCurrencyFlagsCodec.Read(ref reader, out var currency);
+
+        Assert.Equal(395u, currency.CurrencyID);
+        Assert.Equal(4u, currency.Flags);
+    }
+
+    [Fact]
+    public void CataCurrencyId_IsTheInverseOfModernCurrencyId()
+    {
+        Assert.Equal(392u, HermesProxy.World.Client.WorldClient.CataCurrencyId(1901));
+        Assert.Equal(395u, HermesProxy.World.Client.WorldClient.CataCurrencyId(395));
+        Assert.Equal(1901u, HermesProxy.World.Client.WorldClient.ModernCurrencyId(
+            HermesProxy.World.Client.WorldClient.CataCurrencyId(1901)));
     }
 
     private static string Ints(params int[] values)

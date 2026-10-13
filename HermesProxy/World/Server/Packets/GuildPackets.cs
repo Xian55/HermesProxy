@@ -1338,3 +1338,5 @@ public sealed class GuildChallengeUpdate : ServerPacket
     public readonly int[] MaxLevelGold = new int[Types];
     public readonly int[] Gold = new int[Types];
 }
+
+public readonly record struct GuildSetAchievementTracking(uint[] AchievementIds);

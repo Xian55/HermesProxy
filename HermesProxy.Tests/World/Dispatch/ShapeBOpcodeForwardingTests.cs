@@ -44,6 +44,29 @@ public class ShapeBOpcodeForwardingTests
             Opcodes.GetOpcodeValueForVersion(dispatched, ClientVersionBuild.V3_3_5a_12340));
     }
 
+    // A 4.3.4 server has both too. Its table had the cloak under a name of its own, so the request
+    // was dispatched, built and then had no number to go out under.
+    [Theory]
+    [InlineData(0x350103u, Opcode.CMSG_PLAYER_SHOWING_HELM, 0x0735u)]
+    [InlineData(0x350104u, Opcode.CMSG_PLAYER_SHOWING_CLOAK, 0x4135u)]
+    public void VisibleEquipmentToggles_OfACataclysmClient_HaveA434Opcode(
+        uint modernWire, Opcode expectedUniversal, uint expectedLegacy)
+    {
+        Opcode dispatched = Opcodes.GetUniversalOpcode(modernWire, ClientVersionBuild.V4_4_2_60895);
+
+        Assert.Equal(expectedUniversal, dispatched);
+        Assert.Equal(expectedLegacy,
+            Opcodes.GetOpcodeValueForVersion(dispatched, ClientVersionBuild.V4_3_4_15595));
+    }
+
+    [Fact]
+    public void CharacterRenameResult_IsInThe434Table()
+    {
+        // TrinityCore 4.3.4 SMSG_CHAR_RENAME; the layout is the 3.3.5a one
+        Assert.Equal(Opcode.SMSG_CHARACTER_RENAME_RESULT,
+            Opcodes.GetUniversalOpcode(0x2024u, ClientVersionBuild.V4_3_4_15595));
+    }
+
     /// <summary>
     /// The two opcodes that share <c>HandleDelFriend</c> must not collapse onto one legacy value —
     /// that is the specific way a shape-B body can silently do the wrong thing.

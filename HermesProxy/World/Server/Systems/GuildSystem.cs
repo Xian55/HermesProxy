@@ -806,4 +806,22 @@ public static class GuildSystem
 
         ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_GUILD_REQUEST_CHALLENGE_UPDATE));
     }
+    /// <summary>
+    /// The guild achievements the player tracks, sent at login and when the list changes. Only a
+    /// 4.x server knows the request (TrinityCore 4.3.4 <c>HandleGuildSetAchievementTracking</c>: a
+    /// 24-bit count, then the ids).
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_GUILD_SET_ACHIEVEMENT_TRACKING)]
+    public static void HandleGuildSetAchievementTracking(in GuildSetAchievementTracking tracking, in SessionContext ctx)
+    {
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_GUILD_SET_ACHIEVEMENT_TRACKING);
+        packet.WriteBits(tracking.AchievementIds.Length, 24);
+        packet.FlushBits();
+        foreach (uint achievementId in tracking.AchievementIds)
+            packet.WriteUInt32(achievementId);
+        ctx.SendPacketToServer(packet);
+    }
 }

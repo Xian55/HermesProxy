@@ -1626,3 +1626,7 @@ public sealed class RequestCemeteryListResponse : ServerPacket
     public bool IsGossipTriggered;
     public List<uint> CemeteryID = [];
 }
+
+public readonly record struct ViolenceLevel(byte Level);
+
+public readonly record struct SetCurrencyFlags(uint CurrencyID, uint Flags);

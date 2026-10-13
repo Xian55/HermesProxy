@@ -404,3 +404,20 @@ public static class RequestGuildPartyStateCodec
     public static void Read(ref SpanPacketReader r, out RequestGuildPartyState packet)
         => packet = new RequestGuildPartyState(r.ReadPackedGuid128());
 }
+
+public static class GuildSetAchievementTrackingCodec
+{
+    public static void Read(ref SpanPacketReader r, out GuildSetAchievementTracking packet)
+    {
+        // A count and that many achievement ids. The count is wire data: four bytes an id bounds
+        // what can follow, so the array is not sized from a number the packet cannot back.
+        int count = r.ReadInt32();
+        if (count < 0 || count > r.Remaining / sizeof(uint))
+            throw new System.ArgumentOutOfRangeException(nameof(count), count,
+                $"CMSG_GUILD_SET_ACHIEVEMENT_TRACKING claims {count} achievements but only {r.Remaining} bytes remain.");
+        uint[] achievementIds = new uint[count];
+        for (int i = 0; i < count; i++)
+            achievementIds[i] = r.ReadUInt32();
+        packet = new GuildSetAchievementTracking(achievementIds);
+    }
+}

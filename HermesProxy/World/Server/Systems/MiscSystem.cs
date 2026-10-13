@@ -356,4 +356,35 @@ public static class MiscSystem
         WorldPacket packet = new WorldPacket(Opcode.CMSG_MOUNT_SPECIAL_ANIM);
         ctx.SendPacketToServer(packet);
     }
+    /// <summary>
+    /// How much blood the client is set to show, sent at every login. Only a 4.x server has the
+    /// request (TrinityCore 4.3.4 <c>HandleViolenceLevel</c>: one byte).
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_VIOLENCE_LEVEL)]
+    public static void HandleViolenceLevel(in ViolenceLevel violence, in SessionContext ctx)
+    {
+        if (!WorldClient.IsCataLegacy)
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_VIOLENCE_LEVEL);
+        packet.WriteUInt8(violence.Level);
+        ctx.SendPacketToServer(packet);
+    }
+
+    /// <summary>
+    /// A currency shown on the backpack, or moved to "unused". A 4.3.4 server keeps the flags and
+    /// sends them back in its currency list (TrinityCore 4.3.4 <c>SetCurrencyFlags::Read</c>: the
+    /// flags first, then the currency).
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_SET_CURRENCY_FLAGS)]
+    public static void HandleSetCurrencyFlags(in SetCurrencyFlags currency, in SessionContext ctx)
+    {
+        if (!WorldClient.IsCataLegacy)
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_CURRENCY_FLAGS);
+        packet.WriteUInt32(currency.Flags);
+        packet.WriteUInt32(WorldClient.CataCurrencyId(currency.CurrencyID));
+        ctx.SendPacketToServer(packet);
+    }
 }

@@ -18,6 +18,10 @@ public partial class WorldClient
     internal static uint ModernCurrencyId(uint cataCurrencyId)
         => cataCurrencyId == HonorPointsCata ? (uint)Currency.HonorPoints : cataCurrencyId;
 
+    /// <summary>The other way round, for a currency the client names in a request.</summary>
+    internal static uint CataCurrencyId(uint modernCurrencyId)
+        => modernCurrencyId == (uint)Currency.HonorPoints ? HonorPointsCata : modernCurrencyId;
+
     /// <summary>
     /// What an amount of a currency is multiplied by on its way to the 4.4.2 client. Conquest,
     /// Honor, Justice and Valor Points and the Conquest meta currencies are kept in hundredths

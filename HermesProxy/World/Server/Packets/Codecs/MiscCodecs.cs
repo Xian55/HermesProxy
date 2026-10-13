@@ -155,3 +155,24 @@ public static class EmptyClientPacketCodec
         packet = default;
     }
 }
+
+public static class ViolenceLevelCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out ViolenceLevel packet)
+    {
+        byte level = r.ReadUInt8();
+        packet = new ViolenceLevel(level);
+    }
+}
+
+public static class SetCurrencyFlagsCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out SetCurrencyFlags packet)
+    {
+        uint currencyId = r.ReadUInt32();
+        uint flags = r.ReadUInt32();
+        packet = new SetCurrencyFlags(currencyId, flags);
+    }
+}
