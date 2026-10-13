@@ -582,6 +582,36 @@ public sealed class CataSmallPacketTests
         Assert.Equal(0x01010001u, query.VirtualRealmAddress);
     }
 
+    [Fact]
+    public void HandleMoveSetActiveMover_ReadsTheMaskedGuid()
+    {
+        // MoveSetActiveMover::Write for player 0x21: only byte 0 is set, so one mask bit (the
+        // fifth) and one byte, written as it is XORed with 1
+        var mover = DeliverBody<MoveSetActiveMover>(Opcode.SMSG_MOVE_SET_ACTIVE_MOVER, packet =>
+        {
+            MaskedGuid.WriteMaskBits(packet, 0x21, [5, 7, 3, 6, 0, 4, 1, 2]);
+            packet.FlushBits();
+            MaskedGuid.WriteBytes(packet, 0x21, [6, 2, 3, 0, 5, 7, 1, 4]);
+        }, _harness.Client.HandleMoveSetActiveMover);
+
+        Assert.Equal(_other, mover.MoverGUID);
+    }
+
+    [Fact]
+    public void HandleMoveSetActiveMover_AFullGuid_KeepsEveryByteInItsPlace()
+    {
+        // a creature's GUID has something in every byte: a wrong order would move one
+        const ulong creature = 0xF130D4A900123456;
+        var mover = DeliverBody<MoveSetActiveMover>(Opcode.SMSG_MOVE_SET_ACTIVE_MOVER, packet =>
+        {
+            MaskedGuid.WriteMaskBits(packet, creature, [5, 7, 3, 6, 0, 4, 1, 2]);
+            packet.FlushBits();
+            MaskedGuid.WriteBytes(packet, creature, [6, 2, 3, 0, 5, 7, 1, 4]);
+        }, _harness.Client.HandleMoveSetActiveMover);
+
+        Assert.Equal(new WowGuid64(creature).To128(_harness.Session.GameState), mover.MoverGUID);
+    }
+
     private static string Ints(params int[] values)
         => string.Concat(Array.ConvertAll(values, v => Convert.ToHexString(BitConverter.GetBytes(v))));
 }

@@ -44,8 +44,8 @@ public sealed unsafe class DeliberatelyUnhandledOpcodesTests
     }
 
     [Theory]
-    [InlineData(Opcode.SMSG_MOVE_SET_ACTIVE_MOVER)]     // a mind control changes it
-    [InlineData(Opcode.SMSG_LOAD_CUF_PROFILES)]         // the 4.4.2 client has raid frame profiles
+    [InlineData(Opcode.SMSG_RAID_MARKERS_CHANGED)]      // the 4.4.2 client draws raid markers
+    [InlineData(Opcode.SMSG_LFG_UPDATE_STATUS)]         // the dungeon finder, not carried for 4.3.4 yet
     public void AServerPacketTheClientHasAPlaceFor_StaysAWarning(Opcode opcode)
     {
         Assert.False(DeliberatelyUnhandledOpcodes.IsFromServer(opcode));

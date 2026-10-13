@@ -374,12 +374,36 @@ public partial class WorldClient
         // without this synthesis the modern client treats CONTROL_UPDATE as camera-only
         // and never sends client movement for vehicle/charm/possess targets like the
         // Eye of Acherus (quest 12641).
-        if (ModernVersion.IsWotLKClassicOrLater && control.HasControl)
+        //
+        // A 4.3.4 server says it itself, right after this packet (HandleMoveSetActiveMover):
+        // making one here as well would name the mover twice, and from a guess where the
+        // server's own word is at hand.
+        if (ModernVersion.IsWotLKClassicOrLater && control.HasControl && !IsCataLegacy)
         {
             MoveSetActiveMover setMover = new MoveSetActiveMover();
             setMover.MoverGUID = control.Guid;
             SendPacketToClient(setMover);
         }
+    }
+
+    /// <summary>
+    /// Which unit the client's movement keys move: the player, or what it drives or possesses.
+    /// TrinityCore 4.3.4 <c>MoveSetActiveMover::Write</c>, a masked GUID; it follows every
+    /// control update that grants control (<c>Player::SetClientControl</c>), the one at login
+    /// included. The older servers have no such packet, see <see cref="HandleControlUpdate"/>.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_ACTIVE_MOVER)]
+    internal void HandleMoveSetActiveMover(WorldPacket packet)
+    {
+        Span<bool> mask = stackalloc bool[8];
+        Span<byte> guid = stackalloc byte[8];
+        guid.Clear();
+        MaskedGuid.ReadMaskBits(packet, mask, [5, 7, 3, 6, 0, 4, 1, 2]);
+        MaskedGuid.ReadBytes(packet, mask, guid, [6, 2, 3, 0, 5, 7, 1, 4]);
+
+        MoveSetActiveMover setMover = new MoveSetActiveMover();
+        setMover.MoverGUID = new WowGuid64(MaskedGuid.ToUInt64(guid)).To128(GetSession().GameState);
+        SendPacketToClient(setMover);
     }
 
     [HandlesSmsg(Opcode.MSG_MOVE_TELEPORT_ACK)]
