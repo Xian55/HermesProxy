@@ -553,6 +553,35 @@ public sealed class CataSmallPacketTests
             Opcode.SMSG_ACHIEVEMENT_DELETED, Ints(4989), _harness.Client.HandleAchievementDeletedCata)));
     }
 
+    [Fact]
+    public void RealmQueryResponse_ForARealmThatWasFound_CarriesItsNames()
+    {
+        var response = new RealmQueryResponse { VirtualRealmAddress = 0x01010001, LookupState = RealmQueryResponse.Found };
+        response.NameInfo = new VirtualRealmNameInfo(true, false, "Trinity 4.3.4", "Trinity4.3.4");
+
+        // the address, found, then two bits and two 8-bit lengths (13 and 12) and the two names
+        Assert.Equal(Convert.FromHexString("01000101" + "00" + "83" + "43" + "00"
+            + Convert.ToHexString(Encoding.UTF8.GetBytes("Trinity 4.3.4")) + Convert.ToHexString(Encoding.UTF8.GetBytes("Trinity4.3.4"))), Written(response));
+    }
+
+    [Fact]
+    public void RealmQueryResponse_ForARealmThatWasNot_IsTheAddressAndOne()
+    {
+        var response = new RealmQueryResponse { VirtualRealmAddress = 7 };
+
+        Assert.Equal(Convert.FromHexString("07000000" + "01"), Written(response));
+    }
+
+    [Fact]
+    public void QueryRealmNameCodec_ReadsTheAddress()
+    {
+        var reader = new SpanPacketReader(Convert.FromHexString("01000101"));
+
+        QueryRealmNameCodec.Read(ref reader, out var query);
+
+        Assert.Equal(0x01010001u, query.VirtualRealmAddress);
+    }
+
     private static string Ints(params int[] values)
         => string.Concat(Array.ConvertAll(values, v => Convert.ToHexString(BitConverter.GetBytes(v))));
 }

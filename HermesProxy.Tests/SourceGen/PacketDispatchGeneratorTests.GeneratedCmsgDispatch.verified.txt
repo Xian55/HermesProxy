@@ -2161,6 +2161,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.QuerySystem.HandleQueryQuestInfo(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleQueryRealmName_CMSG_QUERY_REALM_NAME(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.QueryRealmNameCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.QuerySystem.HandleQueryRealmName(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleQueryTime_CMSG_QUERY_TIME(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
@@ -3433,6 +3439,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_PLAYER_NAMES] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleNamesQueryRequest_CMSG_QUERY_PLAYER_NAMES;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_QUEST_COMPLETION_NPCS] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQueryQuestCompletionNPCs_CMSG_QUERY_QUEST_COMPLETION_NPCS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_QUEST_INFO] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleQueryQuestInfo_CMSG_QUERY_QUEST_INFO;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_REALM_NAME] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleQueryRealmName_CMSG_QUERY_REALM_NAME;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_TIME] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleQueryTime_CMSG_QUERY_TIME;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_CONFIRM_ACCEPT] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestConfirmAcceptResponse_CMSG_QUEST_CONFIRM_ACCEPT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_ACCEPT_QUEST] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleQuestGiverAcceptQuest_CMSG_QUEST_GIVER_ACCEPT_QUEST;
@@ -3927,6 +3934,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_PLAYER_NAMES,
             global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_QUEST_COMPLETION_NPCS,
             global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_QUEST_INFO,
+            global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_REALM_NAME,
             global::HermesProxy.World.Enums.Opcode.CMSG_QUERY_TIME,
             global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_CONFIRM_ACCEPT,
             global::HermesProxy.World.Enums.Opcode.CMSG_QUEST_GIVER_ACCEPT_QUEST,

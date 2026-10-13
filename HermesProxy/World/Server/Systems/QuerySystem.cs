@@ -171,4 +171,25 @@ public static class QuerySystem
         ctx.SendPacketToServer(packet);
         ctx.GetSession().GameState.LastWhoRequestId = who.RequestID;
     }
+    /// <summary>
+    /// The name of a realm, by its address. The proxy has the realm list itself, so no legacy
+    /// server is asked; a 4.4.2 client asks at every login, a realm it does not know by then.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_QUERY_REALM_NAME)]
+    public static void HandleQueryRealmName(in QueryRealmName query, in SessionContext ctx)
+    {
+        RealmQueryResponse response = new();
+        response.VirtualRealmAddress = query.VirtualRealmAddress;
+        foreach (var realm in ctx.GetSession().RealmManager.GetRealms())
+        {
+            if (realm.Id.GetAddress() != query.VirtualRealmAddress)
+                continue;
+
+            bool isHomeRealm = realm.Id.GetAddress() == ctx.GetSession().RealmId.GetAddress();
+            response.LookupState = RealmQueryResponse.Found;
+            response.NameInfo = new VirtualRealmNameInfo(isHomeRealm, false, realm.Name, realm.NormalizedName);
+            break;
+        }
+        ctx.SendPacket(response);
+    }
 }

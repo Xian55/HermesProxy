@@ -1098,3 +1098,29 @@ class QueryItemTextResponse : ServerPacket
     public bool Valid;
     public string Text = string.Empty;
 }
+
+public readonly record struct QueryRealmName(uint VirtualRealmAddress);
+
+/// <summary>
+/// The name of a realm, asked for by its address: the address again, whether it was found (0)
+/// or not (1), and for a realm that was found the same name block the login answer carries.
+/// </summary>
+public sealed class RealmQueryResponse : ServerPacket
+{
+    public const byte Found = 0;
+    public const byte NotFound = 1;
+
+    public RealmQueryResponse() : base(Opcode.SMSG_REALM_QUERY_RESPONSE) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteUInt32(VirtualRealmAddress);
+        _worldPacket.WriteUInt8(LookupState);
+        if (LookupState == Found)
+            NameInfo.Write(_worldPacket);
+    }
+
+    public uint VirtualRealmAddress;
+    public byte LookupState = NotFound;
+    internal VirtualRealmNameInfo NameInfo;
+}

@@ -75,3 +75,13 @@ public static class QueryPetNameCodec
     public static void Read(ref SpanPacketReader r, out QueryPetName packet)
         => packet = new QueryPetName(r.ReadPackedGuid128());
 }
+
+public static class QueryRealmNameCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out QueryRealmName packet)
+    {
+        uint virtualRealmAddress = r.ReadUInt32();
+        packet = new QueryRealmName(virtualRealmAddress);
+    }
+}
