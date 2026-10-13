@@ -36,6 +36,11 @@ internal static class DeliberatelyUnhandledOpcodes
         Opcode.CMSG_UPDATE_VAS_PURCHASE_STATES,
         Opcode.CMSG_GET_UNDELETE_CHARACTER_COOLDOWN_STATUS,
         Opcode.CMSG_SOCIAL_CONTRACT_REQUEST,
+        // Things a modern server is asked for and a legacy server says unasked, or not at all: a
+        // countdown that is running (a 4.3.4 server starts its own with SMSG_START_TIMER, the older
+        // ones have none), and the forced reactions, which every legacy server sends at login.
+        Opcode.CMSG_QUERY_COUNTDOWN_TIMER,
+        Opcode.CMSG_REQUEST_FORCED_REACTIONS,
         // Bookkeeping of the modern connection that ends at the proxy: the client's word that it
         // has worked off the packets queued for it, how many time sync answers it threw away, and
         // its answer to the suspend token the proxy itself sent around a teleport.
