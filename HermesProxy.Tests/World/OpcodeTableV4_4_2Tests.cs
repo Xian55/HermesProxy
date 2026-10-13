@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using Xunit;
@@ -7,7 +10,8 @@ using Xunit;
 namespace HermesProxy.Tests.World;
 
 /// <summary>
-/// The 4.4.2.60895 opcode table: the 3.4.3.54261 names, with the 4.4.2 client's values.
+/// The 4.4.2.60895 opcode table: the 3.4.3.54261 names with the 4.4.2 client's values, then the rest
+/// of the client's own list.
 /// </summary>
 public class OpcodeTableV4_4_2Tests
 {
@@ -45,42 +49,81 @@ public class OpcodeTableV4_4_2Tests
     }
 
     /// <summary>
-    /// The table is the 3.4.3 one revalued, so that a packet both builds have takes the same
-    /// handler. What 4.4.2 has beyond it is listed here by hand: the retail-style auction house,
-    /// and the addon message with a target, which 3.4.3 sends through the plain addon opcode.
-    /// The member note update is one only a 4.3.4 server sends, so only this table needs it.
+    /// The table begins as the 3.4.3 one revalued, so that a packet both builds have takes the same
+    /// handler: every 3.4.3 name is here, with 0 where the 4.4.2 client has no such opcode.
     /// </summary>
     [Fact]
-    public void HasThe3_4_3Names_AndTheRetailStyleAuctionHouse()
+    public void HasEvery3_4_3Name()
     {
-        string[] only442 =
-        [
-            "CMSG_AUCTION_BROWSE_QUERY",
-            "CMSG_AUCTION_LIST_ITEMS_BY_BUCKET_KEY",
-            "CMSG_AUCTION_LIST_ITEMS_BY_ITEM_ID",
-            "CMSG_AUCTION_LIST_BUCKETS_BY_BUCKET_KEYS",
-            "CMSG_AUCTION_GET_COMMODITY_QUOTE",
-            "CMSG_AUCTION_CONFIRM_COMMODITIES_PURCHASE",
-            "CMSG_AUCTION_CANCEL_COMMODITIES_PURCHASE",
-            "CMSG_AUCTION_SELL_COMMODITY",
-            "CMSG_AUCTION_SET_FAVORITE_ITEM",
-            "SMSG_AUCTION_LIST_BUCKETS_RESULT",
-            "SMSG_AUCTION_GET_COMMODITY_QUOTE_RESULT",
-            "SMSG_AUCTION_FAVORITE_LIST",
-            "SMSG_GUILD_MEMBER_UPDATE_NOTE",
-            "SMSG_START_TIMER",
-            "SMSG_SET_CURRENCY",
-            "SMSG_REQUEST_CEMETERY_LIST_RESPONSE",
-            "SMSG_USERLIST_ADD",
-            "SMSG_USERLIST_REMOVE",
-            "SMSG_USERLIST_UPDATE",
-            "SMSG_MOVE_SKIP_TIME",
-            "CMSG_CLIENT_PORT_GRAVEYARD",
-        ];
+        var names = Enum.GetNames<global::HermesProxy.World.Enums.V4_4_2_60895.Opcode>().ToHashSet();
+
+        Assert.Empty(Enum.GetNames<global::HermesProxy.World.Enums.V3_4_3_54261.Opcode>().Where(name => !names.Contains(name)));
+    }
+
+    /// <summary>
+    /// And it ends with the rest of the client's own list. An opcode the table lacks is logged as
+    /// MSG_NULL_ACTION with a number and dropped, whatever it was: the ghost's "Return to Graveyard"
+    /// button was one. scripts/gen-opcode-table-442.py appends what is missing.
+    /// </summary>
+    [Fact]
+    public void HasEveryNamedOpcodeOfTheClientsList()
+    {
+        var values = Enum.GetValues<global::HermesProxy.World.Enums.V4_4_2_60895.Opcode>().Select(o => (uint)o).ToHashSet();
+
+        var missing = ClientList().Where(row => !values.Contains(row.Value)).Select(row => row.Name).ToList();
+
+        Assert.True(missing.Count == 0,
+            $"run scripts/gen-opcode-table-442.py: {missing.Count} missing, first {string.Join(", ", missing.Take(8))}");
+    }
+
+    /// <summary>
+    /// What the table has and the list has not: the connection opcodes, which the list leaves out,
+    /// and the talent data, which it has without a name.
+    /// </summary>
+    [Fact]
+    public void HasNothingBesideTheListButTheConnectionOpcodes()
+    {
+        var listed = ClientList().Select(row => row.Value).ToHashSet();
+
+        var others = Enum.GetValues<global::HermesProxy.World.Enums.V4_4_2_60895.Opcode>()
+            .Distinct()
+            .Where(o => (uint)o != 0 && !listed.Contains((uint)o))
+            .Select(o => o.ToString())
+            .Order();
 
         Assert.Equal(
-            Enum.GetNames<global::HermesProxy.World.Enums.V3_4_3_54261.Opcode>().Concat(only442).Order(),
-            Enum.GetNames<global::HermesProxy.World.Enums.V4_4_2_60895.Opcode>().Order());
+            [
+                "SMSG_AUTH_CHALLENGE",
+                "SMSG_COMPRESSED_PACKET",
+                "SMSG_CONNECT_TO",
+                "SMSG_ENTER_ENCRYPTED_MODE",
+                "SMSG_PONG",
+                "SMSG_RESUME_COMMS",
+                "SMSG_SUSPEND_COMMS",
+                "SMSG_UPDATE_TALENT_DATA",
+            ],
+            others);
+    }
+
+    // docs/protocol/4.4.2.60895: "| NAME | 0xhex | decimal | ..." for each opcode the client has a name for
+    private static List<(string Name, uint Value)> ClientList()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "HermesProxy.sln")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+
+        var rows = new List<(string, uint)>();
+        foreach (string file in new[] { "cmsg-opcodes.md", "smsg-opcodes.md" })
+        {
+            foreach (string line in File.ReadLines(Path.Combine(dir.FullName, "docs", "protocol", "4.4.2.60895", file)))
+            {
+                Match row = Regex.Match(line, @"^\| (\w+) \| 0x[0-9a-f]+ \| (\d+) \|");
+                if (row.Success)
+                    rows.Add((row.Groups[1].Value, uint.Parse(row.Groups[2].Value)));
+            }
+        }
+        return rows;
     }
 
     /// <summary>
