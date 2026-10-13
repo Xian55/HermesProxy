@@ -112,3 +112,16 @@ public class AchievementEarnedPkt : ServerPacket
         _worldPacket.FlushBits();
     }
 }
+
+/// <summary>An achievement taken away again.</summary>
+public sealed class AchievementDeleted : ServerPacket
+{
+    public AchievementDeleted() : base(Opcode.SMSG_ACHIEVEMENT_DELETED) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteUInt32(AchievementID);
+    }
+
+    public uint AchievementID;
+}

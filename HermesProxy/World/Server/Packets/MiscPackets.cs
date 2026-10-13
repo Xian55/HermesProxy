@@ -254,8 +254,12 @@ public sealed class SetupCurrency : ServerPacket, ISpanWritable
     /// </summary>
     internal sealed class SevenOptionalsLayout : ServerPacketLayout<SetupCurrency>
     {
+        // A 4.3.4 server lists what the character holds of its own currency table, archaeology
+        // fragments and all: forty for a character with every one, where Wrath has twenty rows.
+        private const int MaxCurrenciesCata = 128;
+
         // count(4) + currencies; seven bits and the flags still fit the same two bytes
-        public override int MaxSize => 4 + MaxCurrencies * MaxRecordSize;
+        public override int MaxSize => 4 + MaxCurrenciesCata * MaxRecordSize;
 
         public override void Write(SetupCurrency packet, WorldPacket data)
         {
@@ -291,7 +295,7 @@ public sealed class SetupCurrency : ServerPacket, ISpanWritable
 
         public override int WriteToSpan(SetupCurrency packet, Span<byte> buffer)
         {
-            if (packet.Data.Count > MaxCurrencies)
+            if (packet.Data.Count > MaxCurrenciesCata)
                 return -1;
 
             var writer = new SpanPacketWriter(buffer);
@@ -1630,3 +1634,31 @@ public sealed class RequestCemeteryListResponse : ServerPacket
 public readonly record struct ViolenceLevel(byte Level);
 
 public readonly record struct SetCurrencyFlags(uint CurrencyID, uint Flags);
+
+/// <summary>
+/// A title gained or taken away: the client says so in chat and updates its title list. The
+/// number is the title's bit in the player's known titles.
+/// </summary>
+public sealed class TitleEarned : ServerPacket
+{
+    public TitleEarned(bool lost) : base(lost ? Opcode.SMSG_TITLE_LOST : Opcode.SMSG_TITLE_EARNED) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteUInt32(Index);
+    }
+
+    public uint Index;
+}
+
+public sealed class TriggerMovie : ServerPacket
+{
+    public TriggerMovie() : base(Opcode.SMSG_TRIGGER_MOVIE) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteUInt32(MovieID);
+    }
+
+    public uint MovieID;
+}

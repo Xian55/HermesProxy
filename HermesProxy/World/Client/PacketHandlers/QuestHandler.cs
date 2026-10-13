@@ -940,4 +940,10 @@ public partial class WorldClient
         }
         SendPacketToClient(response);
     }
+    [HandlesSmsg(Opcode.SMSG_QUEST_LOG_FULL)]
+    internal void HandleQuestLogFull(WorldPacket packet)
+    {
+        if (IsCataLegacy)
+            SendPacketToClient(new QuestLogFull());
+    }
 }

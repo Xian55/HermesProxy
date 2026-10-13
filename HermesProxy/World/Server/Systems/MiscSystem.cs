@@ -387,4 +387,16 @@ public static class MiscSystem
         packet.WriteUInt32(WorldClient.CataCurrencyId(currency.CurrencyID));
         ctx.SendPacketToServer(packet);
     }
+    /// <summary>
+    /// A movie has played to its end or was skipped. Empty on both sides; only a 4.3.4 server's
+    /// movies are started (SMSG_TRIGGER_MOVIE), so only it is told.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_COMPLETE_MOVIE)]
+    public static void HandleCompleteMovie(in EmptyClientPacket movie, in SessionContext ctx)
+    {
+        if (!WorldClient.IsCataLegacy)
+            return;
+
+        ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_COMPLETE_MOVIE));
+    }
 }

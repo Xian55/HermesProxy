@@ -531,6 +531,28 @@ public sealed class CataSmallPacketTests
         Assert.Equal(0x6553F100, request.CurrentVersion);
     }
 
+    [Theory]
+    [InlineData(1, Opcode.SMSG_TITLE_EARNED)]
+    [InlineData(0, Opcode.SMSG_TITLE_LOST)]
+    public void HandleTitleEarned_PicksThePacketByTheSecondNumber(int earned, Opcode expected)
+    {
+        var title = Deliver<TitleEarned>(Opcode.SMSG_TITLE_EARNED, Ints(43, earned), _harness.Client.HandleTitleEarnedCata);
+
+        Assert.Equal(expected, _harness.ClientWire.Sent[^1].Opcode);
+        Assert.Equal(Convert.FromHexString(Ints(43)), Written(title));
+    }
+
+    [Fact]
+    public void FourByteNotices_ArePassedOnAsTheyCame()
+    {
+        Assert.Equal(Convert.FromHexString(Ints(16)), Written(Deliver<TriggerMovie>(
+            Opcode.SMSG_TRIGGER_MOVIE, Ints(16), _harness.Client.HandleTriggerMovieCata)));
+        Assert.Equal(Convert.FromHexString(Ints(3)), Written(Deliver<MountResult>(
+            Opcode.SMSG_MOUNT_RESULT, Ints(3), _harness.Client.HandleMountResultCata)));
+        Assert.Equal(Convert.FromHexString(Ints(4989)), Written(Deliver<AchievementDeleted>(
+            Opcode.SMSG_ACHIEVEMENT_DELETED, Ints(4989), _harness.Client.HandleAchievementDeletedCata)));
+    }
+
     private static string Ints(params int[] values)
         => string.Concat(Array.ConvertAll(values, v => Convert.ToHexString(BitConverter.GetBytes(v))));
 }

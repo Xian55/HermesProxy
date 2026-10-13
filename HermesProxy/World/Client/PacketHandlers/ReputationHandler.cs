@@ -76,4 +76,14 @@ public partial class WorldClient
         faction.FactionIndex = packet.ReadUInt32();
         SendPacketToClient(faction);
     }
+    [HandlesSmsg(Opcode.SMSG_SET_FACTION_NOT_VISIBLE)]
+    internal void HandleSetFactionNotVisible(WorldPacket packet)
+    {
+        if (!IsCataLegacy)
+            return;
+
+        SetFactionVisible faction = new(false);
+        faction.FactionIndex = packet.ReadUInt32();
+        SendPacketToClient(faction);
+    }
 }

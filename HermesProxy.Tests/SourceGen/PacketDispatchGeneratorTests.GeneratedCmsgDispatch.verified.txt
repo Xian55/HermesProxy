@@ -877,6 +877,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.MiscSystem.HandleCinematicPacket(global::HermesProxy.World.Enums.Opcode.CMSG_COMPLETE_CINEMATIC, in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCompleteMovie_CMSG_COMPLETE_MOVIE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.MiscSystem.HandleCompleteMovie(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleConfirmRespecWipe_CMSG_CONFIRM_RESPEC_WIPE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ConfirmRespecWipeCodec.Read(ref reader, out var packet);
@@ -3149,6 +3155,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CLOSE_INTERACTION] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleCloseInteraction_CMSG_CLOSE_INTERACTION;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_COLLECTION_ITEM_SET_FAVORITE] = &Thunk_HermesProxy_World_Server_Systems_ToySystem_HandleCollectionItemSetFavorite_CMSG_COLLECTION_ITEM_SET_FAVORITE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_COMPLETE_CINEMATIC] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCinematicPacket_CMSG_COMPLETE_CINEMATIC;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_COMPLETE_MOVIE] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleCompleteMovie_CMSG_COMPLETE_MOVIE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CONFIRM_RESPEC_WIPE] = &Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleConfirmRespecWipe_CMSG_CONFIRM_RESPEC_WIPE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CONTACT_LIST] = &Thunk_HermesProxy_World_Server_Systems_SocialSystem_HandleContactList_CMSG_CONTACT_LIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CONVERT_RAID] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleConvertRaid_CMSG_CONVERT_RAID;
@@ -3722,6 +3729,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_CLOSE_INTERACTION,
             global::HermesProxy.World.Enums.Opcode.CMSG_COLLECTION_ITEM_SET_FAVORITE,
             global::HermesProxy.World.Enums.Opcode.CMSG_COMPLETE_CINEMATIC,
+            global::HermesProxy.World.Enums.Opcode.CMSG_COMPLETE_MOVIE,
             global::HermesProxy.World.Enums.Opcode.CMSG_CONFIRM_RESPEC_WIPE,
             global::HermesProxy.World.Enums.Opcode.CMSG_CONTACT_LIST,
             global::HermesProxy.World.Enums.Opcode.CMSG_CONVERT_RAID,

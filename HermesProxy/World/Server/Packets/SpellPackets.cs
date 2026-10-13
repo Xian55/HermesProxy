@@ -2961,3 +2961,16 @@ class DispelFailed : ServerPacket, ISpanWritable
     public uint SpellID;
     public List<int> FailedSpells = new();
 }
+
+/// <summary>Why a mount could not be mounted.</summary>
+public sealed class MountResult : ServerPacket
+{
+    public MountResult() : base(Opcode.SMSG_MOUNT_RESULT) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteUInt32(Result);
+    }
+
+    public uint Result;
+}

@@ -235,4 +235,17 @@ public partial class WorldClient
             Initial = false,
         });
     }
+    [HandlesSmsg(Opcode.SMSG_ACHIEVEMENT_DELETED)]
+    internal void HandleAchievementDeleted(WorldPacket packet)
+    {
+        if (IsCataLegacy)
+            HandleAchievementDeletedCata(packet);
+    }
+
+    internal void HandleAchievementDeletedCata(WorldPacket packet)
+    {
+        AchievementDeleted deleted = new();
+        deleted.AchievementID = packet.ReadUInt32();
+        SendPacketToClient(deleted);
+    }
 }

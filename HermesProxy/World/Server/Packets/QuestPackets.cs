@@ -1622,3 +1622,11 @@ public sealed class QuestCompletionNPCResponse : ServerPacket
 
     public List<(int QuestID, List<uint> NPCs)> Quests = [];
 }
+
+/// <summary>The quest log has no room for the quest just offered. Empty.</summary>
+public sealed class QuestLogFull : ServerPacket
+{
+    public QuestLogFull() : base(Opcode.SMSG_QUEST_LOG_FULL) { }
+
+    public override void Write() { }
+}

@@ -2217,4 +2217,17 @@ public partial class WorldClient
         }
         SendPacketToClient(spell);
     }
+    [HandlesSmsg(Opcode.SMSG_MOUNT_RESULT)]
+    internal void HandleMountResult(WorldPacket packet)
+    {
+        if (IsCataLegacy)
+            HandleMountResultCata(packet);
+    }
+
+    internal void HandleMountResultCata(WorldPacket packet)
+    {
+        MountResult mount = new();
+        mount.Result = packet.ReadUInt32();
+        SendPacketToClient(mount);
+    }
 }

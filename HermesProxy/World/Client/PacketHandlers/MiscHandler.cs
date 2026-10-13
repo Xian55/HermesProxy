@@ -407,4 +407,37 @@ public partial class WorldClient
 
         RefreshGroupDifficulty(dungeon: null, raidLegacyMode: legacyRaidMode);
     }
+    [HandlesSmsg(Opcode.SMSG_TITLE_EARNED)]
+    internal void HandleTitleEarned(WorldPacket packet)
+    {
+        if (IsCataLegacy)
+            HandleTitleEarnedCata(packet);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>Player::SetTitle</c>: the title's bit, then 1 for earned and 0 for lost.
+    /// The 4.4.2 client has a packet for each.
+    /// </summary>
+    internal void HandleTitleEarnedCata(WorldPacket packet)
+    {
+        uint index = packet.ReadUInt32();
+        bool earned = packet.ReadUInt32() != 0;
+        TitleEarned title = new(lost: !earned);
+        title.Index = index;
+        SendPacketToClient(title);
+    }
+
+    [HandlesSmsg(Opcode.SMSG_TRIGGER_MOVIE)]
+    internal void HandleTriggerMovie(WorldPacket packet)
+    {
+        if (IsCataLegacy)
+            HandleTriggerMovieCata(packet);
+    }
+
+    internal void HandleTriggerMovieCata(WorldPacket packet)
+    {
+        TriggerMovie movie = new();
+        movie.MovieID = packet.ReadUInt32();
+        SendPacketToClient(movie);
+    }
 }

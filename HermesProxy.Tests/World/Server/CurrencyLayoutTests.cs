@@ -79,6 +79,35 @@ public sealed class CurrencyLayoutTests
         Assert.Equal(expected, ((WorldPacket)WorldPacketField.GetValue(packet)!).GetData());
     }
 
+    [Fact]
+    public void SevenOptionalsLayout_TakesACataclysmCharactersFortyCurrenciesWithoutTheSlowPath()
+    {
+        var layout = new SetupCurrency.SevenOptionalsLayout();
+        var packet = new SetupCurrency();
+        for (uint id = 1; id <= 40; id++)
+            packet.Data.Add(new SetupCurrency.Record { Type = id, Quantity = 700, WeeklyQuantity = 1, MaxWeeklyQuantity = 2, TrackedQuantity = 3, MaxQuantity = 4, Unused901 = 5 });
+
+        using var data = new WorldPacket(1u);
+        layout.Write(packet, data);
+        byte[] buffer = new byte[layout.MaxSize];
+
+        int written = layout.WriteToSpan(packet, buffer);
+
+        Assert.Equal(data.GetDataSpan().ToArray(), buffer.AsSpan(0, written).ToArray());
+    }
+
+    [Fact]
+    public void FiveOptionalsLayout_StillSendsALongerListThanWrathHasByTheSlowPath()
+    {
+        var packet = new SetupCurrency();
+        for (uint id = 1; id <= 25; id++)
+            packet.Data.Add(new SetupCurrency.Record { Type = id });
+
+        var layout = new SetupCurrency.FiveOptionalsLayout();
+
+        Assert.Equal(-1, layout.WriteToSpan(packet, new byte[layout.MaxSize]));
+    }
+
     private static readonly PropertyInfo WorldPacketField =
         typeof(ServerPacket).GetProperty("_worldPacket", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
