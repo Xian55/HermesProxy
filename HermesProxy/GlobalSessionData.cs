@@ -640,6 +640,10 @@ public sealed class GameSessionData
     // Interval is configurable: ThrottlingOptions.PartyMemberStateMinIntervalMs.
     public readonly Dictionary<WowGuid128, long> LastPartyMemberStateTickMs = new();
 
+    // The options of each raid frame profile that only a 4.3.4 client has, by profile name, as the
+    // server last sent them: handed back to it when the 4.4.2 client saves the profile.
+    internal readonly Dictionary<string, CufLegacyOnlyOptions> CufOptionsKeptForServer = [];
+
     public byte LfgRequestedRoles;
     public readonly HashSet<uint> LfgKnownDungeonIds = new();
     // The slots the client was last told it is queued for (SMSG_LFG_UPDATE_STATUS).

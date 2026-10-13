@@ -75,6 +75,16 @@ internal static partial class WorldClientLogMessages
         string Opcode,
         uint OpcodeId);
 
+    [LoggerMessage(
+        EventId = 229,
+        Level = LogLevel.Warning,
+        Message = "SMSG_LOAD_CUF_PROFILES could not be read ({Length} bytes); the client keeps the raid frame profiles it has.")]
+    public static partial void CufProfilesUnreadable(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        int Length);
+
     /// <summary>An opcode of <see cref="DeliberatelyUnhandledOpcodes.FromServer"/>.</summary>
     [LoggerMessage(
         EventId = 228,

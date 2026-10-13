@@ -73,6 +73,16 @@ internal static partial class WorldSocketLogMessages
         string Opcode,
         uint OpcodeId);
 
+    [LoggerMessage(
+        EventId = 106,
+        Level = LogLevel.Warning,
+        Message = "CMSG_SAVE_CUF_PROFILES could not be read ({Length} bytes); the raid frame profiles were not passed on.")]
+    public static partial void CufProfilesUnreadable(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        int Length);
+
     /// <summary>An opcode of <see cref="DeliberatelyUnhandledOpcodes.FromClient"/>.</summary>
     [LoggerMessage(
         EventId = 105,

@@ -572,9 +572,14 @@ public partial class WorldClient
         setup.ServerExpansionLevel = VersionChecker.GetClientExpansionLevel(LegacyVersion.Build);
         SendPacketToClient(setup);
 
-        LoadCUFProfiles cuf = new();
-        cuf.Data = GetSession().AccountDataMgr.LoadCUFProfiles();
-        SendPacketToClient(cuf);
+        // A 4.3.4 server sends the character's raid frame profiles itself, right after this
+        // (HandleLoadCUFProfiles); the proxy's own copy is for the servers that keep none.
+        if (!IsCataLegacy)
+        {
+            LoadCUFProfiles cuf = new();
+            cuf.Data = GetSession().AccountDataMgr.LoadCUFProfiles();
+            SendPacketToClient(cuf);
+        }
 
         // Issue #80: modern 1.14+ Classic clients auto-cancel wand `Shoot` when target enters
         // melee range (`autoRangedCombat` CVar default-ON). Priests rely on wand for downtime

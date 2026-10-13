@@ -2,10 +2,12 @@
 using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
 using System;
+using System.Collections.Generic;
 
 namespace HermesProxy.World.Client;
 
@@ -439,5 +441,29 @@ public partial class WorldClient
         TriggerMovie movie = new();
         movie.MovieID = packet.ReadUInt32();
         SendPacketToClient(movie);
+    }
+    /// <summary>
+    /// The raid frame profiles a 4.3.4 server keeps for the character, sent at login and after
+    /// every change of map. The client is given them in its own shape; what they have that it
+    /// has no bit for is remembered, to go back with the next save.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_LOAD_CUF_PROFILES)]
+    internal void HandleLoadCUFProfiles(WorldPacket packet)
+    {
+        List<CufProfile> profiles = [];
+        if (!CufProfiles.TryReadLegacy(packet, profiles))
+        {
+            WorldClientLogMessages.CufProfilesUnreadable(_melLog, _sourceFile, _netDirRecv, (int)packet.GetSize());
+            return;
+        }
+
+        var legacyOnly = GetSession().GameState.CufOptionsKeptForServer;
+        legacyOnly.Clear();
+        foreach (CufProfile profile in profiles)
+            legacyOnly[profile.Name] = profile.LegacyOnly;
+
+        LoadCUFProfiles cuf = new();
+        cuf.Data = CufProfiles.WriteModern(profiles);
+        SendPacketToClient(cuf);
     }
 }
