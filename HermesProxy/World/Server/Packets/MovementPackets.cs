@@ -994,3 +994,21 @@ public readonly record struct InitActiveMoverComplete(uint Ticks);
 
 public readonly record struct MoveSplineDone(WowGuid128 Guid, MovementInfo MoveInfo, int SplineID);
 public readonly record struct MoveTimeSkipped(WowGuid128 MoverGUID, uint TimeSkipped);
+
+/// <summary>
+/// Another player's client skipped this much time (a loading screen, a stall): its movement
+/// timestamps jump by it. 4.4.2 only.
+/// </summary>
+public sealed class MoveSkipTime : ServerPacket
+{
+    public MoveSkipTime() : base(Opcode.SMSG_MOVE_SKIP_TIME, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(MoverGUID);
+        _worldPacket.WriteUInt32(TimeSkipped);
+    }
+
+    public WowGuid128 MoverGUID;
+    public uint TimeSkipped;
+}

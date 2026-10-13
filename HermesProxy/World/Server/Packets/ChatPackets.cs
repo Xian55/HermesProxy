@@ -811,3 +811,50 @@ class ChatServerMessage : ServerPacket, ISpanWritable
 }
 
 public readonly record struct ChatRegisterAddonPrefixes(List<string> Prefixes);
+
+/// <summary>
+/// A player joined a channel whose members are announced, or changed in it: the two packets have
+/// one layout and differ in the opcode. 4.4.2 only; no older client's table here has them.
+/// </summary>
+public sealed class UserlistAdd : ServerPacket
+{
+    public UserlistAdd(bool update) : base(update ? Opcode.SMSG_USERLIST_UPDATE : Opcode.SMSG_USERLIST_ADD) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(UserGUID);
+        _worldPacket.WriteUInt8(UserFlags);
+        _worldPacket.WriteUInt32(ChannelFlags);
+        _worldPacket.WriteUInt32(ChannelID);
+        _worldPacket.WriteBits(ChannelName.GetByteCount(), 7);
+        _worldPacket.FlushBits();
+        _worldPacket.WriteString(ChannelName);
+    }
+
+    public WowGuid128 UserGUID;
+    public byte UserFlags;
+    public uint ChannelFlags;
+    public uint ChannelID;
+    public string ChannelName = string.Empty;
+}
+
+/// <summary>A player left a channel whose members are announced. 4.4.2 only.</summary>
+public sealed class UserlistRemove : ServerPacket
+{
+    public UserlistRemove() : base(Opcode.SMSG_USERLIST_REMOVE) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(UserGUID);
+        _worldPacket.WriteUInt32(ChannelFlags);
+        _worldPacket.WriteUInt32(ChannelID);
+        _worldPacket.WriteBits(ChannelName.GetByteCount(), 7);
+        _worldPacket.FlushBits();
+        _worldPacket.WriteString(ChannelName);
+    }
+
+    public WowGuid128 UserGUID;
+    public uint ChannelFlags;
+    public uint ChannelID;
+    public string ChannelName = string.Empty;
+}

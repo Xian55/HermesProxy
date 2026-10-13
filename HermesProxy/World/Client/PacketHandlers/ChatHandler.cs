@@ -17,6 +17,52 @@ namespace HermesProxy.World.Client;
 
 public partial class WorldClient
 {
+    // Who joins, changes in and leaves a channel that announces its members (the layout has been the
+    // same since 2.x). Only the 4.4.2 opcode table has the client's side of the three, so they are
+    // passed on for a 4.3.4 server and dropped for the others, as before.
+    uint UserlistChannelId(string channelName)
+        => GetSession().GameState.ChannelIds.TryGetValue(channelName, out int id)
+            ? (uint)id
+            : GameData.GetChatChannelIdFromName(channelName);
+
+    [HandlesSmsg(Opcode.SMSG_USERLIST_ADD)]
+    [HandlesSmsg(Opcode.SMSG_USERLIST_UPDATE)]
+    internal void HandleUserlistAdd(WorldPacket packet)
+    {
+        if (IsCataLegacy)
+            HandleUserlistAddCata(packet);
+    }
+
+    internal void HandleUserlistAddCata(WorldPacket packet)
+    {
+        UserlistAdd user = new(update: packet.GetUniversalOpcode(false) == Opcode.SMSG_USERLIST_UPDATE);
+        user.UserGUID = packet.ReadGuid().To128(GetSession().GameState);
+        user.UserFlags = packet.ReadUInt8();
+        user.ChannelFlags = packet.ReadUInt8();
+        packet.ReadUInt32(); // members now in the channel
+        user.ChannelName = packet.ReadCString();
+        user.ChannelID = UserlistChannelId(user.ChannelName);
+        SendPacketToClient(user);
+    }
+
+    [HandlesSmsg(Opcode.SMSG_USERLIST_REMOVE)]
+    internal void HandleUserlistRemove(WorldPacket packet)
+    {
+        if (IsCataLegacy)
+            HandleUserlistRemoveCata(packet);
+    }
+
+    internal void HandleUserlistRemoveCata(WorldPacket packet)
+    {
+        UserlistRemove user = new();
+        user.UserGUID = packet.ReadGuid().To128(GetSession().GameState);
+        user.ChannelFlags = packet.ReadUInt8();
+        packet.ReadUInt32(); // members now in the channel
+        user.ChannelName = packet.ReadCString();
+        user.ChannelID = UserlistChannelId(user.ChannelName);
+        SendPacketToClient(user);
+    }
+
     // Handlers for SMSG opcodes coming the legacy world server
     [HandlesSmsg(Opcode.SMSG_CHANNEL_NOTIFY)]
     internal void HandleChannelNotify(WorldPacket packet)

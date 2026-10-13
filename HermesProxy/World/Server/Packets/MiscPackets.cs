@@ -1608,3 +1608,21 @@ public class ZoneUnderAttack : ServerPacket, ISpanWritable
 
     public int AreaID;
 }
+
+/// <summary>The graveyards the map shows to a dead player. 4.4.2 only.</summary>
+public sealed class RequestCemeteryListResponse : ServerPacket
+{
+    public RequestCemeteryListResponse() : base(Opcode.SMSG_REQUEST_CEMETERY_LIST_RESPONSE) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteBit(IsGossipTriggered);
+        _worldPacket.FlushBits();
+        _worldPacket.WriteInt32(CemeteryID.Count);
+        foreach (uint cemetery in CemeteryID)
+            _worldPacket.WriteUInt32(cemetery);
+    }
+
+    public bool IsGossipTriggered;
+    public List<uint> CemeteryID = [];
+}

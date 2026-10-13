@@ -70,6 +70,12 @@ public class OpcodeTableV4_4_2Tests
             "SMSG_GUILD_MEMBER_UPDATE_NOTE",
             "SMSG_START_TIMER",
             "SMSG_SET_CURRENCY",
+            "SMSG_REQUEST_CEMETERY_LIST_RESPONSE",
+            "SMSG_USERLIST_ADD",
+            "SMSG_USERLIST_REMOVE",
+            "SMSG_USERLIST_UPDATE",
+            "SMSG_MOVE_SKIP_TIME",
+            "CMSG_CLIENT_PORT_GRAVEYARD",
         ];
 
         Assert.Equal(

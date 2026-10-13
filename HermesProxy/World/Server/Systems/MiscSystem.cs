@@ -2,6 +2,7 @@
 using Framework.Constants;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Client;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server.Packets;
@@ -321,6 +322,32 @@ public static class MiscSystem
         response.PvpCPExpCoefficient = 1639.28f;
         response.PvpCPNumerator = 0.00412f;
         ctx.SendPacket(response);
+    }
+
+    /// <summary>
+    /// Asked when the player dies and when the map opens on a dead player. Only a 4.x server knows
+    /// the request; the answer comes back as SMSG_REQUEST_CEMETERY_LIST_RESPONSE.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_REQUEST_CEMETERY_LIST)]
+    public static void HandleRequestCemeteryList(in EmptyClientPacket request, in SessionContext ctx)
+    {
+        if (!WorldClient.IsCataLegacy)
+            return;
+
+        ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_REQUEST_CEMETERY_LIST));
+    }
+
+    /// <summary>
+    /// The ghost's "Return to Graveyard" button. Only a 4.x server knows the request
+    /// (TrinityCore 4.3.4: CMSG_RETURN_TO_GRAVEYARD, empty); it moves the ghost itself.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_CLIENT_PORT_GRAVEYARD)]
+    public static void HandleClientPortGraveyard(in EmptyClientPacket request, in SessionContext ctx)
+    {
+        if (!WorldClient.IsCataLegacy)
+            return;
+
+        ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_CLIENT_PORT_GRAVEYARD));
     }
 
     [HandlesCmsg(Opcode.CMSG_MOUNT_SPECIAL_ANIM)]

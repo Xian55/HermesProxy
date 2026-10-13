@@ -11,6 +11,21 @@ namespace HermesProxy.World.Client;
 
 public partial class WorldClient
 {
+    /// <summary>
+    /// The graveyards of the zone, for the map of a dead player (TrinityCore 4.3.4
+    /// <c>RequestCemeteryListResponse::Write</c>): one bit and a 24-bit count, then the ids.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_REQUEST_CEMETERY_LIST_RESPONSE)]
+    internal void HandleRequestCemeteryListResponse(WorldPacket packet)
+    {
+        RequestCemeteryListResponse cemeteries = new();
+        cemeteries.IsGossipTriggered = packet.HasBit();
+        uint count = packet.ReadBits<uint>(24);
+        for (uint i = 0; i < count; i++)
+            cemeteries.CemeteryID.Add(packet.ReadUInt32());
+        SendPacketToClient(cemeteries);
+    }
+
     // Handlers for SMSG opcodes coming the legacy world server
     [HandlesSmsg(Opcode.SMSG_PONG)]
     internal void HandlePingResponse(WorldPacket packet)

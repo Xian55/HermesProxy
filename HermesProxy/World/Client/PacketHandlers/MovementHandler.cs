@@ -598,6 +598,28 @@ public partial class WorldClient
         GetSession().GameState.IsWaitingForNewWorld = false;
     }
 
+    /// <summary>
+    /// Another player's client skipped time. Only the 4.4.2 opcode table has a packet to pass it
+    /// on as, so it is passed on for a 4.3.4 server and dropped for the others, as before.
+    /// </summary>
+    [HandlesSmsg(Opcode.MSG_MOVE_TIME_SKIPPED)]
+    internal void HandleMoveTimeSkipped(WorldPacket packet)
+    {
+        if (IsCataLegacy)
+            HandleMoveTimeSkippedCata(packet);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 sends the time, then the packed GUID; before 4.x it is the GUID first.
+    /// </summary>
+    internal void HandleMoveTimeSkippedCata(WorldPacket packet)
+    {
+        MoveSkipTime skip = new();
+        skip.TimeSkipped = packet.ReadUInt32();
+        skip.MoverGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
+        SendPacketToClient(skip);
+    }
+
     [HandlesSmsg(Opcode.SMSG_NEW_WORLD)]
     internal void HandleNewWorld(WorldPacket packet)
     {
