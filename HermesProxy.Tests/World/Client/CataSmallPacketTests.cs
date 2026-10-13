@@ -272,4 +272,40 @@ public sealed class CataSmallPacketTests
             ],
             Written(packet));
     }
+
+    [Fact]
+    public void HandleGuildChallengeUpdate_DropsTheExperienceAndReordersTheRest()
+    {
+        // experience 0 30 40 50, gold at the cap 0 125 500 250, counting 0 7 1 3, gold 0 25 100 50, done 0 2 0 1
+        var challenges = Deliver<GuildChallengeUpdate>(Opcode.SMSG_GUILD_CHALLENGE_UPDATE,
+            Ints(0, 30, 40, 50) + Ints(0, 125, 500, 250) + Ints(0, 7, 1, 3) + Ints(0, 25, 100, 50) + Ints(0, 2, 0, 1),
+            _harness.Client.HandleGuildChallengeUpdate);
+
+        Assert.Equal([0, 2, 0, 1, 0, 0], challenges.CurrentCount);
+        Assert.Equal([0, 7, 1, 3, 0, 0], challenges.MaxCount);
+        Assert.Equal([0, 125, 500, 250, 0, 0], challenges.MaxLevelGold);
+        Assert.Equal([0, 25, 100, 50, 0, 0], challenges.Gold);
+    }
+
+    /// <summary>Done, counting, gold, gold at the level cap: the order the client's guild window showed.</summary>
+    [Fact]
+    public void GuildChallengeUpdate_IsFourRunsOfSix_DoneFirst()
+    {
+        var packet = new GuildChallengeUpdate();
+        packet.CurrentCount[1] = 2;
+        packet.MaxCount[1] = 7;
+        packet.MaxLevelGold[1] = 125;
+        packet.Gold[1] = 25;
+
+        byte[] written = Written(packet);
+
+        Assert.Equal(4 * GuildChallengeUpdate.Types * sizeof(int), written.Length);
+        Assert.Equal(2, BitConverter.ToInt32(written, 1 * 4));
+        Assert.Equal(7, BitConverter.ToInt32(written, (6 + 1) * 4));
+        Assert.Equal(25, BitConverter.ToInt32(written, (12 + 1) * 4));
+        Assert.Equal(125, BitConverter.ToInt32(written, (18 + 1) * 4));
+    }
+
+    private static string Ints(params int[] values)
+        => string.Concat(Array.ConvertAll(values, v => Convert.ToHexString(BitConverter.GetBytes(v))));
 }

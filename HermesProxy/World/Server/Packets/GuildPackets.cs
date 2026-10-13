@@ -1304,3 +1304,37 @@ public sealed class GuildPartyState : ServerPacket
     public int NumRequired;
     public float GuildXPEarnedMult;
 }
+
+/// <summary>
+/// The guild challenges of the week: how many of each kind are done, how many count, and what
+/// one pays. The 4.4.2 client has six kinds (none, dungeon, raid, rated battleground and two a
+/// 4.3.4 server does not have), four numbers each.
+/// </summary>
+/// <remarks>
+/// The gold comes before the gold at the level cap. TrinityCore cata_classic writes them the
+/// other way round, and the client's guild window then showed 250 for a dungeon and 125 at the
+/// cap, where the server had 125 and 250.
+/// </remarks>
+public sealed class GuildChallengeUpdate : ServerPacket
+{
+    public const int Types = 6;
+
+    public GuildChallengeUpdate() : base(Opcode.SMSG_GUILD_CHALLENGE_UPDATE) { }
+
+    public override void Write()
+    {
+        foreach (int count in CurrentCount)
+            _worldPacket.WriteInt32(count);
+        foreach (int count in MaxCount)
+            _worldPacket.WriteInt32(count);
+        foreach (int gold in Gold)
+            _worldPacket.WriteInt32(gold);
+        foreach (int gold in MaxLevelGold)
+            _worldPacket.WriteInt32(gold);
+    }
+
+    public readonly int[] CurrentCount = new int[Types];
+    public readonly int[] MaxCount = new int[Types];
+    public readonly int[] MaxLevelGold = new int[Types];
+    public readonly int[] Gold = new int[Types];
+}

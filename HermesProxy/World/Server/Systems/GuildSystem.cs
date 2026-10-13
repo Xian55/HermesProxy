@@ -794,4 +794,16 @@ public static class GuildSystem
         MaskedGuid.Write(packet, CataGuildGuid(request.GuildGuid.GetCounter()), [0, 6, 7, 3, 5, 1, 2, 4], [6, 3, 2, 1, 5, 0, 7, 4]);
         ctx.SendPacketToServer(packet);
     }
+    /// <summary>
+    /// The guild window asks for the week's challenges. A 4.3.4 server has the request under a
+    /// name of its own (CMSG_GUILD_REQUEST_CHALLENGE_UPDATE); both are empty.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_GUILD_CHALLENGE_UPDATE_REQUEST)]
+    public static void HandleGuildChallengeUpdateRequest(in EmptyClientPacket request, in SessionContext ctx)
+    {
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            return;
+
+        ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_GUILD_REQUEST_CHALLENGE_UPDATE));
+    }
 }

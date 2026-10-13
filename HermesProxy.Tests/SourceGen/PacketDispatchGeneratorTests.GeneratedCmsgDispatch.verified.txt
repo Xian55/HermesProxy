@@ -1189,6 +1189,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.GuildSystem.HandleGuildBankBuyTab(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildChallengeUpdateRequest_CMSG_GUILD_CHALLENGE_UPDATE_REQUEST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.GuildSystem.HandleGuildChallengeUpdateRequest(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildDecline_CMSG_GUILD_DECLINE_INVITATION(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
@@ -3179,6 +3185,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_BANK_TEXT_QUERY] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildBankTextQuery_CMSG_GUILD_BANK_TEXT_QUERY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_BANK_UPDATE_TAB] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildBankUpdateTab_CMSG_GUILD_BANK_UPDATE_TAB;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_BANK_WITHDRAW_MONEY] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildBankBuyTab_CMSG_GUILD_BANK_WITHDRAW_MONEY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_CHALLENGE_UPDATE_REQUEST] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildChallengeUpdateRequest_CMSG_GUILD_CHALLENGE_UPDATE_REQUEST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_DECLINE_INVITATION] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildDecline_CMSG_GUILD_DECLINE_INVITATION;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_DELETE] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildDelete_CMSG_GUILD_DELETE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_DELETE_RANK] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildDeleteRank_CMSG_GUILD_DELETE_RANK;
@@ -3720,6 +3727,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_BANK_TEXT_QUERY,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_BANK_UPDATE_TAB,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_BANK_WITHDRAW_MONEY,
+            global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_CHALLENGE_UPDATE_REQUEST,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_DECLINE_INVITATION,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_DELETE,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_DELETE_RANK,

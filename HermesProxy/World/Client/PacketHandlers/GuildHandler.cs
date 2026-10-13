@@ -1083,4 +1083,28 @@ public partial class WorldClient
         state.NumRequired = packet.ReadInt32();
         SendPacketToClient(state);
     }
+    // 4.3.4 has four kinds of guild challenge: none, dungeon, raid, rated battleground.
+    private const int GuildChallengeTypesCata = 4;
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>GuildChallengeUpdate::Write</c>: five runs of four numbers, in the order
+    /// experience, gold at the level cap, how many count, gold, how many are done. The 4.4.2 client
+    /// has no experience and reads the other four in another order, six kinds wide.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_CHALLENGE_UPDATE)]
+    internal void HandleGuildChallengeUpdate(WorldPacket packet)
+    {
+        GuildChallengeUpdate challenges = new();
+        for (int i = 0; i < GuildChallengeTypesCata; i++)
+            packet.ReadInt32(); // experience
+        for (int i = 0; i < GuildChallengeTypesCata; i++)
+            challenges.MaxLevelGold[i] = packet.ReadInt32();
+        for (int i = 0; i < GuildChallengeTypesCata; i++)
+            challenges.MaxCount[i] = packet.ReadInt32();
+        for (int i = 0; i < GuildChallengeTypesCata; i++)
+            challenges.Gold[i] = packet.ReadInt32();
+        for (int i = 0; i < GuildChallengeTypesCata; i++)
+            challenges.CurrentCount[i] = packet.ReadInt32();
+        SendPacketToClient(challenges);
+    }
 }
