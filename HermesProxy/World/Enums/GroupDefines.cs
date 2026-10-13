@@ -110,6 +110,40 @@ public enum GroupUpdateFlagTBC : uint
     Full             = 0x000FFFFF,       // all known flags incl. WotLK VehicleSeat
 }
 
+/// <summary>
+/// What a 4.3.4 party member update carries (TrinityCore 4.3.4 <c>GroupUpdateFlags</c>). Not the
+/// 3.3.5a set with more bits: a WMO group id sits at 0x100 and moves the position, the auras and
+/// the pet up one bit, the position has a height, and the phases follow the vehicle seat.
+/// </summary>
+[Flags]
+public enum GroupUpdateFlagCata : uint
+{
+    None             = 0x00000000,
+    Status           = 0x00000001,       // uint16
+    CurrentHealth    = 0x00000002,       // uint32
+    MaxHealth        = 0x00000004,       // uint32
+    PowerType        = 0x00000008,       // uint8
+    CurrentPower     = 0x00000010,       // uint16
+    MaxPower         = 0x00000020,       // uint16
+    Level            = 0x00000040,       // uint16
+    Zone             = 0x00000080,       // uint16
+    WmoGroupId       = 0x00000100,       // int16
+    Position         = 0x00000200,       // int16 x, y, z
+    Auras            = 0x00000400,       // uint8, uint64 mask, uint32, then spell, uint16 flags and maybe three values a set bit
+    PetGuid          = 0x00000800,       // uint64
+    PetName          = 0x00001000,       // string, zero terminated
+    PetModelId       = 0x00002000,       // uint16
+    PetCurrentHealth = 0x00004000,       // uint32
+    PetMaxHealth     = 0x00008000,       // uint32
+    PetPowerType     = 0x00010000,       // uint8
+    PetCurrentPower  = 0x00020000,       // uint16
+    PetMaxPower      = 0x00040000,       // uint16
+    PetAuras         = 0x00080000,       // as Auras; sent without a pet too, empty
+    VehicleSeat      = 0x00100000,       // int32
+    Phase            = 0x00200000,       // uint32 flags, uint32 count, a uint16 each
+    // 0x00400000 and up are set in a full state and carry nothing
+}
+
 enum PartyResultVanilla : uint
 {
     Ok = 0,

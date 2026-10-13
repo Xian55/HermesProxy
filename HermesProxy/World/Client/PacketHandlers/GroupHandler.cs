@@ -341,12 +341,19 @@ public partial class WorldClient
         // entering, the others follow one list at a time. That list of none is a raid of one, and
         // the client is in the battle's raid from the moment it is in the battle.
         bool raidOfOne = membersCount == 0 && IsCataLegacy && isBattleground && !removed && !party.PartyGUID.IsEmpty();
+        //
+        // The same list with the removal mark ends a party too. SMSG_GROUP_DESTROYED comes with it
+        // and only says so in chat: without the list the client stayed in a party of two that the
+        // server no longer had, after leaving it or after the other member had left.
         bool leftInstanceGroup = false;
+        bool leftHomeGroup = false;
         if (membersCount == 0 && IsCataLegacy && !party.PartyGUID.IsEmpty() && !raidOfOne)
         {
             var instanceGroup = GetSession().GameState.CurrentGroups[1];
             leftInstanceGroup = removed && instanceGroup != null && instanceGroup.PartyGUID == party.PartyGUID;
-            if (!leftInstanceGroup)
+            var homeGroup = GetSession().GameState.CurrentGroups[0];
+            leftHomeGroup = removed && !leftInstanceGroup && homeGroup != null && homeGroup.PartyGUID == party.PartyGUID;
+            if (!leftInstanceGroup && !leftHomeGroup)
                 return;
         }
 
@@ -485,8 +492,19 @@ public partial class WorldClient
             // Addressing the destroy to the home category would leave the client's instance
             // group alive forever — the minimap LFG eye stayed up, stuck on "paused", after
             // "Leave Instance Group" had genuinely removed the group server-side.
-            party.PartyIndex = GetSession().GameState.LastAnnouncedPartyIndex;
-            GetSession().GameState.LastAnnouncedPartyIndex = 0;
+            if (leftHomeGroup)
+            {
+                // named by its GUID: it may be left while a battleground's raid is the group
+                // announced last, and that one stays
+                party.PartyIndex = 0;
+                if (GetSession().GameState.LastAnnouncedPartyIndex == 0 || GetSession().GameState.CurrentGroups[1] == null)
+                    GetSession().GameState.LastAnnouncedPartyIndex = 0;
+            }
+            else
+            {
+                party.PartyIndex = GetSession().GameState.LastAnnouncedPartyIndex;
+                GetSession().GameState.LastAnnouncedPartyIndex = 0;
+            }
 
             party.PartyFlags |= GroupFlags.Destroyed;
             if (party.PartyIndex  == 0)
@@ -1032,6 +1050,12 @@ public partial class WorldClient
             return;
         }
 
+        if (IsCataLegacy)
+        {
+            HandlePartyMemberPartialStateCata(packet, affectedGuid);
+            return;
+        }
+
         GroupUpdateFlagTBC updateFlags = (GroupUpdateFlagTBC)packet.ReadUInt32();
 
         if (ShouldThrottlePartyMemberState(affectedGuid, updateFlags))
@@ -1524,6 +1548,12 @@ public partial class WorldClient
             }
         }
 
+        if (IsCataLegacy)
+        {
+            HandlePartyMemberFullStateCata(packet);
+            return;
+        }
+
         PartyMemberFullState state = ParsePartyMemberFullStateTbc(packet);
         SendPacketToClient(state);
     }
@@ -1752,5 +1782,333 @@ public partial class WorldClient
             return;
         foreach (var guid in drop)
             assigned.Remove(guid);
+    }
+    // --- party member stats of a 4.3.4 server
+
+    /// <summary>What <see cref="TryReadPartyMemberStatsCata"/> found, field by field.</summary>
+    private struct PartyMemberStatsCata
+    {
+        public ushort? Status;
+        public uint? CurrentHealth;
+        public uint? MaxHealth;
+        public byte? PowerType;
+        public ushort? CurrentPower;
+        public ushort? MaxPower;
+        public ushort? Level;
+        public ushort? ZoneID;
+        public PartyMemberPartialState.Vector3_UInt16? Position;
+        public List<PartyMemberAuraStates>? Auras;
+        public PartyMemberPetStats? Pet;
+        public uint? VehicleSeat;
+    }
+
+    /// <summary>
+    /// The change mask as the throttle knows it. Health, power and position are what a bot-filled
+    /// battleground repeats; any other 4.3.4 flag is given a bit the throttle never holds back.
+    /// </summary>
+    internal static GroupUpdateFlagTBC ThrottleFlagsOf(GroupUpdateFlagCata flags)
+    {
+        const GroupUpdateFlagCata SameBits = (GroupUpdateFlagCata)0xFF;    // status to zone
+        GroupUpdateFlagTBC known = (GroupUpdateFlagTBC)(uint)(flags & SameBits);
+        if ((flags & GroupUpdateFlagCata.Position) != 0)
+            known |= GroupUpdateFlagTBC.Position;
+        if ((flags & ~(SameBits | GroupUpdateFlagCata.Position)) != 0)
+            known |= GroupUpdateFlagTBC.Auras;
+        return known;
+    }
+
+    internal void HandlePartyMemberPartialStateCata(WorldPacket packet, WowGuid128 affectedGuid)
+    {
+        GroupUpdateFlagCata flags = (GroupUpdateFlagCata)packet.ReadUInt32();
+        if (ShouldThrottlePartyMemberState(affectedGuid, ThrottleFlagsOf(flags)))
+            return;
+
+        PartyMemberStatsCata stats = default;
+        TryReadPartyMemberStatsCata(packet, flags, ref stats);
+
+        PartyMemberPartialState state = new PartyMemberPartialState();
+        state.AffectedGUID = affectedGuid;
+        state.StatusFlags = stats.Status;
+        state.CurrentHealth = stats.CurrentHealth;
+        state.MaxHealth = stats.MaxHealth;
+        state.PowerType = stats.PowerType;
+        state.CurrentPower = stats.CurrentPower;
+        state.MaxPower = stats.MaxPower;
+        state.Level = stats.Level;
+        state.ZoneID = stats.ZoneID;
+        state.Position = stats.Position;
+        state.Auras = stats.Auras;
+        if (stats.Pet != null)
+            state.Pet = stats.Pet;
+        state.VehicleSeatRecID = stats.VehicleSeat;
+        SendPacketToClient(state);
+    }
+
+    internal void HandlePartyMemberFullStateCata(WorldPacket packet)
+    {
+        const string Op = nameof(Opcode.SMSG_PARTY_MEMBER_FULL_STATE);
+        PartyMemberFullState state = new PartyMemberFullState();
+        if (GetSession().GameState.IsInBattleground())
+        {
+            state.PartyType[0] = 0;
+            state.PartyType[1] = 2;
+        }
+        else
+        {
+            state.PartyType[0] = 1;
+            state.PartyType[1] = 0;
+        }
+
+        // one byte ahead of the member, in the full state only
+        if (!packet.CanRead(1 + 1 + 4))
+        {
+            WarnTruncated(Op, packet, nameof(PartyMemberFullState.MemberGuid), 6);
+            return;
+        }
+        packet.ReadUInt8();
+        state.MemberGuid = packet.ReadPackedGuid().To128(GetSession().GameState);
+        if (!packet.CanRead(4))
+        {
+            WarnTruncated(Op, packet, "ChangeMask", 4);
+            return;
+        }
+        GroupUpdateFlagCata flags = (GroupUpdateFlagCata)packet.ReadUInt32();
+
+        PartyMemberStatsCata stats = default;
+        TryReadPartyMemberStatsCata(packet, flags, ref stats);
+
+        state.StatusFlags = (GroupMemberOnlineStatus)(stats.Status ?? 0);
+        state.CurrentHealth = (int)(stats.CurrentHealth ?? 0);
+        state.MaxHealth = (int)(stats.MaxHealth ?? 0);
+        state.PowerType = stats.PowerType ?? 0;
+        state.CurrentPower = stats.CurrentPower ?? 0;
+        state.MaxPower = stats.MaxPower ?? 0;
+        state.Level = stats.Level ?? 0;
+        state.ZoneID = stats.ZoneID ?? 0;
+        if (stats.Position is { } position)
+        {
+            state.PositionX = position.X;
+            state.PositionY = position.Y;
+            state.PositionZ = position.Z;
+        }
+        if (stats.Auras != null)
+            state.Auras = stats.Auras;
+        if (stats.Pet != null)
+            state.Pet = stats.Pet;
+        state.VehicleSeat = (int)(stats.VehicleSeat ?? 0);
+        SendPacketToClient(state);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>PartyMemberState::Write</c>, from after the change mask. Returns false
+    /// where the packet ends before the mask says it should; what was read by then stands.
+    /// </summary>
+    private bool TryReadPartyMemberStatsCata(WorldPacket packet, GroupUpdateFlagCata flags, ref PartyMemberStatsCata stats)
+    {
+        const string Op = nameof(Opcode.SMSG_PARTY_MEMBER_PARTIAL_STATE);
+
+        if ((flags & GroupUpdateFlagCata.Status) != 0)
+        {
+            if (!packet.CanRead(2)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.Status), 2);
+            stats.Status = packet.ReadUInt16();
+        }
+
+        if ((flags & GroupUpdateFlagCata.CurrentHealth) != 0)
+        {
+            if (!packet.CanRead(4)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.CurrentHealth), 4);
+            stats.CurrentHealth = packet.ReadUInt32();
+        }
+
+        if ((flags & GroupUpdateFlagCata.MaxHealth) != 0)
+        {
+            if (!packet.CanRead(4)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.MaxHealth), 4);
+            stats.MaxHealth = packet.ReadUInt32();
+        }
+
+        if ((flags & GroupUpdateFlagCata.PowerType) != 0)
+        {
+            if (!packet.CanRead(1)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.PowerType), 1);
+            stats.PowerType = packet.ReadUInt8();
+        }
+
+        if ((flags & GroupUpdateFlagCata.CurrentPower) != 0)
+        {
+            if (!packet.CanRead(2)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.CurrentPower), 2);
+            stats.CurrentPower = packet.ReadUInt16();
+        }
+
+        if ((flags & GroupUpdateFlagCata.MaxPower) != 0)
+        {
+            if (!packet.CanRead(2)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.MaxPower), 2);
+            stats.MaxPower = packet.ReadUInt16();
+        }
+
+        if ((flags & GroupUpdateFlagCata.Level) != 0)
+        {
+            if (!packet.CanRead(2)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.Level), 2);
+            stats.Level = packet.ReadUInt16();
+        }
+
+        if ((flags & GroupUpdateFlagCata.Zone) != 0)
+        {
+            if (!packet.CanRead(2)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.Zone), 2);
+            stats.ZoneID = packet.ReadUInt16();
+        }
+
+        if ((flags & GroupUpdateFlagCata.WmoGroupId) != 0)
+        {
+            // Not passed on: no older server has it, so the client has never been sent one here.
+            if (!packet.CanRead(2)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.WmoGroupId), 2);
+            packet.ReadInt16();
+        }
+
+        if ((flags & GroupUpdateFlagCata.Position) != 0)
+        {
+            if (!packet.CanRead(6)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.Position), 6);
+            PartyMemberPartialState.Vector3_UInt16 position = default;
+            position.X = packet.ReadInt16();
+            position.Y = packet.ReadInt16();
+            position.Z = packet.ReadInt16();
+            stats.Position = position;
+        }
+
+        if ((flags & GroupUpdateFlagCata.Auras) != 0)
+        {
+            if (!TryReadPartyMemberAurasCata(packet, ref stats.Auras, Op, nameof(GroupUpdateFlagCata.Auras))) return false;
+        }
+
+        if ((flags & GroupUpdateFlagCata.PetGuid) != 0)
+        {
+            if (!packet.CanRead(8)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.PetGuid), 8);
+            stats.Pet ??= new PartyMemberPetStats();
+            stats.Pet.NewPetGuid = packet.ReadGuid().To128(GetSession().GameState);
+        }
+
+        if ((flags & GroupUpdateFlagCata.PetName) != 0)
+        {
+            if (!packet.CanRead(1)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.PetName), 1);
+            stats.Pet ??= new PartyMemberPetStats();
+            stats.Pet.NewPetName = packet.ReadCString();
+        }
+
+        if ((flags & GroupUpdateFlagCata.PetModelId) != 0)
+        {
+            if (!packet.CanRead(2)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.PetModelId), 2);
+            stats.Pet ??= new PartyMemberPetStats();
+            stats.Pet.DisplayID = packet.ReadUInt16();
+        }
+
+        if ((flags & GroupUpdateFlagCata.PetCurrentHealth) != 0)
+        {
+            if (!packet.CanRead(4)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.PetCurrentHealth), 4);
+            stats.Pet ??= new PartyMemberPetStats();
+            stats.Pet.Health = packet.ReadUInt32();
+        }
+
+        if ((flags & GroupUpdateFlagCata.PetMaxHealth) != 0)
+        {
+            if (!packet.CanRead(4)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.PetMaxHealth), 4);
+            stats.Pet ??= new PartyMemberPetStats();
+            stats.Pet.MaxHealth = packet.ReadUInt32();
+        }
+
+        if ((flags & GroupUpdateFlagCata.PetPowerType) != 0)
+        {
+            if (!packet.CanRead(1)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.PetPowerType), 1);
+            packet.ReadUInt8();
+        }
+
+        if ((flags & GroupUpdateFlagCata.PetCurrentPower) != 0)
+        {
+            if (!packet.CanRead(2)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.PetCurrentPower), 2);
+            packet.ReadUInt16();
+        }
+
+        if ((flags & GroupUpdateFlagCata.PetMaxPower) != 0)
+        {
+            if (!packet.CanRead(2)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.PetMaxPower), 2);
+            packet.ReadUInt16();
+        }
+
+        if ((flags & GroupUpdateFlagCata.PetAuras) != 0)
+        {
+            // Sent for a member without a pet too, with an empty mask: no pet is made of that.
+            List<PartyMemberAuraStates>? petAuras = null;
+            if (!TryReadPartyMemberAurasCata(packet, ref petAuras, Op, nameof(GroupUpdateFlagCata.PetAuras))) return false;
+            if (petAuras != null)
+            {
+                stats.Pet ??= new PartyMemberPetStats();
+                stats.Pet.Auras = petAuras;
+            }
+        }
+
+        if ((flags & GroupUpdateFlagCata.VehicleSeat) != 0)
+        {
+            if (!packet.CanRead(4)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.VehicleSeat), 4);
+            stats.VehicleSeat = packet.ReadUInt32();
+        }
+
+        if ((flags & GroupUpdateFlagCata.Phase) != 0)
+        {
+            // Read past, not passed on: the client is told of no phases for a member of an older
+            // server either, and a wrong one greys the member out as being somewhere else.
+            if (!packet.CanRead(8)) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.Phase), 8);
+            packet.ReadUInt32();
+            uint phases = packet.ReadUInt32();
+            if (phases > packet.Remaining() / 2) return WarnTruncated(Op, packet, nameof(GroupUpdateFlagCata.Phase) + "List", (int)Math.Min(phases * 2, int.MaxValue));
+            for (uint i = 0; i < phases; i++)
+                packet.ReadUInt16();
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// One aura block of a 4.3.4 member: a byte, the mask of the slots that follow, a count the
+    /// server sets to its 64 slots whatever the mask says, then for each set bit the spell, 16 bits
+    /// of flags and, for a scalable aura, the values of its three effects. The client is given
+    /// the values of the effects the aura has.
+    /// </summary>
+    private static bool TryReadPartyMemberAurasCata(WorldPacket packet, ref List<PartyMemberAuraStates>? output, string opcodeName, string field)
+    {
+        if (!packet.CanRead(1 + 8 + 4)) return WarnTruncated(opcodeName, packet, field, 13);
+        packet.ReadUInt8();
+        ulong auraMask = packet.ReadUInt64();
+        packet.ReadUInt32();
+
+        while (auraMask != 0)
+        {
+            auraMask &= auraMask - 1;
+            if (!packet.CanRead(6)) return WarnTruncated(opcodeName, packet, field + "Entry", 6);
+
+            PartyMemberAuraStates aura = new PartyMemberAuraStates();
+            aura.SpellId = AuraSpellRemap.ToModern(packet.ReadUInt32());
+            AuraFlagsWotLK legacyFlags = (AuraFlagsWotLK)packet.ReadUInt16();
+
+            AuraFlagsModern modernFlags = (legacyFlags & AuraFlagsWotLK.Negative) != 0 ? AuraFlagsModern.Negative : AuraFlagsModern.Positive;
+            if ((legacyFlags & AuraFlagsWotLK.Duration) != 0) modernFlags |= AuraFlagsModern.Duration;
+            if ((legacyFlags & AuraFlagsWotLK.NoCaster) != 0) modernFlags |= AuraFlagsModern.NoCaster;
+
+            if ((legacyFlags & AuraFlagsWotLK.Scalable) != 0)
+            {
+                if (!packet.CanRead(12)) return WarnTruncated(opcodeName, packet, field + "Points", 12);
+                for (int effect = 0; effect < 3; effect++)
+                {
+                    int points = packet.ReadInt32();
+                    if (((uint)legacyFlags & (1u << effect)) != 0)
+                        aura.Points.Add(points);
+                }
+                if (aura.Points.Count > 0)
+                    modernFlags |= AuraFlagsModern.Scalable;
+            }
+
+            if (aura.SpellId != 0)
+            {
+                aura.ActiveFlags = (uint)(legacyFlags & (AuraFlagsWotLK.EffectIndex0 | AuraFlagsWotLK.EffectIndex1 | AuraFlagsWotLK.EffectIndex2));
+                aura.AuraFlags = (ushort)modernFlags;
+            }
+            (output ??= new List<PartyMemberAuraStates>()).Add(aura);
+        }
+        return true;
     }
 }
