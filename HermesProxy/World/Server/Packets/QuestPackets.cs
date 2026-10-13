@@ -1597,3 +1597,28 @@ class QuestPushResult : ServerPacket, ISpanWritable
 }
 
 public readonly record struct QuestPushResultResponse(WowGuid128 SenderGUID, uint QuestID, QuestPushReason Result);
+
+public readonly record struct QueryQuestCompletionNPCs(int[] QuestIds);
+
+/// <summary>
+/// Whom each of the asked quests can be handed in to: what the client marks on the map for a quest
+/// that is ready. An entry with the top bit set is a game object, on both sides of the proxy.
+/// </summary>
+public sealed class QuestCompletionNPCResponse : ServerPacket
+{
+    public QuestCompletionNPCResponse() : base(Opcode.SMSG_QUEST_COMPLETION_NPC_RESPONSE) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt32(Quests.Count);
+        foreach (var (questId, npcs) in Quests)
+        {
+            _worldPacket.WriteInt32(questId);
+            _worldPacket.WriteInt32(npcs.Count);
+            foreach (uint npc in npcs)
+                _worldPacket.WriteUInt32(npc);
+        }
+    }
+
+    public List<(int QuestID, List<uint> NPCs)> Quests = [];
+}

@@ -911,4 +911,33 @@ public partial class WorldClient
         blob.QuestObjectiveID = (int)match.Id;
         blob.QuestObjectID = match.ObjectID;
     }
+    // More quests than a quest log holds would be a misread count, not an answer.
+    private const int MaxQuestsInCompletionAnswer = 256;
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>HandleQuestNPCQuery</c>: 23 bits of quests, 24 bits of entries for each
+    /// of them, then for each quest its id and its entries.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_QUEST_COMPLETION_NPC_RESPONSE)]
+    internal void HandleQuestCompletionNPCResponse(WorldPacket packet)
+    {
+        int quests = packet.ReadBits<int>(23);
+        if (quests > MaxQuestsInCompletionAnswer)
+            return;
+
+        int[] entries = new int[quests];
+        for (int i = 0; i < quests; i++)
+            entries[i] = packet.ReadBits<int>(24);
+
+        QuestCompletionNPCResponse response = new();
+        for (int i = 0; i < quests; i++)
+        {
+            int questId = packet.ReadInt32();
+            List<uint> npcs = [];
+            for (int j = 0; j < entries[i]; j++)
+                npcs.Add(packet.ReadUInt32());
+            response.Quests.Add((questId, npcs));
+        }
+        SendPacketToClient(response);
+    }
 }

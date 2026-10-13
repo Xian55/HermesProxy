@@ -11,11 +11,12 @@ namespace HermesProxy.Tests.World.Client;
 
 /// <summary>
 /// Small packets of a 4.3.4 server that had no handler: who joins and leaves a channel, the
-/// graveyards for a dead player's map, another player's skipped time, the guild group state and the
-/// kinds of PvP on offer. The incoming bytes are written out after TrinityCore 4.3.4's writers
-/// (Channel::JoinNotify and LeaveNotify, RequestCemeteryListResponse::Write,
-/// HandleMoveTimeSkippedOpcode, Guild::HandleGuildPartyRequest, PVPOptionsEnabled::Write); the
-/// outgoing ones after the 4.4.2 client's layouts.
+/// graveyards for a dead player's map, another player's skipped time, the guild group state, the
+/// kinds of PvP on offer and whom a quest is handed in to. The incoming bytes are written out
+/// after TrinityCore 4.3.4's writers (Channel::JoinNotify and LeaveNotify,
+/// RequestCemeteryListResponse::Write, HandleMoveTimeSkippedOpcode,
+/// Guild::HandleGuildPartyRequest, PVPOptionsEnabled::Write, HandleQuestNPCQuery); the outgoing
+/// ones after the 4.4.2 client's layouts.
 /// </summary>
 public sealed class CataSmallPacketTests
 {
@@ -229,5 +230,46 @@ public sealed class CataSmallPacketTests
         }));
         Assert.Equal([0x80, 0x00], Written(new PVPOptionsEnabled { RatedBattlegrounds = true }));
         Assert.Equal([0x08, 0x00], Written(new PVPOptionsEnabled { RatedArenas = true }));
+    }
+
+    [Fact]
+    public void HandleQuestCompletionNPCResponse_ReadsAllCountsBeforeAnyQuest()
+    {
+        // two quests with one and two entries: 23 bits, 24, 24; then quest 100 with creature 5000,
+        // and quest 200 with creature 6000 and game object 7000
+        var answer = Deliver<QuestCompletionNPCResponse>(Opcode.SMSG_QUEST_COMPLETION_NPC_RESPONSE,
+            "00 00 04 00 00 02 00 00 04 64 00 00 00 88 13 00 00 c8 00 00 00 70 17 00 00 58 1b 00 80",
+            _harness.Client.HandleQuestCompletionNPCResponse);
+
+        Assert.Equal(2, answer.Quests.Count);
+        Assert.Equal(100, answer.Quests[0].QuestID);
+        Assert.Equal([5000u], answer.Quests[0].NPCs);
+        Assert.Equal(200, answer.Quests[1].QuestID);
+        Assert.Equal([6000u, 7000u | 0x80000000u], answer.Quests[1].NPCs);
+    }
+
+    [Fact]
+    public void HandleQuestCompletionNPCResponse_OfNoQuests_IsAnEmptyAnswer()
+    {
+        var answer = Deliver<QuestCompletionNPCResponse>(Opcode.SMSG_QUEST_COMPLETION_NPC_RESPONSE,
+            "00 00 00", _harness.Client.HandleQuestCompletionNPCResponse);
+
+        Assert.Empty(answer.Quests);
+    }
+
+    [Fact]
+    public void QuestCompletionNPCResponse_WritesEachQuestWithItsOwnCount()
+    {
+        var packet = new QuestCompletionNPCResponse();
+        packet.Quests.Add((100, [5000]));
+        packet.Quests.Add((200, [6000, 7000 | 0x80000000]));
+
+        Assert.Equal(
+            [
+                0x02, 0x00, 0x00, 0x00,
+                0x64, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x88, 0x13, 0x00, 0x00,
+                0xC8, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x70, 0x17, 0x00, 0x00, 0x58, 0x1B, 0x00, 0x80,
+            ],
+            Written(packet));
     }
 }

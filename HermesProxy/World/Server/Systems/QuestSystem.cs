@@ -370,4 +370,21 @@ public static class QuestSystem
 
         WorldSocketLogMessages.QuestClose(_melLog, _sourceFile, _netDirRecv, (int)questId, action);
     }
+    /// <summary>
+    /// Asked for the quests in the log: whom can each be handed in to? Only a 4.x server knows the
+    /// request (TrinityCore 4.3.4 <c>HandleQuestNPCQuery</c>: a 24-bit count, then the quest ids).
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_QUERY_QUEST_COMPLETION_NPCS)]
+    public static void HandleQueryQuestCompletionNPCs(in QueryQuestCompletionNPCs query, in SessionContext ctx)
+    {
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_QUERY_QUEST_COMPLETION_NPCS);
+        packet.WriteBits(query.QuestIds.Length, 24);
+        packet.FlushBits();
+        foreach (int questId in query.QuestIds)
+            packet.WriteInt32(questId);
+        ctx.SendPacketToServer(packet);
+    }
 }

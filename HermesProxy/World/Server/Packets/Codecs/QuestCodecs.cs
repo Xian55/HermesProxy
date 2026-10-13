@@ -155,3 +155,20 @@ public static class QuestPushResultResponseCodec
         packet = new QuestPushResultResponse(senderGuid, questId, result);
     }
 }
+
+public static class QueryQuestCompletionNPCsCodec
+{
+    public static void Read(ref SpanPacketReader r, out QueryQuestCompletionNPCs packet)
+    {
+        // A count and that many quest ids. The count is wire data: four bytes an id bounds what can
+        // follow, so the array is not sized from a number the packet cannot back.
+        int count = r.ReadInt32();
+        if (count < 0 || count > r.Remaining / sizeof(int))
+            throw new ArgumentOutOfRangeException(nameof(count), count,
+                $"CMSG_QUERY_QUEST_COMPLETION_NPCS claims {count} quest ids but only {r.Remaining} bytes remain.");
+        int[] questIds = new int[count];
+        for (int i = 0; i < count; i++)
+            questIds[i] = r.ReadInt32();
+        packet = new QueryQuestCompletionNPCs(questIds);
+    }
+}
