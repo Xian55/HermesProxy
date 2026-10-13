@@ -475,6 +475,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.PetSystem.HandleBuyStableSlot(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarGetNumPending_CMSG_CALENDAR_GET_NUM_PENDING(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarGetNumPending(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelAura_CMSG_CANCEL_AURA(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.CancelAuraCodec.Read(ref reader, out var packet);
@@ -2981,6 +2987,7 @@ internal static unsafe class GeneratedCmsgDispatch
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BUY_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleBuyItem_CMSG_BUY_ITEM_BuyItemCodecWotLKClassic;
         }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BUY_STABLE_SLOT] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleBuyStableSlot_CMSG_BUY_STABLE_SLOT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_GET_NUM_PENDING] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarGetNumPending_CMSG_CALENDAR_GET_NUM_PENDING;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_AURA] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelAura_CMSG_CANCEL_AURA;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_AUTO_REPEAT_SPELL] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelAutoRepeatSpell_CMSG_CANCEL_AUTO_REPEAT_SPELL;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_CAST] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelCast_CMSG_CANCEL_CAST;
@@ -3630,6 +3637,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_BUY_BANK_SLOT,
             global::HermesProxy.World.Enums.Opcode.CMSG_BUY_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_BUY_STABLE_SLOT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_GET_NUM_PENDING,
             global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_AURA,
             global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_AUTO_REPEAT_SPELL,
             global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_CAST,

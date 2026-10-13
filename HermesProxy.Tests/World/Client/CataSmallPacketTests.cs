@@ -306,6 +306,16 @@ public sealed class CataSmallPacketTests
         Assert.Equal(125, BitConverter.ToInt32(written, (18 + 1) * 4));
     }
 
+    [Fact]
+    public void HandleCalendarSendNumPending_PassesTheCountOn()
+    {
+        var pending = Deliver<CalendarSendNumPending>(Opcode.SMSG_CALENDAR_SEND_NUM_PENDING,
+            Ints(3), _harness.Client.HandleCalendarSendNumPendingCata);
+
+        Assert.Equal(3u, pending.NumPending);
+        Assert.Equal(Convert.FromHexString(Ints(3)), Written(pending));
+    }
+
     private static string Ints(params int[] values)
         => string.Concat(Array.ConvertAll(values, v => Convert.ToHexString(BitConverter.GetBytes(v))));
 }

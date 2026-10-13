@@ -727,86 +727,6 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleBuySucceeded(packet);
     }
 
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarClearPendingAction_SMSG_CALENDAR_CLEAR_PENDING_ACTION(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarClearPendingAction(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarCommandResult_SMSG_CALENDAR_COMMAND_RESULT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarCommandResult(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventInvite_SMSG_CALENDAR_EVENT_INVITE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarEventInvite(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventInviteAlert_SMSG_CALENDAR_EVENT_INVITE_ALERT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarEventInviteAlert(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventInviteRemoved_SMSG_CALENDAR_EVENT_INVITE_REMOVED(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarEventInviteRemoved(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventInviteRemovedAlert_SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarEventInviteRemovedAlert(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventModeratorStatusAlert_SMSG_CALENDAR_EVENT_MODERATOR_STATUS_ALERT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarEventModeratorStatusAlert(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventRemovedAlert_SMSG_CALENDAR_EVENT_REMOVED_ALERT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarEventRemovedAlert(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventStatus_SMSG_CALENDAR_EVENT_STATUS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarEventStatus(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventUpdatedAlert_SMSG_CALENDAR_EVENT_UPDATED_ALERT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarEventUpdatedAlert(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarFilterGuild_SMSG_CALENDAR_FILTER_GUILD(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarFilterGuild(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarRaidLockoutAdded_SMSG_CALENDAR_RAID_LOCKOUT_ADDED(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarRaidLockoutAdded(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarRaidLockoutRemoved_SMSG_CALENDAR_RAID_LOCKOUT_REMOVED(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarRaidLockoutRemoved(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarRaidLockoutUpdated_SMSG_CALENDAR_RAID_LOCKOUT_UPDATED(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarRaidLockoutUpdated(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarSendCalendar_SMSG_CALENDAR_SEND_CALENDAR(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarSendCalendar(packet);
-    }
-
-    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarSendEvent_SMSG_CALENDAR_SEND_EVENT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
-    {
-        client.HandleCalendarSendEvent(packet);
-    }
-
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarSendNumPending_SMSG_CALENDAR_SEND_NUM_PENDING(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleCalendarSendNumPending(packet);
@@ -2794,22 +2714,6 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BREAK_TARGET] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBreakTarget_SMSG_BREAK_TARGET;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BUY_FAILED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBuyFailed_SMSG_BUY_FAILED;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_BUY_SUCCEEDED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleBuySucceeded_SMSG_BUY_SUCCEEDED;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_CLEAR_PENDING_ACTION] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarClearPendingAction_SMSG_CALENDAR_CLEAR_PENDING_ACTION;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_COMMAND_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarCommandResult_SMSG_CALENDAR_COMMAND_RESULT;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_INVITE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventInvite_SMSG_CALENDAR_EVENT_INVITE;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_INVITE_ALERT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventInviteAlert_SMSG_CALENDAR_EVENT_INVITE_ALERT;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_INVITE_REMOVED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventInviteRemoved_SMSG_CALENDAR_EVENT_INVITE_REMOVED;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventInviteRemovedAlert_SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_MODERATOR_STATUS_ALERT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventModeratorStatusAlert_SMSG_CALENDAR_EVENT_MODERATOR_STATUS_ALERT;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_REMOVED_ALERT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventRemovedAlert_SMSG_CALENDAR_EVENT_REMOVED_ALERT;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_STATUS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventStatus_SMSG_CALENDAR_EVENT_STATUS;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_UPDATED_ALERT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarEventUpdatedAlert_SMSG_CALENDAR_EVENT_UPDATED_ALERT;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_FILTER_GUILD] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarFilterGuild_SMSG_CALENDAR_FILTER_GUILD;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_RAID_LOCKOUT_ADDED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarRaidLockoutAdded_SMSG_CALENDAR_RAID_LOCKOUT_ADDED;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_RAID_LOCKOUT_REMOVED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarRaidLockoutRemoved_SMSG_CALENDAR_RAID_LOCKOUT_REMOVED;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_RAID_LOCKOUT_UPDATED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarRaidLockoutUpdated_SMSG_CALENDAR_RAID_LOCKOUT_UPDATED;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_SEND_CALENDAR] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarSendCalendar_SMSG_CALENDAR_SEND_CALENDAR;
-        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_SEND_EVENT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarSendEvent_SMSG_CALENDAR_SEND_EVENT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_SEND_NUM_PENDING] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCalendarSendNumPending_SMSG_CALENDAR_SEND_NUM_PENDING;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CANCEL_AUTO_REPEAT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCancelAutoRepeat_SMSG_CANCEL_AUTO_REPEAT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_CANCEL_COMBAT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCancelCombat_SMSG_CANCEL_COMBAT;
@@ -3336,22 +3240,6 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_BREAK_TARGET,
             global::HermesProxy.World.Enums.Opcode.SMSG_BUY_FAILED,
             global::HermesProxy.World.Enums.Opcode.SMSG_BUY_SUCCEEDED,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_CLEAR_PENDING_ACTION,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_COMMAND_RESULT,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_INVITE,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_INVITE_ALERT,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_INVITE_REMOVED,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_MODERATOR_STATUS_ALERT,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_REMOVED_ALERT,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_STATUS,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_EVENT_UPDATED_ALERT,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_FILTER_GUILD,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_RAID_LOCKOUT_ADDED,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_RAID_LOCKOUT_REMOVED,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_RAID_LOCKOUT_UPDATED,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_SEND_CALENDAR,
-            global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_SEND_EVENT,
             global::HermesProxy.World.Enums.Opcode.SMSG_CALENDAR_SEND_NUM_PENDING,
             global::HermesProxy.World.Enums.Opcode.SMSG_CANCEL_AUTO_REPEAT,
             global::HermesProxy.World.Enums.Opcode.SMSG_CANCEL_COMBAT,
