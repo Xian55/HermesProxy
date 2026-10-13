@@ -488,7 +488,10 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         var generated = GeneratedCmsgDispatch.Get(universalOpcode);
         if (generated == null)
         {
-            WorldSocketLogMessages.NoHandlerForOpcode(_melLog, _sourceFile, _netDirRecv, universalOpcode.ToStringFast(), packet.GetOpcode());
+            if (DeliberatelyUnhandledOpcodes.IsFromClient(universalOpcode))
+                WorldSocketLogMessages.LeftUnhandledOnPurpose(_melLog, _sourceFile, _netDirRecv, universalOpcode, packet.GetOpcode());
+            else
+                WorldSocketLogMessages.NoHandlerForOpcode(_melLog, _sourceFile, _netDirRecv, universalOpcode.ToStringFast(), packet.GetOpcode());
             return;
         }
 

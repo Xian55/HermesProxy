@@ -544,13 +544,24 @@ def tc_cata_handlers(tc: Path | None) -> dict[str, bool]:
     return out
 
 
+def deliberately_unhandled() -> set[str]:
+    """Opcodes the proxy leaves alone on purpose (World/Logging/DeliberatelyUnhandledOpcodes.cs):
+    a request of that list is not waiting for a handler."""
+    path = HP / 'World' / 'Logging' / 'DeliberatelyUnhandledOpcodes.cs'
+    if not path.exists():
+        return set()
+    return set(re.findall(r'Opcode\.((?:CMSG|SMSG)_\w+)', path.read_text(encoding='utf-8-sig')))
+
+
 def unanswered_section(unanswered: dict, tc: Path | None) -> list[str]:
     """Requests the 4.4.2 client sent in a session that no handler took. The client holds some
     of its windows until a request is answered (the auction house froze on one), so each is a
     feature that may hang rather than merely be missing."""
     handled = set(cmsg_packet_types())
     tc_acts = tc_cata_handlers(tc)
-    rows = [(name, seen) for name, seen in unanswered.items() if name not in handled]
+    on_purpose = deliberately_unhandled()
+    left_alone = sorted(name for name in unanswered if name in on_purpose and name not in handled)
+    rows = [(name, seen) for name, seen in unanswered.items() if name not in handled and name not in on_purpose]
     if not rows:
         return []
 
@@ -569,6 +580,10 @@ def unanswered_section(unanswered: dict, tc: Path | None) -> list[str]:
         tc_says = '?' if name not in tc_acts else ('acts on it' if tc_acts[name] else 'ignores it')
         md.append(f'| `{name}` | {tc_says} | {seen.count} | {seen.session} |')
     md.append('')
+    if left_alone:
+        md += [f'{len(left_alone)} more that the client sent are left alone on purpose, each with its reason in '
+               '`World/Logging/DeliberatelyUnhandledOpcodes.cs`: '
+               + ', '.join(f'`{name}`' for name in left_alone) + '.', '']
     return md
 
 

@@ -75,6 +75,18 @@ internal static partial class WorldClientLogMessages
         string Opcode,
         uint OpcodeId);
 
+    /// <summary>An opcode of <see cref="DeliberatelyUnhandledOpcodes.FromServer"/>.</summary>
+    [LoggerMessage(
+        EventId = 228,
+        Level = LogLevel.Debug,
+        Message = "Opcode {Opcode} ({OpcodeId}) not passed on, on purpose.")]
+    public static partial void LeftUnhandledOnPurpose(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        Opcode Opcode,
+        uint OpcodeId);
+
     [LoggerMessage(
         EventId = 203,
         Level = LogLevel.Error,

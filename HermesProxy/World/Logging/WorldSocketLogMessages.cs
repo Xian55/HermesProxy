@@ -73,6 +73,18 @@ internal static partial class WorldSocketLogMessages
         string Opcode,
         uint OpcodeId);
 
+    /// <summary>An opcode of <see cref="DeliberatelyUnhandledOpcodes.FromClient"/>.</summary>
+    [LoggerMessage(
+        EventId = 105,
+        Level = LogLevel.Debug,
+        Message = "Opcode {Opcode} ({OpcodeId}) left unanswered on purpose.")]
+    public static partial void LeftUnhandledOnPurpose(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        Opcode Opcode,
+        uint OpcodeId);
+
     [LoggerMessage(
         EventId = 110,
         Level = LogLevel.Debug,
