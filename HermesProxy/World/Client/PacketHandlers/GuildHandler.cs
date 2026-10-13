@@ -1069,4 +1069,18 @@ public partial class WorldClient
         result.RemainingWithdrawMoney = packet.ReadUInt32();
         SendPacketToClient(result);
     }
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>Guild::HandleGuildPartyRequest</c>: one bit, then the experience
+    /// multiplier before the two counts; the 4.4.2 client has the counts first.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_PARTY_STATE)]
+    internal void HandleGuildPartyState(WorldPacket packet)
+    {
+        GuildPartyState state = new();
+        state.InGuildParty = packet.HasBit();
+        state.GuildXPEarnedMult = packet.ReadFloat();
+        state.NumMembers = packet.ReadInt32();
+        state.NumRequired = packet.ReadInt32();
+        SendPacketToClient(state);
+    }
 }

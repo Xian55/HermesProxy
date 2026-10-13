@@ -849,3 +849,33 @@ class PlayerSkinned : ServerPacket, ISpanWritable
 
     public bool FreeRepop;
 }
+
+/// <summary>
+/// Which kinds of PvP the server offers; the PvP window asks when it opens. 4.4.2 has ten bits,
+/// five of them for modes no 4.3.4 server has. 4.4.2 only.
+/// </summary>
+public sealed class PVPOptionsEnabled : ServerPacket
+{
+    public PVPOptionsEnabled() : base(Opcode.SMSG_PVP_OPTIONS_ENABLED) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteBit(RatedBattlegrounds);
+        _worldPacket.WriteBit(PugBattlegrounds);
+        _worldPacket.WriteBit(WargameBattlegrounds);
+        _worldPacket.WriteBit(WargameArenas);
+        _worldPacket.WriteBit(RatedArenas);
+        _worldPacket.WriteBit(false); // ArenaSkirmish
+        _worldPacket.WriteBit(false); // SoloShuffle
+        _worldPacket.WriteBit(false); // RatedSoloShuffle
+        _worldPacket.WriteBit(false); // BattlegroundBlitz
+        _worldPacket.WriteBit(false); // RatedBattlegroundBlitz
+        _worldPacket.FlushBits();
+    }
+
+    public bool RatedBattlegrounds;
+    public bool PugBattlegrounds;
+    public bool WargameBattlegrounds;
+    public bool WargameArenas;
+    public bool RatedArenas;
+}

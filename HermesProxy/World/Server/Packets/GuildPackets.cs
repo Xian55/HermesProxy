@@ -1280,3 +1280,27 @@ public readonly record struct SplitGuildBankItem(
     byte BankTab2,
     byte BankSlot2,
     uint StackCount);
+
+public readonly record struct RequestGuildPartyState(WowGuid128 GuildGuid);
+
+/// <summary>
+/// Whether the group the player is in counts as a guild group, and what it earns. 4.4.2 only.
+/// </summary>
+public sealed class GuildPartyState : ServerPacket
+{
+    public GuildPartyState() : base(Opcode.SMSG_GUILD_PARTY_STATE) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteBit(InGuildParty);
+        _worldPacket.FlushBits();
+        _worldPacket.WriteInt32(NumMembers);
+        _worldPacket.WriteInt32(NumRequired);
+        _worldPacket.WriteFloat(GuildXPEarnedMult);
+    }
+
+    public bool InGuildParty;
+    public int NumMembers;
+    public int NumRequired;
+    public float GuildXPEarnedMult;
+}

@@ -1139,4 +1139,21 @@ public partial class WorldClient
             skinned.FreeRepop = packet.ReadBool();
         SendPacketToClient(skinned);
     }
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>PVPOptionsEnabled::Write</c>: five bits. It names the second, fourth
+    /// and fifth (war game battlegrounds, rated battlegrounds, rated arenas) and sets the other two,
+    /// calling them ignored by the client; they are taken to be the 4.4.2 client's unrated
+    /// battlegrounds and war game arenas, which sit in those places among its first five.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_PVP_OPTIONS_ENABLED)]
+    internal void HandlePvPOptionsEnabled(WorldPacket packet)
+    {
+        PVPOptionsEnabled options = new();
+        options.PugBattlegrounds = packet.HasBit();
+        options.WargameBattlegrounds = packet.HasBit();
+        options.WargameArenas = packet.HasBit();
+        options.RatedBattlegrounds = packet.HasBit();
+        options.RatedArenas = packet.HasBit();
+        SendPacketToClient(options);
+    }
 }

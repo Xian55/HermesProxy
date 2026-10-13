@@ -780,4 +780,18 @@ public static class GuildSystem
         packet.WriteUInt8(legacyBag);
         packet.WriteUInt8(legacySlot);
     }
+    /// <summary>
+    /// Asked whenever the guild or the group changes: is this group a guild group? Only a 4.x
+    /// server knows the request (TrinityCore 4.3.4: CMSG_GUILD_REQUEST_PARTY_STATE).
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_REQUEST_GUILD_PARTY_STATE)]
+    public static void HandleRequestGuildPartyState(in RequestGuildPartyState request, in SessionContext ctx)
+    {
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_REQUEST_GUILD_PARTY_STATE);
+        MaskedGuid.Write(packet, CataGuildGuid(request.GuildGuid.GetCounter()), [0, 6, 7, 3, 5, 1, 2, 4], [6, 3, 2, 1, 5, 0, 7, 4]);
+        ctx.SendPacketToServer(packet);
+    }
 }

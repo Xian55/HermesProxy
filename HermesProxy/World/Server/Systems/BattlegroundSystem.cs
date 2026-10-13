@@ -228,4 +228,16 @@ public static class BattlegroundSystem
             packet.WriteUInt32((uint)ctx.GetSession().GameState.CurrentMapId!);
         ctx.SendPacketToServer(packet);
     }
+    /// <summary>
+    /// The PvP window asks which kinds of PvP there are. Only a 4.x server knows the request
+    /// (TrinityCore 4.3.4: CMSG_REQUEST_PVP_OPTIONS_ENABLED, empty).
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_GET_PVP_OPTIONS_ENABLED)]
+    public static void HandleGetPvpOptionsEnabled(in EmptyClientPacket request, in SessionContext ctx)
+    {
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            return;
+
+        ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_GET_PVP_OPTIONS_ENABLED));
+    }
 }

@@ -1069,6 +1069,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.CharacterSystem.HandleGetAccountCharacterList(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_BattlegroundSystem_HandleGetPvpOptionsEnabled_CMSG_GET_PVP_OPTIONS_ENABLED(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.BattlegroundSystem.HandleGetPvpOptionsEnabled(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_SupportTicketSystem_HandleGMTicketGetCaseStatus_CMSG_GM_TICKET_GET_CASE_STATUS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
@@ -2293,6 +2299,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.MiscSystem.HandleRequestConquestFormulaConstants(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleRequestGuildPartyState_CMSG_REQUEST_GUILD_PARTY_STATE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.RequestGuildPartyStateCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.GuildSystem.HandleRequestGuildPartyState(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleInspectHonorStats_CMSG_REQUEST_HONOR_STATS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.InspectCodec.Read(ref reader, out var packet);
@@ -3133,6 +3145,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GAME_OBJ_USE] = &Thunk_HermesProxy_World_Server_Systems_GameObjectSystem_HandleGameObjUse_CMSG_GAME_OBJ_USE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GENERATE_RANDOM_CHARACTER_NAME] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleGenerateRandomCharacterNameRequest_CMSG_GENERATE_RANDOM_CHARACTER_NAME;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GET_ACCOUNT_CHARACTER_LIST] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleGetAccountCharacterList_CMSG_GET_ACCOUNT_CHARACTER_LIST;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GET_PVP_OPTIONS_ENABLED] = &Thunk_HermesProxy_World_Server_Systems_BattlegroundSystem_HandleGetPvpOptionsEnabled_CMSG_GET_PVP_OPTIONS_ENABLED;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GM_TICKET_GET_CASE_STATUS] = &Thunk_HermesProxy_World_Server_Systems_SupportTicketSystem_HandleGMTicketGetCaseStatus_CMSG_GM_TICKET_GET_CASE_STATUS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GM_TICKET_GET_SYSTEM_STATUS] = &Thunk_HermesProxy_World_Server_Systems_SupportTicketSystem_HandleGMTicketGetSystemStatus_CMSG_GM_TICKET_GET_SYSTEM_STATUS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GOSSIP_SELECT_OPTION] = &Thunk_HermesProxy_World_Server_Systems_NpcSystem_HandleGossipSelectOption_CMSG_GOSSIP_SELECT_OPTION;
@@ -3401,6 +3414,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_BATTLEFIELD_STATUS] = &Thunk_HermesProxy_World_Server_Systems_BattlegroundSystem_HandleRequestBattlefieldStatus_CMSG_REQUEST_BATTLEFIELD_STATUS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_CEMETERY_LIST] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleRequestCemeteryList_CMSG_REQUEST_CEMETERY_LIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleRequestConquestFormulaConstants_CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_GUILD_PARTY_STATE] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleRequestGuildPartyState_CMSG_REQUEST_GUILD_PARTY_STATE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_HONOR_STATS] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleInspectHonorStats_CMSG_REQUEST_HONOR_STATS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_LFG_LIST_BLACKLIST] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleRequestLFGListBlacklist_CMSG_REQUEST_LFG_LIST_BLACKLIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_PARTY_MEMBER_STATS] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleRequestPartyMemberStats_CMSG_REQUEST_PARTY_MEMBER_STATS;
@@ -3681,6 +3695,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_GAME_OBJ_USE,
             global::HermesProxy.World.Enums.Opcode.CMSG_GENERATE_RANDOM_CHARACTER_NAME,
             global::HermesProxy.World.Enums.Opcode.CMSG_GET_ACCOUNT_CHARACTER_LIST,
+            global::HermesProxy.World.Enums.Opcode.CMSG_GET_PVP_OPTIONS_ENABLED,
             global::HermesProxy.World.Enums.Opcode.CMSG_GM_TICKET_GET_CASE_STATUS,
             global::HermesProxy.World.Enums.Opcode.CMSG_GM_TICKET_GET_SYSTEM_STATUS,
             global::HermesProxy.World.Enums.Opcode.CMSG_GOSSIP_SELECT_OPTION,
@@ -3869,6 +3884,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_BATTLEFIELD_STATUS,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_CEMETERY_LIST,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS,
+            global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_GUILD_PARTY_STATE,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_HONOR_STATS,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_LFG_LIST_BLACKLIST,
             global::HermesProxy.World.Enums.Opcode.CMSG_REQUEST_PARTY_MEMBER_STATS,

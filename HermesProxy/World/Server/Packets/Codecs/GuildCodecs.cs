@@ -396,3 +396,11 @@ public static class SplitGuildBankItemCodec
         packet = new SplitGuildBankItem(bankGuid, bankTab1, bankSlot1, bankTab2, bankSlot2, stackCount);
     }
 }
+
+// The guild's GUID and nothing else (docs/protocol 4.4.2).
+public static class RequestGuildPartyStateCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out RequestGuildPartyState packet)
+        => packet = new RequestGuildPartyState(r.ReadPackedGuid128());
+}

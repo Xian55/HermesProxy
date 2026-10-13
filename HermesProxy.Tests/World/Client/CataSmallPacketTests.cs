@@ -10,11 +10,12 @@ using Xunit;
 namespace HermesProxy.Tests.World.Client;
 
 /// <summary>
-/// Four small packets of a 4.3.4 server that had no handler: who joins and leaves a channel, the
-/// graveyards for a dead player's map, and another player's skipped time. The incoming bytes are
-/// written out after TrinityCore 4.3.4's writers (Channel::JoinNotify and LeaveNotify,
-/// RequestCemeteryListResponse::Write, HandleMoveTimeSkippedOpcode); the outgoing ones after the
-/// 4.4.2 client's layouts.
+/// Small packets of a 4.3.4 server that had no handler: who joins and leaves a channel, the
+/// graveyards for a dead player's map, another player's skipped time, the guild group state and the
+/// kinds of PvP on offer. The incoming bytes are written out after TrinityCore 4.3.4's writers
+/// (Channel::JoinNotify and LeaveNotify, RequestCemeteryListResponse::Write,
+/// HandleMoveTimeSkippedOpcode, Guild::HandleGuildPartyRequest, PVPOptionsEnabled::Write); the
+/// outgoing ones after the 4.4.2 client's layouts.
 /// </summary>
 public sealed class CataSmallPacketTests
 {
@@ -172,5 +173,61 @@ public sealed class CataSmallPacketTests
         var packet = new MoveSkipTime { TimeSkipped = 1000 };
 
         Assert.Equal([0x00, 0x00, 0xE8, 0x03, 0x00, 0x00], Written(packet));
+    }
+
+    [Fact]
+    public void HandleGuildPartyState_ReadsTheMultiplierBeforeTheCounts()
+    {
+        // a guild group, experience times 1.5, three of the guild in it, three needed
+        var state = Deliver<GuildPartyState>(Opcode.SMSG_GUILD_PARTY_STATE,
+            "80 00 00 c0 3f 03 00 00 00 03 00 00 00", _harness.Client.HandleGuildPartyState);
+
+        Assert.True(state.InGuildParty);
+        Assert.Equal(1.5f, state.GuildXPEarnedMult);
+        Assert.Equal(3, state.NumMembers);
+        Assert.Equal(3, state.NumRequired);
+    }
+
+    [Fact]
+    public void GuildPartyState_WritesTheCountsBeforeTheMultiplier()
+    {
+        var packet = new GuildPartyState { InGuildParty = true, NumMembers = 2, NumRequired = 3, GuildXPEarnedMult = 1.5f };
+
+        Assert.Equal(
+            [
+                0x80,
+                0x02, 0x00, 0x00, 0x00,
+                0x03, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0xC0, 0x3F,
+            ],
+            Written(packet));
+    }
+
+    [Theory]
+    [InlineData("f8", true, true, true, true, true)]        // what TrinityCore 4.3.4 sends
+    [InlineData("00", false, false, false, false, false)]
+    [InlineData("48", false, true, false, false, true)]     // war game battlegrounds and rated arenas
+    public void HandlePvPOptionsEnabled_ReadsFiveBits(string hex, bool pug, bool wargameBattlegrounds, bool wargameArenas,
+        bool ratedBattlegrounds, bool ratedArenas)
+    {
+        var options = Deliver<PVPOptionsEnabled>(Opcode.SMSG_PVP_OPTIONS_ENABLED, hex, _harness.Client.HandlePvPOptionsEnabled);
+
+        Assert.Equal(pug, options.PugBattlegrounds);
+        Assert.Equal(wargameBattlegrounds, options.WargameBattlegrounds);
+        Assert.Equal(wargameArenas, options.WargameArenas);
+        Assert.Equal(ratedBattlegrounds, options.RatedBattlegrounds);
+        Assert.Equal(ratedArenas, options.RatedArenas);
+    }
+
+    /// <summary>Rated battlegrounds lead on the 4.4.2 wire, and five more bits follow the five.</summary>
+    [Fact]
+    public void PVPOptionsEnabled_WritesTenBits_RatedBattlegroundsFirst()
+    {
+        Assert.Equal([0xF8, 0x00], Written(new PVPOptionsEnabled
+        {
+            RatedBattlegrounds = true, PugBattlegrounds = true, WargameBattlegrounds = true, WargameArenas = true, RatedArenas = true,
+        }));
+        Assert.Equal([0x80, 0x00], Written(new PVPOptionsEnabled { RatedBattlegrounds = true }));
+        Assert.Equal([0x08, 0x00], Written(new PVPOptionsEnabled { RatedArenas = true }));
     }
 }

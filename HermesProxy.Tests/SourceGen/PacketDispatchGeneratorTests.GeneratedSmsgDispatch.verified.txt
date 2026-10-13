@@ -1252,6 +1252,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleGuildMemberUpdateNote(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleGuildPartyState_SMSG_GUILD_PARTY_STATE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleGuildPartyState(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleGuildPermissionsQueryResults_SMSG_GUILD_PERMISSIONS_QUERY_RESULTS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleGuildPermissionsQueryResults(packet);
@@ -2050,6 +2055,11 @@ internal static unsafe class GeneratedSmsgDispatch
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandlePvPLogDataCata_SMSG_PVP_LOG_DATA(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandlePvPLogDataCata(packet);
+    }
+
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandlePvPOptionsEnabled_SMSG_PVP_OPTIONS_ENABLED(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandlePvPOptionsEnabled(packet);
     }
 
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleQueryCreatureResponse_SMSG_QUERY_CREATURE_RESPONSE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
@@ -2890,6 +2900,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_INVITE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildInvite_SMSG_GUILD_INVITE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_INVITE_DECLINED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildInviteDeclined_SMSG_GUILD_INVITE_DECLINED;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_MEMBER_UPDATE_NOTE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildMemberUpdateNote_SMSG_GUILD_MEMBER_UPDATE_NOTE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_PARTY_STATE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildPartyState_SMSG_GUILD_PARTY_STATE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_PERMISSIONS_QUERY_RESULTS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildPermissionsQueryResults_SMSG_GUILD_PERMISSIONS_QUERY_RESULTS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_RANKS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildRanks_SMSG_GUILD_RANKS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_ROSTER] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildRoster_SMSG_GUILD_ROSTER;
@@ -3066,6 +3077,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PRINT_NOTIFICATION] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePrintNotification_SMSG_PRINT_NOTIFICATION;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PVP_CREDIT] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePvPCredit_SMSG_PVP_CREDIT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PVP_LOG_DATA] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePvPLogDataCata_SMSG_PVP_LOG_DATA;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PVP_OPTIONS_ENABLED] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePvPOptionsEnabled_SMSG_PVP_OPTIONS_ENABLED;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_QUERY_CREATURE_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleQueryCreatureResponse_SMSG_QUERY_CREATURE_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_QUERY_GAME_OBJECT_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleQueryGameObjectResposne_SMSG_QUERY_GAME_OBJECT_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_QUERY_GUILD_INFO_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleQueryGuildInfoResponse_SMSG_QUERY_GUILD_INFO_RESPONSE;
@@ -3415,6 +3427,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_INVITE,
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_INVITE_DECLINED,
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_MEMBER_UPDATE_NOTE,
+            global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_PARTY_STATE,
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_PERMISSIONS_QUERY_RESULTS,
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_RANKS,
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_ROSTER,
@@ -3571,6 +3584,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_PRINT_NOTIFICATION,
             global::HermesProxy.World.Enums.Opcode.SMSG_PVP_CREDIT,
             global::HermesProxy.World.Enums.Opcode.SMSG_PVP_LOG_DATA,
+            global::HermesProxy.World.Enums.Opcode.SMSG_PVP_OPTIONS_ENABLED,
             global::HermesProxy.World.Enums.Opcode.SMSG_QUERY_CREATURE_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.SMSG_QUERY_GAME_OBJECT_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.SMSG_QUERY_GUILD_INFO_RESPONSE,
