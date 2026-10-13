@@ -824,4 +824,30 @@ public static class GuildSystem
             packet.WriteUInt32(achievementId);
         ctx.SendPacketToServer(packet);
     }
+    /// <summary>
+    /// The guild window's log tab. Empty on both sides; only a 4.3.4 server is asked.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_GUILD_EVENT_LOG_QUERY)]
+    public static void HandleGuildEventLogQuery(in EmptyClientPacket query, in SessionContext ctx)
+    {
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            return;
+
+        ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_GUILD_EVENT_LOG_QUERY));
+    }
+
+    /// <summary>
+    /// The guild window's rewards tab. The client sends the time of the list it has, in 64 bits;
+    /// a 4.3.4 server reads 32 (TrinityCore 4.3.4 <c>RequestGuildRewardsList::Read</c>).
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_REQUEST_GUILD_REWARDS_LIST)]
+    public static void HandleRequestGuildRewardsList(in RequestGuildRewardsList request, in SessionContext ctx)
+    {
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_REQUEST_GUILD_REWARDS_LIST);
+        packet.WriteUInt32((uint)request.CurrentVersion);
+        ctx.SendPacketToServer(packet);
+    }
 }

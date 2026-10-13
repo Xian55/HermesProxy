@@ -1340,3 +1340,104 @@ public sealed class GuildChallengeUpdate : ServerPacket
 }
 
 public readonly record struct GuildSetAchievementTracking(uint[] AchievementIds);
+
+public readonly record struct RequestGuildRewardsList(long CurrentVersion);
+
+/// <summary>
+/// The day's bank withdrawal limits start anew; the client asks for its own again. Empty.
+/// </summary>
+public sealed class GuildMemberDailyReset : ServerPacket
+{
+    public GuildMemberDailyReset() : base(Opcode.SMSG_GUILD_MEMBER_DAILY_RESET) { }
+
+    public override void Write() { }
+}
+
+/// <summary>
+/// What the guild has earned: the record of a player's achievement list, a count before them.
+/// </summary>
+public sealed class AllGuildAchievements : ServerPacket
+{
+    public AllGuildAchievements() : base(Opcode.SMSG_ALL_GUILD_ACHIEVEMENTS) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt32(Earned.Count);
+        foreach (EarnedAchievement earned in Earned)
+            earned.Write(_worldPacket);
+    }
+
+    public List<EarnedAchievement> Earned = [];
+}
+
+/// <summary>
+/// The guild log: who invited, promoted or removed whom, who joined and who left.
+/// </summary>
+public sealed class GuildEventLogQueryResults : ServerPacket
+{
+    public GuildEventLogQueryResults() : base(Opcode.SMSG_GUILD_EVENT_LOG_QUERY_RESULTS) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt32(Entries.Count);
+        foreach (GuildEventEntry entry in Entries)
+        {
+            _worldPacket.WritePackedGuid128(entry.PlayerGUID);
+            _worldPacket.WritePackedGuid128(entry.OtherGUID);
+            _worldPacket.WriteUInt8(entry.TransactionType);
+            _worldPacket.WriteUInt8(entry.RankID);
+            _worldPacket.WriteUInt32(entry.TransactionDate);
+        }
+    }
+
+    public List<GuildEventEntry> Entries = [];
+}
+
+public struct GuildEventEntry
+{
+    public WowGuid128 PlayerGUID;
+    public WowGuid128 OtherGUID;
+    public byte TransactionType;
+    public byte RankID;
+    public uint TransactionDate;    // seconds ago
+}
+
+/// <summary>
+/// What the guild vendor sells, and the reputation, achievement and gold each asks for.
+/// </summary>
+public sealed class GuildRewardList : ServerPacket
+{
+    public GuildRewardList() : base(Opcode.SMSG_GUILD_REWARD_LIST) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt64(Version);
+        _worldPacket.WriteInt32(RewardItems.Count);
+        foreach (GuildRewardItem item in RewardItems)
+        {
+            _worldPacket.WriteUInt32(item.ItemID);
+            _worldPacket.WriteUInt32(item.Unk4);
+            _worldPacket.WriteInt32(item.AchievementsRequired.Count);
+            _worldPacket.WriteUInt64(item.RaceMask);
+            _worldPacket.WriteInt32(item.MinGuildLevel);
+            _worldPacket.WriteInt32(item.MinGuildRep);
+            _worldPacket.WriteUInt64(item.Cost);
+            foreach (uint achievementId in item.AchievementsRequired)
+                _worldPacket.WriteUInt32(achievementId);
+        }
+    }
+
+    public long Version;
+    public List<GuildRewardItem> RewardItems = [];
+}
+
+public sealed class GuildRewardItem
+{
+    public uint ItemID;
+    public uint Unk4;
+    public List<uint> AchievementsRequired = [];
+    public ulong RaceMask;
+    public int MinGuildLevel;
+    public int MinGuildRep;
+    public ulong Cost;
+}

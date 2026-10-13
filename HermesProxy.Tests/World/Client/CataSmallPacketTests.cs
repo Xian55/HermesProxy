@@ -357,6 +357,180 @@ public sealed class CataSmallPacketTests
             HermesProxy.World.Client.WorldClient.CataCurrencyId(1901)));
     }
 
+    // a received packet as a 4.3.4 server's own writer puts it together
+    private static byte[] Body(Action<WorldPacket> write)
+    {
+        using var packet = new WorldPacket();
+        packet.WriteUInt16(0);
+        write(packet);
+        return packet.GetDataSpan().ToArray();
+    }
+
+    private T DeliverBody<T>(Opcode opcode, Action<WorldPacket> write, Action<WorldPacket> handler) where T : ServerPacket
+    {
+        _harness.Deliver(opcode, Body(write), handler);
+        return Assert.IsType<T>(_harness.ClientWire.Sent[^1].Packet);
+    }
+
+    [Fact]
+    public void HandleGuildMemberDailyReset_IsPassedOnEmpty()
+    {
+        var reset = Deliver<GuildMemberDailyReset>(Opcode.SMSG_GUILD_MEMBER_DAILY_RESET, "",
+            _harness.Client.HandleGuildMemberDailyReset);
+
+        Assert.Empty(Written(reset));
+    }
+
+    [Fact]
+    public void HandleAllGuildAchievements_ReadsADateAndAnIdForEach()
+    {
+        // AchievementMgr<Guild>::SendAllAchievementData
+        long earnedAt = 1_700_000_040;
+        var achievements = DeliverBody<AllGuildAchievements>(Opcode.SMSG_ALL_GUILD_ACHIEVEMENTS, packet =>
+        {
+            packet.WriteBits(2, 23);
+            packet.FlushBits();
+            packet.WritePackedTime(earnedAt);
+            packet.WriteUInt32(4860);
+            packet.WritePackedTime(earnedAt);
+            packet.WriteUInt32(5014);
+        }, _harness.Client.HandleAllGuildAchievements);
+
+        Assert.Equal([4860u, 5014u], achievements.Earned.ConvertAll(e => e.Id));
+        Assert.Equal(Time.GetUnixTimeFromPackedTime(Time.GetPackedTimeFromUnixTime(earnedAt)), achievements.Earned[0].Date);
+        Assert.Equal(WowGuid128.Empty, achievements.Earned[0].Owner);
+        // a count, then id, date, an empty GUID (two mask bytes) and two realm addresses for each
+        Assert.Equal(4 + 2 * (4 + 4 + 2 + 4 + 4), Written(achievements).Length);
+    }
+
+    [Fact]
+    public void HandleGuildEventLogQueryResults_ReadsBothGuidsAroundTheNumbers()
+    {
+        // GuildEventLogQueryResults::Write, one entry: player 2 promoted player 0x21 to rank 3, 90 seconds ago
+        const ulong player = 2, other = 0x21;
+        var log = DeliverBody<GuildEventLogQueryResults>(Opcode.SMSG_GUILD_EVENT_LOG_QUERY_RESULTS, packet =>
+        {
+            packet.WriteBits(1, 23);
+            MaskedGuid.WriteMaskBits(packet, player, [2, 4]);
+            MaskedGuid.WriteMaskBits(packet, other, [7, 6]);
+            MaskedGuid.WriteMaskBits(packet, player, [3]);
+            MaskedGuid.WriteMaskBits(packet, other, [3, 5]);
+            MaskedGuid.WriteMaskBits(packet, player, [7, 5, 0]);
+            MaskedGuid.WriteMaskBits(packet, other, [4, 2, 0, 1]);
+            MaskedGuid.WriteMaskBits(packet, player, [1, 6]);
+            packet.FlushBits();
+            MaskedGuid.WriteBytes(packet, other, [3, 2, 5]);
+            packet.WriteUInt8(3);
+            MaskedGuid.WriteBytes(packet, other, [4]);
+            MaskedGuid.WriteBytes(packet, player, [0, 4]);
+            packet.WriteUInt32(90);
+            MaskedGuid.WriteBytes(packet, player, [7, 3]);
+            MaskedGuid.WriteBytes(packet, other, [0, 6, 7]);
+            MaskedGuid.WriteBytes(packet, player, [5]);
+            packet.WriteUInt8(3);
+            MaskedGuid.WriteBytes(packet, other, [1]);
+            MaskedGuid.WriteBytes(packet, player, [2, 6, 1]);
+        }, _harness.Client.HandleGuildEventLogQueryResults);
+
+        var entry = Assert.Single(log.Entries);
+        Assert.Equal(new WowGuid64(player).To128(_harness.Session.GameState), entry.PlayerGUID);
+        Assert.Equal(_other, entry.OtherGUID);
+        Assert.Equal(3, entry.TransactionType);
+        Assert.Equal(3, entry.RankID);
+        Assert.Equal(90u, entry.TransactionDate);
+    }
+
+    [Fact]
+    public void HandleGuildEventLogQueryResults_NoSecondPlayer_IsAnEmptyGuid()
+    {
+        const ulong player = 2;
+        var log = DeliverBody<GuildEventLogQueryResults>(Opcode.SMSG_GUILD_EVENT_LOG_QUERY_RESULTS, packet =>
+        {
+            packet.WriteBits(1, 23);
+            MaskedGuid.WriteMaskBits(packet, player, [2, 4]);
+            packet.WriteBits(0, 2);
+            MaskedGuid.WriteMaskBits(packet, player, [3]);
+            packet.WriteBits(0, 2);
+            MaskedGuid.WriteMaskBits(packet, player, [7, 5, 0]);
+            packet.WriteBits(0, 4);
+            MaskedGuid.WriteMaskBits(packet, player, [1, 6]);
+            packet.FlushBits();
+            packet.WriteUInt8(0);       // rank
+            MaskedGuid.WriteBytes(packet, player, [0, 4]);
+            packet.WriteUInt32(5);      // seconds ago
+            MaskedGuid.WriteBytes(packet, player, [7, 3, 5]);
+            packet.WriteUInt8(2);       // joined
+            MaskedGuid.WriteBytes(packet, player, [2, 6, 1]);
+        }, _harness.Client.HandleGuildEventLogQueryResults);
+
+        var entry = Assert.Single(log.Entries);
+        Assert.Equal(WowGuid128.Empty, entry.OtherGUID);
+        Assert.Equal(2, entry.TransactionType);
+        Assert.Equal(5u, entry.TransactionDate);
+    }
+
+    [Fact]
+    public void GuildEventLogQueryResults_Layout()
+    {
+        var log = new GuildEventLogQueryResults();
+        log.Entries.Add(new GuildEventEntry { TransactionType = 2, RankID = 4, TransactionDate = 90 });
+
+        // a count; two empty GUIDs of two mask bytes each, the kind, the rank, the age
+        Assert.Equal(Convert.FromHexString("01000000" + "0000" + "0000" + "02" + "04" + "5A000000"), Written(log));
+    }
+
+    [Fact]
+    public void HandleGuildRewardList_ReordersAnItemAndWidensItsRaceMask()
+    {
+        // GuildRewardList::Write: reputation, race mask, item, cost, an unused number, achievement; the time last
+        var rewards = DeliverBody<GuildRewardList>(Opcode.SMSG_GUILD_REWARD_LIST, packet =>
+        {
+            packet.WriteBits(2, 21);
+            packet.FlushBits();
+            packet.WriteUInt32(5); packet.WriteUInt32(0x2FF); packet.WriteUInt32(63125);
+            packet.WriteUInt64(3_000_000); packet.WriteUInt32(0); packet.WriteUInt32(4989);
+            packet.WriteUInt32(4); packet.WriteUInt32(0xFFFFFFFF); packet.WriteUInt32(65435);
+            packet.WriteUInt64(1_500_000); packet.WriteUInt32(0); packet.WriteUInt32(0);
+            packet.WriteInt32(1_700_000_000);
+        }, _harness.Client.HandleGuildRewardList);
+
+        Assert.Equal(1_700_000_000, rewards.Version);
+        Assert.Equal(2, rewards.RewardItems.Count);
+        Assert.Equal(63125u, rewards.RewardItems[0].ItemID);
+        Assert.Equal(5, rewards.RewardItems[0].MinGuildRep);
+        Assert.Equal(0x2FFul, rewards.RewardItems[0].RaceMask);
+        Assert.Equal(3_000_000ul, rewards.RewardItems[0].Cost);
+        Assert.Equal([4989u], rewards.RewardItems[0].AchievementsRequired);
+        Assert.Equal(0xFFFFFFFFul, rewards.RewardItems[1].RaceMask);
+        Assert.Empty(rewards.RewardItems[1].AchievementsRequired);
+    }
+
+    [Fact]
+    public void GuildRewardList_Layout()
+    {
+        var rewards = new GuildRewardList { Version = 7 };
+        rewards.RewardItems.Add(new GuildRewardItem
+        {
+            ItemID = 63125, MinGuildRep = 5, RaceMask = 0x2FF, Cost = 3_000_000, AchievementsRequired = { 4989 },
+        });
+
+        Assert.Equal(Convert.FromHexString(
+            "0700000000000000" + Ints(1)                    // the time of the list, how many
+            + Ints(63125, 0, 1) + "FF02000000000000"         // item, unused, achievements, race mask
+            + Ints(0, 5) + "C0C62D0000000000"                // guild level, reputation, cost
+            + Ints(4989)), Written(rewards));
+    }
+
+    [Fact]
+    public void RequestGuildRewardsListCodec_ReadsSixtyFourBits()
+    {
+        var reader = new SpanPacketReader(Convert.FromHexString("00F1536500000000"));
+
+        RequestGuildRewardsListCodec.Read(ref reader, out var request);
+
+        Assert.Equal(0x6553F100, request.CurrentVersion);
+    }
+
     private static string Ints(params int[] values)
         => string.Concat(Array.ConvertAll(values, v => Convert.ToHexString(BitConverter.GetBytes(v))));
 }

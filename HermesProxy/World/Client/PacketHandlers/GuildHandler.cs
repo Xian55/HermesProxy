@@ -1107,4 +1107,125 @@ public partial class WorldClient
             challenges.CurrentCount[i] = packet.ReadInt32();
         SendPacketToClient(challenges);
     }
+    /// <summary>Empty on both sides.</summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_MEMBER_DAILY_RESET)]
+    internal void HandleGuildMemberDailyReset(WorldPacket packet)
+    {
+        SendPacketToClient(new GuildMemberDailyReset());
+    }
+
+    // Counts past these are a misread, not a guild.
+    private const int MaxGuildAchievements = 4096;
+    private const int MaxGuildEventLogEntries = 1024;
+    private const int MaxGuildRewards = 1024;
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>AchievementMgr&lt;Guild&gt;::SendAllAchievementData</c>: 23 bits of count,
+    /// then a packed date and an id for each. The owner and the realm of the record are left
+    /// empty, as TrinityCore leaves them for a guild's achievements on the later clients.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_ALL_GUILD_ACHIEVEMENTS)]
+    internal void HandleAllGuildAchievements(WorldPacket packet)
+    {
+        int count = (int)packet.ReadBits<uint>(23);
+        if (count > MaxGuildAchievements)
+            return;
+
+        AllGuildAchievements achievements = new();
+        for (int i = 0; i < count; i++)
+        {
+            EarnedAchievement earned = new();
+            earned.Date = packet.ReadPackedTime();
+            earned.Id = packet.ReadUInt32();
+            earned.Owner = WowGuid128.Empty;
+            achievements.Earned.Add(earned);
+        }
+        SendPacketToClient(achievements);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>GuildEventLogQueryResults::Write</c>: 23 bits of count and the masks
+    /// of two GUIDs for each entry, then for each entry the GUID bytes with the rank, the age in
+    /// seconds and the kind of event among them.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_EVENT_LOG_QUERY_RESULTS)]
+    internal void HandleGuildEventLogQueryResults(WorldPacket packet)
+    {
+        int count = (int)packet.ReadBits<uint>(23);
+        if (count > MaxGuildEventLogEntries)
+            return;
+
+        bool[] masks = new bool[count * 16];
+        for (int i = 0; i < count; i++)
+        {
+            Span<bool> player = masks.AsSpan(i * 16, 8);
+            Span<bool> other = masks.AsSpan(i * 16 + 8, 8);
+            MaskedGuid.ReadMaskBits(packet, player, [2, 4]);
+            MaskedGuid.ReadMaskBits(packet, other, [7, 6]);
+            MaskedGuid.ReadMaskBits(packet, player, [3]);
+            MaskedGuid.ReadMaskBits(packet, other, [3, 5]);
+            MaskedGuid.ReadMaskBits(packet, player, [7, 5, 0]);
+            MaskedGuid.ReadMaskBits(packet, other, [4, 2, 0, 1]);
+            MaskedGuid.ReadMaskBits(packet, player, [1, 6]);
+        }
+
+        GuildEventLogQueryResults log = new();
+        Span<byte> playerBytes = stackalloc byte[8];
+        Span<byte> otherBytes = stackalloc byte[8];
+        for (int i = 0; i < count; i++)
+        {
+            ReadOnlySpan<bool> player = masks.AsSpan(i * 16, 8);
+            ReadOnlySpan<bool> other = masks.AsSpan(i * 16 + 8, 8);
+            playerBytes.Clear();
+            otherBytes.Clear();
+
+            GuildEventEntry entry = new();
+            MaskedGuid.ReadBytes(packet, other, otherBytes, [3, 2, 5]);
+            entry.RankID = packet.ReadUInt8();
+            MaskedGuid.ReadBytes(packet, other, otherBytes, [4]);
+            MaskedGuid.ReadBytes(packet, player, playerBytes, [0, 4]);
+            entry.TransactionDate = packet.ReadUInt32();
+            MaskedGuid.ReadBytes(packet, player, playerBytes, [7, 3]);
+            MaskedGuid.ReadBytes(packet, other, otherBytes, [0, 6, 7]);
+            MaskedGuid.ReadBytes(packet, player, playerBytes, [5]);
+            entry.TransactionType = packet.ReadUInt8();
+            MaskedGuid.ReadBytes(packet, other, otherBytes, [1]);
+            MaskedGuid.ReadBytes(packet, player, playerBytes, [2, 6, 1]);
+
+            entry.PlayerGUID = new WowGuid64(MaskedGuid.ToUInt64(playerBytes)).To128(GetSession().GameState);
+            entry.OtherGUID = new WowGuid64(MaskedGuid.ToUInt64(otherBytes)).To128(GetSession().GameState);
+            log.Entries.Add(entry);
+        }
+        SendPacketToClient(log);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>GuildRewardList::Write</c>: 21 bits of count, six numbers an item, the
+    /// time of the list last. A 4.3.4 item asks for one achievement or none and for no guild
+    /// level; its race mask is 32 bits wide.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_REWARD_LIST)]
+    internal void HandleGuildRewardList(WorldPacket packet)
+    {
+        int count = (int)packet.ReadBits<uint>(21);
+        if (count > MaxGuildRewards)
+            return;
+
+        GuildRewardList rewards = new();
+        for (int i = 0; i < count; i++)
+        {
+            GuildRewardItem item = new();
+            item.MinGuildRep = packet.ReadInt32();
+            item.RaceMask = packet.ReadUInt32();
+            item.ItemID = packet.ReadUInt32();
+            item.Cost = packet.ReadUInt64();
+            item.Unk4 = packet.ReadUInt32();
+            uint achievementId = packet.ReadUInt32();
+            if (achievementId != 0)
+                item.AchievementsRequired.Add(achievementId);
+            rewards.RewardItems.Add(item);
+        }
+        rewards.Version = packet.ReadInt32();
+        SendPacketToClient(rewards);
+    }
 }

@@ -421,3 +421,13 @@ public static class GuildSetAchievementTrackingCodec
         packet = new GuildSetAchievementTracking(achievementIds);
     }
 }
+
+public static class RequestGuildRewardsListCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out RequestGuildRewardsList packet)
+    {
+        long currentVersion = r.ReadInt64();
+        packet = new RequestGuildRewardsList(currentVersion);
+    }
+}
