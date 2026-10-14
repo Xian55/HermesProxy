@@ -169,6 +169,21 @@ public sealed class CataSmallPacketTests
         Assert.Equal(1000u, skip.TimeSkipped);
     }
 
+    [Theory]
+    [InlineData("50 00 03", true)]     // Levitate on the player (GUID 2), captured
+    [InlineData("40 00 03", false)]    // and off
+    public void HandleSetPlayHoverAnim_TheFlagAmongTheMaskBits(string hex, bool play)
+    {
+        var anim = Deliver<SetPlayHoverAnim>(Opcode.SMSG_SET_PLAY_HOVER_ANIM, hex, _harness.Client.HandleSetPlayHoverAnim);
+
+        Assert.Equal(_harness.Session.GameState.CurrentPlayerGuid, anim.UnitGUID);
+        Assert.Equal(play, anim.PlayHoverAnim);
+    }
+
+    [Fact]
+    public void SetPlayHoverAnim_Layout()
+        => Assert.Equal([0x00, 0x00, 0x80], Written(new SetPlayHoverAnim { PlayHoverAnim = true }));
+
     [Fact]
     public void MoveSkipTime_Layout()
     {

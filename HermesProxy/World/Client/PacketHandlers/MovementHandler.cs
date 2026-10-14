@@ -648,6 +648,26 @@ public partial class WorldClient
         SendPacketToClient(skip);
     }
 
+    /// <summary>
+    /// TrinityCore 4.3.4 sends the unit's GUID masked, the flag among the mask bits. Only a
+    /// 4.x server sends it.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_SET_PLAY_HOVER_ANIM)]
+    internal void HandleSetPlayHoverAnim(WorldPacket packet)
+    {
+        Span<bool> mask = stackalloc bool[8];
+        Span<byte> guidBytes = stackalloc byte[8];
+        MaskedGuid.ReadMaskBits(packet, mask, [4, 0, 1]);
+        bool play = packet.HasBit();
+        MaskedGuid.ReadMaskBits(packet, mask, [3, 7, 5, 2, 6]);
+        MaskedGuid.ReadBytes(packet, mask, guidBytes, [3, 2, 1, 7, 0, 5, 4, 6]);
+
+        SetPlayHoverAnim anim = new SetPlayHoverAnim();
+        anim.UnitGUID = new WowGuid64(MaskedGuid.ToUInt64(guidBytes)).To128(GetSession().GameState);
+        anim.PlayHoverAnim = play;
+        SendPacketToClient(anim);
+    }
+
     [HandlesSmsg(Opcode.SMSG_NEW_WORLD)]
     internal void HandleNewWorld(WorldPacket packet)
     {

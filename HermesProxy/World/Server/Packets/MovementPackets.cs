@@ -1012,3 +1012,22 @@ public sealed class MoveSkipTime : ServerPacket
     public WowGuid128 MoverGUID;
     public uint TimeSkipped;
 }
+
+/// <summary>
+/// A unit's hover animation on or off, as a hover aura comes and goes. Only a 4.x server sends
+/// one to pass on.
+/// </summary>
+public sealed class SetPlayHoverAnim : ServerPacket
+{
+    public SetPlayHoverAnim() : base(Opcode.SMSG_SET_PLAY_HOVER_ANIM, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(UnitGUID);
+        _worldPacket.WriteBit(PlayHoverAnim);
+        _worldPacket.FlushBits();
+    }
+
+    public WowGuid128 UnitGUID;
+    public bool PlayHoverAnim;
+}
