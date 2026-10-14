@@ -702,6 +702,14 @@ public sealed class GameSessionData
     public void ResetLfgTicket() => _lfgTicket = null;
 
     /// <summary>
+    /// A 4.3.4 server issues the queue's ticket itself and sends it with each queue packet; it is
+    /// kept so the requests that name the queue (leaving it) can carry it back.
+    /// </summary>
+    public void SetLfgTicket(RideTicket ticket) => _lfgTicket = ticket;
+
+    public RideTicket? LfgTicket => _lfgTicket;
+
+    /// <summary>
     /// Records the type byte carried by a full LFG slot so bare dungeon IDs can be widened later.
     /// </summary>
     public void RememberLfgSlot(uint slot)

@@ -1482,6 +1482,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleLFGUpdatePlayer(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleLFGUpdateStatusCata_SMSG_LFG_UPDATE_STATUS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleLFGUpdateStatusCata(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleLoadCUFProfiles_SMSG_LOAD_CUF_PROFILES(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleLoadCUFProfiles(packet);
@@ -3030,6 +3035,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_LFG_TELEPORT_DENIED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleLFGTeleportDenied_SMSG_LFG_TELEPORT_DENIED;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_LFG_UPDATE_PARTY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleLFGUpdateParty_SMSG_LFG_UPDATE_PARTY;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_LFG_UPDATE_PLAYER] = &Thunk_HermesProxy_World_Client_WorldClient_HandleLFGUpdatePlayer_SMSG_LFG_UPDATE_PLAYER;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_LFG_UPDATE_STATUS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleLFGUpdateStatusCata_SMSG_LFG_UPDATE_STATUS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_LOAD_CUF_PROFILES] = &Thunk_HermesProxy_World_Client_WorldClient_HandleLoadCUFProfiles_SMSG_LOAD_CUF_PROFILES;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_LOAD_EQUIPMENT_SET] = &Thunk_HermesProxy_World_Client_WorldClient_HandleLoadEquipmentSet_SMSG_LOAD_EQUIPMENT_SET;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_LOGIN_SET_TIME_SPEED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleLoginSetTimeSpeed_SMSG_LOGIN_SET_TIME_SPEED;
@@ -3568,6 +3574,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_LFG_TELEPORT_DENIED,
             global::HermesProxy.World.Enums.Opcode.SMSG_LFG_UPDATE_PARTY,
             global::HermesProxy.World.Enums.Opcode.SMSG_LFG_UPDATE_PLAYER,
+            global::HermesProxy.World.Enums.Opcode.SMSG_LFG_UPDATE_STATUS,
             global::HermesProxy.World.Enums.Opcode.SMSG_LOAD_CUF_PROFILES,
             global::HermesProxy.World.Enums.Opcode.SMSG_LOAD_EQUIPMENT_SET,
             global::HermesProxy.World.Enums.Opcode.SMSG_LOGIN_SET_TIME_SPEED,

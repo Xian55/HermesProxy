@@ -61,6 +61,25 @@ public static class LfgUpdateTypes
     };
 
     /// <summary>
+    /// The same for a 4.3.4 server (TrinityCore 4.3.4 LFG.h). Its numbers agree with the modern
+    /// ones up to 13; the modern list has SUSPENDED_QUEUE at 14, so the rest are one higher there,
+    /// and three more further on.
+    /// </summary>
+    public static byte CataToModern(byte cataUpdateType) => cataUpdateType switch
+    {
+        <= 13 and not 2 and not 3 => cataUpdateType,   // 2 and 3: the raid browser, none modern
+        14 => ModernProposalBegin,
+        15 => ModernUpdateStatus,
+        16 => ModernGroupMemberOffline,
+        17 => ModernGroupDisband,
+        24 => 25,                       // JOIN_QUEUE_INITIAL
+        25 => 26,                       // DUNGEON_FINISHED
+        43 => 46,                       // PARTY_ROLE_NOT_AVAILABLE
+        45 => 48,                       // JOIN_LFG_OBJECT_FAILED
+        _ => ModernDefault,
+    };
+
+    /// <summary>
     /// True when the update type means the player is still attached to an LFG object at all.
     /// Mirrors TC 3.4.3's <c>LfgJoined = updateType != LFG_UPDATETYPE_REMOVED_FROM_QUEUE</c>,
     /// evaluated against the already-translated modern value.

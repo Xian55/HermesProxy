@@ -83,6 +83,12 @@ public static class LfgSystem
             return;
         }
 
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            ctx.SendPacketToServer(BuildCataJoin(roles, packet.Slots));
+            return;
+        }
+
         WorldPacket legacy = new WorldPacket(Opcode.CMSG_LFG_JOIN);
         legacy.WriteUInt32(roles);
         legacy.WriteUInt8(0); // NoPartialClear
@@ -96,6 +102,45 @@ public static class LfgSystem
         legacy.WriteUInt8(0);
         legacy.WriteCString(string.Empty);
         ctx.SendPacketToServer(legacy);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>LFGJoin::Read</c>: the roles, three "needs" the client always sends
+    /// as 0, then the lengths of the comment and the dungeon list as bits, the comment and the
+    /// dungeons.
+    /// </summary>
+    internal static WorldPacket BuildCataJoin(byte roles, uint[] slots)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_LFG_JOIN);
+        WriteCataJoin(packet, roles, slots);
+        return packet;
+    }
+
+    internal static void WriteCataJoin(WorldPacket packet, byte roles, uint[] slots)
+    {
+        packet.WriteUInt32(roles);
+        for (int i = 0; i < 3; i++)
+            packet.WriteUInt32(0);
+        packet.WriteBits(0, 9);
+        packet.WriteBits(slots.Length, 24);
+        packet.FlushBits();
+        foreach (uint slot in slots)
+            packet.WriteUInt32(slot);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>LFGLeave::Read</c>: a number it does not use, then the queue's ticket
+    /// (time, type, id and the masked GUID of whoever queued). The ticket is the server's own,
+    /// as it came with the last queue packet.
+    /// </summary>
+    internal static void WriteCataLeave(WorldPacket packet, RideTicket ticket)
+    {
+        ulong requester = ticket.RequesterGuid.To64().Low;
+        packet.WriteUInt32(0);
+        packet.WriteUInt32((uint)ticket.Time);
+        packet.WriteUInt32((uint)ticket.Type);
+        packet.WriteUInt32(ticket.Id);
+        MaskedGuid.Write(packet, requester, [4, 5, 0, 6, 2, 7, 1, 3], [7, 4, 3, 2, 6, 0, 1, 5]);
     }
 
     private static void SendDFJoinFailure(in SessionContext ctx, byte modernResult)
@@ -130,6 +175,11 @@ public static class LfgSystem
         // asking for it. Legacy LFGMgr::LeaveLfg has no LFG_STATE_DUNGEON case at all, so
         // leaving from inside is a server-side no-op — which is what a native client sees too.
         WorldPacket leave = new WorldPacket(Opcode.CMSG_LFG_LEAVE);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            var state = ctx.GetSession().GameState;
+            WriteCataLeave(leave, state.LfgTicket ?? state.GetOrCreateLfgTicket(state.CurrentPlayerGuid, 0));
+        }
         ctx.SendPacketToServer(leave);
     }
 

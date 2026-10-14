@@ -5,6 +5,7 @@ using HermesProxy.World;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
+using HermesProxy.World.Server.Systems;
 using Xunit;
 
 namespace HermesProxy.Tests.World.Client;
@@ -143,6 +144,106 @@ public sealed class CataLfgTests
         Assert.Equal(20u, locked.SubReason2);
         Assert.Equal(1 + ClientOnlyDungeons, player.Locks.Count);
     }
+
+    private T DeliverHex<T>(string hex, Action<WorldPacket> handler) where T : ServerPacket
+    {
+        _harness.Deliver(Opcode.SMSG_LFG_UPDATE_STATUS, [0, 0, .. Convert.FromHexString(hex.Replace(" ", ""))], handler);
+        return Assert.IsType<T>(_harness.ClientWire.Sent[^1].Packet);
+    }
+
+    // a queue alone for Random Classic Dungeon (258) as TrinityCore 4.3.4 sent it: ticket 213 of
+    // player 2, type 3, time 0x6ACF0F36
+    private const uint QueuedSlot = 0x06000102;
+
+    [Fact]
+    public void HandleLFGJoinResultCata_AJoinAsTheServerSentIt()
+    {
+        var result = DeliverHex<DFJoinResult>("03000000 00 D5000000 00 360FCF6A 10000000 03", _harness.Client.HandleLFGJoinResultCata);
+
+        Assert.Equal(LfgJoinResults.ModernOk, result.Result);
+        Assert.Equal(213u, result.Ticket.Id);
+        Assert.Equal(0x6ACF0F36L, result.Ticket.Time);
+        Assert.Equal((RideType)3, result.Ticket.Type);
+        Assert.Equal(_harness.Session.GameState.CurrentPlayerGuid, result.Ticket.RequesterGuid);
+        Assert.Empty(result.BlackList);
+        Assert.Same(result.Ticket, _harness.Session.GameState.LfgTicket);
+    }
+
+    [Fact]
+    public void HandleLFGUpdateStatusCata_TheThreeUpdatesOfAQueue()
+    {
+        // joined, then queued, then (after leaving) removed
+        var joined = DeliverHex<DFUpdateStatus>("00000050 00C0 18 D5000000 360FCF6A 000000 03 03000000 02010006", _harness.Client.HandleLFGUpdateStatusCata);
+        Assert.Equal<uint>([QueuedSlot], joined.Slots);
+        Assert.True(joined.Joined);
+        Assert.True(joined.LfgJoined);
+        Assert.False(joined.Queued);
+        Assert.Equal((byte)25, joined.Reason);                    // JOIN_QUEUE_INITIAL, 24 on 4.3.4
+        Assert.Equal(213u, joined.Ticket.Id);
+
+        var queued = DeliverHex<DFUpdateStatus>("00000050 00C8 0D D5000000 360FCF6A 000000 03 03000000 02010006", _harness.Client.HandleLFGUpdateStatusCata);
+        Assert.True(queued.Queued);
+        Assert.Equal(LfgUpdateTypes.ModernAddedToQueue, queued.Reason);
+        Assert.Equal<uint>([QueuedSlot], _harness.Session.GameState.LfgQueuedSlots);
+
+        var removed = DeliverHex<DFUpdateStatus>("00000000 0040 08 D5000000 360FCF6A 000000 03 03000000", _harness.Client.HandleLFGUpdateStatusCata);
+        Assert.Empty(removed.Slots);
+        Assert.False(removed.LfgJoined);
+        Assert.False(removed.Queued);
+        Assert.Equal(LfgUpdateTypes.ModernRemovedFromQueue, removed.Reason);
+        Assert.Empty(_harness.Session.GameState.LfgQueuedSlots);
+    }
+
+    [Fact]
+    public void HandleLFGQueueStatusCata_AStatusAsTheServerSentIt()
+    {
+        _harness.Session.GameState.LfgQueuedSlots = [QueuedSlot];
+
+        // the server names the dungeon the random expanded to (1); the client is told the random
+        var status = DeliverHex<DFQueueStatus>(
+            "40 03 01FFFFFFFF 01FFFFFFFF 02FFFFFFFF FFFFFFFF 360FCF6A 01000001 08000000 D5000000 FFFFFFFF 03000000",
+            _harness.Client.HandleLFGQueueStatusCata);
+
+        Assert.Equal<byte>([1, 1, 2], status.LastNeeded);
+        Assert.Equal(uint.MaxValue, status.AvgWaitTime);
+        Assert.Equal(uint.MaxValue, status.AvgWaitTimeByRole[2]);
+        Assert.Equal(8u, status.QueuedTime);
+        Assert.Equal(QueuedSlot, status.Slot);
+        Assert.Equal(213u, status.Ticket.Id);
+    }
+
+    [Fact]
+    public void WriteCataJoinAndLeave_AsTheyWentToTheServer()
+    {
+        using var join = new WorldPacket();
+        LfgSystem.WriteCataJoin(join, 0x08, [QueuedSlot]);
+        Assert.Equal(Convert.FromHexString("08000000 000000000000000000000000 0000000080 02010006".Replace(" ", "")), join.GetDataSpan().ToArray());
+
+        using var leave = new WorldPacket();
+        LfgSystem.WriteCataLeave(leave, new RideTicket { RequesterGuid = _harness.Session.GameState.CurrentPlayerGuid, Id = 213, Type = (RideType)3, Time = 0x6ACF0F36 });
+        Assert.Equal(Convert.FromHexString("00000000 360FCF6A 03000000 D5000000 20 03".Replace(" ", "")), leave.GetDataSpan().ToArray());
+    }
+
+    [Theory]
+    [InlineData(0x00, LfgJoinResults.ModernOk)]
+    [InlineData(0x1B, LfgJoinResults.ModernRoleCheckFailed)]
+    [InlineData(0x1C, LfgJoinResults.ModernGroupFull)]
+    [InlineData(0x24, LfgJoinResults.ModernInvalidSlot)]
+    [InlineData(0x25, LfgJoinResults.ModernDeserterPlayer)]
+    [InlineData(0x2B, LfgJoinResults.ModernRoleCheckFailed)]
+    [InlineData(0x05, LfgJoinResults.ModernNoLfgObject)]
+    public void LfgJoinResults_CataToModern(byte cata, byte modern) => Assert.Equal(modern, LfgJoinResults.CataToModern(cata));
+
+    [Theory]
+    [InlineData(6, LfgUpdateTypes.ModernJoinQueue)]
+    [InlineData(8, LfgUpdateTypes.ModernRemovedFromQueue)]
+    [InlineData(13, LfgUpdateTypes.ModernAddedToQueue)]
+    [InlineData(14, LfgUpdateTypes.ModernProposalBegin)]
+    [InlineData(15, LfgUpdateTypes.ModernUpdateStatus)]
+    [InlineData(17, LfgUpdateTypes.ModernGroupDisband)]
+    [InlineData(24, 25)]
+    [InlineData(2, LfgUpdateTypes.ModernDefault)]
+    public void LfgUpdateTypes_CataToModern(byte cata, byte modern) => Assert.Equal(modern, LfgUpdateTypes.CataToModern(cata));
 
     [Fact]
     public void GetCataHideSlots_EveryClientOnlyDungeon_TheRandomsAsRandoms()

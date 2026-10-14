@@ -52,4 +52,17 @@ public static class LfgJoinResults
         17 => ModernCantUseDungeons,      // LFG_JOIN_USING_BG_SYSTEM
         _ => ModernNoLfgObject,
     };
+
+    /// <summary>
+    /// The same for a 4.3.4 server (TrinityCore 4.3.4 LFGMgr.h): its results from "group full"
+    /// (0x1C) to "role check failed" (0x2B) are three below the modern ones; its 0x1B is the
+    /// failed role check, as 3.3.5a's 1 is.
+    /// </summary>
+    public static byte CataToModern(byte cataResult) => cataResult switch
+    {
+        0 => ModernOk,
+        0x1B => ModernRoleCheckFailed,
+        >= 0x1C and <= 0x2B => (byte)(cataResult + 3),
+        _ => ModernNoLfgObject,
+    };
 }
