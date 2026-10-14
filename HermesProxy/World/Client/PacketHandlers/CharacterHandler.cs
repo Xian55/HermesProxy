@@ -1092,6 +1092,32 @@ public partial class WorldClient
         }
     }
 
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>InspectHonorStats::Write</c>, the answer to CMSG_REQUEST_HONOR_STATS: the
+    /// kills of today, yesterday and all time around a masked GUID. A 4.3.4 server keeps no honor
+    /// of the day and leaves the rank 0; the client is given the kills.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_INSPECT_HONOR_STATS)]
+    internal void HandleInspectHonorStatsCata(WorldPacket packet)
+    {
+        Span<bool> mask = stackalloc bool[8];
+        Span<byte> guidBytes = stackalloc byte[8];
+        MaskedGuid.ReadMaskBits(packet, mask, [4, 3, 6, 2, 5, 0, 7, 1]);
+        packet.ReadUInt8();     // lifetime highest rank
+        ushort yesterdayHonorableKills = packet.ReadUInt16();
+        ushort todayHonorableKills = packet.ReadUInt16();
+        MaskedGuid.ReadBytes(packet, mask, guidBytes, [2, 0, 6, 3, 4, 1, 5]);
+        uint lifetimeHonorableKills = packet.ReadUInt32();
+        MaskedGuid.ReadBytes(packet, mask, guidBytes, [7]);
+
+        InspectHonorStatsResultWotLKClassic honor = new InspectHonorStatsResultWotLKClassic();
+        honor.PlayerGUID = new WowGuid64(MaskedGuid.ToUInt64(guidBytes)).To128(GetSession().GameState);
+        honor.TodayHK = todayHonorableKills;
+        honor.YesterdayHK = yesterdayHonorableKills;
+        honor.LifeTimeHK = lifetimeHonorableKills;
+        SendPacketToClient(honor);
+    }
+
     [HandlesSmsg(Opcode.MSG_INSPECT_ARENA_TEAMS)]
     internal void HandleInspectArenaTeams(WorldPacket packet)
     {

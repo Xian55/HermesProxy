@@ -99,6 +99,27 @@ public sealed class LegacyMovementCataTests
         Assert.Equal(0, read.GetRemainingSpan().Length);
     }
 
+    [Fact]
+    public void MoveUpdateTeleport_AsATrinityCore434ServerSentIt()
+    {
+        // What the players around saw of player 3 sent home to (-9420, 60, 58.91) by GM command.
+        // TrinityCore 4.3.4 writes this one by hand (MoveUpdateTeleport::Write), not from its
+        // sequence table: the position first, then the bits, no orientation, a time, GUID byte 0.
+        byte[] body = Convert.FromHexString("55A66B42" + "00007042" + "003013C6" + "A1042008" + "A8FEA587" + "02");
+        byte[] framed = new byte[sizeof(ushort) + body.Length];
+        body.CopyTo(framed, sizeof(ushort));
+        using var read = new WorldPacket(framed);
+
+        Assert.True(LegacyMovementCata.TryRead(read, Opcode.SMSG_MOVE_UPDATE_TELEPORT, null!, out ulong mover, out MovementInfo info, out _, out _));
+
+        Assert.Equal(3ul, mover);
+        Assert.Equal(-9420f, info.Position.X);
+        Assert.Equal(60f, info.Position.Y);
+        Assert.Equal(58.9124f, info.Position.Z, 3);
+        Assert.Equal(0x87A5FEA8u, info.MoveTime);
+        Assert.Equal(0, read.GetRemainingSpan().Length);
+    }
+
     private sealed record Read(ulong Guid, uint Flags, uint Time, Vector3 Position, float Orientation,
         uint FallTime, float VerticalSpeed, float HorizontalSpeed);
 

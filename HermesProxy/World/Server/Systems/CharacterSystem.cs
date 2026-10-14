@@ -432,6 +432,16 @@ public static class CharacterSystem
     [HandlesCmsg(Opcode.CMSG_REQUEST_HONOR_STATS)]
     public static void HandleInspectHonorStats(in Inspect inspect, in SessionContext ctx)
     {
+        // 4.3.4 has a request of its own, the GUID masked (TrinityCore 4.3.4 RequestHonorStats::Read);
+        // MSG_INSPECT_HONOR_STATS is not in its table.
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            WorldPacket cata = new WorldPacket(Opcode.CMSG_REQUEST_HONOR_STATS);
+            MaskedGuid.Write(cata, inspect.Target.To64().Low, [1, 5, 7, 3, 2, 4, 0, 6], [4, 7, 0, 5, 1, 6, 2, 3]);
+            ctx.SendPacketToServer(cata);
+            return;
+        }
+
         WorldPacket packet = new WorldPacket(Opcode.MSG_INSPECT_HONOR_STATS);
         packet.WriteGuid(inspect.Target.To64());
         ctx.SendPacketToServer(packet);
@@ -442,6 +452,17 @@ public static class CharacterSystem
     {
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
+            // The 4.4.2 client counts the inspect window's honor numbers as there only once this
+            // request is answered too (HasInspectHonorData() stays false until then). A 4.3.4
+            // server answers it once for each arena team the player is in, and not at all for a
+            // player in none. So an answer without teams goes first; the server's own, if any,
+            // come after it.
+            if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            {
+                InspectPvP empty = new InspectPvP();
+                empty.PlayerGUID = inspect.Target;
+                ctx.SendPacket(empty);
+            }
             WorldPacket packet = new WorldPacket(Opcode.MSG_INSPECT_ARENA_TEAMS);
             packet.WriteGuid(inspect.Target.To64());
             ctx.SendPacketToServer(packet);

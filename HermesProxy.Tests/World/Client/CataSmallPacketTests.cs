@@ -531,6 +531,41 @@ public sealed class CataSmallPacketTests
         Assert.Equal(0x6553F100, request.CurrentVersion);
     }
 
+    [Fact]
+    public void HandleInspectHonorStatsCata_AnAnswerAsTheServerSentIt()
+    {
+        // TrinityCore 4.3.4 InspectHonorStats::Write for player 3, who has killed nobody
+        var honor = Deliver<InspectHonorStatsResultWotLKClassic>(Opcode.SMSG_INSPECT_HONOR_STATS,
+            "04 00 0000 0000 02 00000000", _harness.Client.HandleInspectHonorStatsCata);
+
+        Assert.Equal(new WowGuid64(3).To128(_harness.Session.GameState), honor.PlayerGUID);
+        Assert.Equal((ushort)0, honor.TodayHK);
+        Assert.Equal(0u, honor.LifeTimeHK);
+    }
+
+    [Fact]
+    public void HandleInspectHonorStatsCata_KeepsTheKills()
+    {
+        // the GUID's bytes among the numbers, today's kills after yesterday's
+        const ulong player = 0x21;
+        var honor = DeliverBody<InspectHonorStatsResultWotLKClassic>(Opcode.SMSG_INSPECT_HONOR_STATS, packet =>
+        {
+            MaskedGuid.WriteMaskBits(packet, player, [4, 3, 6, 2, 5, 0, 7, 1]);
+            packet.FlushBits();
+            packet.WriteUInt8(0);
+            packet.WriteUInt16(7);      // yesterday
+            packet.WriteUInt16(2);      // today
+            MaskedGuid.WriteBytes(packet, player, [2, 0, 6, 3, 4, 1, 5]);
+            packet.WriteUInt32(1234);   // all time
+            MaskedGuid.WriteBytes(packet, player, [7]);
+        }, _harness.Client.HandleInspectHonorStatsCata);
+
+        Assert.Equal(_other, honor.PlayerGUID);
+        Assert.Equal((ushort)2, honor.TodayHK);
+        Assert.Equal((ushort)7, honor.YesterdayHK);
+        Assert.Equal(1234u, honor.LifeTimeHK);
+    }
+
     [Theory]
     [InlineData(1, Opcode.SMSG_TITLE_EARNED)]
     [InlineData(0, Opcode.SMSG_TITLE_LOST)]

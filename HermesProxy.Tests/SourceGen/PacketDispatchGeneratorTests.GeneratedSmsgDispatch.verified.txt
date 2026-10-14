@@ -1317,6 +1317,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleInitWorldStates(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleInspectHonorStatsCata_SMSG_INSPECT_HONOR_STATS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleInspectHonorStatsCata(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleInspectResult_SMSG_INSPECT_RESULT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleInspectResult(packet);
@@ -1883,6 +1888,11 @@ internal static unsafe class GeneratedSmsgDispatch
     }
 
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCata_SMSG_MOVE_UPDATE_SWIM_SPEED(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleMoveUpdateCata(packet);
+    }
+
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCata_SMSG_MOVE_UPDATE_TELEPORT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleMoveUpdateCata(packet);
     }
@@ -2983,6 +2993,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_IGNORE_LIST] = &Thunk_HermesProxy_World_Client_WorldClient_HandleIgnoreList_SMSG_IGNORE_LIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INITIALIZE_FACTIONS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInitializeFactions_SMSG_INITIALIZE_FACTIONS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INIT_WORLD_STATES] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInitWorldStates_SMSG_INIT_WORLD_STATES;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_HONOR_STATS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInspectHonorStatsCata_SMSG_INSPECT_HONOR_STATS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInspectResult_SMSG_INSPECT_RESULT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_TALENT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInspectResult_SMSG_INSPECT_TALENT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INSTANCE_DIFFICULTY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInstanceDifficulty_SMSG_INSTANCE_DIFFICULTY;
@@ -3101,6 +3112,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_RUN_SPEED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCata_SMSG_MOVE_UPDATE_RUN_SPEED;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_SWIM_BACK_SPEED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCata_SMSG_MOVE_UPDATE_SWIM_BACK_SPEED;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_SWIM_SPEED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCata_SMSG_MOVE_UPDATE_SWIM_SPEED;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_TELEPORT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCata_SMSG_MOVE_UPDATE_TELEPORT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_WALK_SPEED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCata_SMSG_MOVE_UPDATE_WALK_SPEED;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_NEW_TAXI_PATH] = &Thunk_HermesProxy_World_Client_WorldClient_HandleNewTaxiPath_SMSG_NEW_TAXI_PATH;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_NEW_WORLD] = &Thunk_HermesProxy_World_Client_WorldClient_HandleNewWorld_SMSG_NEW_WORLD;
@@ -3524,6 +3536,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_IGNORE_LIST,
             global::HermesProxy.World.Enums.Opcode.SMSG_INITIALIZE_FACTIONS,
             global::HermesProxy.World.Enums.Opcode.SMSG_INIT_WORLD_STATES,
+            global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_HONOR_STATS,
             global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_RESULT,
             global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_TALENT,
             global::HermesProxy.World.Enums.Opcode.SMSG_INSTANCE_DIFFICULTY,
@@ -3637,6 +3650,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_RUN_SPEED,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_SWIM_BACK_SPEED,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_SWIM_SPEED,
+            global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_TELEPORT,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_WALK_SPEED,
             global::HermesProxy.World.Enums.Opcode.SMSG_NEW_TAXI_PATH,
             global::HermesProxy.World.Enums.Opcode.SMSG_NEW_WORLD,

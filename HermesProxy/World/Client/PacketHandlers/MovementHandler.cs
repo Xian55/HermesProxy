@@ -275,9 +275,12 @@ public partial class WorldClient
     /// <summary>
     /// Other units' movement on a 4.3.4 server: SMSG_MOVE_UPDATE and its knockback and speed
     /// variants replace 3.3.5a's relayed MSG_MOVE_*, already under their modern names, each a
-    /// movement sequence (with the new speed as the extra element of the speed ones).
+    /// movement sequence (with the new speed as the extra element of the speed ones). A unit
+    /// that teleported in sight comes as SMSG_MOVE_UPDATE_TELEPORT and goes on as a plain
+    /// movement update, as 3.3.5a's MSG_MOVE_TELEPORT of another unit does.
     /// </summary>
     [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE)]
+    [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE_TELEPORT)]
     [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE_KNOCK_BACK)]
     [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE_WALK_SPEED)]
     [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE_RUN_SPEED)]
@@ -297,6 +300,7 @@ public partial class WorldClient
         switch (opcode)
         {
             case Opcode.SMSG_MOVE_UPDATE:
+            case Opcode.SMSG_MOVE_UPDATE_TELEPORT:
                 SendPacketToClient(new MoveUpdate { MoverGUID = guid, MoveInfo = info });
                 break;
             case Opcode.SMSG_MOVE_UPDATE_KNOCK_BACK:
