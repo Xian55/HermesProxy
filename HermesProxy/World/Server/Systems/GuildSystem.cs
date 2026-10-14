@@ -328,8 +328,8 @@ public static class GuildSystem
             // TrinityCore 4.3.4 HandleGuildSetRankPermissionsOpcode: old and new rights, eight
             // bank tabs, then the gold limit, the rank's id again and the bit-counted name.
             packet.WriteUInt32(rank.RankID);
-            packet.WriteUInt32(rank.OldFlags);
-            packet.WriteUInt32(rank.Flags);
+            packet.WriteUInt32(rank.OldFlags | HermesProxy.World.Client.WorldClient.CataRankRightEmpty);
+            packet.WriteUInt32(rank.Flags | HermesProxy.World.Client.WorldClient.CataRankRightEmpty);
             for (var i = 0; i < GuildConst.MaxBankTabsCata; i++)
             {
                 packet.WriteUInt32(rank.TabFlags[i]);

@@ -62,7 +62,7 @@ public partial class WorldClient
         GuildPermissionsQueryResults result = new();
         result.RankID = packet.ReadUInt32();
         result.NumTabs = (int)packet.ReadUInt32();
-        result.Flags = (int)packet.ReadUInt32();
+        result.Flags = (int)(packet.ReadUInt32() & ~CataRankRightEmpty);
         result.WithdrawGoldLimit = (int)packet.ReadUInt32();
         uint count = packet.ReadBits<uint>(23);
         if (count > GuildConst.MaxBankTabsCata)
@@ -367,6 +367,14 @@ public partial class WorldClient
     }
 
     /// <summary>
+    /// TrinityCore 4.3.4 GR_RIGHT_EMPTY, part of every one of its rank rights. A modern client reads
+    /// the bit as GR_RIGHT_ROSTER, which a stock realm leaves off the ranks it makes, so it is taken
+    /// off on the way to the client and put back on the way to the server, whose right checks
+    /// (Guild::_HasRankRight) pass every right for a rank stored without it.
+    /// </summary>
+    internal const uint CataRankRightEmpty = 0x40;
+
+    /// <summary>
     /// 4.3.4 counts guild events from 1 and has some the older servers lack (TrinityCore 4.3.4
     /// Guild.h GuildEvents). The three rank events are all "the ranks changed" to this handler;
     /// the mobile sign-on has nothing to be turned into, the founder is read before this.
@@ -471,7 +479,7 @@ public partial class WorldClient
                 rank.TabFlags[tab] = (uint)packet.ReadInt32();
             }
             rank.WithdrawGoldLimit = packet.ReadInt32();
-            rank.Flags = (uint)packet.ReadInt32();
+            rank.Flags = (uint)packet.ReadInt32() & ~CataRankRightEmpty;
             rank.RankName = packet.ReadString((uint)nameLengths[i]);
             rank.RankOrder = (uint)packet.ReadInt32();
             rankNames.Add(rank.RankName);

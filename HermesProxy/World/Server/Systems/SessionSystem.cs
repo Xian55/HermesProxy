@@ -55,8 +55,10 @@ public static class SessionSystem
             return;
         }
 
+        // The answer's object id: a stock 4.4.2 realm's is 1 (TrinityCore cata_classic
+        // WorldSession::SendBattlenetResponse); the older clients keep the 0 they always had.
         ctx.Socket!.BnetRpc.Invoke(
-            serviceId: 0,
+            serviceId: ModernVersion.AddedInVersion(4, 4, 0) ? 1u : 0u,
             (OriginalHash)request.Method.GetServiceHash(),
             request.Method.GetMethodId(),
             request.Method.Token,

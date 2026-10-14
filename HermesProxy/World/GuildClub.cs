@@ -73,6 +73,8 @@ internal sealed class GuildClub
     // What the legacy server has told the proxy.
     private uint _rosterGuild;
     private bool _rosterKnown;
+    // A roster asked for when the guild id changed: until it is here the club is not described.
+    private bool _rosterAsked;
     private readonly Dictionary<WowGuid128, ClubMember> _roster = [];
     private readonly Dictionary<int, uint> _rankRights = [];
     private uint _createTime;
@@ -94,6 +96,7 @@ internal sealed class GuildClub
 
     private WowGuid128 Self => _game.CurrentPlayerGuid;
     private uint GuildId => _game.GetPlayerGuildId(Self);
+    private bool AwaitingRoster => _rosterAsked && !_rosterKnown;
 
     /// <summary>ClubMembershipService.Subscribe: the client's guild club, if it has one yet.</summary>
     public void SubscribeMemberships(Membership.SubscribeResponse response)
@@ -103,7 +106,10 @@ internal sealed class GuildClub
         _clubSubscribed = false;
         _givenRoles.Clear();
 
-        // Not in a guild, a stock realm answers with nothing at all, not even an empty state.
+        // Not in a guild, a stock realm answers with nothing at all, not even an empty state. A club
+        // still waiting for its roster is added when the roster comes.
+        if (AwaitingRoster)
+            return;
         if (!TryDescribe(out ClubDescription? club))
         {
             if (GuildId != 0)
@@ -335,9 +341,18 @@ internal sealed class GuildClub
         {
             _rosterGuild = guildId;
             _rosterKnown = false;
+            _rosterAsked = false;
             _roster.Clear();
             _rankRights.Clear();
             _createTime = 0;
+            // A stock realm describes the club with its member count, leader and creation date,
+            // which only a roster tells, so the club waits for one. A joining member's session
+            // has the guild's name from the invite already. Checked against a 4.3.4 server only.
+            if (guildId != 0 && Client.WorldClient.IsCataLegacy)
+            {
+                RequestRoster();
+                _rosterAsked = true;
+            }
         }
 
         if (!_membershipSubscribed)
@@ -346,7 +361,7 @@ internal sealed class GuildClub
         if (_givenClub != 0 && _givenClub != guildId)
             Withdraw();
 
-        if (_givenClub == 0 && TryDescribe(out ClubDescription? club))
+        if (_givenClub == 0 && !AwaitingRoster && TryDescribe(out ClubDescription? club))
         {
             Membership.ClubAddedNotification added = new()
             {
