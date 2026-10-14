@@ -264,6 +264,8 @@ NO_LEGACY_MAP = re.compile(r'No ' + LEGACY_BUILD + r' opcode mapping for ([A-Z0-
 NO_MODERN_MAP = re.compile(r'No V\d_\d_\d_\d+ opcode mapping for ([A-Z0-9_]+)')
 NO_HANDLER = re.compile(r'C P<S \| No handler for opcode ([A-Z0-9_]+)')
 CLIENT_NO_HANDLER = re.compile(r'C>P S \| No handler for opcode ([A-Z0-9_]+) \((\d+)\)')
+CLIENT_RECV = re.compile(r'\| C>P S \| Received opcode "([A-Z0-9_]+)"')
+CLIENT_SENT = re.compile(r'\| C<P S \| Sending opcode "([A-Z0-9_]+)"')
 
 
 def read_capture(path: Path, names: dict[int, list[str]]) -> tuple[dict[str, int], dict[str, int]]:
@@ -317,10 +319,12 @@ def read_logs(dirs: list[Path], names: dict[int, list[str]]) -> LogEvidence:
             per_cmsg: dict[str, Seen] = {}
             per_client: dict[str, Seen] = {}
             per_unanswered: dict[str, Seen] = {}
+            client_ok: set[str] = set()
             fh.seek(0)
             for line in fh:
                 if (m := RECV.search(line)):
                     per_smsg.setdefault(m.group(1), Seen(session)).count += 1
+                    client_ok.add(m.group(1))
                 elif (m := SENT.search(line)):
                     per_cmsg.setdefault(m.group(1), Seen(session)).count += 1
                 elif (m := CMSG_EXC.search(line)):
@@ -338,6 +342,8 @@ def read_logs(dirs: list[Path], names: dict[int, list[str]]) -> LogEvidence:
                     if name == 'MSG_NULL_ACTION':
                         name = client_names.get(int(m.group(2)), f'0x{int(m.group(2)):x}')
                     per_unanswered.setdefault(name, Seen(session)).count += 1
+                elif (m := CLIENT_RECV.search(line)) or (m := CLIENT_SENT.search(line)):
+                    client_ok.add(m.group(1))
             for capture in sorted((f.parent.parent / 'PacketsLog').glob(f'legacy_*_{session}_*.pkt')):
                 smsg_counts, cmsg_counts = read_capture(capture, names)
                 for op, n in smsg_counts.items():
@@ -347,6 +353,9 @@ def read_logs(dirs: list[Path], names: dict[int, list[str]]) -> LogEvidence:
             # the most recent session that touched an opcode is the one that counts
             ev.smsg.update(per_smsg)
             ev.cmsg.update(per_cmsg)
+            # an error a later session no longer had is gone: that session handled the opcode
+            for op in client_ok - per_client.keys():
+                ev.client_errors.pop(op, None)
             ev.client_errors.update(per_client)
             ev.unanswered.update(per_unanswered)
     return ev

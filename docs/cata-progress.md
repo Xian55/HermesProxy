@@ -17,18 +17,6 @@
 
 ## 4.4.2 client side
 
-### Errors in 4.3.4 sessions
-
-A CMSG reader that threw, or a translated SMSG with no 4.4.2 opcode.
-
-| Opcode | Problem | Count | Session |
-|---|---|---:|---|
-| `CMSG_CHAT_ADDON_MESSAGE_TARGETED` | exception | 1 | 20261011_173925 |
-| `CMSG_CHAT_MESSAGE_WHISPER` | exception | 1 | 20261011_161824 |
-| `CMSG_STAND_STATE_CHANGE` | exception | 1 | 20261011_012409 |
-| `SMSG_MOTD` | no 4.4.2 mapping | 1 | 20261014_013904 |
-| `SMSG_SET_FORCED_REACTIONS` | no 4.4.2 mapping | 3 | 20261014_020056 |
-
 ### Requests nothing answered
 
 What the 4.4.2 client sent in a 4.3.4 session and no handler took, most recent session per opcode; a request that has a handler by now is left out. The client holds some windows until a request is answered, so these can hang a feature, not just lack one. "TrinityCore" says whether the native 4.4.2 server acts on the request (cata_classic `Opcodes.cpp`): one it ignores too is not waited for. Those it acts on are first.
