@@ -53,8 +53,28 @@ public static class ChatSystem
     public static void HandleChatChannelCommand(Opcode opcode, in ChannelCommand command, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(opcode);
-        packet.WriteCString(command.ChannelName);
+        WriteChannelName(packet, command.ChannelName);
         ctx.SendPacketToServer(packet);
+    }
+
+    /// <summary>
+    /// The channel's name: terminated, or for a 4.3.4 server its length as 8 bits and the name
+    /// without a terminator (TrinityCore 4.3.4 HandleChannelOwner, HandleChannelAnnouncements,
+    /// HandleChannelList).
+    /// </summary>
+    static void WriteChannelName(WorldPacket packet, string channelName)
+    {
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            WriteChannelNameCata(packet, channelName);
+        else
+            packet.WriteCString(channelName);
+    }
+
+    internal static void WriteChannelNameCata(WorldPacket packet, string channelName)
+    {
+        packet.WriteBits((uint)Encoding.UTF8.GetByteCount(channelName), 8);
+        packet.FlushBits();
+        packet.WriteString(channelName);
     }
 
     [HandlesCmsg(Opcode.CMSG_CHAT_CHANNEL_PASSWORD)]
@@ -93,16 +113,72 @@ public static class ChatSystem
     public static void HandleChatChannelPlayerCommand(Opcode opcode, in ChannelPlayerCommand command, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(opcode);
+        string name = LegacyPlayerName.StripRealmSuffixToString(command.Name);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            WritePlayerCommandCata(packet, opcode, command.ChannelName, name);
+            ctx.SendPacketToServer(packet);
+            return;
+        }
         packet.WriteCString(command.ChannelName);
-        packet.WriteCString(LegacyPlayerName.StripRealmSuffixToString(command.Name));
+        packet.WriteCString(name);
         ctx.SendPacketToServer(packet);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 reads each of these in an order of its own: the two lengths as bits, then
+    /// the two strings without terminators. The channel's length is 8 bits and the player's 7,
+    /// except in the unban, which has them the other way round.
+    /// </summary>
+    internal static void WritePlayerCommandCata(WorldPacket packet, Opcode opcode, string channel, string name)
+    {
+        uint channelLength = (uint)Encoding.UTF8.GetByteCount(channel);
+        uint nameLength = (uint)Encoding.UTF8.GetByteCount(name);
+        switch (opcode)
+        {
+            case Opcode.CMSG_CHAT_CHANNEL_UNMODERATOR:      // HandleChannelUnmoderator
+                packet.WriteBits(nameLength, 7);
+                packet.WriteBits(channelLength, 8);
+                packet.FlushBits();
+                packet.WriteString(channel);
+                packet.WriteString(name);
+                break;
+            case Opcode.CMSG_CHAT_CHANNEL_INVITE:           // HandleChannelInvite
+                packet.WriteBits(nameLength, 7);
+                packet.WriteBits(channelLength, 8);
+                packet.FlushBits();
+                packet.WriteString(name);
+                packet.WriteString(channel);
+                break;
+            case Opcode.CMSG_CHAT_CHANNEL_KICK:             // HandleChannelKick
+                packet.WriteBits(channelLength, 8);
+                packet.WriteBits(nameLength, 7);
+                packet.FlushBits();
+                packet.WriteString(channel);
+                packet.WriteString(name);
+                break;
+            case Opcode.CMSG_CHAT_CHANNEL_UNBAN:            // HandleChannelUnban
+                packet.WriteBits(channelLength, 7);
+                packet.WriteBits(nameLength, 8);
+                packet.FlushBits();
+                packet.WriteString(name);
+                packet.WriteString(channel);
+                break;
+            default:                                        // set owner, moderator, ban
+                packet.WriteBits(channelLength, 8);
+                packet.WriteBits(nameLength, 7);
+                packet.FlushBits();
+                packet.WriteString(name);
+                packet.WriteString(channel);
+                break;
+        }
     }
 
     [HandlesCmsg(Opcode.CMSG_CHAT_CHANNEL_LIST)]
     public static void HandleChatChannelList(in ChannelCommand command, in SessionContext ctx)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CHAT_CHANNEL_LIST);
-        packet.WriteCString(command.ChannelName);
+        WriteChannelName(packet, command.ChannelName);
         ctx.SendPacketToServer(packet);
         ctx.GetSession().GameState.ChannelDisplayList = false;
     }
@@ -119,7 +195,7 @@ public static class ChatSystem
         else
         {
             WorldPacket packet = new WorldPacket(Opcode.CMSG_CHAT_CHANNEL_DISPLAY_LIST);
-            packet.WriteCString(command.ChannelName);
+            WriteChannelName(packet, command.ChannelName);
             ctx.SendPacketToServer(packet);
         }
         ctx.GetSession().GameState.ChannelDisplayList = true;
