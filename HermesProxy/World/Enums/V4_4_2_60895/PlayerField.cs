@@ -188,9 +188,10 @@ public enum PlayerField
     [DescriptorCreatePlaceholder(DescriptorType.UInt32)]
     PLAYER_PAD_UINT32_1,
 
-    // ForcedReactions[32] (FactionID, Reaction) and Field_13C / Field_140, new in 4.4.2.
-    [DescriptorCreatePlaceholder(DescriptorType.Int32, Count = 64)]
-    PLAYER_PAD_FORCED_REACTIONS,
+    // ForcedReactions[32] (FactionID, Reaction), new in 4.4.2: this client has no
+    // SMSG_SET_FORCED_REACTIONS and reads them here. Field_13C / Field_140 follow.
+    [DescriptorCreatePlaceholder(DescriptorType.Int32, CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteCreatePlayerForcedReactions))]
+    PLAYER_FORCED_REACTIONS_CUSTOM,
     [DescriptorCreatePlaceholder(DescriptorType.Int32)]
     PLAYER_PAD_FIELD_13C,
     [DescriptorCreatePlaceholder(DescriptorType.Int32)]
@@ -269,6 +270,14 @@ public enum PlayerField
                            CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdatePlayerVisibleItem),
                            CustomPredicate = "src.VisibleItems != null && src.VisibleItems[{i}].HasValue")]
     PLAYER_VISIBLE_ITEMS_UPDATE,
+
+    // ForcedReactions Update — PerElement bit 96-127, parent 95. Per-element CustomWriter writes
+    // inner 3-bit mask (0x07) + FlushBits + 2 fields.
+    [DescriptorUpdateField(nameof(PlayerData.ForcedReactions), DescriptorType.Int32, bit: 96,
+                           ArrayCount = 32, ArrayMode = ArrayMode.PerElement, ParentBit = 95,
+                           CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdatePlayerForcedReaction),
+                           CustomPredicate = "src.ForcedReactions[{i}].HasValue")]
+    PLAYER_FORCED_REACTIONS_UPDATE,
 
     // IsQuestLogChangesMaskSkipped = true: 1-bit literal between blocks-mask + FlushBits.
     [DescriptorUpdateBitsPreamble(1u, 1)]

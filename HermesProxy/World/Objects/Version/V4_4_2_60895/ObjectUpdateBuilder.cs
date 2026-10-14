@@ -959,6 +959,18 @@ public partial class ObjectUpdateBuilder
         data.WriteInt64(IsOwner ? (long)Time.UnixTime : 0L);
     }
 
+    // Forced reactions are the player's own and a legacy server tells nobody else of them, so
+    // every other player is made with none.
+    internal void WriteCreatePlayerForcedReactions(WorldPacket data, PlayerData src)
+    {
+        ForcedReactionSlots.WriteCreate(data, IsOwner ? _gameState.ForcedReactionSlots : null);
+    }
+
+    internal void WriteUpdatePlayerForcedReaction(WorldPacket data, ReadOnlySpan<ForcedReaction?> arr, int i)
+    {
+        ForcedReactionSlots.WriteUpdate(data, arr[i]!.Value);
+    }
+
     internal void WriteCreatePlayerBnetAccount(WorldPacket data, PlayerData src)
     {
         // Owner: BNet account GUID lookup. Non-owner: Empty. Matches hand-port file:781-783.

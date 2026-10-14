@@ -644,6 +644,10 @@ public sealed class GameSessionData
     // server last sent them: handed back to it when the 4.4.2 client saves the profile.
     internal readonly Dictionary<string, CufLegacyOnlyOptions> CufOptionsKeptForServer = [];
 
+    // The forced reactions of the session's player, by slot, as a client that keeps them in its
+    // player object has them (see ForcedReactionSlots). Null until a server has sent one.
+    internal ForcedReaction[]? ForcedReactionSlots;
+
     public byte LfgRequestedRoles;
     public readonly HashSet<uint> LfgKnownDungeonIds = new();
     // The slots the client was last told it is queued for (SMSG_LFG_UPDATE_STATUS).

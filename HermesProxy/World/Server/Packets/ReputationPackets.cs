@@ -343,7 +343,7 @@ class SetForcedReactions : ServerPacket, ISpanWritable
     public List<ForcedReaction> Reactions = new();
 }
 
-struct ForcedReaction
+public struct ForcedReaction
 {
     public void Write(WorldPacket data)
     {

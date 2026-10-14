@@ -57,6 +57,13 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_SET_FORCED_REACTIONS)]
     internal void HandleSetForcedReaction(WorldPacket packet)
     {
+        // The packet cannot even be made for a client that has no number for it.
+        if (ModernVersion.GetCurrentOpcode(Opcode.SMSG_SET_FORCED_REACTIONS) == 0)
+        {
+            SetForcedReactionsInPlayerObject(packet);
+            return;
+        }
+
         SetForcedReactions reactions = new();
         var count = packet.ReadInt32();
         for (var i = 0; i < count; i++)
@@ -67,6 +74,42 @@ public partial class WorldClient
             reactions.Reactions.Add(reaction);
         }
         SendPacketToClient(reactions);
+    }
+
+    // A client without the packet (4.4.2) keeps forced reactions in its player object. The
+    // server's list is the whole of them every time: the slots are brought in line with it, and
+    // what changed goes out as a change of the player. A player the client has not been given yet
+    // is made with them (the server sends the list ahead of the player at login).
+    private void SetForcedReactionsInPlayerObject(WorldPacket packet)
+    {
+        int count = packet.ReadInt32();
+        GameSessionData state = GetSession().GameState;
+        if (state.ForcedReactionSlots == null && count == 0)
+            return;
+
+        Span<ForcedReaction> wanted = count <= 64 ? stackalloc ForcedReaction[64] : new ForcedReaction[count];
+        wanted = wanted[..count];
+        for (int i = 0; i < count; i++)
+        {
+            wanted[i].Faction = packet.ReadInt32();
+            wanted[i].Reaction = packet.ReadInt32();
+        }
+
+        ForcedReaction[] slots = state.ForcedReactionSlots ??= new ForcedReaction[ForcedReactionSlots.Count];
+        uint changed = ForcedReactionSlots.Apply(slots, wanted);
+        if (changed == 0 || !state.ClientHasPlayerObject)
+            return;
+
+        ObjectUpdate updateData = new ObjectUpdate(state.CurrentPlayerGuid, UpdateTypeModern.Values, GetSession());
+        ForcedReaction?[] sent = updateData.EnsurePlayerData().EnsureForcedReactions();
+        for (int i = 0; i < slots.Length; i++)
+        {
+            if ((changed & (1u << i)) != 0)
+                sent[i] = slots[i];
+        }
+        UpdateObject updatePacket = new UpdateObject(state);
+        updatePacket.ObjectUpdates.Add(updateData);
+        SendPacketToClient(updatePacket);
     }
 
     [HandlesSmsg(Opcode.SMSG_SET_FACTION_VISIBLE)]

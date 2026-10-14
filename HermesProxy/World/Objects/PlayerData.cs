@@ -25,6 +25,7 @@ public class PlayerData
     private static readonly QuestLog[] _emptyQuestLog = new QuestLog[QuestConst.MaxQuestLogSize];
     private static readonly VisibleItem?[] _emptyVisibleItem19 = new VisibleItem?[19];
     private static readonly ChrCustomizationChoice[] _emptyCustomizations36 = new ChrCustomizationChoice[36];
+    private static readonly ForcedReaction?[] _emptyForcedReactions = new ForcedReaction?[ForcedReactionSlots.Count];
 
     public WowGuid128? DuelArbiter;
     public WowGuid128? WowAccount;
@@ -57,6 +58,12 @@ public class PlayerData
     public float?[] AvgItemLevel { get; } = new float?[6];
     public uint? CurrentBattlePetBreedQuality;
     public int? HonorLevel;
+
+    // The player object's forced reactions, by slot (4.4.2 on). Set only to send a slot as a
+    // change; a create takes them from the session. See ForcedReactionSlots.
+    private ForcedReaction?[]? _forcedReactions;
+    public ReadOnlySpan<ForcedReaction?> ForcedReactions => _forcedReactions ?? _emptyForcedReactions;
+    public ForcedReaction?[] EnsureForcedReactions() => _forcedReactions ??= new ForcedReaction?[ForcedReactionSlots.Count];
 
     /// <summary>The character's name, for a client whose player object carries it (4.4.2 on). Set
     /// only to send it as a change; a create takes the name from the session's player cache.</summary>
