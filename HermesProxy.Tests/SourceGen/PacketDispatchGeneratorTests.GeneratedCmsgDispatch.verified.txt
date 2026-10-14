@@ -937,6 +937,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ChatSystem.HandleChatUnregisterAllAddonPrefixes(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleClearRaidMarker_CMSG_CLEAR_RAID_MARKER(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ClearRaidMarkerCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.GroupSystem.HandleClearRaidMarker(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleClearTradeItem_CMSG_CLEAR_TRADE_ITEM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.ClearTradeItemCodec.Read(ref reader, out var packet);
@@ -3285,6 +3291,7 @@ internal static unsafe class GeneratedCmsgDispatch
         }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_REGISTER_ADDON_PREFIXES] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatRegisterAddonPrefixes_CMSG_CHAT_REGISTER_ADDON_PREFIXES;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_UNREGISTER_ALL_ADDON_PREFIXES] = &Thunk_HermesProxy_World_Server_Systems_ChatSystem_HandleChatUnregisterAllAddonPrefixes_CMSG_CHAT_UNREGISTER_ALL_ADDON_PREFIXES;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CLEAR_RAID_MARKER] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleClearRaidMarker_CMSG_CLEAR_RAID_MARKER;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CLEAR_TRADE_ITEM] = &Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleClearTradeItem_CMSG_CLEAR_TRADE_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CLIENT_PORT_GRAVEYARD] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleClientPortGraveyard_CMSG_CLIENT_PORT_GRAVEYARD;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CLOSE_INTERACTION] = &Thunk_HermesProxy_World_Server_Systems_QuestSystem_HandleCloseInteraction_CMSG_CLOSE_INTERACTION;
@@ -3879,6 +3886,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_MESSAGE_YELL,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_REGISTER_ADDON_PREFIXES,
             global::HermesProxy.World.Enums.Opcode.CMSG_CHAT_UNREGISTER_ALL_ADDON_PREFIXES,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CLEAR_RAID_MARKER,
             global::HermesProxy.World.Enums.Opcode.CMSG_CLEAR_TRADE_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_CLIENT_PORT_GRAVEYARD,
             global::HermesProxy.World.Enums.Opcode.CMSG_CLOSE_INTERACTION,

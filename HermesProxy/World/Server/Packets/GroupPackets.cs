@@ -362,6 +362,8 @@ public class PartyDifficultySettings
 
 public readonly record struct LeaveGroup(sbyte PartyIndex);
 
+public readonly record struct ClearRaidMarker(byte MarkerId);
+
 public readonly record struct PartyUninvite(byte PartyIndex, WowGuid128 TargetGUID, string Reason);
 
 class GroupUninvite : ServerPacket, ISpanWritable
@@ -1076,5 +1078,36 @@ public class RandomRoll : ServerPacket, ISpanWritable
 }
 
 public readonly record struct ChangeSubGroup(WowGuid128 TargetGUID, sbyte PartyIndex, byte NewSubGroup);
+
+/// <summary>
+/// The group's world markers: the mask of those that are out and, for each set bit in bit order,
+/// the marker's map and place.
+/// </summary>
+public sealed class RaidMarkersChanged : ServerPacket
+{
+    public RaidMarkersChanged() : base(Opcode.SMSG_RAID_MARKERS_CHANGED) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt8(PartyIndex);
+        _worldPacket.WriteUInt32(ActiveMarkers);
+        _worldPacket.WriteBits(Markers.Count, 4);
+        _worldPacket.FlushBits();
+        foreach (RaidMarker marker in Markers)
+        {
+            _worldPacket.WritePackedGuid128(WowGuid128.Empty);     // transport
+            _worldPacket.WriteUInt32(marker.MapId);
+            _worldPacket.WriteFloat(marker.X);
+            _worldPacket.WriteFloat(marker.Y);
+            _worldPacket.WriteFloat(marker.Z);
+        }
+    }
+
+    public sbyte PartyIndex;
+    public uint ActiveMarkers;
+    public List<RaidMarker> Markers = [];
+}
+
+public readonly record struct RaidMarker(uint MapId, float X, float Y, float Z);
 
 public readonly record struct SwapSubGroups(sbyte PartyIndex, WowGuid128 FirstTarget, WowGuid128 SecondTarget);

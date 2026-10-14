@@ -103,6 +103,37 @@ public static class GroupSystem
         ctx.SendPacketToServer(packet);
     }
 
+    /// <summary>
+    /// A world marker taken away: its index, the same one byte on both sides (TrinityCore 4.3.4
+    /// HandleGroupClearMarker, which clears <c>1 &lt;&lt; index</c>). 4.3.4 has no "all of them",
+    /// so that goes as one request per marker that is out. Only a 4.3.4 server has the markers.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_CLEAR_RAID_MARKER)]
+    public static void HandleClearRaidMarker(in ClearRaidMarker clear, in SessionContext ctx)
+    {
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            return;
+
+        if (clear.MarkerId < 8)
+        {
+            ctx.SendPacketToServer(BuildClearRaidMarker(clear.MarkerId));
+            return;
+        }
+        uint mask = ctx.GetSession().GameState.RaidMarkerMask;
+        for (byte slot = 0; slot < 8; slot++)
+        {
+            if ((mask & (1u << slot)) != 0)
+                ctx.SendPacketToServer(BuildClearRaidMarker(slot));
+        }
+    }
+
+    internal static WorldPacket BuildClearRaidMarker(byte slot)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_CLEAR_RAID_MARKER);
+        packet.WriteUInt8(slot);
+        return packet;
+    }
+
     [HandlesCmsg(Opcode.CMSG_PARTY_UNINVITE)]
     public static void HandlePartyUninvite(in PartyUninvite kick, in SessionContext ctx)
     {

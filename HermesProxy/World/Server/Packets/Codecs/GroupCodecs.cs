@@ -93,6 +93,13 @@ public static class LeaveGroupCodec
         => packet = new LeaveGroup(r.ReadInt8());
 }
 
+public static class ClearRaidMarkerCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out ClearRaidMarker packet)
+        => packet = new ClearRaidMarker(r.ReadUInt8());
+}
+
 [PacketCodec(typeof(PartyUninvite), AddedIn = ClientVersionBuild.V3_4_3_54261)]
 public static class PartyUninviteCodecWotLKClassic
 {

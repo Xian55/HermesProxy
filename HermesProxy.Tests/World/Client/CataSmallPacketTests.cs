@@ -185,6 +185,41 @@ public sealed class CataSmallPacketTests
         => Assert.Equal([0x00, 0x00, 0x80], Written(new SetPlayHoverAnim { PlayHoverAnim = true }));
 
     [Fact]
+    public void HandleRaidMarkersChanged_OnlyTheMarkersWithAPlace()
+    {
+        _harness.Client.NoteRaidMarker(84997, new Vector3(1, 2, 3));    // marker 2 in sight
+
+        // markers 1 and 2 out; where marker 1 is was never seen
+        var markers = Deliver<RaidMarkersChanged>(Opcode.SMSG_RAID_MARKERS_CHANGED, "03 00 00 00", _harness.Client.HandleRaidMarkersChanged);
+
+        Assert.Equal(2u, markers.ActiveMarkers);
+        RaidMarker marker = Assert.Single(markers.Markers);
+        Assert.Equal((1f, 2f, 3f), (marker.X, marker.Y, marker.Z));
+    }
+
+    [Fact]
+    public void NoteRaidMarker_AMarkerAlreadyOut_SendsTheMarkersAgain()
+    {
+        var before = Deliver<RaidMarkersChanged>(Opcode.SMSG_RAID_MARKERS_CHANGED, "01 00 00 00", _harness.Client.HandleRaidMarkersChanged);
+        Assert.Equal(0u, before.ActiveMarkers);
+
+        _harness.Client.NoteRaidMarker(84996, new Vector3(4, 5, 6));
+
+        var after = Assert.IsType<RaidMarkersChanged>(_harness.ClientWire.Sent[^1].Packet);
+        Assert.Equal(1u, after.ActiveMarkers);
+        Assert.Equal(6f, Assert.Single(after.Markers).Z);
+    }
+
+    [Fact]
+    public void RaidMarkersChanged_Layout()
+    {
+        var packet = new RaidMarkersChanged { ActiveMarkers = 1 };
+        packet.Markers.Add(new RaidMarker(0, 1, 2, 3));
+
+        Assert.Equal(Convert.FromHexString("00 01000000 10 0000 00000000 0000803F 00000040 00004040".Replace(" ", "")), Written(packet));
+    }
+
+    [Fact]
     public void MoveSkipTime_Layout()
     {
         var packet = new MoveSkipTime { TimeSkipped = 1000 };

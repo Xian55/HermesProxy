@@ -704,6 +704,14 @@ public sealed class GameSessionData
     private RideTicket? _lfgServerTicket;
 
     /// <summary>
+    /// A 4.3.4 server's world markers: the mask it last sent, and where each marker is, as its
+    /// dynamic object showed it (the server sends no places, the 4.4.2 client needs them).
+    /// </summary>
+    public uint RaidMarkerMask;
+    public readonly System.Numerics.Vector3?[] RaidMarkerPlaces = new System.Numerics.Vector3?[8];
+    public readonly uint[] RaidMarkerMaps = new uint[8];
+
+    /// <summary>
     /// A 4.3.4 server issues the queue's ticket itself and sends it with each queue packet; it is
     /// kept so the requests that name the queue (leaving it) can carry it back. The client is
     /// given the session's own ticket instead.

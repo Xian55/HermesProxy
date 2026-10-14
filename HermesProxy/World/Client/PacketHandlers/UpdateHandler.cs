@@ -5221,6 +5221,8 @@ public partial class WorldClient
             {
                 updateData.DynamicObjectData.SpellID = updates[DYNAMICOBJECT_SPELLID].Int32Value;
                 updateData.DynamicObjectData.SpellXSpellVisualID = (int)GameData.GetSpellVisual((uint)updateData.DynamicObjectData.SpellID);
+                if (IsCataLegacy && updateData.CreateData?.MoveInfo is { } markerAt)
+                    NoteRaidMarker(updateData.DynamicObjectData.SpellID.Value, markerAt.Position);
             }
             int DYNAMICOBJECT_RADIUS = LegacyVersion.GetUpdateField(DynamicObjectField.DYNAMICOBJECT_RADIUS);
             if (DYNAMICOBJECT_RADIUS >= 0 && updateMaskArray[DYNAMICOBJECT_RADIUS])

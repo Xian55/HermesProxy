@@ -39,6 +39,60 @@ public partial class WorldClient
         SendPacketToClient(party);
     }
 
+    // TrinityCore 4.3.4's world marker spells, markers 1 to 5 (Spell::EffectSummonRaidMarker)
+    private const int FirstRaidMarkerSpell = 84996;
+    private const int RaidMarkerSpellCount = 5;
+
+    /// <summary>
+    /// TrinityCore 4.3.4 sends only the mask of the world markers that are out. The 4.4.2 client
+    /// wants each one's map and place with it, one entry per set bit, and crashes on a set bit
+    /// without one (#415). The places come from the markers' dynamic objects in sight; a marker
+    /// whose place is not known is left out until its object shows.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_RAID_MARKERS_CHANGED)]
+    internal void HandleRaidMarkersChanged(WorldPacket packet)
+    {
+        var state = GetSession().GameState;
+        state.RaidMarkerMask = packet.ReadUInt32();
+        for (int slot = 0; slot < state.RaidMarkerPlaces.Length; slot++)
+        {
+            if ((state.RaidMarkerMask & (1u << slot)) == 0)
+                state.RaidMarkerPlaces[slot] = null;
+        }
+        SendRaidMarkers();
+    }
+
+    /// <summary>
+    /// A world marker's dynamic object came into sight: its place is kept, and the markers go to
+    /// the client again if the server already said that one is out.
+    /// </summary>
+    internal void NoteRaidMarker(int spellId, System.Numerics.Vector3 place)
+    {
+        int slot = spellId - FirstRaidMarkerSpell;
+        if (slot < 0 || slot >= RaidMarkerSpellCount)
+            return;
+
+        var state = GetSession().GameState;
+        state.RaidMarkerPlaces[slot] = place;
+        state.RaidMarkerMaps[slot] = state.CurrentMapId ?? 0;
+        if ((state.RaidMarkerMask & (1u << slot)) != 0)
+            SendRaidMarkers();
+    }
+
+    private void SendRaidMarkers()
+    {
+        var state = GetSession().GameState;
+        RaidMarkersChanged markers = new RaidMarkersChanged();
+        for (int slot = 0; slot < state.RaidMarkerPlaces.Length; slot++)
+        {
+            if ((state.RaidMarkerMask & (1u << slot)) == 0 || state.RaidMarkerPlaces[slot] is not System.Numerics.Vector3 place)
+                continue;
+            markers.ActiveMarkers |= 1u << slot;
+            markers.Markers.Add(new RaidMarker(state.RaidMarkerMaps[slot], place.X, place.Y, place.Z));
+        }
+        SendPacketToClient(markers);
+    }
+
     [HandlesSmsg(Opcode.SMSG_GROUP_DESTROYED)]
     internal void HandleGroupDestroyed(WorldPacket packet)
     {
