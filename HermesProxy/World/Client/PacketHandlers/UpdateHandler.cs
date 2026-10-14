@@ -3014,6 +3014,12 @@ public partial class WorldClient
             {
                 updateData.ItemData.MaxDurability = updates[ITEM_FIELD_MAXDURABILITY].UInt32Value;
             }
+            // the character's played time when the item was made: what a refund's two hours are counted from
+            int ITEM_FIELD_CREATE_PLAYED_TIME = LegacyVersion.GetUpdateField(ItemField.ITEM_FIELD_CREATE_PLAYED_TIME);
+            if (ITEM_FIELD_CREATE_PLAYED_TIME >= 0 && updateMaskArray[ITEM_FIELD_CREATE_PLAYED_TIME])
+            {
+                updateData.ItemData.CreatePlayedTime = updates[ITEM_FIELD_CREATE_PLAYED_TIME].UInt32Value;
+            }
         }
 
         // Container Fields

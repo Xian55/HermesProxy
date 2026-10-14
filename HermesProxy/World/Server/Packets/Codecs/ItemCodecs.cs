@@ -283,3 +283,17 @@ public static class CancelTempEnchantmentCodec
     public static void Read(ref SpanPacketReader r, out CancelTempEnchantment packet)
         => packet = new CancelTempEnchantment(r.ReadUInt32());
 }
+
+public static class GetItemPurchaseDataCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out GetItemPurchaseData packet)
+        => packet = new GetItemPurchaseData(r.ReadPackedGuid128());
+}
+
+public static class ItemPurchaseRefundCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out ItemPurchaseRefund packet)
+        => packet = new ItemPurchaseRefund(r.ReadPackedGuid128());
+}

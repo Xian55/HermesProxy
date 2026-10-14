@@ -371,4 +371,52 @@ public partial class WorldClient
             EnchantSlot = 0,
         });
     }
+
+    /// <summary>
+    /// What a refundable item cost and when it was bought (see <see cref="ItemRefund"/> for the
+    /// two legacy layouts).
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_ITEM_REFUND_INFO_RESPONSE)]
+    internal void HandleItemRefundInfoResponse(WorldPacket packet)
+    {
+        if (ModernVersion.GetCurrentOpcode(Opcode.SMSG_SET_ITEM_PURCHASE_DATA) == 0)
+            return;
+
+        SetItemPurchaseData data = new();
+        if (IsCataLegacy)
+        {
+            ulong guid = ItemRefund.ReadInfoCata(packet, data.Contents, out _);
+            data.ItemGUID = new WowGuid64(guid).To128(GetSession().GameState);
+            // A 4.3.4 server sends the time the refund is still open. The client is sent the
+            // played time at the purchase, which is the item's own field, set by the server then.
+            data.PurchaseTime = GetSession().GameState.GetLegacyFieldValueUInt32(data.ItemGUID, ItemField.ITEM_FIELD_CREATE_PLAYED_TIME);
+        }
+        else
+        {
+            ulong guid = ItemRefund.ReadInfoWrath(packet, data.Contents, out uint purchaseTime);
+            data.ItemGUID = new WowGuid64(guid).To128(GetSession().GameState);
+            data.PurchaseTime = purchaseTime;
+        }
+        SendPacketToClient(data);
+    }
+
+    [HandlesSmsg(Opcode.SMSG_ITEM_PURCHASE_REFUND_RESULT)]
+    internal void HandleItemPurchaseRefundResult(WorldPacket packet)
+    {
+        if (ModernVersion.GetCurrentOpcode(Opcode.SMSG_ITEM_PURCHASE_REFUND_RESULT) == 0)
+            return;
+
+        ItemPurchaseContents contents = new();
+        ulong guid;
+        byte result;
+        bool refunded = IsCataLegacy
+            ? ItemRefund.ReadResultCata(packet, contents, out guid, out result)
+            : ItemRefund.ReadResultWrath(packet, contents, out guid, out result);
+
+        ItemPurchaseRefundResult refund = new();
+        refund.ItemGUID = new WowGuid64(guid).To128(GetSession().GameState);
+        refund.Result = result;
+        refund.Contents = refunded ? contents : null;
+        SendPacketToClient(refund);
+    }
 }

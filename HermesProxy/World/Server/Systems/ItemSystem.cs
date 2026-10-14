@@ -299,4 +299,31 @@ public static class ItemSystem
         packet.WriteUInt32(slot);
         ctx.SendPacketToServer(packet);
     }
+
+    /// <summary>
+    /// What an item cost that can still be handed back: the client asks for every item in its bags
+    /// that carries the refundable flag. Refunds came with 3.0; an older server has no such request.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_GET_ITEM_PURCHASE_DATA)]
+    public static void HandleGetItemPurchaseData(in GetItemPurchaseData request, in SessionContext ctx)
+    {
+        if (LegacyVersion.GetCurrentOpcode(Opcode.CMSG_GET_ITEM_PURCHASE_DATA) == 0)
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_GET_ITEM_PURCHASE_DATA);
+        packet.WriteGuid(request.ItemGUID.To64());
+        ctx.SendPacketToServer(packet);
+    }
+
+    /// <summary>Handing an item back for what it cost.</summary>
+    [HandlesCmsg(Opcode.CMSG_ITEM_PURCHASE_REFUND)]
+    public static void HandleItemPurchaseRefund(in ItemPurchaseRefund request, in SessionContext ctx)
+    {
+        if (LegacyVersion.GetCurrentOpcode(Opcode.CMSG_ITEM_PURCHASE_REFUND) == 0)
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_ITEM_PURCHASE_REFUND);
+        packet.WriteGuid(request.ItemGUID.To64());
+        ctx.SendPacketToServer(packet);
+    }
 }

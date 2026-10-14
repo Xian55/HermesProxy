@@ -1055,6 +1055,9 @@ public enum Opcode : uint
 	// Values from WowPacketParser's V3_4_3_51666 table, which it also uses for 54261.
 	// Still unhandled: naming them only fixes the log.
 	CMSG_GET_ITEM_PURCHASE_DATA = 13615u,
+	CMSG_ITEM_PURCHASE_REFUND = 13616u,
+	SMSG_ITEM_PURCHASE_REFUND_RESULT = 9626u,
+	SMSG_SET_ITEM_PURCHASE_DATA = 9627u,
 	CMSG_REQUEST_PARTY_JOIN_UPDATES = 13816u,
 	CMSG_SUSPEND_TOKEN_RESPONSE = 14186u,
 	SMSG_ENABLE_BARBER_SHOP = 9916u, // 0x26BC

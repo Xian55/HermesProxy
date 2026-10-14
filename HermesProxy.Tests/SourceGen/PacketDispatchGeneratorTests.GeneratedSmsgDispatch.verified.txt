@@ -1312,6 +1312,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleItemNameQueryResponse(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleItemPurchaseRefundResult_SMSG_ITEM_PURCHASE_REFUND_RESULT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleItemPurchaseRefundResult(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleItemPushResult_SMSG_ITEM_PUSH_RESULT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleItemPushResult(packet);
@@ -1320,6 +1325,11 @@ internal static unsafe class GeneratedSmsgDispatch
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleItemQueryResponse_SMSG_ITEM_QUERY_SINGLE_RESPONSE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleItemQueryResponse(packet);
+    }
+
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleItemRefundInfoResponse_SMSG_ITEM_REFUND_INFO_RESPONSE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleItemRefundInfoResponse(packet);
     }
 
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleLearnedSpell_SMSG_LEARNED_SPELL(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
@@ -2906,8 +2916,10 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_COOLDOWN] = &Thunk_HermesProxy_World_Client_WorldClient_HandleItemCooldown_SMSG_ITEM_COOLDOWN;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_ENCHANT_TIME_UPDATE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleItemEnchantTimeUpdate_SMSG_ITEM_ENCHANT_TIME_UPDATE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_NAME_QUERY_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleItemNameQueryResponse_SMSG_ITEM_NAME_QUERY_RESPONSE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_PURCHASE_REFUND_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleItemPurchaseRefundResult_SMSG_ITEM_PURCHASE_REFUND_RESULT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_PUSH_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleItemPushResult_SMSG_ITEM_PUSH_RESULT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_QUERY_SINGLE_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleItemQueryResponse_SMSG_ITEM_QUERY_SINGLE_RESPONSE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_REFUND_INFO_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleItemRefundInfoResponse_SMSG_ITEM_REFUND_INFO_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_LEARNED_SPELL] = &Thunk_HermesProxy_World_Client_WorldClient_HandleLearnedSpell_SMSG_LEARNED_SPELL;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_LEVEL_UP_INFO] = &Thunk_HermesProxy_World_Client_WorldClient_HandleLevelUpInfo_SMSG_LEVEL_UP_INFO;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_LFG_DISABLED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleLFGDisabled_SMSG_LFG_DISABLED;
@@ -3426,8 +3438,10 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_COOLDOWN,
             global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_ENCHANT_TIME_UPDATE,
             global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_NAME_QUERY_RESPONSE,
+            global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_PURCHASE_REFUND_RESULT,
             global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_PUSH_RESULT,
             global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_QUERY_SINGLE_RESPONSE,
+            global::HermesProxy.World.Enums.Opcode.SMSG_ITEM_REFUND_INFO_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.SMSG_LEARNED_SPELL,
             global::HermesProxy.World.Enums.Opcode.SMSG_LEVEL_UP_INFO,
             global::HermesProxy.World.Enums.Opcode.SMSG_LFG_DISABLED,

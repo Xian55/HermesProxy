@@ -957,3 +957,76 @@ internal static class ItemPacketHelpers
         return true;
     }
 }
+
+/// <summary>
+/// What an item was paid with: money, up to five kinds of item and up to five currencies. Part of
+/// both packets about handing an item back (client layout: u64, then ten and ten u32).
+/// </summary>
+public sealed class ItemPurchaseContents
+{
+    public const int Slots = 5;
+
+    public ulong Money;
+    public readonly (uint ItemID, uint ItemCount)[] Items = new (uint, uint)[Slots];
+    public readonly (uint CurrencyID, uint CurrencyCount)[] Currencies = new (uint, uint)[Slots];
+
+    public void Write(WorldPacket data)
+    {
+        data.WriteUInt64(Money);
+        foreach ((uint itemId, uint itemCount) in Items)
+        {
+            data.WriteUInt32(itemId);
+            data.WriteUInt32(itemCount);
+        }
+        foreach ((uint currencyId, uint currencyCount) in Currencies)
+        {
+            data.WriteUInt32(currencyId);
+            data.WriteUInt32(currencyCount);
+        }
+    }
+}
+
+public readonly record struct GetItemPurchaseData(WowGuid128 ItemGUID);
+
+public readonly record struct ItemPurchaseRefund(WowGuid128 ItemGUID);
+
+/// <summary>
+/// The answer to CMSG_GET_ITEM_PURCHASE_DATA: what a refundable item cost, and the character's
+/// played time when it was bought, from which the client counts down the two hours.
+/// </summary>
+public sealed class SetItemPurchaseData : ServerPacket
+{
+    public SetItemPurchaseData() : base(Opcode.SMSG_SET_ITEM_PURCHASE_DATA) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(ItemGUID);
+        Contents.Write(_worldPacket);
+        _worldPacket.WriteUInt32(Flags);
+        _worldPacket.WriteUInt32(PurchaseTime);
+    }
+
+    public WowGuid128 ItemGUID;
+    public readonly ItemPurchaseContents Contents = new();
+    public uint Flags;
+    public uint PurchaseTime;
+}
+
+/// <summary>The answer to CMSG_ITEM_PURCHASE_REFUND; what came back follows only on success (0).</summary>
+public sealed class ItemPurchaseRefundResult : ServerPacket
+{
+    public ItemPurchaseRefundResult() : base(Opcode.SMSG_ITEM_PURCHASE_REFUND_RESULT) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(ItemGUID);
+        _worldPacket.WriteUInt8(Result);
+        _worldPacket.WriteBit(Contents != null);
+        _worldPacket.FlushBits();
+        Contents?.Write(_worldPacket);
+    }
+
+    public WowGuid128 ItemGUID;
+    public byte Result;
+    public ItemPurchaseContents? Contents;
+}
