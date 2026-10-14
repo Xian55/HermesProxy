@@ -1228,4 +1228,91 @@ public partial class WorldClient
         rewards.Version = packet.ReadInt32();
         SendPacketToClient(rewards);
     }
+
+    // Counts past these are a misread: a 4.3.4 server keeps 250 news entries by default, and the
+    // members named in one are a raid at most.
+    private const int MaxGuildNewsEvents = 4096;
+    private const int MaxGuildNewsMembers = 100;
+
+    // News kinds, the same numbers on both sides (TrinityCore 4.3.4 GuildNews, the client's NEWS_*
+    // constants). The value of looted, crafted and purchased, 3 to 5, is an item.
+    private const int GuildNewsItemLooted = 3;
+    private const int GuildNewsItemPurchased = 5;
+    private const int GuildNewsLevelUp = 6;
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>GuildNews::Write</c> (its SMSG_GUILD_NEWS): 21 bits of count; for each
+    /// entry the number of members who were there with the masks of their GUIDs, inside the mask
+    /// of the member the entry is about; then for each entry the GUID bytes with the flags, two
+    /// values, the id, the kind and the packed date among them. The whole list answers
+    /// CMSG_GUILD_QUERY_NEWS; one entry comes when something happens or an entry is pinned.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_NEWS_UPDATE)]
+    internal void HandleGuildNews(WorldPacket packet)
+    {
+        int count = (int)packet.ReadBits<uint>(21);
+        if (count > MaxGuildNewsEvents)
+            return;
+
+        bool[] masks = new bool[count * 8];
+        bool[][] memberMasks = new bool[count][];
+        for (int i = 0; i < count; i++)
+        {
+            int members = (int)packet.ReadBits<uint>(26);
+            if (members > MaxGuildNewsMembers)
+                return;
+
+            Span<bool> mask = masks.AsSpan(i * 8, 8);
+            MaskedGuid.ReadMaskBits(packet, mask, [7]);
+            memberMasks[i] = new bool[members * 8];
+            for (int member = 0; member < members; member++)
+                MaskedGuid.ReadMaskBits(packet, memberMasks[i].AsSpan(member * 8, 8), [7, 1, 5, 3, 4, 6, 0, 2]);
+            MaskedGuid.ReadMaskBits(packet, mask, [0, 6, 5, 4, 3, 1, 2]);
+        }
+
+        GuildNews news = new();
+        Span<byte> guidBytes = stackalloc byte[8];
+        for (int i = 0; i < count; i++)
+        {
+            GuildNewsEvent entry = new();
+            for (int member = 0; member < memberMasks[i].Length / 8; member++)
+            {
+                guidBytes.Clear();
+                MaskedGuid.ReadBytes(packet, memberMasks[i].AsSpan(member * 8, 8), guidBytes, [0, 1, 4, 7, 5, 6, 3, 2]);
+                entry.MemberList.Add(new WowGuid64(MaskedGuid.ToUInt64(guidBytes)).To128(GetSession().GameState));
+            }
+
+            ReadOnlySpan<bool> mask = masks.AsSpan(i * 8, 8);
+            guidBytes.Clear();
+            MaskedGuid.ReadBytes(packet, mask, guidBytes, [5]);
+            entry.Flags = packet.ReadInt32();
+            entry.Data[0] = packet.ReadInt32();
+            entry.Data[1] = packet.ReadInt32();
+            MaskedGuid.ReadBytes(packet, mask, guidBytes, [7, 6, 2, 3, 0, 4, 1]);
+            entry.Id = packet.ReadInt32() + Server.Systems.GuildSystem.CataNewsIdShift;
+            entry.Type = packet.ReadInt32();
+            entry.CompletedDate = packet.ReadPackedTime();
+
+            ulong memberGuid = MaskedGuid.ToUInt64(guidBytes);
+            if (memberGuid != 0)
+                entry.MemberGuid = new WowGuid64(memberGuid).To128(GetSession().GameState);
+
+            // The 4.4.2 client has no guild levels and makes no entry of this kind: asked for it,
+            // its news list answers with nothing at that place.
+            if (entry.Type == GuildNewsLevelUp)
+                continue;
+
+            // The client takes the entry's id from the value and its link from an item record of
+            // its own, which a 4.3.4 entry does not have. With the value alone the entry has no
+            // link, with the record alone no id.
+            if (entry.Type is >= GuildNewsItemLooted and <= GuildNewsItemPurchased)
+                entry.Item = new ItemInstance { ItemID = (uint)entry.Data[0] };
+            news.Events.Add(entry);
+        }
+
+        // Nothing left of what the server sent: no news to the client.
+        if (count > 0 && news.Events.Count == 0)
+            return;
+        SendPacketToClient(news);
+    }
 }

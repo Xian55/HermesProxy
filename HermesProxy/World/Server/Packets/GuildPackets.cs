@@ -1441,3 +1441,51 @@ public sealed class GuildRewardItem
     public int MinGuildRep;
     public ulong Cost;
 }
+
+public readonly record struct GuildQueryNews(WowGuid128 GuildGuid);
+
+public readonly record struct GuildNewsUpdateSticky(WowGuid128 GuildGuid, int NewsId, bool Sticky);
+
+/// <summary>
+/// The guild window's news: who earned, looted, made or bought what, and what the guild reached.
+/// The whole list in answer to a request, one entry when something happens or is pinned.
+/// </summary>
+public sealed class GuildNews : ServerPacket
+{
+    public GuildNews() : base(Opcode.SMSG_GUILD_NEWS) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt32(Events.Count);
+        foreach (GuildNewsEvent news in Events)
+        {
+            _worldPacket.WriteInt32(news.Id);
+            _worldPacket.WritePackedTime(news.CompletedDate);
+            _worldPacket.WriteInt32(news.Type);
+            _worldPacket.WriteInt32(news.Flags);
+            foreach (int data in news.Data)
+                _worldPacket.WriteInt32(data);
+            _worldPacket.WritePackedGuid128(news.MemberGuid);
+            _worldPacket.WriteInt32(news.MemberList.Count);
+            foreach (WowGuid128 member in news.MemberList)
+                _worldPacket.WritePackedGuid128(member);
+            _worldPacket.WriteBit(news.Item != null);
+            _worldPacket.FlushBits();
+            news.Item?.Write(_worldPacket);
+        }
+    }
+
+    public List<GuildNewsEvent> Events = [];
+}
+
+public sealed class GuildNewsEvent
+{
+    public int Id;
+    public long CompletedDate;      // unix time; WritePackedTime packs it
+    public int Type;
+    public int Flags;
+    public readonly int[] Data = new int[2];
+    public WowGuid128 MemberGuid = WowGuid128.Empty;
+    public List<WowGuid128> MemberList = [];
+    public ItemInstance? Item;
+}

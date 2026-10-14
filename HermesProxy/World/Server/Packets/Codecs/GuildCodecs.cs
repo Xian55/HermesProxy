@@ -431,3 +431,24 @@ public static class RequestGuildRewardsListCodec
         packet = new RequestGuildRewardsList(currentVersion);
     }
 }
+
+// The guild's GUID and nothing else (docs/protocol 4.4.2).
+public static class GuildQueryNewsCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out GuildQueryNews packet)
+        => packet = new GuildQueryNews(r.ReadPackedGuid128());
+}
+
+// The guild's GUID, the entry's id, then one bit (docs/protocol 4.4.2).
+public static class GuildNewsUpdateStickyCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out GuildNewsUpdateSticky packet)
+    {
+        WowGuid128 guildGuid = r.ReadPackedGuid128();
+        int newsId = r.ReadInt32();
+        bool sticky = r.HasBit();
+        packet = new GuildNewsUpdateSticky(guildGuid, newsId, sticky);
+    }
+}

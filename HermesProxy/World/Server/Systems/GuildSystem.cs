@@ -850,4 +850,55 @@ public static class GuildSystem
         packet.WriteUInt32((uint)request.CurrentVersion);
         ctx.SendPacketToServer(packet);
     }
+
+    /// <summary>
+    /// A 4.3.4 server numbers a guild's news from 0 (TrinityCore 4.3.4 <c>LogHolder::GetNextGUID</c>).
+    /// The 4.4.2 client shows the pin of entry 0 on the day's header line and not on the entry,
+    /// and then never asks to let it go; from 1 on it pins the entry. So the client is given
+    /// every id one higher than the server has it.
+    /// </summary>
+    internal const int CataNewsIdShift = 1;
+
+    /// <summary>
+    /// The guild window's news. Only a 4.x server keeps any. The request is the guild's GUID in
+    /// the 4.3.4 client's own bit and byte order (WowPacketParser's 4.3.4 parser; TrinityCore
+    /// 4.3.4 <c>HandleGuildQueryNewsOpcode</c> skips four bytes and reads none of it).
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_GUILD_QUERY_NEWS)]
+    public static void HandleGuildQueryNews(in GuildQueryNews query, in SessionContext ctx)
+    {
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_GUILD_QUERY_NEWS);
+        MaskedGuid.Write(packet, CataGuildGuid(query.GuildGuid.GetCounter()), [4, 2, 6, 3, 5, 0, 1, 7], [4, 1, 5, 6, 0, 3, 7, 2]);
+        ctx.SendPacketToServer(packet);
+    }
+
+    /// <summary>
+    /// A news entry pinned to the top of the list, or let go again (TrinityCore 4.3.4
+    /// <c>HandleGuildNewsUpdateStickyOpcode</c>: the entry's id, then the flag among the mask bits
+    /// of the guild's GUID).
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_GUILD_NEWS_UPDATE_STICKY)]
+    public static void HandleGuildNewsUpdateSticky(in GuildNewsUpdateSticky sticky, in SessionContext ctx)
+    {
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_GUILD_NEWS_UPDATE_STICKY);
+        WriteCataNewsUpdateSticky(packet, sticky);
+        ctx.SendPacketToServer(packet);
+    }
+
+    internal static void WriteCataNewsUpdateSticky(WorldPacket packet, GuildNewsUpdateSticky sticky)
+    {
+        ulong guild = CataGuildGuid(sticky.GuildGuid.GetCounter());
+        packet.WriteInt32(sticky.NewsId - CataNewsIdShift);
+        MaskedGuid.WriteMaskBits(packet, guild, [2, 4, 3, 0]);
+        packet.WriteBit(sticky.Sticky);
+        MaskedGuid.WriteMaskBits(packet, guild, [6, 7, 1, 5]);
+        packet.FlushBits();
+        MaskedGuid.WriteBytes(packet, guild, [6, 2, 1, 0, 5, 3, 7, 4]);
+    }
 }
