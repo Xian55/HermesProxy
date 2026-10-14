@@ -275,6 +275,12 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_LFG_PARTY_INFO)]
     internal void HandleLFGPartyInfo(WorldPacket packet)
     {
+        if (IsCataLegacy)
+        {
+            HandleLFGPartyInfoCata(packet);
+            return;
+        }
+
         LFGPartyInfo info = new LFGPartyInfo();
         byte playerCount = packet.ReadUInt8();
         for (byte i = 0; i < playerCount; i++)
@@ -319,9 +325,170 @@ public partial class WorldClient
         }
     }
 
+    // Counts past these are a misread, not a dungeon list.
+    private const int MaxLfgEntries = 1024;
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>LFGPartyInfo::Write</c>: the locks of each other member, by a plain
+    /// GUID, four numbers a lock (the dungeon, the reason, the item level needed and had).
+    /// </summary>
+    internal void HandleLFGPartyInfoCata(WorldPacket packet)
+    {
+        LFGPartyInfo info = new LFGPartyInfo();
+        byte playerCount = packet.ReadUInt8();
+        for (int i = 0; i < playerCount; i++)
+        {
+            LFGBlackListEntry entry = new LFGBlackListEntry();
+            entry.PlayerGuid = packet.ReadGuid().To128(GetSession().GameState);
+            uint lockCount = packet.ReadUInt32();
+            if (lockCount > MaxLfgEntries)
+                return;
+            var alreadyListed = new HashSet<uint>((int)lockCount);
+            for (uint j = 0; j < lockCount; j++)
+            {
+                LFGLockInfoData lockInfo = new LFGLockInfoData();
+                lockInfo.Slot = packet.ReadUInt32();
+                lockInfo.LockStatus = LfgSlots.ToDisplayLockStatus(packet.ReadUInt32());
+                lockInfo.SubReason1 = packet.ReadUInt32();
+                lockInfo.SubReason2 = packet.ReadUInt32();
+                lockInfo.SoftLock = LfgSlots.ToPartySoftLock(lockInfo.LockStatus);
+                entry.Locks.Add(lockInfo);
+                alreadyListed.Add(LfgSlots.GetDungeonId(lockInfo.Slot));
+                GetSession().GameState.RememberLfgSlot(lockInfo.Slot);
+            }
+            // the party's dungeon list reads these, not the player's (as on 3.4.3)
+            foreach (uint packed in LfgSlots.GetCataHideSlots(alreadyListed))
+                entry.Locks.Add(new LFGLockInfoData { Slot = packed, LockStatus = (uint)LFGLockStatus.NotInSeason, SoftLock = (uint)LFGSoftLock.Unk2 });
+            info.Players.Add(entry);
+        }
+        SendPacketToClient(info);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>LFGPlayerInfo::Write</c>: the dungeons the player may queue for, each
+    /// with what it pays and how often it may be had, a shortage reward per role and the rewards
+    /// themselves; then the locked dungeons, four numbers each.
+    /// </summary>
+    /// <remarks>
+    /// 3.3.5a sends a dungeon's slot, a done flag and the rewards only; 4.3.4 sends the numbers a
+    /// modern client wants, so they go on as they came.
+    /// </remarks>
+    internal void HandleLFGPlayerInfoCata(WorldPacket packet)
+    {
+        LFGPlayerInfoPkt info = new LFGPlayerInfoPkt();
+        var session = GetSession().GameState;
+
+        byte dungeonCount = packet.ReadUInt8();
+        for (int i = 0; i < dungeonCount; i++)
+        {
+            LFGPlayerDungeonInfo dungeon = new LFGPlayerDungeonInfo();
+            dungeon.Slot = packet.ReadUInt32();
+            dungeon.FirstReward = packet.ReadUInt8() != 0;
+            dungeon.CompletionQuantity = packet.ReadInt32();
+            dungeon.CompletionLimit = packet.ReadInt32();
+            dungeon.CompletionCurrencyID = packet.ReadInt32();
+            dungeon.SpecificQuantity = packet.ReadInt32();
+            dungeon.SpecificLimit = packet.ReadInt32();
+            dungeon.OverallQuantity = packet.ReadInt32();
+            dungeon.OverallLimit = packet.ReadInt32();
+            dungeon.PurseWeeklyQuantity = packet.ReadInt32();
+            dungeon.PurseWeeklyLimit = packet.ReadInt32();
+            dungeon.PurseQuantity = packet.ReadInt32();
+            dungeon.PurseLimit = packet.ReadInt32();
+            dungeon.Quantity = packet.ReadInt32();
+            dungeon.CompletedMask = packet.ReadUInt32();
+
+            // A role mask and a reward for each of three roles when a role is short, else the
+            // masks alone. The modern packet's shortage rewards are not filled.
+            bool shortageEligible = packet.ReadUInt8() != 0;
+            for (int role = 0; role < 3; role++)
+            {
+                packet.ReadUInt32();
+                if (shortageEligible)
+                    ReadLfgRewardCata(packet);
+            }
+
+            dungeon.Rewards = ReadLfgRewardCata(packet);
+            info.Dungeons.Add(dungeon);
+        }
+
+        LFGBlackList blackList = new LFGBlackList();
+        blackList.Slots = new List<LFGBlackListSlot>();
+        uint lockCount = packet.ReadUInt32();
+        if (lockCount > MaxLfgEntries)
+            return;
+        for (uint i = 0; i < lockCount; i++)
+        {
+            LFGBlackListSlot slot = new LFGBlackListSlot();
+            slot.Slot = packet.ReadUInt32();
+            slot.Reason = LfgSlots.ToDisplayLockStatus(packet.ReadUInt32());
+            slot.SubReason1 = packet.ReadInt32();
+            slot.SubReason2 = packet.ReadInt32();
+            slot.SoftLock = LfgSlots.ToSoftLock(slot.Reason);
+            blackList.Slots.Add(slot);
+        }
+
+        // The client's own dungeons the server does not have would show as open and queue
+        // into nothing; listed as out of season with the soft lock that hides a row.
+        var alreadyListed = new HashSet<uint>(blackList.Slots.Count + info.Dungeons.Count);
+        foreach (var existing in blackList.Slots)
+            alreadyListed.Add(LfgSlots.GetDungeonId(existing.Slot));
+        foreach (var dungeon in info.Dungeons)
+            alreadyListed.Add(LfgSlots.GetDungeonId(dungeon.Slot));
+        foreach (uint packed in LfgSlots.GetCataHideSlots(alreadyListed))
+            blackList.Slots.Add(new LFGBlackListSlot { Slot = packed, Reason = (uint)LFGLockStatus.NotInSeason, SoftLock = (uint)LFGSoftLock.Unk2 });
+        info.BlackList = blackList;
+
+        var known = session.LfgKnownDungeonIds;
+        foreach (var dungeon in info.Dungeons)
+        {
+            known.Add(dungeon.Slot & 0xFFFFFF);
+            session.RememberLfgSlot(dungeon.Slot);
+        }
+        foreach (var locked in blackList.Slots)
+        {
+            known.Add(locked.Slot & 0xFFFFFF);
+            session.RememberLfgSlot(locked.Slot);
+        }
+        SendPacketToClient(info);
+    }
+
+    /// <summary>
+    /// A 4.3.4 dungeon reward: money, experience, then items and currencies in one list, each
+    /// marked by its last byte (1 a currency, 0 an item).
+    /// </summary>
+    private static LFGPlayerQuestReward ReadLfgRewardCata(WorldPacket packet)
+    {
+        LFGPlayerQuestReward rewards = new LFGPlayerQuestReward();
+        rewards.Items = new List<LFGPlayerQuestRewardItem>();
+        rewards.Currency = new List<LFGPlayerQuestRewardCurrency>();
+        rewards.BonusCurrency = new List<LFGPlayerQuestRewardCurrency>();
+        rewards.RewardMoney = packet.ReadInt32();
+        rewards.RewardXP = packet.ReadInt32();
+        byte count = packet.ReadUInt8();
+        for (int i = 0; i < count; i++)
+        {
+            int id = packet.ReadInt32();
+            packet.ReadInt32();     // an item's display, 0 for a currency
+            int quantity = packet.ReadInt32();
+            bool isCurrency = packet.ReadUInt8() != 0;
+            if (isCurrency)
+                rewards.Currency.Add(new LFGPlayerQuestRewardCurrency { CurrencyID = id, Quantity = quantity });
+            else
+                rewards.Items.Add(new LFGPlayerQuestRewardItem { ItemID = id, Quantity = quantity });
+        }
+        return rewards;
+    }
+
     [HandlesSmsg(Opcode.SMSG_LFG_PLAYER_INFO)]
     internal void HandleLFGPlayerInfo(WorldPacket packet)
     {
+        if (IsCataLegacy)
+        {
+            HandleLFGPlayerInfoCata(packet);
+            return;
+        }
+
         LFGPlayerInfoPkt info = new LFGPlayerInfoPkt();
 
         // Random / available dungeons

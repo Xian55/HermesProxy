@@ -111,6 +111,43 @@ public static class LfgSlots
         return extra;
     }
 
+    // LFGDungeons rows of the 4.4.2.60895 client that TrinityCore 4.3.4's LFGDungeons.dbc (240
+    // rows, highest ID 448) does not have: End Time, Well of Eternity and Hour of Twilight under
+    // IDs of their own, the Titan Rune Protocol blocks, Rise of the Zandalari and the two Elemental
+    // Rune Protocol blocks. A block starts with its random's header row.
+    private static readonly (uint First, uint Last)[] CataClientOnlyDungeons =
+    [
+        (436, 436), (438, 438), (440, 440),
+        (TitanRuneGammaHeaderId, TitanRuneGammaLastDungeonId),
+        (TitanRuneBetaHeaderId, TitanRuneBetaLastDungeonId),
+        (TitanRuneAlphaHeaderId, TitanRuneAlphaLastDungeonId),
+        (2735, 2735), (2760, 2769), (2881, 2890), (2894, 2896),
+    ];
+
+    private static readonly uint[] CataClientOnlyRandoms =
+        [TitanRuneGammaHeaderId, TitanRuneBetaHeaderId, TitanRuneAlphaHeaderId, 2735, 2760, 2881];
+
+    /// <summary>
+    /// The same hide-rows for the 4.4.2 client on a 4.3.4 server: every dungeon of the client's
+    /// that the server does not have, a random as a random.
+    /// </summary>
+    public static List<uint> GetCataHideSlots(IEnumerable<uint> alreadyListedDungeonIds)
+    {
+        var have = alreadyListedDungeonIds as HashSet<uint> ?? new HashSet<uint>(alreadyListedDungeonIds);
+        var extra = new List<uint>();
+        foreach ((uint first, uint last) in CataClientOnlyDungeons)
+        {
+            for (uint id = first; id <= last; id++)
+            {
+                if (have.Contains(id))
+                    continue;
+                uint type = System.Array.IndexOf(CataClientOnlyRandoms, id) >= 0 ? LfgTypeRandom : LfgTypeDungeon;
+                extra.Add(PackSlot(type, id));
+            }
+        }
+        return extra;
+    }
+
     /// <summary>
     /// First requested dungeon the 3.3.5a backend cannot serve. Titan Rune / other
     /// post-3.3.5 LFGDungeons IDs belong here. Real 3.3.5 specifics (Utgarde, Gundrak,

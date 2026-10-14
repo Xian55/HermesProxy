@@ -27,6 +27,17 @@ public static class LfgSystem
         if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
             return;
 
+        // 4.3.4 has one request for both, and one bit for which (TrinityCore 4.3.4
+        // LFGGetSystemInfo::Read); the two 3.3.5a requests are not in its table.
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            WorldPacket cata = new WorldPacket(Opcode.CMSG_DF_GET_SYSTEM_INFO);
+            cata.WriteBit(packet.Player);
+            cata.FlushBits();
+            ctx.SendPacketToServer(cata);
+            return;
+        }
+
         WorldPacket legacy = new WorldPacket(packet.Player
             ? Opcode.CMSG_LFG_PLAYER_LOCK_INFO_REQUEST
             : Opcode.CMSG_LFG_PARTY_LOCK_INFO_REQUEST);
