@@ -210,6 +210,8 @@ def sources_at_page_commit(out: Path, files: list[str]) -> dict[str, str]:
 def send_segment(body: str, opcode: str) -> str:
     """The code from `new WorldPacket(Opcode.X)` to the call that sends it."""
     start = body.find(f'new WorldPacket(Opcode.{opcode}')
+    if start == -1:
+        start = body.find('new WorldPacket(opcode)')
     end = body.find('SendPacketToServer(', start)
     return body[start:end if end != -1 else len(body)]
 
@@ -691,6 +693,7 @@ def client_layout_section(log_dirs: list[Path], client_errors: dict) -> list[str
 # 4.3.4 and is what HermesProxy reads or writes already: the change is elsewhere in the family,
 # or trails what HermesProxy takes. (direction, opcode) -> what was read. Shown as "reviewed".
 LEGACY_REVIEWED = {
+    ('C', 'CMSG_BATTLEMASTER_HELLO'): 'HandleBattlemasterHelloOpcode: the battlemaster, a plain GUID',
     ('C', 'CMSG_MAIL_MARK_AS_READ'): 'HandleMailMarkAsRead: mailbox, mail id; 12 bytes captured',
     ('C', 'CMSG_QUEST_GIVER_COMPLETE_QUEST'): 'QuestGiverCompleteQuest::Read: giver, quest, FromScript',
     ('C', 'CMSG_QUEST_POI_QUERY'): 'QuestPOIQuery::Read: count, quest ids',
@@ -775,6 +778,7 @@ def main() -> None:
     rows = []   # (dir, opcode, mapped, ported, layout, seen, where)
     smsg_handlers: dict[str, list[tuple[str, str]]] = defaultdict(list)
     cmsg_sites: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    forwarded: dict[str, list[tuple[str, str]]] = defaultdict(list)
     for name, defs in methods.items():
         for rel, body in defs:
             for m in re.finditer(r'HandlesSmsg\(Opcode\.([A-Z0-9_]+)', body):
@@ -782,6 +786,10 @@ def main() -> None:
                     smsg_handlers[m.group(1)].append((rel, body))
             for m in re.finditer(r'new WorldPacket\(Opcode\.((?:CMSG|MSG)_[A-Z0-9_]+)', body):
                 cmsg_sites[m.group(1)].append((rel, body))
+            # a forwarder that builds the packet from the opcode it is handed sends the ones it handles
+            if 'new WorldPacket(opcode)' in body:
+                for m in re.finditer(r'HandlesCmsg\(Opcode\.((?:CMSG|MSG)_[A-Z0-9_]+)', body):
+                    forwarded[m.group(1)].append((rel, body))
 
     for op, defs in smsg_handlers.items():
         if op not in v335:
@@ -796,10 +804,10 @@ def main() -> None:
         if sequences_file.exists() else set()
     movement_writer = os.path.relpath(HP / 'World' / 'Objects' / 'LegacyMovementCata.cs', REPO).replace(os.sep, '/')
 
-    for op in set(cmsg_sites) | {o for o in ev.cmsg if o.startswith(('CMSG', 'MSG'))} | sequenced:
+    for op in set(cmsg_sites) | set(forwarded) | {o for o in ev.cmsg if o.startswith(('CMSG', 'MSG'))} | sequenced:
         if op not in v335:
             continue
-        defs = cmsg_sites.get(op, [])
+        defs = cmsg_sites.get(op, []) or ([] if op in sequenced else forwarded.get(op, []))
         # A sender inside a method named *Cata is the 4.3.4 version by construction.
         in_cata_method = any(re.search(r'\b\w+Cata\s*\(', b[:b.find('{')]) for _, b in defs)
         is_ported = op in sequenced or in_cata_method or any(ported(send_segment(b, op), methods) for _, b in defs)
