@@ -41,6 +41,12 @@ internal static class DeliberatelyUnhandledOpcodes
         // ones have none), and the forced reactions, which every legacy server sends at login.
         Opcode.CMSG_QUERY_COUNTDOWN_TIMER,
         Opcode.CMSG_REQUEST_FORCED_REACTIONS,
+        // What a group has that a member new to it was not told: its target icons and its raid
+        // markers (TrinityCore cata_classic, HandleRequestPartyJoinUpdates). A legacy server gives
+        // the icons only when asked its own way, and the proxy asks by itself whenever a party
+        // update names a group it did not know (GroupHandler, RequestRaidTargetIconList). Raid
+        // markers have no translation yet.
+        Opcode.CMSG_REQUEST_PARTY_JOIN_UPDATES,
         // Bookkeeping of the modern connection that ends at the proxy: the client's word that it
         // has worked off the packets queued for it, how many time sync answers it threw away, and
         // its answer to the suspend token the proxy itself sent around a teleport.

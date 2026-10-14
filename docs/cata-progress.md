@@ -36,13 +36,12 @@ What the 4.4.2 client sent in a 4.3.4 session and no handler took, most recent s
 | Opcode | TrinityCore cata_classic | Count | Session |
 |---|---|---:|---|
 | `CMSG_COMMERCE_TOKEN_GET_LOG` | acts on it | 1 | 20261011_151802 |
-| `CMSG_REQUEST_PARTY_JOIN_UPDATES` | acts on it | 1 | 20261014_014426 |
 | `CMSG_REQUEST_PVP_REWARDS` | acts on it | 1 | 20261014_030359 |
 | `CMSG_USED_FOLLOW` | ignores it | 2 | 20261011_171859 |
 | `CMSG_GET_ACCOUNT_NOTIFICATIONS` | ignores it | 1 | 20261014_010824 |
 | `CMSG_REQUEST_CROWD_CONTROL_SPELL` | ignores it | 1 | 20261013_002535 |
 
-15 more that the client sent are left alone on purpose, each with its reason in `World/Logging/DeliberatelyUnhandledOpcodes.cs`: `CMSG_BATTLE_PAY_GET_PRODUCT_LIST`, `CMSG_BATTLE_PAY_GET_PURCHASE_LIST`, `CMSG_DISCARDED_TIME_SYNC_ACKS`, `CMSG_GET_UNDELETE_CHARACTER_COOLDOWN_STATUS`, `CMSG_LOG_STREAMING_ERROR`, `CMSG_MOVE_SET_TURN_RATE_CHEAT`, `CMSG_OVERRIDE_SCREEN_FLASH`, `CMSG_QUERY_COUNTDOWN_TIMER`, `CMSG_QUEUED_MESSAGES_END`, `CMSG_REPORT_CLIENT_VARIABLES`, `CMSG_REPORT_ENABLED_ADDONS`, `CMSG_REPORT_KEYBINDING_EXECUTION_COUNTS`, `CMSG_SOCIAL_CONTRACT_REQUEST`, `CMSG_SUSPEND_TOKEN_RESPONSE`, `CMSG_UPDATE_VAS_PURCHASE_STATES`.
+16 more that the client sent are left alone on purpose, each with its reason in `World/Logging/DeliberatelyUnhandledOpcodes.cs`: `CMSG_BATTLE_PAY_GET_PRODUCT_LIST`, `CMSG_BATTLE_PAY_GET_PURCHASE_LIST`, `CMSG_DISCARDED_TIME_SYNC_ACKS`, `CMSG_GET_UNDELETE_CHARACTER_COOLDOWN_STATUS`, `CMSG_LOG_STREAMING_ERROR`, `CMSG_MOVE_SET_TURN_RATE_CHEAT`, `CMSG_OVERRIDE_SCREEN_FLASH`, `CMSG_QUERY_COUNTDOWN_TIMER`, `CMSG_QUEUED_MESSAGES_END`, `CMSG_REPORT_CLIENT_VARIABLES`, `CMSG_REPORT_ENABLED_ADDONS`, `CMSG_REPORT_KEYBINDING_EXECUTION_COUNTS`, `CMSG_REQUEST_PARTY_JOIN_UPDATES`, `CMSG_SOCIAL_CONTRACT_REQUEST`, `CMSG_SUSPEND_TOKEN_RESPONSE`, `CMSG_UPDATE_VAS_PURCHASE_STATES`.
 
 Reading a change: `3.4.3 snippet` → `4.4.2 snippet`, in the docs/protocol layout notation (u8/u16/u32/u64/f32 fields, `guid` a packed GUID, `bytes` a string, `bits(n)` a bit field, `opt[ … ]` present only when a flag says so, `loop[ … ]` repeated, `alt[ … ]` one of two branches; grouping braces dropped). Two tokens of context either side.
 
