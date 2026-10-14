@@ -343,7 +343,7 @@ public static class GuildSystem
         if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
         {
             // TrinityCore 4.3.4 SetGuildMaster::Read: name length, the dethrone flag, the name.
-            string newMaster = LegacyPlayerName.StripRealmSuffix(master.NewMasterName).ToString();
+            string newMaster = StripGluedRealm(LegacyPlayerName.StripRealmSuffix(master.NewMasterName).ToString(), in ctx);
             packet.WriteBits(System.Text.Encoding.UTF8.GetByteCount(newMaster), 7);
             packet.WriteBit(false);
             packet.FlushBits();
@@ -352,6 +352,23 @@ public static class GuildSystem
         else
             packet.WriteCString(LegacyPlayerName.StripRealmSuffix(master.NewMasterName));
         ctx.SendPacketToServer(packet);
+    }
+
+    /// <summary>
+    /// The 4.4.2 client sends <c>/gleader Name-Realm</c> as the name and the realm's normalized
+    /// name run together, without the hyphen (<c>ElmagiTrinity4.3.4</c>, #416), and nothing at all
+    /// for the bare name. A name that ends in a known realm's normalized name loses it. Character
+    /// names are letters only, so this cannot cut into a name.
+    /// </summary>
+    internal static string StripGluedRealm(string name, in SessionContext ctx)
+    {
+        foreach (var realm in ctx.GetSession().RealmManager.GetRealms())
+        {
+            string suffix = realm.NormalizedName;
+            if (suffix.Length > 0 && name.Length > suffix.Length && name.EndsWith(suffix, StringComparison.Ordinal))
+                return name[..^suffix.Length];
+        }
+        return name;
     }
 
     [HandlesCmsg(Opcode.CMSG_GUILD_LEAVE)]
