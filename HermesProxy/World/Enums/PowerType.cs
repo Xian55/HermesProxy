@@ -16,6 +16,10 @@ public enum PowerType : sbyte
     Happiness                     = 4,            // UNIT_FIELD_POWER5
     Rune                          = 5,            // UNIT_FIELD_POWER6
     RunicPower                    = 6,            // UNIT_FIELD_POWER7
+    // The Cataclysm class powers: a 4.3.4 server sends them, the 4.4.2 client shows them.
+    SoulShards                    = 7,
+    Eclipse                       = 8,
+    HolyPower                     = 9,
     ComboPoints                   = 14,           // not real, so we know to set PLAYER_FIELD_BYTES,1
     // Per-rune-type power slots used by V3_4_3 retail (TC-wotlk_classic Powers enum).
     // The V3_4_3 client expects SMSG_SPELL_GO RemainingPower entries with these types

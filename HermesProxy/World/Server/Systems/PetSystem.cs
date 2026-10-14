@@ -174,6 +174,17 @@ public static class PetSystem
         ctx.SendPacketToServer(packet);
     }
 
+    [HandlesCmsg(Opcode.CMSG_PET_SPELL_AUTOCAST)]
+    public static void HandlePetSpellAutocast(in PetSpellAutocast autocast, in SessionContext ctx)
+    {
+        // Without it the client shows the change and the server goes on casting as before.
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_SPELL_AUTOCAST);
+        packet.WriteGuid(autocast.PetGUID.To64(ctx.GetSession().GameState));
+        packet.WriteUInt32(autocast.SpellID);
+        packet.WriteUInt8((byte)(autocast.AutocastEnabled ? 1 : 0));
+        ctx.SendPacketToServer(packet);
+    }
+
     [HandlesCmsg(Opcode.CMSG_REQUEST_PET_INFO)]
     public static void HandleRequestPetInfo(in EmptyClientPacket r, in SessionContext ctx)
     {

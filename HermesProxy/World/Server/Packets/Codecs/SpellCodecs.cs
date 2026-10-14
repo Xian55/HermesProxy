@@ -292,3 +292,20 @@ public static class PetCancelAuraCodec
         packet = new PetCancelAura(petGuid, spellId);
     }
 }
+
+/// <summary>
+/// A pet spell's autocast turned on or off: the modern clients' one layout (TrinityCore
+/// PetSpellAutocast::Read, cata_classic and master alike). Seen from the 4.4.2 client; 3.4.3 has
+/// no such opcode.
+/// </summary>
+public static class PetSpellAutocastCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out PetSpellAutocast packet)
+    {
+        WowGuid128 petGuid = r.ReadPackedGuid128();
+        uint spellId = r.ReadUInt32();
+        bool enabled = r.HasBit();
+        packet = new PetSpellAutocast(petGuid, spellId, enabled);
+    }
+}

@@ -448,4 +448,17 @@ public class SpellCodecEquivalenceTests
         Assert.Equal(e.PetGUID, a.PetGUID);
         Assert.Equal(o.Remaining(), r.Remaining);
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void PetSpellAutocast_ReadsGuidSpellAndFlag(bool enabled)
+    {
+        var (_, f) = Build(w => { w.WritePackedGuid128(Guid); w.WriteUInt32(17253); w.WriteBit(enabled); w.FlushBits(); });
+        var r = ReaderOver(f); PetSpellAutocastCodec.Read(ref r, out var a);
+        Assert.Equal(Guid, a.PetGUID);
+        Assert.Equal(17253u, a.SpellID);
+        Assert.Equal(enabled, a.AutocastEnabled);
+        Assert.Equal(0, r.Remaining);
+    }
 }

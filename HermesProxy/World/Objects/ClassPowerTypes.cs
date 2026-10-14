@@ -12,6 +12,23 @@ public static class ClassPowerTypes
     // ChrClassesXPowerTypes.db2
     public static sbyte GetPowerSlotForClass(Class classId, PowerType power)
     {
+        // 4.4.2's table gives a hunter focus where the older clients have mana, and each Cataclysm
+        // class power a slot of its own; for the rest it is the older clients' table. Without
+        // these the value had no slot and the bar stayed at 0.
+        if (ModernVersion.AddedInVersion(4, 4, 0))
+        {
+            switch (classId, power)
+            {
+                case (Class.Hunter, PowerType.Focus):
+                    return 0;
+                case (Class.Paladin, PowerType.HolyPower):
+                case (Class.Warlock, PowerType.SoulShards):
+                    return 1;
+                case (Class.Druid, PowerType.Eclipse):
+                    return 4;
+            }
+        }
+
         switch (classId)
         {
             case Class.Warrior:

@@ -2167,6 +2167,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.PetSystem.HandlePetSetAction(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetSpellAutocast_CMSG_PET_SPELL_AUTOCAST(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.PetSpellAutocastCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.PetSystem.HandlePetSpellAutocast(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetStopAttack_CMSG_PET_STOP_ATTACK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.PetStopAttackCodec.Read(ref reader, out var packet);
@@ -3566,6 +3572,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_LEARN_TALENT] = &Thunk_HermesProxy_World_Server_Systems_TalentSystem_HandleLearnPetTalent_CMSG_PET_LEARN_TALENT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_RENAME] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetRename_CMSG_PET_RENAME;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_SET_ACTION] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetSetAction_CMSG_PET_SET_ACTION;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_SPELL_AUTOCAST] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetSpellAutocast_CMSG_PET_SPELL_AUTOCAST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PET_STOP_ATTACK] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandlePetStopAttack_CMSG_PET_STOP_ATTACK;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PLAYER_LOGIN] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandlePlayerLogin_CMSG_PLAYER_LOGIN;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_PLAYER_SHOWING_CLOAK] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleShowHelmOrCloak_CMSG_PLAYER_SHOWING_CLOAK;
@@ -4082,6 +4089,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_PET_LEARN_TALENT,
             global::HermesProxy.World.Enums.Opcode.CMSG_PET_RENAME,
             global::HermesProxy.World.Enums.Opcode.CMSG_PET_SET_ACTION,
+            global::HermesProxy.World.Enums.Opcode.CMSG_PET_SPELL_AUTOCAST,
             global::HermesProxy.World.Enums.Opcode.CMSG_PET_STOP_ATTACK,
             global::HermesProxy.World.Enums.Opcode.CMSG_PLAYER_LOGIN,
             global::HermesProxy.World.Enums.Opcode.CMSG_PLAYER_SHOWING_CLOAK,

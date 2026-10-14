@@ -468,3 +468,5 @@ public readonly record struct StableSwapPet(uint PetNumber, WowGuid128 StableMas
 
 public readonly record struct PetCancelAura(WowGuid128 PetGUID, uint SpellID);
 
+public readonly record struct PetSpellAutocast(WowGuid128 PetGUID, uint SpellID, bool AutocastEnabled);
+

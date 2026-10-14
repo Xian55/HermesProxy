@@ -14,18 +14,14 @@ namespace HermesProxy.World.Objects;
 /// </remarks>
 public static class LegacyPowerSlotsCata
 {
-    private const PowerType SoulShards = (PowerType)7;
-    private const PowerType Eclipse = (PowerType)8;
-    private const PowerType HolyPower = (PowerType)9;
-
     private static readonly PowerType[] Warrior = [PowerType.Rage];
-    private static readonly PowerType[] Paladin = [PowerType.Mana, HolyPower];
+    private static readonly PowerType[] Paladin = [PowerType.Mana, PowerType.HolyPower];
     private static readonly PowerType[] Hunter = [PowerType.Focus];
     private static readonly PowerType[] Rogue = [PowerType.Energy];
     private static readonly PowerType[] ManaOnly = [PowerType.Mana];
     private static readonly PowerType[] DeathKnight = [PowerType.RunicPower];
-    private static readonly PowerType[] Warlock = [PowerType.Mana, SoulShards];
-    private static readonly PowerType[] Druid = [PowerType.Mana, PowerType.Rage, PowerType.Energy, Eclipse];
+    private static readonly PowerType[] Warlock = [PowerType.Mana, PowerType.SoulShards];
+    private static readonly PowerType[] Druid = [PowerType.Mana, PowerType.Rage, PowerType.Energy, PowerType.Eclipse];
 
     /// <summary>The power in <paramref name="slot"/> for <paramref name="classId"/>, or Invalid.</summary>
     public static PowerType TypeAt(Class classId, int slot)
