@@ -5,8 +5,10 @@ using HermesProxy.World.Server.Packets;
 namespace HermesProxy.World.Client;
 
 // The calendar of a 3.3.5a server (AzerothCore CalendarMgr::Send* and
-// WorldSession::HandleCalendarGetCalendar) for the 3.4.3 client. Only a 3.3.5a server sends these
-// opcodes; the 1.12 and 2.4.3 servers have no calendar.
+// WorldSession::HandleCalendarGetCalendar) and of a 4.3.4 server (TrinityCore 4.3.4) for the 3.4.3
+// and 4.4.2 clients. The two servers write most of them alike; the calendar list, an event and an
+// invitation alert carry the guild's GUID on 4.3.4 and are read by the *Cata methods. The 1.12 and
+// 2.4.3 servers have no calendar.
 public partial class WorldClient
 {
     [HandlesSmsg(Opcode.SMSG_CALENDAR_SEND_NUM_PENDING)]
@@ -20,6 +22,12 @@ public partial class WorldClient
     // Counts past these are a misread, not a calendar: a 3.3.5a server keeps a hundred invitations
     // an event and thirty events a player.
     private const int MaxCalendarEntries = 4096;
+
+    /// <summary>
+    /// A 4.3.4 guild's GUID as the id the 4.4.2 client knows the guild's calendar by: the guild's
+    /// number, as TrinityCore cata_classic sends it.
+    /// </summary>
+    private static ulong CalendarClubId(ulong guildGuid) => guildGuid & 0x000FFFFFFFFFFFFFul;
 
     private WowGuid128 CalendarPlayer(WowGuid64 guid)
         => guid.IsEmpty() ? WowGuid128.Empty : guid.To128(GetSession().GameState);
@@ -49,6 +57,12 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_CALENDAR_SEND_CALENDAR)]
     internal void HandleCalendarSendCalendar(WorldPacket packet)
     {
+        if (IsCataLegacy)
+        {
+            HandleCalendarSendCalendarCata(packet);
+            return;
+        }
+
         CalendarClock clock = CalendarClock.For(GetSession());
         CalendarSendCalendar calendar = new();
 
@@ -100,6 +114,55 @@ public partial class WorldClient
     }
 
     /// <summary>
+    /// TrinityCore 4.3.4 <c>HandleCalendarGetCalendar</c>: the invitations, the events, the time,
+    /// then the raids the player is saved to, the raids' reset times and the holidays the server
+    /// changed. The client is sent the first two lists. The raid lists are left out (4.3.4 gives
+    /// the seconds until a reset, the 4.4.2 client wants a period and an offset), and the client
+    /// has the holidays in a table of its own.
+    /// </summary>
+    internal void HandleCalendarSendCalendarCata(WorldPacket packet)
+    {
+        CalendarClock clock = CalendarClock.For(GetSession());
+        CalendarSendCalendar calendar = new();
+
+        uint inviteCount = packet.ReadUInt32();
+        if (inviteCount > MaxCalendarEntries)
+            return;
+        for (uint i = 0; i < inviteCount; i++)
+        {
+            CalendarListInvite invite = new();
+            invite.EventId = packet.ReadUInt64();
+            invite.InviteId = packet.ReadUInt64();
+            invite.Status = packet.ReadUInt8();
+            invite.Moderator = packet.ReadUInt8();
+            invite.InviteType = packet.ReadUInt8();
+            invite.InviterGuid = CalendarPlayer(packet.ReadPackedGuid());
+            calendar.Invites.Add(invite);
+        }
+
+        uint eventCount = packet.ReadUInt32();
+        if (eventCount > MaxCalendarEntries)
+            return;
+        for (uint i = 0; i < eventCount; i++)
+        {
+            CalendarListEvent calendarEvent = new();
+            calendarEvent.EventId = packet.ReadUInt64();
+            calendarEvent.EventName = packet.ReadCString();
+            calendarEvent.EventType = (byte)packet.ReadUInt32();
+            calendarEvent.Date = clock.ToClient(packet.ReadUInt32());
+            calendarEvent.Flags = packet.ReadUInt32();
+            calendarEvent.TextureId = packet.ReadInt32();
+            calendarEvent.EventClubId = CalendarClubId(packet.ReadUInt64());
+            calendarEvent.OwnerGuid = CalendarPlayer(packet.ReadPackedGuid());
+            calendar.Events.Add(calendarEvent);
+        }
+
+        packet.ReadUInt32();                    // the server's time in seconds
+        calendar.ServerTime = packet.ReadUInt32();  // and as a packed date
+        SendPacketToClient(calendar);
+    }
+
+    /// <summary>
     /// <c>CalendarMgr::SendCalendarEvent</c>: the event with its two texts in the middle, then
     /// everybody invited, each with the note they left. The guild a guild event is for is its
     /// number, which the modern client takes as the event's club, as TrinityCore wotlk_classic
@@ -108,6 +171,12 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_CALENDAR_SEND_EVENT)]
     internal void HandleCalendarSendEvent(WorldPacket packet)
     {
+        if (IsCataLegacy)
+        {
+            HandleCalendarSendEventCata(packet);
+            return;
+        }
+
         CalendarClock clock = CalendarClock.For(GetSession());
         CalendarSendEvent calendarEvent = new();
         calendarEvent.SendType = packet.ReadUInt8();
@@ -123,6 +192,47 @@ public partial class WorldClient
         calendarEvent.Date = clock.ToClient(packet.ReadUInt32());
         calendarEvent.LockDate = clock.ToClient(packet.ReadUInt32());
         calendarEvent.EventClubId = packet.ReadUInt32();
+
+        uint inviteCount = packet.ReadUInt32();
+        if (inviteCount > MaxCalendarEntries)
+            return;
+        for (uint i = 0; i < inviteCount; i++)
+        {
+            CalendarEventInvite invite = new();
+            invite.Guid = CalendarPlayer(packet.ReadPackedGuid());
+            invite.Level = packet.ReadUInt8();
+            invite.Status = packet.ReadUInt8();
+            invite.Moderator = packet.ReadUInt8();
+            invite.InviteType = packet.ReadUInt8();
+            invite.InviteId = packet.ReadUInt64();
+            invite.ResponseTime = clock.ToClient(packet.ReadUInt32());
+            invite.Notes = packet.ReadCString();
+            calendarEvent.Invites.Add(invite);
+        }
+        SendPacketToClient(calendarEvent);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>CalendarMgr::SendCalendarEvent</c>: the event with its two texts in the
+    /// middle, then everybody invited, each with the note they left.
+    /// </summary>
+    internal void HandleCalendarSendEventCata(WorldPacket packet)
+    {
+        CalendarClock clock = CalendarClock.For(GetSession());
+        CalendarSendEvent calendarEvent = new();
+        calendarEvent.SendType = packet.ReadUInt8();
+        calendarEvent.OwnerGuid = CalendarPlayer(packet.ReadPackedGuid());
+        calendarEvent.EventId = packet.ReadUInt64();
+        calendarEvent.EventName = packet.ReadCString();
+        calendarEvent.Description = packet.ReadCString();
+        calendarEvent.EventType = packet.ReadUInt8();
+        packet.ReadUInt8();                     // repeats
+        packet.ReadUInt32();                    // most invitations
+        calendarEvent.TextureId = packet.ReadInt32();
+        calendarEvent.Flags = packet.ReadUInt32();
+        calendarEvent.Date = clock.ToClient(packet.ReadUInt32());
+        calendarEvent.LockDate = clock.ToClient(packet.ReadUInt32());
+        calendarEvent.EventClubId = CalendarClubId(packet.ReadUInt64());
 
         uint inviteCount = packet.ReadUInt32();
         if (inviteCount > MaxCalendarEntries)
@@ -174,6 +284,12 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_CALENDAR_EVENT_INVITE_ALERT)]
     internal void HandleCalendarEventInviteAlert(WorldPacket packet)
     {
+        if (IsCataLegacy)
+        {
+            HandleCalendarEventInviteAlertCata(packet);
+            return;
+        }
+
         CalendarClock clock = CalendarClock.For(GetSession());
         CalendarInviteAlert alert = new();
         alert.EventId = packet.ReadUInt64();
@@ -183,6 +299,25 @@ public partial class WorldClient
         alert.EventType = (byte)packet.ReadUInt32();
         alert.TextureId = packet.ReadInt32();
         alert.InviteId = packet.ReadUInt64();
+        alert.Status = packet.ReadUInt8();
+        alert.ModeratorStatus = packet.ReadUInt8();
+        alert.OwnerGuid = CalendarPlayer(packet.ReadPackedGuid());
+        alert.InvitedByGuid = CalendarPlayer(packet.ReadPackedGuid());
+        SendPacketToClient(alert);
+    }
+
+    internal void HandleCalendarEventInviteAlertCata(WorldPacket packet)
+    {
+        CalendarClock clock = CalendarClock.For(GetSession());
+        CalendarInviteAlert alert = new();
+        alert.EventId = packet.ReadUInt64();
+        alert.EventName = packet.ReadCString();
+        alert.Date = clock.ToClient(packet.ReadUInt32());
+        alert.Flags = packet.ReadUInt32();
+        alert.EventType = (byte)packet.ReadUInt32();
+        alert.TextureId = packet.ReadInt32();
+        alert.InviteId = packet.ReadUInt64();
+        alert.EventClubId = CalendarClubId(packet.ReadUInt64());
         alert.Status = packet.ReadUInt8();
         alert.ModeratorStatus = packet.ReadUInt8();
         alert.OwnerGuid = CalendarPlayer(packet.ReadPackedGuid());
@@ -299,10 +434,12 @@ public partial class WorldClient
     }
 
     /// <summary>
-    /// A 3.3.5a server's reason for refusing (AzerothCore <c>CalendarError</c>) as the 3.4.3 client
-    /// numbers it (<c>Enum.CalendarErrorType</c> of its interface code). The client has one reason
-    /// more in the eleventh place, "not in that community", so 10 to 36 are one higher there;
-    /// before and after it the numbers agree.
+    /// A legacy server's reason for refusing (AzerothCore and TrinityCore 4.3.4 <c>CalendarError</c>,
+    /// numbered alike) as the 3.4.3 and 4.4.2 clients number it (<c>Enum.CalendarErrorType</c> of
+    /// their interface code). The clients have one reason more in the eleventh place, "not in that
+    /// community", so 10 to 36 are one higher there; before and after it the numbers agree.
+    /// TrinityCore cata_classic sends the old numbers, and "no player of that name" then reads
+    /// "already invited".
     /// </summary>
     internal static byte ModernCalendarError(uint error) => error switch
     {

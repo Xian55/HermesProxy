@@ -7,7 +7,8 @@ using Xunit;
 namespace HermesProxy.Tests.World.Dispatch;
 
 /// <summary>
-/// The calendar requests of the 3.4.3 client (native 3.4.3 server CalendarPackets.cpp). New with
+/// The calendar requests of the 3.4.3 client (native 3.4.3 server CalendarPackets.cpp) and the
+/// 4.4.2 client (docs/protocol 4.4.2), which differ only in the update's flags. New with
 /// their codecs, so there is no frozen <c>Read()</c> to compare with: each case writes the client's
 /// layout, and checks the fields and the reader's final position, over a reader built the way
 /// production builds it.
@@ -119,7 +120,23 @@ public class CalendarCodecTests
             w.WriteString("Two"); w.WriteString("c");
             w.WriteUInt32(100);
         });
-        var r = ReaderOver(f); CalendarUpdateEventCodec.Read(ref r, out var a);
+        var r = ReaderOver(f); CalendarUpdateEventCodecPreCataClassic.Read(ref r, out var a);
+        Assert.Equal(new CalendarUpdateEvent(1, 4, 3, -1, 0x1A93A54F, 0x41, "Two", "c"), a);
+        Assert.Equal(0, r.Remaining);
+    }
+
+    [Fact]
+    public void CalendarUpdateEvent_CataClassic_HasSixteenBitsOfFlags()
+    {
+        var f = Framed(w =>
+        {
+            w.WriteUInt64(9); w.WriteUInt64(1); w.WriteUInt64(4);
+            w.WriteUInt8(3); w.WriteInt32(-1); w.WriteUInt32(0x1A93A54F); w.WriteUInt16(0x41);
+            w.WriteBits(3, 8); w.WriteBits(1, 11); w.FlushBits();
+            w.WriteString("Two"); w.WriteString("c");
+            w.WriteUInt32(100);
+        });
+        var r = ReaderOver(f); CalendarUpdateEventCodecCataClassic.Read(ref r, out var a);
         Assert.Equal(new CalendarUpdateEvent(1, 4, 3, -1, 0x1A93A54F, 0x41, "Two", "c"), a);
         Assert.Equal(0, r.Remaining);
     }

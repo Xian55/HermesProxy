@@ -481,10 +481,94 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.PetSystem.HandleBuyStableSlot(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarAddEvent_CMSG_CALENDAR_ADD_EVENT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CalendarAddEventCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarAddEvent(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarCommunityInvite_CMSG_CALENDAR_COMMUNITY_INVITE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CalendarCommunityInviteRequestCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarCommunityInvite(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarComplain_CMSG_CALENDAR_COMPLAIN(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CalendarComplainCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarComplain(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarCopyEvent_CMSG_CALENDAR_COPY_EVENT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CalendarCopyEventCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarCopyEvent(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarEventSignUp_CMSG_CALENDAR_EVENT_SIGN_UP(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CalendarEventSignUpCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarEventSignUp(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarGet_CMSG_CALENDAR_GET(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarGet(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarGetEvent_CMSG_CALENDAR_GET_EVENT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CalendarGetEventCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarGetEvent(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarGetNumPending_CMSG_CALENDAR_GET_NUM_PENDING(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
         global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarGetNumPending(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarInvite_CMSG_CALENDAR_INVITE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CalendarInviteCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarInvite(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarModeratorStatus_CMSG_CALENDAR_MODERATOR_STATUS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CalendarInviteeStatusCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarModeratorStatus(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarRemoveEvent_CMSG_CALENDAR_REMOVE_EVENT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CalendarRemoveEventCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarRemoveEvent(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarRemoveInvite_CMSG_CALENDAR_REMOVE_INVITE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CalendarRemoveInviteCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarRemoveInvite(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarRsvp_CMSG_CALENDAR_RSVP(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CalendarRsvpCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarRsvp(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarStatus_CMSG_CALENDAR_STATUS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CalendarInviteeStatusCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarStatus(in packet, in ctx);
+    }
+
+    private static void Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarUpdateEvent_CMSG_CALENDAR_UPDATE_EVENT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.CalendarUpdateEventCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.CalendarSystem.HandleCalendarUpdateEvent(in packet, in ctx);
     }
 
     private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelAura_CMSG_CANCEL_AURA(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
@@ -3060,7 +3144,21 @@ internal static unsafe class GeneratedCmsgDispatch
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BUY_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleBuyItem_CMSG_BUY_ITEM_BuyItemCodecWotLKClassic;
         }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BUY_STABLE_SLOT] = &Thunk_HermesProxy_World_Server_Systems_PetSystem_HandleBuyStableSlot_CMSG_BUY_STABLE_SLOT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_ADD_EVENT] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarAddEvent_CMSG_CALENDAR_ADD_EVENT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_COMMUNITY_INVITE] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarCommunityInvite_CMSG_CALENDAR_COMMUNITY_INVITE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_COMPLAIN] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarComplain_CMSG_CALENDAR_COMPLAIN;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_COPY_EVENT] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarCopyEvent_CMSG_CALENDAR_COPY_EVENT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_EVENT_SIGN_UP] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarEventSignUp_CMSG_CALENDAR_EVENT_SIGN_UP;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_GET] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarGet_CMSG_CALENDAR_GET;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_GET_EVENT] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarGetEvent_CMSG_CALENDAR_GET_EVENT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_GET_NUM_PENDING] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarGetNumPending_CMSG_CALENDAR_GET_NUM_PENDING;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_INVITE] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarInvite_CMSG_CALENDAR_INVITE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_MODERATOR_STATUS] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarModeratorStatus_CMSG_CALENDAR_MODERATOR_STATUS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_REMOVE_EVENT] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarRemoveEvent_CMSG_CALENDAR_REMOVE_EVENT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_REMOVE_INVITE] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarRemoveInvite_CMSG_CALENDAR_REMOVE_INVITE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_RSVP] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarRsvp_CMSG_CALENDAR_RSVP;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_STATUS] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarStatus_CMSG_CALENDAR_STATUS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_UPDATE_EVENT] = &Thunk_HermesProxy_World_Server_Systems_CalendarSystem_HandleCalendarUpdateEvent_CMSG_CALENDAR_UPDATE_EVENT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_AURA] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelAura_CMSG_CANCEL_AURA;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_AUTO_REPEAT_SPELL] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelAutoRepeatSpell_CMSG_CANCEL_AUTO_REPEAT_SPELL;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_CAST] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleCancelCast_CMSG_CANCEL_CAST;
@@ -3722,7 +3820,21 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_BUY_BANK_SLOT,
             global::HermesProxy.World.Enums.Opcode.CMSG_BUY_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_BUY_STABLE_SLOT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_ADD_EVENT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_COMMUNITY_INVITE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_COMPLAIN,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_COPY_EVENT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_EVENT_SIGN_UP,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_GET,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_GET_EVENT,
             global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_GET_NUM_PENDING,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_INVITE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_MODERATOR_STATUS,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_REMOVE_EVENT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_REMOVE_INVITE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_RSVP,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_STATUS,
+            global::HermesProxy.World.Enums.Opcode.CMSG_CALENDAR_UPDATE_EVENT,
             global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_AURA,
             global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_AUTO_REPEAT_SPELL,
             global::HermesProxy.World.Enums.Opcode.CMSG_CANCEL_CAST,

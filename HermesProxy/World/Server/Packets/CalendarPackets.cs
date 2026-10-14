@@ -1,10 +1,23 @@
 using System.Collections.Generic;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 
 namespace HermesProxy.World.Server.Packets;
 
 // Calendar dates are packed dates on both sides, with the same bits: they are carried as the
 // number they came as and never turned into a time of this machine's zone on the way.
+
+internal static class CalendarFlags
+{
+    /// <summary>An event's flags: 32 bits on the 3.4.3 client, 16 on the 4.4.2 one.</summary>
+    internal static void Write(WorldPacket data, uint flags, bool wide)
+    {
+        if (wide)
+            data.WriteUInt32(flags);
+        else
+            data.WriteUInt16((ushort)flags);
+    }
+}
 
 /// <summary>
 /// How many calendar invitations wait for an answer: the number on the minimap's calendar button.
@@ -73,48 +86,68 @@ public readonly record struct CalendarCommunityInviteRequest(ulong ClubId, byte 
 /// </remarks>
 public sealed class CalendarSendCalendar : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<CalendarSendCalendar>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new WotLKClassicLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
+
+    private static readonly ServerPacketLayout<CalendarSendCalendar> Layout = Layouts.ForRunningClient();
+
     public CalendarSendCalendar() : base(Opcode.SMSG_CALENDAR_SEND_CALENDAR) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>3.4.3: an event's flags are 32 bits.</summary>
+    internal sealed class WotLKClassicLayout : ServerPacketLayout<CalendarSendCalendar>
     {
-        _worldPacket.WriteUInt32(ServerTime);
-        _worldPacket.WriteInt32(Invites.Count);
-        _worldPacket.WriteInt32(Events.Count);
-        _worldPacket.WriteInt32(RaidLockouts.Count);
-        _worldPacket.WriteInt32(0);     // raid resets
+        public override void Write(CalendarSendCalendar packet, WorldPacket data) => WriteList(packet, data, wideFlags: true);
+    }
 
-        foreach (CalendarRaidLockout lockout in RaidLockouts)
+    /// <summary>4.4.2 (docs/protocol 4.4.2.60895): an event's flags are 16 bits.</summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<CalendarSendCalendar>
+    {
+        public override void Write(CalendarSendCalendar packet, WorldPacket data) => WriteList(packet, data, wideFlags: false);
+    }
+
+    private static void WriteList(CalendarSendCalendar p, WorldPacket data, bool wideFlags)
+    {
+        data.WriteUInt32(p.ServerTime);
+        data.WriteInt32(p.Invites.Count);
+        data.WriteInt32(p.Events.Count);
+        data.WriteInt32(p.RaidLockouts.Count);
+        data.WriteInt32(0);     // raid resets
+
+        foreach (CalendarRaidLockout lockout in p.RaidLockouts)
         {
-            _worldPacket.WriteUInt64(lockout.InstanceId);
-            _worldPacket.WriteInt32(lockout.MapId);
-            _worldPacket.WriteUInt32(lockout.DifficultyId);
-            _worldPacket.WriteInt32(lockout.ExpireTime);
+            data.WriteUInt64(lockout.InstanceId);
+            data.WriteInt32(lockout.MapId);
+            data.WriteUInt32(lockout.DifficultyId);
+            data.WriteInt32(lockout.ExpireTime);
         }
 
-        foreach (CalendarListInvite invite in Invites)
+        foreach (CalendarListInvite invite in p.Invites)
         {
-            _worldPacket.WriteUInt64(invite.EventId);
-            _worldPacket.WriteUInt64(invite.InviteId);
-            _worldPacket.WriteUInt8(invite.Status);
-            _worldPacket.WriteUInt8(invite.Moderator);
-            _worldPacket.WriteUInt8(invite.InviteType);
-            _worldPacket.WritePackedGuid128(invite.InviterGuid);
-            _worldPacket.WriteBit(false);   // ignores the friend and guild restriction
-            _worldPacket.FlushBits();
+            data.WriteUInt64(invite.EventId);
+            data.WriteUInt64(invite.InviteId);
+            data.WriteUInt8(invite.Status);
+            data.WriteUInt8(invite.Moderator);
+            data.WriteUInt8(invite.InviteType);
+            data.WritePackedGuid128(invite.InviterGuid);
+            data.WriteBit(false);   // ignores the friend and guild restriction
+            data.FlushBits();
         }
 
-        foreach (CalendarListEvent calendarEvent in Events)
+        foreach (CalendarListEvent calendarEvent in p.Events)
         {
-            _worldPacket.WriteUInt64(calendarEvent.EventId);
-            _worldPacket.WriteUInt8(calendarEvent.EventType);
-            _worldPacket.WriteUInt32(calendarEvent.Date);
-            _worldPacket.WriteUInt32(calendarEvent.Flags);
-            _worldPacket.WriteInt32(calendarEvent.TextureId);
-            _worldPacket.WriteUInt64(calendarEvent.EventClubId);
-            _worldPacket.WritePackedGuid128(calendarEvent.OwnerGuid);
-            _worldPacket.WriteBits(System.Text.Encoding.UTF8.GetByteCount(calendarEvent.EventName), 8);
-            _worldPacket.FlushBits();
-            _worldPacket.WriteString(calendarEvent.EventName);
+            data.WriteUInt64(calendarEvent.EventId);
+            data.WriteUInt8(calendarEvent.EventType);
+            data.WriteUInt32(calendarEvent.Date);
+            CalendarFlags.Write(data, calendarEvent.Flags, wideFlags);
+            data.WriteInt32(calendarEvent.TextureId);
+            data.WriteUInt64(calendarEvent.EventClubId);
+            data.WritePackedGuid128(calendarEvent.OwnerGuid);
+            data.WriteBits(System.Text.Encoding.UTF8.GetByteCount(calendarEvent.EventName), 8);
+            data.FlushBits();
+            data.WriteString(calendarEvent.EventName);
         }
     }
 
@@ -158,40 +191,60 @@ public struct CalendarRaidLockout
 /// <summary>One event with everybody invited to it: what the event's window shows.</summary>
 public sealed class CalendarSendEvent : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<CalendarSendEvent>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new WotLKClassicLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
+
+    private static readonly ServerPacketLayout<CalendarSendEvent> Layout = Layouts.ForRunningClient();
+
     public CalendarSendEvent() : base(Opcode.SMSG_CALENDAR_SEND_EVENT) { }
 
-    public override void Write()
-    {
-        _worldPacket.WriteUInt8(SendType);
-        _worldPacket.WritePackedGuid128(OwnerGuid);
-        _worldPacket.WriteUInt64(EventId);
-        _worldPacket.WriteUInt8(EventType);
-        _worldPacket.WriteInt32(TextureId);
-        _worldPacket.WriteUInt32(Flags);
-        _worldPacket.WriteUInt32(Date);
-        _worldPacket.WriteUInt32(LockDate);
-        _worldPacket.WriteUInt64(EventClubId);
-        _worldPacket.WriteInt32(Invites.Count);
-        _worldPacket.WriteBits(System.Text.Encoding.UTF8.GetByteCount(EventName), 8);
-        _worldPacket.WriteBits(System.Text.Encoding.UTF8.GetByteCount(Description), 11);
-        _worldPacket.FlushBits();
+    public override void Write() => Layout.Write(this, _worldPacket);
 
-        foreach (CalendarEventInvite invite in Invites)
+    /// <summary>3.4.3: the flags are 32 bits.</summary>
+    internal sealed class WotLKClassicLayout : ServerPacketLayout<CalendarSendEvent>
+    {
+        public override void Write(CalendarSendEvent packet, WorldPacket data) => WriteEvent(packet, data, wideFlags: true);
+    }
+
+    /// <summary>4.4.2: 16 bits.</summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<CalendarSendEvent>
+    {
+        public override void Write(CalendarSendEvent packet, WorldPacket data) => WriteEvent(packet, data, wideFlags: false);
+    }
+
+    private static void WriteEvent(CalendarSendEvent p, WorldPacket data, bool wideFlags)
+    {
+        data.WriteUInt8(p.SendType);
+        data.WritePackedGuid128(p.OwnerGuid);
+        data.WriteUInt64(p.EventId);
+        data.WriteUInt8(p.EventType);
+        data.WriteInt32(p.TextureId);
+        CalendarFlags.Write(data, p.Flags, wideFlags);
+        data.WriteUInt32(p.Date);
+        data.WriteUInt32(p.LockDate);
+        data.WriteUInt64(p.EventClubId);
+        data.WriteInt32(p.Invites.Count);
+        data.WriteBits(System.Text.Encoding.UTF8.GetByteCount(p.EventName), 8);
+        data.WriteBits(System.Text.Encoding.UTF8.GetByteCount(p.Description), 11);
+        data.FlushBits();
+
+        foreach (CalendarEventInvite invite in p.Invites)
         {
-            _worldPacket.WritePackedGuid128(invite.Guid);
-            _worldPacket.WriteUInt64(invite.InviteId);
-            _worldPacket.WriteUInt8(invite.Level);
-            _worldPacket.WriteUInt8(invite.Status);
-            _worldPacket.WriteUInt8(invite.Moderator);
-            _worldPacket.WriteUInt8(invite.InviteType);
-            _worldPacket.WriteUInt32(invite.ResponseTime);
-            _worldPacket.WriteBits(System.Text.Encoding.UTF8.GetByteCount(invite.Notes), 8);
-            _worldPacket.FlushBits();
-            _worldPacket.WriteString(invite.Notes);
+            data.WritePackedGuid128(invite.Guid);
+            data.WriteUInt64(invite.InviteId);
+            data.WriteUInt8(invite.Level);
+            data.WriteUInt8(invite.Status);
+            data.WriteUInt8(invite.Moderator);
+            data.WriteUInt8(invite.InviteType);
+            data.WriteUInt32(invite.ResponseTime);
+            data.WriteBits(System.Text.Encoding.UTF8.GetByteCount(invite.Notes), 8);
+            data.FlushBits();
+            data.WriteString(invite.Notes);
         }
 
-        _worldPacket.WriteString(EventName);
-        _worldPacket.WriteString(Description);
+        data.WriteString(p.EventName);
+        data.WriteString(p.Description);
     }
 
     public byte SendType;
@@ -251,24 +304,49 @@ public sealed class CalendarInviteAdded : ServerPacket
 /// <summary>The player was invited to an event: it appears on the calendar, unanswered.</summary>
 public sealed class CalendarInviteAlert : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<CalendarInviteAlert>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new WotLKClassicLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
+
+    private static readonly ServerPacketLayout<CalendarInviteAlert> Layout = Layouts.ForRunningClient();
+
     public CalendarInviteAlert() : base(Opcode.SMSG_CALENDAR_INVITE_ALERT) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>3.4.3: the flags are 32 bits, and the name's length is the last of the bits.</summary>
+    internal sealed class WotLKClassicLayout : ServerPacketLayout<CalendarInviteAlert>
     {
-        _worldPacket.WriteUInt64(EventId);
-        _worldPacket.WriteUInt32(Date);
-        _worldPacket.WriteUInt32(Flags);
-        _worldPacket.WriteUInt8(EventType);
-        _worldPacket.WriteInt32(TextureId);
-        _worldPacket.WriteUInt64(EventClubId);
-        _worldPacket.WriteUInt64(InviteId);
-        _worldPacket.WriteUInt8(Status);
-        _worldPacket.WriteUInt8(ModeratorStatus);
-        _worldPacket.WritePackedGuid128(InvitedByGuid);
-        _worldPacket.WritePackedGuid128(OwnerGuid);
-        _worldPacket.WriteBits(System.Text.Encoding.UTF8.GetByteCount(EventName), 8);
-        _worldPacket.FlushBits();
-        _worldPacket.WriteString(EventName);
+        public override void Write(CalendarInviteAlert packet, WorldPacket data) => WriteAlert(packet, data, wideFlags: true, bitAfterName: false);
+    }
+
+    /// <summary>
+    /// 4.4.2 (the client's own reader, rva 0x6961F0): 16 bits of flags, and a bit after the name's
+    /// length.
+    /// </summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<CalendarInviteAlert>
+    {
+        public override void Write(CalendarInviteAlert packet, WorldPacket data) => WriteAlert(packet, data, wideFlags: false, bitAfterName: true);
+    }
+
+    private static void WriteAlert(CalendarInviteAlert p, WorldPacket data, bool wideFlags, bool bitAfterName)
+    {
+        data.WriteUInt64(p.EventId);
+        data.WriteUInt32(p.Date);
+        CalendarFlags.Write(data, p.Flags, wideFlags);
+        data.WriteUInt8(p.EventType);
+        data.WriteInt32(p.TextureId);
+        data.WriteUInt64(p.EventClubId);
+        data.WriteUInt64(p.InviteId);
+        data.WriteUInt8(p.Status);
+        data.WriteUInt8(p.ModeratorStatus);
+        data.WritePackedGuid128(p.InvitedByGuid);
+        data.WritePackedGuid128(p.OwnerGuid);
+        data.WriteBits(System.Text.Encoding.UTF8.GetByteCount(p.EventName), 8);
+        if (bitAfterName)
+            data.WriteBit(false);
+        data.FlushBits();
+        data.WriteString(p.EventName);
     }
 
     public ulong EventId;
@@ -391,24 +469,44 @@ public sealed class CalendarEventRemovedAlert : ServerPacket
 /// <summary>An event the player had on the calendar was changed.</summary>
 public sealed class CalendarEventUpdatedAlert : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<CalendarEventUpdatedAlert>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new WotLKClassicLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout()));
+
+    private static readonly ServerPacketLayout<CalendarEventUpdatedAlert> Layout = Layouts.ForRunningClient();
+
     public CalendarEventUpdatedAlert() : base(Opcode.SMSG_CALENDAR_EVENT_UPDATED_ALERT) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>3.4.3: the flags are 32 bits.</summary>
+    internal sealed class WotLKClassicLayout : ServerPacketLayout<CalendarEventUpdatedAlert>
     {
-        _worldPacket.WriteUInt64(EventClubId);
-        _worldPacket.WriteUInt64(EventId);
-        _worldPacket.WriteUInt32(OriginalDate);
-        _worldPacket.WriteUInt32(Date);
-        _worldPacket.WriteUInt32(LockDate);
-        _worldPacket.WriteUInt32(Flags);
-        _worldPacket.WriteInt32(TextureId);
-        _worldPacket.WriteUInt8(EventType);
-        _worldPacket.WriteBits(System.Text.Encoding.UTF8.GetByteCount(EventName), 8);
-        _worldPacket.WriteBits(System.Text.Encoding.UTF8.GetByteCount(Description), 11);
-        _worldPacket.WriteBit(ClearPending);
-        _worldPacket.FlushBits();
-        _worldPacket.WriteString(EventName);
-        _worldPacket.WriteString(Description);
+        public override void Write(CalendarEventUpdatedAlert packet, WorldPacket data) => WriteAlert(packet, data, wideFlags: true);
+    }
+
+    /// <summary>4.4.2: 16 bits.</summary>
+    internal sealed class CataClassicLayout : ServerPacketLayout<CalendarEventUpdatedAlert>
+    {
+        public override void Write(CalendarEventUpdatedAlert packet, WorldPacket data) => WriteAlert(packet, data, wideFlags: false);
+    }
+
+    private static void WriteAlert(CalendarEventUpdatedAlert p, WorldPacket data, bool wideFlags)
+    {
+        data.WriteUInt64(p.EventClubId);
+        data.WriteUInt64(p.EventId);
+        data.WriteUInt32(p.OriginalDate);
+        data.WriteUInt32(p.Date);
+        data.WriteUInt32(p.LockDate);
+        CalendarFlags.Write(data, p.Flags, wideFlags);
+        data.WriteInt32(p.TextureId);
+        data.WriteUInt8(p.EventType);
+        data.WriteBits(System.Text.Encoding.UTF8.GetByteCount(p.EventName), 8);
+        data.WriteBits(System.Text.Encoding.UTF8.GetByteCount(p.Description), 11);
+        data.WriteBit(p.ClearPending);
+        data.FlushBits();
+        data.WriteString(p.EventName);
+        data.WriteString(p.Description);
     }
 
     public ulong EventClubId;

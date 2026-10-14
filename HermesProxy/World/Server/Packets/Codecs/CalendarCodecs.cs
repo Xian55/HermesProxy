@@ -1,11 +1,13 @@
 using System.Runtime.CompilerServices;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Dispatch;
 
 namespace HermesProxy.World.Server.Packets;
 
-// Calendar CMSG codecs: the 3.4.3 client's layouts (native 3.4.3 server CalendarPackets.cpp). A
-// date is a packed date and stays the number it came as. The club id that most of them carry (the
+// Calendar CMSG codecs: the 3.4.3 client's layouts (native 3.4.3 server CalendarPackets.cpp), the
+// same on the 4.4.2 client (docs/protocol 4.4.2.60895) but for the update's flags. A date is a
+// packed date and stays the number it came as. The club id that most of them carry (the
 // guild or community an event belongs to) is read past: a legacy server knows a guild event by
 // the event's own flags.
 
@@ -63,9 +65,27 @@ public static class CalendarAddEventCodec
     }
 }
 
-public static class CalendarUpdateEventCodec
+[PacketCodec(typeof(CalendarUpdateEvent), RemovedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class CalendarUpdateEventCodecPreCataClassic
 {
     public static void Read(ref SpanPacketReader r, out CalendarUpdateEvent packet)
+        => CalendarUpdateEventFields.Read(ref r, out packet, wideFlags: true);
+}
+
+/// <summary>
+/// 4.4.2 (docs/protocol 4.4.2.60895): 16 bits of flags, against 32 in the request that makes an
+/// event.
+/// </summary>
+[PacketCodec(typeof(CalendarUpdateEvent), AddedIn = ClientVersionBuild.V4_4_2_60895)]
+public static class CalendarUpdateEventCodecCataClassic
+{
+    public static void Read(ref SpanPacketReader r, out CalendarUpdateEvent packet)
+        => CalendarUpdateEventFields.Read(ref r, out packet, wideFlags: false);
+}
+
+internal static class CalendarUpdateEventFields
+{
+    internal static void Read(ref SpanPacketReader r, out CalendarUpdateEvent packet, bool wideFlags)
     {
         r.ReadUInt64();     // club id
         ulong eventId = r.ReadUInt64();
@@ -73,7 +93,7 @@ public static class CalendarUpdateEventCodec
         byte eventType = r.ReadUInt8();
         int textureId = r.ReadInt32();
         uint time = r.ReadUInt32();
-        uint flags = r.ReadUInt32();
+        uint flags = wideFlags ? r.ReadUInt32() : r.ReadUInt16();
         uint titleLength = r.ReadBits<uint>(8);
         uint descriptionLength = r.ReadBits<uint>(11);
         string title = r.ReadString(titleLength);

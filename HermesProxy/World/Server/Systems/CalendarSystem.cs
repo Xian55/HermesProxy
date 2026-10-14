@@ -7,9 +7,9 @@ namespace HermesProxy.World.Server.Systems;
 
 /// <summary>
 /// Translation for the modern client's calendar CMSGs, for a server that has a calendar: 3.0 on.
-/// The 3.3.5a requests are AzerothCore's and TrinityCore's <c>HandleCalendar*</c> readers. The
-/// dates the client picks are in its own time and go to the server in the server's
-/// (<see cref="CalendarClock"/>).
+/// The requests are AzerothCore's, TrinityCore's and TrinityCore 4.3.4's <c>HandleCalendar*</c>
+/// readers, which agree on all of them but the report. The dates the client picks are in its own
+/// time and go to the server in the server's (<see cref="CalendarClock"/>).
 /// </summary>
 public static class CalendarSystem
 {
@@ -247,7 +247,8 @@ public static class CalendarSystem
 
     /// <summary>
     /// A 3.3.5a client names the event before the player it reports (AzerothCore
-    /// <c>CalendarComplain</c>, WowPacketParser before 4.3.4), and no invitation.
+    /// <c>CalendarComplain</c>, WowPacketParser before 4.3.4), and no invitation; a 4.3.4 one the
+    /// player first, then the event and the invitation.
     /// </summary>
     [HandlesCmsg(Opcode.CMSG_CALENDAR_COMPLAIN)]
     public static void HandleCalendarComplain(in CalendarComplain complain, in SessionContext ctx)
@@ -256,8 +257,17 @@ public static class CalendarSystem
             return;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CALENDAR_COMPLAIN);
-        packet.WriteUInt64(complain.EventId);
-        packet.WriteGuid(complain.InvitedByGuid.To64());
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            packet.WriteGuid(complain.InvitedByGuid.To64());
+            packet.WriteUInt64(complain.EventId);
+            packet.WriteUInt64(complain.InviteId);
+        }
+        else
+        {
+            packet.WriteUInt64(complain.EventId);
+            packet.WriteGuid(complain.InvitedByGuid.To64());
+        }
         ctx.SendPacketToServer(packet);
     }
 
