@@ -88,7 +88,9 @@ public partial class BnetServices
                 SendRpcMessage(BattlenetRpcErrorCode.Ok, response);
             }
 
-            if (!_serviceHandlers.TryGetValue((serviceHash, methodId), out var handler))
+            // The 4.4.2 client can set bit 30 of the method id (its club requests here come as
+            // 0x40000001 and up); the method is the bits below. The answer carries the id as sent.
+            if (!_serviceHandlers.TryGetValue((serviceHash, methodId & 0x3FFFFFFF), out var handler))
             {
                 BnetServicesLogMessages.ServiceNotImplemented(
                     BnetServices._melNet, BnetServices._sourceFile, BnetServices._netDirNone,
@@ -119,12 +121,19 @@ public partial class BnetServices
 
             var request = (IMessage)Activator.CreateInstance(handler.RequestType)!;
             request.MergeFrom(payload);
+            bool trace = BnetServices._melServer.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Trace);
+            if (trace)
+                BnetServicesLogMessages.RequestContent(BnetServices._melServer, BnetServices._sourceFile, BnetServices._netDirNone,
+                    _serviceHolder.BuildSessionPrefix(), serviceHash, methodId, requestToken, request.ToString() ?? "");
 
             BattlenetRpcErrorCode status;
             if (handler.ResponseType != null)
             {
                 var response = (IMessage)Activator.CreateInstance(handler.ResponseType)!;
                 status = (BattlenetRpcErrorCode)handler.MethodCaller.DynamicInvoke(_serviceHolder, request, response)!;
+                if (trace)
+                    BnetServicesLogMessages.ResponseContent(BnetServices._melServer, BnetServices._sourceFile, BnetServices._netDirNone,
+                        _serviceHolder.BuildSessionPrefix(), serviceHash, methodId, requestToken, status, response.ToString() ?? "");
 
                 if (status == BattlenetRpcErrorCode.Ok)
                     SendResponse(response);

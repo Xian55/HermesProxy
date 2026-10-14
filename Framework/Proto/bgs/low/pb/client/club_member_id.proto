@@ -8,6 +8,9 @@ import "bgs/low/pb/client/rpc_types.proto";
 
 message MemberId {
   option (bgs.protocol.message_options).custom_select_shard = true;
-  optional .bgs.protocol.account.v1.AccountId account_id = 1;
+  // The 4.4.2 client still sends the account in field 1 but takes it from field 3, a plain number
+  // (TrinityCore cata_classic names them account_id_deprecated and account_id).
+  optional .bgs.protocol.account.v1.AccountId account_id_deprecated = 1;
   optional uint64 unique_id = 2;
+  optional uint64 account_id = 3;
 }

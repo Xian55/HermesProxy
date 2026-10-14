@@ -81,6 +81,19 @@ public static class GuildDemoteMemberCodec
         => packet = new GuildDemoteMember(r.ReadPackedGuid128());
 }
 
+// The member and the rank order to give them (docs/protocol 4.4.2, TrinityCore cata_classic
+// GuildAssignMemberRank::Read).
+public static class GuildAssignMemberRankCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out GuildAssignMemberRank packet)
+    {
+        WowGuid128 member = r.ReadPackedGuid128();
+        int rankOrder = r.ReadInt32();
+        packet = new GuildAssignMemberRank(member, rankOrder);
+    }
+}
+
 public static class GuildOfficerRemoveMemberCodec
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

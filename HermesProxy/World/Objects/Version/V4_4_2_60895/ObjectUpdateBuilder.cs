@@ -979,6 +979,11 @@ public partial class ObjectUpdateBuilder
             : WowGuid128.Empty);
     }
 
+    // Every player's, as on a stock realm: the client finds itself and the others among its guild
+    // club's members by it.
+    internal void WriteCreatePlayerGuildClubMemberId(WorldPacket data, PlayerData src)
+        => data.WriteUInt64(GuildClub.MemberIdOf(_updateData.Guid));
+
     // PlayerData ends with the character name from 4.4.2 on. The proxy has the name only from its
     // own cache (the character list or a name query); an unknown one is sent empty.
     private string PlayerName => _gameState.GetPlayerName(_updateData.Guid);

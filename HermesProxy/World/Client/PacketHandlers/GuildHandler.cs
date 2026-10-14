@@ -145,6 +145,7 @@ public partial class WorldClient
                     promote.Promote = eventType == GuildEventType.Promotion;
                     promote.RankID = rankId;
                     SendPacketToClient(promote);
+                    GetSession().GameState.GuildClub.MemberRankChanged(player, (int)rankId);
                 }
                 break;
             }
@@ -162,6 +163,8 @@ public partial class WorldClient
                 joined.VirtualRealmAddress = GetSession().RealmId.GetAddress();
                 joined.Name = strings[0];
                 SendPacketToClient(joined);
+                GetSession().GameState.GuildClub.MemberJoined(
+                    guid != default ? guid : GetSession().GameState.GetPlayerGuidByName(strings[0]));
                 break;
             }
             case GuildEventType.PlayerLeft:
@@ -172,6 +175,8 @@ public partial class WorldClient
                 left.LeaverVirtualRealmAddress = GetSession().RealmId.GetAddress();
                 left.LeaverName = strings[0];
                 SendPacketToClient(left);
+                GetSession().GameState.GuildClub.MemberLeft(
+                    guid != default ? guid : GetSession().GameState.GetPlayerGuidByName(strings[0]), removed: false);
                 break;
             }
             case GuildEventType.PlayerRemoved:
@@ -185,6 +190,8 @@ public partial class WorldClient
                 removed.RemoverVirtualRealmAddress = GetSession().RealmId.GetAddress();
                 removed.RemoverName = strings[1];
                 SendPacketToClient(removed);
+                GetSession().GameState.GuildClub.MemberLeft(
+                    guid != default ? guid : GetSession().GameState.GetPlayerGuidByName(strings[0]), removed: true);
                 break;
             }
             case GuildEventType.LeaderIs:
@@ -205,6 +212,7 @@ public partial class WorldClient
                     leader.NewLeaderVirtualRealmAddress = GetSession().RealmId.GetAddress();
                     leader.NewLeaderName = strings[1];
                     SendPacketToClient(leader);
+                    GetSession().GameState.GuildClub.LeaderChanged(oldLeader, newLeader);
                 }
                 break;
             }
@@ -212,6 +220,7 @@ public partial class WorldClient
             {
                 GuildEventDisbanded disband = new GuildEventDisbanded();
                 SendPacketToClient(disband);
+                GetSession().GameState.GuildClub.Disbanded();
                 break;
             }
             case GuildEventType.TabardChange:
@@ -291,6 +300,48 @@ public partial class WorldClient
     }
 
     /// <summary>
+    /// TrinityCore 4.3.4 Guild::SendGuildRanksUpdate, to every member when one is given a rank: the
+    /// setter's and the member's GUID masks with the promote bit among them, the rank, then the
+    /// GUID bytes. The older servers tell a promotion as a guild event.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_SEND_RANK_CHANGE)]
+    internal void HandleGuildSendRankChange(WorldPacket packet)
+    {
+        Span<bool> setterMask = stackalloc bool[8];
+        Span<bool> memberMask = stackalloc bool[8];
+        MaskedGuid.ReadMaskBits(packet, setterMask, [7, 2]);
+        MaskedGuid.ReadMaskBits(packet, memberMask, [2]);
+        MaskedGuid.ReadMaskBits(packet, setterMask, [1]);
+        MaskedGuid.ReadMaskBits(packet, memberMask, [1, 7, 0, 5, 4]);
+        bool promote = packet.HasBit();
+        MaskedGuid.ReadMaskBits(packet, setterMask, [5, 0]);
+        MaskedGuid.ReadMaskBits(packet, memberMask, [6]);
+        MaskedGuid.ReadMaskBits(packet, setterMask, [3, 6]);
+        MaskedGuid.ReadMaskBits(packet, memberMask, [3]);
+        MaskedGuid.ReadMaskBits(packet, setterMask, [4]);
+        uint rank = packet.ReadUInt32();
+
+        Span<byte> setter = stackalloc byte[8];
+        Span<byte> member = stackalloc byte[8];
+        MaskedGuid.ReadBytes(packet, setterMask, setter, [3]);
+        MaskedGuid.ReadBytes(packet, memberMask, member, [7]);
+        MaskedGuid.ReadBytes(packet, setterMask, setter, [6, 2]);
+        MaskedGuid.ReadBytes(packet, memberMask, member, [5, 0]);
+        MaskedGuid.ReadBytes(packet, setterMask, setter, [7, 5]);
+        MaskedGuid.ReadBytes(packet, memberMask, member, [2, 1]);
+        MaskedGuid.ReadBytes(packet, setterMask, setter, [0, 4, 1]);
+        MaskedGuid.ReadBytes(packet, memberMask, member, [3, 6, 4]);
+
+        GuildSendRankChange change = new GuildSendRankChange();
+        change.Officer = new WowGuid64(MaskedGuid.ToUInt64(setter)).To128(GetSession().GameState);
+        change.Other = new WowGuid64(MaskedGuid.ToUInt64(member)).To128(GetSession().GameState);
+        change.Promote = promote;
+        change.RankID = rank;
+        SendPacketToClient(change);
+        GetSession().GameState.GuildClub.MemberRankChanged(change.Other, (int)rank);
+    }
+
+    /// <summary>
     /// 4.3.4 counts guild events from 1 and has some the older servers lack (TrinityCore 4.3.4
     /// Guild.h GuildEvents). The three rank events are all "the ranks changed" to this handler;
     /// the founder and the mobile sign-on have nothing to be turned into.
@@ -364,6 +415,8 @@ public partial class WorldClient
         GetSession().StoreGuildRankNames(guildId, rankNames);
 
         SendPacketToClient(guild);
+        // The name may be what the player's guild club was waiting for.
+        GetSession().GameState.GuildClub.Sync();
     }
 
     /// <summary>
@@ -401,6 +454,7 @@ public partial class WorldClient
         }
         GetSession().StoreGuildRankNames(GetSession().GameState.GetPlayerGuildId(GetSession().GameState.CurrentPlayerGuid), rankNames);
         SendPacketToClient(ranks);
+        GetSession().GameState.GuildClub.RanksReceived(ranks);
     }
 
     /// <summary>
@@ -479,6 +533,7 @@ public partial class WorldClient
             member.Name = cache.Name = packet.ReadString((uint)nameLengths[i]);
 
             member.Guid = new WowGuid64(MaskedGuid.ToUInt64(guidBytes)).To128(GetSession().GameState);
+            member.GuildClubMemberID = GuildClub.MemberIdOf(member.Guid);
             if (GetSession().GameState.CachedPlayers.TryGetValue(member.Guid, out var existing)
                 && existing.RaceId != Race.None)
                 member.RaceID = existing.RaceId;
@@ -493,6 +548,7 @@ public partial class WorldClient
         guild.CreateDate = packet.ReadPackedTime();
         guild.GuildFlags = (int)packet.ReadUInt32();
         SendPacketToClient(guild);
+        GetSession().GameState.GuildClub.RosterReceived(guild);
     }
 
     /// <summary>
@@ -596,6 +652,7 @@ public partial class WorldClient
         guild.Info.BackgroundColor = packet.ReadUInt32();
 
         SendPacketToClient(guild);
+        GetSession().GameState.GuildClub.Sync();
     }
 
     [HandlesSmsg(Opcode.SMSG_GUILD_INFO)]
@@ -678,6 +735,7 @@ public partial class WorldClient
                 ranks.Ranks.Add(rank);
             }
             SendPacketToClient(ranks);
+            GetSession().GameState.GuildClub.RanksReceived(ranks);
         }
         
 
@@ -686,6 +744,7 @@ public partial class WorldClient
             GuildRosterMemberData member = new GuildRosterMemberData();
             PlayerCache cache = new PlayerCache();
             member.Guid = packet.ReadGuid().To128(GetSession().GameState);
+            member.GuildClubMemberID = GuildClub.MemberIdOf(member.Guid);
             member.VirtualRealmAddress = GetSession().RealmId.GetAddress();
             member.Status = packet.ReadUInt8();
             member.Name = cache.Name = packet.ReadCString();
@@ -710,6 +769,7 @@ public partial class WorldClient
             guild.MemberData.Add(member);
         }
         SendPacketToClient(guild);
+        GetSession().GameState.GuildClub.RosterReceived(guild);
     }
 
     [HandlesSmsg(Opcode.SMSG_GUILD_INVITE)]

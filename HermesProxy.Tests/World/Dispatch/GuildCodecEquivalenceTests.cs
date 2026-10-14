@@ -64,6 +64,17 @@ public class GuildCodecEquivalenceTests
         Assert.Equal(0, r.Remaining);
     }
 
+    // New with the codec too: the member and the rank order to give them (docs/protocol 4.4.2).
+    [Fact]
+    public void GuildAssignMemberRank_ReadsTheMemberAndTheRankOrder()
+    {
+        var (_, f) = Build(w => { w.WritePackedGuid128(Guid); w.WriteInt32(3); });
+        var r = ReaderOver(f); GuildAssignMemberRankCodec.Read(ref r, out var a);
+        Assert.Equal(Guid, a.Member);
+        Assert.Equal(3, a.RankOrder);
+        Assert.Equal(0, r.Remaining);
+    }
+
     // New with their codecs as well: the guild's GUID, and for a pin the entry's id and one bit
     // after it (docs/protocol 4.4.2).
     [Fact]

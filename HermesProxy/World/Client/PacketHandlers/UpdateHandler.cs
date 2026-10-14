@@ -3738,11 +3738,13 @@ public partial class WorldClient
             if (updateData.Guid == GetSession().GameState.CurrentPlayerGuid)
                 HermesProxy.World.Server.CollectionSync.StampSummonedBattlePet(updateData, GetSession().GameState);
 
+            bool guildSent = false;
             int PLAYER_GUILDID = LegacyVersion.GetUpdateField(PlayerField.PLAYER_GUILDID);
             if (PLAYER_GUILDID >= 0 && updateMaskArray[PLAYER_GUILDID])
             {
                 GetSession().GameState.StorePlayerGuildId(guid, updates[PLAYER_GUILDID].UInt32Value);
                 updateData.UnitData.GuildGUID = WowGuid128.CreateGuildOrEmpty(updates[PLAYER_GUILDID].UInt32Value);
+                guildSent = true;
             }
             // 4.3.4 has no PLAYER_GUILDID. A player's guild is the object's DATA field, a whole
             // guild GUID whose low half is the guild id (TrinityCore 4.3.4 Player::SetInGuild),
@@ -3755,11 +3757,15 @@ public partial class WorldClient
                     uint guildId = updates[OBJECT_FIELD_DATA].UInt32Value;
                     GetSession().GameState.StorePlayerGuildId(guid, guildId);
                     updateData.UnitData.GuildGUID = WowGuid128.CreateGuildOrEmpty(guildId);
+                    guildSent = true;
                 }
                 int PLAYER_GUILDLEVEL = LegacyVersion.GetUpdateField(PlayerField.PLAYER_GUILDLEVEL);
                 if (PLAYER_GUILDLEVEL >= 0 && updateMaskArray[PLAYER_GUILDLEVEL])
                     updateData.EnsurePlayerData().GuildLevel = updates[PLAYER_GUILDLEVEL].Int32Value;
             }
+            // Joining, leaving or a guild being disbanded reaches the player's guild club here.
+            if (guildSent && guid == GetSession().GameState.CurrentPlayerGuid)
+                GetSession().GameState.GuildClub.Sync();
             int PLAYER_GUILDRANK = LegacyVersion.GetUpdateField(PlayerField.PLAYER_GUILDRANK);
             if (PLAYER_GUILDRANK >= 0 && updateMaskArray[PLAYER_GUILDRANK])
             {

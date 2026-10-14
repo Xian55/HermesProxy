@@ -811,6 +811,8 @@ public readonly record struct GuildPromoteMember(WowGuid128 Promotee);
 
 public readonly record struct GuildDemoteMember(WowGuid128 Demotee);
 
+public readonly record struct GuildAssignMemberRank(WowGuid128 Member, int RankOrder);
+
 public readonly record struct GuildOfficerRemoveMember(WowGuid128 Removee);
 
 public readonly record struct GuildInviteByName(string Name, uint ArenaTeamId);

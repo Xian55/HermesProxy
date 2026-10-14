@@ -39,7 +39,7 @@ public enum PlayerField
     PLAYER_BNET_ACCOUNT_CUSTOM,
 
     // GuildClubMemberID, new in 4.4.2.
-    [DescriptorCreatePlaceholder(DescriptorType.UInt64)]
+    [DescriptorCreatePlaceholder(DescriptorType.UInt64, CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteCreatePlayerGuildClubMemberId))]
     PLAYER_PAD_GUILD_CLUB_MEMBER_ID,
 
     [DescriptorCreateField(nameof(PlayerData.LootTargetGUID), DescriptorType.PackedGuid128)]

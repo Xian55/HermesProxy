@@ -41,9 +41,12 @@ internal static class DeliberatelyUnhandledOpcodes
         Opcode.CMSG_GET_ACCOUNT_NOTIFICATIONS,
         // Requests even a server of the client's own leaves unanswered (TrinityCore cata_classic:
         // no handler): that the player used /follow (TrinityCore 4.3.4 has the opcode and no
-        // handler either), and the crowd control spell of an arena opponent.
+        // handler either), the crowd control spell of an arena opponent, and the names of guild
+        // club members by their member id, asked when the guild chat opens (the names come with
+        // the roster and the name queries).
         Opcode.CMSG_USED_FOLLOW,
         Opcode.CMSG_REQUEST_CROWD_CONTROL_SPELL,
+        Opcode.CMSG_QUERY_PLAYER_NAME_BY_COMMUNITY_ID,
         // Things a modern server is asked for and a legacy server says unasked, or not at all: a
         // countdown that is running (a 4.3.4 server starts its own with SMSG_START_TIMER, the older
         // ones have none), and the forced reactions, which every legacy server sends at login.

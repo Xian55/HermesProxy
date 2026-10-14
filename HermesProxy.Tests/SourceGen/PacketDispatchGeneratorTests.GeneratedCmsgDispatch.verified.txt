@@ -1237,6 +1237,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.GuildSystem.HandleGuildAddRank(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildAssignMemberRank_CMSG_GUILD_ASSIGN_MEMBER_RANK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.GuildAssignMemberRankCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.GuildSystem.HandleGuildAssignMemberRank(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildAutoDeclineInvitation_CMSG_GUILD_AUTO_DECLINE_INVITATION(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
@@ -3361,6 +3367,7 @@ internal static unsafe class GeneratedCmsgDispatch
                 table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GROUP_SWAP_SUB_GROUP] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleGroupSwapSubGroup_CMSG_GROUP_SWAP_SUB_GROUP_SwapSubGroupsCodecWotLKClassic;
         }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_ADD_RANK] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildAddRank_CMSG_GUILD_ADD_RANK;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_ASSIGN_MEMBER_RANK] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildAssignMemberRank_CMSG_GUILD_ASSIGN_MEMBER_RANK;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_AUTO_DECLINE_INVITATION] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildAutoDeclineInvitation_CMSG_GUILD_AUTO_DECLINE_INVITATION;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_BANK_ACTIVATE] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildBankActivate_CMSG_GUILD_BANK_ACTIVATE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_BANK_BUY_TAB] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildBankBuyTab_CMSG_GUILD_BANK_BUY_TAB;
@@ -3931,6 +3938,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_GROUP_CHANGE_SUB_GROUP,
             global::HermesProxy.World.Enums.Opcode.CMSG_GROUP_SWAP_SUB_GROUP,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_ADD_RANK,
+            global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_ASSIGN_MEMBER_RANK,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_AUTO_DECLINE_INVITATION,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_BANK_ACTIVATE,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_BANK_BUY_TAB,

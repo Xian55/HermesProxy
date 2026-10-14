@@ -57,6 +57,7 @@ public partial class WorldClient
             char1.VirtualRealmAddress = virtualRealmAddress;
             PlayerCache cache = new PlayerCache();
             char1.Guid = entry.Guid.To128(GetSession().GameState);
+            char1.GuildClubMemberID = GuildClub.MemberIdOf(char1.Guid);
             char1.Name = cache.Name = entry.Name;
             char1.RaceId = cache.RaceId = entry.Race;
             char1.ClassId = cache.ClassId = entry.Class;
@@ -515,6 +516,7 @@ public partial class WorldClient
         response.Data.IsDeleted = false;
         response.Data.AccountID = GetSession().GetGameAccountGuidForPlayer(response.Player);
         response.Data.BnetAccountID = GetSession().GetBnetAccountGuidForPlayer(response.Player);
+        response.Data.GuildClubMemberID = GuildClub.MemberIdOf(response.Player);
         response.Data.VirtualRealmAddress = GetSession().RealmId.GetAddress();
         SendPacketToClient(response);
 

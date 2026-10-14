@@ -489,6 +489,8 @@ public partial class WorldClient
                 language, senderName, channelName, text.Length, ChatLogMessages.Preview(text));
 
         SendPacketToClient(chat);
+        if (addonPrefix.Length == 0 && chatTypeModern is ChatMessageTypeModern.Guild or ChatMessageTypeModern.Officer)
+            GetSession().GameState.GuildClub.ChatReceived(chatTypeModern == ChatMessageTypeModern.Officer, sender, text);
     }
 
     public void SendMessageChatVanilla(ChatMessageTypeVanilla type, uint lang, string msg, string channel, string to)

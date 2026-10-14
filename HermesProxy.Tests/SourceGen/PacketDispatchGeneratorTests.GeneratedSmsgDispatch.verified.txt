@@ -1292,6 +1292,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleGuildRoster(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleGuildSendRankChange_SMSG_GUILD_SEND_RANK_CHANGE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleGuildSendRankChange(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleHealthUpdate_SMSG_HEALTH_UPDATE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleHealthUpdate(packet);
@@ -3003,6 +3008,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_RANKS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildRanks_SMSG_GUILD_RANKS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_REWARD_LIST] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildRewardList_SMSG_GUILD_REWARD_LIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_ROSTER] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildRoster_SMSG_GUILD_ROSTER;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_SEND_RANK_CHANGE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildSendRankChange_SMSG_GUILD_SEND_RANK_CHANGE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_HEALTH_UPDATE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleHealthUpdate_SMSG_HEALTH_UPDATE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_HIGHEST_THREAT_UPDATE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleHighestThreatUpdate_SMSG_HIGHEST_THREAT_UPDATE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_IGNORE_LIST] = &Thunk_HermesProxy_World_Client_WorldClient_HandleIgnoreList_SMSG_IGNORE_LIST;
@@ -3549,6 +3555,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_RANKS,
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_REWARD_LIST,
             global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_ROSTER,
+            global::HermesProxy.World.Enums.Opcode.SMSG_GUILD_SEND_RANK_CHANGE,
             global::HermesProxy.World.Enums.Opcode.SMSG_HEALTH_UPDATE,
             global::HermesProxy.World.Enums.Opcode.SMSG_HIGHEST_THREAT_UPDATE,
             global::HermesProxy.World.Enums.Opcode.SMSG_IGNORE_LIST,

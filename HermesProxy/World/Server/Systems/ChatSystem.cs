@@ -346,18 +346,27 @@ public static class ChatSystem
                 return;
         }
 
-        var toBeSentTextParts = ConvertTextMessageIntoMaxLengthParts(packet.Text);
+        SendToLegacy(ctx.GetSession(), type, packet.Language, packet.Text);
+    }
+
+    /// <summary>
+    /// A chat line to the legacy server, split where it is longer than a legacy message may be.
+    /// Also how a line typed into the 4.4.2 guild window's chat reaches the guild (<see cref="GuildClub"/>).
+    /// </summary>
+    internal static void SendToLegacy(GlobalSessionData session, ChatMessageTypeModern type, uint language, string message)
+    {
+        var toBeSentTextParts = ConvertTextMessageIntoMaxLengthParts(message);
         foreach (string text in toBeSentTextParts)
         {
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             {
                 ChatMessageTypeWotLK chatMsg = type.CastEnum<ChatMessageTypeWotLK>();
-                ctx.GetSession().WorldClient!.SendMessageChatWotLK(chatMsg, packet.Language, text, "", "");
+                session.WorldClient!.SendMessageChatWotLK(chatMsg, language, text, "", "");
             }
             else
             {
                 ChatMessageTypeVanilla chatMsg = type.CastEnum<ChatMessageTypeVanilla>();
-                ctx.GetSession().WorldClient!.SendMessageChatVanilla(chatMsg, packet.Language, text, "", "");
+                session.WorldClient!.SendMessageChatVanilla(chatMsg, language, text, "", "");
             }
         }
     }

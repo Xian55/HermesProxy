@@ -67,3 +67,43 @@ public enum GameUtilitiesServiceMethods : uint
     GenericClientRequest = 1,
     GetAllValuesForAttribute = 10,
 }
+
+// The club methods a guild needs, numbered as in club_service.proto, club_listener.proto and the
+// two club_membership protos.
+public enum ClubServiceMethods : uint
+{
+    Subscribe = 1,
+    Unsubscribe = 2,
+    GetClubType = 6,
+    GetMembers = 34,
+    SubscribeStream = 100,
+    UnsubscribeStream = 101,
+    GetStreams = 105,
+    SetStreamFocus = 107,
+    CreateMessage = 150,
+    AdvanceStreamViewTime = 155,
+    GetStreamHistory = 156,
+}
+
+public enum ClubListenerMethods : uint
+{
+    OnSubscribe = 1,
+    OnUnsubscribe = 2,
+    OnMemberAdded = 30,
+    OnMemberRemoved = 31,
+    OnSubscriberStateChanged = 33,
+    OnMemberRoleChanged = 34,
+    OnStreamMessageAdded = 150,
+}
+
+public enum ClubMembershipServiceMethods : uint
+{
+    Subscribe = 1,
+    Unsubscribe = 2,
+}
+
+public enum ClubMembershipListenerMethods : uint
+{
+    OnClubAdded = 1,
+    OnClubRemoved = 2,
+}

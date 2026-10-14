@@ -199,6 +199,11 @@ public sealed class GameSessionData
     /// <summary>The 4.4.2 client's auction house searches. Created on its first request.</summary>
     internal World.Server.Systems.RetailAuctionHouse RetailAuctions
         => _retailAuctions ??= new(new World.Server.Systems.SessionRetailAuctionWire(GlobalSession));
+
+    private World.GuildClub? _guildClub;
+
+    /// <summary>The player's guild as the 4.4.2 client knows it, a Battle.net club.</summary>
+    internal World.GuildClub GuildClub => _guildClub ??= new(this);
     public readonly Dictionary<uint, int> GossipQuestTypesById = new();
     public uint AwaitingQuestRewardId;
     public WowGuid128 AwaitingQuestGiver = WowGuid128.Empty;

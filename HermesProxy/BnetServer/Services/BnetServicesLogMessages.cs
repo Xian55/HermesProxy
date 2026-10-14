@@ -139,4 +139,35 @@ internal static partial class BnetServicesLogMessages
         Level = LogLevel.Debug,
         Message = "Battlenet.LogonRequest: the client's standard offset from UTC is {Offset}; its calendar goes by {Zone}")]
     public static partial void ClientTimeZone(ILogger logger, System.TimeSpan? Offset, string Zone);
+
+    // 511-512: the messages themselves, as JSON. Callers build the JSON only when Trace is on.
+
+    [LoggerMessage(
+        EventId = 511,
+        Level = LogLevel.Trace,
+        Message = "{Prefix} {ServiceHash}/m:{MethodId} token {Token} request: {Content}")]
+    public static partial void RequestContent(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        string Prefix,
+        OriginalHash ServiceHash,
+        uint MethodId,
+        uint Token,
+        string Content);
+
+    [LoggerMessage(
+        EventId = 512,
+        Level = LogLevel.Trace,
+        Message = "{Prefix} {ServiceHash}/m:{MethodId} token {Token} answer {Status}: {Content}")]
+    public static partial void ResponseContent(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        string Prefix,
+        OriginalHash ServiceHash,
+        uint MethodId,
+        uint Token,
+        BattlenetRpcErrorCode Status,
+        string Content);
 }

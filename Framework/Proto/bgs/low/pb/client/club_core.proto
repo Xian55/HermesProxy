@@ -69,6 +69,10 @@ message ClubDescription {
   optional uint32 member_count = 8;
   repeated .bgs.protocol.club.v1.MemberDescription leader = 9;
   optional uint64 creation_time = 10;
+  // Not in the descriptor this file was recovered from. The 4.4.2 client reads them, and a guild
+  // club sent without them is what TrinityCore cata_classic warns about.
+  optional string timezone = 11;
+  optional string locale = 12;
 }
 
 message ClubView {

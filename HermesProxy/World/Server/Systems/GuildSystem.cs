@@ -205,6 +205,54 @@ public static class GuildSystem
         ctx.SendPacketToServer(packet);
     }
 
+    /// <summary>
+    /// The 4.4.2 client sends its promote, its demote and its rank drop-down all as a rank to give
+    /// the member. 4.3.4 has the same request (TrinityCore 4.3.4 HandleGuildAssignRankOpcode: the
+    /// rank, then the member's and the setter's GUID as interleaved masked bits). The older servers
+    /// only move a member one rank, so there it becomes a promote or a demote, judged against the
+    /// member's rank in the last roster; the clients before 4.4.2 keep no roster, and theirs stays
+    /// unanswered as it was.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_GUILD_ASSIGN_MEMBER_RANK)]
+    public static void HandleGuildAssignMemberRank(in GuildAssignMemberRank assign, in SessionContext ctx)
+    {
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            ulong member = assign.Member.To64().Low;
+            ulong setter = ctx.GameState.CurrentPlayerGuid.To64().Low;
+            WorldPacket cata = new WorldPacket(Opcode.CMSG_GUILD_ASSIGN_MEMBER_RANK);
+            cata.WriteUInt32((uint)assign.RankOrder);
+            MaskedGuid.WriteMaskBits(cata, member, [1, 7]);
+            MaskedGuid.WriteMaskBits(cata, setter, [4, 2]);
+            MaskedGuid.WriteMaskBits(cata, member, [4, 5, 6]);
+            MaskedGuid.WriteMaskBits(cata, setter, [1, 7]);
+            MaskedGuid.WriteMaskBits(cata, member, [2, 3, 0]);
+            MaskedGuid.WriteMaskBits(cata, setter, [6, 3, 0, 5]);
+            cata.FlushBits();
+            MaskedGuid.WriteBytes(cata, member, [0]);
+            MaskedGuid.WriteBytes(cata, setter, [1, 3, 5]);
+            MaskedGuid.WriteBytes(cata, member, [7, 3]);
+            MaskedGuid.WriteBytes(cata, setter, [0]);
+            MaskedGuid.WriteBytes(cata, member, [1]);
+            MaskedGuid.WriteBytes(cata, setter, [6]);
+            MaskedGuid.WriteBytes(cata, member, [2, 5, 4]);
+            MaskedGuid.WriteBytes(cata, setter, [2, 4]);
+            MaskedGuid.WriteBytes(cata, member, [6]);
+            MaskedGuid.WriteBytes(cata, setter, [7]);
+            ctx.SendPacketToServer(cata);
+            return;
+        }
+
+        int current = ctx.GameState.GuildClub.RankOf(assign.Member);
+        if (current < 0 || current == assign.RankOrder)
+            return;
+        WorldPacket packet = new WorldPacket(assign.RankOrder < current
+            ? Opcode.CMSG_GUILD_PROMOTE_MEMBER
+            : Opcode.CMSG_GUILD_DEMOTE_MEMBER);
+        packet.WriteCString(ctx.GetSession().GameState.GetPlayerName(assign.Member));
+        ctx.SendPacketToServer(packet);
+    }
+
     [HandlesCmsg(Opcode.CMSG_GUILD_OFFICER_REMOVE_MEMBER)]
     public static void HandleGuildOfficerRemoveMember(in GuildOfficerRemoveMember remove, in SessionContext ctx)
     {

@@ -1338,6 +1338,10 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         features.KioskSessionMinutes = 30;
         features.BpayStoreProductDeliveryDelay = 180;
         features.HiddenUIClubsPresenceUpdateTimer = 60000;
+        // Without clubs the 4.4.2 client never asks for its guild club, and its guild window
+        // stays shut.
+        features.ClubsEnabled = GuildClub.Served;
+        features.ClubsPresenceUpdateEnabled = GuildClub.Served;
         features.VoiceEnabled = false;
         features.BrowserEnabled = false;
 
