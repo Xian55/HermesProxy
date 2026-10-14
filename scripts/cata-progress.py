@@ -713,6 +713,13 @@ LEGACY_REVIEWED = {
     ('C', 'CMSG_GUILD_LEAVE'): 'HandleGuildLeaveOpcode: empty, as in 3.3.5a; a member left in play',
     ('S', 'SMSG_GUILD_COMMAND_RESULT'): 'GuildCommandResult::Write: command, name, result, as in 3.3.5a; '
                                         '4.3.4 sends it as SMSG_GUILD_COMMAND_RESULT_2, which the same handler takes',
+    ('C', 'CMSG_AREA_SPIRIT_HEALER_QUERY'): 'HandleAreaSpiritHealerQueryOpcode: a plain 8-byte GUID, as in 3.3.5a '
+                                            '(WowPacketParser has the 4.3.4 client mask it; the server does not read it so)',
+    ('C', 'CMSG_AREA_SPIRIT_HEALER_QUEUE'): 'HandleAreaSpiritHealerQueueOpcode: a plain 8-byte GUID, as in 3.3.5a',
+    ('C', 'CMSG_QUERY_QUEST_COMPLETION_NPCS'): 'HandleQuestNPCQuery: 24 bits of count, then the quest ids; '
+                                               'written so by its own 4.3.4 branch (QuestSystem)',
+    ('C', 'CMSG_CALENDAR_COMPLAIN'): 'HandleCalendarComplain: the inviter\'s 8-byte GUID, the event, the invitation; '
+                                     'written in that order (CalendarSystem, a server of 4.3.4 only)',
 }
 
 

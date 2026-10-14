@@ -8,12 +8,12 @@
 |---|---:|---|
 | ❌ failing | 0 | the latest session that touched it threw or dropped it |
 | 🚫 unmapped | 66 | not in the 4.3.4 table: renamed, split or removed in 4.x |
-| ⬜ todo | 16 | layout changed in 4.x, no 4.3.4 branch, not seen yet |
-| ⚠️ suspect | 3 | layout changed, no 4.3.4 branch, but passed without an error — likely misread |
+| ⬜ todo | 15 | layout changed in 4.x, no 4.3.4 branch, not seen yet |
+| ⚠️ suspect | 0 | layout changed, no 4.3.4 branch, but passed without an error — likely misread |
 | 🔁 retest | 182 | its file changed after the latest session that exercised it |
 | 🔧 ported, unseen | 78 | has a 4.3.4 branch, waiting for a session to exercise it |
-| · unseen | 199 | same layout as 3.3.5a per WPP, not exercised yet |
-| ✅ seen ok | 242 | ported or unchanged, and the latest session passed it cleanly |
+| · unseen | 200 | same layout as 3.3.5a per WPP, not exercised yet |
+| ✅ seen ok | 245 | ported or unchanged, and the latest session passed it cleanly |
 
 ## 4.4.2 client side
 
@@ -252,7 +252,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🚫 | S | `SMSG_QUEST_UPDATE_ADD_ITEM` |  | same |  |  |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
 | ⬜ | C | `CMSG_BATTLEMASTER_JOIN_ARENA` |  | changed |  |  |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | ⬜ | C | `CMSG_BF_MGR_QUEUE_EXIT_REQUEST` |  | changed |  |  |  | HermesProxy/World/Server/Systems/BattlegroundSystem.cs |
-| ⬜ | C | `CMSG_CALENDAR_COMPLAIN` |  | changed |  |  |  | HermesProxy/World/Server/Systems/CalendarSystem.cs |
 | ⬜ | C | `CMSG_LFG_JOIN` |  | changed |  |  |  | HermesProxy/World/Server/Systems/LfgSystem.cs |
 | ⬜ | C | `CMSG_LFG_LEAVE` |  | changed |  |  |  | HermesProxy/World/Server/Systems/LfgSystem.cs |
 | ⬜ | C | `CMSG_LFG_PROPOSAL_RESULT` |  | changed |  |  |  | HermesProxy/World/Server/Systems/LfgSystem.cs |
@@ -266,9 +265,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ⬜ | S | `SMSG_LFG_PLAYER_REWARD` |  | changed |  |  |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
 | ⬜ | S | `SMSG_LFG_PROPOSAL_UPDATE` |  | changed |  |  |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
 | ⬜ | S | `SMSG_LFG_QUEUE_STATUS` |  | changed |  |  |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
-| ⚠️ | C | `CMSG_AREA_SPIRIT_HEALER_QUERY` |  | changed | 20261013_004221 | 1 |  | (variable opcode) |
-| ⚠️ | C | `CMSG_AREA_SPIRIT_HEALER_QUEUE` |  | changed | 20261013_004221 | 1 |  | (variable opcode) |
-| ⚠️ | C | `CMSG_QUERY_QUEST_COMPLETION_NPCS` |  | changed | 20261014_064233 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
 | 🔁 | C | `CMSG_ACCEPT_GUILD_INVITE` |  | ? | 20261012_213627 | 2 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
 | 🔁 | C | `CMSG_ATTACK_SWING` | yes | same | 20261011_180416 | 2 |  | HermesProxy/World/Server/Systems/MeleeAttackOrder.cs |
 | 🔁 | C | `CMSG_AUCTION_LIST_BIDDED_ITEMS` |  | ? | 20261011_151802 | 1 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
@@ -538,6 +534,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | · | C | `CMSG_ARENA_TEAM_ROSTER` |  | same |  |  |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | · | C | `CMSG_AUTO_EQUIP_ITEM_SLOT` |  | ? |  |  |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | · | C | `CMSG_AUTO_STORE_BAG_ITEM` |  | ? |  |  |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
+| · | C | `CMSG_CALENDAR_COMPLAIN` |  | reviewed |  |  |  | HermesProxy/World/Server/Systems/CalendarSystem.cs |
 | · | C | `CMSG_CALENDAR_EVENT_SIGN_UP` |  | same |  |  |  | HermesProxy/World/Server/Systems/CalendarSystem.cs |
 | · | C | `CMSG_CANCEL_AUTO_REPEAT_SPELL` |  | same |  |  |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | · | C | `CMSG_CANCEL_CHANNELLING` |  | same |  |  |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
@@ -730,6 +727,8 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | · | S | `SMSG_ZONE_UNDER_ATTACK` |  | same |  |  |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | C | `CMSG_ACCEPT_TRADE` |  | same | 20261012_203959 | 2 |  | HermesProxy/World/Server/Systems/TradeSystem.cs |
 | ✅ | C | `CMSG_ACTIVATE_TAXI` |  | same | 20261011_143750 | 1 |  | HermesProxy/World/Server/Systems/TaxiSystem.cs |
+| ✅ | C | `CMSG_AREA_SPIRIT_HEALER_QUERY` |  | reviewed | 20261013_004221 | 1 |  | (variable opcode) |
+| ✅ | C | `CMSG_AREA_SPIRIT_HEALER_QUEUE` |  | reviewed | 20261013_004221 | 1 |  | (variable opcode) |
 | ✅ | C | `CMSG_AREA_TRIGGER` |  | same | 20261014_042037 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | ✅ | C | `CMSG_ATTACK_STOP` |  | same | 20261011_171859 | 1 |  | HermesProxy/World/Server/Systems/MeleeAttackOrder.cs |
 | ✅ | C | `CMSG_AUTH_SESSION` | yes | changed | 20261014_064233 | 1 |  | HermesProxy/World/Client/WorldClient.cs |
@@ -799,6 +798,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_QUERY_CREATURE` |  | same | 20261014_051832 | 37 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | ✅ | C | `CMSG_QUERY_GAME_OBJECT` |  | same | 20261014_064233 | 16 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | ✅ | C | `CMSG_QUERY_GUILD_INFO` | yes | changed | 20261014_064233 | 1 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
+| ✅ | C | `CMSG_QUERY_QUEST_COMPLETION_NPCS` |  | reviewed | 20261014_064233 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
 | ✅ | C | `CMSG_QUERY_QUEST_INFO` |  | same | 20261014_064233 | 2 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
 | ✅ | C | `CMSG_QUERY_TIME` |  | same | 20261014_064233 | 1 |  | HermesProxy/World/Server/Systems/QuerySystem.cs |
 | ✅ | C | `CMSG_QUEST_GIVER_COMPLETE_QUEST` |  | reviewed | 20261011_162223 | 1 |  | (variable opcode) |
