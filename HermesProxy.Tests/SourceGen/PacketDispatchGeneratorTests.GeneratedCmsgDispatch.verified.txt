@@ -415,6 +415,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.BattlePetSystem.HandleBattlePetRequestJournal(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_BattlePetSystem_HandleBattlePetRequestJournalLock_CMSG_BATTLE_PET_REQUEST_JOURNAL_LOCK(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.BattlePetSystem.HandleBattlePetRequestJournalLock(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_BattlePetSystem_HandleBattlePetSetFlags_CMSG_BATTLE_PET_SET_FLAGS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.BattlePetSetFlagsCodec.Read(ref reader, out var packet);
@@ -3015,6 +3021,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BATTLEMASTER_JOIN_SKIRMISH] = &Thunk_HermesProxy_World_Server_Systems_ArenaSystem_HandleBattlematerJoinSkirmish_CMSG_BATTLEMASTER_JOIN_SKIRMISH;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BATTLENET_REQUEST] = &Thunk_HermesProxy_World_Server_Systems_SessionSystem_HandleBattlenetRequest_CMSG_BATTLENET_REQUEST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BATTLE_PET_REQUEST_JOURNAL] = &Thunk_HermesProxy_World_Server_Systems_BattlePetSystem_HandleBattlePetRequestJournal_CMSG_BATTLE_PET_REQUEST_JOURNAL;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BATTLE_PET_REQUEST_JOURNAL_LOCK] = &Thunk_HermesProxy_World_Server_Systems_BattlePetSystem_HandleBattlePetRequestJournalLock_CMSG_BATTLE_PET_REQUEST_JOURNAL_LOCK;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BATTLE_PET_SET_FLAGS] = &Thunk_HermesProxy_World_Server_Systems_BattlePetSystem_HandleBattlePetSetFlags_CMSG_BATTLE_PET_SET_FLAGS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BATTLE_PET_SUMMON] = &Thunk_HermesProxy_World_Server_Systems_BattlePetSystem_HandleBattlePetSummon_CMSG_BATTLE_PET_SUMMON;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_BEGIN_TRADE] = &Thunk_HermesProxy_World_Server_Systems_TradeSystem_HandleEmptyTradePacket_CMSG_BEGIN_TRADE;
@@ -3677,6 +3684,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_BATTLEMASTER_JOIN_SKIRMISH,
             global::HermesProxy.World.Enums.Opcode.CMSG_BATTLENET_REQUEST,
             global::HermesProxy.World.Enums.Opcode.CMSG_BATTLE_PET_REQUEST_JOURNAL,
+            global::HermesProxy.World.Enums.Opcode.CMSG_BATTLE_PET_REQUEST_JOURNAL_LOCK,
             global::HermesProxy.World.Enums.Opcode.CMSG_BATTLE_PET_SET_FLAGS,
             global::HermesProxy.World.Enums.Opcode.CMSG_BATTLE_PET_SUMMON,
             global::HermesProxy.World.Enums.Opcode.CMSG_BEGIN_TRADE,

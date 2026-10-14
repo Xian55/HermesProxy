@@ -42,6 +42,23 @@ public static class BattlePetSystem
         CollectionSync.SendSummonedBattlePet(ctx.GetSession());
     }
 
+    /// <summary>
+    /// The journal's lock, which the client asks for again on every new map. A server of its own
+    /// grants it and sends the journal after it (TrinityCore, HandleBattlePetRequestJournalLock);
+    /// here nobody else could hold it, so it is always granted.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_BATTLE_PET_REQUEST_JOURNAL_LOCK)]
+    public static void HandleBattlePetRequestJournalLock(in EmptyClientPacket request, in SessionContext ctx)
+    {
+        if (!ModernVersion.IsWotLKClassicOrLater)
+            return;
+
+        ctx.SendPacket(new BattlePetJournalLockAcquired());
+        EnsureCollectionFavorites(ctx.GetSession());
+        ctx.SendPacket(BattlePetJournal.FromSession(ctx.GetSession().GameState));
+        CollectionSync.SendSummonedBattlePet(ctx.GetSession());
+    }
+
     [HandlesCmsg(Opcode.CMSG_BATTLE_PET_SUMMON)]
     public static void HandleBattlePetSummon(in BattlePetSummon summon, in SessionContext ctx)
     {

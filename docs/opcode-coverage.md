@@ -27,10 +27,10 @@ the proxy has no reason to translate.
 
 | build | defined | handled | gap |
 |---|---:|---:|---:|
-| `V1_14_1_40688` | 692 | 406 | 286 |
-| `V2_5_2_39570` | 691 | 406 | 285 |
-| `V2_5_3_41750` | 694 | 408 | 286 |
-| `V3_4_3_54261` | 454 | 406 | 48 |
+| `V1_14_1_40688` | 692 | 407 | 285 |
+| `V2_5_2_39570` | 691 | 407 | 284 |
+| `V2_5_3_41750` | 694 | 409 | 285 |
+| `V3_4_3_54261` | 454 | 407 | 47 |
 
 ### Server to proxy (SMSG), by emulator build
 
@@ -210,7 +210,7 @@ silently wrong wherever it does not. Check each against the 4.4.2 client
 (`docs/protocol/4.4.2.60895`) before 4.4.2 becomes a supported build; where it differs, the
 site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a narrower check.
 
-193 sites across 57 files.
+194 sites across 57 files.
 
 | file | sites |
 |---|---:|
@@ -226,9 +226,9 @@ site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a n
 | `HermesProxy/World/Server/Packets/BattleGroundPackets.cs` | 5 |
 | `HermesProxy/World/Server/Packets/GroupPackets.cs` | 5 |
 | `HermesProxy/World/Server/Packets/MailPackets.cs` | 5 |
+| `HermesProxy/World/Server/Systems/BattlePetSystem.cs` | 5 |
 | `HermesProxy/World/Client/PacketHandlers/QuestHandler.cs` | 4 |
 | `HermesProxy/World/Server/Packets/GuildPackets.cs` | 4 |
-| `HermesProxy/World/Server/Systems/BattlePetSystem.cs` | 4 |
 | `HermesProxy/World/Server/Systems/ToySystem.cs` | 4 |
 | `HermesProxy/VersionChecker.cs` | 3 |
 | `HermesProxy/World/Client/PacketHandlers/CombatHandler.cs` | 3 |
