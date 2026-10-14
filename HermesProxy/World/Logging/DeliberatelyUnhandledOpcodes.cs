@@ -36,6 +36,14 @@ internal static class DeliberatelyUnhandledOpcodes
         Opcode.CMSG_UPDATE_VAS_PURCHASE_STATES,
         Opcode.CMSG_GET_UNDELETE_CHARACTER_COOLDOWN_STATUS,
         Opcode.CMSG_SOCIAL_CONTRACT_REQUEST,
+        // The token's price history and the account's notifications: the same kind of service.
+        Opcode.CMSG_COMMERCE_TOKEN_GET_LOG,
+        Opcode.CMSG_GET_ACCOUNT_NOTIFICATIONS,
+        // Requests even a server of the client's own leaves unanswered (TrinityCore cata_classic:
+        // no handler): that the player used /follow (TrinityCore 4.3.4 has the opcode and no
+        // handler either), and the crowd control spell of an arena opponent.
+        Opcode.CMSG_USED_FOLLOW,
+        Opcode.CMSG_REQUEST_CROWD_CONTROL_SPELL,
         // Things a modern server is asked for and a legacy server says unasked, or not at all: a
         // countdown that is running (a 4.3.4 server starts its own with SMSG_START_TIMER, the older
         // ones have none), and the forced reactions, which every legacy server sends at login.
