@@ -116,6 +116,11 @@ public partial class WorldClient
         GuildEventType eventType = (GuildEventType)packet.ReadUInt8();
         if (IsCataLegacy)
         {
+            if ((byte)eventType == CataGuildEventFounder)
+            {
+                SendGuildFounded();
+                return;
+            }
             if (!TryGuildEventFromCata((byte)eventType, out eventType))
                 return;
         }
@@ -341,10 +346,30 @@ public partial class WorldClient
         GetSession().GameState.GuildClub.MemberRankChanged(change.Other, (int)rank);
     }
 
+    // TrinityCore 4.3.4 GE_FOUNDER, broadcast by Guild::Create when the guild has only its founder.
+    private const byte CataGuildEventFounder = 15;
+
+    /// <summary>
+    /// A guild was just made, by this session's character: the only member a founder event reaches.
+    /// A stock 4.4.2 realm tells that as a new leader with no old one (TrinityCore cata_classic
+    /// Guild::Create, SendEventNewLeader(leader, nullptr)), and a native capture has it right after
+    /// the player joined.
+    /// </summary>
+    private void SendGuildFounded()
+    {
+        WowGuid128 founder = GetSession().GameState.CurrentPlayerGuid;
+        GuildEventNewLeader leader = new GuildEventNewLeader();
+        leader.SelfPromoted = false;
+        leader.NewLeaderGUID = founder;
+        leader.NewLeaderVirtualRealmAddress = GetSession().RealmId.GetAddress();
+        leader.NewLeaderName = GetSession().GameState.GetPlayerName(founder);
+        SendPacketToClient(leader);
+    }
+
     /// <summary>
     /// 4.3.4 counts guild events from 1 and has some the older servers lack (TrinityCore 4.3.4
     /// Guild.h GuildEvents). The three rank events are all "the ranks changed" to this handler;
-    /// the founder and the mobile sign-on have nothing to be turned into.
+    /// the mobile sign-on has nothing to be turned into, the founder is read before this.
     /// </summary>
     private static bool TryGuildEventFromCata(byte cataEvent, out GuildEventType eventType)
     {

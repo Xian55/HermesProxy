@@ -3773,6 +3773,8 @@ public partial class WorldClient
                 if (!IsCataLegacy)
                     updateData.EnsurePlayerData().GuildLevel = 25;
                 updateData.EnsurePlayerData().GuildRankID = updates[PLAYER_GUILDRANK].UInt32Value;
+                if (guid == GetSession().GameState.CurrentPlayerGuid)
+                    GetSession().GameState.GuildClub.OwnRankReceived((int)updates[PLAYER_GUILDRANK].UInt32Value);
             }
             int PLAYER_GUILD_TIMESTAMP = LegacyVersion.GetUpdateField(PlayerField.PLAYER_GUILD_TIMESTAMP);
             if (PLAYER_GUILD_TIMESTAMP >= 0 && updateMaskArray[PLAYER_GUILD_TIMESTAMP])

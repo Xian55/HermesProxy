@@ -76,6 +76,10 @@ internal sealed class GuildClub
     private readonly Dictionary<WowGuid128, ClubMember> _roster = [];
     private readonly Dictionary<int, uint> _rankRights = [];
     private uint _createTime;
+    // The player's own rank from its own guild rank field, which comes before any roster: what
+    // the club says the player is until the roster does. The field is 0 until the server changes
+    // it, and 0 is the guild master's rank, so a founder's is never sent: it stays 0 here as well.
+    private int _ownRank;
     private ClubRemovedReason _leaveReason = ClubRemovedReason.MemberLeft;
 
     // Lines this client sent through the guild window whose echo has not come back yet.
@@ -144,7 +148,9 @@ internal sealed class GuildClub
         };
         club.Leader.Add(description.Leader);
 
-        uint role = RoleOf(_roster.TryGetValue(Self, out ClubMember self) ? self.RankId : UnknownRank);
+        // A stock realm has the player's role right in this first message (a guild master's is the
+        // owner's), roster or not.
+        uint role = RoleOf(_roster.TryGetValue(Self, out ClubMember self) ? self.RankId : _ownRank);
         Member member = new()
         {
             Id = IdOf(Self),
@@ -206,7 +212,7 @@ internal sealed class GuildClub
         }
         if (!_roster.ContainsKey(Self))
         {
-            ClubMember self = new(UnknownRank, true, "");
+            ClubMember self = new(_ownRank, true, "");
             response.Member.Add(MemberOf(Self, self));
             _givenRoles[Self] = RoleOf(self.RankId);
         }
@@ -420,6 +426,12 @@ internal sealed class GuildClub
     {
         if (Served)
             _leaveReason = ClubRemovedReason.DestroyedByMember;
+    }
+
+    public void OwnRankReceived(int rankId)
+    {
+        if (Served)
+            _ownRank = rankId;
     }
 
     public void MemberRankChanged(WowGuid128 player, int rankId)
