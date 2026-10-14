@@ -85,7 +85,7 @@ public static class LfgSystem
 
         if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
         {
-            ctx.SendPacketToServer(BuildCataJoin(roles, packet.Slots));
+            ctx.SendPacketToServer(BuildJoinCata(roles, packet.Slots));
             return;
         }
 
@@ -109,14 +109,14 @@ public static class LfgSystem
     /// as 0, then the lengths of the comment and the dungeon list as bits, the comment and the
     /// dungeons.
     /// </summary>
-    internal static WorldPacket BuildCataJoin(byte roles, uint[] slots)
+    internal static WorldPacket BuildJoinCata(byte roles, uint[] slots)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_LFG_JOIN);
-        WriteCataJoin(packet, roles, slots);
+        WriteJoinCata(packet, roles, slots);
         return packet;
     }
 
-    internal static void WriteCataJoin(WorldPacket packet, byte roles, uint[] slots)
+    internal static void WriteJoinCata(WorldPacket packet, byte roles, uint[] slots)
     {
         packet.WriteUInt32(roles);
         for (int i = 0; i < 3; i++)
@@ -133,7 +133,7 @@ public static class LfgSystem
     /// (time, type, id and the masked GUID of whoever queued). The ticket is the server's own,
     /// as it came with the last queue packet.
     /// </summary>
-    internal static void WriteCataLeave(WorldPacket packet, RideTicket ticket)
+    internal static void WriteLeaveCata(WorldPacket packet, RideTicket ticket)
     {
         ulong requester = ticket.RequesterGuid.To64().Low;
         packet.WriteUInt32(0);
@@ -178,7 +178,7 @@ public static class LfgSystem
         if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
         {
             var state = ctx.GetSession().GameState;
-            WriteCataLeave(leave, state.LfgTicket ?? state.GetOrCreateLfgTicket(state.CurrentPlayerGuid, 0));
+            WriteLeaveCata(leave, state.LfgServerTicket ?? state.GetOrCreateLfgTicket(state.CurrentPlayerGuid, 0));
         }
         ctx.SendPacketToServer(leave);
     }
@@ -209,12 +209,24 @@ public static class LfgSystem
         // No assigned role is laid over these: an answer without a role is the role check
         // declined, and an accepted one always carries the role the player picked.
         byte roles = packet.Roles;
-        WorldPacket legacy = new WorldPacket(Opcode.CMSG_LFG_SET_ROLES);
         Log.Print(LogType.Debug, $"LFG[diag]: CMSG_DF_SET_ROLES roles=0x{roles:X2}");
 
         ctx.GetSession().GameState.LfgRequestedRoles = roles;
-        legacy.WriteUInt8(roles);
-        ctx.SendPacketToServer(legacy);
+        ctx.SendPacketToServer(BuildSetRoles(roles));
+    }
+
+    /// <summary>
+    /// The player's roles: one byte to a 3.3.5a server, 32 bits to a 4.3.4 one (TrinityCore 4.3.4
+    /// LFGSetRoles::Read).
+    /// </summary>
+    internal static WorldPacket BuildSetRoles(byte roles)
+    {
+        WorldPacket legacy = new WorldPacket(Opcode.CMSG_LFG_SET_ROLES);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            legacy.WriteUInt32(roles);
+        else
+            legacy.WriteUInt8(roles);
+        return legacy;
     }
 
     static byte OverlayAssignedLfgRoles(in SessionContext ctx, byte roles)

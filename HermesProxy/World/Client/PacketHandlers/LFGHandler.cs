@@ -44,20 +44,23 @@ public partial class WorldClient
     }
 
     /// <summary>
-    /// The queue's ticket as a 4.3.4 server sends it (whoever queued, its id, type and time), kept
-    /// for the requests that name the queue.
+    /// Keeps the queue's ticket as a 4.3.4 server sends it (whoever queued, its id, type and
+    /// time) for the requests that name the queue, and gives the client the session's own. The
+    /// server's ticket does not stay the same over a queue: its id is the player's team, and the
+    /// first update of a party's role check carries the ticket of the player's previous queue
+    /// (TrinityCore 4.3.4 LFGMgr::JoinLfg sends it before it stores the new one). The client took
+    /// that for a second queue, which no later update removed.
     /// </summary>
     private RideTicket CataLfgTicket(ulong requester, uint id, uint type, uint time)
     {
-        RideTicket ticket = new RideTicket
+        GetSession().GameState.SetLfgServerTicket(new RideTicket
         {
             RequesterGuid = requester != 0 ? new WowGuid64(requester).To128(GetSession().GameState) : GetSession().GameState.CurrentPlayerGuid,
             Id = id,
             Type = (RideType)type,
             Time = time,
-        };
-        GetSession().GameState.SetLfgTicket(ticket);
-        return ticket;
+        });
+        return MakeLfgTicket();
     }
 
     /// <summary>

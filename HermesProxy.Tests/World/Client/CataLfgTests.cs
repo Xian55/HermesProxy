@@ -161,12 +161,15 @@ public sealed class CataLfgTests
         var result = DeliverHex<DFJoinResult>("03000000 00 D5000000 00 360FCF6A 10000000 03", _harness.Client.HandleLFGJoinResultCata);
 
         Assert.Equal(LfgJoinResults.ModernOk, result.Result);
-        Assert.Equal(213u, result.Ticket.Id);
-        Assert.Equal(0x6ACF0F36L, result.Ticket.Time);
-        Assert.Equal((RideType)3, result.Ticket.Type);
-        Assert.Equal(_harness.Session.GameState.CurrentPlayerGuid, result.Ticket.RequesterGuid);
         Assert.Empty(result.BlackList);
-        Assert.Same(result.Ticket, _harness.Session.GameState.LfgTicket);
+
+        // the server's ticket is kept for leaving; the client is given the session's own
+        RideTicket server = Assert.IsType<RideTicket>(_harness.Session.GameState.LfgServerTicket);
+        Assert.Equal(213u, server.Id);
+        Assert.Equal(0x6ACF0F36L, server.Time);
+        Assert.Equal((RideType)3, server.Type);
+        Assert.Equal(_harness.Session.GameState.CurrentPlayerGuid, server.RequesterGuid);
+        Assert.Same(_harness.Session.GameState.GetOrCreateLfgTicket(default, 0), result.Ticket);
     }
 
     [Fact]
@@ -179,7 +182,6 @@ public sealed class CataLfgTests
         Assert.True(joined.LfgJoined);
         Assert.False(joined.Queued);
         Assert.Equal((byte)25, joined.Reason);                    // JOIN_QUEUE_INITIAL, 24 on 4.3.4
-        Assert.Equal(213u, joined.Ticket.Id);
 
         var queued = DeliverHex<DFUpdateStatus>("00000050 00C8 0D D5000000 360FCF6A 000000 03 03000000 02010006", _harness.Client.HandleLFGUpdateStatusCata);
         Assert.True(queued.Queued);
@@ -192,6 +194,22 @@ public sealed class CataLfgTests
         Assert.False(removed.Queued);
         Assert.Equal(LfgUpdateTypes.ModernRemovedFromQueue, removed.Reason);
         Assert.Empty(_harness.Session.GameState.LfgQueuedSlots);
+        Assert.Same(joined.Ticket, queued.Ticket);
+        Assert.Same(joined.Ticket, removed.Ticket);
+    }
+
+    [Fact]
+    public void HandleLFGUpdateStatusCata_ARoleCheckStartingOnTheLastQueuesTicket_OneTicketForTheClient()
+    {
+        // TrinityCore 4.3.4 sends a party's first update before it stores the new ticket: the
+        // party's queue begins on the ticket of the leader's last one (time 0x6ACF0F36), and the
+        // next update carries the new one (time 0x6ACF1320)
+        var started = DeliverHex<DFUpdateStatus>("40000050 00C8 06 D5000000 360FCF6A 000000 03 03000000 02010006", _harness.Client.HandleLFGUpdateStatusCata);
+        var queued = DeliverHex<DFUpdateStatus>("40000050 00C8 0D D5000000 2013CF6A 000000 03 03000000 02010006", _harness.Client.HandleLFGUpdateStatusCata);
+
+        Assert.True(started.IsParty);
+        Assert.Same(started.Ticket, queued.Ticket);
+        Assert.Equal(0x6ACF1320L, _harness.Session.GameState.LfgServerTicket!.Time);
     }
 
     [Fact]
@@ -209,18 +227,18 @@ public sealed class CataLfgTests
         Assert.Equal(uint.MaxValue, status.AvgWaitTimeByRole[2]);
         Assert.Equal(8u, status.QueuedTime);
         Assert.Equal(QueuedSlot, status.Slot);
-        Assert.Equal(213u, status.Ticket.Id);
+        Assert.Equal(213u, _harness.Session.GameState.LfgServerTicket!.Id);
     }
 
     [Fact]
-    public void WriteCataJoinAndLeave_AsTheyWentToTheServer()
+    public void WriteJoinAndLeaveCata_AsTheyWentToTheServer()
     {
         using var join = new WorldPacket();
-        LfgSystem.WriteCataJoin(join, 0x08, [QueuedSlot]);
+        LfgSystem.WriteJoinCata(join, 0x08, [QueuedSlot]);
         Assert.Equal(Convert.FromHexString("08000000 000000000000000000000000 0000000080 02010006".Replace(" ", "")), join.GetDataSpan().ToArray());
 
         using var leave = new WorldPacket();
-        LfgSystem.WriteCataLeave(leave, new RideTicket { RequesterGuid = _harness.Session.GameState.CurrentPlayerGuid, Id = 213, Type = (RideType)3, Time = 0x6ACF0F36 });
+        LfgSystem.WriteLeaveCata(leave, new RideTicket { RequesterGuid = _harness.Session.GameState.CurrentPlayerGuid, Id = 213, Type = (RideType)3, Time = 0x6ACF0F36 });
         Assert.Equal(Convert.FromHexString("00000000 360FCF6A 03000000 D5000000 20 03".Replace(" ", "")), leave.GetDataSpan().ToArray());
     }
 

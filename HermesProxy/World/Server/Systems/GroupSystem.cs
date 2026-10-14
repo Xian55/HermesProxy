@@ -292,9 +292,7 @@ public static class GroupSystem
             ctx.GetSession().GameState.LfgRequestedRoles = newRole;
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958))
             {
-                WorldPacket legacy = new WorldPacket(Opcode.CMSG_LFG_SET_ROLES);
-                legacy.WriteUInt8(newRole);
-                ctx.SendPacketToServer(legacy);
+                ctx.SendPacketToServer(LfgSystem.BuildSetRoles(newRole));
             }
         }
 
