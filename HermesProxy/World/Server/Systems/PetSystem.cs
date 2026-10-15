@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Framework.Constants;
 using Framework.Logging;
 using HermesProxy.Enums;
+using HermesProxy.World.Client;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -128,6 +129,22 @@ public static class PetSystem
         ctx.GetSession().GameState.LastStableMaster = stable.StableMaster;
         WorldPacket packet = new WorldPacket(Opcode.CMSG_BUY_STABLE_SLOT);
         packet.WriteGuid(stable.StableMaster.To64());
+        ctx.SendPacketToServer(packet);
+    }
+
+    // TrinityCore 4.3.4 HandleSetPetSlot: the pet and the slot first, then the stable master as a
+    // masked GUID. The server answers with SMSG_PET_SLOT_UPDATED and SMSG_PET_STABLE_RESULT. A
+    // 3.3.5a server has no such opcode (its stable moves are CMSG_STABLE_PET and friends).
+    [HandlesCmsg(Opcode.CMSG_SET_PET_SLOT)]
+    public static void HandleSetPetSlot(in SetPetSlot slot, in SessionContext ctx)
+    {
+        if (!WorldClient.IsCataLegacy)
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_SET_PET_SLOT);
+        packet.WriteUInt32(slot.PetNumber);
+        packet.WriteUInt8(slot.DestSlot);
+        MaskedGuid.Write(packet, slot.StableMaster.To64().Low, [3, 2, 0, 7, 5, 6, 1, 4], [5, 3, 1, 7, 4, 0, 6, 2]);
         ctx.SendPacketToServer(packet);
     }
 

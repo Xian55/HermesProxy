@@ -309,23 +309,23 @@ public partial class WorldClient
             else if (pet.PetFlags != 1)
                 pet.PetFlags = 3;
 
-            CreatureTemplate? template = GameData.GetCreatureTemplate(pet.CreatureID);
-            if (template != null)
-                pet.DisplayID = template.Display.CreatureDisplay[0].CreatureDisplayID;
-            else
-            {
-                WorldPacket query = new WorldPacket(Opcode.CMSG_QUERY_CREATURE);
-                query.WriteUInt32(pet.CreatureID);
-                query.WriteGuid(WowGuid64.Empty);
-                SendPacket(query);
-            }
-
+            pet.DisplayID = PetDisplayId(pet.CreatureID);
             stabledPets.Add(pet);
         }
 
         if (petStableField)
         {
-            SendPetStable(stableMaster, stabledPets, numStableSlots);
+            var state = GetSession().GameState;
+            state.PetStable = new PetStableData { Pets = stabledPets, StableMaster = stableMaster };
+            SendPetStable(state.PetStable, numStableSlots);
+
+            // A stable master's list opens the window, as the native gossip option does; the list
+            // that answers the open window's own request does not open it again.
+            if (!stableMaster.IsEmpty() && stableMaster != state.OpenStableMaster)
+            {
+                state.OpenStableMaster = stableMaster;
+                SendPacketToClient(new NpcInteractionOpenResult(stableMaster, PlayerInteractionType.StableMaster));
+            }
             return;
         }
 
@@ -347,16 +347,11 @@ public partial class WorldClient
     /// <summary>
     /// 4.4.2 (TrinityCore cata_classic Player::AddPetToUpdateFields and SetStableMaster): the pets
     /// and the stable master go into ActivePlayerData.PetStable, where the client finds the pets
-    /// of its Call Pet flyout and the stable window's list. A stable master's list opens the
-    /// window, as the native gossip option does; the list that answers the open window's own
-    /// request does not open it again.
+    /// of its Call Pet flyout and the stable window's list.
     /// </summary>
-    private void SendPetStable(WowGuid128 stableMaster, List<PetStableInfo> pets, byte numStableSlots)
+    private void SendPetStable(PetStableData stable, byte numStableSlots)
     {
         var state = GetSession().GameState;
-        PetStableData stable = new PetStableData { Pets = pets, StableMaster = stableMaster };
-        state.PetStable = stable;
-
         ObjectUpdate update = new ObjectUpdate(state.CurrentPlayerGuid, UpdateTypeModern.Values, GetSession());
         ActivePlayerData data = update.EnsureActivePlayerData();
         data.NumStableSlots = numStableSlots;
@@ -364,12 +359,86 @@ public partial class WorldClient
         UpdateObject packet = new UpdateObject(state);
         packet.ObjectUpdates.Add(update);
         SendPacketToClient(packet);
+    }
 
-        if (!stableMaster.IsEmpty() && stableMaster != state.OpenStableMaster)
+    private uint PetDisplayId(uint creatureId)
+    {
+        CreatureTemplate? template = GameData.GetCreatureTemplate(creatureId);
+        if (template != null)
+            return template.Display.CreatureDisplay[0].CreatureDisplayID;
+
+        WorldPacket query = new WorldPacket(Opcode.CMSG_QUERY_CREATURE);
+        query.WriteUInt32(creatureId);
+        query.WriteGuid(WowGuid64.Empty);
+        SendPacket(query);
+        return 0;
+    }
+
+    // TrinityCore 4.3.4 and cata_classic both number Call Pet slots 0-4 and stable slots from 5;
+    // cata_classic flags the first active, the rest stabled.
+    private static void SetCataSlot(PetStableInfo pet, int slot)
+    {
+        pet.PetSlot = (byte)slot;
+        pet.PetFlags = slot <= 4 ? (byte)1 : (byte)2;
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 SendPetSlotUpdated: pet A went to slot A, and the pet that was there, if
+    /// any, to slot B. 4.3.4 sends a new list only when the pet out was moved (it is dismissed and
+    /// saved), so the 4.4.2 client's pets are moved here and sent again.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_PET_SLOT_UPDATED)]
+    internal void HandlePetSlotUpdated(WorldPacket packet)
+    {
+        int slotA = packet.ReadInt32();
+        uint petNumberA = packet.ReadUInt32();
+        uint petNumberB = packet.ReadUInt32();
+        int slotB = packet.ReadInt32();
+
+        var state = GetSession().GameState;
+        if (state.PetStable == null)
+            return;
+
+        foreach (PetStableInfo pet in state.PetStable.Pets)
         {
-            state.OpenStableMaster = stableMaster;
-            SendPacketToClient(new NpcInteractionOpenResult(stableMaster, PlayerInteractionType.StableMaster));
+            if (pet.PetNumber == petNumberA)
+                SetCataSlot(pet, slotA);
+            else if (petNumberB != 0 && pet.PetNumber == petNumberB)
+                SetCataSlot(pet, slotB);
         }
+        SendPetStable(state.PetStable, state.NumStableSlots);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 PetAdded::Write, after a tame: the new pet and the slot it went to. It
+    /// joins the 4.4.2 client's pets, as cata_classic adds it to the player data.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_PET_ADDED)]
+    internal void HandlePetAdded(WorldPacket packet)
+    {
+        uint level = (uint)packet.ReadInt32();
+        int slot = packet.ReadInt32();
+        packet.ReadUInt8(); // active or stabled, which the slot says again
+        uint creatureId = (uint)packet.ReadInt32();
+        uint petNumber = (uint)packet.ReadInt32();
+        string name = packet.ReadString(packet.ReadBits<uint>(8));
+
+        var state = GetSession().GameState;
+        if (state.PetStable == null)
+            return;
+
+        PetStableInfo pet = new PetStableInfo
+        {
+            PetNumber = petNumber,
+            CreatureID = creatureId,
+            DisplayID = PetDisplayId(creatureId),
+            ExperienceLevel = level,
+            PetName = name,
+        };
+        SetCataSlot(pet, slot);
+        state.PetStable.Pets.RemoveAll(p => p.PetNumber == petNumber);
+        state.PetStable.Pets.Add(pet);
+        SendPetStable(state.PetStable, state.NumStableSlots);
     }
 
     /// <summary>

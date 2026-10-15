@@ -260,6 +260,22 @@ public static class StablePetCodec
         => packet = new StablePet(r.ReadPackedGuid128());
 }
 
+/// <summary>
+/// The pet, the slot it goes to, the stable master (docs/protocol/4.4.2.60895; TrinityCore
+/// cata_classic SetPetSlot::Read). Only the 4.4.2 client has the opcode.
+/// </summary>
+public static class SetPetSlotCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out SetPetSlot packet)
+    {
+        uint petNumber = r.ReadUInt32();
+        byte destSlot = r.ReadUInt8();
+        WowGuid128 stableMaster = r.ReadPackedGuid128();
+        packet = new SetPetSlot(petNumber, destSlot, stableMaster);
+    }
+}
+
 public static class UnstablePetCodec
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

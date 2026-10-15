@@ -425,4 +425,18 @@ public sealed class CataClassicCodecTests
         Assert.Equal(new ChrCustomizationChoice(17, 150), choice);
         Assert.Equal(0, r.Remaining);
     }
+
+    // TrinityCore cata_classic SetPetSlot::Read: the pet number, the slot, the stable master.
+    [Fact]
+    public void SetPetSlot_ReadsPetSlotAndStableMaster()
+    {
+        byte[] f = Framed(w => { w.WriteUInt32(7); w.WriteUInt8(5); w.WritePackedGuid128(Npc); });
+
+        var r = ReaderOver(f);
+        SetPetSlotCodec.Read(ref r, out var packet);
+        Assert.Equal(7u, packet.PetNumber);
+        Assert.Equal(5, packet.DestSlot);
+        Assert.Equal(Npc, packet.StableMaster);
+        Assert.Equal(0, r.Remaining);
+    }
 }

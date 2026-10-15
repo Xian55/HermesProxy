@@ -398,6 +398,10 @@ sealed class PetStableData
 
 public readonly record struct BuyStableSlot(WowGuid128 StableMaster);
 
+// The 4.x stable's one move: a pet to a Call Pet slot (0-4) or a stable slot (5 on), swapping
+// with the pet already there.
+public readonly record struct SetPetSlot(uint PetNumber, byte DestSlot, WowGuid128 StableMaster);
+
 public class PetGuids : ServerPacket, ISpanWritable
 {
     public PetGuids() : base(Opcode.SMSG_PET_GUIDS, ConnectionType.Instance) { }
