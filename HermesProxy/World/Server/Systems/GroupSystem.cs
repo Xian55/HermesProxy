@@ -193,6 +193,11 @@ public static class GroupSystem
             packet.WriteBit(raid.Raid);
             packet.FlushBits();
         }
+        // TrinityCore 4.3.4 reads a whole byte for it (HandleGroupRaidConvertOpcode: a raid of five
+        // or fewer may go back to a party since 4.x). Without the byte the read fails after the
+        // server has already answered "OK", and nothing converts.
+        else if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            packet.WriteUInt8((byte)(raid.Raid ? 1 : 0));
         ctx.SendPacketToServer(packet);
     }
 
