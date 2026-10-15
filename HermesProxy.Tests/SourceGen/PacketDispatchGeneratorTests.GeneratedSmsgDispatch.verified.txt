@@ -1657,6 +1657,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleMoveForceFlagChange(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleMoveSetCollisionHeightCata_SMSG_MOVE_SET_COLLISION_HEIGHT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleMoveSetCollisionHeightCata(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleMoveForceFlagChange_SMSG_MOVE_SET_FEATHER_FALL(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleMoveForceFlagChange(packet);
@@ -1870,6 +1875,11 @@ internal static unsafe class GeneratedSmsgDispatch
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCata_SMSG_MOVE_UPDATE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleMoveUpdateCata(packet);
+    }
+
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCollisionHeightCata_SMSG_MOVE_UPDATE_COLLISION_HEIGHT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleMoveUpdateCollisionHeightCata(packet);
     }
 
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCata_SMSG_MOVE_UPDATE_FLIGHT_BACK_SPEED(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
@@ -3105,6 +3115,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_ROOT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveForceFlagChange_SMSG_MOVE_ROOT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_SET_ACTIVE_MOVER] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveSetActiveMover_SMSG_MOVE_SET_ACTIVE_MOVER;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_SET_CAN_FLY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveForceFlagChange_SMSG_MOVE_SET_CAN_FLY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_SET_COLLISION_HEIGHT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveSetCollisionHeightCata_SMSG_MOVE_SET_COLLISION_HEIGHT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_SET_FEATHER_FALL] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveForceFlagChange_SMSG_MOVE_SET_FEATHER_FALL;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_SET_FLIGHT_BACK_SPEED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveSetSpeedCata_SMSG_MOVE_SET_FLIGHT_BACK_SPEED;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_SET_FLIGHT_SPEED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveSetSpeedCata_SMSG_MOVE_SET_FLIGHT_SPEED;
@@ -3148,6 +3159,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UNSET_CAN_FLY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveForceFlagChange_SMSG_MOVE_UNSET_CAN_FLY;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UNSET_HOVERING] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveForceFlagChange_SMSG_MOVE_UNSET_HOVERING;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCata_SMSG_MOVE_UPDATE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_COLLISION_HEIGHT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCollisionHeightCata_SMSG_MOVE_UPDATE_COLLISION_HEIGHT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_FLIGHT_BACK_SPEED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCata_SMSG_MOVE_UPDATE_FLIGHT_BACK_SPEED;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_FLIGHT_SPEED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCata_SMSG_MOVE_UPDATE_FLIGHT_SPEED;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_KNOCK_BACK] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMoveUpdateCata_SMSG_MOVE_UPDATE_KNOCK_BACK;
@@ -3651,6 +3663,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_ROOT,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_SET_ACTIVE_MOVER,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_SET_CAN_FLY,
+            global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_SET_COLLISION_HEIGHT,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_SET_FEATHER_FALL,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_SET_FLIGHT_BACK_SPEED,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_SET_FLIGHT_SPEED,
@@ -3694,6 +3707,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UNSET_CAN_FLY,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UNSET_HOVERING,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE,
+            global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_COLLISION_HEIGHT,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_FLIGHT_BACK_SPEED,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_FLIGHT_SPEED,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOVE_UPDATE_KNOCK_BACK,

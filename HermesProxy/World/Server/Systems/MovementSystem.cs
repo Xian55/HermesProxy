@@ -381,6 +381,20 @@ public static class MovementSystem
     [HandlesCmsg(Opcode.CMSG_MOVE_SET_COLLISION_HEIGHT_ACK)]
     public static void HandleMoveSetCollisionHeightAck(in MoveSetCollisionHeightAck collisionHeightAck, in SessionContext ctx)
     {
+        // 4.3.4 sent the height itself and waits for this ack (with its move counter, the same
+        // height and the reason) before it tells the players around; without one a server with
+        // AntiCheat.PendingMoveChangesTimeoutTime set kicks the player.
+        if (WorldClient.IsCataLegacy)
+        {
+            // 4.3.4 numbers the reasons mount 0, scale 1; the modern client scale 0, mount 1
+            byte reason = collisionHeightAck.Reason == (byte)MoveSetCollisionHeight.UpdateCollisionHeightReason.Scale ? (byte)1 : (byte)0;
+            WorldPacket packet = new WorldPacket(Opcode.CMSG_MOVE_SET_COLLISION_HEIGHT_ACK);
+            if (LegacyMovementCata.TryWrite(packet, Opcode.CMSG_MOVE_SET_COLLISION_HEIGHT_ACK, collisionHeightAck.MoverGUID.To64(),
+                    collisionHeightAck.Ack.MoveInfo, collisionHeightAck.Ack.MoveCounter, collisionHeightAck.Height, reason))
+                ctx.SendPacketToServer(packet);
+            return;
+        }
+
         // 3.3.5 does have CMSG_MOVE_SET_COLLISION_HGT_ACK (0x517), but Hermes
         // already emits SMSG_MOVE_SET_COLLISION_HEIGHT from UNIT_FIELD_MOUNTDISPLAYID
         // Values. Forwarding the ACK would make AC emit MSG 0x518 and we would

@@ -24,21 +24,34 @@ public static class LegacyMovementCata
     /// <summary>
     /// The opcode's sequence, or null when 4.3.4 has none for it. <paramref name="extraFloat"/>
     /// fills the sequence's extra element: the new speed of a speed-change ack, the height of a
-    /// collision-height ack.
+    /// collision-height ack, whose second extra element is <paramref name="extraBits"/>.
     /// </summary>
     public static bool TryWrite(WorldPacket packet, Opcode opcode, WowGuid64 mover, in MovementInfo info,
-        uint movementCounter = 0, float extraFloat = 0f)
+        uint movementCounter = 0, float extraFloat = 0f, byte extraBits = 0)
     {
         if (!LegacyMovementSequencesCata.ByOpcode.TryGetValue(opcode, out LegacyMovementElement[]? sequence))
             return false;
 
-        Write(packet, sequence, mover, in info, movementCounter, extraFloat);
+        Write(packet, sequence, mover, in info, movementCounter, extraFloat, TwoBitExtraAt(opcode), extraBits);
         return true;
     }
 
-    public static void Write(WorldPacket packet, ReadOnlySpan<LegacyMovementElement> sequence, WowGuid64 mover,
-        in MovementInfo info, uint movementCounter = 0, float extraFloat = 0f)
+    /// <summary>
+    /// Which of the sequence's extra elements is two bits rather than a float: the reason of a
+    /// collision-height change, written before the height and read back after it (TrinityCore
+    /// 4.3.4 SendHeightChangeToMover and HandleSetCollisionHeightAck, MSEExtraTwoBits). -1: none.
+    /// </summary>
+    private static int TwoBitExtraAt(Opcode opcode) => opcode switch
     {
+        Opcode.SMSG_MOVE_SET_COLLISION_HEIGHT => 0,
+        Opcode.CMSG_MOVE_SET_COLLISION_HEIGHT_ACK => 1,
+        _ => -1,
+    };
+
+    public static void Write(WorldPacket packet, ReadOnlySpan<LegacyMovementElement> sequence, WowGuid64 mover,
+        in MovementInfo info, uint movementCounter = 0, float extraFloat = 0f, int twoBitExtraAt = -1, byte extraBits = 0)
+    {
+        int extraIndex = 0;
         uint flags = (uint)info.Flags & 0x3FFFFFFF;
         uint flagsExtra = info.FlagsExtra & FlagsExtraMask;
         TransportInfo transport = info.Transport.GetValueOrDefault();
@@ -204,7 +217,10 @@ public static class LegacyMovementCata
                     packet.FlushBits();
                     break;
                 case LegacyMovementElement.ExtraElement:
-                    packet.WriteFloat(extraFloat);
+                    if (extraIndex++ == twoBitExtraAt)
+                        packet.WriteBits(extraBits, 2);
+                    else
+                        packet.WriteFloat(extraFloat);
                     break;
                 case LegacyMovementElement.End:
                     return;
@@ -219,18 +235,27 @@ public static class LegacyMovementCata
     /// </summary>
     public static bool TryRead(WorldPacket packet, Opcode opcode, GameSessionData gameState, out ulong mover,
         out MovementInfo info, out uint movementCounter, out float extraFloat)
+        => TryRead(packet, opcode, gameState, out mover, out info, out movementCounter, out extraFloat, out _);
+
+    /// <summary>
+    /// <see cref="TryRead(WorldPacket, Opcode, GameSessionData, out ulong, out MovementInfo, out uint, out float)"/>
+    /// for a sequence with a two-bit extra element as well (<paramref name="extraBits"/>).
+    /// </summary>
+    public static bool TryRead(WorldPacket packet, Opcode opcode, GameSessionData gameState, out ulong mover,
+        out MovementInfo info, out uint movementCounter, out float extraFloat, out byte extraBits)
     {
         mover = 0;
         info = default;
         movementCounter = 0;
         extraFloat = 0f;
+        extraBits = 0;
         if (!LegacyMovementSequencesCata.ByOpcode.TryGetValue(opcode, out LegacyMovementElement[]? sequence))
             return false;
 
         if (!WrittenWithoutPresenceBits.Contains(opcode))
         {
-            if (Read(packet, sequence, implicitPresence: false, hasFall: false, hasTransport: false,
-                    out mover, out info, out movementCounter, out extraFloat, out ulong transportGuid))
+            if (Read(packet, sequence, implicitPresence: false, hasFall: false, hasTransport: false, TwoBitExtraAt(opcode),
+                    out mover, out info, out movementCounter, out extraFloat, out extraBits, out ulong transportGuid))
                 SetTransportGuid(ref info, transportGuid, gameState);
             return true;
         }
@@ -245,8 +270,8 @@ public static class LegacyMovementCata
             try
             {
                 bool hasTransport = Read(packet, sequence, implicitPresence: true, hasFall: (guess & 1) != 0,
-                    hasTransport: (guess & 2) != 0, out mover, out info, out movementCounter, out extraFloat,
-                    out ulong transportGuid);
+                    hasTransport: (guess & 2) != 0, twoBitExtraAt: -1, out mover, out info, out movementCounter,
+                    out extraFloat, out extraBits, out ulong transportGuid);
                 if (packet.Remaining() != 0)
                     continue;
                 if (hasTransport)
@@ -288,12 +313,14 @@ public static class LegacyMovementCata
     /// movement flags. Returns whether a transport was read; its GUID is left to the caller.
     /// </summary>
     private static bool Read(WorldPacket packet, LegacyMovementElement[] sequence, bool implicitPresence,
-        bool hasFall, bool hasTransport, out ulong mover, out MovementInfo info, out uint movementCounter,
-        out float extraFloat, out ulong transportGuidValue)
+        bool hasFall, bool hasTransport, int twoBitExtraAt, out ulong mover, out MovementInfo info,
+        out uint movementCounter, out float extraFloat, out byte extraBits, out ulong transportGuidValue)
     {
         info = default;
         movementCounter = 0;
         extraFloat = 0f;
+        extraBits = 0;
+        int extraIndex = 0;
         Span<bool> guidMask = stackalloc bool[8];
         Span<byte> guid = stackalloc byte[8];
         Span<bool> transportMask = stackalloc bool[8];
@@ -378,7 +405,12 @@ public static class LegacyMovementCata
                 case LegacyMovementElement.SplineElevation: if (hasSplineElevation) info.SplineElevation = packet.ReadFloat(); break;
                 case LegacyMovementElement.Counter: movementCounter = packet.ReadUInt32(); break;
                 case LegacyMovementElement.FlushBits: packet.ResetBitPos(); break;
-                case LegacyMovementElement.ExtraElement: extraFloat = packet.ReadFloat(); break;
+                case LegacyMovementElement.ExtraElement:
+                    if (extraIndex++ == twoBitExtraAt)
+                        extraBits = (byte)packet.ReadBits<uint>(2);
+                    else
+                        extraFloat = packet.ReadFloat();
+                    break;
                 case LegacyMovementElement.End: break;
             }
         }

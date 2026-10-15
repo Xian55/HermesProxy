@@ -88,10 +88,11 @@ public static class MoveSetCollisionHeightAckCodec
     public static void Read(ref SpanPacketReader r, out MoveSetCollisionHeightAck packet)
     {
         WowGuid128 mover = r.ReadPackedGuid128();
+        MovementAckCodec.Read(ref r, out var ack);
         float height = r.ReadFloat();
         uint mountDisplayId = r.ReadUInt32();
         byte reason = r.ReadUInt8();
-        packet = new MoveSetCollisionHeightAck(mover, height, mountDisplayId, reason);
+        packet = new MoveSetCollisionHeightAck(mover, ack, height, mountDisplayId, reason);
     }
 }
 

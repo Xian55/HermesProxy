@@ -2581,7 +2581,9 @@ public partial class WorldClient
 
     private void AfterStoreObjectUpdateHook(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData, BitArray changedValuesMask)
     {
-        if (objectType == ObjectType.Player || objectType == ObjectType.ActivePlayer)
+        // A 4.3.4 server sends the collision height itself (SMSG_MOVE_SET_COLLISION_HEIGHT, and
+        // SMSG_MOVE_UPDATE_COLLISION_HEIGHT once the client acks); one made here would come twice.
+        if ((objectType == ObjectType.Player || objectType == ObjectType.ActivePlayer) && !IsCataLegacy)
         {
             int UNIT_FIELD_NATIVEDISPLAYID = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_NATIVEDISPLAYID);
             int UNIT_FIELD_MOUNTDISPLAYID = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_MOUNTDISPLAYID);

@@ -699,7 +699,7 @@ public sealed class MoveSetVehicleRecID : ServerPacket
 
 public readonly record struct MoveSetVehicleRecIDAck(WowGuid128 MoverGUID, MovementAck Ack, uint VehicleRecID);
 
-public readonly record struct MoveSetCollisionHeightAck(WowGuid128 MoverGUID, float Height, uint MountDisplayID, byte Reason);
+public readonly record struct MoveSetCollisionHeightAck(WowGuid128 MoverGUID, MovementAck Ack, float Height, uint MountDisplayID, byte Reason);
 
 class MoveSetCollisionHeight : ServerPacket, ISpanWritable
 {

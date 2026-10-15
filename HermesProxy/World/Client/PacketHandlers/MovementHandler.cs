@@ -904,6 +904,48 @@ public partial class WorldClient
         SendPlayerMovementPacket(speed, speed.MoverGUID);
     }
 
+    // 4.3.4 tells the player of its own new collision height (a mount, a scale aura) with the move
+    // counter and the reason, and waits for the ack before it tells the players around.
+    [HandlesSmsg(Opcode.SMSG_MOVE_SET_COLLISION_HEIGHT)]
+    internal void HandleMoveSetCollisionHeightCata(WorldPacket packet)
+    {
+        var gameState = GetSession().GameState;
+        if (!LegacyMovementCata.TryRead(packet, Opcode.SMSG_MOVE_SET_COLLISION_HEIGHT, gameState,
+                out ulong mover, out _, out uint counter, out float height, out byte reason))
+            return;
+
+        WowGuid128 guid = new WowGuid64(mover).To128(gameState);
+        SendPacketToClient(new MoveSetCollisionHeight
+        {
+            MoverGUID = guid,
+            SequenceIndex = counter,
+            Height = height,
+            Scale = ObjectScale(guid),
+            // 4.3.4 numbers them the other way round: mount 0, scale 1
+            Reason = reason == 1 ? MoveSetCollisionHeight.UpdateCollisionHeightReason.Scale
+                                 : MoveSetCollisionHeight.UpdateCollisionHeightReason.Mount,
+            MountDisplayID = gameState.GetLegacyFieldValueUInt32(guid, UnitField.UNIT_FIELD_MOUNTDISPLAYID),
+        });
+    }
+
+    [HandlesSmsg(Opcode.SMSG_MOVE_UPDATE_COLLISION_HEIGHT)]
+    internal void HandleMoveUpdateCollisionHeightCata(WorldPacket packet)
+    {
+        var gameState = GetSession().GameState;
+        if (!LegacyMovementCata.TryRead(packet, Opcode.SMSG_MOVE_UPDATE_COLLISION_HEIGHT, gameState,
+                out ulong mover, out MovementInfo info, out _, out float height))
+            return;
+
+        WowGuid128 guid = new WowGuid64(mover).To128(gameState);
+        SendPacketToClient(new MoveUpdateCollisionHeight { MoverGUID = guid, MoveInfo = info, Height = height, Scale = ObjectScale(guid) });
+    }
+
+    private float ObjectScale(WowGuid128 guid)
+    {
+        float scale = GetSession().GameState.GetLegacyFieldValueFloat(guid, ObjectField.OBJECT_FIELD_SCALE_X);
+        return scale > 0f ? scale : 1f;
+    }
+
     // for other players
     [HandlesSmsg(Opcode.MSG_MOVE_SET_FLIGHT_BACK_SPEED)]
     [HandlesSmsg(Opcode.MSG_MOVE_SET_FLIGHT_SPEED)]

@@ -187,6 +187,43 @@ public sealed class LegacyMovementCataTests
     }
 
     [Fact]
+    public void MoveSetCollisionHeight_AsATrinityCore434ServerSentIt()
+    {
+        // Player 2 taking the taxi mount: the reason in two bits ahead of the GUID mask (0, a
+        // mount on 4.3.4), the move counter 5, the new height 2.58 last.
+        byte[] body = Convert.FromHexString("0080" + "03" + "05000000" + "22542540");
+        using var read = Framed(body);
+
+        Assert.True(LegacyMovementCata.TryRead(read, Opcode.SMSG_MOVE_SET_COLLISION_HEIGHT, null!, out ulong mover, out _, out uint counter, out float height, out byte reason));
+
+        Assert.Equal(2ul, mover);
+        Assert.Equal(5u, counter);
+        Assert.Equal(2.583f, height, 3);
+        Assert.Equal(0, reason);
+        Assert.Equal(0, read.GetRemainingSpan().Length);
+    }
+
+    [Fact]
+    public void MoveSetCollisionHeightAck_CarriesTheReasonAsTwoBits()
+    {
+        var info = new MovementInfo { Position = new Vector3(1f, 2f, 3f), Orientation = 0.5f, MoveTime = 99 };
+        var mover = new WowGuid64(0x0000000000C0FFEE);
+        using var packet = new WorldPacket(Opcode.MSG_MOVE_HEARTBEAT);
+        Assert.True(LegacyMovementCata.TryWrite(packet, Opcode.CMSG_MOVE_SET_COLLISION_HEIGHT_ACK, mover, in info,
+            movementCounter: 6, extraFloat: 2.0313f, extraBits: 1));
+        packet.FlushBits();
+        using var read = Framed(packet.GetDataSpan().ToArray());
+
+        Assert.True(LegacyMovementCata.TryRead(read, Opcode.CMSG_MOVE_SET_COLLISION_HEIGHT_ACK, null!, out ulong guid, out _, out uint counter, out float height, out byte reason));
+
+        Assert.Equal(mover.Low, guid);
+        Assert.Equal(6u, counter);
+        Assert.Equal(2.0313f, height);
+        Assert.Equal(1, reason);
+        Assert.Equal(0, read.GetRemainingSpan().Length);
+    }
+
+    [Fact]
     public void MoveUpdateRunBackSpeed_NoGuessFits_IsNotRead()
     {
         // one byte more than the packet above: no choice of fall data and transport ends there
