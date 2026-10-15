@@ -1189,11 +1189,15 @@ public partial class ObjectUpdateBuilder
             data.WriteInt16((short)projects[i]);
     }
 
+    // A dynamic field's size and a changed bit for each element, in blocks of 32.
     private static void WriteCompleteDynamicMask(WorldPacket data, int size)
     {
         data.WriteBits((uint)size, 32);
-        if (size > 0)
-            data.WriteBits(uint.MaxValue >> (32 - size), size);
+        for (int block = 0; block < size / 32; block++)
+            data.WriteBits(uint.MaxValue, 32);
+        int rest = size % 32;
+        if (rest > 0)
+            data.WriteBits(uint.MaxValue >> (32 - rest), rest);
     }
 
     // NumStableSlots. A zero placeholder here makes every stable slot render locked even
@@ -1563,10 +1567,13 @@ public partial class ObjectUpdateBuilder
     // Closes group 102: native flushes after NumStableSlots and writes whether a PetStable is
     // there. Once the client has one, every update of the group has to say so, or the client
     // drops it, so the bit follows what the session sent rather than this update.
+    // ResearchHistory (bit 122) comes next, ahead of the PetStable itself (bit 129).
     internal void WriteUpdateActivePlayerPetStableBit(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
     {
         data.FlushBits();
         data.WriteBit(_gameState.PetStable != null);
+        if (blocks.IsBitSet(122))
+            WriteUpdateResearchHistory(data);
     }
 
     // TrinityCore cata_classic StableInfo::WriteUpdate with everything changed: the pets as a
@@ -1640,6 +1647,53 @@ public partial class ObjectUpdateBuilder
             data.WriteString(pet.PetName);
             data.FlushBits();
         }
+    }
+
+    // Archaeology's completed projects from a 4.3.4 server (TrinityCore cata_classic
+    // ResearchHistory): on create the count and each project's id, first completion and count.
+    internal void WriteCreateActivePlayerResearchHistory(WorldPacket data, ActivePlayerData src)
+    {
+        var history = _gameState.ResearchHistory;
+        data.WriteUInt32((uint)history.Count);
+        foreach (var (projectId, firstCompleted, count) in history)
+        {
+            data.WriteUInt32(projectId);
+            data.WriteInt64(firstCompleted);
+            data.WriteUInt32(count);
+        }
+        _gameState.ResearchHistoryDirty = false;
+    }
+
+    // ResearchHistory::WriteUpdate with everything changed: its 2-bit mask, the projects' size and a
+    // changed bit each, flush, then each project whole (CompletedProject: 4-bit mask, flush, values).
+    // Like PetStable it starts on a byte of its own (WowPacketParser's 4.4.2 reader resets its bit
+    // reader first); written into the presence bit's byte, the client read a mask of 0 and no
+    // completed project at all.
+    private void WriteUpdateResearchHistory(WorldPacket data)
+    {
+        var history = _gameState.ResearchHistory;
+        data.FlushBits();
+        data.WriteBits(0b11u, 2);
+        WriteCompleteDynamicMask(data, history.Count);
+        data.FlushBits();
+        foreach (var (projectId, firstCompleted, count) in history)
+        {
+            data.WriteBits(0xFu, 4);
+            data.FlushBits();
+            data.WriteUInt32(projectId);
+            data.WriteInt64(firstCompleted);
+            data.WriteUInt32(count);
+        }
+    }
+
+    // Bit 122 under 102 when the session's completed projects changed.
+    internal void ApplyActivePlayerResearchHistoryMaskMutator(ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        if (!_gameState.ResearchHistoryDirty)
+            return;
+        _gameState.ResearchHistoryDirty = false;
+        blocks.SetBit(102);
+        blocks.SetBit(122);
     }
 
     // HasAny helper for the InvSlots mask-mutator. Returns true when any of the 141

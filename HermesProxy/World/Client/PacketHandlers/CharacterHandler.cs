@@ -582,6 +582,11 @@ public partial class WorldClient
             cuf.Data = GetSession().AccountDataMgr.LoadCUFProfiles();
             SendPacketToClient(cuf);
         }
+        // A 4.3.4 server sends archaeology's completed projects only when asked, which its own
+        // client does when the archaeology window opens. The 4.4.2 client keeps them in the player
+        // data and never asks, so the proxy asks once here.
+        else
+            SendPacketToServer(new WorldPacket(Opcode.CMSG_REQUEST_RESEARCH_HISTORY));
 
         // Issue #80: modern 1.14+ Classic clients auto-cancel wand `Shoot` when target enters
         // melee range (`autoRangedCombat` CVar default-ON). Priests rely on wand for downtime

@@ -1,5 +1,6 @@
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 
 namespace HermesProxy.World.Client;
@@ -102,5 +103,58 @@ public partial class WorldClient
             TotalEarned = tracked * scale,
             SuppressChatLog = suppressChatLog,
         });
+    }
+
+    // Archaeology's completed projects. The 4.4.2 client has no packet for them and keeps them in
+    // ActivePlayerData.ResearchHistory, which a player Values update carries when it changed.
+
+    /// <summary>
+    /// TrinityCore 4.3.4 SetupResearchHistory: 22 bits of count, then per project its id, how often
+    /// it was completed and when first (a uint32 unix time). Sent at login.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_SETUP_RESEARCH_HISTORY)]
+    internal void HandleSetupResearchHistory(WorldPacket packet)
+    {
+        uint count = packet.ReadBits<uint>(22);
+        var history = GetSession().GameState.ResearchHistory;
+        history.Clear();
+        for (uint i = 0; i < count && packet.CanRead(); i++)
+        {
+            uint projectId = packet.ReadUInt32();
+            uint completions = packet.ReadUInt32();
+            long firstCompleted = packet.ReadUInt32();
+            history.Add((projectId, firstCompleted, completions));
+        }
+        SendResearchHistoryValues();
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 ResearchComplete, after a project is solved: when it was first completed,
+    /// how often, the project.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_RESEARCH_COMPLETE)]
+    internal void HandleResearchComplete(WorldPacket packet)
+    {
+        long firstCompleted = packet.ReadUInt32();
+        uint completions = packet.ReadUInt32();
+        uint projectId = packet.ReadUInt32();
+        var history = GetSession().GameState.ResearchHistory;
+        int index = history.FindIndex(entry => entry.ProjectId == projectId);
+        if (index >= 0)
+            history[index] = (projectId, firstCompleted, completions);
+        else
+            history.Add((projectId, firstCompleted, completions));
+        SendResearchHistoryValues();
+    }
+
+    private void SendResearchHistoryValues()
+    {
+        var state = GetSession().GameState;
+        state.ResearchHistoryDirty = true;
+        ObjectUpdate update = new ObjectUpdate(state.CurrentPlayerGuid, UpdateTypeModern.Values, GetSession());
+        update.EnsureActivePlayerData();
+        UpdateObject packet = new UpdateObject(state);
+        packet.ObjectUpdates.Add(update);
+        SendPacketToClient(packet);
     }
 }

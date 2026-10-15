@@ -2342,6 +2342,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleRequestPvpRewardsResponse(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleResearchComplete_SMSG_RESEARCH_COMPLETE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleResearchComplete(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleResetFailedNotify_SMSG_RESET_FAILED_NOTIFY(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleResetFailedNotify(packet);
@@ -2375,6 +2380,11 @@ internal static unsafe class GeneratedSmsgDispatch
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleSetupCurrency_SMSG_SETUP_CURRENCY(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleSetupCurrency(packet);
+    }
+
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleSetupResearchHistory_SMSG_SETUP_RESEARCH_HISTORY(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleSetupResearchHistory(packet);
     }
 
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleSetAnimTier_SMSG_SET_ANIM_TIER(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
@@ -3274,6 +3284,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_REFORGE_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleReforgeResult_SMSG_REFORGE_RESULT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_REQUEST_CEMETERY_LIST_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleRequestCemeteryListResponse_SMSG_REQUEST_CEMETERY_LIST_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_REQUEST_PVP_REWARDS_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleRequestPvpRewardsResponse_SMSG_REQUEST_PVP_REWARDS_RESPONSE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_RESEARCH_COMPLETE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleResearchComplete_SMSG_RESEARCH_COMPLETE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_RESET_FAILED_NOTIFY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleResetFailedNotify_SMSG_RESET_FAILED_NOTIFY;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_RESURRECT_REQUEST] = &Thunk_HermesProxy_World_Client_WorldClient_HandleResurrectRequest_SMSG_RESURRECT_REQUEST;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_RESYNC_RUNES] = &Thunk_HermesProxy_World_Client_WorldClient_HandleResyncRunes_SMSG_RESYNC_RUNES;
@@ -3281,6 +3292,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SEND_KNOWN_SPELLS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSendKnownSpells_SMSG_SEND_KNOWN_SPELLS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SEND_UNLEARN_SPELLS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSendUnlearnSpells_SMSG_SEND_UNLEARN_SPELLS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SETUP_CURRENCY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetupCurrency_SMSG_SETUP_CURRENCY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SETUP_RESEARCH_HISTORY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetupResearchHistory_SMSG_SETUP_RESEARCH_HISTORY;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SET_ANIM_TIER] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetAnimTier_SMSG_SET_ANIM_TIER;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SET_EXTRA_AURA_INFO] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetExtraAuraInfo_SMSG_SET_EXTRA_AURA_INFO;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SET_EXTRA_AURA_INFO_NEED_UPDATE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetExtraAuraInfo_SMSG_SET_EXTRA_AURA_INFO_NEED_UPDATE;
@@ -3809,6 +3821,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_REFORGE_RESULT,
             global::HermesProxy.World.Enums.Opcode.SMSG_REQUEST_CEMETERY_LIST_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.SMSG_REQUEST_PVP_REWARDS_RESPONSE,
+            global::HermesProxy.World.Enums.Opcode.SMSG_RESEARCH_COMPLETE,
             global::HermesProxy.World.Enums.Opcode.SMSG_RESET_FAILED_NOTIFY,
             global::HermesProxy.World.Enums.Opcode.SMSG_RESURRECT_REQUEST,
             global::HermesProxy.World.Enums.Opcode.SMSG_RESYNC_RUNES,
@@ -3816,6 +3829,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_SEND_KNOWN_SPELLS,
             global::HermesProxy.World.Enums.Opcode.SMSG_SEND_UNLEARN_SPELLS,
             global::HermesProxy.World.Enums.Opcode.SMSG_SETUP_CURRENCY,
+            global::HermesProxy.World.Enums.Opcode.SMSG_SETUP_RESEARCH_HISTORY,
             global::HermesProxy.World.Enums.Opcode.SMSG_SET_ANIM_TIER,
             global::HermesProxy.World.Enums.Opcode.SMSG_SET_EXTRA_AURA_INFO,
             global::HermesProxy.World.Enums.Opcode.SMSG_SET_EXTRA_AURA_INFO_NEED_UPDATE,

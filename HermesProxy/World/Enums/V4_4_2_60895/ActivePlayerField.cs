@@ -480,7 +480,9 @@ public enum ActivePlayerField
         CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteCreateActivePlayerTailBits))]
     ACTIVEPLAYER_CREATE_TAIL_BITS_3,
 
-    [DescriptorCreatePlaceholder(DescriptorType.UInt32)]
+    // ResearchHistory: the completed archaeology projects of a 4.3.4 server.
+    [DescriptorCreatePlaceholder(DescriptorType.UInt32,
+        CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteCreateActivePlayerResearchHistory))]
     ACTIVEPLAYER_CREATE_TAIL_UINT32_PLACEHOLDER,
 
     [DescriptorCreatePlaceholder(DescriptorType.Int32, Count = 8)]
@@ -537,6 +539,12 @@ public enum ActivePlayerField
         nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.ApplyActivePlayerResearchMaskMutator),
         HasAnyPredicate = "gameState.ResearchDirty")]
     ACTIVEPLAYER_RESEARCH_MASK_MUTATOR,
+
+    // ResearchHistoryDirty: bit 122 under 102; written by the group-102 closing writer.
+    [DescriptorMaskMutator(
+        nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.ApplyActivePlayerResearchHistoryMaskMutator),
+        HasAnyPredicate = "gameState.ResearchHistoryDirty")]
+    ACTIVEPLAYER_RESEARCH_HISTORY_MASK_MUTATOR,
 
     // ===========================================================================
     // Update — KnownTitles dynamic field (bit 3)

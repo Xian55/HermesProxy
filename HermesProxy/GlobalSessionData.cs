@@ -403,6 +403,10 @@ public sealed class GameSessionData
     public ushort[] ResearchProjects = new ushort[16];
     public ushort[] ResearchSites = new ushort[16];
     public bool ResearchDirty;
+    // A 4.3.4 player's completed archaeology projects (SMSG_SETUP_RESEARCH_HISTORY at login, then
+    // SMSG_RESEARCH_COMPLETE per solve): the 4.4.2 client keeps them in ActivePlayerData.
+    public List<(uint ProjectId, long FirstCompleted, uint Count)> ResearchHistory = [];
+    public bool ResearchHistoryDirty;
     // Set true when ActiveGlyphs[6] changes (talent push, spec switch, glyph apply/remove
     // via legacy PLAYER_FIELD_GLYPHS_1..6). Consumed by V3_4_3 ObjectUpdateBuilder, which
     // writes the new GlyphSlots in the next player Values update. Without this re-emit,
