@@ -23,6 +23,9 @@ public partial class WorldClient
     // TrinityCore 4.3.4 UNIT_NPC_FLAG_REFORGER.
     private const uint CataNpcFlagReforger = 0x08000000;
 
+    // TrinityCore 4.3.4 PLAYER_EXPLORED_ZONES_1: 156 fields.
+    private const int CataExploredZoneFields = 156;
+
     private static readonly Microsoft.Extensions.Logging.ILogger _melObjLifeClient =
         Log.CreateMelLogger(Log.CategoryServer);
 
@@ -4465,7 +4468,21 @@ public partial class WorldClient
                 updateData.EnsureActivePlayerData().ShieldBlock = updates[PLAYER_SHIELD_BLOCK].Int32Value;
             }
             int PLAYER_EXPLORED_ZONES_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_EXPLORED_ZONES_1);
-            if (PLAYER_EXPLORED_ZONES_1 >= 0)
+            if (PLAYER_EXPLORED_ZONES_1 >= 0 && IsCataLegacy)
+            {
+                // 4.3.4 has 156 fields. Each word is built from both of its halves, as the
+                // object holds them now: one half changing alone would otherwise zero the other.
+                for (int word = 0; word < CataExploredZoneFields / 2; word++)
+                {
+                    int low = PLAYER_EXPLORED_ZONES_1 + word * 2;
+                    if (!updateMaskArray[low] && !updateMaskArray[low + 1])
+                        continue;
+                    ulong lowBits = updates.TryGetValue(low, out var lowField) ? lowField.UInt32Value : 0u;
+                    ulong highBits = updates.TryGetValue(low + 1, out var highField) ? highField.UInt32Value : 0u;
+                    updateData.EnsureActivePlayerData().EnsureExploredZones()[word] = lowBits | (highBits << 32);
+                }
+            }
+            else if (PLAYER_EXPLORED_ZONES_1 >= 0)
             {
                 int maxZones = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180) ? 128 : 64;
                 for (int i = 0; i < maxZones; i++)

@@ -178,11 +178,11 @@ public enum ActivePlayerField
     [DescriptorCreateField(nameof(ActivePlayerData.PvpPowerHealing), DescriptorType.Float)]
     ACTIVEPLAYER_CREATE_PVP_POWER_HEALING,
 
-    // BitVectors (bit 63): 13 dynamic vectors, each a uint32 count, all sent empty — explored
-    // zones live in one of them now, and 3.4.3's create sent ExploredZones as zeros too. Then
-    // CharacterDataElements.size and AccountDataElements.size.
-    [DescriptorCreatePlaceholder(DescriptorType.UInt32, Count = 15)]
-    ACTIVEPLAYER_CREATE_BIT_VECTORS_PLACEHOLDER,
+    // BitVectors (bit 63): 13 dynamic vectors, the explored zones in the second and the completed
+    // quests in the tenth; then CharacterDataElements.size and AccountDataElements.size.
+    [DescriptorCreatePlaceholder(DescriptorType.UInt32,
+        CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteCreateActivePlayerBitVectors))]
+    ACTIVEPLAYER_CREATE_BIT_VECTORS_CUSTOM,
 
     // bits 540-541 (parent 539): RestInfo[2] nested struct; StateID defaults to 1.
     [DescriptorCreatePlaceholder(DescriptorType.UInt32,
@@ -375,9 +375,14 @@ public enum ActivePlayerField
     [DescriptorCreatePlaceholder(DescriptorType.UInt32, Count = 7)]
     ACTIVEPLAYER_CREATE_BANK_BAG_SLOT_FLAGS_PLACEHOLDER,
 
-    // bit 410 (parent 409): QuestCompleted[1000] — live property exists; TODO per-element read.
-    [DescriptorCreatePlaceholder(DescriptorType.UInt64, Count = 1000)]
-    ACTIVEPLAYER_CREATE_QUEST_COMPLETED_PLACEHOLDER,
+    // bit 410 (parent 409): QuestCompleted[1000]. The data holds 875 words (the most any quest
+    // bit reaches); the last 125 never change. A zero-filled run here left every quest the
+    // character had done looking undone after a login.
+    [DescriptorCreateField(nameof(ActivePlayerData.QuestCompleted), DescriptorType.UInt64, ArrayCount = 875)]
+    ACTIVEPLAYER_CREATE_QUEST_COMPLETED,
+
+    [DescriptorCreatePlaceholder(DescriptorType.UInt64, Count = 125)]
+    ACTIVEPLAYER_CREATE_QUEST_COMPLETED_TAIL_PLACEHOLDER,
 
     [DescriptorCreateField(nameof(ActivePlayerData.Honor), DescriptorType.Int32)]
     ACTIVEPLAYER_CREATE_HONOR,
@@ -539,6 +544,13 @@ public enum ActivePlayerField
         nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.ApplyActivePlayerResearchMaskMutator),
         HasAnyPredicate = "gameState.ResearchDirty")]
     ACTIVEPLAYER_RESEARCH_MASK_MUTATOR,
+
+    // BitVectors: bit 63 under 38 when the update carries explored zones or completed quests.
+    // Explored zones have no field of their own on 4.4.2, so they need the predicate.
+    [DescriptorMaskMutator(
+        nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.ApplyActivePlayerBitVectorsMaskMutator),
+        HasAnyPredicate = "HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.HasAnyBitVectorWord(src)")]
+    ACTIVEPLAYER_BIT_VECTORS_MASK_MUTATOR,
 
     // ResearchHistoryDirty: bit 122 under 102; written by the group-102 closing writer.
     [DescriptorMaskMutator(
@@ -833,7 +845,11 @@ public enum ActivePlayerField
         ArrayCount = 7, ArrayMode = ArrayMode.PerElement, ParentBit = 281)]
     ACTIVEPLAYER_MOD_DAMAGE_DONE_PERCENT,
 
-    // ExploredZones is a BitVectors entry from 4.4.2 on (bit 63, nested mask); not wired yet.
+    // ExploredZones and QuestCompleted are BitVectors entries from 4.4.2 on (bit 63, nested mask).
+    [DescriptorCustomField("BitVectors", bit: 63,
+        customWriter: nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerBitVectors),
+        ParentBit = 38, WriteOnly = true)]
+    ACTIVEPLAYER_BIT_VECTORS,
 
     // RestInfo[2] at bits 311-312 under parent 310 — nested struct PerElement+CustomWriter.
     [DescriptorUpdateField(nameof(ActivePlayerData.RestInfo), DescriptorType.UInt32, bit: 311,

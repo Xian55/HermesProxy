@@ -1159,6 +1159,93 @@ public partial class ObjectUpdateBuilder
         _gameState.ResearchDirty = false;
     }
 
+    // BitVectors, the 4.4.2 client's 13 uint64 vectors (TrinityCore cata_classic
+    // PlayerDataFlagConstants): the explored zones are the second, the completed quests the tenth,
+    // and the client reads the world map's fog and C_QuestLog.IsQuestFlaggedCompleted from them.
+    // Each goes at its full length, so an update can name the words it changes.
+    private const int BitVectorCount = 13;
+    private const int ExploredZonesVector = 1;
+    private const int QuestCompletedVector = 9;
+
+    private static ulong?[] BitVectorWords(ActivePlayerData src, int vector) => vector switch
+    {
+        ExploredZonesVector => src.ExploredZones,
+        QuestCompletedVector => src.QuestCompleted,
+        _ => null,
+    };
+
+    private static bool AnyWord(ulong?[] words)
+    {
+        if (words == null)
+            return false;
+        foreach (ulong? word in words)
+            if (word.HasValue)
+                return true;
+        return false;
+    }
+
+    internal static bool HasAnyBitVectorWord(ActivePlayerData src)
+        => AnyWord(src.ExploredZones) || AnyWord(src.QuestCompleted);
+
+    internal void WriteCreateActivePlayerBitVectors(WorldPacket data, ActivePlayerData src)
+    {
+        for (int vector = 0; vector < BitVectorCount; vector++)
+        {
+            ulong?[] words = BitVectorWords(src, vector);
+            int size = words?.Length ?? 0;
+            data.WriteUInt32((uint)size);
+            for (int i = 0; i < size; i++)
+                data.WriteUInt64(words[i] ?? 0ul);
+        }
+        data.WriteUInt32(0u);   // CharacterDataElements
+        data.WriteUInt32(0u);   // AccountDataElements
+    }
+
+    internal void ApplyActivePlayerBitVectorsMaskMutator(ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        if (!HasAnyBitVectorWord(src))
+            return;
+        blocks.SetBit(38);
+        blocks.SetBit(63);
+    }
+
+    // BitVectors::WriteUpdate: one block of changes (the group and a bit per vector), then each
+    // changed BitVector: its two-bit mask, the vector's size and a bit per word, then the words.
+    internal void WriteUpdateActivePlayerBitVectors(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        uint changed = 0;
+        for (int vector = 0; vector < BitVectorCount; vector++)
+            if (AnyWord(BitVectorWords(src, vector)))
+                changed |= 1u << (1 + vector);
+        if (changed != 0)
+            changed |= 1u;
+
+        data.WriteBits(1u, 1);
+        data.WriteBits(changed, 32);
+        data.FlushBits();
+        for (int vector = 0; vector < BitVectorCount; vector++)
+        {
+            if ((changed & (1u << (1 + vector))) == 0)
+                continue;
+            ulong?[] words = BitVectorWords(src, vector);
+            data.WriteBits(3u, 2);
+            data.WriteBits((uint)words.Length, 32);
+            for (int block = 0; block < words.Length; block += 32)
+            {
+                int count = Math.Min(32, words.Length - block);
+                uint mask = 0;
+                for (int i = 0; i < count; i++)
+                    if (words[block + i].HasValue)
+                        mask |= 1u << i;
+                data.WriteBits(mask, count);
+            }
+            data.FlushBits();
+            foreach (ulong? word in words)
+                if (word.HasValue)
+                    data.WriteUInt64(word.Value);
+        }
+    }
+
     // Bits 23-28: each array's parent and element bit, set together when the session's lists changed.
     internal void ApplyActivePlayerResearchMaskMutator(ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
     {
