@@ -962,7 +962,8 @@ public enum Opcode : uint
     SMSG_MOVE_SPLINE_ENABLE_COLLISION                     = 0x3CB0,
     SMSG_MOVE_SPLINE_ENABLE_GRAVITY                       = 0x3CA6,
     SMSG_MOVE_SPLINE_ROOT                                 = 0x51B4,
-    SMSG_MOVE_SPLINE_SET_ANIM                             = 0x4335,
+    // TrinityCore 4.3.4 SMSG_SET_ANIM_TIER (WowPacketParser calls it SMSG_MOVE_SPLINE_SET_ANIM).
+    SMSG_SET_ANIM_TIER                                    = 0x4335,
     SMSG_MOVE_SPLINE_SET_FEATHER_FALL                     = 0x3DA5,
     SMSG_MOVE_SPLINE_SET_FLIGHT_BACK_SPEED                = 0x38B3,
     SMSG_MOVE_SPLINE_SET_FLIGHT_SPEED                     = 0x39A0,

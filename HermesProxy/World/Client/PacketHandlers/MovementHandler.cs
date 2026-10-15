@@ -668,6 +668,19 @@ public partial class WorldClient
         SendPacketToClient(anim);
     }
 
+    /// <summary>
+    /// TrinityCore 4.3.4 SetAnimTier: the unit as an old packed GUID and the tier as an int32, sent
+    /// to everyone around when a unit starts or stops hovering or flying. Only a 4.x server sends it.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_SET_ANIM_TIER)]
+    internal void HandleSetAnimTier(WorldPacket packet)
+    {
+        SetAnimTier anim = new SetAnimTier();
+        anim.Unit = packet.ReadPackedGuid().To128(GetSession().GameState);
+        anim.Tier = (uint)packet.ReadInt32();
+        SendPacketToClient(anim);
+    }
+
     [HandlesSmsg(Opcode.SMSG_NEW_WORLD)]
     internal void HandleNewWorld(WorldPacket packet)
     {

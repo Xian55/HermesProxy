@@ -1031,3 +1031,19 @@ public sealed class SetPlayHoverAnim : ServerPacket
     public WowGuid128 UnitGUID;
     public bool PlayHoverAnim;
 }
+
+// A unit's animation tier (ground, swim, hover, fly, submerged), three bits.
+public sealed class SetAnimTier : ServerPacket
+{
+    public SetAnimTier() : base(Opcode.SMSG_SET_ANIM_TIER, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(Unit);
+        _worldPacket.WriteBits(Tier, 3);
+        _worldPacket.FlushBits();
+    }
+
+    public WowGuid128 Unit;
+    public uint Tier;
+}
