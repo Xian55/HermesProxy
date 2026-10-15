@@ -148,6 +148,12 @@ public sealed class GameSessionData
     // The PetStable last sent to a 4.4.2 client. Once it has one, every update of its group says
     // it is still there (or the client drops it), and a create of the player carries it again.
     internal PetStableData? PetStable;
+    // A 4.3.4 server's pet bar as it last sent it and as the proxy's moves changed it, in its own
+    // encoding (action in the low 24 bits, state in the high byte). A command or stance moves on
+    // that server only as one two-slot packet, which the proxy builds from it.
+    public uint[]? PetActionBarLegacy;
+    // The slot a command or stance was picked up from, held back until it is dropped.
+    public int PetActionPickup = -1;
     // The stable master whose window the proxy opened, until the client closes it: the list that
     // answers the open window's own request must not open it a second time.
     public WowGuid128 OpenStableMaster;

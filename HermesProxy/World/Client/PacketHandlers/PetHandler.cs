@@ -63,6 +63,7 @@ public partial class WorldClient
                 return;
             }
 
+            GetSession().GameState.PetActionBarLegacy = null;
             PetClearSpells clear = new();
             SendPacketToClient(clear);
             return;
@@ -103,6 +104,14 @@ public partial class WorldClient
             isVehicleBar |= IsLegacyVehicleBarSlot((byte)(raw >> 24));
         }
         isVehicleBar &= translateActionEncoding;
+
+        // A 4.3.4 server moves a command or stance only as one two-slot packet, which
+        // PetSystem.HandlePetSetAction builds from the bar as the server has it.
+        if (IsCataLegacy)
+        {
+            GetSession().GameState.PetActionBarLegacy = isVehicleBar ? null : rawButtons.ToArray();
+            GetSession().GameState.PetActionPickup = -1;
+        }
 
         for (int i = 0; i < maxCreatureSpells; i++)
         {

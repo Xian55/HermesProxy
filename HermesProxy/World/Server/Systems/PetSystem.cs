@@ -86,15 +86,83 @@ public static class PetSystem
     [HandlesCmsg(Opcode.CMSG_PET_SET_ACTION)]
     public static void HandlePetSetAction(in PetSetAction action, in SessionContext ctx)
     {
-        WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_SET_ACTION);
-        packet.WriteGuid(action.PetGUID.To64(ctx.GetSession().GameState));
-        packet.WriteUInt32(action.Index);
         // Same gating as CMSG_PET_ACTION above — translate only for V3_4_3.
         uint legacyAction = ModernVersion.IsWotLKClassicOrLater
             ? TranslateV343PetActionToLegacy(action.Action)
             : action.Action;
+
+        if (WorldClient.IsCataLegacy && SetPetActionCata(action, legacyAction, ctx))
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_SET_ACTION);
+        packet.WriteGuid(action.PetGUID.To64(ctx.GetSession().GameState));
+        packet.WriteUInt32(action.Index);
         packet.WriteUInt32(legacyAction);
         ctx.SendPacketToServer(packet);
+    }
+
+    private const byte LegacyActCommand = 0x07;
+    private const byte LegacyActReaction = 0x06;
+
+    private static bool IsCommandOrReaction(uint legacyAction)
+        => (legacyAction >> 24) is LegacyActCommand or LegacyActReaction;
+
+    /// <summary>
+    /// A button moved on a 4.3.4 server's pet bar. The 4.4.2 client moves one slot per packet: the
+    /// slot picked up (left empty), the slot dropped on, then the picked-up slot again with what
+    /// was dropped on, if anything was. TrinityCore 4.3.4 HandlePetSetAction moves a command or a
+    /// stance only as one packet with both slots (the command's new slot first, then the slot it
+    /// left with what it displaced), checks that the command was in that second slot, and refuses
+    /// one on its own; an empty slot on its own it takes. Sent one at a time, a moved Attack was
+    /// cleared from its slot and then refused at the new one, and was gone from the server's bar.
+    /// So a command or stance picked up is held back, and its drop goes out as that one packet.
+    /// Spells move one slot at a time as before. Returns false to send the packet as it came.
+    /// </summary>
+    private static bool SetPetActionCata(in PetSetAction action, uint legacyAction, in SessionContext ctx)
+    {
+        var state = ctx.GetSession().GameState;
+        uint[]? bar = state.PetActionBarLegacy;
+        int index = (int)action.Index;
+        if (bar == null || index < 0 || index >= bar.Length)
+            return false;
+
+        if (legacyAction == 0)
+        {
+            if (!IsCommandOrReaction(bar[index]))
+            {
+                bar[index] = 0;
+                state.PetActionPickup = -1;
+                return false;
+            }
+            state.PetActionPickup = index;
+            return true;
+        }
+
+        if (!IsCommandOrReaction(legacyAction))
+        {
+            bar[index] = legacyAction;
+            return false;
+        }
+
+        int from = state.PetActionPickup >= 0 && bar[state.PetActionPickup] == legacyAction
+            ? state.PetActionPickup
+            : Array.IndexOf(bar, legacyAction);
+        state.PetActionPickup = -1;
+        if (from < 0 || from == index)
+            return from == index;
+
+        uint displaced = bar[index];
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_SET_ACTION);
+        packet.WriteGuid(action.PetGUID.To64(state));
+        packet.WriteUInt32((uint)index);
+        packet.WriteUInt32(legacyAction);
+        packet.WriteUInt32((uint)from);
+        packet.WriteUInt32(displaced);
+        ctx.SendPacketToServer(packet);
+
+        bar[index] = legacyAction;
+        bar[from] = displaced;
+        return true;
     }
 
     [HandlesCmsg(Opcode.CMSG_PET_RENAME)]
