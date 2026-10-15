@@ -284,6 +284,17 @@ public class ByteBuffer : IDisposable
         _position += count;
     }
 
+    /// <summary>Where the next byte is read from; <see cref="RewindTo"/> goes back there.</summary>
+    public int ReadPosition => _position;
+
+    /// <summary>Reads again from <paramref name="position"/>, a <see cref="ReadPosition"/> taken earlier.</summary>
+    public void RewindTo(int position)
+    {
+        _bitPosition = 8;
+        _bitValue = 0;
+        _position = position;
+    }
+
     public bool CanRead()
     {
         return _position < _length;

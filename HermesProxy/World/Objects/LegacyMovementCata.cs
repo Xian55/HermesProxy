@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Frozen;
+using System.Linq;
+using Framework.Logging;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Logging;
 
 namespace HermesProxy.World.Objects;
 
@@ -12,6 +16,8 @@ namespace HermesProxy.World.Objects;
 /// </summary>
 public static class LegacyMovementCata
 {
+    private static readonly Microsoft.Extensions.Logging.ILogger _log = Log.CreateMelLogger(Log.CategoryServer);
+
     private const MovementFlagModern PitchFlags = MovementFlagModern.Swimming | MovementFlagModern.Flying;
     private const uint FlagsExtraMask = 0xFFF;          // 4.3.4 sends 12 bits of extra flags
 
@@ -221,13 +227,80 @@ public static class LegacyMovementCata
         if (!LegacyMovementSequencesCata.ByOpcode.TryGetValue(opcode, out LegacyMovementElement[]? sequence))
             return false;
 
+        if (!WrittenWithoutPresenceBits.Contains(opcode))
+        {
+            if (Read(packet, sequence, implicitPresence: false, hasFall: false, hasTransport: false,
+                    out mover, out info, out movementCounter, out extraFloat, out ulong transportGuid))
+                SetTransportGuid(ref info, transportGuid, gameState);
+            return true;
+        }
+
+        // Whether the fall data and the transport are there only the length tells: each guess is
+        // read from the start again until one ends where the packet ends.
+        int start = packet.ReadPosition;
+        int length = packet.Remaining();
+        for (int guess = 0; guess < 4; guess++)
+        {
+            packet.RewindTo(start);
+            try
+            {
+                bool hasTransport = Read(packet, sequence, implicitPresence: true, hasFall: (guess & 1) != 0,
+                    hasTransport: (guess & 2) != 0, out mover, out info, out movementCounter, out extraFloat,
+                    out ulong transportGuid);
+                if (packet.Remaining() != 0)
+                    continue;
+                if (hasTransport)
+                    SetTransportGuid(ref info, transportGuid, gameState);
+                return true;
+            }
+            catch (Exception e) when (e is ArgumentOutOfRangeException or IndexOutOfRangeException)
+            {
+            }
+        }
+        MovementLogMessages.LegacyMovementFitsNoShape(_log, opcode, length);
+        mover = 0;
+        info = default;
+        return false;
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4's tables for these observer updates hold a timestamp, fall data, a
+    /// transport and a pitch but none of the bits that say whether they are there, and its writer
+    /// sends them all the same: the timestamp always, the pitch when swimming or flying, the fall
+    /// data while falling or with a fall time left over from the last one, the transport aboard one.
+    /// </summary>
+    private static readonly FrozenSet<Opcode> WrittenWithoutPresenceBits = LegacyMovementSequencesCata.ByOpcode
+        .Where(p => p.Value.Contains(LegacyMovementElement.Timestamp) && !p.Value.Contains(LegacyMovementElement.HasTimestamp))
+        .Select(p => p.Key)
+        .ToFrozenSet();
+
+    private static void SetTransportGuid(ref MovementInfo info, ulong transportGuid, GameSessionData gameState)
+    {
+        TransportInfo transport = info.Transport.GetValueOrDefault();
+        transport.Guid = new WowGuid64(transportGuid).To128(gameState);
+        info.Transport = transport;
+    }
+
+    /// <summary>
+    /// One pass over <paramref name="sequence"/>. With <paramref name="implicitPresence"/> the
+    /// presence of the fields the sequence has no bit for is taken from <paramref name="hasFall"/>
+    /// and <paramref name="hasTransport"/>, the timestamp is always there and the pitch follows the
+    /// movement flags. Returns whether a transport was read; its GUID is left to the caller.
+    /// </summary>
+    private static bool Read(WorldPacket packet, LegacyMovementElement[] sequence, bool implicitPresence,
+        bool hasFall, bool hasTransport, out ulong mover, out MovementInfo info, out uint movementCounter,
+        out float extraFloat, out ulong transportGuidValue)
+    {
+        info = default;
+        movementCounter = 0;
+        extraFloat = 0f;
         Span<bool> guidMask = stackalloc bool[8];
         Span<byte> guid = stackalloc byte[8];
         Span<bool> transportMask = stackalloc bool[8];
         Span<byte> transportGuid = stackalloc byte[8];
-        bool hasFlags = false, hasFlags2 = false, hasTime = false, hasOrientation = false;
-        bool hasTransport = false, hasTransportTime2 = false, hasVehicleId = false;
-        bool hasPitch = false, hasFall = false, hasFallDirection = false, hasSplineElevation = false;
+        bool hasFlags = false, hasFlags2 = false, hasTime = implicitPresence, hasOrientation = false;
+        bool hasTransportTime2 = false, hasVehicleId = false;
+        bool hasPitch = false, hasFallDirection = false, hasSplineElevation = false;
         TransportInfo transport = new();
         Vector3 position = default;
 
@@ -293,7 +366,10 @@ public static class LegacyMovementCata
                 case LegacyMovementElement.TransportTime: if (hasTransport) transport.Time = packet.ReadUInt32(); break;
                 case LegacyMovementElement.TransportTime2: if (hasTransportTime2) transport.PrevTime = packet.ReadUInt32(); break;
                 case LegacyMovementElement.TransportVehicleId: if (hasVehicleId) transport.VehicleId = packet.ReadUInt32(); break;
-                case LegacyMovementElement.Pitch: if (hasPitch) info.SwimPitch = packet.ReadFloat(); break;
+                case LegacyMovementElement.Pitch:
+                    if (hasPitch || implicitPresence && (info.Flags & PitchFlags) != 0)
+                        info.SwimPitch = packet.ReadFloat();
+                    break;
                 case LegacyMovementElement.FallTime: if (hasFall) info.FallTime = packet.ReadUInt32(); break;
                 case LegacyMovementElement.FallVerticalSpeed: if (hasFall) info.JumpVerticalSpeed = packet.ReadFloat(); break;
                 case LegacyMovementElement.FallCosAngle: if (hasFallDirection) info.JumpCosAngle = packet.ReadFloat(); break;
@@ -309,12 +385,13 @@ public static class LegacyMovementCata
 
         info.Position = position;
         mover = MaskedGuid.ToUInt64(guid);
+        transportGuidValue = 0;
         if (hasTransport)
         {
-            transport.Guid = new WowGuid64(MaskedGuid.ToUInt64(transportGuid)).To128(gameState);
+            transportGuidValue = MaskedGuid.ToUInt64(transportGuid);
             info.Transport = transport;
         }
-        return true;
+        return hasTransport;
     }
 
     private static byte ByteAt(ulong value, int index) => (byte)(value >> (index * 8));

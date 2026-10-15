@@ -120,6 +120,90 @@ public sealed class LegacyMovementCataTests
         Assert.Equal(0, read.GetRemainingSpan().Length);
     }
 
+    [Fact]
+    public void MoveUpdateRunBackSpeed_AsATrinityCore434ServerSentIt()
+    {
+        // What another player saw of player 2 standing at (-8833.9, 622.1, 93.84) when a GM command
+        // made its run-back speed 13.5. The sequence has no bits for the fall data or the timestamp;
+        // the server sent both, the fall time (219) left over from the last jump.
+        byte[] body = Convert.FromHexString("0540" + "DB000000" + "00000000" + "4F5F328A" + "03" + "9A070AC6"
+            + "67861B44" + "00005841" + "D9ACBB42");
+        using var read = Framed(body);
+
+        Assert.True(LegacyMovementCata.TryRead(read, Opcode.SMSG_MOVE_UPDATE_RUN_BACK_SPEED, null!, out ulong mover, out MovementInfo info, out _, out float speed));
+
+        Assert.Equal(2ul, mover);
+        Assert.Equal(13.5f, speed);
+        Assert.Equal(-8833.9f, info.Position.X, 1);
+        Assert.Equal(622.1f, info.Position.Y, 1);
+        Assert.Equal(93.84f, info.Position.Z, 2);
+        Assert.Equal(219u, info.FallTime);
+        Assert.Equal(0x8A325F4Fu, info.MoveTime);
+        Assert.Equal(0, read.GetRemainingSpan().Length);
+    }
+
+    [Fact]
+    public void MoveUpdateWalkSpeed_AsATrinityCore434ServerSentIt()
+    {
+        // The same player made to walk at 5: here the fall data's bit for a direction is written
+        // (no direction) between GUID bits, which only a reader that knows there is fall data takes.
+        byte[] body = Convert.FromHexString("8180" + "00000000" + "DB000000" + "4F5F328A" + "67861B44" + "03"
+            + "D9ACBB42" + "9A070AC6" + "0000A040");
+        using var read = Framed(body);
+
+        Assert.True(LegacyMovementCata.TryRead(read, Opcode.SMSG_MOVE_UPDATE_WALK_SPEED, null!, out ulong mover, out MovementInfo info, out _, out float speed));
+
+        Assert.Equal(2ul, mover);
+        Assert.Equal(5f, speed);
+        Assert.Equal(-8833.9f, info.Position.X, 1);
+        Assert.Equal(622.1f, info.Position.Y, 1);
+        Assert.Equal(219u, info.FallTime);
+        Assert.Equal(0x8A325F4Fu, info.MoveTime);
+        Assert.Equal(0, read.GetRemainingSpan().Length);
+    }
+
+    [Fact]
+    public void MoveUpdateKnockBack_AsATrinityCore434ServerSentIt()
+    {
+        // What player 2 saw of player 3 knocked away from (-8833.9, 622.1, 93.84): falling, so the
+        // server sent the fall data and its direction bit with no bit to say the fall data is there.
+        byte[] body = Convert.FromHexString("080000280180" + "14070D40" + "4164173F" + "00004841" + "16704EBF"
+            + "00000000" + "3333A7C1" + "D9ACBB42" + "9AEC3B8A" + "9A070AC6" + "67861B44" + "02");
+        using var read = Framed(body);
+
+        Assert.True(LegacyMovementCata.TryRead(read, Opcode.SMSG_MOVE_UPDATE_KNOCK_BACK, null!, out ulong mover, out MovementInfo info, out _, out _));
+
+        Assert.Equal(3ul, mover);
+        Assert.Equal(-8833.9f, info.Position.X, 1);
+        Assert.Equal(622.1f, info.Position.Y, 1);
+        Assert.Equal(93.84f, info.Position.Z, 2);
+        Assert.Equal(2.2f, info.Orientation, 2);
+        Assert.Equal(12.5f, info.JumpHorizontalSpeed);
+        Assert.Equal(-20.9f, info.JumpVerticalSpeed, 2);
+        Assert.Equal(0.5914f, info.JumpSinAngle, 3);
+        Assert.Equal(-0.8064f, info.JumpCosAngle, 3);
+        Assert.Equal(0x8A3BEC9Au, info.MoveTime);
+        Assert.Equal(0, read.GetRemainingSpan().Length);
+    }
+
+    [Fact]
+    public void MoveUpdateRunBackSpeed_NoGuessFits_IsNotRead()
+    {
+        // one byte more than the packet above: no choice of fall data and transport ends there
+        byte[] body = Convert.FromHexString("0540" + "DB000000" + "00000000" + "4F5F328A" + "03" + "9A070AC6"
+            + "67861B44" + "00005841" + "D9ACBB42" + "00");
+        using var read = Framed(body);
+
+        Assert.False(LegacyMovementCata.TryRead(read, Opcode.SMSG_MOVE_UPDATE_RUN_BACK_SPEED, null!, out _, out _, out _, out _));
+    }
+
+    private static WorldPacket Framed(byte[] body)
+    {
+        byte[] framed = new byte[sizeof(ushort) + body.Length];
+        body.CopyTo(framed, sizeof(ushort));
+        return new WorldPacket(framed);
+    }
+
     private sealed record Read(ulong Guid, uint Flags, uint Time, Vector3 Position, float Orientation,
         uint FallTime, float VerticalSpeed, float HorizontalSpeed);
 

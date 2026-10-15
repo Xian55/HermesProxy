@@ -17,4 +17,10 @@ internal static partial class MovementLogMessages
         Message = "Violation of MovementFlags found. MovementFlags: {Flags}, MovementFlags2: {FlagsExtra}. Mask {Mask} will be removed.")]
     public static partial void ViolatingFlagsRemoved(
         ILogger logger, uint flags, uint flagsExtra, MovementFlagModern mask);
+
+    [LoggerMessage(
+        EventId = 1611,
+        Level = LogLevel.Warning,
+        Message = "{Opcode} ({Length} bytes) fits none of the shapes TrinityCore 4.3.4 writes it in; dropped.")]
+    public static partial void LegacyMovementFitsNoShape(ILogger logger, Opcode opcode, int length);
 }
