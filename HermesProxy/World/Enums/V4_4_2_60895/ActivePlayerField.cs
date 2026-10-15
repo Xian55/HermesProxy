@@ -476,7 +476,8 @@ public enum ActivePlayerField
 
     // SortBagsRightToLeft, InsertItemsLeftToRight, PetStable present, then the 3-bit
     // AccountBankTabSettings count.
-    [DescriptorCreateBitsPlaceholder(0u, 6)]
+    [DescriptorCreatePlaceholder(DescriptorType.UInt32,
+        CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteCreateActivePlayerTailBits))]
     ACTIVEPLAYER_CREATE_TAIL_BITS_3,
 
     [DescriptorCreatePlaceholder(DescriptorType.UInt32)]
@@ -491,6 +492,12 @@ public enum ActivePlayerField
     // FrozenPerksVendorItem's Disabled and Field_41 bits.
     [DescriptorCreateBitsPlaceholder(0u, 2)]
     ACTIVEPLAYER_CREATE_TAIL_BIT_1,
+
+    // PetStable, when the tail bits said it is there: after FrozenPerksVendorItem and the empty
+    // element and trait config lists, before the AccountBankTabSettings (none).
+    [DescriptorCreatePlaceholder(DescriptorType.UInt32,
+        CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteCreateActivePlayerPetStable))]
+    ACTIVEPLAYER_CREATE_PET_STABLE_CUSTOM,
 
     // Closing flush the hand-port emitted twice; the first is already above.
     [DescriptorCreateBitsPlaceholder(0u, 0)]
@@ -775,12 +782,19 @@ public enum ActivePlayerField
     [DescriptorUpdateField(nameof(ActivePlayerData.GlyphsEnabledWide), DescriptorType.UInt16, bit: 127, ParentBit = 102)]
     ACTIVEPLAYER_GLYPHS_ENABLED,
     // bits 121-123: skipped
-    // Group 102 closes with a flush and the PetStable presence bit (never set here), whenever
-    // the group is in the update at all — so it hangs off bit 102 but sorts after bit 130.
+    // Group 102 closes with a flush and the PetStable presence bit, whenever the group is in the
+    // update at all — so it hangs off bit 102 but sorts after bit 130.
     [DescriptorCustomField("PetStableBit", bit: 102,
         customWriter: nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerPetStableBit),
         WriteOnly = true, WriteOrder = 130)]
     ACTIVEPLAYER_BLOCK_102_PET_STABLE_BIT,
+    // bit 129: PetStable itself, after the presence bit (and ResearchHistory and
+    // FrozenPerksVendorItem at 122 and 123, which the proxy never sends).
+    [DescriptorUpdateField(nameof(ActivePlayerData.PetStable), DescriptorType.UInt32, bit: 129, ParentBit = 102,
+        CustomPredicate = "src.PetStable != null",
+        CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerPetStable),
+        WriteOrder = 131)]
+    ACTIVEPLAYER_PET_STABLE,
 
     // ===========================================================================
     // Update — Arrays

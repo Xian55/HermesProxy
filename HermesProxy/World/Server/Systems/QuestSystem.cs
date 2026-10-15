@@ -155,6 +155,10 @@ public static class QuestSystem
     public static void HandleCloseInteraction(in CloseInteraction close, in SessionContext ctx)
     {
         var state = ctx.GetSession().GameState;
+        // The stable window the proxy opened is closed: its stable master's next list opens it again.
+        if (close.Guid == state.OpenStableMaster)
+            state.OpenStableMaster = default;
+
         if (state.AwaitingQuestRewardId != 0)
         {
             if (ModernVersion.Build != HermesProxy.Enums.ClientVersionBuild.V3_4_3_54261)

@@ -94,6 +94,8 @@ public class ActivePlayerData
     // arrives inside MSG_LIST_STABLED_PETS — so the proxy pushes it as a Values update
     // once a stable master is visited, or the client renders every slot locked (#224).
     public byte? NumStableSlots;
+    // 4.4.2's pet list, sent whole whenever the legacy server sends its stable list.
+    internal HermesProxy.World.Server.Packets.PetStableData? PetStable;
     public int? XP;
     public int? NextLevelXP;
     public int? TrialXP;

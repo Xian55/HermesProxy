@@ -272,7 +272,9 @@ public partial class WorldClient
         // from ActivePlayerData. Cache it for the next CreateObject, and push a Values update
         // now so an already-logged-in player sees a slot unlock the moment it is bought.
         GetSession().GameState.NumStableSlots = numStableSlots;
-        if (ModernVersion.IsWotLKClassicOrLater)
+        // 4.4.2 has the pets in ActivePlayerData too; the slot count goes with them below.
+        bool petStableField = ModernVersion.AddedInVersion(ClientVersionBuild.V4_4_2_60895);
+        if (ModernVersion.IsWotLKClassicOrLater && !petStableField)
         {
             ObjectUpdate slotUpdate = new ObjectUpdate(GetSession().GameState.CurrentPlayerGuid, UpdateTypeModern.Values, GetSession());
             slotUpdate.EnsureActivePlayerData().NumStableSlots = numStableSlots;
@@ -281,12 +283,12 @@ public partial class WorldClient
             SendPacketToClient(slotPacket);
         }
         List<PetStableInfo> stabledPets = new();
+        int stabledCount = 0;
         for (byte i = 0; i < count; i++)
         {
             PetStableInfo pet = new PetStableInfo();
             // TrinityCore 4.3.4 SendStablePet: each pet starts with the slot it sits in.
-            if (IsCataLegacy)
-                packet.ReadInt32();
+            int slot = IsCataLegacy ? packet.ReadInt32() : -1;
             pet.PetNumber = packet.ReadUInt32();
             pet.CreatureID = packet.ReadUInt32();
             pet.ExperienceLevel = packet.ReadUInt32();
@@ -295,7 +297,16 @@ public partial class WorldClient
                 pet.LoyaltyLevel = (byte)packet.ReadUInt32();
             pet.PetFlags = packet.ReadUInt8();
 
-            if (pet.PetFlags != 1)
+            if (petStableField)
+            {
+                // TrinityCore cata_classic PetStableFlags: active 1, stabled 2 (4.3.4 sends a
+                // stabled pet as 3). 3.3.5a numbers no slots: its pet out is Call Pet 1, and the
+                // stabled ones follow from the first stable slot, 5.
+                bool active = pet.PetFlags == 1;
+                pet.PetFlags = active ? (byte)1 : (byte)2;
+                pet.PetSlot = (byte)(slot >= 0 ? slot : active ? 0 : 5 + stabledCount++);
+            }
+            else if (pet.PetFlags != 1)
                 pet.PetFlags = 3;
 
             CreatureTemplate? template = GameData.GetCreatureTemplate(pet.CreatureID);
@@ -312,6 +323,12 @@ public partial class WorldClient
             stabledPets.Add(pet);
         }
 
+        if (petStableField)
+        {
+            SendPetStable(stableMaster, stabledPets, numStableSlots);
+            return;
+        }
+
         // V3_4_3 deleted SMSG_PET_STABLE_LIST; the stable lives in ActivePlayerData and the
         // native server ships it as a hand-built SMSG_UPDATE_OBJECT (issue #224).
         if (ModernVersion.IsWotLKClassicOrLater)
@@ -325,6 +342,34 @@ public partial class WorldClient
         stable.NumStableSlots = numStableSlots;
         stable.Pets.AddRange(stabledPets);
         SendPacketToClient(stable);
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic Player::AddPetToUpdateFields and SetStableMaster): the pets
+    /// and the stable master go into ActivePlayerData.PetStable, where the client finds the pets
+    /// of its Call Pet flyout and the stable window's list. A stable master's list opens the
+    /// window, as the native gossip option does; the list that answers the open window's own
+    /// request does not open it again.
+    /// </summary>
+    private void SendPetStable(WowGuid128 stableMaster, List<PetStableInfo> pets, byte numStableSlots)
+    {
+        var state = GetSession().GameState;
+        PetStableData stable = new PetStableData { Pets = pets, StableMaster = stableMaster };
+        state.PetStable = stable;
+
+        ObjectUpdate update = new ObjectUpdate(state.CurrentPlayerGuid, UpdateTypeModern.Values, GetSession());
+        ActivePlayerData data = update.EnsureActivePlayerData();
+        data.NumStableSlots = numStableSlots;
+        data.PetStable = stable;
+        UpdateObject packet = new UpdateObject(state);
+        packet.ObjectUpdates.Add(update);
+        SendPacketToClient(packet);
+
+        if (!stableMaster.IsEmpty() && stableMaster != state.OpenStableMaster)
+        {
+            state.OpenStableMaster = stableMaster;
+            SendPacketToClient(new NpcInteractionOpenResult(stableMaster, PlayerInteractionType.StableMaster));
+        }
     }
 
     /// <summary>

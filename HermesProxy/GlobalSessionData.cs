@@ -145,6 +145,12 @@ public sealed class GameSessionData
     // Stable master currently being talked to. Needed because a slot purchase has to
     // re-request the stable list to learn the new count (#224).
     public WowGuid128? LastStableMaster;
+    // The PetStable last sent to a 4.4.2 client. Once it has one, every update of its group says
+    // it is still there (or the client drops it), and a create of the player carries it again.
+    internal PetStableData? PetStable;
+    // The stable master whose window the proxy opened, until the client closes it: the list that
+    // answers the open window's own request must not open it a second time.
+    public WowGuid128 OpenStableMaster;
     public uint? CurrentMapId;
     public uint CurrentZoneId;
     public uint CurrentTaxiNode;

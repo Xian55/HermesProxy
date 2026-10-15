@@ -16,6 +16,7 @@ using HermesProxy.World.Server;
 using HermesProxy.World.Server.Packets;
 using System;
 using System.Linq;
+using System.Text;
 
 namespace HermesProxy.World.Objects.Version.V4_4_2_60895;
 
@@ -1559,12 +1560,86 @@ public partial class ObjectUpdateBuilder
         }
     }
 
-    // Closes group 102: native flushes after NumStableSlots and writes whether a PetStable
-    // follows. The proxy never sends one.
+    // Closes group 102: native flushes after NumStableSlots and writes whether a PetStable is
+    // there. Once the client has one, every update of the group has to say so, or the client
+    // drops it, so the bit follows what the session sent rather than this update.
     internal void WriteUpdateActivePlayerPetStableBit(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
     {
         data.FlushBits();
+        data.WriteBit(_gameState.PetStable != null);
+    }
+
+    // TrinityCore cata_classic StableInfo::WriteUpdate with everything changed: the pets as a
+    // dynamic field of their whole count, each pet with all nine of its bits, then the stable
+    // master. A shorter list than before is the client's cue to drop the rest.
+    // The client reads the struct from a byte of its own (WowPacketParser's 4.4.2 reader, made
+    // from the client, resets its bit reader first). TrinityCore writes the mask into the
+    // presence bit's byte, and the client then reads a mask of 0: its own stable window stays
+    // shut on a stock realm.
+    internal void WriteUpdateActivePlayerPetStable(WorldPacket data, ActivePlayerData src)
+    {
+        PetStableData stable = src.PetStable;
+        data.FlushBits();
+        data.WriteBits(0b111u, 3);
+        int count = stable.Pets.Count;
+        data.WriteBits((uint)count, 32);
+        for (int left = count; left > 0; left -= 32)
+            data.WriteBits(left >= 32 ? uint.MaxValue : (1u << left) - 1, Math.Min(left, 32));
+        data.FlushBits();
+
+        foreach (PetStableInfo pet in stable.Pets)
+        {
+            data.WriteBits(0x1FFu, 9);
+            data.FlushBits();
+            data.WriteUInt32(pet.PetSlot);
+            data.WriteUInt32(pet.PetNumber);
+            data.WriteUInt32(pet.CreatureID);
+            data.WriteUInt32(pet.DisplayID);
+            data.WriteUInt32(pet.ExperienceLevel);
+            data.WriteUInt8(pet.PetFlags);
+            data.WriteUInt8(0);
+            data.WriteBits((uint)Encoding.UTF8.GetByteCount(pet.PetName), 8);
+            data.WriteString(pet.PetName);
+            data.FlushBits();
+        }
+
+        data.WritePackedGuid128(stable.StableMaster);
+    }
+
+    // The create's tail bits: SortBagsRightToLeft and InsertItemsLeftToRight off, whether a
+    // PetStable follows, no AccountBankTabSettings.
+    internal void WriteCreateActivePlayerTailBits(WorldPacket data, ActivePlayerData src)
+    {
         data.WriteBit(false);
+        data.WriteBit(false);
+        data.WriteBit(_gameState.PetStable != null);
+        data.WriteBits(0u, 3);
+        data.FlushBits();
+    }
+
+    // TrinityCore cata_classic StableInfo::WriteCreate: the count, the stable master, then each
+    // pet. A player created again (a map change) keeps its pets this way.
+    internal void WriteCreateActivePlayerPetStable(WorldPacket data, ActivePlayerData src)
+    {
+        PetStableData stable = _gameState.PetStable;
+        if (stable == null)
+            return;
+
+        data.WriteUInt32((uint)stable.Pets.Count);
+        data.WritePackedGuid128(stable.StableMaster);
+        foreach (PetStableInfo pet in stable.Pets)
+        {
+            data.WriteUInt32(pet.PetSlot);
+            data.WriteUInt32(pet.PetNumber);
+            data.WriteUInt32(pet.CreatureID);
+            data.WriteUInt32(pet.DisplayID);
+            data.WriteUInt32(pet.ExperienceLevel);
+            data.WriteUInt8(pet.PetFlags);
+            data.WriteUInt8(0);
+            data.WriteBits((uint)Encoding.UTF8.GetByteCount(pet.PetName), 8);
+            data.WriteString(pet.PetName);
+            data.FlushBits();
+        }
     }
 
     // HasAny helper for the InvSlots mask-mutator. Returns true when any of the 141

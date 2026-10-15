@@ -385,6 +385,17 @@ class PetStableInfo
     public string PetName = string.Empty;
 }
 
+/// <summary>
+/// 4.4.2's ActivePlayerData.PetStable: every pet the hunter has, active (Call Pet 1 to 5, slots
+/// 0 to 4) or stabled (slot 5 on), and the stable master whose window is open. The client takes
+/// the Call Pet flyout's pets and the stable window from it.
+/// </summary>
+sealed class PetStableData
+{
+    public List<PetStableInfo> Pets = new();
+    public WowGuid128 StableMaster;
+}
+
 public readonly record struct BuyStableSlot(WowGuid128 StableMaster);
 
 public class PetGuids : ServerPacket, ISpanWritable
