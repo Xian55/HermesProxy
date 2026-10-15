@@ -2627,70 +2627,131 @@ class TotemCreated : ServerPacket, ISpanWritable
 
 public readonly record struct TotemDestroyed(byte Slot, WowGuid128 Guid);
 
-public class SetSpellModifier : ServerPacket, ISpanWritable
+public sealed class SetSpellModifier : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<SetSpellModifier>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new IntValueLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new FloatValueLayout()));
+
+    private static readonly ServerPacketLayout<SetSpellModifier> Layout = Layouts.ForRunningClient();
+
     public SetSpellModifier(Opcode opcode) : base(opcode, ConnectionType.Instance) { }
 
-    public override void Write()
-    {
-        _worldPacket.WriteInt32(Modifiers.Count);
-        foreach (SpellModifierInfo spellMod in Modifiers)
-            spellMod.Write(_worldPacket);
-    }
+    public override void Write() => Layout.Write(this, _worldPacket);
 
     private const int MaxModifiers = 8;
     private const int MaxDataPerModifier = 8;
     // 4 (count) + 8 * (1 + 4 + 8 * 5) = 4 + 8 * 45 = 364 bytes
     public int MaxSize => 4 + MaxModifiers * (1 + 4 + MaxDataPerModifier * 5);
 
-    public int WriteToSpan(Span<byte> buffer)
-    {
-        if (Modifiers.Count > MaxModifiers)
-            return -1;
-
-        var writer = new SpanPacketWriter(buffer);
-        writer.WriteInt32(Modifiers.Count);
-        foreach (SpellModifierInfo spellMod in Modifiers)
-        {
-            if (spellMod.ModifierData.Count > MaxDataPerModifier)
-                return -1;
-
-            writer.WriteUInt8(spellMod.ModIndex);
-            writer.WriteInt32(spellMod.ModifierData.Count);
-            foreach (SpellModifierData modData in spellMod.ModifierData)
-            {
-                writer.WriteInt32(modData.ModifierValue);
-                writer.WriteUInt8(modData.ClassIndex);
-            }
-        }
-        return writer.Position;
-    }
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
 
     public List<SpellModifierInfo> Modifiers = new();
-}
 
-public class SpellModifierInfo
-{
-    public void Write(WorldPacket data)
+    private static bool FitsSpan(SetSpellModifier packet)
     {
-        data.WriteUInt8(ModIndex);
-        data.WriteInt32(ModifierData.Count);
-        foreach (SpellModifierData modData in ModifierData)
-            modData.Write(data);
+        if (packet.Modifiers.Count > MaxModifiers)
+            return false;
+
+        foreach (SpellModifierInfo spellMod in packet.Modifiers)
+        {
+            if (spellMod.ModifierData.Count > MaxDataPerModifier)
+                return false;
+        }
+        return true;
     }
 
+    /// <summary>Up to 4.4.0 (WowPacketParser reads an int32 until 3.4.4 and 4.4.1): the value is an int32.</summary>
+    internal sealed class IntValueLayout : ServerPacketLayout<SetSpellModifier>
+    {
+        public override void Write(SetSpellModifier packet, WorldPacket data)
+        {
+            data.WriteInt32(packet.Modifiers.Count);
+            foreach (SpellModifierInfo spellMod in packet.Modifiers)
+            {
+                data.WriteUInt8(spellMod.ModIndex);
+                data.WriteInt32(spellMod.ModifierData.Count);
+                foreach (SpellModifierData modData in spellMod.ModifierData)
+                {
+                    data.WriteInt32(modData.ModifierValue);
+                    data.WriteUInt8(modData.ClassIndex);
+                }
+            }
+        }
+
+        public override int WriteToSpan(SetSpellModifier packet, Span<byte> buffer)
+        {
+            if (!FitsSpan(packet))
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(packet.Modifiers.Count);
+            foreach (SpellModifierInfo spellMod in packet.Modifiers)
+            {
+                writer.WriteUInt8(spellMod.ModIndex);
+                writer.WriteInt32(spellMod.ModifierData.Count);
+                foreach (SpellModifierData modData in spellMod.ModifierData)
+                {
+                    writer.WriteInt32(modData.ModifierValue);
+                    writer.WriteUInt8(modData.ClassIndex);
+                }
+            }
+            return writer.Position;
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, WowPacketParser from 4.4.1): the value is a float, still
+    /// the summed amount for flat and percent modifiers alike. The int32 bits read as a float are
+    /// a denormal next to zero, so a +5 yard range glyph added nothing to the client's spell range.
+    /// </summary>
+    internal sealed class FloatValueLayout : ServerPacketLayout<SetSpellModifier>
+    {
+        public override void Write(SetSpellModifier packet, WorldPacket data)
+        {
+            data.WriteInt32(packet.Modifiers.Count);
+            foreach (SpellModifierInfo spellMod in packet.Modifiers)
+            {
+                data.WriteUInt8(spellMod.ModIndex);
+                data.WriteInt32(spellMod.ModifierData.Count);
+                foreach (SpellModifierData modData in spellMod.ModifierData)
+                {
+                    data.WriteFloat(modData.ModifierValue);
+                    data.WriteUInt8(modData.ClassIndex);
+                }
+            }
+        }
+
+        public override int WriteToSpan(SetSpellModifier packet, Span<byte> buffer)
+        {
+            if (!FitsSpan(packet))
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(packet.Modifiers.Count);
+            foreach (SpellModifierInfo spellMod in packet.Modifiers)
+            {
+                writer.WriteUInt8(spellMod.ModIndex);
+                writer.WriteInt32(spellMod.ModifierData.Count);
+                foreach (SpellModifierData modData in spellMod.ModifierData)
+                {
+                    writer.WriteFloat(modData.ModifierValue);
+                    writer.WriteUInt8(modData.ClassIndex);
+                }
+            }
+            return writer.Position;
+        }
+    }
+}
+
+public sealed class SpellModifierInfo
+{
     public byte ModIndex;
     public List<SpellModifierData> ModifierData = new();
 }
 
 public struct SpellModifierData
 {
-    public void Write(WorldPacket data)
-    {
-        data.WriteInt32(ModifierValue);
-        data.WriteUInt8(ClassIndex);
-    }
-
     public int ModifierValue;
     public byte ClassIndex;
 }
