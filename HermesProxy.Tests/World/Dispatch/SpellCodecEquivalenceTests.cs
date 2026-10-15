@@ -449,6 +449,71 @@ public class SpellCodecEquivalenceTests
         Assert.Equal(o.Remaining(), r.Remaining);
     }
 
+    [Fact]
+    public void LearnPreviewTalents_ReadsCountTabAndPairs()
+    {
+        var (_, f) = Build(w => { w.WriteUInt32(2); w.WriteInt32(811); w.WriteUInt32(9490); w.WriteUInt32(0); w.WriteUInt32(9491); w.WriteUInt32(1); });
+        var r = ReaderOver(f); LearnPreviewTalentsCodec.Read(ref r, out var a);
+        Assert.Equal(811, a.TalentTab);
+        Assert.Equal(2, a.Talents.Count);
+        Assert.Equal((9490u, 0u), (a.Talents[0].TalentID, a.Talents[0].Rank));
+        Assert.Equal((9491u, 1u), (a.Talents[1].TalentID, a.Talents[1].Rank));
+        Assert.Equal(0, r.Remaining);
+    }
+
+    // The bytes the 4.4.2 client sent for one point in One with Nature, specialization already chosen.
+    [Fact]
+    public void LearnPreviewTalents_CapturedFromTheClient()
+    {
+        byte[] framed = [0, 0, 0x01, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0x12, 0x25, 0, 0, 0, 0, 0, 0];
+        var r = ReaderOver(framed); LearnPreviewTalentsCodec.Read(ref r, out var a);
+        Assert.Equal(-1, a.TalentTab);
+        Assert.Equal((9490u, 0u), (a.Talents[0].TalentID, a.Talents[0].Rank));
+        Assert.Equal(0, r.Remaining);
+    }
+
+    [Fact]
+    public void SetPrimaryTalentTree_ReadsTab()
+    {
+        var (_, f) = Build(w => w.WriteUInt32(811));
+        var r = ReaderOver(f); SetPrimaryTalentTreeCodec.Read(ref r, out var a);
+        Assert.Equal(811u, a.TalentTab);
+        Assert.Equal(0, r.Remaining);
+    }
+
+    // The 4.4.2 talent data (docs/protocol/4.4.2.60895, 0x3B0070): PrimarySpecialization after
+    // the SpecID and the rank as a uint32; the older clients' has neither.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void UpdateTalentData_GroupLayout_WritesTheClientsShape(bool cataClassic)
+    {
+        var packet = new UpdateTalentData { UnspentTalentPoints = 3, ActiveGroup = 0 };
+        packet.TalentGroups.Add(new TalentGroupInfo
+        {
+            SpecID = 0,
+            PrimarySpecialization = 409,
+            Talents = [new TalentEntry { TalentID = 1382, Rank = 1 }],
+            Glyphs = [7],
+        });
+        using var w = new WorldPacket(1u);
+        new UpdateTalentData.GroupsLayout(cataClassic).Write(packet, w);
+
+        using var e = new WorldPacket(1u);
+        e.WriteUInt32(3); e.WriteUInt8(0); e.WriteUInt32(1);
+        e.WriteUInt8(1); e.WriteUInt32(1); e.WriteUInt8(1); e.WriteUInt32(1); e.WriteUInt8(0);
+        if (cataClassic)
+            e.WriteUInt32(409);
+        e.WriteUInt32(1382);
+        if (cataClassic)
+            e.WriteUInt32(1);
+        else
+            e.WriteUInt8(1);
+        e.WriteUInt16(7);
+        e.WriteBit(false); e.FlushBits();
+        Assert.Equal(e.GetData(), w.GetData());
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

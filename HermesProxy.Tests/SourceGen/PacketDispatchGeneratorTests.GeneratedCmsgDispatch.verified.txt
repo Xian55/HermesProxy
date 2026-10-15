@@ -1495,6 +1495,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.QuerySystem.HandleItemTextQuery(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_TalentSystem_HandleLearnPreviewTalents_CMSG_LEARN_PREVIEW_TALENTS(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.LearnPreviewTalentsCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.TalentSystem.HandleLearnPreviewTalents(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleLearnTalent_CMSG_LEARN_TALENT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.LearnTalentCodec.Read(ref reader, out var packet);
@@ -2731,6 +2737,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.CharacterSystem.HandleSetPlayerDeclinedNames(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_TalentSystem_HandleSetPrimaryTalentTree_CMSG_SET_PRIMARY_TALENT_TREE(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.SetPrimaryTalentTreeCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.TalentSystem.HandleSetPrimaryTalentTree(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleSetPvP_CMSG_SET_PVP(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.SetPvPCodec.Read(ref reader, out var packet);
@@ -3420,6 +3432,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_INSTANCE_LOCK_RESPONSE] = &Thunk_HermesProxy_World_Server_Systems_InstanceSystem_HandleInstanceLockResponse_CMSG_INSTANCE_LOCK_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_PURCHASE_REFUND] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleItemPurchaseRefund_CMSG_ITEM_PURCHASE_REFUND;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_TEXT_QUERY] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleItemTextQuery_CMSG_ITEM_TEXT_QUERY;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_PREVIEW_TALENTS] = &Thunk_HermesProxy_World_Server_Systems_TalentSystem_HandleLearnPreviewTalents_CMSG_LEARN_PREVIEW_TALENTS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_TALENT] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleLearnTalent_CMSG_LEARN_TALENT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LEAVE_GROUP] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleLeaveGroup_CMSG_LEAVE_GROUP;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LFG_LIST_GET_STATUS] = &Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleLFGListGetStatus_CMSG_LFG_LIST_GET_STATUS;
@@ -3694,6 +3707,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_LOOT_METHOD] = &Thunk_HermesProxy_World_Server_Systems_LootSystem_HandleSetLootMethod_CMSG_SET_LOOT_METHOD;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_PARTY_LEADER] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleSetPartyLeader_CMSG_SET_PARTY_LEADER;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_PLAYER_DECLINED_NAMES] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleSetPlayerDeclinedNames_CMSG_SET_PLAYER_DECLINED_NAMES;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_PRIMARY_TALENT_TREE] = &Thunk_HermesProxy_World_Server_Systems_TalentSystem_HandleSetPrimaryTalentTree_CMSG_SET_PRIMARY_TALENT_TREE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_PVP] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleSetPvP_CMSG_SET_PVP;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SET_RAID_DIFFICULTY] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleSetRaidDifficulty_CMSG_SET_RAID_DIFFICULTY;
         {
@@ -3987,6 +4001,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_INSTANCE_LOCK_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_PURCHASE_REFUND,
             global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_TEXT_QUERY,
+            global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_PREVIEW_TALENTS,
             global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_TALENT,
             global::HermesProxy.World.Enums.Opcode.CMSG_LEAVE_GROUP,
             global::HermesProxy.World.Enums.Opcode.CMSG_LFG_LIST_GET_STATUS,
@@ -4176,6 +4191,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_LOOT_METHOD,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_PARTY_LEADER,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_PLAYER_DECLINED_NAMES,
+            global::HermesProxy.World.Enums.Opcode.CMSG_SET_PRIMARY_TALENT_TREE,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_PVP,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_RAID_DIFFICULTY,
             global::HermesProxy.World.Enums.Opcode.CMSG_SET_ROLE,

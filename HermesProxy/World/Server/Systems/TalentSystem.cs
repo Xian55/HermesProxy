@@ -31,6 +31,39 @@ public static class TalentSystem
         ctx.SendPacketToServer(packet);
     }
 
+    // The Cataclysm talent window's Learn. A 4.3.4 server takes the same layout (TrinityCore
+    // 4.3.4 HandleLearnPreviewTalents), the tab included; a 3.3.5a one has no specialization and
+    // takes the count and the pairs alone.
+    [HandlesCmsg(Opcode.CMSG_LEARN_PREVIEW_TALENTS)]
+    public static void HandleLearnPreviewTalents(in LearnPreviewTalents learn, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_LEARN_PREVIEW_TALENTS);
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            packet.WriteInt32(learn.TalentTab);
+        packet.WriteUInt32((uint)learn.Talents.Count);
+        foreach (TalentEntry talent in learn.Talents)
+        {
+            packet.WriteUInt32(talent.TalentID);
+            packet.WriteUInt32(talent.Rank);
+        }
+        ctx.SendPacketToServer(packet);
+    }
+
+    // Choosing a specialization before the first point. TrinityCore 4.3.4 leaves
+    // CMSG_SET_PRIMARY_TALENT_TREE unhandled and takes the choice from a talent preview's tab, so
+    // it goes out as a preview with no talents. A 3.3.5a server has no specializations.
+    [HandlesCmsg(Opcode.CMSG_SET_PRIMARY_TALENT_TREE)]
+    public static void HandleSetPrimaryTalentTree(in SetPrimaryTalentTree tree, in SessionContext ctx)
+    {
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_LEARN_PREVIEW_TALENTS);
+        packet.WriteInt32((int)tree.TalentTab);
+        packet.WriteUInt32(0);
+        ctx.SendPacketToServer(packet);
+    }
+
     // Modern V3_4_3 CMSG_REMOVE_GLYPH (0x32E0 / 13056) → legacy CMSG_REMOVE_GLYPH (0x48A).
     // Both share the same payload: uint8 GlyphSlot (0-5). The legacy server replies with
     // a fresh SMSG_UPDATE_TALENT_DATA, which TalentHandler.HandleTalentsInfoUpdate processes

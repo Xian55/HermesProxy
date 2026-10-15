@@ -50,6 +50,9 @@ public partial class WorldClient
         for (byte specIdx = 0; specIdx < specsCount; ++specIdx)
         {
             var group = new TalentInfoCacheGroup();
+            // TrinityCore 4.3.4 BuildPlayerTalentsInfoData: the group's primary talent tree first.
+            if (IsCataLegacy)
+                group.PrimaryTree = packet.ReadUInt32();
 
             byte talentCount = packet.ReadUInt8();
             for (byte t = 0; t < talentCount; ++t)

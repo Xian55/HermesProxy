@@ -1,4 +1,5 @@
 ﻿using Framework.Constants;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
@@ -42,6 +43,13 @@ public readonly record struct RemoveGlyph(byte GlyphSlot);
 // a leading PetGUID. Verify against the first packet capture; adjust if the read overruns.
 public readonly record struct LearnPetTalent(WowGuid128 PetGUID, uint TalentID, ushort Rank);
 
+// The Cataclysm talent window's Learn: the talent tab chosen as the specialization (-1 when it is
+// already chosen) and the talents picked in it.
+public readonly record struct LearnPreviewTalents(int TalentTab, List<TalentEntry> Talents);
+
+// The Cataclysm talent window's specialization choice, made before a point is spent.
+public readonly record struct SetPrimaryTalentTree(uint TalentTab);
+
 // Modern V3_4_3.54261 SMSG_UPDATE_TALENT_DATA. Layout matches WPP's V3_4_0 parser
 // (canonical reader): X:/Programming/RioMcBoo/WowPacketParser/WowPacketParserModule.V3_4_0_45166/Parsers/SpellHandler.cs:436-475
 // (ReadTalentInfoUpdate). Two fields are V3_4_4_59817+ only and MUST NOT be emitted
@@ -58,8 +66,18 @@ public readonly record struct LearnPetTalent(WowGuid128 PetGUID, uint TalentID, 
 //
 // P1 scope: single talent group, no glyph forwarding (drained on the legacy side but not
 // emitted as SMSG_ACTIVE_GLYPHS — see EmptyActiveGlyphs / wotlk.md follow-ups).
+//
+// The 4.4.2 client has the later shape (docs/protocol/4.4.2.60895, 0x3B0070; TrinityCore
+// cata_classic TalentPackets.cpp): each group's PrimarySpecialization, the talent tab its points
+// went into, after the SpecID, and the rank as a uint32.
 public sealed class UpdateTalentData : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<UpdateTalentData>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new GroupsLayout(cataClassic: false)),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new GroupsLayout(cataClassic: true)));
+
+    private static readonly ServerPacketLayout<UpdateTalentData> Layout = Layouts.ForRunningClient();
+
     public uint UnspentTalentPoints;
     public byte ActiveGroup;
     public List<TalentGroupInfo> TalentGroups = new();
@@ -67,35 +85,44 @@ public sealed class UpdateTalentData : ServerPacket
 
     public UpdateTalentData() : base(Opcode.SMSG_UPDATE_TALENT_DATA, ConnectionType.Instance) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    internal sealed class GroupsLayout(bool cataClassic) : ServerPacketLayout<UpdateTalentData>
     {
-        _worldPacket.WriteUInt32(UnspentTalentPoints);
-        _worldPacket.WriteUInt8(ActiveGroup);
-        _worldPacket.WriteUInt32((uint)TalentGroups.Count);
-
-        foreach (var group in TalentGroups)
+        public override void Write(UpdateTalentData packet, WorldPacket data)
         {
-            _worldPacket.WriteUInt8((byte)group.Talents.Count);
-            _worldPacket.WriteUInt32((uint)group.Talents.Count);
+            data.WriteUInt32(packet.UnspentTalentPoints);
+            data.WriteUInt8(packet.ActiveGroup);
+            data.WriteUInt32((uint)packet.TalentGroups.Count);
 
-            _worldPacket.WriteUInt8((byte)group.Glyphs.Count);
-            _worldPacket.WriteUInt32((uint)group.Glyphs.Count);
-
-            _worldPacket.WriteUInt8(group.SpecID);
-            // PrimarySpecialization is V3_4_4_59817+ only — do not emit for V3_4_3.
-
-            foreach (var talent in group.Talents)
+            foreach (var group in packet.TalentGroups)
             {
-                _worldPacket.WriteUInt32(talent.TalentID);
-                _worldPacket.WriteUInt8((byte)talent.Rank);
+                data.WriteUInt8((byte)group.Talents.Count);
+                data.WriteUInt32((uint)group.Talents.Count);
+
+                data.WriteUInt8((byte)group.Glyphs.Count);
+                data.WriteUInt32((uint)group.Glyphs.Count);
+
+                data.WriteUInt8(group.SpecID);
+                if (cataClassic)
+                    data.WriteUInt32(group.PrimarySpecialization);
+
+                foreach (var talent in group.Talents)
+                {
+                    data.WriteUInt32(talent.TalentID);
+                    if (cataClassic)
+                        data.WriteUInt32(talent.Rank);
+                    else
+                        data.WriteUInt8((byte)talent.Rank);
+                }
+
+                foreach (var glyph in group.Glyphs)
+                    data.WriteUInt16(glyph);
             }
 
-            foreach (var glyph in group.Glyphs)
-                _worldPacket.WriteUInt16(glyph);
+            data.WriteBit(packet.IsPetTalents);
+            data.FlushBits();
         }
-
-        _worldPacket.WriteBit(IsPetTalents);
-        _worldPacket.FlushBits();
     }
 }
 
@@ -115,6 +142,8 @@ public struct TalentEntry
 
 public sealed class TalentInfoCacheGroup
 {
+    // The talent tab the group's points went into, which a 4.3.4 server sends; 0 from the older ones.
+    public uint PrimaryTree;
     public List<TalentEntry> Talents = new();
     public List<ushort> Glyphs = new();
 }
@@ -148,7 +177,7 @@ public sealed class TalentInfoCache
             packet.TalentGroups.Add(new TalentGroupInfo
             {
                 SpecID = specId,
-                PrimarySpecialization = 0,  // V3_4_4+ only — kept on the type for forward compat
+                PrimarySpecialization = src.PrimaryTree,
                 Talents = new List<TalentEntry>(src.Talents),
                 Glyphs = new List<ushort>(src.Glyphs),
             });
