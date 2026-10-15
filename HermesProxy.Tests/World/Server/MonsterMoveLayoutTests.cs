@@ -70,6 +70,35 @@ public sealed class MonsterMoveLayoutTests
         AssertBothSerialisers(MonsterMove.Layouts.For(ClientVersionBuild.V3_4_3_54261), packet, expected);
     }
 
+    [Fact]
+    public void CataClassicLayout_JumpExtraData_FollowsThePoints()
+    {
+        ServerSideMovement Leap() => new()
+        {
+            SplineId = 4,
+            SplineFlags = SplineFlagModern.Parabolic,
+            SplineTimeFull = 1000,
+            StartPosition = new Vector3(-9000.26f, -133.851f, 84.0311f),
+            EndPosition = new Vector3(-8996.252f, -141.25f, 83.0605f),
+            TransportGuid = WowGuid128.Empty,
+            TransportSeat = -1,
+            SplineCount = 1,
+        };
+        var guid = new WowGuid128(230, 0x200004000030B3C0);
+        var layout = MonsterMove.Layouts.For(ClientVersionBuild.V4_4_2_60895);
+        byte[] flat = Write(layout, new MonsterMove(guid, Leap()));
+        ServerSideMovement leap = Leap();
+        leap.JumpGravity = 19.29f;
+        leap.JumpStartTime = 250;
+
+        // the presence bit is the third after the packed-delta count, then the block after the end point
+        int bitsAt = 8 + 12 + 4 + 1 + 4 + 4 + 4 + 4 + 1 + 2 + 1;  // GUID .. TransportSeat
+        byte[] expected = [.. flat, .. BitConverter.GetBytes(19.29f), .. BitConverter.GetBytes(250u), 0, 0, 0, 0];
+        expected[bitsAt + 4] |= 0x02;
+
+        AssertBothSerialisers(layout, new MonsterMove(guid, leap), expected);
+    }
+
     // SMSG_ON_MONSTER_MOVE from TrinityCore cata_classic to a 4.4.2.60895 client
     // (refs/native-captures/tc_cata_442_20261010-141101.pkt, packet 266).
     private const string NativeMove =

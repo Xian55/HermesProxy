@@ -174,7 +174,7 @@ public sealed class MonsterMove : ServerPacket, ISpanWritable
         data.WriteBits(PackedDeltaCount, 16);
         data.WriteBit(false); // SplineFilter.HasValue
         data.WriteBit(false); // SpellEffectExtraData.HasValue
-        data.WriteBit(false); // JumpExtraData.HasValue
+        data.WriteBit(MoveSpline.JumpGravity.HasValue); // JumpExtraData.HasValue
         data.FlushBits();
 
         //if (SplineFilter.HasValue)
@@ -206,13 +206,12 @@ public sealed class MonsterMove : ServerPacket, ISpanWritable
         for (int i = 0; i < PackedDeltaCount; i++)
             data.WritePackXYZ(PackedDelta(i));
 
-        /*
-        if (SpellEffectExtraData.HasValue)
-            SpellEffectExtraData.Value.Write(data);
-
-        if (JumpExtraData.HasValue)
-            JumpExtraData.Value.Write(data);
-        */
+        if (MoveSpline.JumpGravity is { } gravity)
+        {
+            data.WriteFloat(gravity);
+            data.WriteUInt32(MoveSpline.JumpStartTime);
+            data.WriteUInt32(0); // Duration
+        }
 
         // Opt-in wire trace. Enable with HERMES_TRACE_MOVEMENT=1 for cross-OS / cross-version
         // packet comparison (issue #74 reopen, macOS vs Windows V1_14_x divergence).
@@ -227,7 +226,8 @@ public sealed class MonsterMove : ServerPacket, ISpanWritable
 
     // Fixed: GUID(18) + StartPos(12) + SplineId(4) + Dest(12) + flags/times(36) + bits(6) = 88
     // SplineType FacingTarget (worst case, V2_5+): float(4) + GUID(18) = 22
-    private const int FixedSize = 88 + 22; // 110 bytes
+    // JumpExtraData: gravity, start time, duration = 12
+    private const int FixedSize = 88 + 22 + 12; // 122 bytes
 
     // Sized from this packet's own spline: points write as Vector3 (12 B), packed deltas as
     // PackXYZ (4 B) -- see WriteToSpan. Both counts are known from the spline before
@@ -269,7 +269,7 @@ public sealed class MonsterMove : ServerPacket, ISpanWritable
         writer.WriteBits((uint)PackedDeltaCount, 16);
         writer.WriteBit(false); // SplineFilter.HasValue
         writer.WriteBit(false); // SpellEffectExtraData.HasValue
-        writer.WriteBit(false); // JumpExtraData.HasValue
+        writer.WriteBit(MoveSpline.JumpGravity.HasValue); // JumpExtraData.HasValue
         writer.FlushBits();
 
         switch (MoveSpline.SplineType)
@@ -292,6 +292,13 @@ public sealed class MonsterMove : ServerPacket, ISpanWritable
 
         for (int i = 0; i < PackedDeltaCount; i++)
             writer.WritePackXYZ(PackedDelta(i));
+
+        if (MoveSpline.JumpGravity is { } gravity)
+        {
+            writer.WriteFloat(gravity);
+            writer.WriteUInt32(MoveSpline.JumpStartTime);
+            writer.WriteUInt32(0); // Duration
+        }
 
         // Opt-in wire trace — see Write() above.
         if (MovementTrace.Enabled)

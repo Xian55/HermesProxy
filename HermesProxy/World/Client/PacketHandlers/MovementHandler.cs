@@ -1174,8 +1174,16 @@ public partial class WorldClient
 
         if (hasTrajectory)
         {
-            packet.ReadFloat(); // Vertical Speed
-            packet.ReadInt32(); // Async-time in ms
+            float gravity = packet.ReadFloat();
+            uint startTime = packet.ReadUInt32();
+            // The arc goes to the client with its jump data; without that data the 4.4.2 client
+            // must not see the Parabolic flag at all (see ConvertSplineFlagsCata).
+            if (IsCataLegacy)
+            {
+                moveSpline.JumpGravity = gravity;
+                moveSpline.JumpStartTime = startTime;
+                moveSpline.SplineFlags |= SplineFlagModern.Parabolic;
+            }
         }
 
         moveSpline.SplineCount = packet.ReadUInt32();

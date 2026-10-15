@@ -31,11 +31,11 @@ public partial class WorldClient
 
     /// <remarks>
     /// Parabolic is left out on purpose. With it the client computes the arc from the spline's
-    /// jump data (gravity, start time), which the modern writers here never send, and the 4.4.2
-    /// client reads that data without checking it is there: an access violation at null + 4 in
-    /// its spline code, on the first leap in sight (Heroic Leap, a charge, a knockback; three
-    /// crashes at a battleground's opening). Without the flag a leap is drawn as a move along
-    /// the ground, as the older clients have always drawn it.
+    /// jump data (gravity, start time), and the 4.4.2 client reads that data without checking it
+    /// is there: an access violation at null + 4 in its spline code, on the first leap in sight
+    /// (Heroic Leap, a charge, a knockback; three crashes at a battleground's opening). The
+    /// monster-move reader puts the flag back together with the jump data; a create's spline,
+    /// whose writer has no jump data, goes without and is drawn as a move along the ground.
     /// </remarks>
     internal static SplineFlagModern ConvertSplineFlagsCata(uint flags)
     {

@@ -25,4 +25,8 @@ public sealed class ServerSideMovement
     public WowGuid128 TransportGuid;
     public sbyte TransportSeat;
     public List<Vector3> SplinePoints = new();
+
+    /// <summary>A leap's arc (the spline is Parabolic): its gravity, and when in the move it starts.</summary>
+    public float? JumpGravity;
+    public uint JumpStartTime;
 }
