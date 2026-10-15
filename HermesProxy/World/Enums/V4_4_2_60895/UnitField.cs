@@ -286,12 +286,13 @@ public enum UnitField
     [DescriptorUpdateField(nameof(UnitData.ModCastHaste), DescriptorType.Float, bit: 67)]
     UNIT_MOD_CAST_HASTE,
 
-    [DescriptorCreatePlaceholder(DescriptorType.Float, "1f")]
-    UNIT_PAD_FLOAT_ONE_3,
-    [DescriptorCreatePlaceholder(DescriptorType.Float, "1f")]
-    UNIT_PAD_FLOAT_ONE_4,
-    [DescriptorCreatePlaceholder(DescriptorType.Float, "1f")]
-    UNIT_PAD_FLOAT_ONE_5,
+    // 4.3.4 sends the melee, ranged and regeneration haste multipliers; their update bits are below
+    [DescriptorCreateField(nameof(UnitData.ModHaste), DescriptorType.Float, DefaultExpression = "1f")]
+    UNIT_MOD_HASTE,
+    [DescriptorCreateField(nameof(UnitData.ModRangedHaste), DescriptorType.Float, DefaultExpression = "1f")]
+    UNIT_MOD_RANGED_HASTE,
+    [DescriptorCreateField(nameof(UnitData.ModHasteRegen), DescriptorType.Float, DefaultExpression = "1f")]
+    UNIT_MOD_HASTE_REGEN,
     [DescriptorCreatePlaceholder(DescriptorType.Float, "1f")]
     UNIT_PAD_FLOAT_ONE_6,
 

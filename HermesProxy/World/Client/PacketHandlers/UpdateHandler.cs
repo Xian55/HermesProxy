@@ -3480,6 +3480,12 @@ public partial class WorldClient
             {
                 updateData.UnitData.ModCastSpeed = updates[UNIT_MOD_CAST_SPEED].FloatValue;
             }
+            // 4.3.4's spell haste multiplier; the 4.4.2 client's spell haste percentage comes from it.
+            int UNIT_MOD_CAST_HASTE = IsCataLegacy ? LegacyVersion.GetUpdateField(UnitField.UNIT_MOD_CAST_HASTE) : -1;
+            if (UNIT_MOD_CAST_HASTE >= 0 && updateMaskArray[UNIT_MOD_CAST_HASTE])
+            {
+                updateData.UnitData.ModCastHaste = updates[UNIT_MOD_CAST_HASTE].FloatValue;
+            }
             int UNIT_CREATED_BY_SPELL = LegacyVersion.GetUpdateField(UnitField.UNIT_CREATED_BY_SPELL);
             if (UNIT_CREATED_BY_SPELL >= 0 && updateMaskArray[UNIT_CREATED_BY_SPELL])
             {
@@ -4351,6 +4357,22 @@ public partial class WorldClient
             }
             if (IsCataLegacy)
             {
+                // 4.3.4 keeps melee, ranged and regeneration haste and the mastery in player fields;
+                // the 4.4.2 client has the haste multipliers in UnitData and the mastery in
+                // ActivePlayerData, and works its haste percentages out of them.
+                int MOD_HASTE = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_MOD_HASTE);
+                if (MOD_HASTE >= 0 && updateMaskArray[MOD_HASTE])
+                    updateData.UnitData.ModHaste = updates[MOD_HASTE].FloatValue;
+                int MOD_RANGED_HASTE = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_MOD_RANGED_HASTE);
+                if (MOD_RANGED_HASTE >= 0 && updateMaskArray[MOD_RANGED_HASTE])
+                    updateData.UnitData.ModRangedHaste = updates[MOD_RANGED_HASTE].FloatValue;
+                int MOD_HASTE_REGEN = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_MOD_HASTE_REGEN);
+                if (MOD_HASTE_REGEN >= 0 && updateMaskArray[MOD_HASTE_REGEN])
+                    updateData.UnitData.ModHasteRegen = updates[MOD_HASTE_REGEN].FloatValue;
+                int MASTERY = LegacyVersion.GetUpdateField(PlayerField.PLAYER_MASTERY);
+                if (MASTERY >= 0 && updateMaskArray[MASTERY])
+                    updateData.EnsureActivePlayerData().Mastery = updates[MASTERY].FloatValue;
+
                 // archaeology: the 4.4.2 client keeps both lists as arrays of their own
                 ReadTwoShortsInto(PlayerField.PLAYER_FIELD_RESEARCHING_1, GetSession().GameState.ResearchProjects);
                 ReadTwoShortsInto(PlayerField.PLAYER_FIELD_RESERACH_SITE_1, GetSession().GameState.ResearchSites);
