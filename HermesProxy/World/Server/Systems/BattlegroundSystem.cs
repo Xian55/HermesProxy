@@ -240,4 +240,17 @@ public static class BattlegroundSystem
 
         ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_GET_PVP_OPTIONS_ENABLED));
     }
+
+    /// <summary>
+    /// The PvP window asks what a battleground pays. Only a 4.x server knows the request
+    /// (TrinityCore 4.3.4: CMSG_REQUEST_PVP_REWARDS, empty); WorldClient translates the answer.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_REQUEST_PVP_REWARDS)]
+    public static void HandleRequestPvpRewards(in EmptyClientPacket request, in SessionContext ctx)
+    {
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            return;
+
+        ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_REQUEST_PVP_REWARDS));
+    }
 }

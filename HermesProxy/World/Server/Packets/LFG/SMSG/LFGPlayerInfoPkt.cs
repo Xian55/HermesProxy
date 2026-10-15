@@ -39,6 +39,8 @@ public struct LFGPlayerQuestReward
     public List<LFGPlayerQuestRewardItem>? Items;
     public List<LFGPlayerQuestRewardCurrency>? Currency;
     public List<LFGPlayerQuestRewardCurrency>? BonusCurrency;
+    // Only SMSG_REQUEST_PVP_REWARDS_RESPONSE carries it, in hundredths of a point.
+    public int? Honor;
 
     public void Write(WorldPacket data)
     {
@@ -66,12 +68,14 @@ public struct LFGPlayerQuestReward
                 data.WriteInt32(c.CurrencyID);
                 data.WriteInt32(c.Quantity);
             }
-        // Optional RewardSpellID, Unused1, Unused2, Honor — all absent
+        // Optional RewardSpellID, Unused1, Unused2 — absent; Honor
         data.WriteBit(false);
         data.WriteBit(false);
         data.WriteBit(false);
-        data.WriteBit(false);
+        data.WriteBit(Honor.HasValue);
         data.FlushBits();
+        if (Honor.HasValue)
+            data.WriteInt32(Honor.Value);
     }
 }
 

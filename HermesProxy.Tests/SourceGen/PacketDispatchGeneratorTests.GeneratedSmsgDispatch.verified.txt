@@ -2312,6 +2312,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleRequestCemeteryListResponse(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleRequestPvpRewardsResponse_SMSG_REQUEST_PVP_REWARDS_RESPONSE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleRequestPvpRewardsResponse(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleResetFailedNotify_SMSG_RESET_FAILED_NOTIFY(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleResetFailedNotify(packet);
@@ -3233,6 +3238,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_READ_ITEM_RESULT_OK] = &Thunk_HermesProxy_World_Client_WorldClient_HandleReadItemResultOk_SMSG_READ_ITEM_RESULT_OK;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_REFORGE_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleReforgeResult_SMSG_REFORGE_RESULT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_REQUEST_CEMETERY_LIST_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleRequestCemeteryListResponse_SMSG_REQUEST_CEMETERY_LIST_RESPONSE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_REQUEST_PVP_REWARDS_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleRequestPvpRewardsResponse_SMSG_REQUEST_PVP_REWARDS_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_RESET_FAILED_NOTIFY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleResetFailedNotify_SMSG_RESET_FAILED_NOTIFY;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_RESURRECT_REQUEST] = &Thunk_HermesProxy_World_Client_WorldClient_HandleResurrectRequest_SMSG_RESURRECT_REQUEST;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_RESYNC_RUNES] = &Thunk_HermesProxy_World_Client_WorldClient_HandleResyncRunes_SMSG_RESYNC_RUNES;
@@ -3761,6 +3767,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_READ_ITEM_RESULT_OK,
             global::HermesProxy.World.Enums.Opcode.SMSG_REFORGE_RESULT,
             global::HermesProxy.World.Enums.Opcode.SMSG_REQUEST_CEMETERY_LIST_RESPONSE,
+            global::HermesProxy.World.Enums.Opcode.SMSG_REQUEST_PVP_REWARDS_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.SMSG_RESET_FAILED_NOTIFY,
             global::HermesProxy.World.Enums.Opcode.SMSG_RESURRECT_REQUEST,
             global::HermesProxy.World.Enums.Opcode.SMSG_RESYNC_RUNES,

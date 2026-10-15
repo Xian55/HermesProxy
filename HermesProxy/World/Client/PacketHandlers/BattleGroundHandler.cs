@@ -621,11 +621,11 @@ public partial class WorldClient
     {
         BattlefieldList bglist = new BattlefieldList();
         packet.ReadInt32(); // conquest bonus, holiday
-        packet.ReadInt32(); // conquest bonus, random
+        int randomWinConquest = packet.ReadInt32();
         packet.ReadInt32(); // honor for a loss, holiday
         bglist.BattlemasterListID = packet.ReadUInt32();
-        packet.ReadInt32(); // honor for a loss, random
-        packet.ReadInt32(); // honor for a win, random
+        int randomLossHonor = packet.ReadInt32();
+        int randomWinHonor = packet.ReadInt32();
         packet.ReadInt32(); // honor for a win, holiday
         bglist.MaxLevel = packet.ReadUInt8();
         bglist.MinLevel = packet.ReadUInt8();
@@ -656,8 +656,48 @@ public partial class WorldClient
         }
         else
             bglist.BattlemasterGuid = WowGuid128.Empty;
+
+        // The 4.4.2 window asked for its rewards before this list came; new amounts go to it first,
+        // so that the list's own refresh already shows them.
+        var rewards = (randomWinHonor, randomWinConquest, randomLossHonor);
+        if (GetSession().GameState.CataRandomBattlegroundRewards != rewards)
+        {
+            GetSession().GameState.CataRandomBattlegroundRewards = rewards;
+            SendPacketToClient(BuildPvpRewardsCata());
+        }
         SendPacketToClient(bglist);
     }
+
+    // TrinityCore 4.3.4 RequestPVPRewardsResponse: this week's conquest and its caps, overall, from
+    // rated battlegrounds and from arenas. The 4.4.2 window takes those from the currencies and
+    // wants the rewards here instead.
+    [HandlesSmsg(Opcode.SMSG_REQUEST_PVP_REWARDS_RESPONSE)]
+    internal void HandleRequestPvpRewardsResponse(WorldPacket packet)
+    {
+        SendPacketToClient(BuildPvpRewardsCata());
+    }
+
+    // The random battleground's amounts as the last 4.3.4 list gave them, for a first win and for
+    // a later one alike: the server already chose between the two by whether one was won today.
+    // A 4.3.4 server says nothing about rated battlegrounds and arenas here.
+    private RequestPvpRewardsResponse BuildPvpRewardsCata()
+    {
+        RequestPvpRewardsResponse response = new RequestPvpRewardsResponse();
+        if (GetSession().GameState.CataRandomBattlegroundRewards is not { } rewards)
+            return response;
+
+        LFGPlayerQuestReward win = new LFGPlayerQuestReward { Honor = rewards.WinHonor * 100 };
+        if (rewards.WinConquest > 0)
+            win.Currency = [new LFGPlayerQuestRewardCurrency { CurrencyID = ConquestCurrencyId, Quantity = rewards.WinConquest * 100 }];
+        LFGPlayerQuestReward loss = new LFGPlayerQuestReward { Honor = rewards.LossHonor * 100 };
+        response.FirstRandomBGWinReward = win;
+        response.NthRandomBGWinReward = win;
+        response.FirstRandomBGLossReward = loss;
+        response.NthRandomBGLossReward = loss;
+        return response;
+    }
+
+    private const int ConquestCurrencyId = 390;
 
     // SMSG_BATTLEFIELD_STATUS on 4.3.4 is the "no longer in this queue" state alone.
     internal void HandleBattlefieldStatusNoneCata(WorldPacket packet)

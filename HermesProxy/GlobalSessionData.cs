@@ -485,6 +485,9 @@ public sealed class GameSessionData
     // A 4.3.4 battleground's clock: when it runs out by the server's time, and on which map.
     public long BattlegroundClockEnd;
     public uint? BattlegroundClockMap;
+    // What a random battleground pays now, from a 4.3.4 battlefield list (whole points): a 4.3.4
+    // server says it there and not in its answer to CMSG_REQUEST_PVP_REWARDS.
+    public (int WinHonor, int WinConquest, int LossHonor)? CataRandomBattlegroundRewards;
     // The legacy server's unix time minus this machine's, from the last time query that went by.
     public long LegacyServerClockOffset;
     public Dictionary<uint, uint> DailyQuestsDone = [];

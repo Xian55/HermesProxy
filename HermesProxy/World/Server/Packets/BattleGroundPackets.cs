@@ -879,3 +879,33 @@ public sealed class PVPOptionsEnabled : ServerPacket
     public bool WargameArenas;
     public bool RatedArenas;
 }
+
+/// <summary>
+/// What a battleground or an arena pays, for the 4.4.2 PvP window (TrinityCore cata_classic
+/// RequestPvPRewardsResponse): eight rewards in this order, honor and conquest (390) in hundredths.
+/// </summary>
+public sealed class RequestPvpRewardsResponse : ServerPacket
+{
+    public RequestPvpRewardsResponse() : base(Opcode.SMSG_REQUEST_PVP_REWARDS_RESPONSE) { }
+
+    public override void Write()
+    {
+        FirstRandomBGWinReward.Write(_worldPacket);
+        FirstRandomBGLossReward.Write(_worldPacket);
+        NthRandomBGWinReward.Write(_worldPacket);
+        NthRandomBGLossReward.Write(_worldPacket);
+        RatedBGRewards.Write(_worldPacket);
+        Arena2v2Rewards.Write(_worldPacket);
+        Arena3v3Rewards.Write(_worldPacket);
+        Arena5v5Rewards.Write(_worldPacket);
+    }
+
+    public LFGPlayerQuestReward FirstRandomBGWinReward;
+    public LFGPlayerQuestReward FirstRandomBGLossReward;
+    public LFGPlayerQuestReward NthRandomBGWinReward;
+    public LFGPlayerQuestReward NthRandomBGLossReward;
+    public LFGPlayerQuestReward RatedBGRewards;
+    public LFGPlayerQuestReward Arena2v2Rewards;
+    public LFGPlayerQuestReward Arena3v3Rewards;
+    public LFGPlayerQuestReward Arena5v5Rewards;
+}
