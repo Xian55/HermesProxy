@@ -168,6 +168,9 @@ public static class PetSystem
     [HandlesCmsg(Opcode.CMSG_PET_RENAME)]
     public static void HandlePetRename(in PetRename pet, in SessionContext ctx)
     {
+        ctx.GetSession().GameState.LastPetRenameGuid = pet.RenameData.PetGUID;
+        ctx.GetSession().GameState.LastPetRenameNumber = pet.RenameData.PetNumber;
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PET_RENAME);
         packet.WriteGuid(pet.RenameData.PetGUID.To64(ctx.GetSession().GameState));
         packet.WriteCString(pet.RenameData.NewName);

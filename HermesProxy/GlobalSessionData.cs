@@ -154,6 +154,10 @@ public sealed class GameSessionData
     public uint[]? PetActionBarLegacy;
     // The slot a command or stance was picked up from, held back until it is dropped.
     public int PetActionPickup = -1;
+    // The pet of the last rename the client asked for: a legacy server's refusal names only the
+    // reason and the name, the modern client's names the pet as well.
+    public WowGuid128 LastPetRenameGuid;
+    public int LastPetRenameNumber;
     // The stable master whose window the proxy opened, until the client closes it: the list that
     // answers the open window's own request must not open it a second time.
     public WowGuid128 OpenStableMaster;

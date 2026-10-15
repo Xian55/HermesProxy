@@ -197,6 +197,32 @@ public struct PetRenameData
     public DeclinedName DeclinedNames;
 }
 
+/// <summary>
+/// A pet rename refused (TrinityCore cata_classic PetNameInvalid::Write): the reason (the same
+/// numbers as 3.3.5a and 4.3.4 send), the pet, its number and the name asked for. Declined names
+/// are left out: a legacy server sends them only for a Russian client.
+/// </summary>
+public sealed class PetNameInvalid : ServerPacket
+{
+    public PetNameInvalid() : base(Opcode.SMSG_PET_NAME_INVALID, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteUInt8(Result);
+        _worldPacket.WritePackedGuid128(PetGUID);
+        _worldPacket.WriteInt32(PetNumber);
+        _worldPacket.WriteUInt8((byte)Encoding.UTF8.GetByteCount(NewName));
+        _worldPacket.WriteBit(false);
+        _worldPacket.FlushBits();
+        _worldPacket.WriteString(NewName);
+    }
+
+    public byte Result;
+    public WowGuid128 PetGUID;
+    public int PetNumber;
+    public string NewName = string.Empty;
+}
+
 public readonly record struct PetAbandon(WowGuid128 PetGUID);
 
 public readonly record struct RequestStabledPets(WowGuid128 StableMaster);

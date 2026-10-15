@@ -2037,6 +2037,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandlePetLearnedSpells(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandlePetNameInvalid_SMSG_PET_NAME_INVALID(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandlePetNameInvalid(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandlePetSlotUpdated_SMSG_PET_SLOT_UPDATED(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandlePetSlotUpdated(packet);
@@ -3223,6 +3228,7 @@ internal static unsafe class GeneratedSmsgDispatch
                 table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PET_CAST_FAILED] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePetCastFailedTBC_SMSG_PET_CAST_FAILED;
         }
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PET_LEARNED_SPELLS] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePetLearnedSpells_SMSG_PET_LEARNED_SPELLS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PET_NAME_INVALID] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePetNameInvalid_SMSG_PET_NAME_INVALID;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PET_SLOT_UPDATED] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePetSlotUpdated_SMSG_PET_SLOT_UPDATED;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PET_SPELLS_MESSAGE] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePetSpellsMessage_SMSG_PET_SPELLS_MESSAGE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_PET_STABLE_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandlePetStableResult_SMSG_PET_STABLE_RESULT;
@@ -3760,6 +3766,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_PET_BROKEN,
             global::HermesProxy.World.Enums.Opcode.SMSG_PET_CAST_FAILED,
             global::HermesProxy.World.Enums.Opcode.SMSG_PET_LEARNED_SPELLS,
+            global::HermesProxy.World.Enums.Opcode.SMSG_PET_NAME_INVALID,
             global::HermesProxy.World.Enums.Opcode.SMSG_PET_SLOT_UPDATED,
             global::HermesProxy.World.Enums.Opcode.SMSG_PET_SPELLS_MESSAGE,
             global::HermesProxy.World.Enums.Opcode.SMSG_PET_STABLE_RESULT,

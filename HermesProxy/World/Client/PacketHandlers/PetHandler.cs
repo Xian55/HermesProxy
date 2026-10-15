@@ -392,6 +392,28 @@ public partial class WorldClient
     }
 
     /// <summary>
+    /// A pet rename refused (TrinityCore 3.3.5a and 4.3.4 SendPetNameInvalid: the reason, the name,
+    /// whether declined names follow, and those). Passed on to the 4.4.2 client with the pet its
+    /// rename request named; it had no handler, so a refused name went without a word.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_PET_NAME_INVALID)]
+    internal void HandlePetNameInvalid(WorldPacket packet)
+    {
+        if (!ModernVersion.AddedInVersion(ClientVersionBuild.V4_4_2_60895))
+            return;
+
+        var state = GetSession().GameState;
+        PetNameInvalid invalid = new PetNameInvalid
+        {
+            Result = (byte)packet.ReadUInt32(),
+            NewName = packet.ReadCString(),
+            PetGUID = state.LastPetRenameGuid,
+            PetNumber = state.LastPetRenameNumber,
+        };
+        SendPacketToClient(invalid);
+    }
+
+    /// <summary>
     /// TrinityCore 4.3.4 SendPetSlotUpdated: pet A went to slot A, and the pet that was there, if
     /// any, to slot B. 4.3.4 sends a new list only when the pet out was moved (it is dismissed and
     /// saved), so the 4.4.2 client's pets are moved here and sent again.
