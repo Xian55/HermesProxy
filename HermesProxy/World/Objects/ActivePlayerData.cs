@@ -194,6 +194,8 @@ public class ActivePlayerData
     public bool? InsertItemsLeftToRight;
     public byte? PvPRankProgress;
     public byte? GlyphsEnabled;
+    // The 4.4.2 client's GlyphsEnabled is 16 bits: a 4.x server's ninth slot needs the ninth bit.
+    public ushort? GlyphsEnabledWide;
 
     // Dynamic Fields
     public List<uint> SelfResSpells = null!;

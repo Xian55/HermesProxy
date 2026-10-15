@@ -4260,10 +4260,43 @@ public partial class WorldClient
             int PLAYER_GLYPHS_ENABLED = LegacyVersion.GetUpdateField(PlayerField.PLAYER_GLYPHS_ENABLED);
             if (PLAYER_GLYPHS_ENABLED >= 0 && updateMaskArray[PLAYER_GLYPHS_ENABLED])
             {
-                byte mask = (byte)(updates[PLAYER_GLYPHS_ENABLED].UInt32Value & 0xFF);
+                // nine bits from a 4.x server (0x100: the third prime slot, at 75)
+                ushort mask = (ushort)(updates[PLAYER_GLYPHS_ENABLED].UInt32Value & 0xFFFF);
                 GetSession().GameState.GlyphsEnabled = mask;
-                updateData.EnsureActivePlayerData().GlyphsEnabled = mask;
+                updateData.EnsureActivePlayerData().GlyphsEnabled = (byte)mask;
+                updateData.EnsureActivePlayerData().GlyphsEnabledWide = mask;
                 Log.Print(LogType.Network, $"[Glyphs] PLAYER_GLYPHS_ENABLED bitmask=0x{mask:X2}");
+            }
+            if (IsCataLegacy)
+            {
+                // 4.3.4 names the nine slots' fields as two arrays, PLAYER_FIELD_GLYPH_SLOTS_1 and
+                // PLAYER_FIELD_GLYPHS_1, both in the order of the GlyphSlot rows (21-26, then the
+                // prime ones 41-43), as the 4.4.2 client has them. Of the WotLK names below only
+                // the first of each exists on 4.3.4, the slot read here already.
+                int GLYPH_SLOTS = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_GLYPH_SLOTS_1);
+                int GLYPHS = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_GLYPHS_1);
+                var state = GetSession().GameState;
+                for (int gi = 0; gi < state.ActiveGlyphs.Length; gi++)
+                {
+                    if (GLYPHS >= 0 && updateMaskArray[GLYPHS + gi])
+                    {
+                        ushort glyphId = (ushort)(updates[GLYPHS + gi].UInt32Value & 0xFFFF);
+                        if (state.ActiveGlyphs[gi] != glyphId)
+                        {
+                            state.ActiveGlyphs[gi] = glyphId;
+                            state.ActiveGlyphsDirty = true;
+                        }
+                    }
+                    if (GLYPH_SLOTS >= 0 && updateMaskArray[GLYPH_SLOTS + gi])
+                    {
+                        uint slotId = updates[GLYPH_SLOTS + gi].UInt32Value;
+                        if (state.ActiveGlyphSlotIds[gi] != slotId)
+                        {
+                            state.ActiveGlyphSlotIds[gi] = slotId;
+                            state.ActiveGlyphsDirty = true;
+                        }
+                    }
+                }
             }
             // PLAYER_FIELD_GLYPHS_1..6 (uint32 each). Legacy server sends these as Values
             // updates on glyph apply/remove and on dual-spec switch. Without reading them,

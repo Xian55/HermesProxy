@@ -1041,7 +1041,7 @@ public partial class ObjectUpdateBuilder
             data.WriteUInt32(_gameState.ActiveGlyphSlotIds[g]);
             data.WriteUInt32(_gameState.ActiveGlyphs[g]);
         }
-        data.WriteUInt8(_gameState.GlyphsEnabled);
+        data.WriteUInt8((byte)_gameState.GlyphsEnabled);
     }
 
     // NumStableSlots. A zero placeholder here makes every stable slot render locked even

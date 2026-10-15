@@ -1106,12 +1106,13 @@ public partial class ObjectUpdateBuilder
     // ActivePlayerData — the legacy glyph state is tracked per session, not per update.
     internal void WriteCreateActivePlayerGlyphs(WorldPacket data, ActivePlayerData src)
     {
-        for (int g = 0; g < PlayerConst.MaxGlyphSlots; g++)
+        int known = _gameState.ActiveGlyphs.Length;
+        for (int g = 0; g < known; g++)
         {
             data.WriteUInt32(_gameState.ActiveGlyphSlotIds[g]);
             data.WriteUInt32(_gameState.ActiveGlyphs[g]);
         }
-        for (int g = PlayerConst.MaxGlyphSlots; g < GlyphSlotCount; g++)
+        for (int g = known; g < GlyphSlotCount; g++)
         {
             data.WriteUInt32(0u);
             data.WriteUInt32(0u);
@@ -1119,7 +1120,7 @@ public partial class ObjectUpdateBuilder
         data.WriteUInt16(_gameState.GlyphsEnabled);
     }
 
-    // 4.4.2 has 9 glyph slots; the legacy server knows 6, which fill the first six.
+    // 4.4.2 has 9 glyph slots; a WotLK server knows 6, which fill the first six, a 4.x server all 9.
     private const int GlyphSlotCount = 9;
 
     // NumStableSlots. A zero placeholder here makes every stable slot render locked even
@@ -1297,15 +1298,15 @@ public partial class ObjectUpdateBuilder
     }
 
     // MaskMutator — pass-1, captures and clears _gameState.ActiveGlyphsDirty.
-    // When dirty, sets 1410 + 1411.. + 1420.. (parent + GlyphSlots + Glyphs) for the six
-    // legacy slots.
+    // When dirty, sets 1410 + 1411.. + 1420.. (parent + GlyphSlots + Glyphs) for the legacy
+    // server's slots (six from WotLK, nine from 4.x).
     internal void ApplyActivePlayerGlyphsMaskMutator(ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
     {
         if (!_gameState.ActiveGlyphsDirty)
             return;
         _gameState.ActiveGlyphsDirty = false;
         blocks.SetBit(1410);
-        for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
+        for (int i = 0; i < _gameState.ActiveGlyphs.Length; i++)
         {
             blocks.SetBit(1411 + i);
             blocks.SetBit(1420 + i);
@@ -1477,7 +1478,7 @@ public partial class ObjectUpdateBuilder
     // first Major/Minor sockets stay valid drop targets.
     internal void WriteUpdateActivePlayerGlyphsGroup(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
     {
-        for (int i = 0; i < PlayerConst.MaxGlyphSlots; i++)
+        for (int i = 0; i < _gameState.ActiveGlyphs.Length; i++)
         {
             if (blocks.IsBitSet(1411 + i))
                 data.WriteUInt32(_gameState.ActiveGlyphSlotIds[i]);

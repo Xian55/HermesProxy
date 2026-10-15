@@ -758,7 +758,7 @@ public enum ActivePlayerField
     // `if (src.GlyphsEnabled.HasValue) { blocks.SetBit(102); blocks.SetBit(120); }`
     // automatically. Source-driven from ActivePlayerData.GlyphsEnabled which
     // UpdateHandler populates alongside the _gameState cache used by the Create path.
-    [DescriptorUpdateField(nameof(ActivePlayerData.GlyphsEnabled), DescriptorType.UInt16, bit: 127, ParentBit = 102)]
+    [DescriptorUpdateField(nameof(ActivePlayerData.GlyphsEnabledWide), DescriptorType.UInt16, bit: 127, ParentBit = 102)]
     ACTIVEPLAYER_GLYPHS_ENABLED,
     // bits 121-123: skipped
     // Group 102 closes with a flush and the PetStable presence bit (never set here), whenever

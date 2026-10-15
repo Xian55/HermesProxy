@@ -11,6 +11,8 @@ public struct PlayerConst
     // Glyph slots per spec. Wire MAX_GLYPH_SLOT_INDEX in mangos/TC 3.3.5
     // (mangos-wotlk Player.h) and V3_4_3 UF::ActivePlayerData::Glyphs[6].
     public const int MaxGlyphSlots = 6;
+    // 4.x has nine, three each of prime, major and minor (TrinityCore 4.3.4 MAX_GLYPH_SLOT_INDEX).
+    public const int MaxGlyphSlotsCata = 9;
     public const int MinSpecializationLevel = 10;
     public const int MaxSpecializations = 5;
     public const int InitialSpecializationIndex = 4;

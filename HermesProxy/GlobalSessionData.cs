@@ -383,12 +383,14 @@ public sealed class GameSessionData
     // feedback when the legacy session is already drained.
     public bool LootMoneyPreClaimed;
     public List<int> ActionButtons = [];
-    public ushort[] ActiveGlyphs = new ushort[PlayerConst.MaxGlyphSlots];
+    public ushort[] ActiveGlyphs = new ushort[LegacyVersion.ExpansionVersion >= 4 ? PlayerConst.MaxGlyphSlotsCata : PlayerConst.MaxGlyphSlots];
     // Per-class GlyphSlot.dbc record IDs, read from legacy PLAYER_FIELD_GLYPH_SLOTS_1..6.
     // Default {21..26} preserves prior hardcoded behavior until the legacy server's first
     // Values update arrives. The V3_4_3 client renders UI position + Major/Minor from these.
-    public uint[] ActiveGlyphSlotIds = [21, 22, 23, 24, 25, 26];
-    public byte GlyphsEnabled;
+    // A 4.x server has three more, the prime slots.
+    public uint[] ActiveGlyphSlotIds = LegacyVersion.ExpansionVersion >= 4 ? [21, 22, 23, 24, 25, 26, 41, 42, 43] : [21, 22, 23, 24, 25, 26];
+    // One bit per slot: nine of them on a 4.x server.
+    public ushort GlyphsEnabled;
     // Set true when ActiveGlyphs[6] changes (talent push, spec switch, glyph apply/remove
     // via legacy PLAYER_FIELD_GLYPHS_1..6). Consumed by V3_4_3 ObjectUpdateBuilder, which
     // writes the new GlyphSlots in the next player Values update. Without this re-emit,

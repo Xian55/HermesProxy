@@ -1083,7 +1083,7 @@ public class ActivePlayerSectionEquivalenceTests
             data.WriteUInt32(gameState.ActiveGlyphSlotIds[g]);                    // GlyphSlots[g]
             data.WriteUInt32(gameState.ActiveGlyphs[g]);                          // Glyphs[g]
         }
-        data.WriteUInt8(gameState.GlyphsEnabled);                                 // bit 120: GlyphsEnabled (UInt8, from _gameState)
+        data.WriteUInt8((byte)gameState.GlyphsEnabled);                           // bit 120: GlyphsEnabled (UInt8, from _gameState)
         data.WriteUInt8(0);                                                        // LfgRoles placeholder
         data.WriteUInt32(0u);                                                      // CategoryCooldownMods.Resize
         data.WriteUInt32(0u);                                                      // WeeklySpellUses.Resize
