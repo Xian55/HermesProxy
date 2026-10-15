@@ -516,12 +516,34 @@ public static class SpellSystem
             // 4.3.4 sends the glyph slot here (TrinityCore 4.3.4 SpellCastRequest.Misc).
             if (WorldClient.IsCataLegacy)
                 packet.WriteUInt32(cast.Misc[0]);
-            packet.WriteUInt8(LegacyCastFlags(cast.SendCastFlags));
+            byte legacyFlags = LegacyCastFlags(cast.SendCastFlags);
+            if (HasArchaeologyCostsCata(cast, legacyFlags))
+                legacyFlags |= LegacyCastFlagArchaeology;
+            packet.WriteUInt8(legacyFlags);
         }
         WriteSpellTargets(cast.Target, targetFlags, packet, ctx.GetSession().GameState);
         WriteClientCastFlagsTrailer(cast.SendCastFlags, cast.MissileTrajectory, packet);
+        if (HasArchaeologyCostsCata(cast, LegacyCastFlags(cast.SendCastFlags)))
+        {
+            // TrinityCore 4.3.4 HandleClientCastFlags: what solving an archaeology project spends,
+            // each a type (1 fragments, a currency; 2 keystones, an item), the id and the count.
+            // The 4.4.2 client sends the same as the cast's weights.
+            packet.WriteUInt32((uint)cast.Weight.Count);
+            foreach (SpellWeight weight in cast.Weight)
+            {
+                packet.WriteUInt8((byte)weight.Type);
+                packet.WriteInt32(weight.ID);
+                packet.WriteUInt32(weight.Quantity);
+            }
+        }
         ctx.SendPacketToServer(packet);
     }
+
+    const byte LegacyCastFlagArchaeology = 0x08;
+
+    // TrinityCore 4.3.4 reads either a trajectory or archaeology costs after the targets, not both.
+    static bool HasArchaeologyCostsCata(SpellCastRequest cast, byte legacyFlags)
+        => WorldClient.IsCataLegacy && cast.Weight.Count > 0 && (legacyFlags & (byte)CastFlag.HasTrajectory) == 0;
 
     /// <summary>
     /// The client's cast flags as a legacy server reads them. Legacy servers only know the

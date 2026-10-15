@@ -1123,6 +1123,78 @@ public partial class ObjectUpdateBuilder
     // 4.4.2 has 9 glyph slots; a WotLK server knows 6, which fill the first six, a 4.x server all 9.
     private const int GlyphSlotCount = 9;
 
+    // Archaeology from a 4.3.4 server: the dig sites, their progress and the race projects, the
+    // three dynamic arrays ActivePlayerData has for them (TrinityCore cata_classic ResearchSites,
+    // ResearchSiteProgress, Research). 4.3.4 keeps a site's finds on the server, so progress is 0.
+    private static int CollectNonZero(ushort[] values, Span<ushort> into)
+    {
+        int count = 0;
+        foreach (ushort value in values)
+            if (value != 0)
+                into[count++] = value;
+        return count;
+    }
+
+    // The three arrays' sizes and contents, then the next three arrays' sizes
+    // (DailyQuestsCompleted, AvailableQuestLineXQuestIDs, Field_1000), all empty.
+    internal void WriteCreateActivePlayerResearch(WorldPacket data, ActivePlayerData src)
+    {
+        Span<ushort> sites = stackalloc ushort[16];
+        Span<ushort> projects = stackalloc ushort[16];
+        int siteCount = CollectNonZero(_gameState.ResearchSites, sites);
+        int projectCount = CollectNonZero(_gameState.ResearchProjects, projects);
+        data.WriteUInt32((uint)siteCount);
+        data.WriteUInt32((uint)siteCount);
+        data.WriteUInt32((uint)projectCount);
+        for (int i = 0; i < siteCount; i++)
+            data.WriteUInt16(sites[i]);
+        for (int i = 0; i < siteCount; i++)
+            data.WriteUInt32(0u);
+        for (int i = 0; i < projectCount; i++)
+            data.WriteInt16((short)projects[i]);
+        data.WriteUInt32(0u);
+        data.WriteUInt32(0u);
+        data.WriteUInt32(0u);
+        _gameState.ResearchDirty = false;
+    }
+
+    // Bits 23-28: each array's parent and element bit, set together when the session's lists changed.
+    internal void ApplyActivePlayerResearchMaskMutator(ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        if (!_gameState.ResearchDirty)
+            return;
+        _gameState.ResearchDirty = false;
+        for (int bit = 23; bit <= 28; bit++)
+            blocks.SetBit(bit);
+    }
+
+    // The three arrays whole: each one's size and a changed bit per element, then (the first value
+    // flushes the bits, as TrinityCore's append does) the sites, the progress and the projects.
+    internal void WriteUpdateActivePlayerResearchPreamble(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        Span<ushort> sites = stackalloc ushort[16];
+        Span<ushort> projects = stackalloc ushort[16];
+        int siteCount = CollectNonZero(_gameState.ResearchSites, sites);
+        int projectCount = CollectNonZero(_gameState.ResearchProjects, projects);
+        WriteCompleteDynamicMask(data, siteCount);
+        WriteCompleteDynamicMask(data, siteCount);
+        WriteCompleteDynamicMask(data, projectCount);
+        data.FlushBits();
+        for (int i = 0; i < siteCount; i++)
+            data.WriteUInt16(sites[i]);
+        for (int i = 0; i < siteCount; i++)
+            data.WriteUInt32(0u);
+        for (int i = 0; i < projectCount; i++)
+            data.WriteInt16((short)projects[i]);
+    }
+
+    private static void WriteCompleteDynamicMask(WorldPacket data, int size)
+    {
+        data.WriteBits((uint)size, 32);
+        if (size > 0)
+            data.WriteBits(uint.MaxValue >> (32 - size), size);
+    }
+
     // NumStableSlots. A zero placeholder here makes every stable slot render locked even
     // after the player has paid for one, because the count reaches the client only through
     // ActivePlayerData (issue #224). Sourced from the legacy stable list.

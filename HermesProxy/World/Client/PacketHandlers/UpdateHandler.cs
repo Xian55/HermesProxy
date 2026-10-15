@@ -4349,6 +4349,33 @@ public partial class WorldClient
                     }
                 }
             }
+            if (IsCataLegacy)
+            {
+                // archaeology: the 4.4.2 client keeps both lists as arrays of their own
+                ReadTwoShortsInto(PlayerField.PLAYER_FIELD_RESEARCHING_1, GetSession().GameState.ResearchProjects);
+                ReadTwoShortsInto(PlayerField.PLAYER_FIELD_RESERACH_SITE_1, GetSession().GameState.ResearchSites);
+
+                void ReadTwoShortsInto(PlayerField field, ushort[] into)
+                {
+                    int first = LegacyVersion.GetUpdateField(field);
+                    if (first < 0)
+                        return;
+                    for (int f = 0; f < into.Length / 2; f++)
+                    {
+                        if (!updateMaskArray[first + f])
+                            continue;
+                        uint value = updates[first + f].UInt32Value;
+                        ushort low = (ushort)(value & 0xFFFF);
+                        ushort high = (ushort)(value >> 16);
+                        if (into[f * 2] != low || into[f * 2 + 1] != high)
+                        {
+                            into[f * 2] = low;
+                            into[f * 2 + 1] = high;
+                            GetSession().GameState.ResearchDirty = true;
+                        }
+                    }
+                }
+            }
             int PLAYER_TRACK_CREATURES = LegacyVersion.GetUpdateField(PlayerField.PLAYER_TRACK_CREATURES);
             if (PLAYER_TRACK_CREATURES >= 0 && updateMaskArray[PLAYER_TRACK_CREATURES])
             {

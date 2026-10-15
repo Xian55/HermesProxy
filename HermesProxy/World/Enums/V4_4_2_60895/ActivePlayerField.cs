@@ -407,9 +407,11 @@ public enum ActivePlayerField
 
     // ---- Create slice 4: dynamic-field prefixes, payloads and bit tail ----
 
-    // Resize prefixes: ResearchSites, ResearchSiteProgress, Research,
-    // DailyQuestsCompleted, AvailableQuestLineXQuestIDs, Field_1000 — all empty.
-    [DescriptorCreatePlaceholder(DescriptorType.UInt32, Count = 6)]
+    // ResearchSites, ResearchSiteProgress and Research (archaeology from a 4.3.4 server: their sizes
+    // and contents), then the sizes of DailyQuestsCompleted, AvailableQuestLineXQuestIDs and
+    // Field_1000, all empty.
+    [DescriptorCreatePlaceholder(DescriptorType.UInt32,
+        CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteCreateActivePlayerResearch))]
     ACTIVEPLAYER_CREATE_DYNAMIC_RESIZE_PREFIXES_A_PLACEHOLDER,
 
     // Heirlooms.Resize + HeirloomFlags.Resize — the two non-zero prefixes.
@@ -523,6 +525,12 @@ public enum ActivePlayerField
         HasAnyPredicate = "gameState.ActiveGlyphsDirty")]
     ACTIVEPLAYER_GLYPHS_MASK_MUTATOR,
 
+    // ResearchDirty: bits 23-28 (the three archaeology arrays) when the session's lists changed.
+    [DescriptorMaskMutator(
+        nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.ApplyActivePlayerResearchMaskMutator),
+        HasAnyPredicate = "gameState.ResearchDirty")]
+    ACTIVEPLAYER_RESEARCH_MASK_MUTATOR,
+
     // ===========================================================================
     // Update — KnownTitles dynamic field (bit 3)
     // ===========================================================================
@@ -547,6 +555,12 @@ public enum ActivePlayerField
     [DescriptorMaskPreamble(bit: 11,
         customWriter: nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerToysPreamble))]
     ACTIVEPLAYER_TOYS_PREAMBLE,
+
+    // ResearchSites, ResearchSiteProgress, Research (bits 23-28): their masks and, flushed, their
+    // values, all before the block's FlushBits, as TrinityCore cata_classic writes them.
+    [DescriptorMaskPreamble(bit: 23,
+        customWriter: nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerResearchPreamble))]
+    ACTIVEPLAYER_RESEARCH_PREAMBLE,
 
     [DescriptorUpdateField(nameof(ActivePlayerData.Toys), DescriptorType.Int32, bit: 11, ParentBit = 0,
         CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerToysBody),

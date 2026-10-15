@@ -391,6 +391,12 @@ public sealed class GameSessionData
     public uint[] ActiveGlyphSlotIds = LegacyVersion.ExpansionVersion >= 4 ? [21, 22, 23, 24, 25, 26, 41, 42, 43] : [21, 22, 23, 24, 25, 26];
     // One bit per slot: nine of them on a 4.x server.
     public ushort GlyphsEnabled;
+    // A 4.3.4 player's archaeology, two uint16 per field in eight fields each: the project of
+    // every race (PLAYER_FIELD_RESEARCHING_1) and the dig sites (PLAYER_FIELD_RESERACH_SITE_1),
+    // 0 for none. Dirty sends them again in the next player Values update.
+    public ushort[] ResearchProjects = new ushort[16];
+    public ushort[] ResearchSites = new ushort[16];
+    public bool ResearchDirty;
     // Set true when ActiveGlyphs[6] changes (talent push, spec switch, glyph apply/remove
     // via legacy PLAYER_FIELD_GLYPHS_1..6). Consumed by V3_4_3 ObjectUpdateBuilder, which
     // writes the new GlyphSlots in the next player Values update. Without this re-emit,
