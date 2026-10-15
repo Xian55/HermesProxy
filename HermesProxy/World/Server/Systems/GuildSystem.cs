@@ -74,6 +74,21 @@ public static class GuildSystem
         ctx.SendPacketToServer(packet);
     }
 
+    /// <summary>
+    /// What the guild's members can craft. Only a 4.x server has guild recipes (TrinityCore 4.3.4
+    /// GuildQueryRecipes::Read: the guild's GUID masked).
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_GUILD_QUERY_RECIPES)]
+    public static void HandleGuildQueryRecipes(in GuildQueryRecipes query, in SessionContext ctx)
+    {
+        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            return;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_GUILD_QUERY_RECIPES);
+        MaskedGuid.Write(packet, CataGuildGuid(query.GuildGuid.GetCounter()), [5, 6, 1, 4, 2, 7, 0, 3], [3, 1, 0, 5, 4, 2, 6, 7]);
+        ctx.SendPacketToServer(packet);
+    }
+
     [HandlesCmsg(Opcode.CMSG_GUILD_PERMISSIONS_QUERY)]
     public static void HandleGuildPermissionsQuery(in EmptyClientPacket query, in SessionContext ctx)
     {

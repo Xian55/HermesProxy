@@ -30,6 +30,19 @@ public sealed class CataClassicCodecTests
     private static SpanPacketReader ReaderOver(byte[] framed)
         => new(new WorldPacket(framed).GetRemainingSpan());
 
+    // The guild's packed GUID and nothing else (docs/protocol/4.4.2.60895).
+    [Fact]
+    public void GuildQueryRecipes_ReadsTheGuild()
+    {
+        WowGuid128 guild = WowGuid128.CreateGuildOrEmpty(7);
+        byte[] f = Framed(w => w.WritePackedGuid128(guild));
+
+        var r = ReaderOver(f);
+        GuildQueryRecipesCodec.Read(ref r, out var packet);
+        Assert.Equal(guild, packet.GuildGuid);
+        Assert.Equal(0, r.Remaining);
+    }
+
     // Captured from the 4.4.2 client: "gooday" whispered to Mirabilis.
     [Fact]
     public void ChatMessageWhisper_CataClassic_ReadsACapturedWhisper()

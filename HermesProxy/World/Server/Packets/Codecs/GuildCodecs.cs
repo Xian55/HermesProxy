@@ -446,6 +446,13 @@ public static class RequestGuildRewardsListCodec
 }
 
 // The guild's GUID and nothing else (docs/protocol 4.4.2).
+public static class GuildQueryRecipesCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out GuildQueryRecipes packet)
+        => packet = new GuildQueryRecipes(r.ReadPackedGuid128());
+}
+
 public static class GuildQueryNewsCodec
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

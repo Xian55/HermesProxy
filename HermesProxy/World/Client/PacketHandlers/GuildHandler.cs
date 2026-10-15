@@ -1334,6 +1334,23 @@ public partial class WorldClient
     private const int GuildNewsLevelUp = 6;
 
     /// <summary>
+    /// TrinityCore 4.3.4 <c>GuildKnownRecipes::Write</c>: 16 bits of count, then per profession its
+    /// skill line and 300 bytes of recipe bits. The 4.4.2 client takes the count as a uint32.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_GUILD_KNOWN_RECIPES)]
+    internal void HandleGuildKnownRecipes(WorldPacket packet)
+    {
+        uint count = packet.ReadBits<uint>(16);
+        GuildKnownRecipes recipes = new GuildKnownRecipes();
+        for (uint i = 0; i < count && packet.CanRead(); i++)
+        {
+            int skillLineId = packet.ReadInt32();
+            recipes.Recipes.Add((skillLineId, packet.ReadBytes(GuildKnownRecipes.RecipeBytes)));
+        }
+        SendPacketToClient(recipes);
+    }
+
+    /// <summary>
     /// TrinityCore 4.3.4 <c>GuildNews::Write</c> (its SMSG_GUILD_NEWS): 21 bits of count; for each
     /// entry the number of members who were there with the masks of their GUIDs, inside the mask
     /// of the member the entry is about; then for each entry the GUID bytes with the flags, two

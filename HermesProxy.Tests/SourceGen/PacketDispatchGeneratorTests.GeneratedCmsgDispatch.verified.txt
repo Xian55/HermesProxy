@@ -1399,6 +1399,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.GuildSystem.HandleGuildQueryNews(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildQueryRecipes_CMSG_GUILD_QUERY_RECIPES(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.GuildQueryRecipesCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.GuildSystem.HandleGuildQueryRecipes(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildSetAchievementTracking_CMSG_GUILD_SET_ACHIEVEMENT_TRACKING(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.GuildSetAchievementTrackingCodec.Read(ref reader, out var packet);
@@ -3424,6 +3430,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_PERMISSIONS_QUERY] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildPermissionsQuery_CMSG_GUILD_PERMISSIONS_QUERY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_PROMOTE_MEMBER] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildPromoteMember_CMSG_GUILD_PROMOTE_MEMBER;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_QUERY_NEWS] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildQueryNews_CMSG_GUILD_QUERY_NEWS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_QUERY_RECIPES] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildQueryRecipes_CMSG_GUILD_QUERY_RECIPES;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_SET_ACHIEVEMENT_TRACKING] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildSetAchievementTracking_CMSG_GUILD_SET_ACHIEVEMENT_TRACKING;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_SET_GUILD_MASTER] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildSetGuildMaster_CMSG_GUILD_SET_GUILD_MASTER;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_SET_MEMBER_NOTE] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildSetMemberNote_CMSG_GUILD_SET_MEMBER_NOTE;
@@ -4000,6 +4007,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_PERMISSIONS_QUERY,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_PROMOTE_MEMBER,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_QUERY_NEWS,
+            global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_QUERY_RECIPES,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_SET_ACHIEVEMENT_TRACKING,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_SET_GUILD_MASTER,
             global::HermesProxy.World.Enums.Opcode.CMSG_GUILD_SET_MEMBER_NOTE,

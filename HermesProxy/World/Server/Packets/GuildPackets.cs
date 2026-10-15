@@ -1446,6 +1446,28 @@ public sealed class GuildRewardItem
 
 public readonly record struct GuildQueryNews(WowGuid128 GuildGuid);
 
+public readonly record struct GuildQueryRecipes(WowGuid128 GuildGuid);
+
+// What the guild's members can craft: per profession (skill line) one bit per recipe, 300 bytes.
+public sealed class GuildKnownRecipes : ServerPacket
+{
+    public const int RecipeBytes = 300;
+
+    public GuildKnownRecipes() : base(Opcode.SMSG_GUILD_KNOWN_RECIPES) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteUInt32((uint)Recipes.Count);
+        foreach (var (skillLineId, bits) in Recipes)
+        {
+            _worldPacket.WriteInt32(skillLineId);
+            _worldPacket.WriteBytes(bits);
+        }
+    }
+
+    public List<(int SkillLineId, byte[] Bits)> Recipes = [];
+}
+
 public readonly record struct GuildNewsUpdateSticky(WowGuid128 GuildGuid, int NewsId, bool Sticky);
 
 /// <summary>
