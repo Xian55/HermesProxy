@@ -2425,6 +2425,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.MiscSystem.HandleReclaimCorpse(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleReforgeItem_CMSG_REFORGE_ITEM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.ReforgeItemCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.ItemSystem.HandleReforgeItem(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_TalentSystem_HandleRemoveGlyph_CMSG_REMOVE_GLYPH(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.RemoveGlyphCodec.Read(ref reader, out var packet);
@@ -3635,6 +3641,7 @@ internal static unsafe class GeneratedCmsgDispatch
         }
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_READ_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleReadItem_CMSG_READ_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_RECLAIM_CORPSE] = &Thunk_HermesProxy_World_Server_Systems_MiscSystem_HandleReclaimCorpse_CMSG_RECLAIM_CORPSE;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REFORGE_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleReforgeItem_CMSG_REFORGE_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REMOVE_GLYPH] = &Thunk_HermesProxy_World_Server_Systems_TalentSystem_HandleRemoveGlyph_CMSG_REMOVE_GLYPH;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REORDER_CHARACTERS] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleReorderCharacters_CMSG_REORDER_CHARACTERS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_REPAIR_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleRepairItem_CMSG_REPAIR_ITEM;
@@ -4144,6 +4151,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_READY_CHECK_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.CMSG_READ_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_RECLAIM_CORPSE,
+            global::HermesProxy.World.Enums.Opcode.CMSG_REFORGE_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_REMOVE_GLYPH,
             global::HermesProxy.World.Enums.Opcode.CMSG_REORDER_CHARACTERS,
             global::HermesProxy.World.Enums.Opcode.CMSG_REPAIR_ITEM,

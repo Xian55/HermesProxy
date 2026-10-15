@@ -24,6 +24,9 @@ public enum ItemField
     ITEM_FIELD_DURATION = ObjectField.OBJECT_END + 0x0009, // Size: 1, Type: INT, Flags: OWNER, UNUSED1
     ITEM_FIELD_SPELL_CHARGES = ObjectField.OBJECT_END + 0x000A, // Size: 5, Type: INT, Flags: OWNER, UNUSED1
     ITEM_FIELD_FLAGS = ObjectField.OBJECT_END + 0x000F, // Size: 1, Type: INT, Flags: PUBLIC
+    // The 15 enchantment slots as one field, (id, duration, charges) each, as the reader takes it;
+    // without the name the reader skipped every 4.3.4 item's enchantment slots.
+    ITEM_FIELD_ENCHANTMENT = ObjectField.OBJECT_END + 0x0010,
     ITEM_FIELD_ENCHANTMENT_1_1 = ObjectField.OBJECT_END + 0x0010, // Size: 2, Type: INT, Flags: PUBLIC
     ITEM_FIELD_ENCHANTMENT_1_3 = ObjectField.OBJECT_END + 0x0012, // Size: 1, Type: TWO_SHORT, Flags: PUBLIC
     ITEM_FIELD_ENCHANTMENT_2_1 = ObjectField.OBJECT_END + 0x0013, // Size: 2, Type: INT, Flags: PUBLIC

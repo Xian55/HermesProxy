@@ -1030,3 +1030,20 @@ public sealed class ItemPurchaseRefundResult : ServerPacket
     public byte Result;
     public ItemPurchaseContents? Contents;
 }
+
+// The reforger, the item's bag and slot, and the ItemReforge row (0 takes a reforge off).
+public readonly record struct ReforgeItem(WowGuid128 ReforgerGUID, uint ContainerId, uint SlotNum, uint ItemReforgeRecId);
+
+// Whether the reforge went through: one bit on 4.3.4 and on 4.4.2.
+public sealed class ReforgeResult : ServerPacket
+{
+    public ReforgeResult() : base(Opcode.SMSG_REFORGE_RESULT) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteBit(Success);
+        _worldPacket.FlushBits();
+    }
+
+    public bool Success;
+}

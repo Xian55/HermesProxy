@@ -297,3 +297,20 @@ public static class ItemPurchaseRefundCodec
     public static void Read(ref SpanPacketReader r, out ItemPurchaseRefund packet)
         => packet = new ItemPurchaseRefund(r.ReadPackedGuid128());
 }
+
+/// <summary>
+/// The reforger, the bag, the slot and the ItemReforge row (docs/protocol/4.4.2.60895; TrinityCore
+/// cata_classic ReforgeItem::Read). Only the 4.4.2 client has the opcode.
+/// </summary>
+public static class ReforgeItemCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out ReforgeItem packet)
+    {
+        WowGuid128 reforger = r.ReadPackedGuid128();
+        uint containerId = r.ReadUInt32();
+        uint slotNum = r.ReadUInt32();
+        uint itemReforgeRecId = r.ReadUInt32();
+        packet = new ReforgeItem(reforger, containerId, slotNum, itemReforgeRecId);
+    }
+}

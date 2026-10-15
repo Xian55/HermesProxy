@@ -44,6 +44,14 @@ public static class NpcSystem
     [HandlesCmsg(Opcode.CMSG_TALK_TO_GOSSIP)]
     public static void HandleTalkToGossip(in InteractWithNPC interact, in SessionContext ctx)
     {
+        // A 4.3.4 reforger has no gossip: its client opened the forge from the NPC flag alone. The
+        // 4.4.2 client asks with a gossip hello and waits for the window to be opened for it.
+        if (WorldClient.IsCataLegacy && ctx.GetSession().GameState.ReforgerGuids.Contains(interact.CreatureGUID))
+        {
+            ctx.SendPacket(new NpcInteractionOpenResult(interact.CreatureGUID, PlayerInteractionType.ForgeMaster));
+            return;
+        }
+
         // V3_4_3 re-talks to the same NPC right after RequestItems. Replay once
         // so the frame stays bound. A later talk is Cancel / the multi-quest list.
         if (ModernVersion.Build == HermesProxy.Enums.ClientVersionBuild.V3_4_3_54261

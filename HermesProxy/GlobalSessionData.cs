@@ -534,6 +534,8 @@ public sealed class GameSessionData
     public readonly ConcurrentDictionary<uint, byte> GoLockTemplateRequested = new();
     public HashSet<WowGuid64> DespawnedGameObjects = [];
     public HashSet<WowGuid128> HunterPetGuids = [];
+    // NPCs a 4.3.4 server flags as reforgers: their gossip hello opens the forge (NpcSystem).
+    public HashSet<WowGuid128> ReforgerGuids = [];
 
     // Pet GUID translation tables for cMaNGOS-style backends. MaNGOS-era TBC/WotLK
     // encodes Pet GUIDs with pet_number (a per-character spawn counter) in the entry

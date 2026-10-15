@@ -33,6 +33,9 @@ public class ItemData
     public int? Context;
     public ulong? ArtifactXP;
     public uint? ItemAppearanceModID;
+    // The ItemReforge row of a reforged item (0 for none): an enchantment on a 4.3.4 server, item
+    // modifier 58 on the 4.4.2 client.
+    public uint? Reforge;
 
     // Dynamic Fields
     public bool HasGemsUpdate;

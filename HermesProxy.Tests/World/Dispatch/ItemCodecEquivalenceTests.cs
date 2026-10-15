@@ -388,4 +388,15 @@ public class ItemCodecEquivalenceTests
         Assert.Equal(e.EnchantmentSlot, a.EnchantmentSlot);
         Assert.Equal(o.Remaining(), r.Remaining);
     }
+
+    // docs/protocol/4.4.2.60895: the reforger, the bag, the slot, the ItemReforge row.
+    [Fact]
+    public void ReforgeItem_ReadsReforgerBagSlotAndRow()
+    {
+        var (_, f) = Build(w => { w.WritePackedGuid128(Guid); w.WriteUInt32(255); w.WriteUInt32(23); w.WriteUInt32(113); });
+        var r = ReaderOver(f); ReforgeItemCodec.Read(ref r, out var a);
+        Assert.Equal(Guid, a.ReforgerGUID);
+        Assert.Equal((255u, 23u, 113u), (a.ContainerId, a.SlotNum, a.ItemReforgeRecId));
+        Assert.Equal(0, r.Remaining);
+    }
 }

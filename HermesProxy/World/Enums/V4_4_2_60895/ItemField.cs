@@ -174,10 +174,17 @@ public enum ItemField
                                  CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteCreateItemGemsBody))]
     ITEM_GEMS_BODY_CREATE,
 
-    // Trailing 6-bit zero write + FlushBits — ItemModList::WriteCreate for the
-    // Modifiers field (Values.size() == 0).
-    [DescriptorCreateBitsPlaceholder(0u, 6)]
-    ITEM_PAD_TRAILING_DYNAMIC_FIELDS,
+    // ItemModList::WriteCreate for the Modifiers field: a 6-bit count, FlushBits, each
+    // modifier's type and value. The only one carried is the reforge (modifier 58).
+    [DescriptorCreatePlaceholder(DescriptorType.UInt32,
+                                 CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteCreateItemModifiers))]
+    ITEM_MODIFIERS_CREATE,
+
+    // Modifiers, Update path (bit 19). TrinityCore cata_classic ItemData::WriteUpdate writes it
+    // last in block 0, after ItemBonusKey (21) and DEBUGItemLevel (22), hence the write order.
+    [DescriptorUpdateField(nameof(ItemData.Reforge), DescriptorType.UInt32, bit: 19, ParentBit = 0, WriteOrder = 22,
+                           CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateItemModifiers))]
+    ITEM_MODIFIERS_UPDATE,
 
     // -------------------------------------------------------------------------
     // Gems dynamic field, Update path. Two emit phases, mirroring UnitData's

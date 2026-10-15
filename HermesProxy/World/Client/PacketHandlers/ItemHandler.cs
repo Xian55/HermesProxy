@@ -419,4 +419,13 @@ public partial class WorldClient
         refund.Contents = refunded ? contents : null;
         SendPacketToClient(refund);
     }
+
+    // TrinityCore 4.3.4 ReforgeResult::Write: one bit, as on 4.4.2.
+    [HandlesSmsg(Opcode.SMSG_REFORGE_RESULT)]
+    internal void HandleReforgeResult(WorldPacket packet)
+    {
+        ReforgeResult result = new ReforgeResult();
+        result.Success = packet.HasBit();
+        SendPacketToClient(result);
+    }
 }

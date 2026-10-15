@@ -594,6 +594,9 @@ public enum Opcode : uint
 	SMSG_SET_PLAYER_DECLINED_NAMES_RESULT = 0x4E000Bu,
 	SMSG_SET_PROFICIENCY = 0x3B01D0u,
 	SMSG_SHOW_BANK = 0x3B030Bu,
+	// The same wire again, for a window the proxy opens with an interaction type of its choosing
+	// (NpcInteractionOpenResult): the reforger's forge.
+	SMSG_NPC_INTERACTION_OPEN_RESULT = 0x3B030Bu,
 	SMSG_SHOW_RATINGS = 0u,
 	SMSG_SOCKET_GEMS_SUCCESS = 0x3B01C2u,
 	// Same wire opcode as SMSG_SHOW_BANK / SMSG_BINDER_CONFIRM /

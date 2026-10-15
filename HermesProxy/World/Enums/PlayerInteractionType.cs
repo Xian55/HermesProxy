@@ -36,4 +36,6 @@ public enum PlayerInteractionType : int
     BlackMarketAuctioneer       = 27,
     AdventureMap                = 28,
     WorldMap                    = 29,
+    // TrinityCore cata_classic DBCEnums.h: the 4.4.2 client's reforging window.
+    ForgeMaster                 = 66,
 }

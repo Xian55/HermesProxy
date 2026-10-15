@@ -485,6 +485,41 @@ public partial class ObjectUpdateBuilder
         return size;
     }
 
+    // TrinityCore cata_classic ITEM_MODIFIER_REFORGE.
+    private const byte ItemModifierReforge = 58;
+
+    // ItemModList::WriteCreate: the count in 6 bits, then each modifier's type and value.
+    internal void WriteCreateItemModifiers(WorldPacket data, ItemData src)
+    {
+        bool reforged = src.Reforge is > 0;
+        data.WriteBits(reforged ? 1u : 0u, 6);
+        data.FlushBits();
+        if (reforged)
+        {
+            data.WriteUInt8(ItemModifierReforge);
+            data.WriteInt32((int)src.Reforge!.Value);
+        }
+        data.FlushBits();
+    }
+
+    // ItemModList::WriteUpdate with the whole list each time: its own one-bit mask, the values'
+    // count (6 bits) and a changed bit for each, then the values. A reforge of 0 empties the list.
+    internal void WriteUpdateItemModifiers(WorldPacket data, ItemData src)
+    {
+        bool reforged = src.Reforge is > 0;
+        data.WriteBits(1u, 1);
+        data.WriteBits(reforged ? 1u : 0u, 6);
+        if (reforged)
+            data.WriteBits(1u, 1);
+        data.FlushBits();
+        if (reforged)
+        {
+            data.WriteUInt8(ItemModifierReforge);
+            data.WriteInt32((int)src.Reforge!.Value);
+        }
+        data.FlushBits();
+    }
+
     internal void WriteCreateItemGemsSize(WorldPacket data, ItemData src)
     {
         data.WriteUInt32(GetItemGemsSize());

@@ -326,4 +326,23 @@ public static class ItemSystem
         packet.WriteGuid(request.ItemGUID.To64());
         ctx.SendPacketToServer(packet);
     }
+
+    // TrinityCore 4.3.4 ReforgeItem::Read: the reforge row, the slot, the bag, then the reforger as a
+    // masked GUID. The server checks the NPC by its own reforger flag, so no gossip has to come first.
+    [HandlesCmsg(Opcode.CMSG_REFORGE_ITEM)]
+    public static void HandleReforgeItem(in ReforgeItem reforge, in SessionContext ctx)
+    {
+        // The 4.4.2 client counts its backpack from slot 35, 4.3.4 from 23 (the ring in the 13th
+        // backpack slot came as 255/47 and was refused); a bag's own slots are the same on both.
+        byte container = (byte)reforge.ContainerId;
+        byte bag = container != Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy(container) : container;
+        byte slot = container == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustModernInventorySlotToLegacy((byte)reforge.SlotNum) : (byte)reforge.SlotNum;
+
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_REFORGE_ITEM);
+        packet.WriteUInt32(reforge.ItemReforgeRecId);
+        packet.WriteUInt32(slot);
+        packet.WriteUInt32(bag);
+        MaskedGuid.Write(packet, reforge.ReforgerGUID.To64().Low, [2, 6, 3, 4, 1, 0, 7, 5], [2, 3, 6, 4, 1, 0, 7, 5]);
+        ctx.SendPacketToServer(packet);
+    }
 }

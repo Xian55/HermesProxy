@@ -914,3 +914,29 @@ public class SpiritHealerConfirm : ServerPacket, ISpanWritable
 
     public WowGuid128 Guid;
 }
+
+/// <summary>
+/// A window the proxy opens itself, as a stock 4.4.2 realm opens it after the NPC's gossip option
+/// (TrinityCore cata_classic: GossipOptionNpc to PlayerInteractionType, StartInteraction): the NPC,
+/// the interaction type and whether it opened.
+/// </summary>
+public sealed class NpcInteractionOpenResult : ServerPacket
+{
+    public NpcInteractionOpenResult(WowGuid128 npc, PlayerInteractionType interactionType)
+        : base(Opcode.SMSG_NPC_INTERACTION_OPEN_RESULT, ConnectionType.Instance)
+    {
+        Npc = npc;
+        InteractionType = interactionType;
+    }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(Npc);
+        _worldPacket.WriteInt32((int)InteractionType);
+        _worldPacket.WriteBit(true);
+        _worldPacket.FlushBits();
+    }
+
+    public WowGuid128 Npc;
+    public PlayerInteractionType InteractionType;
+}

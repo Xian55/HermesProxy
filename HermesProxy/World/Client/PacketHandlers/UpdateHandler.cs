@@ -20,6 +20,9 @@ namespace HermesProxy.World.Client;
 
 public partial class WorldClient
 {
+    // TrinityCore 4.3.4 UNIT_NPC_FLAG_REFORGER.
+    private const uint CataNpcFlagReforger = 0x08000000;
+
     private static readonly Microsoft.Extensions.Logging.ILogger _melObjLifeClient =
         Log.CreateMelLogger(Log.CategoryServer);
 
@@ -2957,6 +2960,27 @@ public partial class WorldClient
                     updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Prop4] = ReadEnchantData(Enums.TBC.EnchantmentSlot.Prop4);
 
                 }
+                else if (IsCataLegacy)
+                {
+                    // Read the WotLK way, a 4.3.4 item's engineering, reforge and transmogrification
+                    // landed in the random-property slots and its random properties after them.
+                    updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Perm] = ReadEnchantData(Enums.Cata.EnchantmentSlot.Perm);
+                    updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Temp] = ReadEnchantData(Enums.Cata.EnchantmentSlot.Temp);
+                    updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Sock1] = ReadEnchantData(Enums.Cata.EnchantmentSlot.Sock1);
+                    updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Sock2] = ReadEnchantData(Enums.Cata.EnchantmentSlot.Sock2);
+                    updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Sock3] = ReadEnchantData(Enums.Cata.EnchantmentSlot.Sock3);
+                    updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Bonus] = ReadEnchantData(Enums.Cata.EnchantmentSlot.Bonus);
+                    updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Prismatic] = ReadEnchantData(Enums.Cata.EnchantmentSlot.Prismatic);
+                    updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Use] = ReadEnchantData(Enums.Cata.EnchantmentSlot.Engineering);
+                    updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Prop0] = ReadEnchantData(Enums.Cata.EnchantmentSlot.Prop0);
+                    updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Prop1] = ReadEnchantData(Enums.Cata.EnchantmentSlot.Prop1);
+                    updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Prop2] = ReadEnchantData(Enums.Cata.EnchantmentSlot.Prop2);
+                    updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Prop3] = ReadEnchantData(Enums.Cata.EnchantmentSlot.Prop3);
+                    updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Prop4] = ReadEnchantData(Enums.Cata.EnchantmentSlot.Prop4);
+                    // The reforge is no enchantment on the 4.4.2 client but an item modifier.
+                    if (ReadEnchantData(Enums.Cata.EnchantmentSlot.Reforge) is { ID: int reforge })
+                        updateData.ItemData.Reforge = (uint)reforge;
+                }
                 else
                 {
                     updateData.ItemData.Enchantment[Enums.Classic.EnchantmentSlot.Perm] = ReadEnchantData(Enums.WotLK.EnchantmentSlot.Perm);
@@ -3487,7 +3511,15 @@ public partial class WorldClient
                 }
                 else
                 {
-                    updateData.UnitData.EnsureNpcFlags()[0] = updates[UNIT_NPC_FLAGS].UInt32Value;
+                    uint npcFlags = updates[UNIT_NPC_FLAGS].UInt32Value;
+                    // TrinityCore 4.3.4 UNIT_NPC_FLAG_REFORGER. The 4.4.2 client reads the bit as another
+                    // flag and opens the forge only when told to, after a gossip hello (NpcSystem).
+                    if (IsCataLegacy && (npcFlags & CataNpcFlagReforger) != 0)
+                    {
+                        npcFlags = (npcFlags & ~CataNpcFlagReforger) | (uint)NPCFlags.Gossip;
+                        GetSession().GameState.ReforgerGuids.Add(guid);
+                    }
+                    updateData.UnitData.EnsureNpcFlags()[0] = npcFlags;
                 }
             }
             int UNIT_NPC_EMOTESTATE = LegacyVersion.GetUpdateField(UnitField.UNIT_NPC_EMOTESTATE);
