@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Framework.IO;
+using HermesProxy.World.Dispatch;
 
 namespace HermesProxy.World.Server.Packets;
 
@@ -23,6 +24,27 @@ public static class LearnPreviewTalentsCodec
             talents.Add(new TalentEntry { TalentID = talentId, Rank = rank });
         }
         packet = new LearnPreviewTalents(talentTab, talents);
+    }
+}
+
+/// <summary>
+/// The pet, the count of (talent, rank) pairs, then the pairs (docs/protocol/4.4.2.60895). Only
+/// the 4.4.2 client has the opcode.
+/// </summary>
+public static class LearnPreviewTalentsPetCodec
+{
+    public static void Read(ref SpanPacketReader r, out LearnPreviewTalentsPet packet)
+    {
+        WowGuid128 petGuid = r.ReadPackedGuid128();
+        uint count = r.ReadUInt32();
+        var talents = new List<TalentEntry>(CodecHelpers.WireCountCapacity(count, in r, 8));
+        for (uint i = 0; i < count; i++)
+        {
+            uint talentId = r.ReadUInt32();
+            uint rank = r.ReadUInt32();
+            talents.Add(new TalentEntry { TalentID = talentId, Rank = rank });
+        }
+        packet = new LearnPreviewTalentsPet(petGuid, talents);
     }
 }
 

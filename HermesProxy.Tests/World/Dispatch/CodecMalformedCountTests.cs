@@ -92,6 +92,28 @@ public class CodecMalformedCountTests
         Assert.IsNotType<OutOfMemoryException>(caught);
     }
 
+    [Theory]
+    [InlineData(0x7FFFFFFFu)]
+    [InlineData(0xFFFFFFFFu)]
+    public void LearnPreviewTalentsPet_AbsurdCount_ThrowsOnUnderflowWithoutReserving(uint count)
+    {
+        byte[] payload = [0, 0, .. BitConverter.GetBytes(count)];
+
+        Exception? caught = null;
+        try
+        {
+            var r = ReaderOver(payload);
+            LearnPreviewTalentsPetCodec.Read(ref r, out _);
+        }
+        catch (Exception e)
+        {
+            caught = e;
+        }
+
+        Assert.NotNull(caught);
+        Assert.IsNotType<OutOfMemoryException>(caught);
+    }
+
     /// <summary>A well-formed list still round-trips, so the clamp never costs a real packet.</summary>
     [Fact]
     public void QueryPlayerNames_WellFormed_ReadsEveryGuid()

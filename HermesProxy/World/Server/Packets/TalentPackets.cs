@@ -47,6 +47,9 @@ public readonly record struct LearnPetTalent(WowGuid128 PetGUID, uint TalentID, 
 // already chosen) and the talents picked in it.
 public readonly record struct LearnPreviewTalents(int TalentTab, List<TalentEntry> Talents);
 
+// The pet talent window's Learn: the pet and its (talent, rank) pairs.
+public readonly record struct LearnPreviewTalentsPet(WowGuid128 PetGUID, List<TalentEntry> Talents);
+
 // The Cataclysm talent window's specialization choice, made before a point is spent.
 public readonly record struct SetPrimaryTalentTree(uint TalentTab);
 

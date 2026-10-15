@@ -473,6 +473,18 @@ public class SpellCodecEquivalenceTests
     }
 
     [Fact]
+    public void LearnPreviewTalentsPet_ReadsPetAndPairs()
+    {
+        var (_, f) = Build(w => { w.WritePackedGuid128(Guid); w.WriteUInt32(2); w.WriteUInt32(1388); w.WriteUInt32(0); w.WriteUInt32(1387); w.WriteUInt32(1); });
+        var r = ReaderOver(f); LearnPreviewTalentsPetCodec.Read(ref r, out var a);
+        Assert.Equal(Guid, a.PetGUID);
+        Assert.Equal(2, a.Talents.Count);
+        Assert.Equal((1388u, 0u), (a.Talents[0].TalentID, a.Talents[0].Rank));
+        Assert.Equal((1387u, 1u), (a.Talents[1].TalentID, a.Talents[1].Rank));
+        Assert.Equal(0, r.Remaining);
+    }
+
+    [Fact]
     public void SetPrimaryTalentTree_ReadsTab()
     {
         var (_, f) = Build(w => w.WriteUInt32(811));

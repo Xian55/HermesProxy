@@ -49,6 +49,23 @@ public static class TalentSystem
         ctx.SendPacketToServer(packet);
     }
 
+    // The pet talent window's Learn. TrinityCore 4.3.4 HandleLearnPreviewTalentsPet (and 3.3.5a)
+    // read the pet's full GUID, the count and the pairs. It had no handler, so a pet never learned
+    // a talent through the window.
+    [HandlesCmsg(Opcode.CMSG_LEARN_PREVIEW_TALENTS_PET)]
+    public static void HandleLearnPreviewTalentsPet(in LearnPreviewTalentsPet learn, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_LEARN_PREVIEW_TALENTS_PET);
+        packet.WriteGuid(learn.PetGUID.To64(ctx.GetSession().GameState));
+        packet.WriteUInt32((uint)learn.Talents.Count);
+        foreach (TalentEntry talent in learn.Talents)
+        {
+            packet.WriteUInt32(talent.TalentID);
+            packet.WriteUInt32(talent.Rank);
+        }
+        ctx.SendPacketToServer(packet);
+    }
+
     // Choosing a specialization before the first point. TrinityCore 4.3.4 leaves
     // CMSG_SET_PRIMARY_TALENT_TREE unhandled and takes the choice from a talent preview's tab, so
     // it goes out as a preview with no talents. A 3.3.5a server has no specializations.

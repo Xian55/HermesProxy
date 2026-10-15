@@ -1507,6 +1507,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.TalentSystem.HandleLearnPreviewTalents(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_TalentSystem_HandleLearnPreviewTalentsPet_CMSG_LEARN_PREVIEW_TALENTS_PET(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.LearnPreviewTalentsPetCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.TalentSystem.HandleLearnPreviewTalentsPet(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleLearnTalent_CMSG_LEARN_TALENT(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.LearnTalentCodec.Read(ref reader, out var packet);
@@ -3458,6 +3464,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_PURCHASE_REFUND] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleItemPurchaseRefund_CMSG_ITEM_PURCHASE_REFUND;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_TEXT_QUERY] = &Thunk_HermesProxy_World_Server_Systems_QuerySystem_HandleItemTextQuery_CMSG_ITEM_TEXT_QUERY;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_PREVIEW_TALENTS] = &Thunk_HermesProxy_World_Server_Systems_TalentSystem_HandleLearnPreviewTalents_CMSG_LEARN_PREVIEW_TALENTS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_PREVIEW_TALENTS_PET] = &Thunk_HermesProxy_World_Server_Systems_TalentSystem_HandleLearnPreviewTalentsPet_CMSG_LEARN_PREVIEW_TALENTS_PET;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_TALENT] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleLearnTalent_CMSG_LEARN_TALENT;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LEAVE_GROUP] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleLeaveGroup_CMSG_LEAVE_GROUP;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_LFG_LIST_GET_STATUS] = &Thunk_HermesProxy_World_Server_Systems_LfgSystem_HandleLFGListGetStatus_CMSG_LFG_LIST_GET_STATUS;
@@ -4031,6 +4038,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_PURCHASE_REFUND,
             global::HermesProxy.World.Enums.Opcode.CMSG_ITEM_TEXT_QUERY,
             global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_PREVIEW_TALENTS,
+            global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_PREVIEW_TALENTS_PET,
             global::HermesProxy.World.Enums.Opcode.CMSG_LEARN_TALENT,
             global::HermesProxy.World.Enums.Opcode.CMSG_LEAVE_GROUP,
             global::HermesProxy.World.Enums.Opcode.CMSG_LFG_LIST_GET_STATUS,
