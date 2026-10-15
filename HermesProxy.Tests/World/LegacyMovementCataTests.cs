@@ -142,6 +142,23 @@ public sealed class LegacyMovementCataTests
         Assert.Equal(0, read.GetRemainingSpan().Length);
     }
 
+    [Theory]
+    [InlineData("E11807F00000C84141", 25f)]
+    [InlineData("E11807F00000204041", 2.5f)]
+    public void SplineMoveSetWalkSpeed_AsATrinityCore434ServerSentIt(string hex, float expected)
+    {
+        // A hunter's pet (pet number 6) given a walk speed while it followed its owner. TrinityCore
+        // 4.3.4 sends it as SMSG_SPLINE_MOVE_SET_WALK_SPEED (0x34A5); the opcode table had it under
+        // WowPacketParser's name for it, a walk-back speed, which no handler takes.
+        using var read = Framed(Convert.FromHexString(hex));
+
+        Assert.True(LegacyMovementCata.TryRead(read, Opcode.SMSG_MOVE_SPLINE_SET_WALK_SPEED, null!, out ulong mover, out _, out _, out float speed));
+
+        Assert.Equal(0xF140000600000019ul, mover);
+        Assert.Equal(expected, speed);
+        Assert.Equal(0, read.GetRemainingSpan().Length);
+    }
+
     [Fact]
     public void MoveUpdateWalkSpeed_AsATrinityCore434ServerSentIt()
     {

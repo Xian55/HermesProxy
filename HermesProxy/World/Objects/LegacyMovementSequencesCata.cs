@@ -272,7 +272,7 @@ public static class LegacyMovementSequencesCata
             [Opcode.SMSG_MOVE_UPDATE_SWIM_SPEED] = MovementUpdateSwimSpeed,
             [Opcode.SMSG_MOVE_UPDATE_SWIM_BACK_SPEED] = MoveUpdateSwimBackSpeed,
             [Opcode.SMSG_MOVE_UPDATE_WALK_SPEED] = MovementUpdateWalkSpeed,
-            [Opcode.SMSG_MOVE_SPLINE_SET_WALK_BACK_SPEED] = SplineMoveSetWalkSpeed,
+            [Opcode.SMSG_MOVE_SPLINE_SET_WALK_SPEED] = SplineMoveSetWalkSpeed,
             [Opcode.SMSG_MOVE_SPLINE_SET_RUN_SPEED] = SplineMoveSetRunSpeed,
             [Opcode.SMSG_MOVE_SPLINE_SET_RUN_BACK_SPEED] = SplineMoveSetRunBackSpeed,
             [Opcode.SMSG_MOVE_SPLINE_SET_SWIM_SPEED] = SplineMoveSetSwimSpeed,

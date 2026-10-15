@@ -978,8 +978,8 @@ public enum Opcode : uint
     SMSG_MOVE_SPLINE_SET_SWIM_BACK_SPEED                  = 0x59A1,
     SMSG_MOVE_SPLINE_SET_SWIM_SPEED                       = 0x39A4,
     SMSG_MOVE_SPLINE_SET_TURN_RATE                        = 0x78B5,
-    SMSG_MOVE_SPLINE_SET_WALK_BACK_SPEED                  = 0x34A5,
     SMSG_MOVE_SPLINE_SET_WALK_MODE                        = 0x54B6,
+    SMSG_MOVE_SPLINE_SET_WALK_SPEED                       = 0x34A5, // TrinityCore 4.3.4's SMSG_SPLINE_MOVE_SET_WALK_SPEED; WowPacketParser calls it WALK_BACK, a speed 4.3.4 does not have
     SMSG_MOVE_SPLINE_SET_WATER_WALK                       = 0x50A2,
     SMSG_MOVE_SPLINE_START_SWIM                           = 0x31A5,
     SMSG_MOVE_SPLINE_STOP_SWIM                            = 0x1DA2,
