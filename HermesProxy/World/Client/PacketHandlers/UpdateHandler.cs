@@ -3653,6 +3653,27 @@ public partial class WorldClient
                 updateData.UnitData.RangedAttackPowerModPos = (short)rapMods;
                 updateData.UnitData.RangedAttackPowerModNeg = (short)(rapMods >> 16);
             }
+            if (IsCataLegacy)
+            {
+                // 4.3.4 has a field each for what buffs add and debuffs take, the latter as a
+                // positive amount (TrinityCore 4.3.4 UpdateAttackPowerAndDamage). The 4.4.2 client
+                // adds both mods to the base, so that one goes in negative.
+                int AP_MOD_POS = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_ATTACK_POWER_MOD_POS);
+                if (AP_MOD_POS >= 0 && updateMaskArray[AP_MOD_POS])
+                    updateData.UnitData.AttackPowerModPos = updates[AP_MOD_POS].Int32Value;
+                int AP_MOD_NEG = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_ATTACK_POWER_MOD_NEG);
+                if (AP_MOD_NEG >= 0 && updateMaskArray[AP_MOD_NEG])
+                    updateData.UnitData.AttackPowerModNeg = -updates[AP_MOD_NEG].Int32Value;
+                int AP_MULTIPLIER = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_ATTACK_POWER_MULTIPLIER);
+                if (AP_MULTIPLIER >= 0 && updateMaskArray[AP_MULTIPLIER])
+                    updateData.UnitData.AttackPowerMultiplier = updates[AP_MULTIPLIER].FloatValue;
+                int RAP_MOD_POS = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RANGED_ATTACK_POWER_MOD_POS);
+                if (RAP_MOD_POS >= 0 && updateMaskArray[RAP_MOD_POS])
+                    updateData.UnitData.RangedAttackPowerModPos = updates[RAP_MOD_POS].Int32Value;
+                int RAP_MOD_NEG = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RANGED_ATTACK_POWER_MOD_NEG);
+                if (RAP_MOD_NEG >= 0 && updateMaskArray[RAP_MOD_NEG])
+                    updateData.UnitData.RangedAttackPowerModNeg = -updates[RAP_MOD_NEG].Int32Value;
+            }
             int UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER);
             if (UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER >= 0 && updateMaskArray[UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER])
             {
