@@ -384,9 +384,87 @@ public partial class WorldClient
         return (slot & 0xFF000000) != 0 ? slot : LfgSlots.PackSlot(LfgSlots.LfgTypeDungeon, slot);
     }
 
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>LFGProposalUpdate::Write</c>: the ticket's numbers, the masks of the
+    /// ticket's GUID and of the instance's around the silent flag and the members' five flags,
+    /// then the GUIDs' bytes with every member's roles in the middle.
+    /// </summary>
+    internal void HandleLFGProposalUpdateCata(WorldPacket packet)
+    {
+        uint time = packet.ReadUInt32();
+        uint completedMask = packet.ReadUInt32();
+        uint id = packet.ReadUInt32();
+        uint type = packet.ReadUInt32();
+        uint slot = packet.ReadUInt32();
+        uint proposalId = packet.ReadUInt32();
+        byte state = packet.ReadUInt8();
+
+        Span<bool> ticketMask = stackalloc bool[8];
+        Span<bool> instanceMask = stackalloc bool[8];
+        MaskedGuid.ReadMaskBits(packet, instanceMask, [4]);
+        MaskedGuid.ReadMaskBits(packet, ticketMask, [3, 7, 0]);
+        MaskedGuid.ReadMaskBits(packet, instanceMask, [1]);
+        bool silent = packet.HasBit();
+        MaskedGuid.ReadMaskBits(packet, ticketMask, [4, 5]);
+        MaskedGuid.ReadMaskBits(packet, instanceMask, [3]);
+        int playerCount = (int)packet.ReadBits<uint>(23);
+        MaskedGuid.ReadMaskBits(packet, instanceMask, [7]);
+        if (playerCount > MaxLfgEntries)
+            return;
+
+        DFProposalUpdate prop = new DFProposalUpdate();
+        for (int i = 0; i < playerCount; i++)
+        {
+            DFProposalPlayer player = new DFProposalPlayer();
+            player.SameParty = packet.HasBit();
+            player.MyParty = packet.HasBit();
+            player.Accepted = packet.HasBit();
+            player.Responded = packet.HasBit();
+            player.Me = packet.HasBit();
+            prop.Players.Add(player);
+        }
+        MaskedGuid.ReadMaskBits(packet, instanceMask, [5]);
+        MaskedGuid.ReadMaskBits(packet, ticketMask, [6]);
+        MaskedGuid.ReadMaskBits(packet, instanceMask, [2, 6]);
+        MaskedGuid.ReadMaskBits(packet, ticketMask, [2, 1]);
+        MaskedGuid.ReadMaskBits(packet, instanceMask, [0]);
+
+        Span<byte> ticketBytes = stackalloc byte[8];
+        Span<byte> instanceBytes = stackalloc byte[8];
+        MaskedGuid.ReadBytes(packet, ticketMask, ticketBytes, [5]);
+        MaskedGuid.ReadBytes(packet, instanceMask, instanceBytes, [3, 6]);
+        MaskedGuid.ReadBytes(packet, ticketMask, ticketBytes, [6, 0]);
+        MaskedGuid.ReadBytes(packet, instanceMask, instanceBytes, [5]);
+        MaskedGuid.ReadBytes(packet, ticketMask, ticketBytes, [1]);
+        foreach (DFProposalPlayer player in prop.Players)
+            player.Roles = (byte)packet.ReadUInt32();
+        MaskedGuid.ReadBytes(packet, instanceMask, instanceBytes, [7]);
+        MaskedGuid.ReadBytes(packet, ticketMask, ticketBytes, [4]);
+        MaskedGuid.ReadBytes(packet, instanceMask, instanceBytes, [0, 1]);
+        MaskedGuid.ReadBytes(packet, ticketMask, ticketBytes, [2, 7]);
+        MaskedGuid.ReadBytes(packet, instanceMask, instanceBytes, [2]);
+        MaskedGuid.ReadBytes(packet, ticketMask, ticketBytes, [3]);
+        MaskedGuid.ReadBytes(packet, instanceMask, instanceBytes, [4]);
+
+        prop.Ticket = CataLfgTicket(MaskedGuid.ToUInt64(ticketBytes), id, type, time);
+        prop.InstanceID = MaskedGuid.ToUInt64(instanceBytes);
+        prop.ProposalID = proposalId;
+        prop.Slot = GetSession().GameState.GetLfgSlotForDungeon(slot);
+        prop.State = (sbyte)state;
+        prop.CompletedMask = completedMask;
+        prop.ProposalSilent = silent;
+        SendPacketToClient(prop);
+    }
+
     [HandlesSmsg(Opcode.SMSG_LFG_PROPOSAL_UPDATE)]
     internal void HandleLFGProposalUpdate(WorldPacket packet)
     {
+        if (IsCataLegacy)
+        {
+            HandleLFGProposalUpdateCata(packet);
+            return;
+        }
+
         DFProposalUpdate prop = new DFProposalUpdate();
         prop.Ticket = MakeLfgTicket();
         uint dungeonEntry = packet.ReadUInt32();
@@ -770,9 +848,39 @@ public partial class WorldClient
         }
     }
 
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>LFGPlayerReward::Write</c>: the two dungeons, money and XP with none of
+    /// 3.3.5a's fillers, and each reward carries whether it is a currency.
+    /// </summary>
+    internal void HandleLFGPlayerRewardCata(WorldPacket packet)
+    {
+        LFGPlayerReward reward = new LFGPlayerReward();
+        reward.QueuedSlot = GetSession().GameState.GetLfgSlotForDungeon(packet.ReadUInt32());
+        reward.ActualSlot = GetSession().GameState.GetLfgSlotForDungeon(packet.ReadUInt32());
+        reward.RewardMoney = (int)packet.ReadUInt32();
+        reward.AddedXP = (int)packet.ReadUInt32();
+        byte count = packet.ReadUInt8();
+        for (int i = 0; i < count; i++)
+        {
+            LFGPlayerRewardItem item = new LFGPlayerRewardItem();
+            item.ItemID = packet.ReadUInt32();
+            packet.ReadUInt32();    // display id
+            item.Quantity = packet.ReadUInt32();
+            item.IsCurrency = packet.ReadUInt8() != 0;
+            reward.Rewards.Add(item);
+        }
+        SendPacketToClient(reward);
+    }
+
     [HandlesSmsg(Opcode.SMSG_LFG_PLAYER_REWARD)]
     internal void HandleLFGPlayerReward(WorldPacket packet)
     {
+        if (IsCataLegacy)
+        {
+            HandleLFGPlayerRewardCata(packet);
+            return;
+        }
+
         LFGPlayerReward reward = new LFGPlayerReward();
         reward.QueuedSlot = packet.ReadUInt32();        // rdungeonEntry
         reward.ActualSlot = packet.ReadUInt32();        // sdungeonEntry

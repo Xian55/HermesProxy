@@ -242,6 +242,84 @@ public sealed class CataLfgTests
         Assert.Equal(Convert.FromHexString("00000000 360FCF6A 03000000 D5000000 20 03".Replace(" ", "")), leave.GetDataSpan().ToArray());
     }
 
+    [Fact]
+    public void HandleLFGProposalUpdateCata_ADungeonFoundForOne()
+    {
+        // TrinityCore 4.3.4 LFGProposalUpdate::Write: proposal 7 for the queue above, state
+        // initiating, one member (this player, a damage dealer, not answered yet), no instance
+        var prop = Deliver<DFProposalUpdate>(packet =>
+        {
+            packet.WriteUInt32(0x6ACF0F36);                         // ticket time
+            packet.WriteUInt32(0x5);                                // completed mask
+            packet.WriteUInt32(213);                                // ticket id
+            packet.WriteUInt32(3);                                  // ticket type
+            packet.WriteUInt32(QueuedSlot);
+            packet.WriteUInt32(7);                                  // proposal
+            packet.WriteUInt8(0);                                   // state
+            // instance[4], requester[3], [7], [0], instance[1], silent, requester[4], [5], instance[3]
+            foreach (bool bit in new[] { false, false, false, true, false, false, false, false, false })
+                packet.WriteBit(bit);
+            packet.WriteBits(1u, 23);
+            packet.WriteBit(false);                                 // instance[7]
+            // SameParty, MyParty, Accepted, Responded, Me
+            foreach (bool bit in new[] { false, false, false, false, true })
+                packet.WriteBit(bit);
+            for (int i = 0; i < 7; i++)
+                packet.WriteBit(false);                             // the GUIDs' last mask bits
+            packet.FlushBits();
+            packet.WriteUInt8(0x02 ^ 1);                            // requester[0]
+            packet.WriteUInt32(0x08);                               // roles
+        }, _harness.Client.HandleLFGProposalUpdateCata);
+
+        Assert.Equal(7u, prop.ProposalID);
+        Assert.Equal(QueuedSlot, prop.Slot);
+        Assert.Equal(0, prop.State);
+        Assert.Equal(0x5u, prop.CompletedMask);
+        Assert.Equal(0ul, prop.InstanceID);
+        Assert.False(prop.ProposalSilent);
+        DFProposalPlayer me = Assert.Single(prop.Players);
+        Assert.True(me.Me);
+        Assert.False(me.Responded);
+        Assert.Equal(0x08, me.Roles);
+        Assert.Equal(213u, _harness.Session.GameState.LfgServerTicket!.Id);
+        Assert.Equal(_harness.Session.GameState.CurrentPlayerGuid, _harness.Session.GameState.LfgServerTicket!.RequesterGuid);
+    }
+
+    [Fact]
+    public void WriteProposalResultCata_AnAcceptAsItGoesToTheServer()
+    {
+        using var accept = new WorldPacket();
+        LfgSystem.WriteProposalResultCata(accept, 7, true, new RideTicket { RequesterGuid = _harness.Session.GameState.CurrentPlayerGuid, Id = 213, Type = (RideType)3, Time = 0x6ACF0F36 });
+
+        // the ticket's mask has byte 0 alone, the instance's mask is empty with the answer second
+        Assert.Equal(Convert.FromHexString("07000000 360FCF6A 03000000 D5000000 20 03 4000".Replace(" ", "")), accept.GetDataSpan().ToArray());
+    }
+
+    [Fact]
+    public void HandleLFGPlayerRewardCata_MoneyXpAnItemAndJusticePoints()
+    {
+        var reward = Deliver<LFGPlayerReward>(packet =>
+        {
+            packet.WriteUInt32(QueuedSlot);
+            packet.WriteUInt32(Slot(LfgSlots.LfgTypeDungeon, 6));
+            packet.WriteUInt32(4500);
+            packet.WriteUInt32(1200);
+            packet.WriteUInt8(2);
+            packet.WriteUInt32(51999); packet.WriteUInt32(31337); packet.WriteUInt32(1); packet.WriteUInt8(0);
+            packet.WriteUInt32(395); packet.WriteUInt32(0); packet.WriteUInt32(7000); packet.WriteUInt8(1);
+        }, _harness.Client.HandleLFGPlayerRewardCata);
+
+        Assert.Equal(QueuedSlot, reward.QueuedSlot);
+        Assert.Equal(Slot(LfgSlots.LfgTypeDungeon, 6), reward.ActualSlot);
+        Assert.Equal(4500, reward.RewardMoney);
+        Assert.Equal(1200, reward.AddedXP);
+        Assert.Equal(2, reward.Rewards.Count);
+        Assert.False(reward.Rewards[0].IsCurrency);
+        Assert.Equal(51999u, reward.Rewards[0].ItemID);
+        Assert.True(reward.Rewards[1].IsCurrency);
+        Assert.Equal(7000u, reward.Rewards[1].Quantity);
+    }
+
     [Theory]
     [InlineData(0x00, LfgJoinResults.ModernOk)]
     [InlineData(0x1B, LfgJoinResults.ModernRoleCheckFailed)]

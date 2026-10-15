@@ -250,9 +250,36 @@ public static class LfgSystem
             return;
 
         WorldPacket legacy = new WorldPacket(Opcode.CMSG_LFG_PROPOSAL_RESULT);
-        legacy.WriteUInt32(packet.ProposalID);
-        legacy.WriteUInt8((byte)(packet.Accepted ? 1 : 0));
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            var state = ctx.GetSession().GameState;
+            WriteProposalResultCata(legacy, packet.ProposalID, packet.Accepted, state.LfgServerTicket ?? state.GetOrCreateLfgTicket(state.CurrentPlayerGuid, 0));
+        }
+        else
+        {
+            legacy.WriteUInt32(packet.ProposalID);
+            legacy.WriteUInt8((byte)(packet.Accepted ? 1 : 0));
+        }
         ctx.SendPacketToServer(legacy);
+    }
+
+    /// <summary>
+    /// TrinityCore 4.3.4 <c>LFGProposalResponse::Read</c>: the proposal, the queue's ticket as the
+    /// server sent it, then the instance's masked GUID with the answer among its bits. The client
+    /// names no instance, and the server does not read the one it gets.
+    /// </summary>
+    internal static void WriteProposalResultCata(WorldPacket packet, uint proposalId, bool accepted, RideTicket ticket)
+    {
+        packet.WriteUInt32(proposalId);
+        packet.WriteUInt32((uint)ticket.Time);
+        packet.WriteUInt32((uint)ticket.Type);
+        packet.WriteUInt32(ticket.Id);
+        MaskedGuid.Write(packet, ticket.RequesterGuid.To64().Low, [4, 5, 0, 6, 2, 7, 1, 3], [7, 4, 3, 2, 6, 0, 1, 5]);
+        packet.WriteBit(false);
+        packet.WriteBit(accepted);
+        for (int i = 0; i < 7; i++)
+            packet.WriteBit(false);
+        packet.FlushBits();
     }
 
     [HandlesCmsg(Opcode.CMSG_LFG_LIST_GET_STATUS)]
