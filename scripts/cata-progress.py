@@ -712,6 +712,8 @@ LEGACY_REVIEWED = {
     ('C', 'MSG_LIST_STABLED_PETS'): 'HandleListStabledPetsOpcode: the stable master, nothing else',
     ('C', 'CMSG_LEARN_PREVIEW_TALENTS_PET'): 'HandleLearnPreviewTalentsPet: pet GUID, count, pairs as in 3.3.5a; '
         "WPP's 4.x change is the tab of CMSG_LEARN_PREVIEW_TALENTS, which shares its parser; a pet learned a talent in play",
+    ('C', 'CMSG_QUEST_GIVER_REQUEST_REWARD'): 'QuestGiverRequestReward::Read: the quest giver and the quest, as in 3.3.5a; '
+        'a delivery quest was handed in through it',
     ('S', 'MSG_CHANNEL_START'): 'ChannelStart::Write: two flags and what they announce, after everything read',
     ('S', 'MSG_MOVE_TELEPORT_ACK'): 'client to server only on 4.3.4; the teleport itself is MSG_MOVE_TELEPORT, ported',
     ('S', 'SMSG_DUEL_WINNER'): 'Player::DuelComplete: fled byte, loser, winner',
