@@ -86,7 +86,7 @@ Each of these has more than one codec, chosen by build range at table-build time
 anyone adding a client this is the short list worth checking first: a layout that already
 changed once is the most likely to have changed again.
 
-44 packets across 89 codecs.
+45 packets across 91 codecs.
 
 | packet | codec | axis | added in | removed in |
 |---|---|---|---|---|
@@ -179,6 +179,8 @@ changed once is the most likely to have changed again.
 | `UseToy` | `UseToyCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `UserClientUpdateAccountData` | `UserClientUpdateAccountDataCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `UserClientUpdateAccountData` | `UserClientUpdateAccountDataCodecPreCataClassic` | modern | — | `V4_4_2_60895` |
+| `WhoRequestPkt` | `WhoRequestPktCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
+| `WhoRequestPkt` | `WhoRequestPktCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
 
 ## 4. Exact-equality version checks — the new-client work list
 
