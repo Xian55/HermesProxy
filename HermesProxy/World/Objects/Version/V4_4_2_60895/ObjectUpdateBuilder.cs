@@ -193,11 +193,19 @@ public partial class ObjectUpdateBuilder
         // m_goTemplateAddon.WorldEffectID != 0 (rare special GOs with world-effect
         // overlays). HermesProxy doesn't track WorldEffectID, so we never set it.
         // If a GO surfaces that needs the bit, add a targeted check here.
+        // A ship or zeppelin is the exception on 4.4.2: the client follows its path only from
+        // the ShipPath this block carries (a native Cataclysm Classic create of The Bravery has
+        // it), and without one draws the boat where the create left it, never moving.
+        if (hasMoveInfo && IsShip)
+            _createBits |= CreateObjectBits.GameObject;
         if (_objectType == ObjectTypeBCC.ActivePlayer)
             _createBits |= CreateObjectBits.ActivePlayer | CreateObjectBits.ThisIsYou;
     }
 
     private bool Has(CreateObjectBits flag) => (_createBits & flag) != 0;
+
+    // GAMEOBJECT_TYPE_MAP_OBJ_TRANSPORT: boats and zeppelins on a taxi path.
+    private bool IsShip => _objectType == ObjectTypeBCC.GameObject && _updateData.GameObjectData?.TypeID == 15;
 
     internal void BuildMovementUpdate(WorldPacket data)
     {
@@ -301,9 +309,25 @@ public partial class ObjectUpdateBuilder
 
         if (Has(CreateObjectBits.GameObject))
         {
+            // TrinityCore cata_classic BuildMovementUpdate: WorldEffectID, then whether an int
+            // follows, a ship path, a transport state percent.
+            bool shipPath = IsShip;
             data.WriteUInt32(0u);
             data.WriteBit(false);
+            data.WriteBit(shipPath);
+            data.WriteBit(false);
             data.FlushBits();
+            if (shipPath)
+            {
+                // The time offset from ServerTime to the ship's own timer: none, since the
+                // ServerTime sent is the ship's timer itself (the legacy path progress).
+                data.WriteUInt32(0u);
+                data.WriteUInt32(0u);   // next stop
+                data.WriteBit(false);   // a stop requested
+                data.WriteBit(false);   // stopped
+                data.WriteBit(false);
+                data.FlushBits();
+            }
         }
 
         if (Has(CreateObjectBits.ActivePlayer))
