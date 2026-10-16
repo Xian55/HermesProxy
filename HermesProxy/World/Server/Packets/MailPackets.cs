@@ -214,8 +214,7 @@ internal abstract class AuctionMailBody
             if (mail.Auction is not { } record)
                 return mail.Body;
 
-            WowGuid128 guid = record.Counterparty;
-            string who = string.Create(CultureInfo.InvariantCulture, $"Player-{guid.GetRealmId()}-{guid.GetCounter():X8}");
+            string who = ClientGuidText.Of(record.Counterparty);
 
             switch (record.Type)
             {
