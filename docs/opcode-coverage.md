@@ -30,7 +30,7 @@ the proxy has no reason to translate.
 | `V1_14_1_40688` | 692 | 431 | 261 |
 | `V2_5_2_39570` | 691 | 430 | 261 |
 | `V2_5_3_41750` | 694 | 433 | 261 |
-| `V3_4_3_54261` | 455 | 410 | 45 |
+| `V3_4_3_54261` | 469 | 424 | 45 |
 
 ### Server to proxy (SMSG), by emulator build
 
@@ -38,7 +38,7 @@ the proxy has no reason to translate.
 |---|---:|---:|---:|
 | `V1_12_1_5875` | 363 | 271 | 92 |
 | `V2_4_3_8606` | 460 | 309 | 151 |
-| `V3_3_5a_12340` | 583 | 381 | 202 |
+| `V3_3_5a_12340` | 583 | 384 | 199 |
 
 ## 2. Version-ranged handlers
 
@@ -86,7 +86,7 @@ Each of these has more than one codec, chosen by build range at table-build time
 anyone adding a client this is the short list worth checking first: a layout that already
 changed once is the most likely to have changed again.
 
-45 packets across 91 codecs.
+46 packets across 93 codecs.
 
 | packet | codec | axis | added in | removed in |
 |---|---|---|---|---|
@@ -104,6 +104,8 @@ changed once is the most likely to have changed again.
 | `AutoBankItem` | `AutoBankItemCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `BuyItem` | `BuyItemCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
 | `BuyItem` | `BuyItemCodecWotLKClassic` | modern | `V3_4_3_54261` | — |
+| `CalendarUpdateEvent` | `CalendarUpdateEventCodecCataClassic` | modern | `V4_4_2_60895` | — |
+| `CalendarUpdateEvent` | `CalendarUpdateEventCodecPreCataClassic` | modern | — | `V4_4_2_60895` |
 | `CastSpell` | `CastSpellCodec` | modern | — | `V4_4_2_60895` |
 | `CastSpell` | `CastSpellCodecCataClassic` | modern | `V4_4_2_60895` | — |
 | `ChangeSubGroup` | `ChangeSubGroupCodecPreWotLKClassic` | modern | — | `V3_4_3_54261` |
