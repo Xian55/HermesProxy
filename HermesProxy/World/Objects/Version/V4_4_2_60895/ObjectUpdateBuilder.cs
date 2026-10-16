@@ -1298,6 +1298,8 @@ public partial class ObjectUpdateBuilder
             data.WriteUInt32(0u);
         for (int i = 0; i < projectCount; i++)
             data.WriteInt16((short)projects[i]);
+        if (blocks.IsBitSet(11) || blocks.IsBitSet(14))
+            WriteLaterDynamicMasks(data, ref blocks, src);
     }
 
     // A dynamic field's size and a changed bit for each element, in blocks of 32.
@@ -1320,8 +1322,9 @@ public partial class ObjectUpdateBuilder
     }
 
     // Dynamic-field payloads, in WPP wire order: KnownTitles (folded to 64-bit words),
-    // then Heirlooms[Count], HeirloomFlags[Count], then Toys[Count]. Counts were
-    // written earlier by the resize prefixes, so payload length has to agree with them.
+    // then Heirlooms[Count], HeirloomFlags[Count], Toys[Count], then (Transmog and
+    // ConditionalTransmog being empty) SelfResSpells. Counts were written earlier by the
+    // resize prefixes, so payload length has to agree with them.
     internal void WriteCreateActivePlayerDynamicPayloads(WorldPacket data, ActivePlayerData src)
     {
         Span<ulong> foldedTitles = stackalloc ulong[6];
@@ -1335,14 +1338,19 @@ public partial class ObjectUpdateBuilder
         var usableToys = _gameState.GetUsableToysOrdered();
         for (int i = 0; i < usableToys.Length; i++)
             data.WriteInt32((int)usableToys[i]);
+        WriteSelfResSpells(data, src);
     }
 
-    // Toys.Resize + the seven empty prefixes after it (Transmog through TaskQuests).
-    // Missing LearnedToys still writes Resize 0 so the later payload length stays valid.
+    // Toys.Resize and the seven prefixes after it, Transmog through TaskQuests, all empty but
+    // SelfResSpells. Missing LearnedToys still writes Resize 0 so the later payload length
+    // stays valid.
     internal void WriteCreateActivePlayerToyResizePrefixes(WorldPacket data, ActivePlayerData src)
     {
         data.WriteUInt32((uint)_gameState.GetUsableToysOrdered().Length);
-        for (int i = 0; i < 7; i++)
+        data.WriteUInt32(0u);   // Transmog
+        data.WriteUInt32(0u);   // ConditionalTransmog
+        data.WriteUInt32((uint)GetSelfResSpellCount(src));
+        for (int i = 0; i < 4; i++)
             data.WriteUInt32(0u);
     }
 
@@ -1555,12 +1563,34 @@ public partial class ObjectUpdateBuilder
 
     internal static int GetToyCount(ActivePlayerData src) => src.Toys?.Count ?? 0;
 
+    // TrinityCore cata_classic writes the masks of bits 6-21 (Toys, SelfResSpells) in a bit
+    // section of their own, after bits 1-5, the research masks and values, and a flush. Written
+    // straight after the 14-bit blocks mask they came one byte early, so the client read every
+    // body after them one byte late. The generator orders preambles by bit, research last: with
+    // research to send, its writer writes these masks at its end; otherwise the first of them does.
+    private static void WriteLaterDynamicMasks(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        data.FlushBits();
+        if (blocks.IsBitSet(11))
+        {
+            int count = GetToyCount(src);
+            data.WriteBits((uint)count, 32);
+            for (int i = 0; i < count; i++)
+                data.WriteBit(true);
+        }
+        if (blocks.IsBitSet(14))
+        {
+            int count = GetSelfResSpellCount(src);
+            data.WriteBits((uint)count, 32);
+            for (int i = 0; i < count; i++)
+                data.WriteBit(true);
+        }
+    }
+
     internal void WriteUpdateActivePlayerToysPreamble(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
     {
-        int count = GetToyCount(src);
-        data.WriteBits((uint)count, 32);
-        for (int i = 0; i < count; i++)
-            data.WriteBit(true);
+        if (!blocks.IsBitSet(23))
+            WriteLaterDynamicMasks(data, ref blocks, src);
     }
 
     internal void WriteUpdateActivePlayerToysBody(WorldPacket data, ActivePlayerData src)
@@ -1569,6 +1599,37 @@ public partial class ObjectUpdateBuilder
             return;
         foreach (int itemId in src.Toys)
             data.WriteInt32(itemId);
+    }
+
+    // A 4.3.4 server has one self-res spell field and clears it to 0, where the list goes empty.
+    internal static int GetSelfResSpellCount(ActivePlayerData src)
+    {
+        int count = 0;
+        if (src.SelfResSpells != null)
+            foreach (uint spellId in src.SelfResSpells)
+                if (spellId != 0)
+                    count++;
+        return count;
+    }
+
+    internal void WriteUpdateActivePlayerSelfResSpellsPreamble(WorldPacket data, ref Framework.Util.StackBitMask blocks, ActivePlayerData src)
+    {
+        if (!blocks.IsBitSet(11) && !blocks.IsBitSet(23))
+            WriteLaterDynamicMasks(data, ref blocks, src);
+    }
+
+    internal void WriteUpdateActivePlayerSelfResSpellsBody(WorldPacket data, ActivePlayerData src)
+    {
+        WriteSelfResSpells(data, src);
+    }
+
+    private static void WriteSelfResSpells(WorldPacket data, ActivePlayerData src)
+    {
+        if (src.SelfResSpells == null)
+            return;
+        foreach (uint spellId in src.SelfResSpells)
+            if (spellId != 0)
+                data.WriteInt32((int)spellId);
     }
 
     // Skill (bit 32) — nested SkillInfo write via existing WriteUpdateSkillInfo helper.

@@ -583,6 +583,12 @@ public enum ActivePlayerField
         customWriter: nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerToysPreamble))]
     ACTIVEPLAYER_TOYS_PREAMBLE,
 
+    // SelfResSpells (bit 14): what the death popup offers instead of releasing (Soulstone,
+    // Reincarnation), from a 4.3.4 server's PLAYER_SELF_RES_SPELL.
+    [DescriptorMaskPreamble(bit: 14,
+        customWriter: nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerSelfResSpellsPreamble))]
+    ACTIVEPLAYER_SELF_RES_SPELLS_PREAMBLE,
+
     // ResearchSites, ResearchSiteProgress, Research (bits 23-28): their masks and, flushed, their
     // values, all before the block's FlushBits, as TrinityCore cata_classic writes them.
     [DescriptorMaskPreamble(bit: 23,
@@ -593,6 +599,12 @@ public enum ActivePlayerField
         CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerToysBody),
         CustomPredicate = "src.Toys != null && src.Toys.Count > 0")]
     ACTIVEPLAYER_TOYS,
+
+    // An empty list is a change too: it takes the offer away once the player is back up.
+    [DescriptorUpdateField(nameof(ActivePlayerData.SelfResSpells), DescriptorType.Int32, bit: 14, ParentBit = 0,
+        CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerSelfResSpellsBody),
+        CustomPredicate = "src.SelfResSpells != null")]
+    ACTIVEPLAYER_SELF_RES_SPELLS,
 
     // ===========================================================================
     // Update — Block 0 scalars (group bit 0, bits 26-37)
