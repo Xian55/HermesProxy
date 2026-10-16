@@ -1602,6 +1602,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleMailListResult(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleMirrorImageData_SMSG_MIRROR_IMAGE_COMPONENTED_DATA(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleMirrorImageData(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleMonsterMove_SMSG_MONSTER_MOVE_TRANSPORT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleMonsterMove(packet);
@@ -3129,6 +3134,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_LOOT_START_ROLL] = &Thunk_HermesProxy_World_Client_WorldClient_HandleLootStartRoll_SMSG_LOOT_START_ROLL;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MAIL_COMMAND_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMailCommandResult_SMSG_MAIL_COMMAND_RESULT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MAIL_LIST_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMailListResult_SMSG_MAIL_LIST_RESULT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MIRROR_IMAGE_COMPONENTED_DATA] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMirrorImageData_SMSG_MIRROR_IMAGE_COMPONENTED_DATA;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MONSTER_MOVE_TRANSPORT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMonsterMove_SMSG_MONSTER_MOVE_TRANSPORT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOTD] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMotd_SMSG_MOTD;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_MOUNT_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleMountResult_SMSG_MOUNT_RESULT;
@@ -3682,6 +3688,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_LOOT_START_ROLL,
             global::HermesProxy.World.Enums.Opcode.SMSG_MAIL_COMMAND_RESULT,
             global::HermesProxy.World.Enums.Opcode.SMSG_MAIL_LIST_RESULT,
+            global::HermesProxy.World.Enums.Opcode.SMSG_MIRROR_IMAGE_COMPONENTED_DATA,
             global::HermesProxy.World.Enums.Opcode.SMSG_MONSTER_MOVE_TRANSPORT,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOTD,
             global::HermesProxy.World.Enums.Opcode.SMSG_MOUNT_RESULT,

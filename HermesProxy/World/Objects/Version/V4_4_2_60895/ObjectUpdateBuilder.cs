@@ -851,19 +851,25 @@ public partial class ObjectUpdateBuilder
     // appearance copy, so stripping the flag should leave the clones rendering via their
     // own (already mage-shaped) DisplayID instead of invisible. Revisit if Mirror Image
     // visuals regress.
+    //
+    // The 4.4.2 client does ask for a mirror image's look (CMSG_GET_MIRROR_IMAGE_DATA) when the
+    // bit is there, and only then: without it the Mage's images were drawn as the bare race model.
+    // So the Mage's Mirror Image keeps it; it is told apart by its entry.
     private const uint UNIT_FLAG2_CLONED = 0x00000010;
+    private const uint MageMirrorImageEntry = 31216;
     private uint SanitizeFlags2(uint flags2, WowGuid128? createdBy)
     {
         if ((flags2 & UNIT_FLAG2_CLONED) == 0)
             return flags2;
 
-        bool isCreature = _updateData.Guid.GetHighType() == HighGuidType.Creature;
-        uint outFlags = isCreature ? (flags2 & ~UNIT_FLAG2_CLONED) : flags2;
+        bool strip = _updateData.Guid.GetHighType() == HighGuidType.Creature
+            && _updateData.Guid.GetEntry() != MageMirrorImageEntry;
+        uint outFlags = strip ? (flags2 & ~UNIT_FLAG2_CLONED) : flags2;
 
         if (Framework.Logging.Log.IsTraceEnabled)
         {
             Framework.Logging.Log.Print(Framework.Logging.LogType.Trace,
-                $"[SanitizeFlags2] guid={_updateData.Guid} highType={_updateData.Guid.GetHighType()} in=0x{flags2:X8} out=0x{outFlags:X8} stripped={isCreature} createdBy={(createdBy?.ToString() ?? "null")}");
+                $"[SanitizeFlags2] guid={_updateData.Guid} highType={_updateData.Guid.GetHighType()} in=0x{flags2:X8} out=0x{outFlags:X8} stripped={strip} createdBy={(createdBy?.ToString() ?? "null")}");
         }
         return outFlags;
     }

@@ -1027,6 +1027,40 @@ public partial class WorldClient
         SendPacketToClient(cooldown);
     }
 
+    /// <summary>
+    /// The answer to a mirror image's question (TrinityCore's SMSG_MIRRORIMAGE_DATA, 3.3.5a and
+    /// 4.3.4 alike): the caster's model, race, sex and class, then for a player caster skin, face,
+    /// hair style, hair colour, facial hair, the guild and eleven item displays (head, shoulders,
+    /// shirt, chest, waist, legs, feet, wrists, hands, back, tabard). A creature caster gets 53
+    /// zero bytes in their place, so the length tells the two apart.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_MIRROR_IMAGE_COMPONENTED_DATA)]
+    internal void HandleMirrorImageData(WorldPacket packet)
+    {
+        const int PlayerLookBytes = 5 + 8 + 11 * 4;
+
+        MirrorImageComponentedData image = new();
+        image.UnitGUID = packet.ReadGuid().To128(GetSession().GameState);
+        image.DisplayID = packet.ReadInt32();
+        image.RaceID = packet.ReadUInt8();
+        image.Gender = packet.ReadUInt8();
+        image.ClassID = packet.ReadUInt8();
+        if (packet.Remaining() >= PlayerLookBytes)
+        {
+            byte skin = packet.ReadUInt8();
+            byte face = packet.ReadUInt8();
+            byte hairStyle = packet.ReadUInt8();
+            byte hairColor = packet.ReadUInt8();
+            byte facialHair = packet.ReadUInt8();
+            image.Customizations = CharacterCustomizations.ConvertLegacyCustomizationsToModern(
+                (Race)image.RaceID, (Gender)image.Gender, skin, face, hairStyle, hairColor, facialHair);
+            packet.ReadUInt64(); // guild
+            for (int i = 0; i < 11; i++)
+                image.ItemDisplayIDs.Add(packet.ReadInt32());
+        }
+        SendPacketToClient(image);
+    }
+
     [HandlesSmsg(Opcode.SMSG_COOLDOWN_EVENT)]
     internal void HandleCooldownEvent(WorldPacket packet)
     {

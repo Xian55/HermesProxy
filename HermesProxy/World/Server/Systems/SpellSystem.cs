@@ -341,6 +341,20 @@ public static class SpellSystem
         ctx.SendPacketToServer(packet);
     }
 
+    /// <summary>
+    /// A mirror image asks what it looks like. TrinityCore 4.3.4 reads the display id after the
+    /// GUID and skips it; 3.3.5a takes the GUID alone.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_GET_MIRROR_IMAGE_DATA)]
+    public static void HandleGetMirrorImageData(in GetMirrorImageData request, in SessionContext ctx)
+    {
+        WorldPacket packet = new WorldPacket(Opcode.CMSG_GET_MIRROR_IMAGE_DATA);
+        packet.WriteGuid(request.UnitGUID.To64());
+        if (WorldClient.IsCataLegacy)
+            packet.WriteUInt32(request.DisplayID);
+        ctx.SendPacketToServer(packet);
+    }
+
     [HandlesCmsg(Opcode.CMSG_CANCEL_AURA)]
     public static void HandleCancelAura(in CancelAura aura, in SessionContext ctx)
     {

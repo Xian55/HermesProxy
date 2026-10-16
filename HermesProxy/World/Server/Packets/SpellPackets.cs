@@ -516,6 +516,9 @@ public class SpellChargeEntry
 
 public readonly record struct CancelAura(uint SpellID, WowGuid128 CasterGUID);
 
+/// <summary>Data only — parsing lives in <c>GetMirrorImageDataCodec</c>, behaviour in <c>SpellSystem</c>.</summary>
+public readonly record struct GetMirrorImageData(WowGuid128 UnitGUID, uint DisplayID);
+
 public class CancelAutoRepeat : ServerPacket, ISpanWritable
 {
     public CancelAutoRepeat() : base(Opcode.SMSG_CANCEL_AUTO_REPEAT) { }
@@ -1746,6 +1749,43 @@ public class CooldownEvent : ServerPacket, ISpanWritable
 
     public bool IsPet;
     public uint SpellID;
+}
+
+/// <summary>
+/// What a mirror image looks like: the caster's model, race, sex and class, their appearance as
+/// customization choices and the display of each visible item.
+/// </summary>
+public sealed class MirrorImageComponentedData : ServerPacket
+{
+    public MirrorImageComponentedData() : base(Opcode.SMSG_MIRROR_IMAGE_COMPONENTED_DATA) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(UnitGUID);
+        _worldPacket.WriteInt32(DisplayID);
+        _worldPacket.WriteUInt8(RaceID);
+        _worldPacket.WriteUInt8(Gender);
+        _worldPacket.WriteUInt8(ClassID);
+        _worldPacket.WriteInt32(Customizations.Count);
+        _worldPacket.WritePackedGuid128(GuildGUID);
+        _worldPacket.WriteInt32(ItemDisplayIDs.Count);
+        foreach (ChrCustomizationChoice customization in Customizations)
+        {
+            _worldPacket.WriteUInt32(customization.ChrCustomizationOptionID);
+            _worldPacket.WriteUInt32(customization.ChrCustomizationChoiceID);
+        }
+        foreach (int itemDisplayId in ItemDisplayIDs)
+            _worldPacket.WriteInt32(itemDisplayId);
+    }
+
+    public WowGuid128 UnitGUID;
+    public int DisplayID;
+    public byte RaceID;
+    public byte Gender;
+    public byte ClassID;
+    public List<ChrCustomizationChoice> Customizations = [];
+    public WowGuid128 GuildGUID = WowGuid128.Empty;
+    public List<int> ItemDisplayIDs = [];
 }
 
 public class ClearCooldown : ServerPacket, ISpanWritable

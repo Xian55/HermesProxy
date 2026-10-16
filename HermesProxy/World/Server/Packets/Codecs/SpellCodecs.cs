@@ -114,6 +114,16 @@ public static class CancelChannellingCodec
     }
 }
 
+public static class GetMirrorImageDataCodec
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Read(ref SpanPacketReader r, out GetMirrorImageData packet)
+    {
+        WowGuid128 unitGuid = r.ReadPackedGuid128();
+        packet = new GetMirrorImageData(unitGuid, r.ReadUInt32());
+    }
+}
+
 public static class CancelAuraCodec
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

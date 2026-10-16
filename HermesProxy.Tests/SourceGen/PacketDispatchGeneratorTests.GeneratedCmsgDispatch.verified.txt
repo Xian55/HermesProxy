@@ -1183,6 +1183,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.ItemSystem.HandleGetItemPurchaseData(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleGetMirrorImageData_CMSG_GET_MIRROR_IMAGE_DATA(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.GetMirrorImageDataCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.SpellSystem.HandleGetMirrorImageData(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_BattlegroundSystem_HandleGetPvpOptionsEnabled_CMSG_GET_PVP_OPTIONS_ENABLED(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.EmptyClientPacketCodec.Read(ref reader, out var packet);
@@ -3404,6 +3410,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GENERATE_RANDOM_CHARACTER_NAME] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleGenerateRandomCharacterNameRequest_CMSG_GENERATE_RANDOM_CHARACTER_NAME;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GET_ACCOUNT_CHARACTER_LIST] = &Thunk_HermesProxy_World_Server_Systems_CharacterSystem_HandleGetAccountCharacterList_CMSG_GET_ACCOUNT_CHARACTER_LIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GET_ITEM_PURCHASE_DATA] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleGetItemPurchaseData_CMSG_GET_ITEM_PURCHASE_DATA;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GET_MIRROR_IMAGE_DATA] = &Thunk_HermesProxy_World_Server_Systems_SpellSystem_HandleGetMirrorImageData_CMSG_GET_MIRROR_IMAGE_DATA;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GET_PVP_OPTIONS_ENABLED] = &Thunk_HermesProxy_World_Server_Systems_BattlegroundSystem_HandleGetPvpOptionsEnabled_CMSG_GET_PVP_OPTIONS_ENABLED;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GM_TICKET_GET_CASE_STATUS] = &Thunk_HermesProxy_World_Server_Systems_SupportTicketSystem_HandleGMTicketGetCaseStatus_CMSG_GM_TICKET_GET_CASE_STATUS;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_GM_TICKET_GET_SYSTEM_STATUS] = &Thunk_HermesProxy_World_Server_Systems_SupportTicketSystem_HandleGMTicketGetSystemStatus_CMSG_GM_TICKET_GET_SYSTEM_STATUS;
@@ -3998,6 +4005,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_GENERATE_RANDOM_CHARACTER_NAME,
             global::HermesProxy.World.Enums.Opcode.CMSG_GET_ACCOUNT_CHARACTER_LIST,
             global::HermesProxy.World.Enums.Opcode.CMSG_GET_ITEM_PURCHASE_DATA,
+            global::HermesProxy.World.Enums.Opcode.CMSG_GET_MIRROR_IMAGE_DATA,
             global::HermesProxy.World.Enums.Opcode.CMSG_GET_PVP_OPTIONS_ENABLED,
             global::HermesProxy.World.Enums.Opcode.CMSG_GM_TICKET_GET_CASE_STATUS,
             global::HermesProxy.World.Enums.Opcode.CMSG_GM_TICKET_GET_SYSTEM_STATUS,

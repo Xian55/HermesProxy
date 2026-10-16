@@ -538,4 +538,21 @@ public class SpellCodecEquivalenceTests
         Assert.Equal(enabled, a.AutocastEnabled);
         Assert.Equal(0, r.Remaining);
     }
+
+    /// <summary>
+    /// A Mirror Image asking what it looks like, captured from a 4.4.2 client: the image's GUID
+    /// (creature 31216) and the display id the client has for it (50, the caster's).
+    /// </summary>
+    [Fact]
+    public void GetMirrorImageData_ReadsTheImageAndItsDisplay()
+    {
+        byte[] framed = [0x00, 0x00, 0x03, 0xA6, 0x67, 0xB6, 0x7C, 0x1E, 0x04, 0x20, 0x32, 0x00, 0x00, 0x00];
+
+        var r = ReaderOver(framed); GetMirrorImageDataCodec.Read(ref r, out var a);
+
+        Assert.Equal(new WowGuid128(0xB667UL, 0x20000400001E7C00UL), a.UnitGUID);
+        Assert.Equal(31216u, a.UnitGUID.GetEntry());
+        Assert.Equal(50u, a.DisplayID);
+        Assert.Equal(0, r.Remaining);
+    }
 }
