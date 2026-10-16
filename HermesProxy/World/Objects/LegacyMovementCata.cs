@@ -48,8 +48,35 @@ public static class LegacyMovementCata
         _ => -1,
     };
 
+    /// <summary>
+    /// What CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE weaves through its sequence's extra elements:
+    /// the seat, then the masked GUID of the vehicle it belongs to (TrinityCore 4.3.4
+    /// HandleChangeSeatsOnControlledVehicle, accessoryGuid).
+    /// </summary>
+    private static readonly LegacyMovementElement[] ChangeSeatsExtra =
+    [
+        LegacyMovementElement.ExtraInt8,
+        LegacyMovementElement.HasGuidByte2, LegacyMovementElement.HasGuidByte4, LegacyMovementElement.HasGuidByte7,
+        LegacyMovementElement.HasGuidByte6, LegacyMovementElement.HasGuidByte5, LegacyMovementElement.HasGuidByte0,
+        LegacyMovementElement.HasGuidByte1, LegacyMovementElement.HasGuidByte3,
+        LegacyMovementElement.GuidByte6, LegacyMovementElement.GuidByte1, LegacyMovementElement.GuidByte2,
+        LegacyMovementElement.GuidByte5, LegacyMovementElement.GuidByte3, LegacyMovementElement.GuidByte0,
+        LegacyMovementElement.GuidByte4, LegacyMovementElement.GuidByte7,
+    ];
+
+    /// <summary>
+    /// A seat change from the vehicle UI: the vehicle's movement block, the seat to move to and the
+    /// vehicle that seat is on. An empty <paramref name="dstVehicle"/> asks for the next seat when
+    /// <paramref name="dstSeat"/> is positive, the previous one otherwise.
+    /// </summary>
+    public static void WriteChangeSeats(WorldPacket packet, WowGuid64 vehicle, in MovementInfo info,
+        WowGuid64 dstVehicle, sbyte dstSeat)
+        => Write(packet, LegacyMovementSequencesCata.ByOpcode[Opcode.CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE], vehicle,
+            in info, extraSequence: ChangeSeatsExtra, extraGuid: dstVehicle.Low, extraInt8: dstSeat);
+
     public static void Write(WorldPacket packet, ReadOnlySpan<LegacyMovementElement> sequence, WowGuid64 mover,
-        in MovementInfo info, uint movementCounter = 0, float extraFloat = 0f, int twoBitExtraAt = -1, byte extraBits = 0)
+        in MovementInfo info, uint movementCounter = 0, float extraFloat = 0f, int twoBitExtraAt = -1, byte extraBits = 0,
+        ReadOnlySpan<LegacyMovementElement> extraSequence = default, ulong extraGuid = 0, sbyte extraInt8 = 0)
     {
         int extraIndex = 0;
         uint flags = (uint)info.Flags & 0x3FFFFFFF;
@@ -217,7 +244,9 @@ public static class LegacyMovementCata
                     packet.FlushBits();
                     break;
                 case LegacyMovementElement.ExtraElement:
-                    if (extraIndex++ == twoBitExtraAt)
+                    if (!extraSequence.IsEmpty)
+                        WriteExtra(packet, extraSequence[extraIndex++], extraGuid, extraInt8);
+                    else if (extraIndex++ == twoBitExtraAt)
                         packet.WriteBits(extraBits, 2);
                     else
                         packet.WriteFloat(extraFloat);
@@ -427,6 +456,23 @@ public static class LegacyMovementCata
     }
 
     private static byte ByteAt(ulong value, int index) => (byte)(value >> (index * 8));
+
+    // One element of an extra sequence, as TrinityCore 4.3.4's ExtraMovementStatusElement reads it.
+    private static void WriteExtra(WorldPacket packet, LegacyMovementElement element, ulong guid, sbyte int8)
+    {
+        switch (element)
+        {
+            case >= LegacyMovementElement.HasGuidByte0 and <= LegacyMovementElement.HasGuidByte7:
+                packet.WriteBit(ByteAt(guid, element - LegacyMovementElement.HasGuidByte0) != 0);
+                break;
+            case >= LegacyMovementElement.GuidByte0 and <= LegacyMovementElement.GuidByte7:
+                WriteMaskedByte(packet, ByteAt(guid, element - LegacyMovementElement.GuidByte0));
+                break;
+            case LegacyMovementElement.ExtraInt8:
+                packet.WriteInt8(int8);
+                break;
+        }
+    }
 
     private static void WriteMaskedByte(WorldPacket packet, byte value)
     {

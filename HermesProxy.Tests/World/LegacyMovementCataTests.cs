@@ -241,6 +241,40 @@ public sealed class LegacyMovementCataTests
     }
 
     [Fact]
+    public void ChangeSeatsOnControlledVehicle_ServerReadsTheSeatAndItsVehicle()
+    {
+        // TrinityCore 4.3.4 HandleChangeSeatsOnControlledVehicle: the seat and the vehicle it is on
+        // come through the sequence's extra elements, in an order of their own (accessoryGuid).
+        LegacyMovementElement[] accessoryGuid =
+        [
+            LegacyMovementElement.ExtraInt8,
+            LegacyMovementElement.HasGuidByte2, LegacyMovementElement.HasGuidByte4, LegacyMovementElement.HasGuidByte7,
+            LegacyMovementElement.HasGuidByte6, LegacyMovementElement.HasGuidByte5, LegacyMovementElement.HasGuidByte0,
+            LegacyMovementElement.HasGuidByte1, LegacyMovementElement.HasGuidByte3,
+            LegacyMovementElement.GuidByte6, LegacyMovementElement.GuidByte1, LegacyMovementElement.GuidByte2,
+            LegacyMovementElement.GuidByte5, LegacyMovementElement.GuidByte3, LegacyMovementElement.GuidByte0,
+            LegacyMovementElement.GuidByte4, LegacyMovementElement.GuidByte7,
+        ];
+        var info = new MovementInfo { Position = new Vector3(5600.5f, 2010.25f, 798f), Orientation = 1.25f, MoveTime = 4242 };
+        var vehicle = new WowGuid64(0xF150006DBE001234);
+        var seatVehicle = new WowGuid64(0xF15000700A005678);
+        using var packet = new WorldPacket(Opcode.MSG_MOVE_HEARTBEAT);
+        LegacyMovementCata.WriteChangeSeats(packet, vehicle, in info, seatVehicle, 2);
+        packet.FlushBits();
+        using var read = Framed(packet.GetDataSpan().ToArray());
+
+        var back = ReadLikeTrinityCore434(read, LegacyMovementSequencesCata.ByOpcode[Opcode.CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE], accessoryGuid);
+
+        Assert.Equal(vehicle.Low, back.Guid);
+        Assert.Equal(info.Position, back.Position);
+        Assert.Equal(info.Orientation, back.Orientation);
+        Assert.Equal(info.MoveTime, back.Time);
+        Assert.Equal(seatVehicle.Low, back.ExtraGuid);
+        Assert.Equal(2, back.ExtraInt8);
+        Assert.Equal(0, read.GetRemainingSpan().Length);
+    }
+
+    [Fact]
     public void MoveUpdateRunBackSpeed_NoGuessFits_IsNotRead()
     {
         // one byte more than the packet above: no choice of fall data and transport ends there
@@ -259,13 +293,18 @@ public sealed class LegacyMovementCataTests
     }
 
     private sealed record Read(ulong Guid, uint Flags, uint Time, Vector3 Position, float Orientation,
-        uint FallTime, float VerticalSpeed, float HorizontalSpeed);
+        uint FallTime, float VerticalSpeed, float HorizontalSpeed, ulong ExtraGuid, sbyte ExtraInt8);
 
-    // TrinityCore 4.3.4 Player::ReadMovementInfo, reduced to the fields asserted above.
-    private static Read ReadLikeTrinityCore434(WorldPacket data, LegacyMovementElement[] sequence)
+    // TrinityCore 4.3.4 Player::ReadMovementInfo, reduced to the fields asserted above; an extra
+    // element takes the next one of `extra`, as its ExtraMovementStatusElement does.
+    private static Read ReadLikeTrinityCore434(WorldPacket data, LegacyMovementElement[] sequence, LegacyMovementElement[]? extra = null)
     {
         Span<bool> mask = stackalloc bool[8];
         Span<byte> guid = stackalloc byte[8];
+        Span<bool> extraMask = stackalloc bool[8];
+        Span<byte> extraGuid = stackalloc byte[8];
+        int extraIndex = 0;
+        sbyte extraInt8 = 0;
         bool hasFlags = false, hasFlags2 = false, hasTime = false, hasOrientation = false, hasTransport = false;
         bool hasPitch = false, hasFall = false, hasFallDirection = false, hasSplineElevation = false;
         uint flags = 0, time = 0, fallTime = 0;
@@ -314,12 +353,23 @@ public sealed class LegacyMovementCataTests
                 case LegacyMovementElement.SplineElevation: if (hasSplineElevation) data.ReadFloat(); break;
                 case LegacyMovementElement.Counter: data.ReadUInt32(); break;
                 case LegacyMovementElement.FlushBits: data.ResetBitPos(); break;
+                case LegacyMovementElement.ExtraElement:
+                    LegacyMovementElement e = extra![extraIndex++];
+                    if (e is >= LegacyMovementElement.HasGuidByte0 and <= LegacyMovementElement.HasGuidByte7)
+                        extraMask[e - LegacyMovementElement.HasGuidByte0] = data.HasBit();
+                    else if (e is >= LegacyMovementElement.GuidByte0 and <= LegacyMovementElement.GuidByte7)
+                        MaskedGuid.ReadByte(data, extraMask, extraGuid, e - LegacyMovementElement.GuidByte0);
+                    else
+                        extraInt8 = (sbyte)data.ReadUInt8();
+                    break;
                 default:
                     Assert.False(hasTransport, $"transport element {element} with transport data");
                     break;
             }
         }
 
-        return new Read(MaskedGuid.ToUInt64(guid), flags, time, new Vector3(x, y, z), o, fallTime, vertical, horizontal);
+        Assert.Equal(extra?.Length ?? 0, extraIndex);
+        return new Read(MaskedGuid.ToUInt64(guid), flags, time, new Vector3(x, y, z), o, fallTime, vertical, horizontal,
+            MaskedGuid.ToUInt64(extraGuid), extraInt8);
     }
 }

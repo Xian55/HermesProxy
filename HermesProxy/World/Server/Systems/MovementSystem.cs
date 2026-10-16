@@ -488,7 +488,9 @@ public static class MovementSystem
     /// The player driving a vehicle moves to another seat, of the vehicle or of one riding on it
     /// (a passenger asks with the requests above). A 3.3.5a server reads it as
     /// CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE (AzerothCore HandleChangeSeatsOnControlledVehicle):
-    /// the vehicle, its movement, the vehicle the seat is on and the seat.
+    /// the vehicle, its movement, the vehicle the seat is on and the seat. 4.3.4 reads the same
+    /// opcode with the seat and the vehicle's masked GUID woven through the extra elements of its
+    /// movement sequence (TrinityCore 4.3.4 HandleChangeSeatsOnControlledVehicle).
     /// </summary>
     [HandlesCmsg(Opcode.CMSG_MOVE_CHANGE_VEHICLE_SEATS)]
     public static void HandleMoveChangeVehicleSeats(in MoveChangeVehicleSeats change, in SessionContext ctx)
@@ -497,7 +499,10 @@ public static class MovementSystem
             return;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE);
-        WriteLegacyChangeSeats(packet, change, ctx.GetSession().GameState);
+        if (WorldClient.IsCataLegacy)
+            LegacyMovementCata.WriteChangeSeats(packet, change.Mover.To64(), change.MoveInfo, change.DstVehicle.To64(), LegacySeat(change));
+        else
+            WriteLegacyChangeSeats(packet, change, ctx.GetSession().GameState);
         ctx.SendPacketToServer(packet);
     }
 
@@ -506,11 +511,13 @@ public static class MovementSystem
         packet.WritePackedGuid(change.Mover.To64());
         SeatGravity.WriteClientMovement(packet, change.MoveInfo, gameState);
         packet.WritePackedGuid(change.DstVehicle.To64());
-        // Without a vehicle the seat is only a direction: the modern client sends 255 for the
-        // previous seat and anything else for the next, the server takes -1 and +1.
-        sbyte seat = change.DstVehicle.IsEmpty() ? (change.DstSeatIndex != 255 ? (sbyte)1 : (sbyte)-1) : (sbyte)change.DstSeatIndex;
-        packet.WriteInt8(seat);
+        packet.WriteInt8(LegacySeat(change));
     }
+
+    // Without a vehicle the seat is only a direction: the modern client sends 255 for the
+    // previous seat and anything else for the next, the server takes -1 and +1.
+    private static sbyte LegacySeat(in MoveChangeVehicleSeats change)
+        => change.DstVehicle.IsEmpty() ? (change.DstSeatIndex != 255 ? (sbyte)1 : (sbyte)-1) : (sbyte)change.DstSeatIndex;
 
     [HandlesCmsg(Opcode.CMSG_RIDE_VEHICLE_INTERACT)]
     public static void HandleRideVehicleInteract(in RideVehicleInteract interact, in SessionContext ctx)

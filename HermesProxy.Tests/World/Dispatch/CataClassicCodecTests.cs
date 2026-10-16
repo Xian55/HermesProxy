@@ -2,6 +2,7 @@ using System;
 using Framework.IO;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 using Xunit;
 
@@ -437,6 +438,30 @@ public sealed class CataClassicCodecTests
         Assert.Equal(7u, packet.PetNumber);
         Assert.Equal(5, packet.DestSlot);
         Assert.Equal(Npc, packet.StableMaster);
+        Assert.Equal(0, r.Remaining);
+    }
+
+    // The vehicle's movement, then the vehicle the seat is on and the seat (TrinityCore
+    // cata_classic MoveChangeVehicleSeats::Read, WowPacketParser's 4.4 reader).
+    [Fact]
+    public void MoveChangeVehicleSeats_ReadsTheMovementAndTheSeat()
+    {
+        var vehicle = new WowGuid128(0x6DBE, 0x2030000000000000);
+        var info = new MovementInfo { Position = new Vector3(5600.5f, 2010.25f, 798.0f), Orientation = 1.25f, MoveTime = 4242 };
+        byte[] f = Framed(w =>
+        {
+            ModernMovementCodec.Write(w, vehicle, in info);
+            w.WritePackedGuid128(vehicle);
+            w.WriteUInt8(2);
+        });
+
+        var r = ReaderOver(f);
+        MoveChangeVehicleSeatsCodec.Read(ref r, out var packet);
+        Assert.Equal(vehicle, packet.Mover);
+        Assert.Equal(info.Position, packet.MoveInfo.Position);
+        Assert.Equal(4242u, packet.MoveInfo.MoveTime);
+        Assert.Equal(vehicle, packet.DstVehicle);
+        Assert.Equal(2, packet.DstSeatIndex);
         Assert.Equal(0, r.Remaining);
     }
 }

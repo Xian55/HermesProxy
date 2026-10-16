@@ -1000,6 +1000,7 @@ public sealed class PhaseShiftChange : ServerPacket
 public readonly record struct InitActiveMoverComplete(uint Ticks);
 
 public readonly record struct MoveSplineDone(WowGuid128 Guid, MovementInfo MoveInfo, int SplineID);
+
 public readonly record struct MoveTimeSkipped(WowGuid128 MoverGUID, uint TimeSkipped);
 
 /// <summary>

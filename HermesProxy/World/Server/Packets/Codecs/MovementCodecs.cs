@@ -21,19 +21,6 @@ public static class MovementAckCodec
     }
 }
 
-/// <summary>Native 3.4.3 <c>MoveChangeVehicleSeats::Read</c>: the movement status, the vehicle, the seat.</summary>
-public static class MoveChangeVehicleSeatsCodec
-{
-    public static void Read(ref SpanPacketReader r, out MoveChangeVehicleSeats packet)
-    {
-        WowGuid128 mover = r.ReadPackedGuid128();
-        ModernMovementCodec.Read(ref r, out MovementInfo moveInfo);
-        WowGuid128 dstVehicle = r.ReadPackedGuid128();
-        byte dstSeatIndex = r.ReadUInt8();
-        packet = new MoveChangeVehicleSeats(mover, moveInfo, dstVehicle, dstSeatIndex);
-    }
-}
-
 public static class ClientPlayerMovementCodec
 {
     public static void Read(ref SpanPacketReader r, out ClientPlayerMovement packet)
@@ -128,6 +115,18 @@ public static class MoveSplineDoneCodec
         ModernMovementCodec.Read(ref r, out MovementInfo moveInfo);
         int splineId = r.ReadInt32();
         packet = new MoveSplineDone(guid, moveInfo, splineId);
+    }
+}
+
+public static class MoveChangeVehicleSeatsCodec
+{
+    public static void Read(ref SpanPacketReader r, out MoveChangeVehicleSeats packet)
+    {
+        WowGuid128 mover = r.ReadPackedGuid128();
+        ModernMovementCodec.Read(ref r, out MovementInfo moveInfo);
+        WowGuid128 dstVehicle = r.ReadPackedGuid128();
+        byte dstSeatIndex = r.ReadUInt8();
+        packet = new MoveChangeVehicleSeats(mover, moveInfo, dstVehicle, dstSeatIndex);
     }
 }
 
