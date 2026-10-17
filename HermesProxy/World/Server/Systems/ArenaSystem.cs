@@ -123,10 +123,19 @@ public static class ArenaSystem
             InvitePartyToArenaTeam(in ctx, teamId);
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_BATTLEMASTER_JOIN_ARENA);
-        packet.WriteGuid(join.Guid.To64());
-        packet.WriteUInt8(join.TeamIndex);
-        packet.WriteBool(true); // As Group
-        packet.WriteBool(true); // Is Rated
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            // TrinityCore 4.3.4 HandleBattlemasterJoinArena reads the slot alone: a 4.3.4 arena
+            // join is always rated and always the whole group.
+            packet.WriteUInt8(join.TeamIndex);
+        }
+        else
+        {
+            packet.WriteGuid(join.Guid.To64());
+            packet.WriteUInt8(join.TeamIndex);
+            packet.WriteBool(true); // As Group
+            packet.WriteBool(true); // Is Rated
+        }
         WorldSocketLogMessages.BattlemasterJoinArena(
             _melLog, _sourceFile, _netDirSend, join.TeamIndex, teamId);
         ctx.SendPacketToServer(packet);
@@ -162,6 +171,14 @@ public static class ArenaSystem
     [HandlesCmsg(Opcode.CMSG_BATTLEMASTER_JOIN_SKIRMISH)]
     public static void HandleBattlematerJoinSkirmish(in BattlemasterJoinSkirmish join, in SessionContext ctx)
     {
+        // 4.3.4 has no skirmishes: no opcode for one, and its arena join, which the 3.3.5a
+        // request would become, reads its first byte as a rated team's slot.
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            WorldSocketLogMessages.SkirmishNotOnServer(_melLog, _sourceFile, _netDirSend, join.TeamSize);
+            return;
+        }
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_BATTLEMASTER_JOIN_ARENA);
         packet.WriteGuid(join.Guid.To64());
         packet.WriteUInt8(join.TeamSize);

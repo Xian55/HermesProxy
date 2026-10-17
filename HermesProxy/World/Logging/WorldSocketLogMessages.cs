@@ -168,6 +168,16 @@ internal static partial class WorldSocketLogMessages
         byte TeamSize,
         bool AsGroup);
 
+    [LoggerMessage(
+        EventId = 122,
+        Level = LogLevel.Information,
+        Message = "CMSG_BATTLEMASTER_JOIN_SKIRMISH teamSize={TeamSize} not sent: the server has no skirmishes")]
+    public static partial void SkirmishNotOnServer(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        byte TeamSize);
+
     /// <summary>
     /// The modern client is told BadServer and dropped here, so this line is the only place the
     /// legacy world server's own verdict reaches the log on the client-facing side. Carrying
