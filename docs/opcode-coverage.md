@@ -30,15 +30,15 @@ the proxy has no reason to translate.
 | `V1_14_1_40688` | 692 | 431 | 261 |
 | `V2_5_2_39570` | 691 | 430 | 261 |
 | `V2_5_3_41750` | 694 | 433 | 261 |
-| `V3_4_3_54261` | 469 | 424 | 45 |
+| `V3_4_3_54261` | 470 | 425 | 45 |
 
 ### Server to proxy (SMSG), by emulator build
 
 | build | defined | handled | gap |
 |---|---:|---:|---:|
 | `V1_12_1_5875` | 363 | 271 | 92 |
-| `V2_4_3_8606` | 460 | 309 | 151 |
-| `V3_3_5a_12340` | 583 | 384 | 199 |
+| `V2_4_3_8606` | 460 | 310 | 150 |
+| `V3_3_5a_12340` | 583 | 385 | 198 |
 
 ## 2. Version-ranged handlers
 
@@ -216,11 +216,11 @@ silently wrong wherever it does not. Check each against the 4.4.2 client
 (`docs/protocol/4.4.2.60895`) before 4.4.2 becomes a supported build; where it differs, the
 site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a narrower check.
 
-194 sites across 57 files.
+197 sites across 57 files.
 
 | file | sites |
 |---|---:|
-| `HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs` | 21 |
+| `HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs` | 23 |
 | `HermesProxy/World/GameData.cs` | 15 |
 | `HermesProxy/World/Server/Packets/NPCPackets.cs` | 11 |
 | `HermesProxy/World/Client/PacketHandlers/PetHandler.cs` | 8 |
@@ -233,6 +233,7 @@ site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a n
 | `HermesProxy/World/Server/Packets/GroupPackets.cs` | 5 |
 | `HermesProxy/World/Server/Packets/MailPackets.cs` | 5 |
 | `HermesProxy/World/Server/Systems/BattlePetSystem.cs` | 5 |
+| `HermesProxy/World/Client/PacketHandlers/LootHandler.cs` | 4 |
 | `HermesProxy/World/Client/PacketHandlers/QuestHandler.cs` | 4 |
 | `HermesProxy/World/Server/Packets/GuildPackets.cs` | 4 |
 | `HermesProxy/World/Server/Systems/ToySystem.cs` | 4 |
@@ -240,7 +241,6 @@ site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a n
 | `HermesProxy/World/Client/PacketHandlers/CombatHandler.cs` | 3 |
 | `HermesProxy/World/Client/PacketHandlers/EquipmentSetHandler.cs` | 3 |
 | `HermesProxy/World/Client/PacketHandlers/GroupHandler.cs` | 3 |
-| `HermesProxy/World/Client/PacketHandlers/LootHandler.cs` | 3 |
 | `HermesProxy/World/Server/Packets/UpdatePackets.cs` | 3 |
 | `HermesProxy/World/Server/Systems/BattlegroundSystem.cs` | 3 |
 | `HermesProxy/World/Server/Systems/EquipmentSetSystem.cs` | 3 |
