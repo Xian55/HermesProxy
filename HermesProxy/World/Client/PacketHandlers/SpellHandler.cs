@@ -796,6 +796,12 @@ public partial class WorldClient
             }
         }
 
+        // The same fake summon cast from a second 4.3.4 core carries the two empty target counts
+        // and stops short of the target flags (#407): nothing more to read there either.
+        int targetFlagsSize = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180) ? 4 : 2;
+        if (!packet.CanRead(targetFlagsSize))
+            return dbdata;
+
         var targetFlags = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180) ?
             (SpellCastTargetFlags)packet.ReadUInt32() : (SpellCastTargetFlags)packet.ReadUInt16();
         dbdata.Target.Flags = targetFlags;

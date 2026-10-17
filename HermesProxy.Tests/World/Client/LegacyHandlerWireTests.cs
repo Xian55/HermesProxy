@@ -106,6 +106,25 @@ public class LegacyHandlerWireTests
         Assert.Empty(go.Cast.HitTargets);
     }
 
+    // The fake summon cast as a second 4.3.4 core writes it: the two target counts, both zero,
+    // and no target flags (#407). Read on, the flags came from past the end of the packet: a
+    // received packet sits in a pooled buffer longer than itself, here filled with 0xFF.
+    [Fact]
+    public void SpellGo_WithEmptyCountsAndNoTargetFlags_IsForwardedWithNoTargets()
+    {
+        byte[] wire = [.. _scenario.BuildPetSummonSpellGo(), 0, 0];
+        byte[] buffer = [.. wire, .. Enumerable.Repeat((byte)0xFF, 16)];
+
+        using (var packet = new WorldPacket(buffer, wire.Length, isPooled: false))
+            _harness.Client.HandleSpellGo(packet);
+
+        var go = Assert.IsType<SpellGo>(Assert.Single(_harness.ClientWire.Sent).Packet);
+        Assert.Equal(52150, go.Cast.SpellID);
+        Assert.Empty(go.Cast.HitTargets);
+        Assert.Empty(go.Cast.MissTargets);
+        Assert.Equal((SpellCastTargetFlags)0, go.Cast.Target.Flags);
+    }
+
     private static readonly string[] ValuesBatchGolden =
     [
         "SMSG_POWER_UPDATE:01A0010408010000007210000000",
