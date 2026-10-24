@@ -120,11 +120,12 @@
 - Size: 1 bytes (packed GUIDs not counted)
 - Bit fields (all-zero packet, widths in arrival order): byte 0: 1 · 1 · 1 · 1 · 1 · 1 · 1 · 1
 
-### — (0x2939)
+### SMSG_REQUEST_PVP_REWARDS_RESPONSE (0x2939)
 
 - Modern: 10553 (0x2939) · 3.3.5a: — · Area: Combat
 - Layout: `{ u8 u32*3 u32 u32 loop[ u32*2 ] loop[ u32*2 ] loop[ u32*2 ] u8 opt[ u32 ] opt[ u32 ] opt[ u64 ] opt[ u32 ] } { u8 u32*3 u32 u32 loop[ u32*2 ] loop[ u32*2 ] loop[ u32*2 ] u8 opt[ u32 ] opt[ u32 ] opt[ u64 ] opt[ u32 ] } { u8 u32*3 u32 u32 loop[ u32*2 ] loop[ u32*2 ] loop[ u32*2 ] u8 opt[ u32 ] opt[ u32 ] opt[ u64 ] opt[ u32 ] } { u8 u32*3 u32 u32 loop[ u32*2 ] loop[ u32*2 ] loop[ u32*2 ] u8 opt[ u32 ] opt[ u32 ] opt[ u64 ] opt[ u32 ] }`
 - Bit fields (all-zero packet, widths in arrival order): byte 21: 1 · 1 · 1 · 1 · (4 unused) · 8; byte 43: 1 · 1 · 1 · 1 · (4 unused) · 8; byte 65: 1 · 1 · 1 · 1 · (4 unused) · 8; byte 87: 1 · 1 · 1 · 1 · (4 unused)
+- HermesProxy: `RequestPvpRewardsResponse` — matches
 
 ### — (0x293a)
 

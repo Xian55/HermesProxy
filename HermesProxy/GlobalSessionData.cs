@@ -526,6 +526,9 @@ public sealed class GameSessionData
     // What a random battleground pays now, from a 4.3.4 battlefield list (whole points): a 4.3.4
     // server says it there and not in its answer to CMSG_REQUEST_PVP_REWARDS.
     public (int WinHonor, int WinConquest, int LossHonor)? CataRandomBattlegroundRewards;
+    // The same from a 3.3.5a battlefield list (whole points). A 3.3.5a server has no
+    // CMSG_REQUEST_PVP_REWARDS; the proxy answers it with these.
+    public (int WinHonor, int WinArena, int LossHonor)? WotLKBattlegroundRewards;
     // The legacy server's unix time minus this machine's, from the last time query that went by.
     public long LegacyServerClockOffset;
     public Dictionary<uint, uint> DailyQuestsDone = [];

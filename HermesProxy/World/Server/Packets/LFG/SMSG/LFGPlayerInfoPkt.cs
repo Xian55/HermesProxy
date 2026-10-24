@@ -39,10 +39,10 @@ public struct LFGPlayerQuestReward
     public List<LFGPlayerQuestRewardItem>? Items;
     public List<LFGPlayerQuestRewardCurrency>? Currency;
     public List<LFGPlayerQuestRewardCurrency>? BonusCurrency;
-    // Only SMSG_REQUEST_PVP_REWARDS_RESPONSE carries it, in hundredths of a point.
+    // Only SMSG_REQUEST_PVP_REWARDS_RESPONSE carries it: whole points, written in the client's unit.
     public int? Honor;
 
-    public void Write(WorldPacket data)
+    public void Write(WorldPacket data, int honorScale = 1)
     {
         data.WriteUInt8(Mask);
         data.WriteInt32(RewardMoney);
@@ -75,7 +75,7 @@ public struct LFGPlayerQuestReward
         data.WriteBit(Honor.HasValue);
         data.FlushBits();
         if (Honor.HasValue)
-            data.WriteInt32(Honor.Value);
+            data.WriteInt32(Honor.Value * honorScale);
     }
 }
 

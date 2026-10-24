@@ -889,7 +889,7 @@ Every server-to-client opcode of the client, with its 3.3.5a counterpart where H
 | — | 0x2936 | 10550 | — | Combat | ignored by the client | — |
 | — | 0x2937 | 10551 | — | Combat | fixed, 1 bytes | — |
 | — | 0x2938 | 10552 | — | Combat | fixed, 1 bytes | — |
-| — | 0x2939 | 10553 | — | Combat | variable | — |
+| SMSG_REQUEST_PVP_REWARDS_RESPONSE | 0x2939 | 10553 | — | Combat | variable | matches |
 | — | 0x293a | 10554 | — | Combat | variable | — |
 | — | 0x293b | 10555 | — | Combat | ignored by the client | — |
 | SMSG_BREAK_TARGET | 0x293c | 10556 | 338 (0x152) | Combat | fixed, 0 bytes | matches |
