@@ -855,6 +855,7 @@ public partial class WorldClient
             ResyncItemQuestCredits();
             RefreshCurrencies();
             CollectionSync.RefreshUsableToys(GetSession());
+            CollectionSync.RefreshCollectedAppearances(GetSession());
         }
 
         if (missingItemTemplates != null)

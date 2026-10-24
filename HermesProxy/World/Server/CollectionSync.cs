@@ -173,6 +173,30 @@ public static class CollectionSync
         session.WorldClient.SendPacketToClient(AccountToyUpdate.FromSession(state));
     }
 
+    /// <summary>
+    /// The 4.4.2 client counts an appearance as collected only by ActivePlayerData.Transmog, which a
+    /// 4.3.4 server has no collection for: every tooltip said "You haven't collected this
+    /// appearance", the worn items' too. The carried items' appearances are the collection. Before
+    /// the client has its player the create writes them; afterwards a change goes out as a Values
+    /// update at once.
+    /// </summary>
+    public static void RefreshCollectedAppearances(GlobalSessionData session)
+    {
+        if (ModernVersion.ExpansionVersion < 4)
+            return;
+        var state = session.GameState;
+        if (state.CurrentPlayerGuid.IsEmpty() || session.WorldClient == null)
+            return;
+        if (!state.RefreshCarriedAppearances() || !state.ClientHasPlayerObject)
+            return;
+
+        var updateData = new ObjectUpdate(state.CurrentPlayerGuid, UpdateTypeModern.Values, session);
+        updateData.EnsureActivePlayerData();
+        var updatePacket = new UpdateObject(state);
+        updatePacket.ObjectUpdates.Add(updateData);
+        session.WorldClient.SendPacketToClient(updatePacket);
+    }
+
     static bool ToysMatch(uint[] left, uint[] right)
     {
         if (left.Length != right.Length)

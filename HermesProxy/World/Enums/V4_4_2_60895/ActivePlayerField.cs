@@ -558,6 +558,12 @@ public enum ActivePlayerField
         HasAnyPredicate = "gameState.ResearchHistoryDirty")]
     ACTIVEPLAYER_RESEARCH_HISTORY_MASK_MUTATOR,
 
+    // TransmogDirty: bit 12 (the collected appearances) when the carried items' appearances changed.
+    [DescriptorMaskMutator(
+        nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.ApplyActivePlayerTransmogMaskMutator),
+        HasAnyPredicate = "gameState.TransmogDirty")]
+    ACTIVEPLAYER_TRANSMOG_MASK_MUTATOR,
+
     // ===========================================================================
     // Update — KnownTitles dynamic field (bit 3)
     // ===========================================================================
@@ -583,6 +589,12 @@ public enum ActivePlayerField
         customWriter: nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerToysPreamble))]
     ACTIVEPLAYER_TOYS_PREAMBLE,
 
+    // Transmog (bit 12): the collected appearances, a bit per ItemModifiedAppearance in uint32
+    // blocks. Only the changed blocks go out.
+    [DescriptorMaskPreamble(bit: 12,
+        customWriter: nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerTransmogPreamble))]
+    ACTIVEPLAYER_TRANSMOG_PREAMBLE,
+
     // ConditionalTransmog (bit 13): appearances the wardrobe may use without having collected
     // them, the items the player carries (a 4.3.4 server transmogrifies from those).
     [DescriptorMaskPreamble(bit: 13,
@@ -605,6 +617,12 @@ public enum ActivePlayerField
         CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerToysBody),
         CustomPredicate = "src.Toys != null && src.Toys.Count > 0")]
     ACTIVEPLAYER_TOYS,
+
+    // Set by the mask mutator, from the session's blocks rather than ActivePlayerData.
+    [DescriptorCustomField("Transmog", bit: 12,
+        customWriter: nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerTransmogBody),
+        ParentBit = 0, WriteOnly = true)]
+    ACTIVEPLAYER_TRANSMOG,
 
     [DescriptorUpdateField(nameof(ActivePlayerData.ConditionalTransmog), DescriptorType.UInt32, bit: 13, ParentBit = 0,
         CustomWriter = nameof(HermesProxy.World.Objects.Version.V4_4_2_60895.ObjectUpdateBuilder.WriteUpdateActivePlayerConditionalTransmogBody),
