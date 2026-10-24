@@ -5232,17 +5232,24 @@ public static partial class GameData
     }
 
     /// <summary>
-    /// A 3.3.5a server's vendor prices, where the client's own ItemExtendedCost rows differ. A
-    /// vendor list names a price by its id alone, and Wrath Classic and Cataclysm Classic changed
-    /// many of 3.3.5a's rows (386: 15300 honor on 3.3.5a, 7650 on the 3.4.3 client), so the client
-    /// showed one price and the server charged another. The rows are 3.3.5a's in the client's
-    /// layout, honor in hundredths for 4.4.2, so they are sent in front of a 3.3.5a server only.
-    /// Built by scripts/build-item-extended-cost-hotfix.py.
+    /// The server's vendor prices, where the client's own ItemExtendedCost rows differ. A vendor
+    /// list names a price by its id alone, and Wrath Classic and Cataclysm Classic changed many of
+    /// 3.3.5a's rows (386: 15300 honor on 3.3.5a, 7650 on the 3.4.3 client), so the client showed
+    /// one price and the server charged another. The rows are the server's in the client's layout:
+    /// 3.3.5a's in ItemExtendedCost{3,4}.csv (honor in hundredths for 4.4.2), 4.3.4's in
+    /// ItemExtendedCostCata4.csv (2285, 175 honor at the arena vendors, which the 4.4.2 client
+    /// lacks). Built by scripts/build-item-extended-cost-hotfix.py.
     /// </summary>
     public static void LoadItemExtendedCostHotfixes()
     {
-        var path = Path.Combine("CSV", "Hotfix", $"ItemExtendedCost{ModernVersion.ExpansionVersion}.csv");
-        if (LegacyVersion.ExpansionVersion != 3 || !File.Exists(path))
+        string? file = LegacyVersion.ExpansionVersion switch
+        {
+            3 => $"ItemExtendedCost{ModernVersion.ExpansionVersion}.csv",
+            4 => $"ItemExtendedCostCata{ModernVersion.ExpansionVersion}.csv",
+            _ => null,
+        };
+        var path = Path.Combine("CSV", "Hotfix", file ?? "");
+        if (file == null || !File.Exists(path))
             return;
 
         using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);

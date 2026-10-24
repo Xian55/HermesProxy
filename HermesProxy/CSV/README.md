@@ -130,13 +130,17 @@ The test bed's 3.3.5a server keeps using `*3`; these have no `*4` until a 4.3.4 
 | `PassiveSpells` | 3 | passive spells |
 | `AuraDurations` | 1 | aura durations |
 
-## A 3.3.5a server's rows, in the client's layout
+## The server's rows, in the client's layout
 
-Read for the client's expansion, loaded only in front of a 3.3.5a server.
+Read for the client's expansion, loaded only in front of the server they come from.
 
 | family | suffixes | what it holds |
 |---|---|---|
 | `Hotfix/ItemExtendedCost` | 3 4 | the rows of 3.3.5a's `ItemExtendedCost.dbc` that the client's own table has differently or not at all, sent as hotfixes: a vendor list names a price by its id alone. Honor in hundredths for `*4`. Built by `scripts/build-item-extended-cost-hotfix.py --build <client build>` from the 3.3.5a DBC directory |
+
+`Hotfix/ItemExtendedCostCata4.csv` is the same for a 4.3.4 server, loaded only in front of one:
+the rows of 4.3.4's `ItemExtendedCost.db2` the 4.4.2 client has differently or not at all, built
+with `--cata-db2 <the server's ItemExtendedCost.db2>`.
 
 ## One file for every build
 

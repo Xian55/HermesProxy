@@ -1427,8 +1427,8 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         // DB2s (1064/1064 and 190/190, zero differing, zero new), i.e. 1254 wasted records
         // per login. Neither store is read anywhere else in the proxy.
         //
-        // ItemExtendedCost holds only the rows where a 3.3.5a server's vendor prices differ
-        // from the client's, and is empty in front of any other server.
+        // ItemExtendedCost holds only the rows where the server's vendor prices differ from the
+        // client's.
         if (ModernVersion.IsWotLKClassicOrLater)
         {
             hotfixes.TableFilter = new HashSet<DB2Hash>
