@@ -29,6 +29,51 @@ public partial class WorldClient
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
             party.ResultData = packet.ReadUInt32();
         SendPacketToClient(party);
+
+        // The server's answer to its own player leaving, before it takes them out. TrinityCore
+        // 4.3.4 then sends the list that removes the player; another 4.3.4 core sends none for a
+        // dungeon finder group, left inside its dungeon or after teleporting out. The client stayed
+        // in a group of five the server no longer had them in, and a Leave after that went
+        // unanswered.
+        if (IsCataLegacy && party.Command == PartyOperationLeave && party.Result == (byte)PartyResultModern.Ok)
+            SendLeftGroup();
+    }
+
+    // TrinityCore PartyOperation PARTY_OP_LEAVE
+    private const byte PartyOperationLeave = 2;
+
+    /// <summary>
+    /// The player is out of the group announced last: what the server's removal list does, said
+    /// before it comes. That list then names no group the client is in, and goes no further.
+    /// </summary>
+    private void SendLeftGroup()
+    {
+        var state = GetSession().GameState;
+        byte index = state.LastAnnouncedPartyIndex;
+        PartyUpdate? group = state.CurrentGroups[index];
+        if (group == null)
+            return;
+
+        state.MasterLootCandidates = null;
+        state.LastMasterLootSentTarget = default;
+        PartyUpdate party = new PartyUpdate();
+        party.SequenceNum = state.GroupUpdateCounter++;
+        party.PartyIndex = index;
+        party.PartyFlags |= GroupFlags.Destroyed;
+        party.PartyGUID = index == 0 ? WowGuid128.Empty : group.PartyGUID;
+        party.LeaderGUID = WowGuid128.Empty;
+        party.MyIndex = -1;
+        state.CurrentGroups[index] = null;
+        state.LastAnnouncedPartyIndex = 0;
+        if (state.CurrentGroups[0] == null && state.CurrentGroups[1] == null)
+            state.GroupAssignedRoles.Clear();
+        SendPacketToClient(party);
+
+        if (state.LastGroupWasLfg)
+        {
+            state.LastGroupWasLfg = false;
+            SendLfgAssociationEnded();
+        }
     }
 
     [HandlesSmsg(Opcode.SMSG_GROUP_DECLINE)]
