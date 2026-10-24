@@ -48,6 +48,8 @@ public static partial class GameData
     public static Dictionary<uint, ItemSparseRecord> ItemSparseRecordsStore = [];
     public static Dictionary<uint, ItemAppearance> ItemAppearanceStore = [];
     public static Dictionary<uint, ItemModifiedAppearance> ItemModifiedAppearanceStore = [];
+    // Item -> its first ItemModifiedAppearance row. Looked up for every item the player carries.
+    public static Dictionary<uint, ItemModifiedAppearance> ItemModifiedAppearanceByItemStore = [];
     public static Dictionary<uint, ItemEffect> ItemEffectStore = [];
     public static FrozenDictionary<uint, Battleground> Battlegrounds = FrozenDictionary<uint, Battleground>.Empty;
     // Dungeon and raid map -> its lowest difficulty and that difficulty's MaxPlayers, from
@@ -322,14 +324,7 @@ public static partial class GameData
         => ItemModifiedAppearanceStore.TryGetValue(id, out var appearance) ? appearance : null;
 
     public static ItemModifiedAppearance? GetItemModifiedAppearanceByItemId(uint itemId)
-    {
-        foreach (var item in ItemModifiedAppearanceStore)
-        {
-            if (item.Value.ItemID == (int)itemId)
-                return item.Value;
-        }
-        return null;
-    }
+        => ItemModifiedAppearanceByItemStore.TryGetValue(itemId, out var appearance) ? appearance : null;
 
     public static ItemEffect? GetItemEffectByItemId(uint itemId, byte slot)
     {
@@ -1150,6 +1145,7 @@ public static partial class GameData
 
         using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
         ItemModifiedAppearanceStore = new Dictionary<uint, ItemModifiedAppearance>(EstimateRowCount<ItemModifiedAppearance>(path));
+        ItemModifiedAppearanceByItemStore = new Dictionary<uint, ItemModifiedAppearance>(ItemModifiedAppearanceStore.Capacity);
         foreach (var row in reader)
         {
             ItemModifiedAppearance modifiedAppearance = new ItemModifiedAppearance();
@@ -1160,6 +1156,7 @@ public static partial class GameData
             modifiedAppearance.OrderIndex = int.Parse(row[4].Span);
             modifiedAppearance.TransmogSourceTypeEnum = int.Parse(row[5].Span);
             ItemModifiedAppearanceStore.Add((uint)modifiedAppearance.Id, modifiedAppearance);
+            ItemModifiedAppearanceByItemStore.TryAdd((uint)modifiedAppearance.ItemID, modifiedAppearance);
         }
     }
 
@@ -4952,6 +4949,7 @@ public static partial class GameData
             return null;
         }
         ItemModifiedAppearanceStore.Add((uint)record.Id, record);
+        ItemModifiedAppearanceByItemStore.TryAdd((uint)record.ItemID, record);
         Log.Print(LogType.Storage, $"ItemModifiedAppearance #{record.Id} created for item #{record.ItemID}.");
         return record;
     }

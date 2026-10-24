@@ -9,9 +9,9 @@ A backend's column shows how the latest session there that touched the opcode we
 | Status | Count | Meaning |
 |---|---:|---|
 | ❌ failing | 0 | a backend's latest session that touched it threw or dropped it |
-| 🔁 retest | 326 | its file changed after the latest session that exercised it |
+| 🔁 retest | 327 | its file changed after the latest session that exercised it |
 | · unseen | 87 | no session on any backend exercised it yet |
-| ✅ seen ok | 396 | the latest session on each backend that touched it passed it cleanly |
+| ✅ seen ok | 395 | the latest session on each backend that touched it passed it cleanly |
 | ∅ not sent | 28 | a server packet TrinityCore 3.3.5 never sends, and no session saw |
 
 ## What's left
@@ -41,7 +41,7 @@ Per feature: how many of its opcodes each backend's latest session passed cleanl
 | Trade | 12 | 10 | 11 | 1 |  | 1 | 3 | · `CMSG_IGNORE_TRADE` |
 | Query | 15 | 12 | 14 | 12 |  | 1 | 1 | · `SMSG_ITEM_NAME_QUERY_RESPONSE` |
 | Achievement | 5 | 4 | 4 | 3 |  | 1 |  | · `SMSG_ACHIEVEMENT_DELETED` |
-| Battleground | 17 | 12 | 14 | 1 |  |  | 8 |  |
+| Battleground | 17 | 12 | 14 | 1 |  |  | 9 |  |
 | Auction | 13 |  | 13 |  |  |  | 7 |  |
 | Instance | 15 | 13 | 10 | 4 |  |  | 7 |  |
 | Objects | 6 | 6 | 6 | 5 |  |  | 6 |  |
@@ -264,6 +264,7 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | 🔁 | S | `SMSG_AUCTION_COMMAND_RESULT` |  | ✅ 10-11 |  | 20261011_152733 | 17 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | 🔁 | S | `SMSG_AUCTION_OWNER_NOTIFICATION` |  | ✅ 09-13 |  | 20260913_022351 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | 🔁 | S | `SMSG_BARBER_SHOP_RESULT` | ✅ 09-06 | ✅ 10-23 |  | 20261023_055610 | 27 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
+| 🔁 | S | `SMSG_BATTLEFIELD_LIST` | ✅ 09-06 | ✅ 10-23 |  | 20261023_010816 | 13 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
 | 🔁 | S | `SMSG_BATTLEFIELD_MGR_EJECTED` | ✅ 09-01 |  |  | 20260901_001120 | 1 |  | HermesProxy/World/Client/PacketHandlers/BattlefieldMgrHandler.cs |
 | 🔁 | S | `SMSG_BATTLEFIELD_MGR_ENTERING` | ✅ 09-01 |  |  | 20260901_001120 | 2 |  | HermesProxy/World/Client/PacketHandlers/BattlefieldMgrHandler.cs |
 | 🔁 | S | `SMSG_BATTLEFIELD_MGR_ENTRY_INVITE` | ✅ 09-01 |  |  | 20260901_231357 | 5 |  | HermesProxy/World/Client/PacketHandlers/BattlefieldMgrHandler.cs |
@@ -731,7 +732,6 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | ✅ | S | `SMSG_AUCTION_LIST_OWNED_ITEMS_RESULT` |  | ✅ 10-22 |  | 20261022_202131 | 8 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | ✅ | S | `SMSG_AURA_UPDATE` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_023616 | 108 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_AURA_UPDATE_ALL` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_023616 | 721 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| ✅ | S | `SMSG_BATTLEFIELD_LIST` | ✅ 09-06 | ✅ 10-23 |  | 20261023_010816 | 13 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
 | ✅ | S | `SMSG_BATTLEFIELD_STATUS` | ✅ 09-01 | ✅ 10-23 |  | 20261023_010816 | 17 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
 | ✅ | S | `SMSG_BINDER_CONFIRM` |  | ✅ 10-24 |  | 20261024_000209 | 2 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
 | ✅ | S | `SMSG_BIND_POINT_UPDATE` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_023616 | 18 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
@@ -966,14 +966,14 @@ HermesProxy/World/Client/PacketHandlers/SystemHandler.cs 806898d603ef9252
 HermesProxy/World/Client/PacketHandlers/TalentHandler.cs 44aefb28c8709d82
 HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs 8c9cc01c98e6100b
 HermesProxy/World/Client/PacketHandlers/TradeHandler.cs 27f0e60d0f199fdd
-HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs d9ba4a9177eb2fb1
+HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs e7e6266ea84ca8b9
 HermesProxy/World/Client/PacketHandlers/UpdateHandlerCata.cs 78004f57afd6928a
 HermesProxy/World/Client/PacketHandlers/WorldStateHandler.cs 7f47d3d9cac7b00e
 HermesProxy/World/Client/SeatGravity.cs 9d2a660de9366fd9
 HermesProxy/World/Client/WorldClient.cs aeb8d8e09785bfd3
 HermesProxy/World/Client/WorldClientCataHandshake.cs f73fe4895229ea0c
 HermesProxy/World/Dispatch/SessionContext.cs b74de2b3cc19f3c8
-HermesProxy/World/GameData.cs 8a9c65598ac0a3cc
+HermesProxy/World/GameData.cs 78c3a919b183e436
 HermesProxy/World/GuildClub.cs b1aa090972b200df
 HermesProxy/World/ItemRefund.cs 9ed8e05a4424441f
 HermesProxy/World/MaskedGuid.cs 38ad2baffdeef245

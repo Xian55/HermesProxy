@@ -1398,6 +1398,90 @@ public sealed class GameSessionData
         return appearances;
     }
 
+    /// <summary>
+    /// The 4.4.2 client's ActivePlayerData.Transmog, the appearances it counts as collected: bit n of
+    /// block n / 32 is ItemModifiedAppearance n. A 4.3.4 server keeps no collection and takes an
+    /// appearance from an item the player carries, so these are the carried items' appearances.
+    /// </summary>
+    public readonly List<uint> TransmogBlocks = [];
+
+    /// <summary>The blocks of <see cref="TransmogBlocks"/> the client has not been sent, a bit per block.</summary>
+    public readonly List<uint> TransmogBlocksChanged = [];
+
+    /// <summary>Whether <see cref="TransmogBlocks"/> changed since the client last got it.</summary>
+    public bool TransmogDirty;
+
+    // The appearances TransmogBlocks was last set from, sorted.
+    private readonly List<int> _carriedAppearanceIds = [];
+
+    /// <summary>
+    /// Sets <see cref="TransmogBlocks"/> to the appearances of the items the player carries now.
+    /// Returns whether a bit changed; the blocks the size grew by count as changed, as TrinityCore's
+    /// resize marks them.
+    /// </summary>
+    public bool RefreshCarriedAppearances()
+    {
+        var carried = new List<int>();
+        foreach (var (_, entry, _) in GetCarriedItems())
+        {
+            if (GameData.GetItemModifiedAppearanceByItemId(entry) is { } appearance)
+                carried.Add(appearance.Id);
+        }
+        carried.Sort();
+
+        bool changed = false;
+        foreach (int id in _carriedAppearanceIds)
+        {
+            if (carried.BinarySearch(id) < 0)
+                changed |= SetTransmogBit(id, false);
+        }
+        foreach (int id in carried)
+            changed |= SetTransmogBit(id, true);
+
+        _carriedAppearanceIds.Clear();
+        _carriedAppearanceIds.AddRange(carried);
+        return changed;
+    }
+
+    internal bool SetTransmogBit(int appearanceId, bool collected)
+    {
+        int block = appearanceId / 32;
+        uint flag = 1u << (appearanceId % 32);
+        if (block >= TransmogBlocks.Count)
+        {
+            if (!collected)
+                return false;
+            while (TransmogBlocks.Count <= block)
+            {
+                TransmogBlocks.Add(0);
+                MarkTransmogBlockChanged(TransmogBlocks.Count - 1);
+            }
+        }
+
+        uint before = TransmogBlocks[block];
+        uint after = collected ? before | flag : before & ~flag;
+        if (after == before)
+            return false;
+        TransmogBlocks[block] = after;
+        MarkTransmogBlockChanged(block);
+        return true;
+    }
+
+    private void MarkTransmogBlockChanged(int block)
+    {
+        while (TransmogBlocksChanged.Count <= block / 32)
+            TransmogBlocksChanged.Add(0);
+        TransmogBlocksChanged[block / 32] |= 1u << (block % 32);
+        TransmogDirty = true;
+    }
+
+    /// <summary>The client has every block now: the player's create or a Values update carried them.</summary>
+    public void ClearTransmogChanges()
+    {
+        TransmogBlocksChanged.Clear();
+        TransmogDirty = false;
+    }
+
     void CollectInventoryToyIds(List<uint> dest)
     {
         void Consider(WowGuid64 guid64)
