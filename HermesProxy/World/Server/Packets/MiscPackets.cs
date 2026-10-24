@@ -1113,6 +1113,34 @@ class PlaySound : ServerPacket, ISpanWritable
     public int BroadcastTextId;
 }
 
+/// <summary>
+/// A unit plays an AnimKit once (TrinityCore cata_classic PlayOneShotAnimKit::Write): the unit,
+/// then the kit.
+/// </summary>
+sealed class PlayOneShotAnimKit : ServerPacket, ISpanWritable
+{
+    public PlayOneShotAnimKit() : base(Opcode.SMSG_PLAY_ONE_SHOT_ANIM_KIT) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(Unit);
+        _worldPacket.WriteUInt16(AnimKitID);
+    }
+
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 2;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(Unit.Low, Unit.High);
+        writer.WriteUInt16(AnimKitID);
+        return writer.Position;
+    }
+
+    public WowGuid128 Unit;
+    public ushort AnimKitID;
+}
+
 class PlayObjectSound : ServerPacket, ISpanWritable
 {
     public PlayObjectSound() : base(Opcode.SMSG_PLAY_OBJECT_SOUND) { }

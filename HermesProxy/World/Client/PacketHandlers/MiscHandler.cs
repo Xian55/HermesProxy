@@ -262,6 +262,20 @@ public partial class WorldClient
         SendPacketToClient(sound);
     }
 
+    /// <summary>
+    /// TrinityCore 4.3.4 PlayOneShotAnimKit::Write: the unit's packed GUID, then the kit. A script
+    /// plays one on a creature (a dragon lifting off, a boss's gesture) or a GM with
+    /// <c>.debug play animkit</c>; the 4.4.2 client was never told, and the unit stood still.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_PLAY_ONE_SHOT_ANIM_KIT)]
+    internal void HandlePlayOneShotAnimKit(WorldPacket packet)
+    {
+        PlayOneShotAnimKit animKit = new();
+        animKit.Unit = packet.ReadPackedGuid().To128(GetSession().GameState);
+        animKit.AnimKitID = packet.ReadUInt16();
+        SendPacketToClient(animKit);
+    }
+
     // The modern client prints its "You feel tipsy" / "You drink the X and feel drunk" lines from
     // this packet, not from the Inebriation field. Vanilla servers never send it.
     [HandlesSmsg(Opcode.SMSG_CROSSED_INEBRIATION_THRESHOLD)]
