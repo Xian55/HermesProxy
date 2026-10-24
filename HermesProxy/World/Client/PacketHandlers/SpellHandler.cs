@@ -2054,17 +2054,22 @@ public partial class WorldClient
 
     // 4.3.4 sends a count and a list of (type, value) pairs (TrinityCore 4.3.4 PowerUpdate),
     // which is the modern shape. Read the 3.3.5a way, the count's low byte came out as the power
-    // type, so every unit's update named Rage with a garbage value.
+    // type, so every unit's update named Rage with a garbage value. Its SetPower writes the power
+    // field too, as 3.3.5a's does, so a forwarded value waits for that field the same way.
     void HandlePowerUpdateCata(WorldPacket packet, WowGuid128 guid)
     {
         PowerUpdate update = new PowerUpdate(guid);
-        var runeState = guid == GetSession().GameState.CurrentPlayerGuid ? GetSession().GameState.RuneState : null;
+        var gameState = GetSession().GameState;
+        var runeState = guid == gameState.CurrentPlayerGuid ? gameState.RuneState : null;
+        bool ownUnit = guid == gameState.CurrentPlayerGuid || guid == gameState.CurrentPetGuid;
         uint count = packet.ReadUInt32();
         for (uint i = 0; i < count; i++)
         {
             var powerType = ClassPowerTypes.ToModernPowerType((PowerType)packet.ReadUInt8());
             int power = packet.ReadInt32();
             update.Powers.Add(new PowerUpdatePower(power, (byte)powerType));
+            if (ownUnit)
+                _forwardedPowerUpdates[(guid, (byte)powerType)] = power;
             // The death knight's next rune cast tells the client this runic power in its
             // SMSG_SPELL_GO. Left at 0, every rune spell emptied the client's runic power, which
             // only the next change put back: at full, Frost Strike showed nothing to spend.
