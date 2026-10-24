@@ -9,9 +9,9 @@ A backend's column shows how the latest session there that touched the opcode we
 | Status | Count | Meaning |
 |---|---:|---|
 | ❌ failing | 0 | a backend's latest session that touched it threw or dropped it |
-| 🔁 retest | 343 | its file changed after the latest session that exercised it |
+| 🔁 retest | 344 | its file changed after the latest session that exercised it |
 | · unseen | 87 | no session on any backend exercised it yet |
-| ✅ seen ok | 379 | the latest session on each backend that touched it passed it cleanly |
+| ✅ seen ok | 378 | the latest session on each backend that touched it passed it cleanly |
 | ∅ not sent | 28 | a server packet TrinityCore 3.3.5 never sends, and no session saw |
 
 ## What's left
@@ -51,10 +51,10 @@ Per feature: how many of its opcodes each backend's latest session passed cleanl
 | SupportTicket | 4 | 4 | 2 |  |  |  | 4 |  |
 | Combat | 18 | 17 | 18 | 13 |  |  | 3 |  |
 | Reputation | 7 | 7 | 5 | 3 |  |  | 3 |  |
+| Hotfix | 1 | 1 | 1 | 1 |  |  | 1 |  |
 | BattlePet | 1 |  | 1 |  |  |  |  |  |
 | Connection | 2 | 2 | 2 | 2 |  |  |  |  |
 | EquipmentSet | 6 | 1 | 6 | 1 |  |  |  |  |
-| Hotfix | 1 | 1 | 1 | 1 |  |  |  |  |
 | Other | 2 | 1 | 2 |  |  |  |  |  |
 | PhaseShift | 1 | 1 |  | 1 |  |  |  |  |
 | Social | 8 | 4 | 8 | 2 |  |  |  |  |
@@ -181,6 +181,7 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | 🔁 | C | `CMSG_PUSH_QUEST_TO_PARTY` | ✅ 08-30 | ✅ 09-13 |  | 20260913_010515 | 7 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
 | 🔁 | C | `CMSG_QUERY_CREATURE` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_012152 | 173 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | 🔁 | C | `CMSG_QUERY_GAME_OBJECT` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_023616 | 364 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
+| 🔁 | C | `CMSG_QUERY_NPC_TEXT` | ✅ 09-16 | ✅ 10-24 | ✅ 09-17 | 20261024_000209 | 8 |  | HermesProxy/World/Server/Systems/HotfixSystem.cs |
 | 🔁 | C | `CMSG_QUEST_GIVER_QUERY_QUEST` | ✅ 09-06 | ✅ 10-17 | ✅ 09-17 | 20261017_001635 | 13 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
 | 🔁 | C | `CMSG_REMOVE_GLYPH` |  | ✅ 10-23 |  | 20261023_065825 | 3 |  | HermesProxy/World/Server/Systems/TalentSystem.cs |
 | 🔁 | C | `CMSG_REQUEST_PET_INFO` | ✅ 09-09 | ✅ 10-23 | ✅ 09-17 | 20261023_213708 | 8 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
@@ -629,7 +630,6 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | ✅ | C | `CMSG_PING` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_023616 | 128 |  | HermesProxy/World/Client/WorldClient.cs |
 | ✅ | C | `CMSG_PLAYER_LOGIN` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_023616 | 7 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | ✅ | C | `CMSG_QUERY_GUILD_INFO` | ✅ 10-23 | ✅ 10-24 |  | 20261024_004453 | 3 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
-| ✅ | C | `CMSG_QUERY_NPC_TEXT` | ✅ 09-16 | ✅ 10-24 | ✅ 09-17 | 20261024_000209 | 8 |  | HermesProxy/World/Server/Systems/HotfixSystem.cs |
 | ✅ | C | `CMSG_QUERY_PAGE_TEXT` |  | ✅ 10-23 |  | 20261023_055610 | 4 |  | HermesProxy/World/Server/Systems/QuerySystem.cs |
 | ✅ | C | `CMSG_QUERY_PETITION` |  | ✅ 09-15 |  | 20260915_225130 | 1 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
 | ✅ | C | `CMSG_QUERY_PET_NAME` | ✅ 09-09 | ✅ 10-24 | ✅ 09-17 | 20261024_004453 | 3 |  | HermesProxy/World/Server/Systems/QuerySystem.cs |
@@ -1079,7 +1079,7 @@ HermesProxy/World/Server/Systems/EquipmentSetSystem.cs cd86ba9ee2fa8a71
 HermesProxy/World/Server/Systems/GameObjectSystem.cs a4f3bb5a26debf9b
 HermesProxy/World/Server/Systems/GroupSystem.cs 72d5c1a6e0fcf69c
 HermesProxy/World/Server/Systems/GuildSystem.cs 3f4113220dc555bc
-HermesProxy/World/Server/Systems/HotfixSystem.cs ba31ea62e12e846a
+HermesProxy/World/Server/Systems/HotfixSystem.cs a2b68db30249e7fa
 HermesProxy/World/Server/Systems/InstanceSystem.cs c7eadea06ae8cac6
 HermesProxy/World/Server/Systems/ItemSystem.cs e6457c86a0731f16
 HermesProxy/World/Server/Systems/LfgSystem.cs fc63f761f5b76f9b
