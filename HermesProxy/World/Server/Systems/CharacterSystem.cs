@@ -224,6 +224,7 @@ public static class CharacterSystem
         // so anything set after SendConnectToInstance is a live race. That race crashed
         // the proxy with a NullReferenceException on every enter-world attempt.
         ctx.GetSession().GameState.IsFirstEnterWorld = true;
+        ctx.GetSession().GameState.NewWorldCounter = 0;
         ctx.GetSession().GameState.CurrentPlayerGuid = playerLogin.Guid;
         ctx.GetSession().GameState.CurrentPlayerInfo = ownCharacter;
         // TrinityCore 4.3.4 sends the first SMSG_UPDATE_OBJECT before SMSG_LOGIN_VERIFY_WORLD, and

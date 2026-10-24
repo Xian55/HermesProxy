@@ -483,30 +483,76 @@ public class TransferAborted : ServerPacket, ISpanWritable
     public TransferAbortReasonModern Reason;
 }
 
-public class NewWorld : ServerPacket, ISpanWritable
+public sealed class NewWorld : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<NewWorld>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new NoCounterLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CounterLayout()));
+
+    private static readonly ServerPacketLayout<NewWorld> Layout = Layouts.ForRunningClient();
+
     public NewWorld() : base(Opcode.SMSG_NEW_WORLD) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    public int MaxSize => Layout.MaxSize;
+
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>Up to 3.4.3: the map, where and facing which way, the reason and the movement offset.</summary>
+    internal sealed class NoCounterLayout : ServerPacketLayout<NewWorld>
     {
-        _worldPacket.WriteUInt32(MapID);
-        _worldPacket.WriteVector3(Position);
-        _worldPacket.WriteFloat(Orientation);
-        _worldPacket.WriteUInt32(Reason);
-        _worldPacket.WriteVector3(MovementOffset);
+        public override int MaxSize => 36; // 2 uint + 2 Vector3 (24 bytes) + float = 36
+
+        public override void Write(NewWorld packet, WorldPacket data) => WriteDestination(packet, data);
+
+        public override int WriteToSpan(NewWorld packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            WriteDestination(packet, ref writer);
+            return writer.Position;
+        }
     }
 
-    public int MaxSize => 36; // 2 uint + 2 Vector3 (24 bytes) + float = 36
-
-    public int WriteToSpan(Span<byte> buffer)
+    /// <summary>
+    /// 4.4.1 and later (TrinityCore cata_classic NewWorld::Write, WowPacketParser's 4.4 reader, and
+    /// the 4.4.2 client, which reads 40 bytes): the player's count of far teleports follows.
+    /// </summary>
+    internal sealed class CounterLayout : ServerPacketLayout<NewWorld>
     {
-        var writer = new SpanPacketWriter(buffer);
-        writer.WriteUInt32(MapID);
-        writer.WriteVector3(Position);
-        writer.WriteFloat(Orientation);
-        writer.WriteUInt32(Reason);
-        writer.WriteVector3(MovementOffset);
-        return writer.Position;
+        public override int MaxSize => 40;
+
+        public override void Write(NewWorld packet, WorldPacket data)
+        {
+            WriteDestination(packet, data);
+            data.WriteInt32(packet.Counter);
+        }
+
+        public override int WriteToSpan(NewWorld packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            WriteDestination(packet, ref writer);
+            writer.WriteInt32(packet.Counter);
+            return writer.Position;
+        }
+    }
+
+    private static void WriteDestination(NewWorld packet, WorldPacket data)
+    {
+        data.WriteUInt32(packet.MapID);
+        data.WriteVector3(packet.Position);
+        data.WriteFloat(packet.Orientation);
+        data.WriteUInt32(packet.Reason);
+        data.WriteVector3(packet.MovementOffset);
+    }
+
+    private static void WriteDestination(NewWorld packet, ref SpanPacketWriter writer)
+    {
+        writer.WriteUInt32(packet.MapID);
+        writer.WriteVector3(packet.Position);
+        writer.WriteFloat(packet.Orientation);
+        writer.WriteUInt32(packet.Reason);
+        writer.WriteVector3(packet.MovementOffset);
     }
 
     public uint MapID;
@@ -514,6 +560,7 @@ public class NewWorld : ServerPacket, ISpanWritable
     public Vector3 Position = new();
     public float Orientation;
     public Vector3 MovementOffset;    // Adjusts all pending movement events by this offset
+    public int Counter;
 }
 
 public readonly record struct WorldPortResponse;

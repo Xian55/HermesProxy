@@ -773,6 +773,10 @@ public partial class WorldClient
                 GetSession().ToClient.Cancel(PlayerGuidSubjectKey);
             }
 
+            // No legacy NEW_WORLD carries the count, so the proxy keeps it the way TrinityCore
+            // cata_classic does (Player::m_newWorldCounter: 0 at login, raised before each far
+            // teleport is sent).
+            teleport.Counter = ++GetSession().GameState.NewWorldCounter;
             SendPacketToClient(teleport);
             if (teleport.MapID > 1)
             {
