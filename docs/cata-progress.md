@@ -10,10 +10,10 @@
 | 🚫 unmapped | 68 | not in the 4.3.4 table: renamed, split or removed in 4.x |
 | ⬜ todo | 0 | layout changed in 4.x, no 4.3.4 branch, not seen yet |
 | ⚠️ suspect | 0 | layout changed, no 4.3.4 branch, but passed without an error — likely misread |
-| 🔁 retest | 252 | its file changed after the latest session that exercised it |
+| 🔁 retest | 235 | its file changed after the latest session that exercised it |
 | 🔧 ported, unseen | 11 | has a 4.3.4 branch, waiting for a session to exercise it |
 | · unseen | 13 | same layout as 3.3.5a per WPP, not exercised yet |
-| ✅ seen ok | 568 | ported or unchanged, and the latest session passed it cleanly |
+| ✅ seen ok | 585 | ported or unchanged, and the latest session passed it cleanly |
 | ∅ not sent | 44 | a server packet TrinityCore 4.3.4 never sends: another opcode carries it there, or nothing calls its writer |
 
 ## What's left
@@ -22,15 +22,15 @@ The rows of the legacy table below that still ask for work, by feature. A sessio
 
 | Feature | ❌ | 🚫 | ⬜ | ⚠️ | 🔧 | · | 🔁 | To play or read |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| Movement |  |  |  |  | 9 | 1 | 62 | 🔧 `CMSG_DISMISS_CONTROLLED_VEHICLE`, `CMSG_MOVE_FALL_RESET`, `CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK`, `CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK`, `CMSG_MOVE_NOT_ACTIVE_MOVER`, `SMSG_MOVE_SET_PITCH_RATE`, `SMSG_MOVE_SET_TURN_RATE`, `SMSG_MOVE_SPLINE_SET_PITCH_RATE`, `SMSG_MOVE_SPLINE_SET_TURN_RATE`<br>· `MSG_MOVE_TELEPORT_ACK` |
+| Movement |  |  |  |  | 9 | 1 | 51 | 🔧 `CMSG_DISMISS_CONTROLLED_VEHICLE`, `CMSG_MOVE_FALL_RESET`, `CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK`, `CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK`, `CMSG_MOVE_NOT_ACTIVE_MOVER`, `SMSG_MOVE_SET_PITCH_RATE`, `SMSG_MOVE_SET_TURN_RATE`, `SMSG_MOVE_SPLINE_SET_PITCH_RATE`, `SMSG_MOVE_SPLINE_SET_TURN_RATE`<br>· `MSG_MOVE_TELEPORT_ACK` |
 | Character |  |  |  |  |  | 6 | 17 | · `CMSG_CHARACTER_RENAME_REQUEST`, `CMSG_SET_PLAYER_DECLINED_NAMES`, `SMSG_CHARACTER_LOGIN_FAILED`, `SMSG_CHARACTER_RENAME_RESULT`, `SMSG_PET_UPDATE_COMBO_POINTS`, `SMSG_SET_PLAYER_DECLINED_NAMES_RESULT` |
-| Misc |  |  |  |  |  | 2 | 21 | · `SMSG_INVALIDATE_PLAYER`, `SMSG_SPECIAL_MOUNT_ANIM` |
+| Misc |  |  |  |  |  | 2 | 18 | · `SMSG_INVALIDATE_PLAYER`, `SMSG_SPECIAL_MOUNT_ANIM` |
 | Quest |  |  |  |  |  | 2 | 9 | · `CMSG_QUEST_CONFIRM_ACCEPT`, `SMSG_QUEST_CONFIRM_ACCEPT` |
-| Pet |  |  |  |  |  | 1 | 18 | · `CMSG_PET_CANCEL_AURA` |
+| Pet |  |  |  |  |  | 1 | 17 | · `CMSG_PET_CANCEL_AURA` |
 | Achievement |  |  |  |  | 1 |  |  | 🔧 `SMSG_ACHIEVEMENT_DELETED` |
 | Calendar |  |  |  |  | 1 |  |  | 🔧 `CMSG_CALENDAR_COMPLAIN` |
 | Trade |  |  |  |  |  | 1 |  | · `CMSG_BUSY_TRADE` |
-| Spell |  |  |  |  |  |  | 35 |  |
+| Spell |  |  |  |  |  |  | 27 |  |
 | Battleground |  |  |  |  |  |  | 18 |  |
 | Guild |  |  |  |  |  |  | 15 |  |
 | LFG |  |  |  |  |  |  | 11 |  |
@@ -39,8 +39,10 @@ The rows of the legacy table below that still ask for work, by feature. A sessio
 | Auction |  |  |  |  |  |  | 4 |  |
 | Loot |  |  |  |  |  |  | 4 |  |
 | NPC |  |  |  |  |  |  | 4 |  |
+| Objects |  |  |  |  |  |  | 4 |  |
 | Group |  |  |  |  |  |  | 3 |  |
 | Mail |  |  |  |  |  |  | 3 |  |
+| Arena |  |  |  |  |  |  | 2 |  |
 | Battlefield |  |  |  |  |  |  | 2 |  |
 | Currency |  |  |  |  |  |  | 2 |  |
 | Talent |  |  |  |  |  |  | 2 |  |
@@ -67,33 +69,33 @@ Opcodes HermesProxy writes or reads whose 4.4.2 layout differs from 3.4.3 (docs/
 
 | | Opcode | HP type | Change | Sent | Layouts |
 |---|---|---|---|---:|---|
-| ✅ | `SMSG_ON_MONSTER_MOVE` | `MonsterMove` | `guid u32 u32 u32 u32 u32` → `guid u32 u32` | 866004 | [3.4.3](protocol/3.4.3.54261/smsg-structures/movement.md#smsg_on_monster_move--smsg_monster_move_transport-0x2dd4) · [4.4.2](protocol/4.4.2.60895/smsg-structures/movement.md#smsg_on_monster_move-0x4c0002) |
-| ✅ | `SMSG_UPDATE_OBJECT` | `UpdateObject` | `u32 u16 u8 opt[` → `opt[ u16 u32 u8 opt[`<br>`u32 bytes` → `u32 bytes alt[ loop[ u8 opt[ opt[ guid ] opt[ opt[ u8 opt[ u8 u8 u8 opt[ u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u8 opt[ u32 u32 u32 u32 u8 ] ] u32 opt[ u32 u32 u32 u32 ] opt[ guid ] opt[ u32 ] opt[ u32 u32 ] opt[ u16 u16 u16 ] opt[ u64 ] loop[ u32 ] opt[ guid u32 u32 u32 u32 u8 u32 u8 opt[ u32 ] opt[ u32 ] ] opt[ u32 u32 u32 u32 u8 opt[ alt[ u32 u32 alt[ u32 u32 u32 u32 u32 alt[ u32 u32 u32 u32 loop[ u32 u32 ] opt[ loop[ u32 u32 ] alt[ u32 u32 u32 u32 u32 u32 alt[ u32 u32 u32 u32 u32 u32 u32 u32 ] alt[ u32 u32 u32 ] u32 ] ] ] ] ] ] u8 u8 u8 opt[ u32 u32 u8 u8 loop[ u32 u32 u32 ] ] opt[ u32 u32 u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 u32 u32 u32 ] opt[ u8 u32 u32 u32 u32 u32 u32 u32 opt[ guid ] opt[ u32 u32 u32 ] ] ] opt[ u32 u8 opt[ u32 u32 u8 ] opt[ u32 ] opt[ u32 ] ] opt[ u8 opt[ guid ] ] opt[ u8 opt[ u8 bytes ] opt[ loop[ guid u32 u32 u16 u8 u8 u8 ] loop[ u32 u32 loop[ u32 u32 ] opt[ u16 u16 u32 u32 u32 u8 u8 guid u8 ] ] ] ] opt[ u8 opt[ u32 loop[ u32 ] ] opt[ u8 u8 u32 loop[ u8 ] ] loop[ u32 ] ] opt[ u8 opt[ u32 ] ] alt[ u32 u8 u8 loop[ u8 ] loop[ u8 ] ] ] alt[ u8 u8 u8 opt[ guid loop[ u32 ] u32 u32 u32 u32 u32 u32 u32 u32 u32 loop[ guid ] u8 opt[ guid ] opt[ u32 u32 u32 u32 u32 ] opt[ u32 u32 ] opt[ u32 u32 u8 opt[ u32 u32 u32 ] ] u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u8 loop[ guid u32 u32 u32 u32 u32 u32 u32 u32 u32 u8 ] opt[ u32 u32 u32 u32 u8 opt[ u32 u32 u32 u32 u32 u8 u8 u8 opt[ u32 loop[ u32 u32 ] u8 ] opt[ opt[ opt[ u32 ] alt[ guid ] alt[ u32 u32 u32 ] ] ] opt[ u32 ] loop[ u32 u32 u32 ] opt[ u32 u32 u32 ] ] ] ] u32 opt[ u32 u32 u32 u32 ] opt[ guid ] opt[ u32 ] opt[ u32 u32 ] opt[ u16 u16 u16 ] opt[ u64 ] loop[ u32 ] opt[ guid u32 u32 u32 u32 u8 u32 u8 opt[ u32 ] opt[ u32 ] ] opt[ u32 u32 u32 u32 u8 opt[ alt[ u32 u32 alt[ u32 u32 u32 u32 u32 alt[ u32 u32 u32 u32 loop[ u32 u32 ] opt[ loop[ u32 u32 ] alt[ u32 u32 u32 u32 u32 u32 alt[ u32 u32 u32 u32 u32 u32 u32 u32 ] alt[ u32 u32 u32 ] u32 ] ] ] ] ] ] u8 u8 u8 opt[ u32 u32 u8 u8 loop[ u32 u32 u32 ] ] opt[ u32 u32 u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 u32 u32 u32 ] opt[ u8 u32 u32 u32 u32 u32 u32 u32 opt[ guid ] opt[ u32 u32 u32 ] ] ] opt[ u32 u8 opt[ u32 u32 u8 ] opt[ u32 ] opt[ u32 ] ] opt[ u8 opt[ guid ] ] opt[ u8 opt[ u8 bytes ] opt[ loop[ guid u32 u32 u16 u8 u8 u8 loop[ guid u32 u32 u32 u16 u16 u32 u32 u32 u32 u32 u8 u16 u8 u32 u32 u32 loop[ u32 u32 ] bits(7) bytes ] ] loop[ u32 u32 loop[ u32 u32 u32 u32 u8 ] loop[ u32 u32 ] opt[ u16 u16 u32 u32 u32 u8 u8 guid u8 ] ] ] ] opt[ u8 opt[ u32 loop[ u32 ] ] opt[ u8 u8 u32 loop[ u8 ] ] loop[ u32 ] ] opt[ u8 opt[ u32 ] ] alt[ u32 u8 u8 loop[ u8 ] loop[ u8 ] ] ] ] alt[ opt[ u32 u8 u8 opt[ u8 opt[ u8 loop[ u8 ] u8 loop[ u8 ] ] alt[ u8 loop[ u8 ] ] ] ] alt[ u32 bytes ] ] ] ] ] opt[ loop[ u8 opt[ opt[ guid u8 u8 u8 u8 opt[ guid loop[ u32 ] u32 u32 u32 u32 u32 u32 u32 u32 u32 loop[ guid ] u8 opt[ guid ] opt[ u32 u32 u32 u32 u32 ] opt[ u32 u32 ] opt[ u32 u32 u8 opt[ u32 u32 u32 ] ] u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u8 loop[ guid u32 u32 u32 u32 u32 u32 u32 u32 u32 u8 ] opt[ u32 u32 u32 u32 u8 opt[ u32 u32 u32 u32 u32 u8 u8 u8 opt[ u32 loop[ u32 u32 ] u8 ] opt[ opt[ opt[ u32 ] alt[ guid ] alt[ u32 u32 u32 ] ] ] opt[ u32 ] loop[ u32 u32 u32 ] opt[ u32 u32 u32 ] ] ] ] u32 opt[ u32 u32 u32 u32 ] opt[ guid ] opt[ u32 ] opt[ u32 u32 ] opt[ u16 u16 u16 ] opt[ u64 ] loop[ u32 ] opt[ guid u32 u32 u32 u32 u8 u32 u8 opt[ u32 ] opt[ u32 ] ] opt[ u32 u32 u32 u32 u8 opt[ alt[ u32 u32 alt[ u32 u32 u32 u32 u32 alt[ u32 u32 u32 u32 loop[ u32 u32 ] opt[ loop[ u32 u32 ] alt[ u32 u32 u32 u32 u32 u32 alt[ u32 u32 u32 u32 u32 u32 u32 u32 ] alt[ u32 u32 u32 ] u32 ] ] ] ] ] ] u8 u8 u8 opt[ u32 u32 u8 u8 loop[ u32 u32 u32 ] ] opt[ u32 u32 u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 u32 u32 u32 ] opt[ u8 u32 u32 u32 u32 u32 u32 u32 opt[ guid ] opt[ u32 u32 u32 ] ] ] opt[ u32 u8 opt[ u32 u32 u8 ] opt[ u32 ] opt[ u32 ] ] opt[ u8 opt[ guid ] ] opt[ u8 opt[ u8 bytes ] opt[ loop[ guid u32 u32 u16 u8 u8 u8 loop[ guid u32 u32 u32 u16 u16 u32 u32 u32 u32 u32 u8 u16 u8 u32 u32 u32 loop[ u32 u32 ] bits(7) bytes ] ] loop[ u32 u32 loop[ u32 u32 u32 u32 u8 ] loop[ u32 u32 ] opt[ u16 u16 u32 u32 u32 u8 u8 guid u8 ] ] ] ] opt[ u8 opt[ u32 loop[ u32 ] ] opt[ u8 u8 u32 loop[ u8 ] ] loop[ u32 ] ] opt[ u8 opt[ u32 ] ] ] alt[ guid ] ] ] ] ] ]` | 682334 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_update_object-0x27cb) · [4.4.2](protocol/4.4.2.60895/smsg-structures/object-update.md#smsg_update_object-0x4b0000) |
-| ✅ | `SMSG_SPELL_GO` | `SpellGo` | `] alt[ opt[ u8 ] alt[ u8 ] ] guid` → `] alt[ u8 ] guid`<br>`] loop[ u32 u8 ] opt[` → `] loop[ u8 u32 ] opt[`<br>`u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32` | 212493 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_go-0x2c36) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_go-0x510028) |
-| ✅ | `SMSG_SPELL_START` | `SpellStart` | `] alt[ opt[ u8 ] alt[ u8 ] ] guid` → `] alt[ u8 ] guid`<br>`] loop[ u32 u8 ] opt[` → `] loop[ u8 u32 ] opt[` | 140763 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_start-0x2c37) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_start-0x510029) |
-| ✅ | `SMSG_QUERY_CREATURE_RESPONSE` | `QueryCreatureResponse` | `u32 u32 bytes bytes` → `u32 u32 u32 bytes bytes`<br>`u32 ] ]` → `u32 ] loop[ u32 ] ]` | 67850 | [3.4.3](protocol/3.4.3.54261/smsg-structures/cache.md#smsg_query_creature_response-0x2914) · [4.4.2](protocol/4.4.2.60895/smsg-structures/cache.md#smsg_query_creature_response-0x3f0006) |
-| ✅ | `SMSG_CHAT` | `ChatPkt` | `u32 u32 u32 u32 u8 u8 u8 u8 u8 u8 u8 bits(7) opt[ u8` → `u32 u32 u16 u32 u32 u8 bits(3) u8 alt[ u8 ] alt[ u8 ] alt[ u8 ] u8 alt[ u8 ] opt[ u8` | 18840 | [3.4.3](protocol/3.4.3.54261/smsg-structures/chat.md#smsg_chat-0x2bad) · [4.4.2](protocol/4.4.2.60895/smsg-structures/chat.md#smsg_chat-0x400001) |
-| ✅ | `CMSG_CHAT_MESSAGE_WHISPER` | `ChatMessageWhisper` | `u32 u8` → `u32 guid u32 u8` | 10579 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_chat_message_whisper-0x37d0) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_chat_message_whisper-0x300008) |
-| ✅ | `SMSG_CHANNEL_NOTIFY_JOINED` | `ChannelNotifyJoined` | `bits(7) opt[ u8 ] alt[ u8 ] bits(3) u32 u32 u64` → `u8 u8 u8 u32 u8 u32 u64` | 5436 | [3.4.3](protocol/3.4.3.54261/smsg-structures/chat.md#smsg_channel_notify_joined-0x2bc2) · [4.4.2](protocol/4.4.2.60895/smsg-structures/chat.md#smsg_channel_notify_joined-0x400017) |
-| ✅ | `CMSG_CAST_SPELL` | `CastSpell` | `u32 u32 loop[ u32` → `u32 u32 u8 loop[ u32` | 3992 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_cast_spell-0x329c) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_cast_spell-0x340155) |
-| ✅ | `SMSG_PHASE_SHIFT_CHANGE` | `PhaseShiftChange` | `guid loop[ u16 u16 ]` → `guid loop[ u32 u16 ]` | 3029 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_phase_shift_change-0x2578) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_phase_shift_change-0x3b000c) |
-| ✅ | `SMSG_PARTY_UPDATE` | `PartyUpdate` | `guid u8 u32 u8` → `guid u8 u32 u32 u8` | 1334 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_party_update-0x25f4) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_party_update-0x3b008d) |
-| ✅ | `SMSG_QUERY_QUEST_INFO_RESPONSE` | `QueryQuestInfoResponse` | `u32 u32 bits(9) opt[ u8 ] alt[ u8 ] bits(4) opt[ u8 ] alt[ u8 ] bits(4) bits(9) opt[ u8 ] alt[ u8 ] bits(2) opt[ u8` → `u32 u32 u32 loop[ u32 ] loop[ u32 ] u8 u8 u8 bits(4) u8 alt[ u8 ] opt[ u8`<br>`u8 ] alt[ u8 ] bits(2) opt[ u8 ] alt[ u8` → `u8 ] opt[ u8 ] alt[ u8 ] bits(2) u8 u8 alt[ u8`<br>`u8 ] bits(3) loop[ u32 u8 u8 u32` → `u8 ] u8 alt[ u8 ] opt[ u8 ] loop[ u32 u32 u8 u32` | 1324 | [3.4.3](protocol/3.4.3.54261/smsg-structures/quest.md#smsg_query_quest_info_response-0x2a96) · [4.4.2](protocol/4.4.2.60895/smsg-structures/quest.md#smsg_query_quest_info_response-0x4f0016) |
-| ✅ | `SMSG_ENUM_CHARACTERS_RESULT` | `EnumCharactersResult` | `u8 u32 u32` → `u8 u8 u32 u32 u32 u32`<br>`] loop[ guid u64 u8 u8 u8 u8 u32 u8` → `] loop[ u64 u8 u32 u32 loop[ u32 u32 opt[ guid ] ] ] loop[ guid u32 u8 u8 u8 u8 u16 u32 u8`<br>`u32 u32 guid u32 u32` → `u32 u32 u64 guid u32 u32 u32 u8 u32 u32 u32 loop[ u32 u8 u32 u8 u32 u32 u32 ] u32 u64 u32 u32 u32 u32`<br>`u32 u32 u32 u8 u8 ] u64 u16 u32 u32` → `u32 u32 ] u8 bytes u8 u32 u32 u32 loop[ u32 ] loop[ u8 ] loop[ bytes ] ] loop[ guid u32 u8 u8 u8 u8 u16 u32 u8 u32 u32 u32 u32 u32 u64 guid u32 u32 u32 u8 u32 u32 u32 loop[ u32 u8 u32 u8 u32 u32 u32 ] u32 u64 u32 u32 u32 u32 u32 u32`<br>… 1 more | 1236 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_enum_characters_result-0x2583) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_enum_characters_result-0x3b0018) |
-| ✅ | `SMSG_SPELL_EXECUTE_LOG` | `SpellExecuteLog` | `guid u32 u32 u32 ]` → `guid u32 u8 u32 ]`<br>`u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32` | 1164 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_execute_log-0x2c3d) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_execute_log-0x51002f) |
-| ✅ | `SMSG_SPELL_ENERGIZE_LOG` | `SpellEnergizeLog` | `guid u32 u32 u32 u32` → `guid u32 u8 u32 u32`<br>`u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32` | 877 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_energize_log-0x2c19) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_energize_log-0x510009) |
-| ✅ | `SMSG_FEATURE_SYSTEM_STATUS` | `FeatureSystemStatus` | `u32 u32 u16 u16 u32 loop[ u32 u32 ] u8 u8` → `u32 u32 u32 u32 u16 u16 u32 u32 u32 u32 u32 loop[ u32 u32 u32 ] u8 u8 u8 u8`<br>`] ] u8 guid` → `] ] bytes u8 guid` | 867 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_feature_system_status-0x25bf) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_feature_system_status-0x3b0058) |
-| ✅ | `SMSG_INITIALIZE_FACTIONS` | `InitializeFactions` | `loop[ u16 u32 ] loop[ u8 ]` → `u32 u32 loop[ u32 u16 u32 ] loop[ u32 u8 ]` | 867 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_initialize_factions-0x2724) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_initialize_factions-0x3b01bf) |
-| ✅ | `SMSG_ITEM_PUSH_RESULT` | `ItemPushResult` | `u32 u32 u32 u32 guid` → `u32 u32 u8 u32 guid`<br>`u8 loop[ u32 u8 ] opt[` → `u8 loop[ u8 u32 ] opt[` | 841 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_item_push_result-0x2623) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_item_push_result-0x3b00bc) |
-| ✅ | `SMSG_FEATURE_SYSTEM_STATUS_GLUE_SCREEN` | `FeatureSystemStatusGlueScreen` | `u8 u8 opt[ u8 u8 ] opt[ u8` → `u8 u8 u8 u8 opt[ u8`<br>`u32 u32 u16 u16 u32 u32` → `u32 u32 u32 u32 u16 u16 u32 u32 u32`<br>`u32 ] opt[ bytes ] loop[ u32 ] loop[ u32 u32` → `u32 ] bytes loop[ u32 ] loop[ u32 u32 u32` | 694 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_feature_system_status_glue_screen-0x25c0) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_feature_system_status_glue_screen-0x3b0059) |
+| ✅ | `SMSG_ON_MONSTER_MOVE` | `MonsterMove` | `guid u32 u32 u32 u32 u32` → `guid u32 u32` | 869414 | [3.4.3](protocol/3.4.3.54261/smsg-structures/movement.md#smsg_on_monster_move--smsg_monster_move_transport-0x2dd4) · [4.4.2](protocol/4.4.2.60895/smsg-structures/movement.md#smsg_on_monster_move-0x4c0002) |
+| ✅ | `SMSG_UPDATE_OBJECT` | `UpdateObject` | `u32 u16 u8 opt[` → `opt[ u16 u32 u8 opt[`<br>`u32 bytes` → `u32 bytes alt[ loop[ u8 opt[ opt[ guid ] opt[ opt[ u8 opt[ u8 u8 u8 opt[ u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u8 opt[ u32 u32 u32 u32 u8 ] ] u32 opt[ u32 u32 u32 u32 ] opt[ guid ] opt[ u32 ] opt[ u32 u32 ] opt[ u16 u16 u16 ] opt[ u64 ] loop[ u32 ] opt[ guid u32 u32 u32 u32 u8 u32 u8 opt[ u32 ] opt[ u32 ] ] opt[ u32 u32 u32 u32 u8 opt[ alt[ u32 u32 alt[ u32 u32 u32 u32 u32 alt[ u32 u32 u32 u32 loop[ u32 u32 ] opt[ loop[ u32 u32 ] alt[ u32 u32 u32 u32 u32 u32 alt[ u32 u32 u32 u32 u32 u32 u32 u32 ] alt[ u32 u32 u32 ] u32 ] ] ] ] ] ] u8 u8 u8 opt[ u32 u32 u8 u8 loop[ u32 u32 u32 ] ] opt[ u32 u32 u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 u32 u32 u32 ] opt[ u8 u32 u32 u32 u32 u32 u32 u32 opt[ guid ] opt[ u32 u32 u32 ] ] ] opt[ u32 u8 opt[ u32 u32 u8 ] opt[ u32 ] opt[ u32 ] ] opt[ u8 opt[ guid ] ] opt[ u8 opt[ u8 bytes ] opt[ loop[ guid u32 u32 u16 u8 u8 u8 ] loop[ u32 u32 loop[ u32 u32 ] opt[ u16 u16 u32 u32 u32 u8 u8 guid u8 ] ] ] ] opt[ u8 opt[ u32 loop[ u32 ] ] opt[ u8 u8 u32 loop[ u8 ] ] loop[ u32 ] ] opt[ u8 opt[ u32 ] ] alt[ u32 u8 u8 loop[ u8 ] loop[ u8 ] ] ] alt[ u8 u8 u8 opt[ guid loop[ u32 ] u32 u32 u32 u32 u32 u32 u32 u32 u32 loop[ guid ] u8 opt[ guid ] opt[ u32 u32 u32 u32 u32 ] opt[ u32 u32 ] opt[ u32 u32 u8 opt[ u32 u32 u32 ] ] u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u8 loop[ guid u32 u32 u32 u32 u32 u32 u32 u32 u32 u8 ] opt[ u32 u32 u32 u32 u8 opt[ u32 u32 u32 u32 u32 u8 u8 u8 opt[ u32 loop[ u32 u32 ] u8 ] opt[ opt[ opt[ u32 ] alt[ guid ] alt[ u32 u32 u32 ] ] ] opt[ u32 ] loop[ u32 u32 u32 ] opt[ u32 u32 u32 ] ] ] ] u32 opt[ u32 u32 u32 u32 ] opt[ guid ] opt[ u32 ] opt[ u32 u32 ] opt[ u16 u16 u16 ] opt[ u64 ] loop[ u32 ] opt[ guid u32 u32 u32 u32 u8 u32 u8 opt[ u32 ] opt[ u32 ] ] opt[ u32 u32 u32 u32 u8 opt[ alt[ u32 u32 alt[ u32 u32 u32 u32 u32 alt[ u32 u32 u32 u32 loop[ u32 u32 ] opt[ loop[ u32 u32 ] alt[ u32 u32 u32 u32 u32 u32 alt[ u32 u32 u32 u32 u32 u32 u32 u32 ] alt[ u32 u32 u32 ] u32 ] ] ] ] ] ] u8 u8 u8 opt[ u32 u32 u8 u8 loop[ u32 u32 u32 ] ] opt[ u32 u32 u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 u32 u32 u32 ] opt[ u8 u32 u32 u32 u32 u32 u32 u32 opt[ guid ] opt[ u32 u32 u32 ] ] ] opt[ u32 u8 opt[ u32 u32 u8 ] opt[ u32 ] opt[ u32 ] ] opt[ u8 opt[ guid ] ] opt[ u8 opt[ u8 bytes ] opt[ loop[ guid u32 u32 u16 u8 u8 u8 loop[ guid u32 u32 u32 u16 u16 u32 u32 u32 u32 u32 u8 u16 u8 u32 u32 u32 loop[ u32 u32 ] bits(7) bytes ] ] loop[ u32 u32 loop[ u32 u32 u32 u32 u8 ] loop[ u32 u32 ] opt[ u16 u16 u32 u32 u32 u8 u8 guid u8 ] ] ] ] opt[ u8 opt[ u32 loop[ u32 ] ] opt[ u8 u8 u32 loop[ u8 ] ] loop[ u32 ] ] opt[ u8 opt[ u32 ] ] alt[ u32 u8 u8 loop[ u8 ] loop[ u8 ] ] ] ] alt[ opt[ u32 u8 u8 opt[ u8 opt[ u8 loop[ u8 ] u8 loop[ u8 ] ] alt[ u8 loop[ u8 ] ] ] ] alt[ u32 bytes ] ] ] ] ] opt[ loop[ u8 opt[ opt[ guid u8 u8 u8 u8 opt[ guid loop[ u32 ] u32 u32 u32 u32 u32 u32 u32 u32 u32 loop[ guid ] u8 opt[ guid ] opt[ u32 u32 u32 u32 u32 ] opt[ u32 u32 ] opt[ u32 u32 u8 opt[ u32 u32 u32 ] ] u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u8 loop[ guid u32 u32 u32 u32 u32 u32 u32 u32 u32 u8 ] opt[ u32 u32 u32 u32 u8 opt[ u32 u32 u32 u32 u32 u8 u8 u8 opt[ u32 loop[ u32 u32 ] u8 ] opt[ opt[ opt[ u32 ] alt[ guid ] alt[ u32 u32 u32 ] ] ] opt[ u32 ] loop[ u32 u32 u32 ] opt[ u32 u32 u32 ] ] ] ] u32 opt[ u32 u32 u32 u32 ] opt[ guid ] opt[ u32 ] opt[ u32 u32 ] opt[ u16 u16 u16 ] opt[ u64 ] loop[ u32 ] opt[ guid u32 u32 u32 u32 u8 u32 u8 opt[ u32 ] opt[ u32 ] ] opt[ u32 u32 u32 u32 u8 opt[ alt[ u32 u32 alt[ u32 u32 u32 u32 u32 alt[ u32 u32 u32 u32 loop[ u32 u32 ] opt[ loop[ u32 u32 ] alt[ u32 u32 u32 u32 u32 u32 alt[ u32 u32 u32 u32 u32 u32 u32 u32 ] alt[ u32 u32 u32 ] u32 ] ] ] ] ] ] u8 u8 u8 opt[ u32 u32 u8 u8 loop[ u32 u32 u32 ] ] opt[ u32 u32 u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 ] opt[ u32 u32 u32 u32 ] opt[ u8 u32 u32 u32 u32 u32 u32 u32 opt[ guid ] opt[ u32 u32 u32 ] ] ] opt[ u32 u8 opt[ u32 u32 u8 ] opt[ u32 ] opt[ u32 ] ] opt[ u8 opt[ guid ] ] opt[ u8 opt[ u8 bytes ] opt[ loop[ guid u32 u32 u16 u8 u8 u8 loop[ guid u32 u32 u32 u16 u16 u32 u32 u32 u32 u32 u8 u16 u8 u32 u32 u32 loop[ u32 u32 ] bits(7) bytes ] ] loop[ u32 u32 loop[ u32 u32 u32 u32 u8 ] loop[ u32 u32 ] opt[ u16 u16 u32 u32 u32 u8 u8 guid u8 ] ] ] ] opt[ u8 opt[ u32 loop[ u32 ] ] opt[ u8 u8 u32 loop[ u8 ] ] loop[ u32 ] ] opt[ u8 opt[ u32 ] ] ] alt[ guid ] ] ] ] ] ]` | 685410 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_update_object-0x27cb) · [4.4.2](protocol/4.4.2.60895/smsg-structures/object-update.md#smsg_update_object-0x4b0000) |
+| ✅ | `SMSG_SPELL_GO` | `SpellGo` | `] alt[ opt[ u8 ] alt[ u8 ] ] guid` → `] alt[ u8 ] guid`<br>`] loop[ u32 u8 ] opt[` → `] loop[ u8 u32 ] opt[`<br>`u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32` | 217395 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_go-0x2c36) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_go-0x510028) |
+| ✅ | `SMSG_SPELL_START` | `SpellStart` | `] alt[ opt[ u8 ] alt[ u8 ] ] guid` → `] alt[ u8 ] guid`<br>`] loop[ u32 u8 ] opt[` → `] loop[ u8 u32 ] opt[` | 141489 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_start-0x2c37) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_start-0x510029) |
+| ✅ | `SMSG_QUERY_CREATURE_RESPONSE` | `QueryCreatureResponse` | `u32 u32 bytes bytes` → `u32 u32 u32 bytes bytes`<br>`u32 ] ]` → `u32 ] loop[ u32 ] ]` | 68952 | [3.4.3](protocol/3.4.3.54261/smsg-structures/cache.md#smsg_query_creature_response-0x2914) · [4.4.2](protocol/4.4.2.60895/smsg-structures/cache.md#smsg_query_creature_response-0x3f0006) |
+| ✅ | `SMSG_CHAT` | `ChatPkt` | `u32 u32 u32 u32 u8 u8 u8 u8 u8 u8 u8 bits(7) opt[ u8` → `u32 u32 u16 u32 u32 u8 bits(3) u8 alt[ u8 ] alt[ u8 ] alt[ u8 ] u8 alt[ u8 ] opt[ u8` | 18939 | [3.4.3](protocol/3.4.3.54261/smsg-structures/chat.md#smsg_chat-0x2bad) · [4.4.2](protocol/4.4.2.60895/smsg-structures/chat.md#smsg_chat-0x400001) |
+| ✅ | `CMSG_CHAT_MESSAGE_WHISPER` | `ChatMessageWhisper` | `u32 u8` → `u32 guid u32 u8` | 10673 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_chat_message_whisper-0x37d0) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_chat_message_whisper-0x300008) |
+| ✅ | `SMSG_CHANNEL_NOTIFY_JOINED` | `ChannelNotifyJoined` | `bits(7) opt[ u8 ] alt[ u8 ] bits(3) u32 u32 u64` → `u8 u8 u8 u32 u8 u32 u64` | 5453 | [3.4.3](protocol/3.4.3.54261/smsg-structures/chat.md#smsg_channel_notify_joined-0x2bc2) · [4.4.2](protocol/4.4.2.60895/smsg-structures/chat.md#smsg_channel_notify_joined-0x400017) |
+| ✅ | `CMSG_CAST_SPELL` | `CastSpell` | `u32 u32 loop[ u32` → `u32 u32 u8 loop[ u32` | 4019 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_cast_spell-0x329c) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_cast_spell-0x340155) |
+| ✅ | `SMSG_PHASE_SHIFT_CHANGE` | `PhaseShiftChange` | `guid loop[ u16 u16 ]` → `guid loop[ u32 u16 ]` | 3033 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_phase_shift_change-0x2578) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_phase_shift_change-0x3b000c) |
+| ✅ | `SMSG_PARTY_UPDATE` | `PartyUpdate` | `guid u8 u32 u8` → `guid u8 u32 u32 u8` | 1340 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_party_update-0x25f4) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_party_update-0x3b008d) |
+| ✅ | `SMSG_QUERY_QUEST_INFO_RESPONSE` | `QueryQuestInfoResponse` | `u32 u32 bits(9) opt[ u8 ] alt[ u8 ] bits(4) opt[ u8 ] alt[ u8 ] bits(4) bits(9) opt[ u8 ] alt[ u8 ] bits(2) opt[ u8` → `u32 u32 u32 loop[ u32 ] loop[ u32 ] u8 u8 u8 bits(4) u8 alt[ u8 ] opt[ u8`<br>`u8 ] alt[ u8 ] bits(2) opt[ u8 ] alt[ u8` → `u8 ] opt[ u8 ] alt[ u8 ] bits(2) u8 u8 alt[ u8`<br>`u8 ] bits(3) loop[ u32 u8 u8 u32` → `u8 ] u8 alt[ u8 ] opt[ u8 ] loop[ u32 u32 u8 u32` | 1328 | [3.4.3](protocol/3.4.3.54261/smsg-structures/quest.md#smsg_query_quest_info_response-0x2a96) · [4.4.2](protocol/4.4.2.60895/smsg-structures/quest.md#smsg_query_quest_info_response-0x4f0016) |
+| ✅ | `SMSG_ENUM_CHARACTERS_RESULT` | `EnumCharactersResult` | `u8 u32 u32` → `u8 u8 u32 u32 u32 u32`<br>`] loop[ guid u64 u8 u8 u8 u8 u32 u8` → `] loop[ u64 u8 u32 u32 loop[ u32 u32 opt[ guid ] ] ] loop[ guid u32 u8 u8 u8 u8 u16 u32 u8`<br>`u32 u32 guid u32 u32` → `u32 u32 u64 guid u32 u32 u32 u8 u32 u32 u32 loop[ u32 u8 u32 u8 u32 u32 u32 ] u32 u64 u32 u32 u32 u32`<br>`u32 u32 u32 u8 u8 ] u64 u16 u32 u32` → `u32 u32 ] u8 bytes u8 u32 u32 u32 loop[ u32 ] loop[ u8 ] loop[ bytes ] ] loop[ guid u32 u8 u8 u8 u8 u16 u32 u8 u32 u32 u32 u32 u32 u64 guid u32 u32 u32 u8 u32 u32 u32 loop[ u32 u8 u32 u8 u32 u32 u32 ] u32 u64 u32 u32 u32 u32 u32 u32`<br>… 1 more | 1238 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_enum_characters_result-0x2583) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_enum_characters_result-0x3b0018) |
+| ✅ | `SMSG_SPELL_EXECUTE_LOG` | `SpellExecuteLog` | `guid u32 u32 u32 ]` → `guid u32 u8 u32 ]`<br>`u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32` | 1165 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_execute_log-0x2c3d) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_execute_log-0x51002f) |
+| ✅ | `SMSG_SPELL_ENERGIZE_LOG` | `SpellEnergizeLog` | `guid u32 u32 u32 u32` → `guid u32 u8 u32 u32`<br>`u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32` | 885 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_energize_log-0x2c19) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_energize_log-0x510009) |
+| ✅ | `SMSG_FEATURE_SYSTEM_STATUS` | `FeatureSystemStatus` | `u32 u32 u16 u16 u32 loop[ u32 u32 ] u8 u8` → `u32 u32 u32 u32 u16 u16 u32 u32 u32 u32 u32 loop[ u32 u32 u32 ] u8 u8 u8 u8`<br>`] ] u8 guid` → `] ] bytes u8 guid` | 869 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_feature_system_status-0x25bf) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_feature_system_status-0x3b0058) |
+| ✅ | `SMSG_INITIALIZE_FACTIONS` | `InitializeFactions` | `loop[ u16 u32 ] loop[ u8 ]` → `u32 u32 loop[ u32 u16 u32 ] loop[ u32 u8 ]` | 869 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_initialize_factions-0x2724) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_initialize_factions-0x3b01bf) |
+| ✅ | `SMSG_ITEM_PUSH_RESULT` | `ItemPushResult` | `u32 u32 u32 u32 guid` → `u32 u32 u8 u32 guid`<br>`u8 loop[ u32 u8 ] opt[` → `u8 loop[ u8 u32 ] opt[` | 842 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_item_push_result-0x2623) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_item_push_result-0x3b00bc) |
+| ✅ | `SMSG_FEATURE_SYSTEM_STATUS_GLUE_SCREEN` | `FeatureSystemStatusGlueScreen` | `u8 u8 opt[ u8 u8 ] opt[ u8` → `u8 u8 u8 u8 opt[ u8`<br>`u32 u32 u16 u16 u32 u32` → `u32 u32 u32 u32 u16 u16 u32 u32 u32`<br>`u32 ] opt[ bytes ] loop[ u32 ] loop[ u32 u32` → `u32 ] bytes loop[ u32 ] loop[ u32 u32 u32` | 696 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_feature_system_status_glue_screen-0x25c0) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_feature_system_status_glue_screen-0x3b0059) |
 | ✅ | `SMSG_GUILD_ROSTER` | `GuildRoster` | `u64 u8 u8 u8 u8 bytes bytes` → `u64 u8 bits(6) u8 u8 opt[ u8 ] u32 u32 u32 loop[ u32 u32 u32 u32 u8 ] bytes bytes` | 475 | [3.4.3](protocol/3.4.3.54261/smsg-structures/guild.md#smsg_guild_roster-0x29bb) · [4.4.2](protocol/4.4.2.60895/smsg-structures/guild.md#smsg_guild_roster-0x470003) |
 | ✅ | `SMSG_SET_FACTION_STANDING` | `SetFactionStanding` | `u32 u32 ] u8` → `u32 u32 u32 ] u8` | 372 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_set_faction_standing-0x272c) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_set_faction_standing-0x3b01c7) |
 | ✅ | `SMSG_GOSSIP_MESSAGE` | `GossipMessagePkt` | `guid u32 u32` → `guid u32 u32 u32`<br>`u8 u8 u32 loop[` → `u8 u8 u8 u32 loop[`<br>`u32 u32 ] bytes` → `u32 u32 u8 ] bytes`<br>`u32 ] ] opt[` → `u32 ] bytes ] opt[`<br>… 1 more | 359 | [3.4.3](protocol/3.4.3.54261/smsg-structures/quest.md#smsg_gossip_message-0x2a98) · [4.4.2](protocol/4.4.2.60895/smsg-structures/quest.md#smsg_gossip_message-0x4f0018) |
-| ✅ | `CMSG_REQUEST_ACCOUNT_DATA` | `RequestAccountData` | `guid bits(4) flush` → `guid u32` | 310 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_request_account_data-0x3694) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_request_account_data-0x3900c1) |
-| ✅ | `SMSG_UPDATE_ACCOUNT_DATA` | `UpdateAccountData` | `guid u64 u32 u8 u32 bytes` → `u64 u32 guid u32 u32 bytes` | 310 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_update_account_data-0x2709) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_update_account_data-0x3b01a5) |
+| ✅ | `CMSG_REQUEST_ACCOUNT_DATA` | `RequestAccountData` | `guid bits(4) flush` → `guid u32` | 311 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_request_account_data-0x3694) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_request_account_data-0x3900c1) |
+| ✅ | `SMSG_UPDATE_ACCOUNT_DATA` | `UpdateAccountData` | `guid u64 u32 u8 u32 bytes` → `u64 u32 guid u32 u32 bytes` | 311 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_update_account_data-0x2709) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_update_account_data-0x3b01a5) |
 | ✅ | `CMSG_UPDATE_ACCOUNT_DATA` | `UserClientUpdateAccountData` | `guid u64 u32 bits(4) flush u32 bytes` → `u64 u32 guid u32 u32 bytes` | 227 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_update_account_data-0x3695) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_update_account_data-0x3900c2) |
 | ✅ | `CMSG_USE_ITEM` | `UseItem` | `u32 u32 loop[ u32` → `u32 u32 u8 loop[ u32` | 172 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_use_item-0x3298) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_use_item-0x340151) |
-| ✅ | `CMSG_STAND_STATE_CHANGE` | `StandStateChange` | `u32` → `u8` | 112 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_stand_state_change-0x318c) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_stand_state_change-0x340035) |
+| ✅ | `CMSG_STAND_STATE_CHANGE` | `StandStateChange` | `u32` → `u8` | 114 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_stand_state_change-0x318c) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_stand_state_change-0x340035) |
 | ✅ | `CMSG_PET_CAST_SPELL` | `PetCastSpell` | `u32 u32 loop[ u32` → `u32 u32 u8 loop[ u32` | 105 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_pet_cast_spell-0x329b) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_pet_cast_spell-0x340154) |
 | ✅ | `SMSG_QUEST_GIVER_QUEST_DETAILS` | `QuestGiverQuestDetails` | `guid guid u32 u32` → `guid guid u32 u32 u32`<br>`u32 u32 u8 ] bits(9) opt[ u8 ] alt[ u8 ] bits(4) opt[ u8 ] alt[ u8 ] bits(4) opt[ u8 ] alt[ u8 ] bits(2) opt[ u8 ] alt[ u8 ] opt[ u8 ] alt[ u8 ] bits(2) u8 opt[ u8 ] opt[ u8 ] opt[ u8 ] opt[ u8 ] u32 u32 u32 u32 u32 u32 u32 u32 u32 u32` → `u32 u32 u32 ] u8 u8 u8 u8 u8 u8 u8 u8 u8 u8 loop[ u32 u32 ] loop[ u32 u32 u32 ] u32 u32`<br>`] u32 loop[ u32 u32 ] u32 u32 u32 u8 u32` → `] u32 u32 u32 u32 loop[ u32 ] u8 u32`<br>`u8 loop[ u32 u8 ] opt[` → `u8 loop[ u8 u32 ] opt[` | 91 | [3.4.3](protocol/3.4.3.54261/smsg-structures/quest.md#smsg_quest_giver_quest_details-0x2a92) · [4.4.2](protocol/4.4.2.60895/smsg-structures/quest.md#smsg_quest_giver_quest_details-0x4f0012) |
 | ✅ | `SMSG_QUEST_GIVER_OFFER_REWARD_MESSAGE` | `QuestGiverOfferRewardMessage` | `guid u32` → `loop[ u32 u32 ] loop[ u32 u32 u32 ] u32 u32 u32 u32 u64 u32 u32 u32 u32 loop[ u32 u32 u32 u32 ] loop[ u32 ] u32 u32 u32 u32 loop[ u32 ] u8 u32 u32 u32 u8 u8 loop[ u8 u32 ] opt[ u8 u32 loop[ u32 ] ] u32 u8 u32 u32 u32 u8 u8 loop[ u8 u32 ] opt[ u8 u32 loop[ u32 ] ] u32 u8 u32 u32 u32 u8 u8 loop[ u8 u32 ] opt[ u8 u32 loop[ u32 ] ] u32 u8 u32 u32 u32 u8 u8 loop[ u8 u32 ] opt[ u8 u32 loop[ u32 ] ] u32 u8 u32 u32 u32 u8 u8 loop[ u8 u32 ] opt[ u8 u32 loop[ u32 ] ] u32 u8 u32 u32 u32 u8 u8 loop[ u8 u32 ] opt[ u8 u32 loop[ u32 ] ] u32 u8 u32 guid u32`<br>`u32 u32 u32 u32 u32 u32 u32 u64 u32 u32 u32 u32 loop[ u32 u32 u32 u32 ] loop[ u32 ] u32 loop[ u32 u32 ] u32 u32 u32 u8 u32 u32 u32 u8 u8 loop[ u32 u8 ] opt[ u8 u32 loop[ u32 ] ] u32 u8 u32 u32 u32 u8 u8 loop[ u32 u8 ] opt[ u8 u32 loop[ u32 ] ] u32 u8 u32 u32 u32 u8 u8 loop[ u32 u8 ] opt[ u8 u32 loop[ u32 ] ] u32 u8 u32 u32 u32 u8 u8 loop[ u32 u8 ] opt[ u8 u32 loop[ u32 ] ] u32 u8 u32 u32 u32 u8 u8 loop[ u32 u8 ] opt[ u8 u32 loop[ u32 ] ] u32 u8 u32 u32 u32 u8 u8 loop[ u32 u8 ] opt[ u8 u32 loop[ u32 ] ] u32 u8 u32 u32 u32 u32 u32 u32 u32 u8 u8 u8 u8 bits(2) u8 opt[ u8 ] alt[ u8 ] bits(2) u8 loop[` → `u32 u32 u8 u8 u8 u8 u8 u8 u8 u8 loop[` | 79 | [3.4.3](protocol/3.4.3.54261/smsg-structures/quest.md#smsg_quest_giver_offer_reward_message-0x2a94) · [4.4.2](protocol/4.4.2.60895/smsg-structures/quest.md#smsg_quest_giver_offer_reward_message-0x4f0014) |
@@ -120,8 +122,8 @@ Opcodes HermesProxy writes or reads whose 4.4.2 layout differs from 3.4.3 (docs/
 | ✅ | `CMSG_SET_FACTION_NOT_AT_WAR` | `SetFactionNotAtWar` | `u8` → `u16` | 1 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_set_faction_not_at_war-0x34df) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_set_faction_not_at_war-0x350072) |
 | ✅ | `CMSG_USE_TOY` | `UseToy` | `u32 u32 loop[ u32` → `u32 u32 u8 loop[ u32` |  | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_use_toy-0x329a) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_use_toy-0x340153) |
 | ✅ | `SMSG_PAUSE_MIRROR_TIMER` | `PauseMirrorTimer` | `u32 u8` → `u8 u8` |  | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_pause_mirror_timer-0x2710) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_pause_mirror_timer-0x3b01ac) |
-| ✅ | `SMSG_ATTACKER_STATE_UPDATE` | `AttackerStateUpdate` | `u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32` | 161920 | [3.4.3](protocol/3.4.3.54261/smsg-structures/combat.md#smsg_attacker_state_update-0x2952) · [4.4.2](protocol/4.4.2.60895/smsg-structures/combat.md#smsg_attacker_state_update-0x410030) |
-| ✅ | `SMSG_POWER_UPDATE` | `PowerUpdate` | `u32 loop[ u32 u8 ]` → `u32 loop[ u8 u32 ]` | 52078 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_power_update-0x26d2) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_power_update-0x3b016e) |
+| ✅ | `SMSG_ATTACKER_STATE_UPDATE` | `AttackerStateUpdate` | `u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32` | 163094 | [3.4.3](protocol/3.4.3.54261/smsg-structures/combat.md#smsg_attacker_state_update-0x2952) · [4.4.2](protocol/4.4.2.60895/smsg-structures/combat.md#smsg_attacker_state_update-0x410030) |
+| ✅ | `SMSG_POWER_UPDATE` | `PowerUpdate` | `u32 loop[ u32 u8 ]` → `u32 loop[ u8 u32 ]` | 52265 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_power_update-0x26d2) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_power_update-0x3b016e) |
 | ✅ | `CMSG_PARTY_UNINVITE` | `PartyUninvite` | `u8 flush guid` → `u8 opt[ u8 ] flush guid` | 28 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_party_uninvite-0x364a) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_party_uninvite-0x390073) |
 | ✅ | `SMSG_QUERY_PETITION_RESPONSE` | `QueryPetitionResponse` | `u8 loop[ opt[ u8 ] alt[ u8 ] ] loop[` → `u8 loop[ u8 ] loop[` | 10 | [3.4.3](protocol/3.4.3.54261/smsg-structures/cache.md#smsg_query_petition_response-0x291b) · [4.4.2](protocol/4.4.2.60895/smsg-structures/cache.md#smsg_query_petition_response-0x3f000d) |
 | ✅ | `CMSG_PETITION_BUY` | `PetitionBuy` | `bits(7) flush guid` → `u8 flush guid` | 8 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_petition_buy-0x34c8) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_petition_buy-0x350052) |
@@ -134,37 +136,37 @@ Opcodes HermesProxy writes or reads whose 4.4.2 layout differs from 3.4.3 (docs/
 | | Opcode | HP type | Change | Sent | Layouts |
 |---|---|---|---|---:|---|
 | 🟰 | `SMSG_PARTY_MEMBER_PARTIAL_STATE` | `PartyMemberPartialState` | `guid loop[ u16 u16 ]` → `guid loop[ u32 u16 ]`<br>🟰 phase flags widen to u32; HermesProxy sends no phases | 113863 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_party_member_partial_state-0x2758) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_party_member_partial_state-0x3b01f3) |
-| 🟰 | `SMSG_AURA_UPDATE` | `AuraUpdate` | `u8 u8 loop[ u8` → `u8 opt[ u8 ] alt[ u8 ] opt[ u8 ] loop[ u8`<br>🟰 notation: both builds read a 1-bit and a 9-bit field first | 85810 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_aura_update--smsg_aura_update_all-0x2c1f) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_aura_update-0x510011) |
-| 🟰 | `SMSG_SPELL_NON_MELEE_DAMAGE_LOG` | `SpellNonMeleeDamageLog` | `u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32`<br>🟰 SpellCastLogData gains two ints and a byte power type; HermesProxy never sends log data | 15749 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_non_melee_damage_log-0x2c2f) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_non_melee_damage_log-0x510021) |
-| 🟰 | `SMSG_SPELL_PERIODIC_AURA_LOG` | `SpellPeriodicAuraLog` | `u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32`<br>🟰 SpellCastLogData gains two ints and a byte power type; HermesProxy never sends log data | 12463 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_periodic_aura_log-0x2c18) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_periodic_aura_log-0x510008) |
+| 🟰 | `SMSG_AURA_UPDATE` | `AuraUpdate` | `u8 u8 loop[ u8` → `u8 opt[ u8 ] alt[ u8 ] opt[ u8 ] loop[ u8`<br>🟰 notation: both builds read a 1-bit and a 9-bit field first | 86372 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_aura_update--smsg_aura_update_all-0x2c1f) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_aura_update-0x510011) |
+| 🟰 | `SMSG_SPELL_NON_MELEE_DAMAGE_LOG` | `SpellNonMeleeDamageLog` | `u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32`<br>🟰 SpellCastLogData gains two ints and a byte power type; HermesProxy never sends log data | 16085 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_non_melee_damage_log-0x2c2f) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_non_melee_damage_log-0x510021) |
+| 🟰 | `SMSG_SPELL_PERIODIC_AURA_LOG` | `SpellPeriodicAuraLog` | `u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32`<br>🟰 SpellCastLogData gains two ints and a byte power type; HermesProxy never sends log data | 12477 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_periodic_aura_log-0x2c18) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_periodic_aura_log-0x510008) |
 | 🟰 | `SMSG_SPELL_HEAL_LOG` | `SpellHealLog` | `u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32`<br>🟰 SpellCastLogData gains two ints and a byte power type; HermesProxy never sends log data | 2229 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_heal_log-0x2c1a) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_heal_log-0x51000a) |
-| 🟰 | `SMSG_GM_TICKET_CASE_STATUS` | `GMTicketCaseStatus` | `u8 u8 bytes bytes` → `u8 u8 opt[ u8 ] alt[ u8 ] opt[ u8 ] alt[ u8 ] opt[ u8 ] alt[ u8 ] opt[ u8 ] alt[ u8 ] opt[ u8 ] alt[ u8 ] opt[ u8 ] alt[ u8 ] bytes bytes bytes bytes`<br>🟰 two more strings per case; HermesProxy always sends an empty case list | 1165 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_gm_ticket_case_status-0x26a3) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_gm_ticket_case_status-0x3b013f) |
-| 🟰 | `SMSG_PET_SPELLS_MESSAGE` | `PetSpells` | `u16 u32 u16 u8 loop[` → `u16 u32 u8 u8 u8 loop[`<br>🟰 same bytes: the 3.4.3 u16 is (CommandState, Flag 0), 4.4.2 reads two bytes | 1026 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_pet_spells_message-0x2c22) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_pet_spells_message-0x510014) |
+| 🟰 | `SMSG_GM_TICKET_CASE_STATUS` | `GMTicketCaseStatus` | `u8 u8 bytes bytes` → `u8 u8 opt[ u8 ] alt[ u8 ] opt[ u8 ] alt[ u8 ] opt[ u8 ] alt[ u8 ] opt[ u8 ] alt[ u8 ] opt[ u8 ] alt[ u8 ] opt[ u8 ] alt[ u8 ] bytes bytes bytes bytes`<br>🟰 two more strings per case; HermesProxy always sends an empty case list | 1170 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_gm_ticket_case_status-0x26a3) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_gm_ticket_case_status-0x3b013f) |
+| 🟰 | `SMSG_PET_SPELLS_MESSAGE` | `PetSpells` | `u16 u32 u16 u8 loop[` → `u16 u32 u8 u8 u8 loop[`<br>🟰 same bytes: the 3.4.3 u16 is (CommandState, Flag 0), 4.4.2 reads two bytes | 1027 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_pet_spells_message-0x2c22) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_pet_spells_message-0x510014) |
 | 🟰 | `SMSG_CHANNEL_NOTIFY_LEFT` | `ChannelNotifyLeft` | `bits(7) opt[ u8 ] u32 bytes` → `u8 u32 bytes`<br>🟰 notation: bit fields 7 · 1 in both | 779 | [3.4.3](protocol/3.4.3.54261/smsg-structures/chat.md#smsg_channel_notify_left-0x2bc3) · [4.4.2](protocol/4.4.2.60895/smsg-structures/chat.md#smsg_channel_notify_left-0x400018) |
 | 🟰 | `SMSG_GUILD_EVENT_PRESENCE_CHANGE` | `GuildEventPresenceChange` | `u8 ] opt[ u8 ] bytes` → `u8 ] bytes`<br>🟰 4.4.2 reads one bit fewer of the same byte (6 · 1 against 6 · 1 · 1); the extra bit is ignored | 779 | [3.4.3](protocol/3.4.3.54261/smsg-structures/guild.md#smsg_guild_event_presence_change-0x29f0) · [4.4.2](protocol/4.4.2.60895/smsg-structures/guild.md#smsg_guild_event_presence_change-0x470037) |
-| 🟰 | `SMSG_CHAT_SERVER_MESSAGE` | `ChatServerMessage` | `u32 u8 bits(3) bytes` → `u32 u8 u8 bytes`<br>🟰 notation: an 11-bit length in both | 714 | [3.4.3](protocol/3.4.3.54261/smsg-structures/chat.md#smsg_chat_server_message-0x2bc5) · [4.4.2](protocol/4.4.2.60895/smsg-structures/chat.md#smsg_chat_server_message-0x40001a) |
+| 🟰 | `SMSG_CHAT_SERVER_MESSAGE` | `ChatServerMessage` | `u32 u8 bits(3) bytes` → `u32 u8 u8 bytes`<br>🟰 notation: an 11-bit length in both | 718 | [3.4.3](protocol/3.4.3.54261/smsg-structures/chat.md#smsg_chat_server_message-0x2bc5) · [4.4.2](protocol/4.4.2.60895/smsg-structures/chat.md#smsg_chat_server_message-0x40001a) |
 | 🟰 | `CMSG_MOVE_SET_COLLISION_HEIGHT_ACK` | `MoveSetCollisionHeightAck` | `] ] opt[ u32 ] alt[ u32 ] f32 u32` → `] ] u32 f32 u32`<br>🟰 notation: MovementInfo then the ack index in both | 707 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_set_collision_height_ack-0x3a3b) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_set_collision_height_ack-0x370058) |
-| 🟰 | `SMSG_AUTH_RESPONSE` | `AuthResponse` | `u64 ] loop[ u8 u8 ] loop[` → `u64 ] opt[ loop[ u8 u8 ] ] loop[`<br>`u32 u32 u8 ]` → `u32 u32 u32 u8 ]`<br>🟰 the queue block gains a field, written by AuthWaitInfo.Shapes; the rest is notation | 696 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_auth_response-0x256d) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_auth_response-0x3b0001) |
+| 🟰 | `SMSG_AUTH_RESPONSE` | `AuthResponse` | `u64 ] loop[ u8 u8 ] loop[` → `u64 ] opt[ loop[ u8 u8 ] ] loop[`<br>`u32 u32 u8 ]` → `u32 u32 u32 u8 ]`<br>🟰 the queue block gains a field, written by AuthWaitInfo.Shapes; the rest is notation | 698 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_auth_response-0x256d) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_auth_response-0x3b0001) |
 | 🟰 | `SMSG_PARTY_MEMBER_FULL_STATE` | `PartyMemberFullState` | `guid loop[ u16 u16 ]` → `guid loop[ u32 u16 ]`<br>🟰 phase flags widen to u32; HermesProxy sends no phases | 614 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_party_member_full_state-0x2759) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_party_member_full_state-0x3b01f4) |
 | 🟰 | `CMSG_MOVE_FORCE_RUN_SPEED_CHANGE_ACK` | `MovementSpeedAck` | `opt[ u32 f32 ] u32 f32` → `opt[ u32 ] alt[ u32 ] f32`<br>🟰 notation: MovementInfo, the ack index and the speed in both | 611 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_force_run_speed_change_ack-0x3a0b) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_force_run_speed_change_ack-0x370027) |
-| 🟰 | `CMSG_MOVE_FORCE_UNROOT_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 599 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_force_unroot_ack-0x3a0f) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_force_unroot_ack-0x37002b) |
+| 🟰 | `CMSG_MOVE_FORCE_UNROOT_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 603 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_force_unroot_ack-0x3a0f) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_force_unroot_ack-0x37002b) |
 | 🟰 | `SMSG_SUSPEND_TOKEN` | `SuspendToken` | `u32 bits(2)` → `u32 u8`<br>🟰 notation: two bits in one byte either way | 476 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_suspend_token-0x25a8) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_suspend_token-0x3b0041) |
 | 🟰 | `SMSG_RESUME_TOKEN` | `ResumeToken` | `u32 bits(2)` → `u32 u8`<br>🟰 notation: two bits in one byte either way | 475 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_resume_token-0x25a9) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_resume_token-0x3b0042) |
+| 🟰 | `CMSG_MOVE_FORCE_ROOT_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 398 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_force_root_ack-0x3a0e) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_force_root_ack-0x37002a) |
 | 🟰 | `SMSG_GUILD_EVENT_PLAYER_JOINED` | `GuildEventPlayerJoined` | `guid u32 u8 bytes` → `guid u32 bits(6) bytes`<br>🟰 notation: bit fields 6 in both | 397 | [3.4.3](protocol/3.4.3.54261/smsg-structures/guild.md#smsg_guild_event_player_joined-0x29eb) · [4.4.2](protocol/4.4.2.60895/smsg-structures/guild.md#smsg_guild_event_player_joined-0x470032) |
-| 🟰 | `CMSG_MOVE_FORCE_ROOT_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 394 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_force_root_ack-0x3a0e) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_force_root_ack-0x37002a) |
 | 🟰 | `SMSG_GUILD_EVENT_MOTD` | `GuildEventMotd` | `bits(11) bytes` → `opt[ u8 ] alt[ u8 ] bits(3) bytes`<br>🟰 notation: bit fields 11 in both | 364 | [3.4.3](protocol/3.4.3.54261/smsg-structures/guild.md#smsg_guild_event_motd-0x29ef) · [4.4.2](protocol/4.4.2.60895/smsg-structures/guild.md#smsg_guild_event_motd-0x470036) |
-| 🟰 | `CMSG_MOVE_WATER_WALK_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 352 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_water_walk_ack-0x3a1d) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_water_walk_ack-0x370039) |
+| 🟰 | `CMSG_MOVE_WATER_WALK_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 356 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_water_walk_ack-0x3a1d) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_water_walk_ack-0x370039) |
 | 🟰 | `SMSG_LOOT_RESPONSE` | `LootResponse` | `u8 loop[ u32 u8 ] opt[` → `u8 loop[ u8 u32 ] opt[`<br>🟰 item modifiers swap to (type, value); HermesProxy writes none, and a read takes the same five bytes | 318 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_loot_response-0x2614) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_loot_response-0x3b00ad) |
 | 🟰 | `SMSG_TRADE_STATUS` | `TradeStatusPkt` | `u8 bits(5) opt[ opt[ u8 ] u32 u32` → `u8 opt[ u32 u32`<br>🟰 notation: HermesProxy matches TrinityCore cata_classic bit for bit | 314 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_trade_status-0x2582) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_trade_status-0x3b0017) |
 | 🟰 | `CMSG_MOVE_FORCE_SWIM_SPEED_CHANGE_ACK` | `MovementSpeedAck` | `opt[ u32 f32 ] u32 f32` → `opt[ u32 ] alt[ u32 ] f32`<br>🟰 notation: MovementInfo, the ack index and the speed in both | 265 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_force_swim_speed_change_ack-0x3a0d) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_force_swim_speed_change_ack-0x370029) |
 | 🟰 | `CMSG_MOVE_FORCE_FLIGHT_SPEED_CHANGE_ACK` | `MovementSpeedAck` | `opt[ u32 f32 ] u32 f32` → `opt[ u32 ] alt[ u32 ] f32`<br>🟰 notation: MovementInfo, the ack index and the speed in both | 236 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_force_flight_speed_change_ack-0x3a2d) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_force_flight_speed_change_ack-0x37004a) |
-| 🟰 | `CMSG_MOVE_FEATHER_FALL_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 228 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_feather_fall_ack-0x3a1c) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_feather_fall_ack-0x370038) |
+| 🟰 | `CMSG_MOVE_FEATHER_FALL_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 230 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_feather_fall_ack-0x3a1c) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_feather_fall_ack-0x370038) |
 | 🟰 | `SMSG_SPELL_DAMAGE_SHIELD` | `SpellDamageShield` | `u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32`<br>🟰 SpellCastLogData gains two ints and a byte power type; HermesProxy never sends log data | 194 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_spell_damage_shield-0x2c2e) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_spell_damage_shield-0x510020) |
-| 🟰 | `CMSG_MOVE_HOVER_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 186 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_hover_ack-0x3a13) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_hover_ack-0x37002f) |
+| 🟰 | `CMSG_MOVE_HOVER_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 188 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_hover_ack-0x3a13) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_hover_ack-0x37002f) |
 | 🟰 | `SMSG_GUILD_BANK_QUERY_RESULTS` | `GuildBankQueryResults` | `u8 loop[ u32 u8 ] opt[` → `u8 loop[ u8 u32 ] opt[`<br>🟰 item modifiers swap to (type, value); HermesProxy writes none, and a read takes the same five bytes | 177 | [3.4.3](protocol/3.4.3.54261/smsg-structures/guild.md#smsg_guild_bank_query_results-0x29df) · [4.4.2](protocol/4.4.2.60895/smsg-structures/guild.md#smsg_guild_bank_query_results-0x470026) |
 | 🟰 | `CMSG_MOVE_GRAVITY_ENABLE_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 161 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_gravity_enable_ack-0x3a36) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_gravity_enable_ack-0x370053) |
-| 🟰 | `CMSG_MOVE_SET_CAN_FLY_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 140 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_set_can_fly_ack-0x3a27) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_set_can_fly_ack-0x370043) |
-| 🟰 | `SMSG_ENVIRONMENTAL_DAMAGE_LOG` | `EnvironmentalDamageLog` | `u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32`<br>🟰 SpellCastLogData gains two ints and a byte power type; HermesProxy never sends log data | 130 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_environmental_damage_log-0x2c1e) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_environmental_damage_log-0x51000e) |
+| 🟰 | `CMSG_MOVE_SET_CAN_FLY_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 142 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_set_can_fly_ack-0x3a27) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_set_can_fly_ack-0x370043) |
+| 🟰 | `SMSG_ENVIRONMENTAL_DAMAGE_LOG` | `EnvironmentalDamageLog` | `u32 u32 u8 u8 loop[ u32 u32 u32` → `u32 u32 u32 u32 u8 u8 loop[ u8 u32 u32`<br>🟰 SpellCastLogData gains two ints and a byte power type; HermesProxy never sends log data | 134 | [3.4.3](protocol/3.4.3.54261/smsg-structures/spell.md#smsg_environmental_damage_log-0x2c1e) · [4.4.2](protocol/4.4.2.60895/smsg-structures/spell.md#smsg_environmental_damage_log-0x51000e) |
 | 🟰 | `CMSG_MOVE_FORCE_RUN_BACK_SPEED_CHANGE_ACK` | `MovementSpeedAck` | `opt[ u32 f32 ] u32 f32` → `opt[ u32 ] alt[ u32 ] f32`<br>🟰 notation: MovementInfo, the ack index and the speed in both | 106 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_force_run_back_speed_change_ack-0x3a0c) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_force_run_back_speed_change_ack-0x370028) |
 | 🟰 | `CMSG_MOVE_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK` | `MovementSpeedAck` | `opt[ u32 f32 ] u32 f32` → `opt[ u32 ] alt[ u32 ] f32`<br>🟰 notation: MovementInfo, the ack index and the speed in both | 82 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_force_flight_back_speed_change_ack-0x3a2e) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_force_flight_back_speed_change_ack-0x37004b) |
 | 🟰 | `CMSG_MOVE_FORCE_SWIM_BACK_SPEED_CHANGE_ACK` | `MovementSpeedAck` | `opt[ u32 f32 ] u32 f32` → `opt[ u32 ] alt[ u32 ] f32`<br>🟰 notation: MovementInfo, the ack index and the speed in both | 82 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_force_swim_back_speed_change_ack-0x3a22) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_force_swim_back_speed_change_ack-0x37003e) |
@@ -176,7 +178,7 @@ Opcodes HermesProxy writes or reads whose 4.4.2 layout differs from 3.4.3 (docs/
 | 🟰 | `CMSG_BUY_ITEM` | `BuyItem` | `flush loop[ u32 u8 ] opt[` → `flush loop[ u8 u32 ] opt[`<br>🟰 item modifiers swap to (type, value); HermesProxy writes none, and a read takes the same five bytes | 59 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_buy_item-0x34a3) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_buy_item-0x35002d) |
 | 🟰 | `CMSG_MOVE_KNOCK_BACK_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] alt[ u32 ] flush opt[` → `] ] u32 flush opt[`<br>🟰 notation: MovementInfo then the ack index in both | 49 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_knock_back_ack-0x3a12) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_knock_back_ack-0x37002e) |
 | 🟰 | `SMSG_TRADE_UPDATED` | `TradeUpdated` | `u8 loop[ u32 u8 ] opt[` → `u8 loop[ u8 u32 ] opt[`<br>🟰 notation, plus item modifiers (never written) | 44 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_trade_updated-0x2581) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_trade_updated-0x3b0016) |
-| 🟰 | `SMSG_ARENA_TEAM_EVENT` | `ArenaTeamEvent` | `u8 loop[ opt[ u8 ] alt[ u8 ] opt[ u8` → `u8 loop[ u8 opt[ u8`<br>🟰 notation: bit fields 8 · 9 · 9 · 9 in both | 24 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_arena_team_event-0x2762) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_arena_team_event-0x3b01fd) |
+| 🟰 | `SMSG_ARENA_TEAM_EVENT` | `ArenaTeamEvent` | `u8 loop[ opt[ u8 ] alt[ u8 ] opt[ u8` → `u8 loop[ u8 opt[ u8`<br>🟰 notation: bit fields 8 · 9 · 9 · 9 in both | 25 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_arena_team_event-0x2762) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_arena_team_event-0x3b01fd) |
 | 🟰 | `SMSG_LOOT_ALL_PASSED` | `LootAllPassed` | `u8 loop[ u32 u8 ] opt[` → `u8 loop[ u8 u32 ] opt[`<br>🟰 item modifiers swap to (type, value); HermesProxy writes none, and a read takes the same five bytes | 18 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_loot_all_passed-0x2621) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_loot_all_passed-0x3b00ba) |
 | 🟰 | `SMSG_LOOT_ROLL_WON` | `LootRollWon` | `u8 loop[ u32 u8 ] opt[` → `u8 loop[ u8 u32 ] opt[`<br>🟰 item modifiers swap to (type, value); HermesProxy writes none, and a read takes the same five bytes | 15 | [3.4.3](protocol/3.4.3.54261/smsg-structures/general.md#smsg_loot_roll_won-0x2622) · [4.4.2](protocol/4.4.2.60895/smsg-structures/general.md#smsg_loot_roll_won-0x3b00bb) |
 | 🟰 | `CMSG_MOVE_GRAVITY_DISABLE_ACK` | `MovementAckMessage` | `] ] opt[ u32 ] u32` → `] ] u32`<br>🟰 notation: MovementInfo then the ack index in both | 14 | [3.4.3](protocol/3.4.3.54261/cmsg-structures.md#cmsg_move_gravity_disable_ack-0x3a35) · [4.4.2](protocol/4.4.2.60895/cmsg-structures.md#cmsg_move_gravity_disable_ack-0x370052) |
@@ -276,6 +278,8 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🚫 | S | `SMSG_QUEST_UPDATE_ADD_ITEM` |  | same |  |  |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
 | 🔁 | C | `CMSG_AREA_SPIRIT_HEALER_QUERY` |  | reviewed | 20261013_004221 | 1 |  | HermesProxy/World/Server/Systems/NpcSystem.cs |
 | 🔁 | C | `CMSG_AREA_SPIRIT_HEALER_QUEUE` |  | reviewed | 20261013_004221 | 1 |  | HermesProxy/World/Server/Systems/NpcSystem.cs |
+| 🔁 | C | `CMSG_ARENA_TEAM_QUERY` |  | same | 20261024_101724 | 16 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
+| 🔁 | C | `CMSG_ARENA_TEAM_ROSTER` |  | same | 20261024_101724 | 16 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | 🔁 | C | `CMSG_AUCTION_LIST_ITEMS` | yes | changed | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
 | 🔁 | C | `CMSG_AUCTION_PLACE_BID` | yes | same | 20261022_161951 | 2 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
 | 🔁 | C | `CMSG_AUCTION_REMOVE_ITEM` |  | same | 20261011_145718 | 1 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
@@ -287,7 +291,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `CMSG_BF_MGR_QUEUE_EXIT_REQUEST` | yes | changed | 20261022_145205 | 3 |  | HermesProxy/World/Server/Systems/BattlegroundSystem.cs |
 | 🔁 | C | `CMSG_BF_MGR_QUEUE_INVITE_RESPONSE` | yes | changed | 20261022_145205 | 8 |  | HermesProxy/World/Server/Systems/BattlegroundSystem.cs |
 | 🔁 | C | `CMSG_CANCEL_CAST` |  | same | 20261015_062938 | 1 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
-| 🔁 | C | `CMSG_CAST_SPELL` | yes | changed | 20261024_092150 | 86 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | C | `CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE` | yes | same | 20261022_013438 | 2 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `CMSG_CHAR_DELETE` |  | same | 20261021_025330 | 1 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | 🔁 | C | `CMSG_CHAT_ADDON_MESSAGE_BATTLEGROUND` | yes | new in 4.x | 20261021_231435 | 1 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
@@ -313,10 +316,8 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `CMSG_MAIL_CREATE_TEXT_ITEM` |  | changed | 20261011_033542 | 1 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | 🔁 | C | `CMSG_MOUNT_SPECIAL_ANIM` |  | same | 20261012_232508 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | 🔁 | C | `CMSG_MOVE_ENABLE_SWIM_TO_FLY_TRANS_ACK` | yes | ? | 20261022_002335 | 6 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
-| 🔁 | C | `CMSG_MOVE_FEATHER_FALL_ACK` | yes | changed | 20261021_221920 | 4 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
-| 🔁 | C | `CMSG_MOVE_HOVER_ACK` | yes | changed | 20261021_221920 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | 🔁 | C | `CMSG_MOVE_SET_COLLISION_HEIGHT_ACK` | yes | new in 4.x | 20261024_024153 | 12 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
-| 🔁 | C | `CMSG_MOVE_SPLINE_DONE` | yes | changed | 20261024_040154 | 8 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
+| 🔁 | C | `CMSG_NAME_QUERY` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | 🔁 | C | `CMSG_OPENING_CINEMATIC` |  | ? | 20261022_003546 | 2 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | 🔁 | C | `CMSG_PET_ABANDON` |  | same | 20261015_010820 | 1 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
 | 🔁 | C | `CMSG_PET_ACTION` | yes | changed | 20261021_180247 | 74 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
@@ -329,6 +330,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `CMSG_PLAYER_SHOWING_HELM` |  | ? | 20261017_070650 | 2 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | 🔁 | C | `CMSG_PLAYER_VEHICLE_ENTER` |  | same | 20261021_135117 | 8 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `CMSG_PVP_LOG_DATA` | yes | new in 4.x | 20261020_154034 | 3 |  | HermesProxy/World/Server/Systems/BattlegroundSystem.cs |
+| 🔁 | C | `CMSG_QUERY_GAME_OBJECT` |  | same | 20261024_101724 | 4 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | 🔁 | C | `CMSG_RECLAIM_CORPSE` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | 🔁 | C | `CMSG_REPOP_REQUEST` |  | same | 20261022_112336 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | 🔁 | C | `CMSG_REQUEST_HONOR_STATS` | yes | new in 4.x | 20261022_084148 | 1 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
@@ -381,15 +383,12 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_CHAT_PLAYER_NOTFOUND` |  | same | 20261011_175006 | 1 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | 🔁 | S | `SMSG_CHAT_SERVER_MESSAGE` |  | same | 20261021_160516 | 1 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | 🔁 | S | `SMSG_CLEAR_COOLDOWN` |  | same | 20261024_092150 | 10 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| 🔁 | S | `SMSG_CLEAR_COOLDOWNS` | yes | new in 4.x | 20261024_092150 | 16 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_CONTROL_UPDATE` | yes | same | 20261024_040154 | 6 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| 🔁 | S | `SMSG_CORPSE_RECLAIM_DELAY` |  | same | 20261022_114446 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_CURRENCY_LOOT_REMOVED` | yes | new in 4.x | 20261020_231647 | 2 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
-| 🔁 | S | `SMSG_DEATH_RELEASE_LOC` |  | same | 20261022_114446 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_DELETE_CHAR` |  | same | 20261021_025330 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
+| 🔁 | S | `SMSG_DESTROY_OBJECT` |  | same | 20261024_101724 | 77 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | 🔁 | S | `SMSG_DISPEL_FAILED` |  | same | 20261022_015111 | 3 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_DURABILITY_DAMAGE_DEATH` | yes | changed | 20261022_074240 | 2 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
-| 🔁 | S | `SMSG_ENVIRONMENTAL_DAMAGE_LOG` |  | same | 20261022_090935 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_FLIGHT_SPLINE_SYNC` | yes | same | 20261021_215934 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_GOSSIP_POI` |  | same | 20261015_201350 | 1 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
 | 🔁 | S | `SMSG_GROUP_DECLINE` |  | same | 20261021_154642 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
@@ -409,7 +408,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_ITEM_ENCHANT_TIME_UPDATE` |  | same | 20261021_112409 | 20 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
 | 🔁 | S | `SMSG_ITEM_PURCHASE_REFUND_RESULT` | yes | changed | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
 | 🔁 | S | `SMSG_ITEM_REFUND_INFO_RESPONSE` | yes | changed | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
-| 🔁 | S | `SMSG_LEARNED_SPELL` |  | reviewed | 20261024_092150 | 61 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_LFG_BOOT_PROPOSAL_UPDATE` | yes | changed | 20261022_060848 | 6 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
 | 🔁 | S | `SMSG_LFG_JOIN_RESULT` | yes | changed | 20261022_083839 | 1 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
 | 🔁 | S | `SMSG_LFG_OFFER_CONTINUE` |  | reviewed | 20261022_081249 | 2 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
@@ -423,26 +421,19 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_LOOT_MASTER_LIST` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | 🔁 | S | `SMSG_LOOT_MONEY_NOTIFY` |  | reviewed | 20261021_180247 | 2 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | 🔁 | S | `SMSG_MIRROR_IMAGE_COMPONENTED_DATA` | yes | changed | 20261021_074624 | 12 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| 🔁 | S | `SMSG_MODIFY_COOLDOWN` | yes | same | 20261021_215934 | 2 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_MONSTER_MOVE_TRANSPORT` | yes | changed | 20261024_040154 | 7 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOUNT_RESULT` | yes | changed | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_MOVE_DISABLE_GRAVITY` | yes | changed | 20261024_040154 | 5 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_DISABLE_TRANSITION_BETWEEN_SWIM_AND_FLY` | yes | changed | 20261022_002335 | 3 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_ENABLE_TRANSITION_BETWEEN_SWIM_AND_FLY` | yes | changed | 20261022_002335 | 3 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_KNOCK_BACK` | yes | changed | 20261024_024153 | 12 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| 🔁 | S | `SMSG_MOVE_ROOT` | yes | changed | 20261024_040154 | 5 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_SET_CAN_FLY` | yes | changed | 20261024_024153 | 11 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_SET_COLLISION_HEIGHT` | yes | new in 4.x | 20261024_024153 | 12 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| 🔁 | S | `SMSG_MOVE_SET_FEATHER_FALL` | yes | changed | 20261021_221920 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_SET_FLIGHT_BACK_SPEED` | yes | new in 4.x | 20261022_114446 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| 🔁 | S | `SMSG_MOVE_SET_HOVERING` | yes | changed | 20261021_221920 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| 🔁 | S | `SMSG_MOVE_SET_LAND_WALK` | yes | changed | 20261022_114446 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| 🔁 | S | `SMSG_MOVE_SET_NORMAL_FALL` | yes | changed | 20261021_221920 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_SET_RUN_BACK_SPEED` | yes | new in 4.x | 20261022_114446 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_SET_SWIM_BACK_SPEED` | yes | new in 4.x | 20261022_114446 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_SET_SWIM_SPEED` | yes | new in 4.x | 20261024_024153 | 31 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_SET_WALK_SPEED` | yes | new in 4.x | 20261024_024153 | 31 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| 🔁 | S | `SMSG_MOVE_SET_WATER_WALK` | yes | changed | 20261022_112336 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_SPLINE_SET_FEATHER_FALL` | yes | changed | 20261021_221920 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_SPLINE_SET_HOVER` | yes | changed | 20261021_221920 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_SPLINE_SET_LAND_WALK` | yes | changed | 20261021_221920 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
@@ -452,9 +443,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_MOVE_SPLINE_START_SWIM` | yes | changed | 20261022_165434 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_SPLINE_STOP_SWIM` | yes | changed | 20261022_165434 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_SPLINE_UNSET_HOVER` | yes | changed | 20261021_221920 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| 🔁 | S | `SMSG_MOVE_UNROOT` | yes | changed | 20261024_040154 | 5 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_UNSET_CAN_FLY` | yes | changed | 20261024_024153 | 10 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| 🔁 | S | `SMSG_MOVE_UNSET_HOVERING` | yes | changed | 20261021_221920 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_UPDATE_COLLISION_HEIGHT` | yes | new in 4.x | 20261022_003546 | 8 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_UPDATE_FLIGHT_BACK_SPEED` | yes | new in 4.x | 20261022_114446 | 88 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_MOVE_UPDATE_FLIGHT_SPEED` | yes | new in 4.x | 20261022_114446 | 110 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
@@ -472,7 +461,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_PET_LEARNED_SPELLS` |  | same | 20261021_160516 | 3 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | 🔁 | S | `SMSG_PET_NAME_INVALID` | yes | ? | 20261015_230722 | 1 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | 🔁 | S | `SMSG_PET_SLOT_UPDATED` | yes | new in 4.x | 20261021_180247 | 2 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
-| 🔁 | S | `SMSG_PET_SPELLS_MESSAGE` | yes | same | 20261024_040154 | 6 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | 🔁 | S | `SMSG_PET_STABLE_RESULT` |  | ? | 20261021_180247 | 2 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | 🔁 | S | `SMSG_PET_TAME_FAILURE` |  | same | 20261021_160516 | 1 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | 🔁 | S | `SMSG_PET_UNLEARNED_SPELLS` |  | same | 20261021_160516 | 3 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
@@ -503,19 +491,15 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_SPELL_DAMAGE_SHIELD` | yes | changed | 20261022_143743 | 20 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_DELAYED` |  | same | 20261021_180247 | 6 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_DISPELL_LOG` |  | same | 20261022_015111 | 6 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| 🔁 | S | `SMSG_SPELL_ENERGIZE_LOG` |  | same | 20261024_092150 | 16 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| 🔁 | S | `SMSG_SPELL_EXECUTE_LOG` |  | same | 20261024_092150 | 19 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_FAILED_OTHER` |  | same | 20261024_024153 | 94 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_FAILURE` |  | same | 20261024_024153 | 94 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_HEAL_LOG` |  | same | 20261024_092150 | 5 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_INSTAKILL_LOG` |  | same | 20261024_024153 | 13 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_INTERRUPT_LOG` | yes | new in 4.x | 20261024_024153 | 3 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_MISS_LOG` |  | same | 20261024_024153 | 5 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| 🔁 | S | `SMSG_SPELL_NON_MELEE_DAMAGE_LOG` |  | same | 20261024_092150 | 123 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_STEAL_LOG` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_START_MIRROR_TIMER` |  | same | 20261022_090935 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_START_TIMER` | yes | new in 4.x | 20261022_114446 | 12 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
-| 🔁 | S | `SMSG_STOP_MIRROR_TIMER` |  | same | 20261022_114446 | 3 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_SUMMON_REQUEST` |  | same | 20261021_154642 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | 🔁 | S | `SMSG_SUPERCEDED_SPELLS` | yes | same | 20261022_002335 | 6 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_TITLE_EARNED` | yes | same | 20261017_225242 | 2 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
@@ -524,6 +508,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_TRIGGER_MOVIE` |  | same | 20261017_225242 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_UPDATE_COMBO_POINTS` |  | same | 20261021_112409 | 95 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | 🔁 | S | `SMSG_UPDATE_CURRENCY` | yes | new in 4.x | 20261022_074240 | 2 |  | HermesProxy/World/Client/PacketHandlers/CurrencyHandler.cs |
+| 🔁 | S | `SMSG_UPDATE_OBJECT` | yes | changed | 20261024_101724 | 726 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | 🔁 | S | `SMSG_USERLIST_UPDATE` | yes | same | 20261022_092302 | 2 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | 🔁 | S | `SMSG_ZONE_UNDER_ATTACK` |  | same | 20261022_165434 | 5 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔧 | C | `CMSG_CALENDAR_COMPLAIN` | yes | changed |  |  |  | HermesProxy/World/Server/Systems/CalendarSystem.cs |
@@ -559,17 +544,15 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_ADD_IGNORE` |  | same | 20261021_160516 | 1 |  | HermesProxy/World/Server/Systems/SocialSystem.cs |
 | ✅ | C | `CMSG_ALTER_APPEARANCE` |  | same | 20261024_070752 | 5 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | ✅ | C | `CMSG_AREA_TRIGGER` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
-| ✅ | C | `CMSG_ARENA_TEAM_ACCEPT` |  | same | 20261024_101724 | 3 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
-| ✅ | C | `CMSG_ARENA_TEAM_DECLINE` |  | same | 20261021_234714 | 1 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
-| ✅ | C | `CMSG_ARENA_TEAM_DISBAND` |  | same | 20261024_101724 | 4 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
-| ✅ | C | `CMSG_ARENA_TEAM_INVITE` |  | same | 20261024_101724 | 4 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
+| ✅ | C | `CMSG_ARENA_TEAM_ACCEPT` |  | same | 20261024_101724 | 4 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
+| ✅ | C | `CMSG_ARENA_TEAM_DECLINE` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
+| ✅ | C | `CMSG_ARENA_TEAM_DISBAND` |  | same | 20261024_101724 | 6 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
+| ✅ | C | `CMSG_ARENA_TEAM_INVITE` |  | same | 20261024_101724 | 6 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | ✅ | C | `CMSG_ARENA_TEAM_LEADER` |  | same | 20261022_015111 | 2 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | ✅ | C | `CMSG_ARENA_TEAM_LEAVE` |  | same | 20261021_234714 | 1 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
-| ✅ | C | `CMSG_ARENA_TEAM_QUERY` |  | same | 20261024_101724 | 11 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | ✅ | C | `CMSG_ARENA_TEAM_REMOVE` |  | same | 20261022_015111 | 1 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
-| ✅ | C | `CMSG_ARENA_TEAM_ROSTER` |  | same | 20261024_101724 | 11 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
-| ✅ | C | `CMSG_ATTACK_STOP` |  | same | 20261024_092150 | 10 |  | HermesProxy/World/Server/Systems/MeleeAttackOrder.cs |
-| ✅ | C | `CMSG_ATTACK_SWING` | yes | same | 20261024_092150 | 10 |  | HermesProxy/World/Server/Systems/MeleeAttackOrder.cs |
+| ✅ | C | `CMSG_ATTACK_STOP` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Server/Systems/MeleeAttackOrder.cs |
+| ✅ | C | `CMSG_ATTACK_SWING` | yes | same | 20261024_101724 | 1 |  | HermesProxy/World/Server/Systems/MeleeAttackOrder.cs |
 | ✅ | C | `CMSG_AUCTION_LIST_BIDDED_ITEMS` |  | ? | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
 | ✅ | C | `CMSG_AUCTION_LIST_OWNED_ITEMS` |  | ? | 20261024_070752 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | ✅ | C | `CMSG_AUTH_SESSION` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Client/WorldClient.cs |
@@ -604,13 +587,14 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_CALENDAR_GUILD_FILTER` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/CalendarSystem.cs |
 | ✅ | C | `CMSG_CALENDAR_REMOVE_EVENT` |  | same | 20261021_180247 | 4 |  | HermesProxy/World/Server/Systems/CalendarSystem.cs |
 | ✅ | C | `CMSG_CALENDAR_UPDATE_EVENT` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/CalendarSystem.cs |
-| ✅ | C | `CMSG_CANCEL_AURA` |  | same | 20261024_024153 | 2 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
+| ✅ | C | `CMSG_CANCEL_AURA` |  | same | 20261024_101724 | 3 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | ✅ | C | `CMSG_CANCEL_AUTO_REPEAT_SPELL` |  | same | 20261021_180247 | 14 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | ✅ | C | `CMSG_CANCEL_CHANNELLING` |  | same | 20261021_180247 | 2 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | ✅ | C | `CMSG_CANCEL_MOUNT_AURA` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | ✅ | C | `CMSG_CANCEL_TEMP_ENCHANTMENT` |  | same | 20261021_112409 | 5 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `CMSG_CANCEL_TRADE` |  | same | 20261024_100254 | 2 |  | HermesProxy/World/Server/Systems/TradeSystem.cs |
-| ✅ | C | `CMSG_CHAT_ADDON_MESSAGE_WHISPER` | yes | new in 4.x | 20261024_101724 | 201 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
+| ✅ | C | `CMSG_CAST_SPELL` | yes | changed | 20261024_101724 | 10 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| ✅ | C | `CMSG_CHAT_ADDON_MESSAGE_WHISPER` | yes | new in 4.x | 20261024_101724 | 745 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | ✅ | C | `CMSG_CHAT_CHANNEL_ANNOUNCEMENTS` | yes | same | 20261021_204441 | 4 |  | HermesProxy/World/Server/Systems/ChatSystem.cs |
 | ✅ | C | `CMSG_CHAT_CHANNEL_BAN` | yes | same | 20261021_204441 | 2 |  | HermesProxy/World/Server/Systems/ChatSystem.cs |
 | ✅ | C | `CMSG_CHAT_CHANNEL_DECLINE_INVITE` |  | same | 20261021_204441 | 3 |  | HermesProxy/World/Server/Systems/ChatSystem.cs |
@@ -626,12 +610,12 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_CHAT_CHANNEL_UNMODERATOR` | yes | ? | 20261021_204441 | 2 |  | HermesProxy/World/Server/Systems/ChatSystem.cs |
 | ✅ | C | `CMSG_CHAT_JOIN_CHANNEL` | yes | changed | 20261024_101724 | 4 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | ✅ | C | `CMSG_CHAT_LEAVE_CHANNEL` | yes | same | 20261022_165434 | 4 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
-| ✅ | C | `CMSG_CHAT_MESSAGE_AFK` | yes | new in 4.x | 20261024_100254 | 2 |  | (variable opcode) |
+| ✅ | C | `CMSG_CHAT_MESSAGE_AFK` | yes | new in 4.x | 20261024_101724 | 2 |  | (variable opcode) |
 | ✅ | C | `CMSG_CHAT_MESSAGE_CHANNEL` | yes | new in 4.x | 20261015_010820 | 1 |  | (variable opcode) |
 | ✅ | C | `CMSG_CHAT_MESSAGE_GUILD` | yes | new in 4.x | 20261017_225242 | 1 |  | (variable opcode) |
 | ✅ | C | `CMSG_CHAT_MESSAGE_PARTY` | yes | new in 4.x | 20261022_081249 | 2 |  | (variable opcode) |
-| ✅ | C | `CMSG_CHAT_MESSAGE_SAY` | yes | new in 4.x | 20261024_101724 | 7 |  | (variable opcode) |
-| ✅ | C | `CMSG_CHAT_MESSAGE_WHISPER` | yes | new in 4.x | 20261024_092150 | 6 |  | (variable opcode) |
+| ✅ | C | `CMSG_CHAT_MESSAGE_SAY` | yes | new in 4.x | 20261024_101724 | 19 |  | (variable opcode) |
+| ✅ | C | `CMSG_CHAT_MESSAGE_WHISPER` | yes | new in 4.x | 20261024_101724 | 36 |  | (variable opcode) |
 | ✅ | C | `CMSG_CHAT_UNREGISTER_ALL_ADDON_PREFIXES` | yes | new in 4.x | 20261024_101724 | 1 |  | HermesProxy/World/Server/Systems/ChatSystem.cs |
 | ✅ | C | `CMSG_CLEAR_RAID_MARKER` | yes | new in 4.x | 20261021_180247 | 4 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
 | ✅ | C | `CMSG_CLEAR_TRADE_ITEM` |  | reviewed | 20261024_075821 | 1 |  | HermesProxy/World/Server/Systems/TradeSystem.cs |
@@ -658,8 +642,8 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_GM_TICKET_GET_SYSTEM_STATUS` |  | same | 20261011_195056 | 1 |  | HermesProxy/World/Server/Systems/SupportTicketSystem.cs |
 | ✅ | C | `CMSG_GOSSIP_SELECT_OPTION` |  | same | 20261024_070752 | 3 |  | HermesProxy/World/Server/Systems/NpcSystem.cs |
 | ✅ | C | `CMSG_GROUP_CHANGE_SUB_GROUP` |  | same | 20261024_081947 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
-| ✅ | C | `CMSG_GROUP_DISBAND` |  | same | 20261024_101724 | 3 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
-| ✅ | C | `CMSG_GROUP_INVITE_RESPONSE` | yes | new in 4.x | 20261024_101724 | 2 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
+| ✅ | C | `CMSG_GROUP_DISBAND` |  | same | 20261024_101724 | 6 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
+| ✅ | C | `CMSG_GROUP_INVITE_RESPONSE` | yes | new in 4.x | 20261024_101724 | 5 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
 | ✅ | C | `CMSG_GROUP_SWAP_SUB_GROUP` |  | same | 20261015_071124 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
 | ✅ | C | `CMSG_GROUP_UNINVITE_GUID` |  | same | 20261022_165434 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
 | ✅ | C | `CMSG_GUILD_ADD_RANK` | yes | changed | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
@@ -717,37 +701,38 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_MAIL_RETURN_TO_SENDER` |  | same | 20261021_201402 | 4 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | ✅ | C | `CMSG_MAIL_TAKE_ITEM` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | ✅ | C | `CMSG_MAIL_TAKE_MONEY` | yes | changed | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
-| ✅ | C | `CMSG_MOVE_CHANGE_TRANSPORT` | yes | changed | 20261024_040154 | 6 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
+| ✅ | C | `CMSG_MOVE_CHANGE_TRANSPORT` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
+| ✅ | C | `CMSG_MOVE_FEATHER_FALL_ACK` | yes | changed | 20261024_101724 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK` | yes | ? | 20261022_114446 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_FORCE_FLIGHT_SPEED_CHANGE_ACK` | yes | changed | 20261024_100254 | 1 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
-| ✅ | C | `CMSG_MOVE_FORCE_ROOT_ACK` | yes | ? | 20261024_040154 | 5 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
+| ✅ | C | `CMSG_MOVE_FORCE_ROOT_ACK` | yes | ? | 20261024_101724 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_FORCE_RUN_BACK_SPEED_CHANGE_ACK` | yes | changed | 20261022_114446 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_FORCE_RUN_SPEED_CHANGE_ACK` | yes | changed | 20261024_100254 | 1 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_FORCE_SWIM_BACK_SPEED_CHANGE_ACK` | yes | ? | 20261022_114446 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_FORCE_SWIM_SPEED_CHANGE_ACK` | yes | changed | 20261024_024153 | 31 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
-| ✅ | C | `CMSG_MOVE_FORCE_UNROOT_ACK` | yes | ? | 20261024_040154 | 5 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
+| ✅ | C | `CMSG_MOVE_FORCE_UNROOT_ACK` | yes | ? | 20261024_101724 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_FORCE_WALK_SPEED_CHANGE_ACK` | yes | changed | 20261024_024153 | 31 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_GRAVITY_DISABLE_ACK` | yes | changed | 20261024_040154 | 5 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_GRAVITY_ENABLE_ACK` | yes | changed | 20261024_092150 | 8 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
+| ✅ | C | `CMSG_MOVE_HOVER_ACK` | yes | changed | 20261024_101724 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_KNOCK_BACK_ACK` | yes | changed | 20261024_024153 | 12 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_SET_CAN_FLY` | yes | new in 4.x | 20261024_024153 | 141 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_SET_CAN_FLY_ACK` | yes | changed | 20261024_024153 | 20 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
-| ✅ | C | `CMSG_MOVE_TIME_SKIPPED` | yes | changed | 20261024_101724 | 2 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
-| ✅ | C | `CMSG_MOVE_WATER_WALK_ACK` | yes | changed | 20261022_114446 | 1 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
-| ✅ | C | `CMSG_NAME_QUERY` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
+| ✅ | C | `CMSG_MOVE_SPLINE_DONE` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
+| ✅ | C | `CMSG_MOVE_TIME_SKIPPED` | yes | changed | 20261024_101724 | 8 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
+| ✅ | C | `CMSG_MOVE_WATER_WALK_ACK` | yes | changed | 20261024_101724 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_NEXT_CINEMATIC_CAMERA` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | ✅ | C | `CMSG_OFFER_PETITION` |  | same | 20261022_025027 | 2 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
 | ✅ | C | `CMSG_OPEN_ITEM` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `CMSG_OPT_OUT_OF_LOOT` | yes | changed | 20261021_180247 | 3 |  | HermesProxy/World/Server/Systems/LootSystem.cs |
-| ✅ | C | `CMSG_PARTY_INVITE` | yes | ? | 20261024_101724 | 2 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
+| ✅ | C | `CMSG_PARTY_INVITE` | yes | ? | 20261024_101724 | 5 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
 | ✅ | C | `CMSG_PETITION_BUY` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
 | ✅ | C | `CMSG_PETITION_SHOW_SIGNATURES` |  | same | 20261022_025027 | 2 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
 | ✅ | C | `CMSG_PET_CAST_SPELL` |  | same | 20261024_040154 | 2 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
-| ✅ | C | `CMSG_PING` | yes | same | 20261024_101724 | 30 |  | HermesProxy/World/Client/WorldClient.cs |
+| ✅ | C | `CMSG_PING` | yes | same | 20261024_101724 | 116 |  | HermesProxy/World/Client/WorldClient.cs |
 | ✅ | C | `CMSG_PLAYER_LOGIN` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | ✅ | C | `CMSG_PUSH_QUEST_TO_PARTY` |  | same | 20261021_154642 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
-| ✅ | C | `CMSG_QUERY_CREATURE` |  | same | 20261024_100254 | 1 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
-| ✅ | C | `CMSG_QUERY_GAME_OBJECT` |  | same | 20261024_101724 | 4 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
+| ✅ | C | `CMSG_QUERY_CREATURE` |  | same | 20261024_101724 | 3 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | ✅ | C | `CMSG_QUERY_GUILD_INFO` | yes | changed | 20261022_012152 | 1 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
 | ✅ | C | `CMSG_QUERY_NPC_TEXT` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/HotfixSystem.cs |
 | ✅ | C | `CMSG_QUERY_PAGE_TEXT` |  | same | 20261024_092150 | 2 |  | HermesProxy/World/Server/Systems/QuerySystem.cs |
@@ -762,14 +747,14 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_QUEST_GIVER_HELLO` |  | same | 20261024_024153 | 38 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
 | ✅ | C | `CMSG_QUEST_GIVER_QUERY_QUEST` |  | same | 20261024_024153 | 12 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
 | ✅ | C | `CMSG_QUEST_GIVER_REQUEST_REWARD` |  | reviewed | 20261024_024153 | 16 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
-| ✅ | C | `CMSG_QUEST_GIVER_STATUS_MULTIPLE_QUERY` |  | same | 20261024_101724 | 6 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
-| ✅ | C | `CMSG_QUEST_GIVER_STATUS_QUERY` |  | same | 20261024_101724 | 2 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
+| ✅ | C | `CMSG_QUEST_GIVER_STATUS_MULTIPLE_QUERY` |  | same | 20261024_101724 | 23 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
+| ✅ | C | `CMSG_QUEST_GIVER_STATUS_QUERY` |  | same | 20261024_101724 | 41 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
 | ✅ | C | `CMSG_QUEST_LOG_REMOVE_QUEST` |  | same | 20261022_161951 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
 | ✅ | C | `CMSG_QUEST_POI_QUERY` |  | reviewed | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/QueryHandler.cs |
 | ✅ | C | `CMSG_READ_ITEM` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `CMSG_REFORGE_ITEM` | yes | new in 4.x | 20261017_225242 | 2 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `CMSG_REPAIR_ITEM` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
-| ✅ | C | `CMSG_REQUEST_CEMETERY_LIST` | yes | new in 4.x | 20261024_101724 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
+| ✅ | C | `CMSG_REQUEST_CEMETERY_LIST` | yes | new in 4.x | 20261024_101724 | 7 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | ✅ | C | `CMSG_REQUEST_GUILD_PARTY_STATE` | yes | new in 4.x | 20261022_012152 | 2 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
 | ✅ | C | `CMSG_REQUEST_GUILD_REWARDS_LIST` | yes | new in 4.x | 20261017_070650 | 1 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
 | ✅ | C | `CMSG_REQUEST_PARTY_MEMBER_STATS` |  | same | 20261024_081947 | 2 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
@@ -795,8 +780,8 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_SET_FACTION_INACTIVE` |  | same | 20261011_023912 | 2 |  | HermesProxy/World/Server/Systems/ReputationSystem.cs |
 | ✅ | C | `CMSG_SET_LOOT_METHOD` |  | same | 20261024_075821 | 2 |  | HermesProxy/World/Server/Systems/LootSystem.cs |
 | ✅ | C | `CMSG_SET_PARTY_LEADER` |  | ? | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
-| ✅ | C | `CMSG_SET_SELECTION` |  | same | 20261024_092150 | 5 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
-| ✅ | C | `CMSG_SET_SHEATHED` |  | same | 20261024_092150 | 22 |  | HermesProxy/World/Server/Systems/CombatSystem.cs |
+| ✅ | C | `CMSG_SET_SELECTION` |  | same | 20261024_101724 | 10 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
+| ✅ | C | `CMSG_SET_SHEATHED` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Server/Systems/CombatSystem.cs |
 | ✅ | C | `CMSG_SET_TRADE_GOLD` | yes | changed | 20261024_075821 | 4 |  | HermesProxy/World/Server/Systems/TradeSystem.cs |
 | ✅ | C | `CMSG_SET_TRADE_ITEM` | yes | changed | 20261024_075821 | 1 |  | HermesProxy/World/Server/Systems/TradeSystem.cs |
 | ✅ | C | `CMSG_SET_WATCHED_FACTION` |  | same | 20261011_032105 | 1 |  | HermesProxy/World/Server/Systems/ReputationSystem.cs |
@@ -805,20 +790,20 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_SPELL_CLICK` |  | same | 20261024_024153 | 7 |  | HermesProxy/World/Server/Systems/NpcSystem.cs |
 | ✅ | C | `CMSG_SPIRIT_HEALER_ACTIVATE` |  | same | 20261021_180247 | 2 |  | HermesProxy/World/Server/Systems/NpcSystem.cs |
 | ✅ | C | `CMSG_SPLIT_ITEM` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
-| ✅ | C | `CMSG_STAND_STATE_CHANGE` |  | same | 20261024_100254 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
+| ✅ | C | `CMSG_STAND_STATE_CHANGE` |  | same | 20261024_101724 | 2 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | ✅ | C | `CMSG_SUMMON_RESPONSE` |  | same | 20261021_154642 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
 | ✅ | C | `CMSG_SUSPEND_TOKEN_RESPONSE` | yes | new in 4.x | 20261024_092150 | 8 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | C | `CMSG_SWAP_INV_ITEM` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `CMSG_SWAP_ITEM` |  | same | 20261024_024153 | 10 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `CMSG_TALK_TO_GOSSIP` |  | ? | 20261024_070752 | 3 |  | HermesProxy/World/Server/Systems/NpcSystem.cs |
-| ✅ | C | `CMSG_TAXI_NODE_STATUS_QUERY` |  | same | 20261024_101724 | 7 |  | HermesProxy/World/Server/Systems/TaxiSystem.cs |
+| ✅ | C | `CMSG_TAXI_NODE_STATUS_QUERY` |  | same | 20261024_101724 | 19 |  | HermesProxy/World/Server/Systems/TaxiSystem.cs |
 | ✅ | C | `CMSG_TAXI_QUERY_AVAILABLE_NODES` |  | same | 20261015_201350 | 1 |  | HermesProxy/World/Server/Systems/TaxiSystem.cs |
-| ✅ | C | `CMSG_TIME_SYNC_RESPONSE` |  | reviewed | 20261024_101724 | 45 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
+| ✅ | C | `CMSG_TIME_SYNC_RESPONSE` |  | reviewed | 20261024_101724 | 174 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | ✅ | C | `CMSG_TOTEM_DESTROYED` | yes | changed | 20261021_112409 | 6 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | ✅ | C | `CMSG_TRAINER_BUY_SPELL` | yes | changed | 20261024_024153 | 12 |  | HermesProxy/World/Server/Systems/NpcSystem.cs |
 | ✅ | C | `CMSG_TRANSMOGRIFY_ITEMS` | yes | new in 4.x | 20261024_062159 | 2 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `CMSG_TURN_IN_PETITION` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
-| ✅ | C | `CMSG_TUTORIAL_FLAG` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
+| ✅ | C | `CMSG_TUTORIAL_FLAG` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | ✅ | C | `CMSG_UNACCEPT_TRADE` |  | same | 20261021_154642 | 2 |  | HermesProxy/World/Server/Systems/TradeSystem.cs |
 | ✅ | C | `CMSG_USE_ITEM` | yes | same | 20261024_092150 | 2 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | ✅ | C | `CMSG_VIOLENCE_LEVEL` | yes | new in 4.x | 20261024_101724 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
@@ -826,7 +811,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_WRAP_ITEM` |  | ? | 20261021_154642 | 1 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `MSG_AUCTION_HELLO` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
 | ✅ | C | `MSG_MINIMAP_PING` |  | same | 20261024_081947 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
-| ✅ | C | `MSG_MOVE_FALL_LAND` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
+| ✅ | C | `MSG_MOVE_FALL_LAND` | yes | changed | 20261024_101724 | 12 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `MSG_MOVE_HEARTBEAT` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `MSG_MOVE_JUMP` | yes | changed | 20261024_070752 | 1 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `MSG_MOVE_SET_PITCH` | yes | changed | 20261024_040154 | 1 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
@@ -839,17 +824,17 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `MSG_MOVE_START_SWIM` | yes | changed | 20261024_024153 | 1 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `MSG_MOVE_START_TURN_LEFT` | yes | changed | 20261024_024153 | 76 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `MSG_MOVE_START_TURN_RIGHT` | yes | changed | 20261024_024153 | 73 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
-| ✅ | C | `MSG_MOVE_STOP` | yes | changed | 20261024_040154 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
+| ✅ | C | `MSG_MOVE_STOP` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `MSG_MOVE_STOP_ASCEND` | yes | changed | 20261024_024153 | 117 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `MSG_MOVE_STOP_STRAFE` | yes | changed | 20261024_024153 | 734 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `MSG_MOVE_STOP_TURN` | yes | changed | 20261024_024153 | 149 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
-| ✅ | C | `MSG_MOVE_TELEPORT_ACK` | yes | changed | 20261024_101724 | 3 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
+| ✅ | C | `MSG_MOVE_TELEPORT_ACK` | yes | changed | 20261024_101724 | 11 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | ✅ | C | `MSG_MOVE_WORLDPORT_ACK` |  | same | 20261024_092150 | 8 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | ✅ | C | `MSG_PETITION_DECLINE` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
 | ✅ | C | `MSG_PETITION_RENAME` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
 | ✅ | C | `MSG_QUERY_NEXT_MAIL_TIME` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | ✅ | C | `MSG_RAID_READY_CHECK` |  | same | 20261024_081947 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
-| ✅ | C | `MSG_RAID_TARGET_UPDATE` |  | same | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
+| ✅ | C | `MSG_RAID_TARGET_UPDATE` |  | same | 20261024_101724 | 5 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | C | `MSG_RANDOM_ROLL` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
 | ✅ | C | `MSG_SAVE_GUILD_EMBLEM` |  | same | 20261022_012152 | 1 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
 | ✅ | C | `MSG_SET_DUNGEON_DIFFICULTY` |  | same | 20261024_092150 | 5 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
@@ -860,13 +845,13 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `MSG_CHANNEL_START` |  | reviewed | 20261024_092150 | 63 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `MSG_LIST_STABLED_PETS` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | ✅ | S | `MSG_MINIMAP_PING` |  | same | 20261024_081947 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
-| ✅ | S | `MSG_MOVE_TELEPORT` | yes | changed | 20261024_101724 | 3 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `MSG_MOVE_TELEPORT` | yes | changed | 20261024_101724 | 11 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | S | `MSG_PETITION_DECLINE` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs |
 | ✅ | S | `MSG_PETITION_RENAME` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs |
 | ✅ | S | `MSG_QUERY_NEXT_MAIL_TIME` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MailHandler.cs |
 | ✅ | S | `MSG_RAID_READY_CHECK` |  | same | 20261024_081947 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `MSG_RAID_READY_CHECK_CONFIRM` |  | same | 20261024_081947 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
-| ✅ | S | `MSG_RAID_TARGET_UPDATE` |  | same | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
+| ✅ | S | `MSG_RAID_TARGET_UPDATE` |  | same | 20261024_101724 | 5 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `MSG_SAVE_GUILD_EMBLEM` |  | same | 20261022_012152 | 1 |  | HermesProxy/World/Client/PacketHandlers/GuildHandler.cs |
 | ✅ | S | `MSG_SET_DUNGEON_DIFFICULTY` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `MSG_SET_RAID_DIFFICULTY` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
@@ -875,28 +860,28 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_ACCOUNT_DATA_TIMES` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_ACHIEVEMENT_EARNED` |  | same | 20261024_070752 | 2 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | ✅ | S | `SMSG_ACTIVATE_TAXI_REPLY` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs |
-| ✅ | S | `SMSG_AI_REACTION` |  | same | 20261024_101724 | 18 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
+| ✅ | S | `SMSG_AI_REACTION` |  | same | 20261024_101724 | 4 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_ALL_ACHIEVEMENT_DATA` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | ✅ | S | `SMSG_ALL_GUILD_ACHIEVEMENTS` | yes | new in 4.x | 20261022_012152 | 1 |  | HermesProxy/World/Client/PacketHandlers/GuildHandler.cs |
-| ✅ | S | `SMSG_ARENA_TEAM_COMMAND_RESULT` | yes | changed | 20261024_101724 | 5 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
-| ✅ | S | `SMSG_ARENA_TEAM_EVENT` | yes | same | 20261024_101724 | 3 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
-| ✅ | S | `SMSG_ARENA_TEAM_INVITE` |  | same | 20261024_101724 | 3 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
-| ✅ | S | `SMSG_ARENA_TEAM_QUERY_RESPONSE` |  | same | 20261024_101724 | 7 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
-| ✅ | S | `SMSG_ARENA_TEAM_ROSTER` |  | same | 20261024_101724 | 7 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
-| ✅ | S | `SMSG_ARENA_TEAM_STATS` |  | same | 20261024_101724 | 7 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
-| ✅ | S | `SMSG_ATTACKER_STATE_UPDATE` |  | reviewed | 20261024_101724 | 126 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
+| ✅ | S | `SMSG_ARENA_TEAM_COMMAND_RESULT` | yes | changed | 20261024_101724 | 8 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
+| ✅ | S | `SMSG_ARENA_TEAM_EVENT` | yes | same | 20261024_101724 | 4 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
+| ✅ | S | `SMSG_ARENA_TEAM_INVITE` |  | same | 20261024_101724 | 4 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
+| ✅ | S | `SMSG_ARENA_TEAM_QUERY_RESPONSE` |  | same | 20261024_101724 | 10 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
+| ✅ | S | `SMSG_ARENA_TEAM_ROSTER` |  | same | 20261024_101724 | 10 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
+| ✅ | S | `SMSG_ARENA_TEAM_STATS` |  | same | 20261024_101724 | 10 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
+| ✅ | S | `SMSG_ATTACKER_STATE_UPDATE` |  | reviewed | 20261024_101724 | 440 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_ATTACKSWING_BADFACING` |  | same | 20261024_024153 | 19 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_ATTACKSWING_NOTINRANGE` |  | same | 20261024_024153 | 65 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
-| ✅ | S | `SMSG_ATTACK_START` |  | same | 20261024_101724 | 23 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
-| ✅ | S | `SMSG_ATTACK_STOP` |  | same | 20261024_101724 | 16 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
+| ✅ | S | `SMSG_ATTACK_START` |  | same | 20261024_101724 | 167 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
+| ✅ | S | `SMSG_ATTACK_STOP` |  | same | 20261024_101724 | 3 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_AUCTION_BIDDER_NOTIFICATION` | yes | same | 20261022_161951 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | ✅ | S | `SMSG_AUCTION_COMMAND_RESULT` | yes | same | 20261022_161951 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | ✅ | S | `SMSG_AUCTION_LIST_BIDDED_ITEMS_RESULT` | yes | ? | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | ✅ | S | `SMSG_AUCTION_LIST_ITEMS_RESULT` | yes | ? | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | ✅ | S | `SMSG_AUCTION_LIST_OWNED_ITEMS_RESULT` | yes | ? | 20261024_070752 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | ✅ | S | `SMSG_AUCTION_OWNER_NOTIFICATION` | yes | same | 20261022_161951 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
-| ✅ | S | `SMSG_AURA_UPDATE` | yes | same | 20261024_101724 | 29 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| ✅ | S | `SMSG_AURA_UPDATE_ALL` | yes | same | 20261024_101724 | 5 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| ✅ | S | `SMSG_AURA_UPDATE` | yes | same | 20261024_101724 | 212 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| ✅ | S | `SMSG_AURA_UPDATE_ALL` | yes | same | 20261024_101724 | 87 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_BARBER_SHOP_RESULT` |  | same | 20261024_070752 | 5 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_BATTLEFIELD_LIST` | yes | changed | 20261024_101724 | 3 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
 | ✅ | S | `SMSG_BATTLEFIELD_MGR_ENTRY_INVITE` | yes | changed | 20261022_145205 | 7 |  | HermesProxy/World/Client/PacketHandlers/BattlefieldMgrHandler.cs |
@@ -922,30 +907,33 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_CALENDAR_SEND_CALENDAR` | yes | changed | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/CalendarHandler.cs |
 | ✅ | S | `SMSG_CALENDAR_SEND_EVENT` | yes | changed | 20261021_180247 | 10 |  | HermesProxy/World/Client/PacketHandlers/CalendarHandler.cs |
 | ✅ | S | `SMSG_CALENDAR_SEND_NUM_PENDING` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/CalendarHandler.cs |
-| ✅ | S | `SMSG_CANCEL_COMBAT` |  | same | 20261024_101724 | 3 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
-| ✅ | S | `SMSG_CHANNEL_NOTIFY` |  | same | 20261024_101724 | 4 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
-| ✅ | S | `SMSG_CHAT` | yes | changed | 20261024_101724 | 11 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
+| ✅ | S | `SMSG_CANCEL_COMBAT` |  | same | 20261024_101724 | 13 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
+| ✅ | S | `SMSG_CHANNEL_NOTIFY` |  | same | 20261024_101724 | 33 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
+| ✅ | S | `SMSG_CHAT` | yes | changed | 20261024_101724 | 54 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
+| ✅ | S | `SMSG_CLEAR_COOLDOWNS` | yes | new in 4.x | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_CONTACT_LIST` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/SocialHandler.cs |
 | ✅ | S | `SMSG_CONVERT_RUNE` |  | same | 20261024_100254 | 4 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| ✅ | S | `SMSG_COOLDOWN_EVENT` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| ✅ | S | `SMSG_COOLDOWN_EVENT` |  | same | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| ✅ | S | `SMSG_CORPSE_RECLAIM_DELAY` |  | same | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_CREATE_CHAR` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
-| ✅ | S | `SMSG_CRITERIA_DELETED` |  | same | 20261022_114446 | 7 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
-| ✅ | S | `SMSG_CRITERIA_UPDATE` |  | same | 20261024_100254 | 6 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
+| ✅ | S | `SMSG_CRITERIA_DELETED` |  | same | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
+| ✅ | S | `SMSG_CRITERIA_UPDATE` |  | same | 20261024_101724 | 6 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | ✅ | S | `SMSG_CROSSED_INEBRIATION_THRESHOLD` |  | same | 20261024_070752 | 2 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
+| ✅ | S | `SMSG_DEATH_RELEASE_LOC` |  | same | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_DEFENSE_MESSAGE` |  | same | 20261022_165434 | 1 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
-| ✅ | S | `SMSG_DESTROY_OBJECT` |  | same | 20261024_101724 | 12 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | ✅ | S | `SMSG_DESTRUCTIBLE_BUILDING_DAMAGE` |  | same | 20261022_015111 | 1 |  | HermesProxy/World/Client/PacketHandlers/GameObjectHandler.cs |
-| ✅ | S | `SMSG_DISMOUNT` |  | same | 20261024_101724 | 12 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
+| ✅ | S | `SMSG_DISMOUNT` |  | same | 20261024_101724 | 43 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_DUEL_COMPLETE` |  | same | 20261024_075821 | 1 |  | HermesProxy/World/Client/PacketHandlers/DuelHandler.cs |
 | ✅ | S | `SMSG_DUEL_COUNTDOWN` |  | same | 20261016_034215 | 2 |  | HermesProxy/World/Client/PacketHandlers/DuelHandler.cs |
 | ✅ | S | `SMSG_DUEL_IN_BOUNDS` |  | ? | 20261016_034215 | 2 |  | HermesProxy/World/Client/PacketHandlers/DuelHandler.cs |
 | ✅ | S | `SMSG_DUEL_OUT_OF_BOUNDS` |  | same | 20261016_034215 | 2 |  | HermesProxy/World/Client/PacketHandlers/DuelHandler.cs |
 | ✅ | S | `SMSG_DUEL_REQUESTED` |  | same | 20261024_075821 | 1 |  | HermesProxy/World/Client/PacketHandlers/DuelHandler.cs |
 | ✅ | S | `SMSG_DUEL_WINNER` |  | reviewed | 20261016_034215 | 2 |  | HermesProxy/World/Client/PacketHandlers/DuelHandler.cs |
-| ✅ | S | `SMSG_EMOTE` |  | same | 20261024_101724 | 9 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
+| ✅ | S | `SMSG_EMOTE` |  | same | 20261024_101724 | 40 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | ✅ | S | `SMSG_ENABLE_BARBER_SHOP` |  | same | 20261024_070752 | 5 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_ENCHANTMENT_LOG` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
 | ✅ | S | `SMSG_ENUM_CHARACTERS_RESULT` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
+| ✅ | S | `SMSG_ENVIRONMENTAL_DAMAGE_LOG` |  | same | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_EQUIPMENT_SET_ID` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/EquipmentSetHandler.cs |
 | ✅ | S | `SMSG_EXPLORATION_EXPERIENCE` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_FEATURE_SYSTEM_STATUS` |  | reviewed | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/SystemHandler.cs |
@@ -954,13 +942,13 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_FRIEND_STATUS` |  | same | 20261021_160516 | 2 |  | HermesProxy/World/Client/PacketHandlers/SocialHandler.cs |
 | ✅ | S | `SMSG_GAME_OBJECT_CUSTOM_ANIM` |  | same | 20261022_013438 | 324 |  | HermesProxy/World/Client/PacketHandlers/GameObjectHandler.cs |
 | ✅ | S | `SMSG_GAME_OBJECT_DESPAWN` |  | ? | 20261024_092150 | 2 |  | HermesProxy/World/Client/PacketHandlers/GameObjectHandler.cs |
-| ✅ | S | `SMSG_GM_MESSAGECHAT` | yes | changed | 20261024_101724 | 201 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
+| ✅ | S | `SMSG_GM_MESSAGECHAT` | yes | changed | 20261024_101724 | 745 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | ✅ | S | `SMSG_GM_TICKET_CREATE` |  | same | 20261021_234714 | 3 |  | HermesProxy/World/Client/PacketHandlers/SupportTicketHandler.cs |
 | ✅ | S | `SMSG_GM_TICKET_GET_SYSTEM_STATUS` |  | same | 20261011_195056 | 1 |  | HermesProxy/World/Client/PacketHandlers/SupportTicketHandler.cs |
 | ✅ | S | `SMSG_GOSSIP_COMPLETE` |  | same | 20261024_024153 | 58 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
 | ✅ | S | `SMSG_GOSSIP_MESSAGE` |  | reviewed | 20261024_070752 | 3 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
-| ✅ | S | `SMSG_GROUP_DESTROYED` |  | same | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
-| ✅ | S | `SMSG_GROUP_LIST` | yes | changed | 20261024_101724 | 6 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
+| ✅ | S | `SMSG_GROUP_DESTROYED` |  | same | 20261024_101724 | 5 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
+| ✅ | S | `SMSG_GROUP_LIST` | yes | changed | 20261024_101724 | 15 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `SMSG_GROUP_NEW_LEADER` |  | ? | 20261022_165434 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `SMSG_GROUP_UNINVITE` |  | same | 20261022_165434 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `SMSG_GUILD_ACHIEVEMENT_EARNED` | yes | new in 4.x | 20261022_012152 | 1 |  | HermesProxy/World/Client/PacketHandlers/GuildHandler.cs |
@@ -974,18 +962,19 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_GUILD_ROSTER` | yes | changed | 20261022_012152 | 1 |  | HermesProxy/World/Client/PacketHandlers/GuildHandler.cs |
 | ✅ | S | `SMSG_HIGHEST_THREAT_UPDATE` |  | same | 20261024_101724 | 18 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_INITIALIZE_FACTIONS` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/ReputationHandler.cs |
-| ✅ | S | `SMSG_INIT_WORLD_STATES` | yes | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/WorldStateHandler.cs |
+| ✅ | S | `SMSG_INIT_WORLD_STATES` | yes | same | 20261024_101724 | 7 |  | HermesProxy/World/Client/PacketHandlers/WorldStateHandler.cs |
 | ✅ | S | `SMSG_INSTANCE_LOCK_WARNING_QUERY` | yes | changed | 20261021_180247 | 2 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
 | ✅ | S | `SMSG_INSTANCE_RESET` |  | same | 20261024_092150 | 2 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
 | ✅ | S | `SMSG_INSTANCE_RESET_FAILED` |  | ? | 20261021_160516 | 1 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
 | ✅ | S | `SMSG_INSTANCE_SAVE_CREATED` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
 | ✅ | S | `SMSG_INVENTORY_CHANGE_FAILURE` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
 | ✅ | S | `SMSG_ITEM_COOLDOWN` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
-| ✅ | S | `SMSG_ITEM_PUSH_RESULT` |  | same | 20261024_092150 | 8 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
+| ✅ | S | `SMSG_ITEM_PUSH_RESULT` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
+| ✅ | S | `SMSG_LEARNED_SPELL` |  | reviewed | 20261024_101724 | 9 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_LEVEL_UP_INFO` | yes | changed | 20261024_024153 | 3 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_LFG_PARTY_INFO` | yes | same | 20261022_084148 | 1 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
 | ✅ | S | `SMSG_LFG_PLAYER_INFO` | yes | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
-| ✅ | S | `SMSG_LFG_UPDATE_STATUS` | yes | new in 4.x | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
+| ✅ | S | `SMSG_LFG_UPDATE_STATUS` | yes | new in 4.x | 20261024_101724 | 5 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
 | ✅ | S | `SMSG_LOAD_CUF_PROFILES` | yes | new in 4.x | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_LOAD_EQUIPMENT_SET` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/EquipmentSetHandler.cs |
 | ✅ | S | `SMSG_LOGIN_SET_TIME_SPEED` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
@@ -995,7 +984,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_LOGOUT_RESPONSE` |  | same | 20261024_100254 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_LOG_XP_GAIN` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_LOOT_ALL_PASSED` |  | same | 20261024_081947 | 3 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
-| ✅ | S | `SMSG_LOOT_LIST` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
+| ✅ | S | `SMSG_LOOT_LIST` |  | same | 20261024_101724 | 7 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | ✅ | S | `SMSG_LOOT_RELEASE` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | ✅ | S | `SMSG_LOOT_REMOVED` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | ✅ | S | `SMSG_LOOT_RESPONSE` | yes | changed | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
@@ -1004,47 +993,57 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_LOOT_START_ROLL` |  | reviewed | 20261024_081947 | 4 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | ✅ | S | `SMSG_MAIL_COMMAND_RESULT` |  | same | 20261024_070752 | 4 |  | HermesProxy/World/Client/PacketHandlers/MailHandler.cs |
 | ✅ | S | `SMSG_MAIL_LIST_RESULT` | yes | changed | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/MailHandler.cs |
+| ✅ | S | `SMSG_MODIFY_COOLDOWN` | yes | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_MOTD` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/SystemHandler.cs |
 | ✅ | S | `SMSG_MOVE_ENABLE_GRAVITY` | yes | changed | 20261024_092150 | 8 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_ROOT` | yes | changed | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | S | `SMSG_MOVE_SET_ACTIVE_MOVER` | yes | new in 4.x | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SET_FEATHER_FALL` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | S | `SMSG_MOVE_SET_FLIGHT_SPEED` | yes | new in 4.x | 20261024_100254 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SET_HOVERING` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SET_LAND_WALK` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SET_NORMAL_FALL` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | S | `SMSG_MOVE_SET_RUN_SPEED` | yes | new in 4.x | 20261024_100254 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_SPLINE_DISABLE_GRAVITY` | yes | changed | 20261024_101724 | 11 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_SPLINE_ENABLE_GRAVITY` | yes | changed | 20261024_101724 | 12 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_SPLINE_ROOT` | yes | changed | 20261024_092150 | 342 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_SPLINE_SET_FLIGHT_BACK_SPEED` | yes | changed | 20261024_092150 | 4 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_SPLINE_SET_FLIGHT_SPEED` | yes | changed | 20261024_101724 | 34 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_SPLINE_SET_FLYING` | yes | changed | 20261024_101724 | 11 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_SPLINE_SET_RUN_BACK_SPEED` | yes | changed | 20261024_092150 | 4 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SET_WATER_WALK` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SPLINE_DISABLE_GRAVITY` | yes | changed | 20261024_101724 | 43 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SPLINE_ENABLE_GRAVITY` | yes | changed | 20261024_101724 | 43 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SPLINE_ROOT` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SPLINE_SET_FLIGHT_BACK_SPEED` | yes | changed | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SPLINE_SET_FLIGHT_SPEED` | yes | changed | 20261024_101724 | 129 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SPLINE_SET_FLYING` | yes | changed | 20261024_101724 | 43 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SPLINE_SET_RUN_BACK_SPEED` | yes | changed | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | S | `SMSG_MOVE_SPLINE_SET_RUN_MODE` | yes | changed | 20261024_092150 | 5 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_SPLINE_SET_RUN_SPEED` | yes | changed | 20261024_092150 | 4 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_SPLINE_SET_SWIM_BACK_SPEED` | yes | changed | 20261024_092150 | 4 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_SPLINE_SET_SWIM_SPEED` | yes | changed | 20261024_092150 | 4 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SPLINE_SET_RUN_SPEED` | yes | changed | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SPLINE_SET_SWIM_BACK_SPEED` | yes | changed | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SPLINE_SET_SWIM_SPEED` | yes | changed | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | S | `SMSG_MOVE_SPLINE_SET_WALK_MODE` | yes | changed | 20261024_092150 | 12 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_SPLINE_UNROOT` | yes | changed | 20261024_092150 | 5 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_SPLINE_UNSET_FLYING` | yes | changed | 20261024_101724 | 12 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_UPDATE` | yes | new in 4.x | 20261024_101724 | 4 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_MOVE_UPDATE_TELEPORT` | yes | new in 4.x | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SPLINE_UNROOT` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_SPLINE_UNSET_FLYING` | yes | changed | 20261024_101724 | 43 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_UNROOT` | yes | changed | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_UNSET_HOVERING` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_UPDATE` | yes | new in 4.x | 20261024_101724 | 551 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_MOVE_UPDATE_TELEPORT` | yes | new in 4.x | 20261024_101724 | 6 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | S | `SMSG_NEW_WORLD` | yes | changed | 20261024_092150 | 8 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | S | `SMSG_NOTIFY_RECEIVED_MAIL` |  | ? | 20261024_070752 | 2 |  | HermesProxy/World/Client/PacketHandlers/MailHandler.cs |
-| ✅ | S | `SMSG_ON_MONSTER_MOVE` | yes | changed | 20261024_101724 | 386 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_PARTY_COMMAND_RESULT` |  | reviewed | 20261024_101724 | 4 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
-| ✅ | S | `SMSG_PARTY_INVITE` | yes | ? | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
-| ✅ | S | `SMSG_PARTY_KILL_LOG` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
+| ✅ | S | `SMSG_ON_MONSTER_MOVE` | yes | changed | 20261024_101724 | 1539 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| ✅ | S | `SMSG_PARTY_COMMAND_RESULT` |  | reviewed | 20261024_101724 | 10 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
+| ✅ | S | `SMSG_PARTY_INVITE` | yes | ? | 20261024_101724 | 5 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
+| ✅ | S | `SMSG_PARTY_KILL_LOG` |  | same | 20261024_101724 | 7 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_PARTY_MEMBER_FULL_STATE` | yes | ? | 20261024_081947 | 2 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `SMSG_PARTY_MEMBER_PARTIAL_STATE` | yes | ? | 20261024_075821 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `SMSG_PETITION_SHOW_LIST` |  | same | 20261022_025027 | 2 |  | HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs |
 | ✅ | S | `SMSG_PETITION_SHOW_SIGNATURES` |  | same | 20261022_025027 | 2 |  | HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs |
 | ✅ | S | `SMSG_PETITION_SIGN_RESULTS` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs |
+| ✅ | S | `SMSG_PET_SPELLS_MESSAGE` | yes | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | ✅ | S | `SMSG_PHASE_SHIFT_CHANGE` | yes | changed | 20261024_070752 | 3 |  | HermesProxy/World/Client/PacketHandlers/PhaseShiftHandler.cs |
 | ✅ | S | `SMSG_PLAYED_TIME` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_PLAY_OBJECT_SOUND` | yes | changed | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_PLAY_SOUND` | yes | changed | 20261024_100254 | 2 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
-| ✅ | S | `SMSG_PONG` |  | same | 20261024_101724 | 30 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
-| ✅ | S | `SMSG_POWER_UPDATE` | yes | changed | 20261024_101724 | 16 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| ✅ | S | `SMSG_PONG` |  | same | 20261024_101724 | 116 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
+| ✅ | S | `SMSG_POWER_UPDATE` | yes | changed | 20261024_101724 | 66 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_PRINT_NOTIFICATION` | yes | ? | 20261024_092150 | 5 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | ✅ | S | `SMSG_PVP_OPTIONS_ENABLED` | yes | new in 4.x | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
-| ✅ | S | `SMSG_QUERY_CREATURE_RESPONSE` | yes | changed | 20261024_101724 | 66 |  | HermesProxy/World/Client/PacketHandlers/QueryHandler.cs |
+| ✅ | S | `SMSG_QUERY_CREATURE_RESPONSE` | yes | changed | 20261024_101724 | 544 |  | HermesProxy/World/Client/PacketHandlers/QueryHandler.cs |
 | ✅ | S | `SMSG_QUERY_GAME_OBJECT_RESPONSE` | yes | changed | 20261024_101724 | 4 |  | HermesProxy/World/Client/PacketHandlers/QueryHandler.cs |
 | ✅ | S | `SMSG_QUERY_GUILD_INFO_RESPONSE` | yes | changed | 20261022_012152 | 2 |  | HermesProxy/World/Client/PacketHandlers/GuildHandler.cs |
 | ✅ | S | `SMSG_QUERY_NPC_TEXT_RESPONSE` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/QueryHandler.cs |
@@ -1056,8 +1055,8 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_QUERY_TIME_RESPONSE` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/QueryHandler.cs |
 | ✅ | S | `SMSG_QUEST_COMPLETION_NPC_RESPONSE` | yes | new in 4.x | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
 | ✅ | S | `SMSG_QUEST_GIVER_QUEST_COMPLETE` | yes | changed | 20261024_024153 | 46 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
-| ✅ | S | `SMSG_QUEST_GIVER_STATUS` | yes | changed | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
-| ✅ | S | `SMSG_QUEST_GIVER_STATUS_MULTIPLE` | yes | changed | 20261024_101724 | 6 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
+| ✅ | S | `SMSG_QUEST_GIVER_STATUS` | yes | changed | 20261024_101724 | 41 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
+| ✅ | S | `SMSG_QUEST_GIVER_STATUS_MULTIPLE` | yes | changed | 20261024_101724 | 23 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
 | ✅ | S | `SMSG_QUEST_POI_QUERY_RESPONSE` |  | same | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
 | ✅ | S | `SMSG_QUEST_UPDATE_ADD_KILL` |  | same | 20261024_024153 | 335 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
 | ✅ | S | `SMSG_QUEST_UPDATE_COMPLETE` |  | reviewed | 20261024_024153 | 54 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
@@ -1066,7 +1065,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_RAID_INSTANCE_MESSAGE` |  | same | 20261024_092150 | 3 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
 | ✅ | S | `SMSG_RAID_MARKERS_CHANGED` | yes | new in 4.x | 20261022_165434 | 4 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `SMSG_READ_ITEM_RESULT_OK` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
-| ✅ | S | `SMSG_REQUEST_CEMETERY_LIST_RESPONSE` | yes | new in 4.x | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
+| ✅ | S | `SMSG_REQUEST_CEMETERY_LIST_RESPONSE` | yes | new in 4.x | 20261024_101724 | 7 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_REQUEST_PVP_REWARDS_RESPONSE` | yes | new in 4.x | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
 | ✅ | S | `SMSG_RESET_FAILED_NOTIFY` |  | same | 20261021_160516 | 1 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
 | ✅ | S | `SMSG_SELL_RESPONSE` |  | ? | 20261024_024153 | 3 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
@@ -1083,18 +1082,22 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_SHOW_BANK` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
 | ✅ | S | `SMSG_SHOW_TAXI_NODES` | yes | changed | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs |
 | ✅ | S | `SMSG_SOCKET_GEMS` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
-| ✅ | S | `SMSG_SPELL_GO` | yes | changed | 20261024_101724 | 928 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| ✅ | S | `SMSG_SPELL_PERIODIC_AURA_LOG` |  | same | 20261024_100254 | 31 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| ✅ | S | `SMSG_SPELL_START` | yes | changed | 20261024_101724 | 23 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| ✅ | S | `SMSG_SPELL_ENERGIZE_LOG` |  | same | 20261024_101724 | 6 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| ✅ | S | `SMSG_SPELL_EXECUTE_LOG` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| ✅ | S | `SMSG_SPELL_GO` | yes | changed | 20261024_101724 | 3700 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| ✅ | S | `SMSG_SPELL_NON_MELEE_DAMAGE_LOG` |  | same | 20261024_101724 | 126 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| ✅ | S | `SMSG_SPELL_PERIODIC_AURA_LOG` |  | same | 20261024_101724 | 7 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| ✅ | S | `SMSG_SPELL_START` | yes | changed | 20261024_101724 | 327 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_SPIRIT_HEALER_CONFIRM` |  | same | 20261021_180247 | 2 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
-| ✅ | S | `SMSG_STAND_STATE_UPDATE` |  | same | 20261024_100254 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
+| ✅ | S | `SMSG_STAND_STATE_UPDATE` |  | same | 20261024_101724 | 3 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
+| ✅ | S | `SMSG_STOP_MIRROR_TIMER` |  | same | 20261024_101724 | 6 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_SUSPEND_TOKEN` | yes | new in 4.x | 20261024_092150 | 8 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
-| ✅ | S | `SMSG_TAXI_NODE_STATUS` | yes | same | 20261024_101724 | 7 |  | HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs |
+| ✅ | S | `SMSG_TAXI_NODE_STATUS` | yes | same | 20261024_101724 | 19 |  | HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs |
 | ✅ | S | `SMSG_TEXT_EMOTE` |  | same | 20261024_092150 | 2 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
-| ✅ | S | `SMSG_THREAT_CLEAR` |  | same | 20261024_101724 | 16 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
-| ✅ | S | `SMSG_THREAT_REMOVE` |  | same | 20261024_024153 | 2826 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
-| ✅ | S | `SMSG_THREAT_UPDATE` |  | same | 20261024_101724 | 246 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
-| ✅ | S | `SMSG_TIME_SYNC_REQUEST` |  | same | 20261024_101724 | 45 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
+| ✅ | S | `SMSG_THREAT_CLEAR` |  | same | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
+| ✅ | S | `SMSG_THREAT_REMOVE` |  | same | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
+| ✅ | S | `SMSG_THREAT_UPDATE` |  | same | 20261024_101724 | 1307 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
+| ✅ | S | `SMSG_TIME_SYNC_REQUEST` |  | same | 20261024_101724 | 174 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_TRADE_STATUS` | yes | changed | 20261024_075821 | 5 |  | HermesProxy/World/Client/PacketHandlers/TradeHandler.cs |
 | ✅ | S | `SMSG_TRADE_STATUS_EXTENDED` | yes | changed | 20261024_075821 | 2 |  | HermesProxy/World/Client/PacketHandlers/TradeHandler.cs |
 | ✅ | S | `SMSG_TRAINER_BUY_FAILED` |  | reviewed | 20261024_024153 | 1 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
@@ -1103,19 +1106,18 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_TRIGGER_CINEMATIC` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_TURN_IN_PETITION_RESULT` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs |
 | ✅ | S | `SMSG_TUTORIAL_FLAGS` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
-| ✅ | S | `SMSG_UNLEARNED_SPELLS` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| ✅ | S | `SMSG_UNLEARNED_SPELLS` |  | same | 20261024_101724 | 10 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_UPDATE_ACTION_BUTTONS` | yes | changed | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_UPDATE_INSTANCE_ENCOUNTER_UNIT` | yes | changed | 20261024_092150 | 13 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
 | ✅ | S | `SMSG_UPDATE_INSTANCE_OWNERSHIP` |  | same | 20261024_092150 | 8 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
 | ✅ | S | `SMSG_UPDATE_LAST_INSTANCE` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
-| ✅ | S | `SMSG_UPDATE_OBJECT` | yes | changed | 20261024_101724 | 139 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
-| ✅ | S | `SMSG_UPDATE_TALENT_DATA` | yes | same | 20261024_101724 | 2 |  | HermesProxy/World/Client/PacketHandlers/TalentHandler.cs |
-| ✅ | S | `SMSG_UPDATE_WORLD_STATE` | yes | changed | 20261024_101724 | 9 |  | HermesProxy/World/Client/PacketHandlers/WorldStateHandler.cs |
+| ✅ | S | `SMSG_UPDATE_TALENT_DATA` | yes | same | 20261024_101724 | 4 |  | HermesProxy/World/Client/PacketHandlers/TalentHandler.cs |
+| ✅ | S | `SMSG_UPDATE_WORLD_STATE` | yes | changed | 20261024_101724 | 63 |  | HermesProxy/World/Client/PacketHandlers/WorldStateHandler.cs |
 | ✅ | S | `SMSG_USERLIST_ADD` | yes | same | 20261022_165434 | 20 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
-| ✅ | S | `SMSG_USERLIST_REMOVE` | yes | same | 20261024_092150 | 8 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
+| ✅ | S | `SMSG_USERLIST_REMOVE` | yes | same | 20261024_101724 | 4 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | ✅ | S | `SMSG_USE_EQUIPMENT_SET_RESULT` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/EquipmentSetHandler.cs |
 | ✅ | S | `SMSG_VENDOR_INVENTORY` | yes | changed | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
-| ✅ | S | `SMSG_WEATHER` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
+| ✅ | S | `SMSG_WEATHER` |  | same | 20261024_101724 | 12 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_WHO` |  | same | 20261024_070752 | 2 |  | HermesProxy/World/Client/PacketHandlers/QueryHandler.cs |
 | ✅ | S | `SMSG_WORLD_SERVER_INFO` | yes | new in 4.x | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
 | ∅ | S | `MSG_MOVE_FALL_LAND` | yes | changed |  |  |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
@@ -1202,7 +1204,7 @@ HermesProxy/World/Client/PacketHandlers/SystemHandler.cs 806898d603ef9252
 HermesProxy/World/Client/PacketHandlers/TalentHandler.cs 44aefb28c8709d82
 HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs 8c9cc01c98e6100b
 HermesProxy/World/Client/PacketHandlers/TradeHandler.cs 27f0e60d0f199fdd
-HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs e7e6266ea84ca8b9
+HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs cf9d9e06e85cab15
 HermesProxy/World/Client/PacketHandlers/UpdateHandlerCata.cs 78004f57afd6928a
 HermesProxy/World/Client/PacketHandlers/WorldStateHandler.cs 7f47d3d9cac7b00e
 HermesProxy/World/Client/SeatGravity.cs 9d2a660de9366fd9

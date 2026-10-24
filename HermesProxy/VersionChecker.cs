@@ -613,6 +613,12 @@ public static class ModernVersion
     /// the older ones get the bytes they always did.
     /// </summary>
     public static readonly bool PlayerObjectCarriesAverageItemLevel = ExpansionVersion >= 4;
+    /// <summary>
+    /// From 4.4.2 on Honor Points (1901) count in hundredths, as Conquest, Justice and Valor Points
+    /// do (CurrencyTypes flag 0x8), and the client divides by 100 what it is sent. The older
+    /// clients count honor in whole points, as a 3.3.5a server does.
+    /// </summary>
+    public static readonly bool CurrenciesInHundredths = ExpansionVersion >= 4;
 
     public static int BuildInt => (int)Build;
     public static string VersionString => Build.ToString();
