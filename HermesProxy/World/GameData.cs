@@ -2428,6 +2428,7 @@ public static partial class GameData
     public const uint HotfixChrCustomizationChoiceBegin = 3_000_000;
     public const uint HotfixChrCustomizationOptionBegin = 3_100_000;
     public const uint HotfixItemExtendedCostBegin = 3_200_000;
+    public const uint HotfixCurrencyTypesBegin = 3_300_000;
     // ConcurrentDictionary so LoadHotfixes can run its sub-loaders in parallel — each
     // sub-loader writes to a disjoint HotfixId key range (per the HotfixXxxBegin constants
     // above), so there's no actual contention on writes; we just need a thread-safe Add.
@@ -2459,6 +2460,7 @@ public static partial class GameData
             LoadItemHotfixes,
             LoadItemEffectHotfixes,
             LoadItemExtendedCostHotfixes,
+            LoadCurrencyTypesHotfixes,
             LoadItemDisplayInfoHotfixes,
             LoadCreatureDisplayInfoHotfixes,
             LoadCreatureDisplayInfoExtraHotfixes,
@@ -5316,6 +5318,66 @@ public static partial class GameData
             record.HotfixContent.WriteUInt16((ushort)row[17 + i]);  // CurrencyID
         for (int i = 0; i < 5; i++)
             record.HotfixContent.WriteUInt32((uint)row[22 + i]);    // CurrencyCount
+        return record;
+    }
+
+    /// <summary>
+    /// A 4.3.4 server's weekly caps, where the 4.4.2 client's CurrencyTypes rows have none:
+    /// Cataclysm Classic gave Conquest and Valor Points a season's total instead, and the client
+    /// takes a weekly cap from its own row alone (from the server's SMSG_SETUP_CURRENCY only when
+    /// the row has ComputedWeeklyMaximum). The rows are the client's with 4.3.4's caps, in
+    /// CurrencyTypesCata4.csv. Built by scripts/build-currency-types-hotfix.py.
+    /// </summary>
+    public static void LoadCurrencyTypesHotfixes()
+    {
+        var path = Path.Combine("CSV", "Hotfix", $"CurrencyTypesCata{ModernVersion.ExpansionVersion}.csv");
+        if (LegacyVersion.ExpansionVersion != 4 || !File.Exists(path))
+            return;
+
+        using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
+        uint counter = 0;
+        var columns = new string[CurrencyTypesColumns];
+        foreach (var row in reader)
+        {
+            counter++;
+            for (int i = 0; i < columns.Length; i++)
+                columns[i] = row[i].ToString();
+            HotfixRecord record = CurrencyTypesHotfix(HotfixCurrencyTypesBegin + counter, columns);
+            Hotfixes[record.HotfixId] = record;
+        }
+    }
+
+    // ID, name, description, category, icon, spell weight and category, the two caps, quality,
+    // faction, award condition, the world state of the cap, one float and the two flag words.
+    internal const int CurrencyTypesColumns = 16;
+
+    /// <summary>
+    /// One CurrencyTypes row as the 4.4.2 client reads a hotfix of it (TrinityCore cata_classic
+    /// CurrencyTypesLoadInfo; the ID is not in the row), from the columns of CurrencyTypesCata4.csv.
+    /// </summary>
+    internal static HotfixRecord CurrencyTypesHotfix(uint hotfixId, ReadOnlySpan<string> row)
+    {
+        HotfixRecord record = new HotfixRecord();
+        record.Status = HotfixStatus.Valid;
+        record.TableHash = DB2Hash.CurrencyTypes;
+        record.HotfixId = hotfixId;
+        record.UniqueId = hotfixId;
+        record.RecordId = uint.Parse(row[0], CultureInfo.InvariantCulture);
+        record.HotfixContent.WriteCString(row[1]);                                                // Name
+        record.HotfixContent.WriteCString(row[2]);                                                // Description
+        record.HotfixContent.WriteUInt8(byte.Parse(row[3], CultureInfo.InvariantCulture));       // CategoryID
+        record.HotfixContent.WriteInt32(int.Parse(row[4], CultureInfo.InvariantCulture));        // InventoryIconFileID
+        record.HotfixContent.WriteUInt32(uint.Parse(row[5], CultureInfo.InvariantCulture));      // SpellWeight
+        record.HotfixContent.WriteUInt8(byte.Parse(row[6], CultureInfo.InvariantCulture));       // SpellCategory
+        record.HotfixContent.WriteUInt32(uint.Parse(row[7], CultureInfo.InvariantCulture));      // MaxQty
+        record.HotfixContent.WriteUInt32(uint.Parse(row[8], CultureInfo.InvariantCulture));      // MaxEarnablePerWeek
+        record.HotfixContent.WriteInt8(sbyte.Parse(row[9], CultureInfo.InvariantCulture));       // Quality
+        record.HotfixContent.WriteInt32(int.Parse(row[10], CultureInfo.InvariantCulture));       // FactionID
+        record.HotfixContent.WriteInt32(int.Parse(row[11], CultureInfo.InvariantCulture));       // AwardConditionID
+        record.HotfixContent.WriteInt32(int.Parse(row[12], CultureInfo.InvariantCulture));       // MaxQtyWorldStateID
+        record.HotfixContent.WriteFloat(float.Parse(row[13], CultureInfo.InvariantCulture));     // Unknown1154
+        record.HotfixContent.WriteInt32(int.Parse(row[14], CultureInfo.InvariantCulture));       // Flags
+        record.HotfixContent.WriteInt32(int.Parse(row[15], CultureInfo.InvariantCulture));       // FlagsB
         return record;
     }
 

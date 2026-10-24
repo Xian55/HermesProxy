@@ -9,9 +9,9 @@ A backend's column shows how the latest session there that touched the opcode we
 | Status | Count | Meaning |
 |---|---:|---|
 | ❌ failing | 0 | a backend's latest session that touched it threw or dropped it |
-| 🔁 retest | 347 | its file changed after the latest session that exercised it |
+| 🔁 retest | 351 | its file changed after the latest session that exercised it |
 | · unseen | 87 | no session on any backend exercised it yet |
-| ✅ seen ok | 375 | the latest session on each backend that touched it passed it cleanly |
+| ✅ seen ok | 371 | the latest session on each backend that touched it passed it cleanly |
 | ∅ not sent | 28 | a server packet TrinityCore 3.3.5 never sends, and no session saw |
 
 ## What's left
@@ -23,7 +23,7 @@ Per feature: how many of its opcodes each backend's latest session passed cleanl
 | Movement | 133 | 81 | 109 | 51 |  | 24 | 94 | · `CMSG_DISMISS_CONTROLLED_VEHICLE`, `CMSG_MOVE_CHANGE_TRANSPORT`, `CMSG_MOVE_ENABLE_SWIM_TO_FLY_TRANS_ACK`, `CMSG_MOVE_FALL_RESET`, `CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK`, `CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK`, `CMSG_MOVE_GRAVITY_DISABLE_ACK`, `CMSG_MOVE_GRAVITY_ENABLE_ACK`, `CMSG_MOVE_NOT_ACTIVE_MOVER`, `MSG_MOVE_GRAVITY_CHNG`, `MSG_MOVE_KNOCK_BACK`, `MSG_MOVE_SET_PITCH_RATE`, `MSG_MOVE_SET_TURN_RATE`, `MSG_MOVE_START_PITCH_DOWN`, `MSG_MOVE_START_PITCH_UP`, `MSG_MOVE_STOP_PITCH`, `SMSG_FLIGHT_SPLINE_SYNC`, `SMSG_FORCE_PITCH_RATE_CHANGE`, `SMSG_FORCE_TURN_RATE_CHANGE`, `SMSG_MOVE_DISABLE_GRAVITY`, `SMSG_MOVE_ENABLE_GRAVITY`, `SMSG_MOVE_SPLINE_SET_NORMAL_FALL`, `SMSG_MOVE_SPLINE_SET_PITCH_RATE`, `SMSG_MOVE_SPLINE_SET_TURN_RATE` |
 | Arena | 16 |  | 6 |  |  | 10 | 2 | · `CMSG_ARENA_TEAM_ACCEPT`, `CMSG_ARENA_TEAM_DECLINE`, `CMSG_ARENA_TEAM_DISBAND`, `CMSG_ARENA_TEAM_INVITE`, `CMSG_ARENA_TEAM_LEADER`, `CMSG_ARENA_TEAM_LEAVE`, `CMSG_ARENA_TEAM_REMOVE`, `SMSG_ARENA_TEAM_COMMAND_RESULT`, `SMSG_ARENA_TEAM_EVENT`, `SMSG_ARENA_TEAM_INVITE` |
 | Guild | 40 | 15 | 33 | 1 |  | 8 | 15 | · `CMSG_ACCEPT_GUILD_INVITE`, `CMSG_GUILD_DECLINE_INVITATION`, `CMSG_GUILD_DELETE`, `CMSG_GUILD_DELETE_RANK`, `CMSG_GUILD_UPDATE_INFO_TEXT`, `MSG_SAVE_GUILD_EMBLEM`, `MSG_TABARDVENDOR_ACTIVATE`, `SMSG_GUILD_INVITE` |
-| Chat | 32 | 12 | 25 | 9 |  | 5 | 14 | · `CMSG_CHAT_CHANNEL_DECLINE_INVITE`, `CMSG_CHAT_CHANNEL_DISPLAY_LIST`, `SMSG_CHANNEL_LIST`, `SMSG_DEFENSE_MESSAGE`, `SMSG_USERLIST_UPDATE` |
+| Chat | 32 | 12 | 25 | 9 |  | 5 | 15 | · `CMSG_CHAT_CHANNEL_DECLINE_INVITE`, `CMSG_CHAT_CHANNEL_DISPLAY_LIST`, `SMSG_CHANNEL_LIST`, `SMSG_DEFENSE_MESSAGE`, `SMSG_USERLIST_UPDATE` |
 | Group | 28 | 18 | 23 | 1 |  | 4 | 19 | · `CMSG_SUMMON_RESPONSE`, `MSG_MINIMAP_PING`, `MSG_RAID_READY_CHECK_FINISHED`, `SMSG_SUMMON_REQUEST` |
 | Petition | 13 |  | 9 |  |  | 4 | 8 | · `CMSG_TURN_IN_PETITION`, `MSG_PETITION_DECLINE`, `MSG_PETITION_RENAME`, `SMSG_TURN_IN_PETITION_RESULT` |
 | NPC | 24 | 12 | 20 | 10 |  | 4 | 5 | · `CMSG_BATTLEMASTER_HELLO`, `CMSG_PET_UNLEARN`, `CMSG_TRAINER_LIST`, `SMSG_TRAINER_BUY_FAILED` |
@@ -41,7 +41,7 @@ Per feature: how many of its opcodes each backend's latest session passed cleanl
 | Trade | 12 | 10 | 11 | 1 |  | 1 | 3 | · `CMSG_IGNORE_TRADE` |
 | Achievement | 5 | 4 | 4 | 3 |  | 1 |  | · `SMSG_ACHIEVEMENT_DELETED` |
 | Query | 15 | 12 | 14 | 12 |  | 1 |  | · `SMSG_ITEM_NAME_QUERY_RESPONSE` |
-| Battleground | 17 | 12 | 14 | 1 |  |  | 14 |  |
+| Battleground | 17 | 12 | 14 | 1 |  |  | 15 |  |
 | Auction | 13 |  | 13 |  |  |  | 7 |  |
 | Instance | 15 | 13 | 10 | 4 |  |  | 7 |  |
 | Battlefield | 5 | 5 |  |  |  |  | 5 |  |
@@ -49,10 +49,10 @@ Per feature: how many of its opcodes each backend's latest session passed cleanl
 | GameObject | 6 | 6 | 2 | 1 |  |  | 4 |  |
 | SupportTicket | 4 | 4 | 2 |  |  |  | 4 |  |
 | Reputation | 7 | 7 | 5 | 3 |  |  | 3 |  |
+| Connection | 2 | 2 | 2 | 2 |  |  | 2 |  |
 | Combat | 18 | 17 | 18 | 13 |  |  | 1 |  |
 | Hotfix | 1 | 1 | 1 | 1 |  |  | 1 |  |
 | BattlePet | 1 |  | 1 |  |  |  |  |  |
-| Connection | 2 | 2 | 2 | 2 |  |  |  |  |
 | EquipmentSet | 6 | 1 | 6 | 1 |  |  |  |  |
 | Objects | 6 | 6 | 6 | 5 |  |  |  |  |
 | Other | 2 | 1 | 2 |  |  |  |  |  |
@@ -99,6 +99,7 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | 🔁 | C | `CMSG_AUCTION_PLACE_BID` |  | ✅ 10-10 |  | 20261010_033357 | 3 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
 | 🔁 | C | `CMSG_AUCTION_REMOVE_ITEM` |  | ✅ 09-13 |  | 20260913_022351 | 1 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
 | 🔁 | C | `CMSG_AUCTION_SELL_ITEM` |  | ✅ 10-11 |  | 20261011_152733 | 17 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
+| 🔁 | C | `CMSG_AUTH_SESSION` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 3 |  | HermesProxy/World/Client/WorldClient.cs |
 | 🔁 | C | `CMSG_BATTLEFIELD_LEAVE` | ✅ 09-01 | ✅ 10-23 |  | 20261023_010816 | 3 |  | HermesProxy/World/Server/Systems/BattlegroundSystem.cs |
 | 🔁 | C | `CMSG_BATTLEFIELD_PORT` | ✅ 09-01 | ✅ 10-23 |  | 20261023_010816 | 3 |  | HermesProxy/World/Server/Systems/BattlegroundSystem.cs |
 | 🔁 | C | `CMSG_BATTLEMASTER_JOIN` | ✅ 09-01 | ✅ 10-23 |  | 20261023_010816 | 3 |  | HermesProxy/World/Server/Systems/BattlegroundSystem.cs |
@@ -158,6 +159,7 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | 🔁 | C | `CMSG_LOOT_ROLL` |  | ✅ 10-22 |  | 20261022_182230 | 2 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | 🔁 | C | `CMSG_MAIL_CREATE_TEXT_ITEM` | ✅ 09-02 | ✅ 10-11 |  | 20261011_152733 | 2 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | 🔁 | C | `CMSG_MAIL_RETURN_TO_SENDER` | ✅ 09-02 |  |  | 20260902_213858 | 1 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
+| 🔁 | C | `CMSG_MESSAGECHAT` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 1180 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | 🔁 | C | `CMSG_MOUNT_SPECIAL_ANIM` |  | ✅ 10-06 |  | 20261006_221548 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | 🔁 | C | `CMSG_MOVE_FEATHER_FALL_ACK` | ✅ 09-01 | ✅ 10-23 |  | 20261023_194550 | 10 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `CMSG_MOVE_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK` | ✅ 09-09 | ✅ 10-24 |  | 20261024_204721 | 6 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
@@ -183,6 +185,7 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | 🔁 | C | `CMSG_PET_SET_ACTION` | ✅ 09-03 | ✅ 10-23 |  | 20261023_173439 | 21 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
 | 🔁 | C | `CMSG_PET_SPELL_AUTOCAST` |  | ✅ 10-23 |  | 20261023_160725 | 7 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
 | 🔁 | C | `CMSG_PET_STOP_ATTACK` |  | ✅ 10-23 |  | 20261023_173439 | 4 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
+| 🔁 | C | `CMSG_PING` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 120 |  | HermesProxy/World/Client/WorldClient.cs |
 | 🔁 | C | `CMSG_PLAYER_SHOWING_CLOAK` |  | ✅ 09-28 |  | 20260928_200202 | 2 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | 🔁 | C | `CMSG_PLAYER_SHOWING_HELM` |  | ✅ 09-28 |  | 20260928_200202 | 2 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | 🔁 | C | `CMSG_PLAYER_VEHICLE_ENTER` |  | ✅ 10-06 |  | 20261006_223935 | 1 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
@@ -287,6 +290,7 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | 🔁 | S | `SMSG_AUCTION_COMMAND_RESULT` |  | ✅ 10-11 |  | 20261011_152733 | 17 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | 🔁 | S | `SMSG_AUCTION_OWNER_NOTIFICATION` |  | ✅ 09-13 |  | 20260913_022351 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | 🔁 | S | `SMSG_BARBER_SHOP_RESULT` | ✅ 09-06 | ✅ 10-23 |  | 20261023_055610 | 27 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
+| 🔁 | S | `SMSG_BATTLEFIELD_LIST` | ✅ 09-06 | ✅ 10-24 |  | 20261024_222618 | 7 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
 | 🔁 | S | `SMSG_BATTLEFIELD_MGR_EJECTED` | ✅ 09-01 |  |  | 20260901_001120 | 1 |  | HermesProxy/World/Client/PacketHandlers/BattlefieldMgrHandler.cs |
 | 🔁 | S | `SMSG_BATTLEFIELD_MGR_ENTERING` | ✅ 09-01 |  |  | 20260901_001120 | 2 |  | HermesProxy/World/Client/PacketHandlers/BattlefieldMgrHandler.cs |
 | 🔁 | S | `SMSG_BATTLEFIELD_MGR_ENTRY_INVITE` | ✅ 09-01 |  |  | 20260901_231357 | 5 |  | HermesProxy/World/Client/PacketHandlers/BattlefieldMgrHandler.cs |
@@ -532,7 +536,6 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | ✅ | C | `CMSG_ATTACK_STOP` | ✅ 09-09 | ✅ 10-24 | ✅ 09-15 | 20261024_204721 | 9 |  | HermesProxy/World/Server/Systems/MeleeAttackOrder.cs |
 | ✅ | C | `CMSG_AUCTION_LIST_BIDDED_ITEMS` |  | ✅ 10-22 |  | 20261022_202131 | 4 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
 | ✅ | C | `CMSG_AUCTION_LIST_OWNED_ITEMS` |  | ✅ 10-22 |  | 20261022_202131 | 8 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
-| ✅ | C | `CMSG_AUTH_SESSION` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 3 |  | HermesProxy/World/Client/WorldClient.cs |
 | ✅ | C | `CMSG_AUTOBANK_ITEM` |  | ✅ 10-24 |  | 20261024_000209 | 1 |  | (variable opcode) |
 | ✅ | C | `CMSG_AUTOSTORE_BANK_ITEM` |  | ✅ 10-24 | ✅ 09-17 | 20261024_000209 | 3 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `CMSG_AUTOSTORE_LOOT_ITEM` | ✅ 09-09 | ✅ 10-24 | ✅ 09-17 | 20261024_002047 | 19 |  | (variable opcode) |
@@ -615,14 +618,12 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | ✅ | C | `CMSG_MAIL_MARK_AS_READ` | ✅ 09-02 | ✅ 10-24 | ✅ 09-17 | 20261024_000209 | 4 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | ✅ | C | `CMSG_MAIL_TAKE_ITEM` | ✅ 09-02 | ✅ 10-24 | ✅ 09-11 | 20261024_000209 | 4 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | ✅ | C | `CMSG_MAIL_TAKE_MONEY` | ✅ 09-02 | ✅ 10-24 |  | 20261024_000209 | 2 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
-| ✅ | C | `CMSG_MESSAGECHAT` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 1180 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | ✅ | C | `CMSG_MOVE_TIME_SKIPPED` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 14 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | ✅ | C | `CMSG_NAME_QUERY` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 8 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | ✅ | C | `CMSG_NEXT_CINEMATIC_CAMERA` | ✅ 09-09 | ✅ 10-23 | ✅ 09-12 | 20261023_111922 | 3 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | ✅ | C | `CMSG_OPEN_ITEM` | ✅ 09-03 | ✅ 10-23 |  | 20261023_055610 | 5 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `CMSG_PARTY_INVITE` | ✅ 09-02 | ✅ 10-22 |  | 20261022_202131 | 7 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
 | ✅ | C | `CMSG_PET_ACTION` | ✅ 09-09 | ✅ 10-23 | ✅ 09-15 | 20261023_204800 | 10 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
-| ✅ | C | `CMSG_PING` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 120 |  | HermesProxy/World/Client/WorldClient.cs |
 | ✅ | C | `CMSG_PLAYER_LOGIN` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 7 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | ✅ | C | `CMSG_QUERY_CREATURE` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_205856 | 173 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | ✅ | C | `CMSG_QUERY_GAME_OBJECT` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 362 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
@@ -729,7 +730,6 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | ✅ | S | `SMSG_AUCTION_LIST_OWNED_ITEMS_RESULT` |  | ✅ 10-22 |  | 20261022_202131 | 8 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | ✅ | S | `SMSG_AURA_UPDATE` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_205856 | 91 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_AURA_UPDATE_ALL` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 713 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| ✅ | S | `SMSG_BATTLEFIELD_LIST` | ✅ 09-06 | ✅ 10-24 |  | 20261024_222618 | 7 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
 | ✅ | S | `SMSG_BINDER_CONFIRM` |  | ✅ 10-24 |  | 20261024_000209 | 2 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
 | ✅ | S | `SMSG_BIND_POINT_UPDATE` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 18 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_BREAK_TARGET` | ✅ 10-23 | ✅ 10-17 |  | 20261023_012203 | 10 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
@@ -973,7 +973,7 @@ HermesProxy/World/Client/SeatGravity.cs 9d2a660de9366fd9
 HermesProxy/World/Client/WorldClient.cs aeb8d8e09785bfd3
 HermesProxy/World/Client/WorldClientCataHandshake.cs f73fe4895229ea0c
 HermesProxy/World/Dispatch/SessionContext.cs b74de2b3cc19f3c8
-HermesProxy/World/GameData.cs 3ca824e564ddee5b
+HermesProxy/World/GameData.cs 2aaead127f94dcc8
 HermesProxy/World/GuildClub.cs b1aa090972b200df
 HermesProxy/World/ItemRefund.cs ddc050973d0a0cdd
 HermesProxy/World/MaskedGuid.cs 38ad2baffdeef245
@@ -1102,5 +1102,5 @@ HermesProxy/World/Server/Systems/SupportTicketSystem.cs 2d482e7ece41c7cc
 HermesProxy/World/Server/Systems/TalentSystem.cs ce4c81a39587d9aa
 HermesProxy/World/Server/Systems/TaxiSystem.cs 9760b0b210ed8645
 HermesProxy/World/Server/Systems/TradeSystem.cs bffc2fa6c7d6573a
-HermesProxy/World/Server/WorldSocket.cs 74fe32a8508fc9fe
+HermesProxy/World/Server/WorldSocket.cs b885855752bbe1df
 -->
