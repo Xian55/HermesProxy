@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace HermesProxy.World.Client;
 
@@ -1864,12 +1865,21 @@ public partial class WorldClient
 
         if (isAll)
             slotMap.Clear();
-        foreach (var aura in update.Auras)
+        foreach (ref var aura in CollectionsMarshal.AsSpan(update.Auras))
         {
             if (aura.AuraData == null)
+            {
                 slotMap.Remove(aura.Slot);
-            else
-                slotMap[aura.Slot] = aura;
+                continue;
+            }
+
+            bool refreshed = !isAll && slotMap.TryGetValue(aura.Slot, out var previous)
+                                    && IsAuraRefresh(previous, aura);
+            slotMap[aura.Slot] = aura;
+
+            // Only on the way out: a resync built from KnownAuras must not log a refresh again.
+            if (refreshed)
+                aura.AuraData = aura.AuraData with { Flags = aura.AuraData.Flags | AuraFlagsModern.Refresh };
         }
 
         World.Logging.SpellLogMessages.AuraUpdate(
@@ -1885,6 +1895,21 @@ public partial class WorldClient
         if (update.Auras.Count > 0)
             SendPacketToClient(update);
     }
+
+    // A 3.3.5a or 4.3.4 server refreshes an aura by sending it again in its slot with a new
+    // duration; nothing in the packet says so. The modern client logs SPELL_AURA_REFRESH only for
+    // a partial update carrying AuraFlags.Refresh, so the proxy sets it when the slot keeps its
+    // spell and stack count and the aura now ends later than it did. A stack change already logs
+    // APPLIED_DOSE or REMOVED_DOSE. The margin keeps the latency between two legacy packets from
+    // reading as a refresh; a refresh within it of the aura's last update goes unlogged.
+    internal const int AuraRefreshMinGainMs = 500;
+
+    internal static bool IsAuraRefresh(in AuraInfo previous, in AuraInfo current)
+        => previous.AuraData != null
+           && previous.ExpiresAt != 0 && current.ExpiresAt != 0
+           && previous.AuraData.SpellID == current.AuraData.SpellID
+           && previous.AuraData.Applications == current.AuraData.Applications
+           && current.ExpiresAt - previous.ExpiresAt > AuraRefreshMinGainMs;
 
     // Whole-list equality for AURA_UPDATE_ALL dedup. Returns true iff every incoming
     // slot has a cached counterpart that is equal under AuraDataInfo's compiler-
@@ -1980,6 +2005,8 @@ public partial class WorldClient
         {
             data.Duration = packet.ReadInt32();
             data.Remaining = packet.ReadInt32();
+            if (data.Remaining > 0)
+                aura.ExpiresAt = packet.GetReceivedTime() + data.Remaining.Value;
         }
 
         if (legacyFlags.HasAnyFlag(AuraFlagsWotLK.Scalable))
