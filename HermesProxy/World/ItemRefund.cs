@@ -58,9 +58,11 @@ public static class ItemRefund
             contents.Items[i] = (item, count);
         }
 
+        // The server's honor is in whole points, the 4.4.2 client's in hundredths.
         int slot = 0;
         if (honor != 0)
-            contents.Currencies[slot++] = ((uint)Currency.HonorPoints, honor);
+            contents.Currencies[slot++] = ((uint)Currency.HonorPoints,
+                ModernVersion.CurrenciesInHundredths ? honor * WorldClient.ModernCurrencyScale((uint)Currency.HonorPoints) : honor);
         if (arena != 0)
             contents.Currencies[slot] = ((uint)Currency.ArenaPoints, arena);
     }

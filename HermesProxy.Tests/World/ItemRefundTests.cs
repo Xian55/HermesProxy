@@ -164,6 +164,10 @@ public sealed class ItemRefundTests
 
     // --- 3.3.5a
 
+    // A 3.3.5a server's honor is in whole points; the 4.4.2 client counts it in hundredths, the
+    // 3.4.3 client as the server does. Arena points are whole for both.
+    private static uint WrathHonor(uint honor) => ModernVersion.CurrenciesInHundredths ? honor * 100 : honor;
+
     [Fact]
     public void WrathInfo_HonorAndArenaPoints_BecomeCurrencies()
     {
@@ -181,7 +185,7 @@ public sealed class ItemRefundTests
         Assert.Equal((20558u, 3u), contents.Items[0]);
         Assert.Equal((0u, 0u), contents.Items[1]);
         Assert.Equal((29434u, 1u), contents.Items[4]);
-        Assert.Equal(((uint)Currency.HonorPoints, 300u), contents.Currencies[0]);
+        Assert.Equal(((uint)Currency.HonorPoints, WrathHonor(300)), contents.Currencies[0]);
         Assert.Equal(((uint)Currency.ArenaPoints, 45u), contents.Currencies[1]);
         Assert.Equal((0u, 0u), contents.Currencies[2]);
     }
@@ -212,7 +216,7 @@ public sealed class ItemRefundTests
         Assert.Equal(ItemGuid, guid);
         Assert.Equal(0, result);
         Assert.Equal((43228u, 20u), contents.Items[1]);
-        Assert.Equal(((uint)Currency.HonorPoints, 2000u), contents.Currencies[0]);
+        Assert.Equal(((uint)Currency.HonorPoints, WrathHonor(2000)), contents.Currencies[0]);
     }
 
     [Fact]
