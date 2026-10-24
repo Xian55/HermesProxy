@@ -212,6 +212,26 @@ public static partial class GameData
         return false;
     }
 
+    /// <summary>
+    /// A weapon's attack delay in milliseconds, 0 for an item without one: as the server
+    /// described it when it did, else from the client's own item data.
+    /// </summary>
+    public static bool TryGetItemDelay(uint entry, out uint delay)
+    {
+        if (ItemTemplates.TryGetValue(entry, out var template))
+        {
+            delay = template.Delay;
+            return true;
+        }
+        if (ItemSparseRecordsStore.TryGetValue(entry, out var row))
+        {
+            delay = row.Delay;
+            return true;
+        }
+        delay = 0;
+        return false;
+    }
+
     public static void StoreQuestTemplate(uint entry, QuestTemplate template)
     {
         CollectionsMarshal.GetValueRefOrAddDefault(QuestTemplates, entry, out _) = template;

@@ -267,7 +267,7 @@ public enum UnitField
     [DescriptorUpdateField(nameof(UnitData.PetNextLevelExperience), DescriptorType.UInt32, bit: 63)]
     UNIT_PET_NEXT_LEVEL_EXPERIENCE,
 
-    // ---- ModCastSpeed / ModCastHaste (default 1f Create) + float-1 placeholders × 4 + CreatedBySpell + EmoteState + 2× Int16 0 ----
+    // ---- ModCastSpeed / ModCastHaste / ModHaste / ModRangedHaste / ModHasteRegen (default 1f Create) + float-1 placeholder + CreatedBySpell + EmoteState + 2× Int16 0 ----
 
     [DescriptorCreateField(nameof(UnitData.ModCastSpeed), DescriptorType.Float, DefaultExpression = "1f")]
     [DescriptorUpdateField(nameof(UnitData.ModCastSpeed), DescriptorType.Float, bit: 65)]
@@ -276,12 +276,14 @@ public enum UnitField
     [DescriptorUpdateField(nameof(UnitData.ModCastHaste), DescriptorType.Float, bit: 66)]
     UNIT_MOD_CAST_HASTE,
 
-    [DescriptorCreatePlaceholder(DescriptorType.Float, "1f")]
-    UNIT_PAD_FLOAT_ONE_3,
-    [DescriptorCreatePlaceholder(DescriptorType.Float, "1f")]
-    UNIT_PAD_FLOAT_ONE_4,
-    [DescriptorCreatePlaceholder(DescriptorType.Float, "1f")]
-    UNIT_PAD_FLOAT_ONE_5,
+    // The proxy works the melee and ranged ones out of a 3.3.5a server's attack times; their
+    // update bits are below
+    [DescriptorCreateField(nameof(UnitData.ModHaste), DescriptorType.Float, DefaultExpression = "1f")]
+    UNIT_MOD_HASTE,
+    [DescriptorCreateField(nameof(UnitData.ModRangedHaste), DescriptorType.Float, DefaultExpression = "1f")]
+    UNIT_MOD_RANGED_HASTE,
+    [DescriptorCreateField(nameof(UnitData.ModHasteRegen), DescriptorType.Float, DefaultExpression = "1f")]
+    UNIT_MOD_HASTE_REGEN,
     [DescriptorCreatePlaceholder(DescriptorType.Float, "1f")]
     UNIT_PAD_FLOAT_ONE_6,
 
