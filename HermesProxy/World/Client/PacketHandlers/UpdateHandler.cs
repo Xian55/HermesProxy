@@ -3521,7 +3521,7 @@ public partial class WorldClient
                     }
                 }
             }
-            if (IsCataLegacy || ModernVersion.ExpansionVersion == 3)
+            if (ModernVersion.IsWotLKClassicOrLater)
                 CopyPowerRegenModifiers(guid, updateData, updateMaskArray, updates);
             int UNIT_VIRTUAL_ITEM_SLOT_DISPLAY = LegacyVersion.GetUpdateField(UnitField.UNIT_VIRTUAL_ITEM_SLOT_DISPLAY);
             if (UNIT_VIRTUAL_ITEM_SLOT_DISPLAY >= 0)
