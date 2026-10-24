@@ -1025,7 +1025,7 @@ HermesProxy/World/Server/Packets/Codecs/SupportTicketCodecs.cs 3ad0419fe499832b
 HermesProxy/World/Server/Packets/Codecs/TalentCodecs.cs ace48e001e84437a
 HermesProxy/World/Server/Packets/CollectionPackets.cs 21fd5d6231509fc8
 HermesProxy/World/Server/Packets/CombatPackets.cs 6ce3a58f68798ccf
-HermesProxy/World/Server/Packets/DuelPackets.cs e5b2874700c7dc6b
+HermesProxy/World/Server/Packets/DuelPackets.cs 776c2242c372c540
 HermesProxy/World/Server/Packets/EmptyInitPackets.cs fbbca57d5e071940
 HermesProxy/World/Server/Packets/EquipmentSetPackets.cs 6cf116cc98a53108
 HermesProxy/World/Server/Packets/GameObjectPackets.cs 2da908ddaaf03728
