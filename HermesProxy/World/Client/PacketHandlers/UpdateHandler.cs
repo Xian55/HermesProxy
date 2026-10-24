@@ -5700,8 +5700,14 @@ public partial class WorldClient
             {
                 updateData.DynamicObjectData.SpellID = updates[DYNAMICOBJECT_SPELLID].Int32Value;
                 updateData.DynamicObjectData.SpellXSpellVisualID = (int)GameData.GetSpellVisual((uint)updateData.DynamicObjectData.SpellID);
-                if (IsCataLegacy && updateData.CreateData?.MoveInfo is { } markerAt)
-                    NoteRaidMarker(updateData.DynamicObjectData.SpellID.Value, markerAt.Position);
+                if (IsCataLegacy && IsRaidMarkerSpell(updateData.DynamicObjectData.SpellID.Value))
+                {
+                    // The 4.4.2 client draws each world marker itself, from SMSG_RAID_MARKERS_CHANGED;
+                    // the object's own visual drew it a second time on the same spot.
+                    updateData.DynamicObjectData.SpellXSpellVisualID = 0;
+                    if (updateData.CreateData?.MoveInfo is { } markerAt)
+                        NoteRaidMarker(updateData.DynamicObjectData.SpellID.Value, markerAt.Position);
+                }
             }
             int DYNAMICOBJECT_RADIUS = LegacyVersion.GetUpdateField(DynamicObjectField.DYNAMICOBJECT_RADIUS);
             if (DYNAMICOBJECT_RADIUS >= 0 && updateMaskArray[DYNAMICOBJECT_RADIUS])
