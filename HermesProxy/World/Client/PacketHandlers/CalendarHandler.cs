@@ -47,12 +47,46 @@ public partial class WorldClient
         return lockout;
     }
 
+    // A raid's reset period is whole days; the seconds until a reset almost never are.
+    private const int SecondsPerDay = 86400;
+
+    /// <summary>
+    /// The raids' resets after the saves: a moment the server counts from, then each raid's map and
+    /// two numbers. AzerothCore sends what a 3.3.5a client reads there, the period and an offset
+    /// from that moment; TrinityCore (3.3.5a and 4.3.4) sends the seconds until the next reset in
+    /// the period's place, an offset of 0 and a fixed moment. A whole number of days is taken for
+    /// AzerothCore's period; otherwise the period is the client's own (MapDifficulty). A raid the
+    /// client does not know is left out.
+    /// </summary>
+    private static void ReadCalendarRaidResets(WorldPacket packet, long serverNow, CalendarSendCalendar calendar)
+    {
+        long origin = packet.ReadUInt32();
+        uint count = packet.ReadUInt32();
+        if (count > MaxCalendarEntries)
+            return;
+        for (uint i = 0; i < count; i++)
+        {
+            uint mapId = packet.ReadUInt32();
+            int periodOrSecondsLeft = packet.ReadInt32();
+            int offset = packet.ReadInt32();
+            uint difficultyId = GameData.ModernInstanceDifficulty(mapId, 0).DifficultyId;
+            if (difficultyId == 0 || periodOrSecondsLeft <= 0)
+                continue;
+
+            if (periodOrSecondsLeft % SecondsPerDay == 0)
+            {
+                calendar.RaidResets.Add(CalendarRaidReset.At((int)mapId, difficultyId, periodOrSecondsLeft, origin + offset));
+                continue;
+            }
+            if (GameData.InstanceResetPeriods.TryGetValue((mapId, difficultyId), out uint period))
+                calendar.RaidResets.Add(CalendarRaidReset.At((int)mapId, difficultyId, (int)period, serverNow + periodOrSecondsLeft));
+        }
+    }
+
     /// <summary>
     /// <c>HandleCalendarGetCalendar</c>: the invitations, the events, the time, then the raids the
     /// player is saved to, the raids' reset times and the holidays the server changed. The client
-    /// is sent the first three lists. The resets are left out as TrinityCore wotlk_classic leaves
-    /// them out (a 3.3.5a server counts their period from a day of its own configuration), and the
-    /// client has the holidays in a table of its own.
+    /// is sent all but the holidays, which it has in a table of its own.
     /// </summary>
     [HandlesSmsg(Opcode.SMSG_CALENDAR_SEND_CALENDAR)]
     internal void HandleCalendarSendCalendar(WorldPacket packet)
@@ -97,7 +131,7 @@ public partial class WorldClient
             calendar.Events.Add(calendarEvent);
         }
 
-        packet.ReadUInt32();                    // the server's time in seconds
+        long serverNow = packet.ReadUInt32();   // the server's time in seconds
         calendar.ServerTime = packet.ReadUInt32();  // and as a packed date
 
         uint lockoutCount = packet.ReadUInt32();
@@ -110,17 +144,16 @@ public partial class WorldClient
             uint secondsLeft = packet.ReadUInt32();
             calendar.RaidLockouts.Add(CalendarLockout(mapId, difficulty, secondsLeft, packet.ReadUInt64()));
         }
+        ReadCalendarRaidResets(packet, serverNow, calendar);
         SendPacketToClient(calendar);
     }
 
     /// <summary>
     /// TrinityCore 4.3.4 <c>HandleCalendarGetCalendar</c>: the invitations, the events, the time,
     /// then the raids the player is saved to, the raids' reset times and the holidays the server
-    /// changed. The client is sent the first three lists. A save is 3.3.5a's (map, difficulty,
-    /// seconds left, save id); without it a lock made before the calendar's first opening of the
-    /// session never showed there. The resets are left out (4.3.4 gives the seconds until a reset,
-    /// the 4.4.2 client wants a period and an offset), and the client has the holidays in a table
-    /// of its own.
+    /// changed. The client is sent all but the holidays, which it has in a table of its own. A save
+    /// is 3.3.5a's (map, difficulty, seconds left, save id); without it a lock made before the
+    /// calendar's first opening of the session never showed there.
     /// </summary>
     internal void HandleCalendarSendCalendarCata(WorldPacket packet)
     {
@@ -159,7 +192,7 @@ public partial class WorldClient
             calendar.Events.Add(calendarEvent);
         }
 
-        packet.ReadUInt32();                    // the server's time in seconds
+        long serverNow = packet.ReadUInt32();   // the server's time in seconds
         calendar.ServerTime = packet.ReadUInt32();  // and as a packed date
 
         uint lockoutCount = packet.ReadUInt32();
@@ -172,6 +205,7 @@ public partial class WorldClient
             uint secondsLeft = packet.ReadUInt32();
             calendar.RaidLockouts.Add(CalendarLockout(mapId, difficulty, secondsLeft, packet.ReadUInt64()));
         }
+        ReadCalendarRaidResets(packet, serverNow, calendar);
         SendPacketToClient(calendar);
     }
 
