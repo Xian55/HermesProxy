@@ -1141,6 +1141,34 @@ sealed class PlayOneShotAnimKit : ServerPacket, ISpanWritable
     public ushort AnimKitID;
 }
 
+/// <summary>
+/// The AnimKit a unit idles in from now on, 0 for none (TrinityCore cata_classic
+/// SetAIAnimKit::Write): the unit, then the kit. Native sends it on the instance connection.
+/// </summary>
+sealed class SetAIAnimKit : ServerPacket, ISpanWritable
+{
+    public SetAIAnimKit() : base(Opcode.SMSG_SET_AI_ANIM_KIT, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(Unit);
+        _worldPacket.WriteUInt16(AnimKitID);
+    }
+
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 2;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(Unit.Low, Unit.High);
+        writer.WriteUInt16(AnimKitID);
+        return writer.Position;
+    }
+
+    public WowGuid128 Unit;
+    public ushort AnimKitID;
+}
+
 class PlayObjectSound : ServerPacket, ISpanWritable
 {
     public PlayObjectSound() : base(Opcode.SMSG_PLAY_OBJECT_SOUND) { }

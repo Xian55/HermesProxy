@@ -950,7 +950,7 @@ HermesProxy/World/Client/PacketHandlers/ItemHandler.cs d7a6499b66e91298
 HermesProxy/World/Client/PacketHandlers/LFGHandler.cs 555f3b38bee404a2
 HermesProxy/World/Client/PacketHandlers/LootHandler.cs 213f1600c7976d11
 HermesProxy/World/Client/PacketHandlers/MailHandler.cs c3a9d82228f08161
-HermesProxy/World/Client/PacketHandlers/MiscHandler.cs 68393bea36e2c3dc
+HermesProxy/World/Client/PacketHandlers/MiscHandler.cs dcc2c5ab77bd27f8
 HermesProxy/World/Client/PacketHandlers/MovementHandler.cs d3941c376c7dde08
 HermesProxy/World/Client/PacketHandlers/NPCHandler.cs d747fbf0d80f5412
 HermesProxy/World/Client/PacketHandlers/PetHandler.cs df17c1d1b8eedba0
@@ -1048,7 +1048,7 @@ HermesProxy/World/Server/Packets/LFG/SMSG/LFGTeleportDenied.cs a6c3c90850f4d607
 HermesProxy/World/Server/Packets/LFG/SMSG/LfgBootPlayer.cs b8e7af7c1787ef5e
 HermesProxy/World/Server/Packets/LootPackets.cs f758c074cefb934f
 HermesProxy/World/Server/Packets/MailPackets.cs e606739a2a96540a
-HermesProxy/World/Server/Packets/MiscPackets.cs f11f82761f3c5c2d
+HermesProxy/World/Server/Packets/MiscPackets.cs c4dc1a3bd4bc97d4
 HermesProxy/World/Server/Packets/MovementPackets.cs 584c2f48b61f06bb
 HermesProxy/World/Server/Packets/NPCPackets.cs 9c70acbcdb9c93a0
 HermesProxy/World/Server/Packets/PetPackets.cs 2002a80e57e697f4
