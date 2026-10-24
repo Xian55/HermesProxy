@@ -26,6 +26,31 @@ public partial class WorldClient
         public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
     }
 
+    /// <summary>
+    /// The vehicle whose bar the client shows is gone. TrinityCore 3.3.5a and 4.3.4 send the empty
+    /// SMSG_PET_SPELLS_MESSAGE only when a charm ends (RemoveCharmedBy), and a vehicle the player
+    /// summoned gives its owner the bar without one: the Skeletal Gryphon at the end of Massacre At
+    /// Light's Point flew the player back, despawned, and nothing cleared its bar. The 3.3.5a and
+    /// 4.3.4 clients take the vehicle bar down when the player leaves the vehicle. The 3.4.3 and 4.4.2
+    /// clients take it down only on that message, so the empty bar stayed on screen until a /reload.
+    /// </summary>
+    private void ClearBarOfDestroyedVehicle(WowGuid128 guid)
+    {
+        var state = GetSession().GameState;
+        if (!ModernVersion.IsWotLKClassicOrLater
+            || guid.GetHighType() != HighGuidType.Vehicle
+            || guid != state.CurrentPetGuid)
+            return;
+
+        state.CurrentPetGuid = WowGuid128.Empty;
+        state.ClientHasPetObject = false;
+        state.ClearPendingPetCasts();
+        GetSession().ToClient.Cancel(HeldPetSpells.Key);
+        SendPacketToClient(new PetSpells { Specialization = 0 });
+        // as for an ended vehicle bar in HandlePetSpellsMessage: a pet still out gets its bar back
+        SendPacketToServer(new WorldPacket(Opcode.CMSG_REQUEST_PET_INFO));
+    }
+
     // Handlers for SMSG opcodes coming the legacy world server
     [HandlesSmsg(Opcode.SMSG_PET_SPELLS_MESSAGE)]
     internal void HandlePetSpellsMessage(WorldPacket packet)

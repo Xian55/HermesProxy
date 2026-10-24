@@ -221,6 +221,8 @@ public partial class WorldClient
         UpdateObject updateObject = new UpdateObject(GetSession().GameState);
         updateObject.DestroyedGuids.Add(guid);
         SendPacketToClient(updateObject);
+
+        ClearBarOfDestroyedVehicle(guid);
     }
 
     bool ShouldSkipV343CorpseRecreate(WowGuid128 guid)
