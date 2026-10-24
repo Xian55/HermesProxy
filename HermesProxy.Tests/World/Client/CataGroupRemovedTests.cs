@@ -71,4 +71,58 @@ public sealed class CataGroupRemovedTests
         Assert.IsType<GroupUninvite>(sent[0]);
         Assert.IsType<PartyUpdate>(sent[^1]);
     }
+
+    // TrinityCore 4.3.4 SendPartyResult(PARTY_OP_LEAVE, name, ERR_PARTY_RESULT_OK): the operation,
+    // the player's name, the result, its value and a GUID of nothing
+    private static void DeliverLeaveAnswer(LegacyHandlerHarness harness)
+    {
+        byte[] wire = [0, 0, 2, 0, 0, 0, (byte)'D', (byte)'k', 0, 0, 0, 0, 0, 0, 0, 0, 0, .. BitConverter.GetBytes(0ul)];
+        harness.Deliver(Opcode.SMSG_PARTY_COMMAND_RESULT, wire, harness.Client.HandlePartyCommandResult);
+    }
+
+    [Fact]
+    public void LeavingADungeonFinderGroup_WithNoListAfter_TakesThePlayerOut()
+    {
+        if (!WorldClient.IsCataLegacy)
+            return;
+        var harness = new LegacyHandlerHarness(recordClientPackets: true);
+        harness.SetActivePlayer(new WowGuid64(0x2BF));
+        var state = harness.Session.GameState;
+        state.CurrentGroups[1] = new PartyUpdate
+        {
+            PartyIndex = 1,
+            PartyFlags = GroupFlags.Lfg | GroupFlags.LfgRestricted,
+            PartyGUID = new WowGuid64(Group).To128(state),
+        };
+        state.LastAnnouncedPartyIndex = 1;
+        state.LastGroupWasLfg = true;
+        harness.ClientWire.Sent.Clear();
+
+        DeliverLeaveAnswer(harness);
+
+        var sent = harness.ClientWire.Sent.Select(s => s.Packet).ToArray();
+        Assert.IsType<PartyCommandResult>(sent[0]);
+        var removed = Assert.IsType<PartyUpdate>(sent[1]);
+        Assert.True(removed.PartyFlags.HasFlag(GroupFlags.Destroyed));
+        Assert.Equal(1, removed.PartyIndex);
+        Assert.Equal(2, sent.OfType<DFUpdateStatus>().Count());
+        Assert.Null(state.CurrentGroups[1]);
+        Assert.False(state.LastGroupWasLfg);
+    }
+
+    [Fact]
+    public void LeavingAParty_ThenTheList_IsToldOnce()
+    {
+        if (!WorldClient.IsCataLegacy)
+            return;
+        var harness = InAParty();
+
+        DeliverLeaveAnswer(harness);
+        DeliverEmptyList(harness);
+
+        var sent = harness.ClientWire.Sent.Select(s => s.Packet).ToArray();
+        Assert.IsType<PartyCommandResult>(sent[0]);
+        Assert.True(Assert.Single(sent.OfType<PartyUpdate>()).PartyFlags.HasFlag(GroupFlags.Destroyed));
+        Assert.Null(harness.Session.GameState.CurrentGroups[0]);
+    }
 }
