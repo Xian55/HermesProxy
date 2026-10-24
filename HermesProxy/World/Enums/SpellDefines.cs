@@ -491,7 +491,9 @@ public enum AuraFlagsModern : ushort
     Duration   = 0x04,
     Scalable   = 0x08,
     Negative   = 0x10,
-    Unk20      = 0x20,
+    // TrinityCore's AFLAG_UNK20. On an aura that keeps its slot and spell in a partial update, the
+    // 3.4.3 client logs SPELL_AURA_REFRESH; it raises that event nowhere else.
+    Refresh    = 0x20,
     Unk40      = 0x40,
     Unk80      = 0x80,
     Positive   = 0x100,

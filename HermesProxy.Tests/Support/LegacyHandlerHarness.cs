@@ -90,9 +90,10 @@ internal sealed class LegacyHandlerHarness
     /// session executor do: a pooled read-mode packet, disposed after the handler, followed by the
     /// per-packet outbox tick.
     /// </summary>
-    public void Deliver(Opcode opcode, byte[] wire, Action<WorldPacket> handler)
+    /// <param name="receivedTime">The packet's receive time in ms; now when left out.</param>
+    public void Deliver(Opcode opcode, byte[] wire, Action<WorldPacket> handler, int? receivedTime = null)
     {
-        using (var packet = LegacyPacketBuilder.Receive(wire))
+        using (var packet = LegacyPacketBuilder.Receive(wire, receivedTime))
             handler(packet);
         Session.OnLegacyPacketHandled(opcode);
     }
@@ -150,12 +151,12 @@ internal static class LegacyPacketBuilder
     }
 
     /// <summary>A received packet, in a pooled rental as <c>WorldClient.ReceiveLoop</c> leaves it.</summary>
-    public static WorldPacket Receive(byte[] wire)
+    public static WorldPacket Receive(byte[] wire, int? receivedTime = null)
     {
         byte[] rented = ArrayPool<byte>.Shared.Rent(wire.Length);
         wire.CopyTo(rented, 0);
         var packet = new WorldPacket(rented, wire.Length, isPooled: true);
-        packet.SetReceiveTime(Environment.TickCount);
+        packet.SetReceiveTime(receivedTime ?? Environment.TickCount);
         return packet;
     }
 

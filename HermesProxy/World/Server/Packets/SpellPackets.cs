@@ -617,6 +617,11 @@ public struct AuraInfo
 
     public byte Slot;
     public AuraDataInfo AuraData;
+
+    // Not on the wire. When the aura runs out on the proxy's clock (the legacy packet's receive
+    // time plus the time it had left), 0 for an aura without a duration. A refresh is told from
+    // any other update of the same aura by this moving later.
+    public int ExpiresAt;
 }
 
 // Record class so the compiler synthesizes Equals/GetHashCode over the auto-properties
