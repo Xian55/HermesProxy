@@ -987,7 +987,7 @@ HermesProxy/World/Outbox/SessionWires.cs 0a3dc80df7199f1b
 HermesProxy/World/Packet.cs bddda3075781cbe4
 HermesProxy/World/Server/LfgSlots.cs d41c29db0976b62a
 HermesProxy/World/Server/Packets/AchievementPackets.cs caf7fcbd4785f359
-HermesProxy/World/Server/Packets/ArenaPackets.cs ea698124445e1c55
+HermesProxy/World/Server/Packets/ArenaPackets.cs 378c093d21575fc5
 HermesProxy/World/Server/Packets/AuctionPackets.cs b8967cb8959fdb6c
 HermesProxy/World/Server/Packets/AuthenticationPackets.cs 547cb135cfe8b7cd
 HermesProxy/World/Server/Packets/BattleGroundPackets.cs 96404a7e236c64a8
@@ -1048,7 +1048,7 @@ HermesProxy/World/Server/Packets/LFG/SMSG/LFGTeleportDenied.cs a6c3c90850f4d607
 HermesProxy/World/Server/Packets/LFG/SMSG/LfgBootPlayer.cs b8e7af7c1787ef5e
 HermesProxy/World/Server/Packets/LootPackets.cs f758c074cefb934f
 HermesProxy/World/Server/Packets/MailPackets.cs e606739a2a96540a
-HermesProxy/World/Server/Packets/MiscPackets.cs d3947a02b9caf6dc
+HermesProxy/World/Server/Packets/MiscPackets.cs 7e88e9f92c3ae50d
 HermesProxy/World/Server/Packets/MovementPackets.cs 584c2f48b61f06bb
 HermesProxy/World/Server/Packets/NPCPackets.cs 9c70acbcdb9c93a0
 HermesProxy/World/Server/Packets/PetPackets.cs 2002a80e57e697f4
