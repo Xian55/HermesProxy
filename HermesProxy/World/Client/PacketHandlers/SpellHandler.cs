@@ -697,6 +697,16 @@ public partial class WorldClient
                 SendPacketToClient(prepare);
             }
         }
+        // A cast of the player's that the client did not ask for is one the server triggered.
+        // Another 4.3.4 core does not mark those CAST_FLAG_PENDING, so the client was not told
+        // to skip their cooldowns (see HandleSpellStartOrGo): Raise Dead's summon left Raise
+        // Dead locked after the server had cleared it.
+        else if (IsCataLegacy
+                 && GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit
+                 && !GameData.CooldownOnEventSpells.Contains((uint)spell.Cast.SpellID))
+        {
+            spell.Cast.CastFlagsEx |= (uint)CastFlagEx.IgnoreCooldown;
+        }
 
         if (!spell.Cast.CasterUnit.IsEmpty() && GameData.AuraSpells.Contains((uint)spell.Cast.SpellID))
         {

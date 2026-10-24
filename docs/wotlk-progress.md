@@ -960,7 +960,7 @@ HermesProxy/World/Client/PacketHandlers/QueryHandler.cs 5b77eb763334bbb9
 HermesProxy/World/Client/PacketHandlers/QuestHandler.cs 926c9b9b6ca11c48
 HermesProxy/World/Client/PacketHandlers/ReputationHandler.cs 8779f67cd63844c7
 HermesProxy/World/Client/PacketHandlers/SocialHandler.cs 82df06fafc59f62c
-HermesProxy/World/Client/PacketHandlers/SpellHandler.cs 9f8d3d36ebbdabfa
+HermesProxy/World/Client/PacketHandlers/SpellHandler.cs a90bd2f73e12ab1d
 HermesProxy/World/Client/PacketHandlers/SupportTicketHandler.cs 2a0596ae281fb06f
 HermesProxy/World/Client/PacketHandlers/SystemHandler.cs 806898d603ef9252
 HermesProxy/World/Client/PacketHandlers/TalentHandler.cs 44aefb28c8709d82
