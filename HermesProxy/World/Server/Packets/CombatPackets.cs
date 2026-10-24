@@ -21,6 +21,7 @@ using System.Collections.Generic;
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 
@@ -108,74 +109,137 @@ public class SAttackStop : ServerPacket, ISpanWritable
     public bool NowDead;
 }
 
-class AttackerStateUpdate : ServerPacket
+sealed class AttackerStateUpdate : ServerPacket
 {
-    public AttackerStateUpdate() : base(Opcode.SMSG_ATTACKER_STATE_UPDATE, ConnectionType.Instance) { }
-    public override void Write()
-    {
-        WorldPacket attackRoundInfo = new();
-        attackRoundInfo.WriteUInt32((uint)HitInfo);
-        attackRoundInfo.WritePackedGuid128(AttackerGUID);
-        attackRoundInfo.WritePackedGuid128(VictimGUID);
-        attackRoundInfo.WriteInt32(Damage);
-        attackRoundInfo.WriteInt32(OriginalDamage);
-        attackRoundInfo.WriteInt32(OverDamage);
-        attackRoundInfo.WriteUInt8((byte)SubDmg.Count);
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<AttackerStateUpdate>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new CombatLogTuningLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new ContentTuningParamsLayout()));
 
-        foreach (var subDmg in SubDmg)
+    private static readonly ServerPacketLayout<AttackerStateUpdate> Layout = Layouts.ForRunningClient();
+
+    public AttackerStateUpdate() : base(Opcode.SMSG_ATTACKER_STATE_UPDATE, ConnectionType.Instance) { }
+
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>Up to 3.4.3: the attack round ends with the combat log's 13-byte content tuning.</summary>
+    internal sealed class CombatLogTuningLayout : ServerPacketLayout<AttackerStateUpdate>
+    {
+        public override void Write(AttackerStateUpdate packet, WorldPacket data)
+        {
+            WorldPacket attackRoundInfo = new();
+            WriteRoundUpToTuning(packet, attackRoundInfo, damageRanges: 1);
+
+            var tuning = packet.ContentTuning;
+            attackRoundInfo.WriteUInt8((byte)tuning.TuningType);
+            attackRoundInfo.WriteUInt8(tuning.TargetLevel);
+            attackRoundInfo.WriteUInt8(tuning.Expansion);
+            attackRoundInfo.WriteInt16(tuning.PlayerLevelDelta);
+            attackRoundInfo.WriteFloat(tuning.PlayerItemLevel);
+            attackRoundInfo.WriteFloat(tuning.TargetItemLevel);
+
+            WriteLogDataAndRound(packet, data, attackRoundInfo);
+        }
+    }
+
+    /// <summary>
+    /// 4.4.1 and later (TrinityCore cata_classic AttackerStateUpdate, WowPacketParser's 4.4 reader):
+    /// the attack round ends with ContentTuningParams, 14 bytes, and the debug block carries five
+    /// damage ranges. Written in the older form, the round came one byte short and the client read
+    /// past it.
+    /// </summary>
+    internal sealed class ContentTuningParamsLayout : ServerPacketLayout<AttackerStateUpdate>
+    {
+        public override void Write(AttackerStateUpdate packet, WorldPacket data)
+        {
+            WorldPacket attackRoundInfo = new();
+            WriteRoundUpToTuning(packet, attackRoundInfo, damageRanges: 5);
+
+            var tuning = packet.ContentTuning;
+            attackRoundInfo.WriteUInt16((ushort)tuning.PlayerItemLevel);
+            attackRoundInfo.WriteInt16(tuning.PlayerLevelDelta);
+            attackRoundInfo.WriteUInt32((uint)tuning.TargetItemLevel);
+            attackRoundInfo.WriteUInt8(tuning.TargetLevel);
+            attackRoundInfo.WriteUInt8(tuning.Expansion);
+            attackRoundInfo.WriteUInt8(tuning.TargetMinScalingLevel);
+            attackRoundInfo.WriteUInt8(tuning.TargetMaxScalingLevel);
+            attackRoundInfo.WriteInt8(tuning.TargetScalingLevelDelta);
+            attackRoundInfo.WriteBits((uint)tuning.TuningType, 4);
+            attackRoundInfo.WriteBit(false);    // ScalesWithItemLevel
+            attackRoundInfo.FlushBits();
+
+            WriteLogDataAndRound(packet, data, attackRoundInfo);
+        }
+    }
+
+    // The attack round up to its content tuning. The debug block's damage range is the first of
+    // damageRanges; any after it are zero.
+    private static void WriteRoundUpToTuning(AttackerStateUpdate packet, WorldPacket attackRoundInfo, int damageRanges)
+    {
+        var hitInfo = packet.HitInfo;
+        attackRoundInfo.WriteUInt32((uint)hitInfo);
+        attackRoundInfo.WritePackedGuid128(packet.AttackerGUID);
+        attackRoundInfo.WritePackedGuid128(packet.VictimGUID);
+        attackRoundInfo.WriteInt32(packet.Damage);
+        attackRoundInfo.WriteInt32(packet.OriginalDamage);
+        attackRoundInfo.WriteInt32(packet.OverDamage);
+        attackRoundInfo.WriteUInt8((byte)packet.SubDmg.Count);
+
+        foreach (var subDmg in packet.SubDmg)
         {
             attackRoundInfo.WriteUInt32(subDmg.SchoolMask);
             attackRoundInfo.WriteFloat(subDmg.FloatDamage);
             attackRoundInfo.WriteInt32(subDmg.IntDamage);
-            if (HitInfo.HasAnyFlag(HitInfo.FullAbsorb | HitInfo.PartialAbsorb))
+            if (hitInfo.HasAnyFlag(HitInfo.FullAbsorb | HitInfo.PartialAbsorb))
                 attackRoundInfo.WriteInt32(subDmg.Absorbed);
-            if (HitInfo.HasAnyFlag(HitInfo.FullResist | HitInfo.PartialResist))
+            if (hitInfo.HasAnyFlag(HitInfo.FullResist | HitInfo.PartialResist))
                 attackRoundInfo.WriteInt32(subDmg.Resisted);
         }
 
-        attackRoundInfo.WriteUInt8(VictimState);
-        attackRoundInfo.WriteInt32(AttackerState);
-        attackRoundInfo.WriteUInt32(MeleeSpellID);
+        attackRoundInfo.WriteUInt8(packet.VictimState);
+        attackRoundInfo.WriteInt32(packet.AttackerState);
+        attackRoundInfo.WriteUInt32(packet.MeleeSpellID);
 
-        if (HitInfo.HasAnyFlag(HitInfo.Block))
-            attackRoundInfo.WriteInt32(BlockAmount);
+        if (hitInfo.HasAnyFlag(HitInfo.Block))
+            attackRoundInfo.WriteInt32(packet.BlockAmount);
 
-        if (HitInfo.HasAnyFlag(HitInfo.RageGain))
-            attackRoundInfo.WriteInt32(RageGained);
+        if (hitInfo.HasAnyFlag(HitInfo.RageGain))
+            attackRoundInfo.WriteInt32(packet.RageGained);
 
-        if (HitInfo.HasAnyFlag(HitInfo.Unk0))
+        if (hitInfo.HasAnyFlag(HitInfo.Unk0))
         {
-            attackRoundInfo.WriteUInt32(UnkState.State1);
-            attackRoundInfo.WriteFloat(UnkState.State2);
-            attackRoundInfo.WriteFloat(UnkState.State3);
-            attackRoundInfo.WriteFloat(UnkState.State4);
-            attackRoundInfo.WriteFloat(UnkState.State5);
-            attackRoundInfo.WriteFloat(UnkState.State6);
-            attackRoundInfo.WriteFloat(UnkState.State7);
-            attackRoundInfo.WriteFloat(UnkState.State8);
-            attackRoundInfo.WriteFloat(UnkState.State9);
-            attackRoundInfo.WriteFloat(UnkState.State10);
-            attackRoundInfo.WriteFloat(UnkState.State11);
-            attackRoundInfo.WriteUInt32(UnkState.State12);
+            var unkState = packet.UnkState;
+            attackRoundInfo.WriteUInt32(unkState.State1);
+            attackRoundInfo.WriteFloat(unkState.State2);
+            attackRoundInfo.WriteFloat(unkState.State3);
+            attackRoundInfo.WriteFloat(unkState.State4);
+            attackRoundInfo.WriteFloat(unkState.State5);
+            attackRoundInfo.WriteFloat(unkState.State6);
+            attackRoundInfo.WriteFloat(unkState.State7);
+            attackRoundInfo.WriteFloat(unkState.State8);
+            attackRoundInfo.WriteFloat(unkState.State9);
+            attackRoundInfo.WriteFloat(unkState.State10);
+            attackRoundInfo.WriteFloat(unkState.State11);
+            for (int i = 1; i < damageRanges; i++)
+            {
+                attackRoundInfo.WriteFloat(0.0f);
+                attackRoundInfo.WriteFloat(0.0f);
+            }
+            attackRoundInfo.WriteUInt32(unkState.State12);
         }
 
-        if (HitInfo.HasAnyFlag(HitInfo.Block | HitInfo.Unk12))
-            attackRoundInfo.WriteFloat(Unk);
+        if (hitInfo.HasAnyFlag(HitInfo.Block | HitInfo.Unk12))
+            attackRoundInfo.WriteFloat(packet.Unk);
+    }
 
-        attackRoundInfo.WriteUInt8((byte)ContentTuning.TuningType);
-        attackRoundInfo.WriteUInt8(ContentTuning.TargetLevel);
-        attackRoundInfo.WriteUInt8(ContentTuning.Expansion);
-        attackRoundInfo.WriteInt16(ContentTuning.PlayerLevelDelta);
-        attackRoundInfo.WriteFloat(ContentTuning.PlayerItemLevel);
-        attackRoundInfo.WriteFloat(ContentTuning.TargetItemLevel);
+    private static void WriteLogDataAndRound(AttackerStateUpdate packet, WorldPacket data, WorldPacket attackRoundInfo)
+    {
+        data.WriteBit(packet.LogData != null);
+        if (packet.LogData != null)
+            packet.LogData.Write(data);
+        data.FlushBits();
 
-        _worldPacket.WriteBit(LogData != null);
-        if (LogData != null)
-            LogData.Write(_worldPacket);
-        _worldPacket.FlushBits();
-
-        _worldPacket.WriteUInt32(attackRoundInfo.GetSize());
-        _worldPacket.WriteBytes(attackRoundInfo);
+        data.WriteUInt32(attackRoundInfo.GetSize());
+        data.WriteBytes(attackRoundInfo);
     }
 
     public HitInfo HitInfo; // Flags
