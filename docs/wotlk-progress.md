@@ -967,7 +967,7 @@ HermesProxy/World/Client/PacketHandlers/TalentHandler.cs 44aefb28c8709d82
 HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs 8c9cc01c98e6100b
 HermesProxy/World/Client/PacketHandlers/TradeHandler.cs 27f0e60d0f199fdd
 HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs 765e892e6b358c9a
-HermesProxy/World/Client/PacketHandlers/UpdateHandlerCata.cs 78004f57afd6928a
+HermesProxy/World/Client/PacketHandlers/UpdateHandlerCata.cs ce02497943701984
 HermesProxy/World/Client/PacketHandlers/WorldStateHandler.cs 7f47d3d9cac7b00e
 HermesProxy/World/Client/SeatGravity.cs 9d2a660de9366fd9
 HermesProxy/World/Client/WorldClient.cs aeb8d8e09785bfd3
@@ -1064,7 +1064,7 @@ HermesProxy/World/Server/Packets/SystemPackets.cs 4f6491fd9e219bdc
 HermesProxy/World/Server/Packets/TalentPackets.cs 2e67cc9aad895d57
 HermesProxy/World/Server/Packets/TaxiPackets.cs d6aa7f3ba71c2d16
 HermesProxy/World/Server/Packets/TradePackets.cs 5f5fab36da26c601
-HermesProxy/World/Server/Packets/UpdatePackets.cs 4e7046a10190f7c2
+HermesProxy/World/Server/Packets/UpdatePackets.cs deca0e0ffbd4d70b
 HermesProxy/World/Server/Packets/WorldStatePackets.cs 6d120fcd46da35b8
 HermesProxy/World/Server/Systems/ArenaSystem.cs 1c1841b7167088b7
 HermesProxy/World/Server/Systems/AuctionSystem.cs 2b638625cc580c40

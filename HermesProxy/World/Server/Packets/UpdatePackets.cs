@@ -46,6 +46,11 @@ public class CreateObjectData
     public uint VehicleId;
     public float VehicleOrientation;
     public uint TransportPathTimer; // only set for transports
+    // The AnimKits a 4.3.4 server's create gives the object: the one it idles in, moves in and
+    // fights in, 0 for none.
+    public ushort AIAnimKitID;
+    public ushort MovementAnimKitID;
+    public ushort MeleeAnimKitID;
     // System.Numerics.Quaternion's default (0,0,0,0) is a non-unit quaternion that
     // the V3_4_3 client rejects on Transport/GameObject CreateObject. Initializing
     // to Identity (0,0,0,1) gives a valid baseline for objects whose legacy server
