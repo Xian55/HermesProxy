@@ -221,7 +221,7 @@ silently wrong wherever it does not. Check each against the 4.4.2 client
 (`docs/protocol/4.4.2.60895`) before 4.4.2 becomes a supported build; where it differs, the
 site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a narrower check.
 
-206 sites across 57 files.
+205 sites across 57 files.
 
 | file | sites |
 |---|---:|
@@ -257,7 +257,6 @@ site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a n
 | `HermesProxy/World/Server/Packets/AuctionPackets.cs` | 2 |
 | `HermesProxy/World/Server/Packets/CharacterPackets.cs` | 2 |
 | `HermesProxy/World/Server/Packets/ItemPackets.cs` | 2 |
-| `HermesProxy/World/Server/Packets/LootPackets.cs` | 2 |
 | `HermesProxy/World/Server/Packets/SystemPackets.cs` | 2 |
 | `HermesProxy/World/Server/Packets/TaxiPackets.cs` | 2 |
 | `HermesProxy/World/Server/Systems/ItemSystem.cs` | 2 |
@@ -274,6 +273,7 @@ site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a n
 | `HermesProxy/World/Server/Packets/ChatPackets.cs` | 1 |
 | `HermesProxy/World/Server/Packets/Codecs/SupportTicketCodecs.cs` | 1 |
 | `HermesProxy/World/Server/Packets/LFG/SMSG/LFGPlayerReward.cs` | 1 |
+| `HermesProxy/World/Server/Packets/LootPackets.cs` | 1 |
 | `HermesProxy/World/Server/Packets/MiscPackets.cs` | 1 |
 | `HermesProxy/World/Server/Packets/QueryPackets.cs` | 1 |
 | `HermesProxy/World/Server/Packets/ReputationPackets.cs` | 1 |
