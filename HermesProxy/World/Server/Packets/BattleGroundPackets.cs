@@ -818,34 +818,80 @@ public class AreaSpiritHealerTime : ServerPacket, ISpanWritable
     public uint TimeLeft;
 }
 
-class PvPCredit : ServerPacket, ISpanWritable
+/// <summary>
+/// The honor a kill or a battleground gave: the honor before and after the kill's modifiers, who
+/// died and their rank. From 3.4.3 on a ForceHonorable bit follows (docs/protocol 3.4.3.54261 and
+/// 4.4.2.60895: one bit in byte 14, WowPacketParser 3.4.x/4.4.x); 1.14 and 2.5 end with the rank.
+/// </summary>
+sealed class PvPCredit : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<PvPCredit>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V3_4_3_54261, new RankLastLayout()),
+        (ClientVersionBuild.V3_4_3_54261, ClientVersionBuild.Zero, new ForceHonorableLayout()));
+
+    private static readonly ServerPacketLayout<PvPCredit> Layout = Layouts.ForRunningClient();
+
     public PvPCredit() : base(Opcode.SMSG_PVP_CREDIT) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    public int MaxSize => 12 + PackedGuidHelper.MaxPackedGuid128Size + 1; // 2 ints + GUID + uint + the bit's byte
+
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>1.14 and 2.5: the packet ends with the rank.</summary>
+    internal sealed class RankLastLayout : ServerPacketLayout<PvPCredit>
     {
-        _worldPacket.WriteInt32(OriginalHonor);
-        _worldPacket.WriteInt32(Honor);
-        _worldPacket.WritePackedGuid128(Target);
-        _worldPacket.WriteUInt32(Rank);
+        public override void Write(PvPCredit packet, WorldPacket data)
+        {
+            data.WriteInt32(packet.OriginalHonor);
+            data.WriteInt32(packet.Honor);
+            data.WritePackedGuid128(packet.Target);
+            data.WriteUInt32(packet.Rank);
+        }
+
+        public override int WriteToSpan(PvPCredit packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(packet.OriginalHonor);
+            writer.WriteInt32(packet.Honor);
+            writer.WritePackedGuid128(packet.Target.Low, packet.Target.High);
+            writer.WriteUInt32(packet.Rank);
+            return writer.Position;
+        }
     }
 
-    public int MaxSize => 12 + PackedGuidHelper.MaxPackedGuid128Size; // 2 ints + GUID + uint
-
-    public int WriteToSpan(Span<byte> buffer)
+    /// <summary>3.4.3 and 4.4.2: the rank, then ForceHonorable in a byte of its own.</summary>
+    internal sealed class ForceHonorableLayout : ServerPacketLayout<PvPCredit>
     {
-        var writer = new SpanPacketWriter(buffer);
-        writer.WriteInt32(OriginalHonor);
-        writer.WriteInt32(Honor);
-        writer.WritePackedGuid128(Target.Low, Target.High);
-        writer.WriteUInt32(Rank);
-        return writer.Position;
+        public override void Write(PvPCredit packet, WorldPacket data)
+        {
+            data.WriteInt32(packet.OriginalHonor);
+            data.WriteInt32(packet.Honor);
+            data.WritePackedGuid128(packet.Target);
+            data.WriteUInt32(packet.Rank);
+            data.WriteBit(packet.ForceHonorable);
+            data.FlushBits();
+        }
+
+        public override int WriteToSpan(PvPCredit packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(packet.OriginalHonor);
+            writer.WriteInt32(packet.Honor);
+            writer.WritePackedGuid128(packet.Target.Low, packet.Target.High);
+            writer.WriteUInt32(packet.Rank);
+            writer.WriteBit(packet.ForceHonorable);
+            writer.FlushBits();
+            return writer.Position;
+        }
     }
 
     public int OriginalHonor;
     public int Honor;
     public WowGuid128 Target;
     public uint Rank;
+    public bool ForceHonorable;
 }
 
 class PlayerSkinned : ServerPacket, ISpanWritable
