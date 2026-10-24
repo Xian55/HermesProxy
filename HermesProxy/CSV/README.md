@@ -142,6 +142,12 @@ Read for the client's expansion, loaded only in front of the server they come fr
 the rows of 4.3.4's `ItemExtendedCost.db2` the 4.4.2 client has differently or not at all, built
 with `--cata-db2 <the server's ItemExtendedCost.db2>`.
 
+`Hotfix/CurrencyTypesCata4.csv`, also only in front of a 4.3.4 server: the 4.4.2 client's
+CurrencyTypes rows for Conquest Points, Valor Points and the two Conquest metas with 4.3.4's
+weekly caps. Cataclysm Classic gave them a season's total instead, and the client takes a weekly
+cap from its own row alone. Built by `scripts/build-currency-types-hotfix.py --build 4.4.2.60895
+--cata-dbc <the server's CurrencyTypes.dbc>`.
+
 ## One file for every build
 
 `AreaNames`, `Battlegrounds`, `BuildAuthSeeds`, `ChatChannels`, `CreatureDisplayInfo`,

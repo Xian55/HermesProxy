@@ -1428,13 +1428,14 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         // per login. Neither store is read anywhere else in the proxy.
         //
         // ItemExtendedCost holds only the rows where the server's vendor prices differ from the
-        // client's.
+        // client's, CurrencyTypes a 4.3.4 server's weekly caps.
         if (ModernVersion.IsWotLKClassicOrLater)
         {
             hotfixes.TableFilter = new HashSet<DB2Hash>
             {
                 DB2Hash.AreaTrigger,
                 DB2Hash.ItemExtendedCost,
+                DB2Hash.CurrencyTypes,
             };
         }
         SendPacket(hotfixes);

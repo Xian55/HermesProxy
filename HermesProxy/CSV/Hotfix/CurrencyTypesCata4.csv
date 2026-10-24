@@ -1,0 +1,5 @@
+ID,Name_lang,Description_lang,CategoryID,InventoryIconFileID,SpellWeight,SpellCategory,MaxQty,MaxEarnablePerWeek,Quality,FactionID,AwardConditionID,MaxQtyWorldStateID,Unknown1154,Flags_0,Flags_1
+390,Conquest Points,Earned as a reward for Arena or Rated Battlegrounds and used to purchase the most powerful PvP armor and weapons.,2,463449,0,0,0,0,1,0,0,0,0,396,1
+396,Valor Points,Earned for defeating the most recent raid bosses or completing heroic Dungeon Finder runs and used to purchase the most powerful PvE armor and weapons.,22,463447,0,0,0,100000,4,0,0,0,0,456,0
+483,Conquest Arena Meta,,89,463449,0,0,0,0,1,0,0,0,0,1420,1
+484,Conquest BG Meta,,89,463449,0,0,0,0,1,0,0,0,0,1420,1
