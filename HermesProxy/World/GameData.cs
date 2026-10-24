@@ -2407,6 +2407,7 @@ public static partial class GameData
     public const uint HotfixCreatureDisplayInfoOptionBegin = 2_900_000;
     public const uint HotfixChrCustomizationChoiceBegin = 3_000_000;
     public const uint HotfixChrCustomizationOptionBegin = 3_100_000;
+    public const uint HotfixItemExtendedCostBegin = 3_200_000;
     // ConcurrentDictionary so LoadHotfixes can run its sub-loaders in parallel — each
     // sub-loader writes to a disjoint HotfixId key range (per the HotfixXxxBegin constants
     // above), so there's no actual contention on writes; we just need a thread-safe Add.
@@ -2437,6 +2438,7 @@ public static partial class GameData
             LoadItemSparseHotfixes,
             LoadItemHotfixes,
             LoadItemEffectHotfixes,
+            LoadItemExtendedCostHotfixes,
             LoadItemDisplayInfoHotfixes,
             LoadCreatureDisplayInfoHotfixes,
             LoadCreatureDisplayInfoExtraHotfixes,
@@ -5227,6 +5229,67 @@ public static partial class GameData
             record.HotfixContent.WriteInt32(parentItemId);
             Hotfixes[record.HotfixId] = record;
         }
+    }
+
+    /// <summary>
+    /// A 3.3.5a server's vendor prices, where the client's own ItemExtendedCost rows differ. A
+    /// vendor list names a price by its id alone, and Wrath Classic and Cataclysm Classic changed
+    /// many of 3.3.5a's rows (386: 15300 honor on 3.3.5a, 7650 on the 3.4.3 client), so the client
+    /// showed one price and the server charged another. The rows are 3.3.5a's in the client's
+    /// layout, honor in hundredths for 4.4.2, so they are sent in front of a 3.3.5a server only.
+    /// Built by scripts/build-item-extended-cost-hotfix.py.
+    /// </summary>
+    public static void LoadItemExtendedCostHotfixes()
+    {
+        var path = Path.Combine("CSV", "Hotfix", $"ItemExtendedCost{ModernVersion.ExpansionVersion}.csv");
+        if (LegacyVersion.ExpansionVersion != 3 || !File.Exists(path))
+            return;
+
+        using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+        uint counter = 0;
+        Span<int> values = stackalloc int[ItemExtendedCostColumns];
+        foreach (var row in reader)
+        {
+            counter++;
+            for (int i = 0; i < values.Length; i++)
+                values[i] = row[i].Parse<int>();
+            HotfixRecord record = ItemExtendedCostHotfix(HotfixItemExtendedCostBegin + counter, values);
+            Hotfixes[record.HotfixId] = record;
+        }
+    }
+
+    // ID, the rating, bracket, flags, faction, reputation and achievement, then five items, five
+    // item counts, five currencies and five currency counts.
+    internal const int ItemExtendedCostColumns = 27;
+
+    /// <summary>
+    /// One ItemExtendedCost row as the 3.4.3 and 4.4.2 clients read a hotfix of it (TrinityCore
+    /// wotlk_classic / cata_classic ItemExtendedCostLoadInfo), from the columns of
+    /// CSV/Hotfix/ItemExtendedCost*.csv.
+    /// </summary>
+    internal static HotfixRecord ItemExtendedCostHotfix(uint hotfixId, ReadOnlySpan<int> row)
+    {
+        HotfixRecord record = new HotfixRecord();
+        record.Status = HotfixStatus.Valid;
+        record.TableHash = DB2Hash.ItemExtendedCost;
+        record.HotfixId = hotfixId;
+        record.UniqueId = hotfixId;
+        record.RecordId = (uint)row[0];
+        record.HotfixContent.WriteUInt16((ushort)row[1]); // RequiredArenaRating
+        record.HotfixContent.WriteInt8((sbyte)row[2]);    // ArenaBracket
+        record.HotfixContent.WriteUInt8((byte)row[3]);    // Flags
+        record.HotfixContent.WriteUInt8((byte)row[4]);    // MinFactionID
+        record.HotfixContent.WriteInt32(row[5]);          // MinReputation
+        record.HotfixContent.WriteUInt8((byte)row[6]);    // RequiredAchievement
+        for (int i = 0; i < 5; i++)
+            record.HotfixContent.WriteInt32(row[7 + i]);            // ItemID
+        for (int i = 0; i < 5; i++)
+            record.HotfixContent.WriteUInt16((ushort)row[12 + i]);  // ItemCount
+        for (int i = 0; i < 5; i++)
+            record.HotfixContent.WriteUInt16((ushort)row[17 + i]);  // CurrencyID
+        for (int i = 0; i < 5; i++)
+            record.HotfixContent.WriteUInt32((uint)row[22 + i]);    // CurrencyCount
+        return record;
     }
 
     public static void LoadItemDisplayInfoHotfixes()
