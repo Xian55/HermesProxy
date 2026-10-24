@@ -116,7 +116,7 @@ public static class HotfixSystem
         }
     }
 
-    private static void FillBroadcastTextReply(DBReply reply, uint id)
+    internal static void FillBroadcastTextReply(DBReply reply, uint id)
     {
         BroadcastText? bct = GameData.GetBroadcastText(id);
         if (bct == null)
@@ -135,7 +135,12 @@ public static class HotfixSystem
         reply.Data.WriteUInt32(bct.Language);
         reply.Data.WriteUInt32(0); // ConditionId
         reply.Data.WriteUInt16(0); // EmotesId
-        reply.Data.WriteUInt8(0); // Flags
+        // A u16 from 4.4.1 on (a u8 before). Written as a u8 for the 4.4.2 client, every field after
+        // it came a byte early and the text's emote was read as part of a sound kit id.
+        if (ModernVersion.AddedInVersion(4, 4, 1))
+            reply.Data.WriteUInt16(0); // Flags
+        else
+            reply.Data.WriteUInt8(0); // Flags
         reply.Data.WriteUInt32(0); // ChatBubbleDurationMs
         if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
             reply.Data.WriteUInt32(0); // VoiceOverPriorityID
