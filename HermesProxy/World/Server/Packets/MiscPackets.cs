@@ -1444,22 +1444,49 @@ public sealed class PauseMirrorTimer : ServerPacket, ISpanWritable
     public bool Paused;
 }
 
-public class StopMirrorTimer : ServerPacket, ISpanWritable
+public sealed class StopMirrorTimer : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<StopMirrorTimer>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new IntTimerLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new ByteTimerLayout()));
+
+    private static readonly ServerPacketLayout<StopMirrorTimer> Layout = Layouts.ForRunningClient();
+
     public StopMirrorTimer() : base(Opcode.SMSG_STOP_MIRROR_TIMER) { }
 
-    public override void Write()
-    {
-        _worldPacket.WriteInt32((int)Timer);
-    }
+    public override void Write() => Layout.Write(this, _worldPacket);
 
     public int MaxSize => 4; // int
 
-    public int WriteToSpan(Span<byte> buffer)
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>Up to 3.4.3: the timer type is a uint32.</summary>
+    internal sealed class IntTimerLayout : ServerPacketLayout<StopMirrorTimer>
     {
-        var writer = new SpanPacketWriter(buffer);
-        writer.WriteInt32((int)Timer);
-        return writer.Position;
+        public override void Write(StopMirrorTimer packet, WorldPacket data) => data.WriteInt32((int)packet.Timer);
+
+        public override int WriteToSpan(StopMirrorTimer packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32((int)packet.Timer);
+            return writer.Position;
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic, WowPacketParser 4.4.x): the timer type is a byte. The uint32
+    /// left three bytes the client never read.
+    /// </summary>
+    internal sealed class ByteTimerLayout : ServerPacketLayout<StopMirrorTimer>
+    {
+        public override void Write(StopMirrorTimer packet, WorldPacket data) => data.WriteUInt8((byte)packet.Timer);
+
+        public override int WriteToSpan(StopMirrorTimer packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt8((byte)packet.Timer);
+            return writer.Position;
+        }
     }
 
     public MirrorTimerType Timer;
