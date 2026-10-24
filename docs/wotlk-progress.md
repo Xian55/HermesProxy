@@ -9,9 +9,9 @@ A backend's column shows how the latest session there that touched the opcode we
 | Status | Count | Meaning |
 |---|---:|---|
 | ❌ failing | 0 | a backend's latest session that touched it threw or dropped it |
-| 🔁 retest | 364 | its file changed after the latest session that exercised it |
+| 🔁 retest | 367 | its file changed after the latest session that exercised it |
 | · unseen | 87 | no session on any backend exercised it yet |
-| ✅ seen ok | 358 | the latest session on each backend that touched it passed it cleanly |
+| ✅ seen ok | 355 | the latest session on each backend that touched it passed it cleanly |
 | ∅ not sent | 28 | a server packet TrinityCore 3.3.5 never sends, and no session saw |
 
 ## What's left
@@ -21,7 +21,7 @@ Per feature: how many of its opcodes each backend's latest session passed cleanl
 | Feature | Opcodes | TrinityCore | AzerothCore | CMaNGOS | ❌ | · | 🔁 | To play |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
 | Movement | 133 | 81 | 109 | 51 |  | 24 | 104 | · `CMSG_DISMISS_CONTROLLED_VEHICLE`, `CMSG_MOVE_CHANGE_TRANSPORT`, `CMSG_MOVE_ENABLE_SWIM_TO_FLY_TRANS_ACK`, `CMSG_MOVE_FALL_RESET`, `CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK`, `CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK`, `CMSG_MOVE_GRAVITY_DISABLE_ACK`, `CMSG_MOVE_GRAVITY_ENABLE_ACK`, `CMSG_MOVE_NOT_ACTIVE_MOVER`, `MSG_MOVE_GRAVITY_CHNG`, `MSG_MOVE_KNOCK_BACK`, `MSG_MOVE_SET_PITCH_RATE`, `MSG_MOVE_SET_TURN_RATE`, `MSG_MOVE_START_PITCH_DOWN`, `MSG_MOVE_START_PITCH_UP`, `MSG_MOVE_STOP_PITCH`, `SMSG_FLIGHT_SPLINE_SYNC`, `SMSG_FORCE_PITCH_RATE_CHANGE`, `SMSG_FORCE_TURN_RATE_CHANGE`, `SMSG_MOVE_DISABLE_GRAVITY`, `SMSG_MOVE_ENABLE_GRAVITY`, `SMSG_MOVE_SPLINE_SET_NORMAL_FALL`, `SMSG_MOVE_SPLINE_SET_PITCH_RATE`, `SMSG_MOVE_SPLINE_SET_TURN_RATE` |
-| Arena | 16 |  | 6 |  |  | 10 | 2 | · `CMSG_ARENA_TEAM_ACCEPT`, `CMSG_ARENA_TEAM_DECLINE`, `CMSG_ARENA_TEAM_DISBAND`, `CMSG_ARENA_TEAM_INVITE`, `CMSG_ARENA_TEAM_LEADER`, `CMSG_ARENA_TEAM_LEAVE`, `CMSG_ARENA_TEAM_REMOVE`, `SMSG_ARENA_TEAM_COMMAND_RESULT`, `SMSG_ARENA_TEAM_EVENT`, `SMSG_ARENA_TEAM_INVITE` |
+| Arena | 16 |  | 6 |  |  | 10 | 5 | · `CMSG_ARENA_TEAM_ACCEPT`, `CMSG_ARENA_TEAM_DECLINE`, `CMSG_ARENA_TEAM_DISBAND`, `CMSG_ARENA_TEAM_INVITE`, `CMSG_ARENA_TEAM_LEADER`, `CMSG_ARENA_TEAM_LEAVE`, `CMSG_ARENA_TEAM_REMOVE`, `SMSG_ARENA_TEAM_COMMAND_RESULT`, `SMSG_ARENA_TEAM_EVENT`, `SMSG_ARENA_TEAM_INVITE` |
 | Guild | 40 | 15 | 33 | 1 |  | 8 | 15 | · `CMSG_ACCEPT_GUILD_INVITE`, `CMSG_GUILD_DECLINE_INVITATION`, `CMSG_GUILD_DELETE`, `CMSG_GUILD_DELETE_RANK`, `CMSG_GUILD_UPDATE_INFO_TEXT`, `MSG_SAVE_GUILD_EMBLEM`, `MSG_TABARDVENDOR_ACTIVATE`, `SMSG_GUILD_INVITE` |
 | Chat | 32 | 12 | 25 | 9 |  | 5 | 14 | · `CMSG_CHAT_CHANNEL_DECLINE_INVITE`, `CMSG_CHAT_CHANNEL_DISPLAY_LIST`, `SMSG_CHANNEL_LIST`, `SMSG_DEFENSE_MESSAGE`, `SMSG_USERLIST_UPDATE` |
 | Group | 28 | 18 | 23 | 1 |  | 4 | 10 | · `CMSG_SUMMON_RESPONSE`, `MSG_MINIMAP_PING`, `MSG_RAID_READY_CHECK_FINISHED`, `SMSG_SUMMON_REQUEST` |
@@ -279,6 +279,9 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | 🔁 | S | `MSG_TALENT_WIPE_CONFIRM` | ✅ 09-03 | ✅ 09-06 |  | 20260906_005030 | 3 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
 | 🔁 | S | `SMSG_AREA_SPIRIT_HEALER_TIME` |  | ✅ 10-06 |  | 20261006_001625 | 1 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
 | 🔁 | S | `SMSG_AREA_TRIGGER_MESSAGE` | ✅ 09-08 | ✅ 10-10 | ✅ 10-23 | 20261023_004307 | 6 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
+| 🔁 | S | `SMSG_ARENA_TEAM_QUERY_RESPONSE` |  | ✅ 10-24 |  | 20261024_023616 | 2 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
+| 🔁 | S | `SMSG_ARENA_TEAM_ROSTER` |  | ✅ 10-24 |  | 20261024_023616 | 2 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
+| 🔁 | S | `SMSG_ARENA_TEAM_STATS` |  | ✅ 10-24 |  | 20261024_023616 | 2 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
 | 🔁 | S | `SMSG_AUCTION_BIDDER_NOTIFICATION` |  | ✅ 10-10 |  | 20261010_033357 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | 🔁 | S | `SMSG_AUCTION_COMMAND_RESULT` |  | ✅ 10-11 |  | 20261011_152733 | 17 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | 🔁 | S | `SMSG_AUCTION_OWNER_NOTIFICATION` |  | ✅ 09-13 |  | 20260913_022351 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
@@ -737,9 +740,6 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | ✅ | S | `SMSG_ACTIVATE_TAXI_REPLY` | ✅ 09-16 | ✅ 10-24 |  | 20261024_000209 | 5 |  | HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs |
 | ✅ | S | `SMSG_AI_REACTION` | ✅ 10-23 | ✅ 10-24 | ✅ 09-17 | 20261024_002047 | 17 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_ALL_ACHIEVEMENT_DATA` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_023616 | 18 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
-| ✅ | S | `SMSG_ARENA_TEAM_QUERY_RESPONSE` |  | ✅ 10-24 |  | 20261024_023616 | 2 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
-| ✅ | S | `SMSG_ARENA_TEAM_ROSTER` |  | ✅ 10-24 |  | 20261024_023616 | 2 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
-| ✅ | S | `SMSG_ARENA_TEAM_STATS` |  | ✅ 10-24 |  | 20261024_023616 | 2 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
 | ✅ | S | `SMSG_ATTACKER_STATE_UPDATE` | ✅ 10-23 | ✅ 10-24 | ✅ 09-17 | 20261024_002047 | 56 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_ATTACKSWING_BADFACING` | ✅ 10-23 | ✅ 10-23 |  | 20261023_012203 | 2 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_ATTACKSWING_NOTINRANGE` | ✅ 09-09 | ✅ 10-23 |  | 20261023_103241 | 4 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
@@ -931,7 +931,7 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 HermesProxy/World/CalendarClock.cs f9b82043eaca9532
 HermesProxy/World/Client/LegacyStreamInflater.cs 7e8e84925d065503
 HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs 7a8c6c96e154686d
-HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs 84e4d181ed28ff05
+HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs dc26c029fc96af44
 HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs 7bf5487b49d8126a
 HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs e9c12202603052d0
 HermesProxy/World/Client/PacketHandlers/BattlefieldMgrHandler.cs 5490947dadacd97c
