@@ -276,6 +276,20 @@ public partial class WorldClient
         SendPacketToClient(animKit);
     }
 
+    /// <summary>
+    /// TrinityCore 4.3.4 SetAIAnimKit::Write: the unit's packed GUID, then the kit it idles in, 0
+    /// for none. Scripts set one on a creature (Zul'Gurub's zombies get theirs as the instance
+    /// loads); the 4.4.2 client was never told, and the creatures stood in their plain stance.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_SET_AI_ANIM_KIT)]
+    internal void HandleSetAIAnimKit(WorldPacket packet)
+    {
+        SetAIAnimKit animKit = new();
+        animKit.Unit = packet.ReadPackedGuid().To128(GetSession().GameState);
+        animKit.AnimKitID = packet.ReadUInt16();
+        SendPacketToClient(animKit);
+    }
+
     // The modern client prints its "You feel tipsy" / "You drink the X and feel drunk" lines from
     // this packet, not from the Inebriation field. Vanilla servers never send it.
     [HandlesSmsg(Opcode.SMSG_CROSSED_INEBRIATION_THRESHOLD)]
