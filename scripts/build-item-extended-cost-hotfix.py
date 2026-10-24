@@ -19,13 +19,21 @@ hotfixes when its server is 3.3.5a:
     - the rating and bracket requirements are 3.3.5a's; Flags, MinFactionID, MinReputation and
       RequiredAchievement are 0, which 3.3.5a has no columns for.
 
+A 4.3.4 server has the same problem on a smaller scale: three of its ids are missing from the
+4.4.2 client (2285, 175 honor, at the arena vendors among them) and 71 rows ask for another rating.
+With --cata-db2 the source is 4.3.4's own ItemExtendedCost.db2 and the result goes to
+ItemExtendedCostCata4.csv, which the proxy sends in front of a 4.3.4 server: the 4.3.4 row as it
+is, with its Honor Points (392) as the 4.4.2 client's (1901). Both count in hundredths.
+
 Usage
 -----
     python scripts/build-item-extended-cost-hotfix.py --build 3.4.3.54261
     python scripts/build-item-extended-cost-hotfix.py --build 4.4.2.60895 --dbc-dir "D:/wow335a/dbc"
+    python scripts/build-item-extended-cost-hotfix.py --build 4.4.2.60895 --cata-db2 "D:/wow434/ItemExtendedCost.db2"
 
 The 3.3.5a DBC directory is found as in diff-dbc-vs-db2.py: --dbc-dir, else the
-HERMES_TOOLS_DBC_335A environment variable. DB2 downloads are cached under .cache/db2/<build>/.
+HERMES_TOOLS_DBC_335A environment variable. The 4.3.4 file is the one a 4.3.4 server reads from
+its dbc directory (WDB2, build 15595). DB2 downloads are cached under .cache/db2/<build>/.
 """
 
 from __future__ import annotations
@@ -46,6 +54,7 @@ DBC_ENV = "HERMES_TOOLS_DBC_335A"
 
 HONOR = 1901
 ARENA_POINTS = 1900
+HONOR_CATA = 392  # 4.3.4's Honor Points, "Honor Deprecated 3" to the 4.4.2 client
 
 # 3.3.5a ItemExtendedCost.dbc, 16 fields of 4 bytes.
 LEGACY_FIELDS = (["ID", "HonorPoints", "ArenaPoints", "ArenaBracket"]
@@ -83,6 +92,52 @@ def read_legacy(path: Path) -> dict[int, dict[str, int]]:
     return rows
 
 
+def read_cata(path: Path) -> dict[int, tuple[int, ...]]:
+    """4.3.4's ItemExtendedCost.db2 (WDB2), 31 fields of 4 bytes: TrinityCore 4.3.4 ItemExtendedCostEntry."""
+    data = path.read_bytes()
+    if data[:4] != b"WDB2":
+        raise ValueError(f"{path.name}: not a WDB2 file (magic {data[:4]!r})")
+    count, fields, size, _, _, build, _, min_id, max_id = struct.unpack_from("<9I", data, 4)
+    if fields != 31 or build != 15595:
+        raise ValueError(f"{path.name}: {fields} fields of build {build}, expected 31 of 15595")
+    offset = 48 + ((max_id - min_id + 1) * 6 if max_id else 0)
+    rows = {}
+    for index in range(count):
+        values = struct.unpack_from(f"<{fields}i", data, offset + index * size)
+        rows[values[0]] = values
+    return rows
+
+
+def cata_row(row: tuple[int, ...]) -> list[int]:
+    """A 4.3.4 row in HEADER's order. Its honor and arena point fields (1, 2) are unused there."""
+    items = [(row[4 + i], row[9 + i]) for i in range(5) if row[4 + i]]
+    currencies = [(HONOR if row[16 + i] == HONOR_CATA else row[16 + i], row[21 + i])
+                  for i in range(5) if row[16 + i]]
+    # RequiredPersonalArenaRating, RequiredArenaSlot, RequirementFlags, RequiredFactionId,
+    # RequiredFactionStanding, RequiredAchievement
+    return padded(row[0], row[14], row[3], row[28], row[26], row[27], row[30], items, currencies)
+
+
+def padded(row_id, rating, bracket, flags, faction, reputation, achievement, items, currencies) -> list[int]:
+    if len(items) > 5 or len(currencies) > 5:
+        raise ValueError(f"row {row_id}: more than five items or currencies")
+    items = items + [(0, 0)] * (5 - len(items))
+    currencies = currencies + [(0, 0)] * (5 - len(currencies))
+    return ([row_id, rating, bracket, flags, faction, reputation, achievement]
+            + [i for i, _ in items] + [c for _, c in items]
+            + [i for i, _ in currencies] + [c for _, c in currencies])
+
+
+def same(target: list[int], client: dict[str, str]) -> bool:
+    """Whether the client's row asks for what the target row does, slot order aside."""
+    def pairs(values, ids, counts):
+        return sorted((values[ids + i], values[counts + i]) for i in range(5) if values[ids + i])
+    theirs = [int(client[c]) for c in HEADER]
+    return (target[1:7] == theirs[1:7]
+            and pairs(target, 7, 12) == pairs(theirs, 7, 12)
+            and pairs(target, 17, 22) == pairs(theirs, 17, 22))
+
+
 def fetch_client_csv(table: str, build: str) -> Path:
     cached = CACHE_DIR / build / f"{table}.csv"
     if cached.exists() and cached.stat().st_size > 0:
@@ -100,11 +155,8 @@ def read_csv(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def cost(rating: int, bracket: int, items, currencies):
-    return rating, bracket, tuple(sorted(items)), tuple(sorted(currencies))
-
-
-def legacy_cost(row: dict[str, int], tokens: dict[int, int], honor_scale: int):
+def legacy_row(row: dict[str, int], tokens: dict[int, int], honor_scale: int) -> list[int]:
+    """A 3.3.5a row in HEADER's order; 3.3.5a has no flags, faction or achievement columns."""
     items, currencies = [], []
     if row["HonorPoints"]:
         currencies.append((HONOR, row["HonorPoints"] * honor_scale))
@@ -118,57 +170,40 @@ def legacy_cost(row: dict[str, int], tokens: dict[int, int], honor_scale: int):
             currencies.append((tokens[item], count))
         else:
             items.append((item, count))
-    return items, currencies
-
-
-def client_cost(row: dict[str, str]):
-    items = [(int(row[f"ItemID_{i}"]), int(row[f"ItemCount_{i}"]))
-             for i in range(5) if row[f"ItemID_{i}"] not in ("", "0")]
-    currencies = [(int(row[f"CurrencyID_{i}"]), int(row[f"CurrencyCount_{i}"]))
-                  for i in range(5) if row[f"CurrencyID_{i}"] not in ("", "0")]
-    return cost(int(row["RequiredArenaRating"]), int(row["ArenaBracket"]), items, currencies)
+    return padded(row["ID"], row["RequiredArenaRating"], row["ArenaBracket"], 0, 0, 0, 0, items, currencies)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--build", required=True, help="client build, 3.4.3.54261 or 4.4.2.60895")
     parser.add_argument("--dbc-dir", help=f"3.3.5a DBC directory (default: ${DBC_ENV})")
+    parser.add_argument("--cata-db2", help="a 4.3.4 server's ItemExtendedCost.db2, for ItemExtendedCostCata4.csv")
     args = parser.parse_args()
 
     expansion = int(args.build.split(".")[0])
-    if expansion not in (3, 4):
-        sys.exit("--build must be a 3.4.3 or a 4.4.2 build")
-    honor_scale = 100 if expansion >= 4 else 1
-
-    legacy = read_legacy(resolve_dbc_dir(args.dbc_dir) / "ItemExtendedCost.dbc")
+    if expansion not in (3, 4) or (args.cata_db2 and expansion != 4):
+        sys.exit("--build must be a 3.4.3 or a 4.4.2 build, and a 4.4.2 one with --cata-db2")
     client = {int(r["ID"]): r for r in read_csv(fetch_client_csv("ItemExtendedCost", args.build))}
-    tokens = {int(r["ItemId"]): int(r["CurrencyId"])
-              for r in read_csv(CSV_DIR / f"CurrencyTypes{expansion}.csv") if r["ItemId"] != "0"}
 
-    out = []
-    for row_id in sorted(legacy):
-        if row_id == 0:
-            continue
-        row = legacy[row_id]
-        items, currencies = legacy_cost(row, tokens, honor_scale)
-        if len(items) > 5 or len(currencies) > 5:
-            raise ValueError(f"row {row_id}: more than five items or currencies")
-        wanted = cost(row["RequiredArenaRating"], row["ArenaBracket"], items, currencies)
-        if row_id in client and client_cost(client[row_id]) == wanted:
-            continue
-        items += [(0, 0)] * (5 - len(items))
-        currencies += [(0, 0)] * (5 - len(currencies))
-        out.append([row_id, row["RequiredArenaRating"], row["ArenaBracket"], 0, 0, 0, 0]
-                   + [i for i, _ in items] + [c for _, c in items]
-                   + [i for i, _ in currencies] + [c for _, c in currencies])
+    if args.cata_db2:
+        server = {row_id: cata_row(row) for row_id, row in read_cata(Path(args.cata_db2)).items()}
+        target = CSV_DIR / "Hotfix" / "ItemExtendedCostCata4.csv"
+    else:
+        tokens = {int(r["ItemId"]): int(r["CurrencyId"])
+                  for r in read_csv(CSV_DIR / f"CurrencyTypes{expansion}.csv") if r["ItemId"] != "0"}
+        honor_scale = 100 if expansion >= 4 else 1
+        legacy = read_legacy(resolve_dbc_dir(args.dbc_dir) / "ItemExtendedCost.dbc")
+        server = {row_id: legacy_row(row, tokens, honor_scale) for row_id, row in legacy.items()}
+        target = CSV_DIR / "Hotfix" / f"ItemExtendedCost{expansion}.csv"
 
-    target = CSV_DIR / "Hotfix" / f"ItemExtendedCost{expansion}.csv"
+    out = [row for row_id, row in sorted(server.items())
+           if row_id != 0 and not (row_id in client and same(row, client[row_id]))]
     with target.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, lineterminator="\n")
         writer.writerow(HEADER)
         writer.writerows(out)
     missing = sum(1 for r in out if r[0] not in client)
-    print(f"{target.relative_to(REPO_ROOT)}: {len(out)} rows ({missing} the client lacks) of {len(legacy) - 1}")
+    print(f"{target.relative_to(REPO_ROOT)}: {len(out)} rows ({missing} the client lacks) of {len(server) - (0 in server)}")
     return 0
 
 

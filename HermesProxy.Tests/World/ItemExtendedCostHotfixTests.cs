@@ -36,13 +36,15 @@ public sealed class ItemExtendedCostHotfixTests
     }
 
     [Theory]
-    [InlineData(3, 15300u)]
-    [InlineData(4, 1_530_000u)] // the 4.4.2 client counts honor in hundredths
-    public void ShippedRows_CarryTheServersPrice(int expansion, uint honor)
+    [InlineData("ItemExtendedCost3.csv", "386", 15300u)]
+    [InlineData("ItemExtendedCost4.csv", "386", 1_530_000u)] // the 4.4.2 client counts honor in hundredths
+    // 4.3.4's 175 honor at the arena vendors, a row the 4.4.2 client lacks; 4.3.4 counts in hundredths too
+    [InlineData("ItemExtendedCostCata4.csv", "2285", 17_500u)]
+    public void ShippedRows_CarryTheServersPrice(string file, string id, uint honor)
     {
-        string path = Path.Combine(AppContext.BaseDirectory, "CSV", "Hotfix", $"ItemExtendedCost{expansion}.csv");
+        string path = Path.Combine(AppContext.BaseDirectory, "CSV", "Hotfix", file);
         string[] header = File.ReadLines(path).First().Split(',');
-        string[] row = File.ReadLines(path).Select(l => l.Split(',')).Single(c => c[0] == "386");
+        string[] row = File.ReadLines(path).Select(l => l.Split(',')).Single(c => c[0] == id);
 
         Assert.Equal(GameData.ItemExtendedCostColumns, header.Length);
         Assert.Equal(((uint)Currency.HonorPoints).ToString(), row[Array.IndexOf(header, "CurrencyID_0")]);
