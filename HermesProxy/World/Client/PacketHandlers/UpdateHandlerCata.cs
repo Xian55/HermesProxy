@@ -332,12 +332,15 @@ public partial class WorldClient
 
         if (hasAnimKit)
         {
-            if (hasAiAnimKit)
-                packet.ReadUInt16();
-            if (hasMovementAnimKit)
-                packet.ReadUInt16();
-            if (hasMeleeAnimKit)
-                packet.ReadUInt16();
+            ushort aiAnimKit = hasAiAnimKit ? packet.ReadUInt16() : (ushort)0;
+            ushort movementAnimKit = hasMovementAnimKit ? packet.ReadUInt16() : (ushort)0;
+            ushort meleeAnimKit = hasMeleeAnimKit ? packet.ReadUInt16() : (ushort)0;
+            if (updateData != null)
+            {
+                updateData.CreateData.AIAnimKitID = aiAnimKit;
+                updateData.CreateData.MovementAnimKitID = movementAnimKit;
+                updateData.CreateData.MeleeAnimKitID = meleeAnimKit;
+            }
         }
 
         if (hasServerTime)

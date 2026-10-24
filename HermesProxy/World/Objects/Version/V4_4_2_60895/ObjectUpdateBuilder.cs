@@ -182,6 +182,9 @@ public partial class ObjectUpdateBuilder
             _createBits |= CreateObjectBits.CombatVictim;
         if (create is { VehicleId: not 0 })
             _createBits |= CreateObjectBits.Vehicle;
+        // TrinityCore cata_classic: an object has the AnimKit block when any of its three kits is set.
+        if (create is { AIAnimKitID: not 0 } or { MovementAnimKitID: not 0 } or { MeleeAnimKitID: not 0 })
+            _createBits |= CreateObjectBits.AnimKit;
         if (hasMoveInfo && _objectType == ObjectTypeBCC.GameObject)
             _createBits |= CreateObjectBits.Rotation;
         // CreateObjectBits.GameObject is NOT set unconditionally here — empirical
@@ -293,9 +296,9 @@ public partial class ObjectUpdateBuilder
 
         if (Has(CreateObjectBits.AnimKit))
         {
-            data.WriteUInt16(0);
-            data.WriteUInt16(0);
-            data.WriteUInt16(0);
+            data.WriteUInt16(_updateData.CreateData.AIAnimKitID);
+            data.WriteUInt16(_updateData.CreateData.MovementAnimKitID);
+            data.WriteUInt16(_updateData.CreateData.MeleeAnimKitID);
         }
 
         if (Has(CreateObjectBits.Rotation))
