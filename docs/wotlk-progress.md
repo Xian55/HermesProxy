@@ -975,7 +975,7 @@ HermesProxy/World/Client/WorldClientCataHandshake.cs f73fe4895229ea0c
 HermesProxy/World/Dispatch/SessionContext.cs b74de2b3cc19f3c8
 HermesProxy/World/GameData.cs 78c3a919b183e436
 HermesProxy/World/GuildClub.cs b1aa090972b200df
-HermesProxy/World/ItemRefund.cs 9ed8e05a4424441f
+HermesProxy/World/ItemRefund.cs ddc050973d0a0cdd
 HermesProxy/World/MaskedGuid.cs 38ad2baffdeef245
 HermesProxy/World/Objects/LegacyMovementCata.cs 98d44682b32b0e43
 HermesProxy/World/Objects/LegacyMovementCodec.cs 2c051240a27eabd0
