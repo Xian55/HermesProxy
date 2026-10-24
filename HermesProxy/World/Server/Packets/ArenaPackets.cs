@@ -205,26 +205,67 @@ struct ArenaTeamMember
 /// Leaving the request unanswered is what left the tiles blank while the arena-team packets were
 /// all arriving correctly — those feed the team roster view, not the tiles.
 /// <para>
-/// Seven fixed bracket records, each nineteen int32 then the Disqualified bit and a flush —
-/// exactly <c>WorldPackets::Battleground::RatedPvpInfo::Write</c> and its BracketInfo operator on
-/// the native 3.4.3 server. There are no counts and no bits outside each record, so the packet is
-/// a fixed 7 × 77 bytes.
+/// Fixed bracket records, each nineteen int32 then the Disqualified bit and a flush — exactly
+/// <c>WorldPackets::Battleground::RatedPvpInfo::Write</c> and its BracketInfo operator on the
+/// native server. There are no counts and no bits outside each record: seven records (7 × 77
+/// bytes) for 3.4.3, nine for 4.4.2 (TrinityCore cata_classic <c>Bracket[9]</c>, and the 4.4.2
+/// client's reader).
 /// </para>
 /// <para>
 /// Only five of the nineteen have a 3.3.5a source; the rest are left zero, which is also what the
 /// native server sends for them since it only fills the same five.
 /// </para>
 /// </remarks>
-class RatedPvpInfo : ServerPacket, ISpanWritable
+sealed class RatedPvpInfo : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<RatedPvpInfo>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new BracketsLayout(bracketCount: 7)),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new BracketsLayout(bracketCount: 9)));
+
+    private static readonly ServerPacketLayout<RatedPvpInfo> Layout = Layouts.ForRunningClient();
+
     public RatedPvpInfo() : base(Opcode.SMSG_RATED_PVP_INFO) { }
 
-    public const int BracketCount = 7;
+    public override void Write() => Layout.Write(this, _worldPacket);
 
-    public override void Write()
+    public int MaxSize => Layout.MaxSize;
+
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>The brackets in order, as many as the client reads; those the server has no record for are zero.</summary>
+    internal sealed class BracketsLayout(int bracketCount) : ServerPacketLayout<RatedPvpInfo>
     {
-        for (int i = 0; i < BracketCount; i++)
-            WriteBracket(_worldPacket, i < Brackets.Length ? Brackets[i] : null);
+        public int BracketCount { get; } = bracketCount;
+
+        public override int MaxSize => BracketCount * (19 * 4 + 1);
+
+        public override void Write(RatedPvpInfo packet, WorldPacket data)
+        {
+            for (int i = 0; i < BracketCount; i++)
+                WriteBracket(data, i < packet.Brackets.Length ? packet.Brackets[i] : null);
+        }
+
+        public override int WriteToSpan(RatedPvpInfo packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            for (int i = 0; i < BracketCount; i++)
+            {
+                RatedBracketInfo? b = i < packet.Brackets.Length ? packet.Brackets[i] : null;
+                writer.WriteInt32((int)(b?.PersonalRating ?? 0));
+                writer.WriteInt32(0);
+                writer.WriteInt32((int)(b?.SeasonPlayed ?? 0));
+                writer.WriteInt32((int)(b?.SeasonWon ?? 0));
+                writer.WriteInt32(0);
+                writer.WriteInt32(0);
+                writer.WriteInt32((int)(b?.WeeklyPlayed ?? 0));
+                writer.WriteInt32((int)(b?.WeeklyWon ?? 0));
+                for (int n = 0; n < 11; n++)
+                    writer.WriteInt32(0);
+                writer.WriteBit(false);
+                writer.FlushBits();
+            }
+            return writer.Position;
+        }
     }
 
     private static void WriteBracket(WorldPacket data, RatedBracketInfo? b)
@@ -250,30 +291,6 @@ class RatedPvpInfo : ServerPacket, ISpanWritable
         data.WriteInt32(0);                                   // Rank
         data.WriteBit(false);                                 // Disqualified
         data.FlushBits();
-    }
-
-    public int MaxSize => BracketCount * (19 * 4 + 1);
-
-    public int WriteToSpan(Span<byte> buffer)
-    {
-        var writer = new SpanPacketWriter(buffer);
-        for (int i = 0; i < BracketCount; i++)
-        {
-            RatedBracketInfo? b = i < Brackets.Length ? Brackets[i] : null;
-            writer.WriteInt32((int)(b?.PersonalRating ?? 0));
-            writer.WriteInt32(0);
-            writer.WriteInt32((int)(b?.SeasonPlayed ?? 0));
-            writer.WriteInt32((int)(b?.SeasonWon ?? 0));
-            writer.WriteInt32(0);
-            writer.WriteInt32(0);
-            writer.WriteInt32((int)(b?.WeeklyPlayed ?? 0));
-            writer.WriteInt32((int)(b?.WeeklyWon ?? 0));
-            for (int n = 0; n < 11; n++)
-                writer.WriteInt32(0);
-            writer.WriteBit(false);
-            writer.FlushBits();
-        }
-        return writer.Position;
     }
 
     public RatedBracketInfo[] Brackets = [];

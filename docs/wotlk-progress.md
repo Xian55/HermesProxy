@@ -987,7 +987,7 @@ HermesProxy/World/Outbox/SessionWires.cs 0a3dc80df7199f1b
 HermesProxy/World/Packet.cs bddda3075781cbe4
 HermesProxy/World/Server/LfgSlots.cs d41c29db0976b62a
 HermesProxy/World/Server/Packets/AchievementPackets.cs caf7fcbd4785f359
-HermesProxy/World/Server/Packets/ArenaPackets.cs 378c093d21575fc5
+HermesProxy/World/Server/Packets/ArenaPackets.cs 40d0f028cf416e14
 HermesProxy/World/Server/Packets/AuctionPackets.cs b8967cb8959fdb6c
 HermesProxy/World/Server/Packets/AuthenticationPackets.cs 547cb135cfe8b7cd
 HermesProxy/World/Server/Packets/BattleGroundPackets.cs 96404a7e236c64a8
