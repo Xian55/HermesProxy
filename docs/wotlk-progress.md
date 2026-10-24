@@ -1048,7 +1048,7 @@ HermesProxy/World/Server/Packets/LFG/SMSG/LFGTeleportDenied.cs a6c3c90850f4d607
 HermesProxy/World/Server/Packets/LFG/SMSG/LfgBootPlayer.cs b8e7af7c1787ef5e
 HermesProxy/World/Server/Packets/LootPackets.cs f758c074cefb934f
 HermesProxy/World/Server/Packets/MailPackets.cs e606739a2a96540a
-HermesProxy/World/Server/Packets/MiscPackets.cs c4dc1a3bd4bc97d4
+HermesProxy/World/Server/Packets/MiscPackets.cs 363828889bdfaa81
 HermesProxy/World/Server/Packets/MovementPackets.cs 584c2f48b61f06bb
 HermesProxy/World/Server/Packets/NPCPackets.cs 9c70acbcdb9c93a0
 HermesProxy/World/Server/Packets/PetPackets.cs 2002a80e57e697f4

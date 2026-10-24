@@ -29,6 +29,8 @@ public sealed class CataClassicFieldWidthLayoutTests
         Assert.IsType<StartMirrorTimer.ByteTimerLayout>(StartMirrorTimer.Layouts.For(ClientVersionBuild.V4_4_2_60895));
         Assert.IsType<PauseMirrorTimer.IntTimerLayout>(PauseMirrorTimer.Layouts.For(ClientVersionBuild.V3_4_3_54261));
         Assert.IsType<PauseMirrorTimer.ByteTimerLayout>(PauseMirrorTimer.Layouts.For(ClientVersionBuild.V4_4_2_60895));
+        Assert.IsType<StopMirrorTimer.IntTimerLayout>(StopMirrorTimer.Layouts.For(ClientVersionBuild.V3_4_3_54261));
+        Assert.IsType<StopMirrorTimer.ByteTimerLayout>(StopMirrorTimer.Layouts.For(ClientVersionBuild.V4_4_2_60895));
     }
 
     // ---- SMSG_ITEM_PUSH_RESULT ----
@@ -100,7 +102,7 @@ public sealed class CataClassicFieldWidthLayoutTests
         AssertBothSerialisers(new ItemPushResult.ByteQualityLayout(), p, p.MaxSize, expected);
     }
 
-    // ---- SMSG_START_MIRROR_TIMER / SMSG_PAUSE_MIRROR_TIMER ----
+    // ---- SMSG_START_MIRROR_TIMER / SMSG_PAUSE_MIRROR_TIMER / SMSG_STOP_MIRROR_TIMER ----
 
     private static StartMirrorTimer Breath() => new()
     {
@@ -163,6 +165,26 @@ public sealed class CataClassicFieldWidthLayoutTests
         expected.WriteUInt8(0x80);
 
         AssertBothSerialisers(new PauseMirrorTimer.ByteTimerLayout(), p, p.MaxSize, expected);
+    }
+
+    [Fact]
+    public void StopMirrorTimer_IntTimerLayout_MatchesTheOldWriter()
+    {
+        var p = new StopMirrorTimer { Timer = MirrorTimerType.Breath };
+        using var old = new WorldPacket(1u);
+        old.WriteInt32((int)p.Timer);
+
+        AssertBothSerialisers(new StopMirrorTimer.IntTimerLayout(), p, p.MaxSize, old);
+    }
+
+    [Fact]
+    public void StopMirrorTimer_ByteTimerLayout_WritesTheTimerAsAByte()
+    {
+        var p = new StopMirrorTimer { Timer = MirrorTimerType.Breath };
+        using var expected = new WorldPacket(1u);
+        expected.WriteUInt8((byte)p.Timer);
+
+        AssertBothSerialisers(new StopMirrorTimer.ByteTimerLayout(), p, p.MaxSize, expected);
     }
 
     // ---- SMSG_CHANNEL_NOTIFY_JOINED ----
