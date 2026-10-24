@@ -4102,6 +4102,7 @@ public partial class ObjectUpdateBuilder
             if (src.AttackRoundBaseTime[0].HasValue) { blocks.SetBit(171); blocks.SetBit(172); }
             if (src.AttackRoundBaseTime[1].HasValue) { blocks.SetBit(171); blocks.SetBit(173); }
         }
+        if (src.RangedAttackRoundBaseTime.HasValue) { blocks.SetBit(45); }
         if (src.BoundingRadius.HasValue) { blocks.SetBit(46); }
         if (src.CombatReach.HasValue) { blocks.SetBit(47); }
         if (src.NativeDisplayID.HasValue) { blocks.SetBit(49); }
@@ -4324,6 +4325,7 @@ public partial class ObjectUpdateBuilder
         if (blocks.IsBitSet(42)) WriteUpdateUnitFlags2(data, src);
         if (blocks.IsBitSet(43)) data.WriteUInt32(src.Flags3!.Value);
         if (blocks.IsBitSet(44)) data.WriteUInt32(src.AuraState!.Value);
+        if (blocks.IsBitSet(45)) data.WriteUInt32(src.RangedAttackRoundBaseTime!.Value);
         if (blocks.IsBitSet(46)) data.WriteFloat(src.BoundingRadius!.Value);
         if (blocks.IsBitSet(47)) data.WriteFloat(src.CombatReach!.Value);
         if (blocks.IsBitSet(48)) data.WriteFloat(src.DisplayScale!.Value);
@@ -4428,6 +4430,7 @@ public partial class ObjectUpdateBuilder
         if (src.Flags2.HasValue) return true;
         if (src.AuraState.HasValue) return true;
         if (src.AttackRoundBaseTime != null) for (int i = 0; i < 2; i++) if (src.AttackRoundBaseTime[i].HasValue) return true;
+        if (src.RangedAttackRoundBaseTime.HasValue) return true;
         if (src.BoundingRadius.HasValue) return true;
         if (src.CombatReach.HasValue) return true;
         if (src.NativeDisplayID.HasValue) return true;
