@@ -19,6 +19,7 @@
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -55,31 +56,80 @@ public class CanDuelResult : ServerPacket, ISpanWritable
     public bool Result;
 }
 
-public class DuelRequested : ServerPacket, ISpanWritable
+public sealed class DuelRequested : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<DuelRequested>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V3_4_3_54261, new GuidsLayout()),
+        (ClientVersionBuild.V3_4_3_54261, ClientVersionBuild.Zero, new ToTheDeathLayout()));
+
+    private static readonly ServerPacketLayout<DuelRequested> Layout = Layouts.ForRunningClient();
+
     public DuelRequested() : base(Opcode.SMSG_DUEL_REQUESTED, ConnectionType.Instance) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    public int MaxSize => Layout.MaxSize;
+
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>1.14 and 2.5: the flag, who asked and that player's account.</summary>
+    internal sealed class GuidsLayout : ServerPacketLayout<DuelRequested>
     {
-        _worldPacket.WritePackedGuid128(ArbiterGUID);
-        _worldPacket.WritePackedGuid128(RequestedByGUID);
-        _worldPacket.WritePackedGuid128(RequestedByWowAccount);
+        public override int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 3; // 3 GUIDs
+
+        public override void Write(DuelRequested packet, WorldPacket data) => WriteGuids(packet, data);
+
+        public override int WriteToSpan(DuelRequested packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            WriteGuids(packet, ref writer);
+            return writer.Position;
+        }
     }
 
-    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 3; // 3 GUIDs
-
-    public int WriteToSpan(Span<byte> buffer)
+    /// <summary>
+    /// 3.4.3 and 4.4.2 (TrinityCore wotlk_classic and cata_classic DuelRequested::Write, the clients'
+    /// own readers): the GUIDs, then a byte holding the ToTheDeath bit.
+    /// </summary>
+    internal sealed class ToTheDeathLayout : ServerPacketLayout<DuelRequested>
     {
-        var writer = new SpanPacketWriter(buffer);
-        writer.WritePackedGuid128(ArbiterGUID.Low, ArbiterGUID.High);
-        writer.WritePackedGuid128(RequestedByGUID.Low, RequestedByGUID.High);
-        writer.WritePackedGuid128(RequestedByWowAccount.Low, RequestedByWowAccount.High);
-        return writer.Position;
+        public override int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 3 + 1; // 3 GUIDs + 1 byte for bit
+
+        public override void Write(DuelRequested packet, WorldPacket data)
+        {
+            WriteGuids(packet, data);
+            data.WriteBit(packet.ToTheDeath);
+            data.FlushBits();
+        }
+
+        public override int WriteToSpan(DuelRequested packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            WriteGuids(packet, ref writer);
+            writer.WriteBit(packet.ToTheDeath);
+            writer.FlushBits();
+            return writer.Position;
+        }
+    }
+
+    private static void WriteGuids(DuelRequested packet, WorldPacket data)
+    {
+        data.WritePackedGuid128(packet.ArbiterGUID);
+        data.WritePackedGuid128(packet.RequestedByGUID);
+        data.WritePackedGuid128(packet.RequestedByWowAccount);
+    }
+
+    private static void WriteGuids(DuelRequested packet, ref SpanPacketWriter writer)
+    {
+        writer.WritePackedGuid128(packet.ArbiterGUID.Low, packet.ArbiterGUID.High);
+        writer.WritePackedGuid128(packet.RequestedByGUID.Low, packet.RequestedByGUID.High);
+        writer.WritePackedGuid128(packet.RequestedByWowAccount.Low, packet.RequestedByWowAccount.High);
     }
 
     public WowGuid128 ArbiterGUID;
     public WowGuid128 RequestedByGUID;
     public WowGuid128 RequestedByWowAccount;
+    public bool ToTheDeath; // a Wrath Classic duel to the death; no legacy server has one
 }
 
 public readonly record struct DuelResponse(WowGuid128 ArbiterGUID, bool Accepted, bool Forfeited);
