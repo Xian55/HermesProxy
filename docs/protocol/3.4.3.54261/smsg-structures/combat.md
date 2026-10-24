@@ -237,7 +237,7 @@
 - Layout: `u32*2 guid u32 u8`
 - Size: 13 bytes (packed GUIDs not counted)
 - Bit fields (all-zero packet, widths in arrival order): byte 14: 1 · (7 unused)
-- HermesProxy: `PvPCredit` — differs (#363)
+- HermesProxy: `PvPCredit` — matches
 
 ### SMSG_CANCEL_COMBAT (0x294b)
 

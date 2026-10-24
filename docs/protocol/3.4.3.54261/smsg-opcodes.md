@@ -906,7 +906,7 @@ Every server-to-client opcode of the client, with its 3.3.5a counterpart where H
 | SMSG_CAN_DUEL_RESULT | 0x2947 | 10567 | — | Combat | fixed, 1 bytes | differs (#369) |
 | SMSG_CLEAR_TARGET | 0x2948 | 10568 | 959 (0x3bf) | Combat | fixed, 0 bytes | matches |
 | — | 0x2949 | 10569 | — | Combat | fixed struct | — |
-| SMSG_PVP_CREDIT | 0x294a | 10570 | 652 (0x28c) | Combat | fixed, 13 bytes | differs (#363) |
+| SMSG_PVP_CREDIT | 0x294a | 10570 | 652 (0x28c) | Combat | fixed, 13 bytes | matches |
 | SMSG_CANCEL_COMBAT | 0x294b | 10571 | 334 (0x14e) | Combat | fixed struct | matches |
 | SMSG_ATTACK_SWING_ERROR | 0x294c | 10572 | — | Combat | variable | matches |
 | — | 0x294d | 10573 | — | Combat | variable | — |
