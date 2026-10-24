@@ -198,9 +198,11 @@ public enum UnitField
                            ArrayCount = 2, ArrayMode = ArrayMode.PerElement, ParentBit = 171)]
     UNIT_ATTACK_ROUND_BASE_TIME,
 
-    // ---- RangedAttackRoundBaseTime owner-only Create (bow-fallback) ----
+    // ---- RangedAttackRoundBaseTime owner-only Create (bow-fallback); update bit 45, between
+    // AuraState and BoundingRadius (WPP UpdateFieldsHandler343) ----
 
     [DescriptorCreatePlaceholder(DescriptorType.UInt32, Visibility = FieldVisibility.Owner, CustomWriter = nameof(HermesProxy.World.Objects.Version.V3_4_3_54261.ObjectUpdateBuilder.WriteCreateUnitRangedAttackTime))]
+    [DescriptorUpdateField(nameof(UnitData.RangedAttackRoundBaseTime), DescriptorType.UInt32, bit: 45)]
     UNIT_RANGED_ATTACK_ROUND_TIME_CUSTOM,
 
     // ---- BoundingRadius / CombatReach / NativeDisplayID / MountDisplayID + padding ----
