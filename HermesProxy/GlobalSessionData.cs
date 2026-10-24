@@ -137,6 +137,8 @@ public sealed class GameSessionData
     public bool IsWaitingForNewWorld;
     public bool IsWaitingForWorldPortAck;
     public bool IsFirstEnterWorld;
+    // Far teleports since the character entered the world; the 4.4 NEW_WORLD carries it.
+    public int NewWorldCounter;
     public bool IsInWorld;
     // Purchased stable slots, learned from legacy MSG_LIST_STABLED_PETS. V3_4_3 keeps this
     // in ActivePlayerData, and the client greys out every slot it thinks is unpurchased,
