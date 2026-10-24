@@ -129,8 +129,13 @@ public partial class WorldClient
     internal void HandleArenaTeamEvent(WorldPacket packet)
     {
         ArenaTeamEvent arena = new ArenaTeamEvent();
-        var eventType = (ArenaTeamEventLegacy)packet.ReadUInt8();
-        arena.Event = eventType.CastEnum<ArenaTeamEventModern>();
+        byte eventType = packet.ReadUInt8();
+        // TrinityCore 4.3.4 numbers the events as the modern clients do (ERR_ARENA_TEAM_JOIN_SS = 4);
+        // 3.3.5a starts them one lower. Cast as a 3.3.5a event, a player joining read as leaving
+        // and a disbanded team as no event the client knew.
+        arena.Event = IsCataLegacy
+            ? (ArenaTeamEventModern)eventType
+            : ((ArenaTeamEventLegacy)eventType).CastEnum<ArenaTeamEventModern>();
         byte count = packet.ReadUInt8();
         for (byte i = 0; i < count; i++)
         {
