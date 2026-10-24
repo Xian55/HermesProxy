@@ -1,5 +1,6 @@
 ﻿using System;
 using Framework.IO;
+using HermesProxy.Enums;
 using HermesProxy.World;
 using HermesProxy.World.Server.Packets;
 using Xunit;
@@ -40,7 +41,10 @@ public class V343PvpWireTests
             Brackets = [new RatedBracketInfo { PersonalRating = 1842, SeasonPlayed = 9, SeasonWon = 5 }],
         };
 
-        byte[] actual = SpanBytes(packet);
+        // the 3.4.3 layout whatever client the run is pinned to; the 4.4.2 one is in RatedPvpInfoLayoutTests
+        var layout = RatedPvpInfo.Layouts.For(ClientVersionBuild.V3_4_3_54261);
+        var buffer = new byte[layout.MaxSize];
+        byte[] actual = buffer[..layout.WriteToSpan(packet, buffer)];
 
         Assert.Equal(7 * (19 * 4 + 1), actual.Length);
         Assert.Equal(539, actual.Length);
