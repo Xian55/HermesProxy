@@ -2883,15 +2883,17 @@ public partial class WorldClient
         SetupCurrency currencies = new SetupCurrency();
         foreach (var (currencyId, quantity) in published)
         {
+            // The server's honor is in whole points, the 4.4.2 client's in hundredths.
+            uint scale = ModernVersion.CurrenciesInHundredths ? ModernCurrencyScale(currencyId) : 1u;
             var record = new SetupCurrency.Record
             {
                 Type = currencyId,
-                Quantity = quantity,
+                Quantity = quantity * scale,
             };
             // A zero cap in CurrencyTypes.db2 means uncapped; sending it would show "0" as the
             // ceiling, so the optional field is left out instead.
             if (GameData.CurrencyTypeStore.TryGetValue(currencyId, out var type) && type.MaxQuantity != 0)
-                record.MaxQuantity = (int)type.MaxQuantity;
+                record.MaxQuantity = (int)(type.MaxQuantity * scale);
 
             currencies.Data.Add(record);
         }
