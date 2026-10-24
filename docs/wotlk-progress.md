@@ -1046,7 +1046,7 @@ HermesProxy/World/Server/Packets/LFG/SMSG/LFGPlayerReward.cs 895f0a6c8691e00b
 HermesProxy/World/Server/Packets/LFG/SMSG/LFGRoleCheckUpdate.cs c85f402b720e8104
 HermesProxy/World/Server/Packets/LFG/SMSG/LFGTeleportDenied.cs a6c3c90850f4d607
 HermesProxy/World/Server/Packets/LFG/SMSG/LfgBootPlayer.cs b8e7af7c1787ef5e
-HermesProxy/World/Server/Packets/LootPackets.cs fabf29f6cb9265ef
+HermesProxy/World/Server/Packets/LootPackets.cs f758c074cefb934f
 HermesProxy/World/Server/Packets/MailPackets.cs e606739a2a96540a
 HermesProxy/World/Server/Packets/MiscPackets.cs d3947a02b9caf6dc
 HermesProxy/World/Server/Packets/MovementPackets.cs 584c2f48b61f06bb

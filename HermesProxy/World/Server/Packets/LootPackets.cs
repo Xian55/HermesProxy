@@ -279,16 +279,18 @@ class StartLootRoll : ServerPacket, ISpanWritable
 {
     public StartLootRoll() : base(Opcode.SMSG_LOOT_START_ROLL) { }
 
-    // V3_4_3 StartLootRoll::Write inserts LootRollIneligibleReason between ValidRolls
-    // and Method: std::array<LootRollIneligibilityReason, 4> where the enum is uint32,
-    // appended as 4 * sizeof(uint32) = 16 bytes. Omitting it lands Method and the whole
-    // Item block 16 bytes early. 3.3.5a has no equivalent — it sends only the ValidRolls
-    // mask — so every entry is written as None (0).
-    private const int IneligibleReasonCount = 4;
+    // From 3.4.3 on the client reads three LootRollIneligibilityReason (uint32 each) between
+    // ValidRolls and Method, and an int32 DungeonEncounterID after Method (the 3.4.3 and 4.4.2
+    // clients' own readers, WowPacketParser's 3.4.4 and 4.4 readers). Omitting them lands Method
+    // and the whole Item block 16 bytes early. TrinityCore 3.4.3 wrote four reasons and no
+    // encounter, the same length, and so did this writer: the client took the fourth reason's
+    // first byte for the method (free for all) and an encounter id with the method in its top
+    // byte. 3.3.5a has neither — it sends only the ValidRolls mask — so every reason is None (0)
+    // and the encounter 0.
+    private const int IneligibleReasonCount = 3;
     private const int IneligibleReasonBytes = IneligibleReasonCount * sizeof(uint);
 
-    private static bool WritesIneligibleReasons =>
-        ModernVersion.IsWotLKClassicOrLater;
+    private static bool WritesIneligibleReasons => LootRollWire.WritesDungeonEncounterId;
 
     public override void Write()
     {
@@ -302,14 +304,17 @@ class StartLootRoll : ServerPacket, ISpanWritable
                 _worldPacket.WriteUInt32(0);         // LootRollIneligibilityReason.None
         }
         _worldPacket.WriteUInt8((byte)Method);
+        if (WritesIneligibleReasons)
+            _worldPacket.WriteInt32(0);              // DungeonEncounterID
         Item.Write(_worldPacket);
     }
 
     // LootItemData: 1 (bits) + ItemInstance + 4 + 1 + 1 = 7 + ItemInstanceMaxSize
     private const int LootItemDataSize = 7 + ItemPacketHelpers.ItemInstanceMaxSize;
-    // GUID(18) + 2 uints(8) + 2 bytes(2) + LootRollIneligibleReason(16 on V3_4_3) + LootItemData
+    // GUID(18) + 2 uints(8) + 2 bytes(2) + LootRollIneligibleReason(12) and DungeonEncounterID(4)
+    // from V3_4_3 on + LootItemData
     public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 8 + 2
-        + (WritesIneligibleReasons ? IneligibleReasonBytes : 0)
+        + (WritesIneligibleReasons ? IneligibleReasonBytes + sizeof(int) : 0)
         + LootItemDataSize;
 
     public int WriteToSpan(Span<byte> buffer)
@@ -325,6 +330,8 @@ class StartLootRoll : ServerPacket, ISpanWritable
                 writer.WriteUInt32(0);               // LootRollIneligibilityReason.None
         }
         writer.WriteUInt8((byte)Method);
+        if (WritesIneligibleReasons)
+            writer.WriteInt32(0);                    // DungeonEncounterID
 
         // Write LootItemData inline
         writer.WriteBits(Item.Type, 2);
@@ -361,7 +368,8 @@ public readonly record struct LootRoll(WowGuid128 LootObj, byte LootListID, Roll
 /// SMSG_LOOT_ALL_PASSED carries it too, right after LootObj: no native capture has one, but the
 /// 3.4.3 client reads it there and TrinityCore 3.4.3 writes it. Without it the client read the
 /// item 4 bytes late and ran past the end of the packet (#360).
-/// SMSG_LOOT_START_ROLL and SMSG_LOOT_REMOVED do NOT have this field. Issue #162.
+/// SMSG_LOOT_START_ROLL has it too, after the loot method (see StartLootRoll); SMSG_LOOT_REMOVED
+/// does not. Issue #162.
 /// </summary>
 internal static class LootRollWire
 {
