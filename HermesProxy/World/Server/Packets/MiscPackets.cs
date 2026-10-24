@@ -1496,81 +1496,149 @@ public class ConquestFormulaConstants : ServerPacket, ISpanWritable
     public float PvpCPNumerator;
 }
 
-public class SeasonInfo : ServerPacket, ISpanWritable
+public sealed class SeasonInfo : ServerPacket, ISpanWritable
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<SeasonInfo>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V3_4_3_54261, new OneFlagLayout()),
+        (ClientVersionBuild.V3_4_3_54261, ClientVersionBuild.V4_4_2_60895, new TwoFlagsLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new ThreeFlagsLayout()));
+
+    private static readonly ServerPacketLayout<SeasonInfo> Layout = Layouts.ForRunningClient();
+
     public SeasonInfo() : base(Opcode.SMSG_SEASON_INFO) { }
 
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    public int MaxSize => Layout.MaxSize;
+
+    public int WriteToSpan(Span<byte> buffer) => Layout.WriteToSpan(this, buffer);
+
+    /// <summary>Up to 2.5: five int32 and the weekly reward chest bit.</summary>
+    internal sealed class OneFlagLayout : ServerPacketLayout<SeasonInfo>
+    {
+        public override int MaxSize => 21;
+
+        public override void Write(SeasonInfo packet, WorldPacket data)
+        {
+            data.WriteInt32(packet.MythicPlusSeasonID);
+            data.WriteInt32(packet.CurrentSeason);
+            data.WriteInt32(packet.PreviousSeason);
+            data.WriteInt32(packet.ConquestWeeklyProgressCurrencyID);
+            data.WriteInt32(packet.PvpSeasonID);
+            data.WriteBit(packet.WeeklyRewardChestsEnabled);
+            data.FlushBits();
+        }
+
+        public override int WriteToSpan(SeasonInfo packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt32(packet.MythicPlusSeasonID);
+            writer.WriteInt32(packet.CurrentSeason);
+            writer.WriteInt32(packet.PreviousSeason);
+            writer.WriteInt32(packet.ConquestWeeklyProgressCurrencyID);
+            writer.WriteInt32(packet.PvpSeasonID);
+            writer.WriteBit(packet.WeeklyRewardChestsEnabled);
+            writer.FlushBits();
+            return writer.Position;
+        }
+    }
+
+    /// <summary>
+    /// 3.4.3: a sixth int32 the 2.5 layout folded away, the two Mythic+ ids ahead of the arena
+    /// pair, and the uses-teams bit. Writing the shorter form left the client four bytes short: it
+    /// read PvpSeasonID and the trailing bit off the end of the packet, and the two arena seasons
+    /// landed one slot early, so CurrentSeason arrived as a Mythic+ id and PreviousSeason as the
+    /// current arena season.
+    /// </summary>
     /// <remarks>
-    /// V3_4_3 carries a sixth int32 the later layout folded away, and orders the two Mythic+ ids
-    /// ahead of the arena pair. Writing the shorter form left the client four bytes short: it read
-    /// PvpSeasonID and the trailing bit off the end of the packet, and the two arena seasons landed
-    /// one slot early, so CurrentSeason arrived as a Mythic+ id and PreviousSeason as the current
-    /// arena season.
-    /// <para>
     /// Ground truth is the native 3.4.3 wire, 25 bytes in every capture under
     /// <c>refs/native-captures/</c> - e.g. wintergrasp #127:
     /// <c>00000000 00000000 20000000 1F000000 00000000 00000000 00</c>, i.e. two zero Mythic+ ids,
     /// arena season 32, previous 31, then two zeros and the flushed bit byte. Wrathion writes the
     /// same seven fields in <c>WorldPackets::Battleground::SeasonInfo::Write</c>.
-    /// </para>
     /// </remarks>
-    public override void Write()
+    internal sealed class TwoFlagsLayout : ServerPacketLayout<SeasonInfo>
     {
-        if (PvpWire.IsV343)
+        public override int MaxSize => 25;
+
+        public override void Write(SeasonInfo packet, WorldPacket data)
         {
-            _worldPacket.WriteInt32(MythicPlusDisplaySeasonID);
-            _worldPacket.WriteInt32(MythicPlusSeasonID);
-            _worldPacket.WriteInt32(CurrentSeason);
-            _worldPacket.WriteInt32(PreviousSeason);
-            _worldPacket.WriteInt32(ConquestWeeklyProgressCurrencyID);
-            _worldPacket.WriteInt32(PvpSeasonID);
-            _worldPacket.WriteBit(WeeklyRewardChestsEnabled);
-            _worldPacket.WriteBit(CurrentArenaSeasonUsesTeams);
-            _worldPacket.FlushBits();
-            return;
+            WriteSeasons(packet, data);
+            data.WriteBit(packet.WeeklyRewardChestsEnabled);
+            data.WriteBit(packet.CurrentArenaSeasonUsesTeams);
+            data.FlushBits();
         }
 
-        _worldPacket.WriteInt32(MythicPlusSeasonID);
-        _worldPacket.WriteInt32(CurrentSeason);
-        _worldPacket.WriteInt32(PreviousSeason);
-        _worldPacket.WriteInt32(ConquestWeeklyProgressCurrencyID);
-        _worldPacket.WriteInt32(PvpSeasonID);
-        _worldPacket.WriteBit(WeeklyRewardChestsEnabled);
-        _worldPacket.FlushBits();
-    }
-
-    public int MaxSize => 25; // 6 ints + 1 byte for the flushed bit (V3_4_3); older builds write 21
-
-    /// <remarks>Kept in lockstep with <see cref="Write"/>; see the remarks there.</remarks>
-    public int WriteToSpan(Span<byte> buffer)
-    {
-        var writer = new SpanPacketWriter(buffer);
-
-        if (PvpWire.IsV343)
+        public override int WriteToSpan(SeasonInfo packet, Span<byte> buffer)
         {
-            writer.WriteInt32(MythicPlusDisplaySeasonID);
-            writer.WriteInt32(MythicPlusSeasonID);
-            writer.WriteInt32(CurrentSeason);
-            writer.WriteInt32(PreviousSeason);
-            writer.WriteInt32(ConquestWeeklyProgressCurrencyID);
-            writer.WriteInt32(PvpSeasonID);
-            writer.WriteBit(WeeklyRewardChestsEnabled);
-            writer.WriteBit(CurrentArenaSeasonUsesTeams);
+            var writer = new SpanPacketWriter(buffer);
+            WriteSeasons(packet, ref writer);
+            writer.WriteBit(packet.WeeklyRewardChestsEnabled);
+            writer.WriteBit(packet.CurrentArenaSeasonUsesTeams);
             writer.FlushBits();
             return writer.Position;
         }
-
-        writer.WriteInt32(MythicPlusSeasonID);
-        writer.WriteInt32(CurrentSeason);
-        writer.WriteInt32(PreviousSeason);
-        writer.WriteInt32(ConquestWeeklyProgressCurrencyID);
-        writer.WriteInt32(PvpSeasonID);
-        writer.WriteBit(WeeklyRewardChestsEnabled);
-        writer.FlushBits();
-        return writer.Position;
     }
 
-    /// <summary>V3_4_3 only - the first of the two Mythic+ ids, both zero on the native wire.</summary>
+    /// <summary>
+    /// 4.4.1 and later (the 4.4.2 client reads 29 bytes, TrinityCore cata_classic
+    /// <c>WorldPackets::Arena::PvpSeason::Write</c>, WowPacketParser's 5.5.0 reader): one more
+    /// int32 after the 3.4.3 six, and a third bit for the previous season's teams. Sent the 3.4.3
+    /// way, the client read the flag byte as part of that int32 and its bits past the end, so it
+    /// took a team-based server's arena season for a solo one.
+    /// </summary>
+    /// <remarks>
+    /// The int32 is unnamed in every source (WowPacketParser calls it Unknown1027_1) and 0 on the
+    /// native 4.4.2 wire. The client's UI only asks about the current season's teams.
+    /// </remarks>
+    internal sealed class ThreeFlagsLayout : ServerPacketLayout<SeasonInfo>
+    {
+        public override int MaxSize => 29;
+
+        public override void Write(SeasonInfo packet, WorldPacket data)
+        {
+            WriteSeasons(packet, data);
+            data.WriteInt32(0);
+            data.WriteBit(packet.WeeklyRewardChestsEnabled);
+            data.WriteBit(packet.CurrentArenaSeasonUsesTeams);
+            data.WriteBit(false);
+            data.FlushBits();
+        }
+
+        public override int WriteToSpan(SeasonInfo packet, Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            WriteSeasons(packet, ref writer);
+            writer.WriteInt32(0);
+            writer.WriteBit(packet.WeeklyRewardChestsEnabled);
+            writer.WriteBit(packet.CurrentArenaSeasonUsesTeams);
+            writer.WriteBit(false);
+            writer.FlushBits();
+            return writer.Position;
+        }
+    }
+
+    private static void WriteSeasons(SeasonInfo packet, WorldPacket data)
+    {
+        data.WriteInt32(packet.MythicPlusDisplaySeasonID);
+        data.WriteInt32(packet.MythicPlusSeasonID);
+        data.WriteInt32(packet.CurrentSeason);
+        data.WriteInt32(packet.PreviousSeason);
+        data.WriteInt32(packet.ConquestWeeklyProgressCurrencyID);
+        data.WriteInt32(packet.PvpSeasonID);
+    }
+
+    private static void WriteSeasons(SeasonInfo packet, ref SpanPacketWriter writer)
+    {
+        writer.WriteInt32(packet.MythicPlusDisplaySeasonID);
+        writer.WriteInt32(packet.MythicPlusSeasonID);
+        writer.WriteInt32(packet.CurrentSeason);
+        writer.WriteInt32(packet.PreviousSeason);
+        writer.WriteInt32(packet.ConquestWeeklyProgressCurrencyID);
+        writer.WriteInt32(packet.PvpSeasonID);
+    }
+
+    /// <summary>From 3.4.3 on - the first of the two Mythic+ ids, both zero on the native wire.</summary>
     public int MythicPlusDisplaySeasonID;
     public int MythicPlusSeasonID;
     public int PreviousSeason;
@@ -1578,8 +1646,8 @@ public class SeasonInfo : ServerPacket, ISpanWritable
     public int PvpSeasonID;
     public int ConquestWeeklyProgressCurrencyID;
     public bool WeeklyRewardChestsEnabled;
-    /// <summary>V3_4_3 only - the second flag bit. The client's arena UI follows it: with it set the
-    /// PvP and inspect frames show arena teams, as on a 3.3.5a server; clear, they show solo
+    /// <summary>From 3.4.3 on - the second flag bit. The client's arena UI follows it: with it set
+    /// the PvP and inspect frames show arena teams, as on a 3.3.5a server; clear, they show solo
     /// brackets, which a team-based server never fills.</summary>
     public bool CurrentArenaSeasonUsesTeams;
 }

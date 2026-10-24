@@ -29,20 +29,12 @@ using System.Text;
 namespace HermesProxy.World.Server.Packets;
 
 /// <summary>
-/// Gate for SMSG_PVP_SEASON, whose V3_4_3 layout was corrected against the native captures under
-/// <c>refs/native-captures/</c> (25 bytes, six int32).
+/// From 3.4.3 on the inspect frame asks for each arena team of the inspected player, once the
+/// season info says arenas use teams; <c>ArenaSystem</c> passes the query on to the server.
 /// </summary>
-/// <remarks>
-/// <c>ModernVersion.Build</c> is <see langword="static readonly"/> and the test process runs as one
-/// fixed build, so <c>SpanWriteParityTests</c> cannot otherwise reach the V3_4_3 arms — which is
-/// precisely where a Write/WriteToSpan pair drifts unnoticed (#156, #162). Production never sets it.
-/// </remarks>
 internal static class PvpWire
 {
-    internal static bool? ForceV343ForTests;
-
-    public static bool IsV343 =>
-        ForceV343ForTests ?? ModernVersion.IsWotLKClassicOrLater;
+    public static bool IsV343 => ModernVersion.IsWotLKClassicOrLater;
 }
 
 public readonly record struct ArenaTeamRosterRequest(uint TeamIndex);

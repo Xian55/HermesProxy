@@ -75,23 +75,6 @@ public class SpanWriteParityTests
         }
     }
 
-    // Same reason as above for SMSG_PVP_SEASON, whose V3_4_3 arm gained a sixth int32 and so
-    // duplicates the whole field list into a second arm of each writer.
-    [Theory]
-    [InlineData(typeof(SeasonInfo))]
-    public void WriteToSpan_MatchesWrite_OnV343PvpLayout(Type type)
-    {
-        PvpWire.ForceV343ForTests = true;
-        try
-        {
-            AssertParity(type, blankStrings: false);
-        }
-        finally
-        {
-            PvpWire.ForceV343ForTests = null;
-        }
-    }
-
     private static void AssertParity(Type type, bool blankStrings)
     {
         // Defaults first: a null sub-object is often an absent optional (a WriteBit(x != null)

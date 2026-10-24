@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Reflection;
 using Framework.IO;
 using HermesProxy.World;
 using HermesProxy.World.Server.Packets;
@@ -8,26 +7,11 @@ using Xunit;
 namespace HermesProxy.Tests.World.Server;
 
 /// <summary>
-/// Byte-for-byte pin for SMSG_PVP_SEASON, whose V3_4_3 layout differs from the shared one, taken
-/// from the native 3.4.3 captures in <c>refs/native-captures/</c>.
+/// Pins for the 3.4.3 PvP panel's packets, whose field lists appear twice (Write and WriteToSpan).
+/// SMSG_PVP_SEASON is in <see cref="SeasonInfoLayoutTests"/>.
 /// </summary>
-/// <remarks>
-/// Worth pinning as literal bytes rather than field-by-field because the bug it guards was an
-/// ordering and length bug, which a field-by-field assertion cannot see: the writer and the
-/// assertion would simply agree on the wrong order. The packet is also written twice — once in
-/// <c>Write()</c> and once in <c>WriteToSpan</c> — so the field list appears twice and only the
-/// bytes tie them together.
-/// <para>
-/// <c>ModernVersion.Build</c> is fixed for the test process, so the V3_4_3 arm is reached via
-/// <c>PvpWire.ForceV343ForTests</c>, the same escape hatch <c>LootRollWire</c> uses.
-/// </para>
-/// </remarks>
-[Collection("V343ValuesFilter")]
 public class V343PvpWireTests
 {
-    private static readonly PropertyInfo WorldPacketField =
-        typeof(ServerPacket).GetProperty("_worldPacket", BindingFlags.NonPublic | BindingFlags.Instance)!;
-
     private static byte[] SpanBytes(ServerPacket packet)
     {
         var spanWritable = (ISpanWritable)packet;
@@ -35,75 +19,6 @@ public class V343PvpWireTests
         int written = spanWritable.WriteToSpan(buffer);
         Assert.True(written >= 0, "WriteToSpan reported MaxSize exceeded.");
         return buffer[..written];
-    }
-
-    /// <summary>
-    /// SMSG_PVP_SEASON (0x25C1), 25 bytes in all five captures. Taken from the wintergrasp
-    /// capture, packet #127: two zero Mythic+ ids, arena season 32, previous 31, then
-    /// ConquestWeeklyProgressCurrencyID, PvpSeasonID and the flushed bit byte.
-    /// </summary>
-    /// <remarks>
-    /// The bug this pins: the packet used to be written in the later five-int32 order, so it went
-    /// out four bytes short and the two arena seasons landed one slot early — the client read the
-    /// current season as a Mythic+ id and the previous season as the current one, then ran off the
-    /// end of the packet for the last two fields.
-    /// </remarks>
-    [Fact]
-    public void SeasonInfo_MatchesTheNativeWire()
-    {
-        PvpWire.ForceV343ForTests = true;
-        try
-        {
-            var packet = new SeasonInfo
-            {
-                CurrentSeason = 32,
-                PreviousSeason = 31,
-            };
-
-            byte[] expected = Convert.FromHexString(
-                "00000000" + // MythicPlusDisplaySeasonID
-                "00000000" + // MythicPlusSeasonID
-                "20000000" + // CurrentSeason  = 32
-                "1F000000" + // PreviousSeason = 31
-                "00000000" + // ConquestWeeklyProgressCurrencyID
-                "00000000" + // PvpSeasonID
-                "00");       // WeeklyRewardChestsEnabled, flushed
-
-            Assert.Equal(25, expected.Length);
-            Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(SpanBytes(packet)));
-        }
-        finally
-        {
-            PvpWire.ForceV343ForTests = null;
-        }
-    }
-
-    /// <summary>
-    /// The second flag bit is "the current arena season uses teams": the 3.4.3 client's PvP and
-    /// inspect frames follow it. Left clear, they showed solo brackets that a team-based 3.3.5a
-    /// server never fills, so an inspected player's arena slots were always empty.
-    /// </summary>
-    [Theory]
-    [InlineData(true, "40")]
-    [InlineData(false, "00")]
-    public void SeasonInfo_OnV343_SendsUsesTeamsAsTheSecondBit(bool v343, string flags)
-    {
-        PvpWire.ForceV343ForTests = v343;
-        try
-        {
-            var packet = new SeasonInfo { CurrentArenaSeasonUsesTeams = true };
-
-            string viaSpan = Convert.ToHexString(SpanBytes(packet));
-            packet.Write();
-            string viaWrite = Convert.ToHexString(((WorldPacket)WorldPacketField.GetValue(packet)!).GetData());
-
-            Assert.EndsWith(flags, viaSpan);
-            Assert.Equal(viaSpan, viaWrite);
-        }
-        finally
-        {
-            PvpWire.ForceV343ForTests = null;
-        }
     }
 
     /// <summary>
