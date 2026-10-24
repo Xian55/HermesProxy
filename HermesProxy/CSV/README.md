@@ -148,6 +148,13 @@ weekly caps. Cataclysm Classic gave them a season's total instead, and the clien
 cap from its own row alone. Built by `scripts/build-currency-types-hotfix.py --build 4.4.2.60895
 --cata-dbc <the server's CurrencyTypes.dbc>`.
 
+`Hotfix/GlobalStrings4.csv`, the other way round: only in front of a server older than 4.3.4. The
+4.4.2 client's honor chat lines (`COMBATLOG_HONORAWARD`, `COMBATLOG_HONORGAIN`,
+`COMBATLOG_HONORGAIN_NO_RANK`) in each of its locales, with `%d` for its `%.2f`: below
+Cataclysm's expansion level the client passes them the honor as a whole number, which `%.2f` prints
+as 0.00. Sent in the client's locale. Built by `scripts/build-global-strings-hotfix.py --build
+4.4.2.60895`.
+
 ## One file for every build
 
 `AreaNames`, `Battlegrounds`, `BuildAuthSeeds`, `ChatChannels`, `CreatureDisplayInfo`,

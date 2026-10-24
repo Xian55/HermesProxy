@@ -215,7 +215,7 @@ public static class HotfixSystem
             HotfixRecord? record;
             if (GameData.Hotfixes.TryGetValue(id, out record))
             {
-                connect.Hotfixes.Add(record);
+                connect.Hotfixes.Add(GameData.HotfixForLocale(record, ctx.GetSession().Locale));
                 matched++;
             }
         }
