@@ -77,12 +77,12 @@ public readonly record struct CalendarComplain(WowGuid128 InvitedByGuid, ulong E
 public readonly record struct CalendarCommunityInviteRequest(ulong ClubId, byte MinLevel, byte MaxLevel, byte MaxRankOrder);
 
 /// <summary>
-/// The calendar's own list: the invitations and events of the player and the raids the player is
-/// saved to. The days raids reset on are sent empty, as TrinityCore wotlk_classic sends them.
+/// The calendar's own list: the invitations and events of the player, the raids the player is
+/// saved to and when each raid resets.
 /// </summary>
 /// <remarks>
-/// Four counts first, then the four lists, resets before lockouts (the 3.4.3 client's layout;
-/// a 3.3.5a server puts each count in front of its own list and the lockouts first).
+/// Four counts first, then the lockouts, the resets, the invitations and the events (the 3.4.3
+/// and 4.4.2 clients' readers; a 3.3.5a server puts each count in front of its own list).
 /// </remarks>
 public sealed class CalendarSendCalendar : ServerPacket
 {
@@ -114,7 +114,7 @@ public sealed class CalendarSendCalendar : ServerPacket
         data.WriteInt32(p.Invites.Count);
         data.WriteInt32(p.Events.Count);
         data.WriteInt32(p.RaidLockouts.Count);
-        data.WriteInt32(0);     // raid resets
+        data.WriteInt32(p.RaidResets.Count);
 
         foreach (CalendarRaidLockout lockout in p.RaidLockouts)
         {
@@ -122,6 +122,15 @@ public sealed class CalendarSendCalendar : ServerPacket
             data.WriteInt32(lockout.MapId);
             data.WriteUInt32(lockout.DifficultyId);
             data.WriteInt32(lockout.ExpireTime);
+        }
+
+        foreach (CalendarRaidReset reset in p.RaidResets)
+        {
+            data.WriteInt32(reset.MapId);
+            data.WriteUInt32(0);    // unknown; 0 shows the reset
+            data.WriteInt32(reset.IntervalSeconds);
+            data.WriteInt32(reset.OffsetSeconds);
+            data.WriteUInt32(reset.DifficultyId);
         }
 
         foreach (CalendarListInvite invite in p.Invites)
@@ -155,6 +164,7 @@ public sealed class CalendarSendCalendar : ServerPacket
     public List<CalendarListInvite> Invites = [];
     public List<CalendarListEvent> Events = [];
     public List<CalendarRaidLockout> RaidLockouts = [];
+    public List<CalendarRaidReset> RaidResets = [];
 }
 
 public struct CalendarListInvite
@@ -186,6 +196,25 @@ public struct CalendarRaidLockout
     public int MapId;
     public uint DifficultyId;
     public int ExpireTime;
+}
+
+/// <summary>
+/// When a raid resets, as the 3.4.3 and 4.4.2 clients count it: at the clients' own epoch (see
+/// <see cref="ClientEpoch"/>) plus the offset, and every interval before and after that. The
+/// client shows the ones still to come, a few weeks ahead.
+/// </summary>
+public readonly record struct CalendarRaidReset(int MapId, uint DifficultyId, int IntervalSeconds, int OffsetSeconds)
+{
+    /// <summary>
+    /// The moment the client counts raid resets from: <c>Cfg_Regions.Raidorigin</c> of its
+    /// region's row, 2005-09-20 15:00 UTC (a Tuesday) for the US, which every realm the proxy
+    /// lists is in (region 1). The 3.4.3 and 4.4.2 clients read it when the calendar arrives.
+    /// </summary>
+    public const long ClientEpoch = 1127228400;
+
+    /// <summary>A raid that resets every <paramref name="interval"/> seconds, next at <paramref name="nextReset"/> (Unix time).</summary>
+    public static CalendarRaidReset At(int mapId, uint difficultyId, int interval, long nextReset)
+        => new(mapId, difficultyId, interval, (int)(((nextReset - ClientEpoch) % interval + interval) % interval));
 }
 
 /// <summary>One event with everybody invited to it: what the event's window shows.</summary>

@@ -61,6 +61,10 @@ public static partial class GameData
     // has the heroic or 25-player difficulty the legacy server put the player in.
     public static FrozenDictionary<(uint MapId, uint DifficultyId), uint> InstanceDifficultySizes
         = FrozenDictionary<(uint MapId, uint DifficultyId), uint>.Empty;
+    // The client's own reset period of each (map, difficulty) row, in seconds, for the calendar's
+    // raid resets. Rows that never reset are left out.
+    public static FrozenDictionary<(uint MapId, uint DifficultyId), uint> InstanceResetPeriods
+        = FrozenDictionary<(uint MapId, uint DifficultyId), uint>.Empty;
 
     /// <summary>
     /// A 3.3.5a instance difficulty, 0-1 in a dungeon (normal, heroic) and 0-3 in a raid (10, 25,
@@ -1417,7 +1421,33 @@ public static partial class GameData
         {
             DefaultInstanceDifficulty = ParseMapDifficulties(path);
             InstanceDifficultySizes = ParseMapDifficultySizes(path);
+            InstanceResetPeriods = ParseMapResetPeriods(path);
         }
+    }
+
+    /// <summary>
+    /// MapDifficulty's ResetInterval as seconds: a day, a week, three days (the 20-player raids)
+    /// and five days (the 40-player Onyxia).
+    /// </summary>
+    public static FrozenDictionary<(uint MapId, uint DifficultyId), uint> ParseMapResetPeriods(string path)
+    {
+        using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+        var dict = new Dictionary<(uint MapId, uint DifficultyId), uint>();
+
+        foreach (var row in reader)
+        {
+            uint seconds = row[3].Parse<uint>() switch
+            {
+                1 => 86400,
+                2 => 7 * 86400,
+                3 => 3 * 86400,
+                4 => 5 * 86400,
+                _ => 0,
+            };
+            if (seconds != 0)
+                dict[(uint.Parse(row[0].Span), uint.Parse(row[1].Span))] = seconds;
+        }
+        return dict.ToFrozenDictionary();
     }
 
     public static FrozenDictionary<(uint MapId, uint DifficultyId), uint> ParseMapDifficultySizes(string path)

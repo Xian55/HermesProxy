@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Reflection;
 using System.Text;
 using HermesProxy.Tests.Support;
@@ -17,6 +18,11 @@ namespace HermesProxy.Tests.World.Client;
 /// October 2026 at 20:30); the rest are written after its writers. The outgoing bytes follow the
 /// 4.4.2 client's layouts.
 /// </summary>
+/// <remarks>
+/// In the collection that owns <see cref="GameData"/>'s instance difficulty tables: the raid
+/// lockouts and resets read them, and another class swaps them.
+/// </remarks>
+[Collection("V343ValuesFilter")]
 public sealed class CataCalendarTests
 {
     private static readonly PropertyInfo WorldPacketField =
@@ -39,6 +45,25 @@ public sealed class CataCalendarTests
     {
         _harness.Deliver(Opcode.SMSG_CALENDAR_SEND_EVENT, [0, 0, .. Convert.FromHexString(hex.Replace(" ", ""))], handler);
         return Assert.IsType<T>(_harness.ClientWire.Sent[^1].Packet);
+    }
+
+    // The raid lockouts and resets number their difficulty by the map's rows in the 4.4.2 client's
+    // data, and a reset takes its period from there.
+    private T DeliverWithDifficulties<T>(string hex, Action<WorldPacket> handler) where T : ServerPacket
+    {
+        var (defaults, sizes, periods) = (GameData.DefaultInstanceDifficulty, GameData.InstanceDifficultySizes, GameData.InstanceResetPeriods);
+        string csv = Path.Combine("CSV", "MapDifficulty4.csv");
+        GameData.DefaultInstanceDifficulty = GameData.ParseMapDifficulties(csv);
+        GameData.InstanceDifficultySizes = GameData.ParseMapDifficultySizes(csv);
+        GameData.InstanceResetPeriods = GameData.ParseMapResetPeriods(csv);
+        try
+        {
+            return Deliver<T>(hex, handler);
+        }
+        finally
+        {
+            (GameData.DefaultInstanceDifficulty, GameData.InstanceDifficultySizes, GameData.InstanceResetPeriods) = (defaults, sizes, periods);
+        }
     }
 
     private static byte[] Written(ServerPacket packet)
@@ -66,9 +91,9 @@ public sealed class CataCalendarTests
     [Fact]
     public void HandleCalendarSendCalendar_KeepsTheInvitationsEventsAndSaves()
     {
-        // HandleCalendarGetCalendar: one invitation, one event, the time, a saved raid, then a
-        // raid's reset and a holiday, which are not passed on
-        var calendar = Deliver<CalendarSendCalendar>(
+        // HandleCalendarGetCalendar: one invitation, one event, the time, a saved raid (Blackwing
+        // Descent 25 heroic), a raid's reset and a holiday, which is not passed on
+        var calendar = DeliverWithDifficulties<CalendarSendCalendar>(
             Ints(1) + Longs(1, 7) + "03" + "02" + "00" + "0102"
             + Ints(1) + Longs(1) + Text("Probe event") + Ints(3) + "1EA5931A" + Ints(1, -1) + Longs(0) + "0102"
             + Ints(0x6ACEFA23) + "EA58931A"
@@ -95,9 +120,11 @@ public sealed class CataCalendarTests
         Assert.Equal(_player, calendarEvent.OwnerGuid);
         CalendarRaidLockout lockout = Assert.Single(calendar.RaidLockouts);
         Assert.Equal(669, lockout.MapId);
-        Assert.Equal(GameData.ModernInstanceDifficulty(669, 3).DifficultyId, lockout.DifficultyId);
+        Assert.Equal(6u, lockout.DifficultyId);
         Assert.Equal(3600, lockout.ExpireTime);
         Assert.Equal(42ul, lockout.InstanceId);
+        // TrinityCore's seconds until the next reset, on the client's weekly period for the map
+        Assert.Equal(new CalendarRaidReset(669, 3, 604800, 306000), Assert.Single(calendar.RaidResets));
     }
 
     [Fact]
@@ -115,11 +142,13 @@ public sealed class CataCalendarTests
     public void CalendarSendCalendar_Layout()
     {
         var calendar = new CalendarSendCalendar { ServerTime = 0x1A9358EA };
+        calendar.RaidResets.Add(new CalendarRaidReset(669, 3, 604800, 306000));
         calendar.Invites.Add(new CalendarListInvite { EventId = 1, InviteId = 7, Status = 3, Moderator = 2, InviteType = 0, InviterGuid = WowGuid128.Empty });
         calendar.Events.Add(new CalendarListEvent { EventId = 1, EventType = 3, Date = EventDate, Flags = 1, TextureId = -1, OwnerGuid = WowGuid128.Empty, EventName = "Probe" });
 
         Assert.Equal(Convert.FromHexString(
-            "EA58931A" + Ints(1, 1, 0, 0)                           // the time; invitations, events, saved raids, resets
+            "EA58931A" + Ints(1, 1, 0, 1)                           // the time; invitations, events, saved raids, resets
+            + Ints(669, 0, 604800, 306000, 3)                       // a reset: map, 0, period, offset, difficulty
             + Longs(1, 7) + "030200" + "0000" + "00"                // an invitation: no inviter, no flag
             + Longs(1) + "03" + "1EA5931A" + "0100" + Ints(-1)      // an event: type, date, 16-bit flags, texture
             + Longs(0) + "0000" + "05" + Convert.ToHexString(Encoding.UTF8.GetBytes("Probe"))),

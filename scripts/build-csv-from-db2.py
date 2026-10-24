@@ -437,7 +437,8 @@ def build_taxi_path(build: str) -> tuple[list[str], list[list[str]]]:
 
 
 def build_map_difficulty(build: str) -> tuple[list[str], list[list[str]]]:
-    """The difficulties of each dungeon and raid, for SMSG_WORLD_SERVER_INFO.
+    """The difficulties of each dungeon and raid, for SMSG_WORLD_SERVER_INFO and the
+    calendar's raid resets.
 
     A native server sends a map's difficulty and its MaxPlayers, which is 0 / 0 on
     continents, battlegrounds and arenas. Only dungeons (InstanceType 1) and raids (2)
@@ -446,8 +447,10 @@ def build_map_difficulty(build: str) -> tuple[list[str], list[list[str]]]:
     """
     instances = {r["ID"] for r in read_csv(fetch_client_csv("Map", build))
                  if r["InstanceType"] in ("1", "2")}
-    header = ["MapId", "DifficultyId", "MaxPlayers"]
-    rows = [[r["MapID"], r["DifficultyID"], r["MaxPlayers"]]
+    # ResetInterval is the client's own period of a raid's reset: 1 a day, 2 a week, 3 three
+    # days (the 20-player raids), 4 five days (the 40-player Onyxia); the calendar's raid resets.
+    header = ["MapId", "DifficultyId", "MaxPlayers", "ResetInterval"]
+    rows = [[r["MapID"], r["DifficultyID"], r["MaxPlayers"], r["ResetInterval"]]
             for r in read_csv(fetch_client_csv("MapDifficulty", build))
             if r["MapID"] in instances and r["DifficultyID"] != "0"]
     rows.sort(key=lambda r: (int(r[0]), int(r[1])))

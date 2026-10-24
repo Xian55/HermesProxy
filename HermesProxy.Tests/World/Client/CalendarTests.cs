@@ -49,20 +49,22 @@ public sealed class CalendarTests
         return Assert.IsType<T>(_harness.ClientWire.Sent[^1].Packet);
     }
 
-    // The raid lockouts number their difficulty by the map's rows in the client's data.
+    // The raid lockouts and resets number their difficulty by the map's rows in the client's data,
+    // and a reset takes its period from there.
     private T DeliverWithDifficulties<T>(string hex, Action<WorldPacket> handler) where T : ServerPacket
     {
-        var (defaults, sizes) = (GameData.DefaultInstanceDifficulty, GameData.InstanceDifficultySizes);
+        var (defaults, sizes, periods) = (GameData.DefaultInstanceDifficulty, GameData.InstanceDifficultySizes, GameData.InstanceResetPeriods);
         string csv = Path.Combine("CSV", "MapDifficulty3.csv");
         GameData.DefaultInstanceDifficulty = GameData.ParseMapDifficulties(csv);
         GameData.InstanceDifficultySizes = GameData.ParseMapDifficultySizes(csv);
+        GameData.InstanceResetPeriods = GameData.ParseMapResetPeriods(csv);
         try
         {
             return Deliver<T>(hex, handler);
         }
         finally
         {
-            (GameData.DefaultInstanceDifficulty, GameData.InstanceDifficultySizes) = (defaults, sizes);
+            (GameData.DefaultInstanceDifficulty, GameData.InstanceDifficultySizes, GameData.InstanceResetPeriods) = (defaults, sizes, periods);
         }
     }
 
@@ -115,6 +117,38 @@ public sealed class CalendarTests
         Assert.Equal(631, lockout.MapId);
         Assert.Equal(4u, lockout.DifficultyId);     // 25 normal
         Assert.Equal(3600, lockout.ExpireTime);
+        // AzerothCore's weekly reset at the base, 16 hours after the client's own weekly moment
+        Assert.Equal(new CalendarRaidReset(631, 3, 604800, 57600), Assert.Single(calendar.RaidResets));
+    }
+
+    [Fact]
+    public void HandleCalendarSendCalendar_TrinityCoresReset_IsTheSecondsLeftOnTheClientsPeriod()
+    {
+        // TrinityCore 3.3.5a: the seconds until Icecrown Citadel's next reset, no offset, a fixed base
+        var calendar = DeliverWithDifficulties<CalendarSendCalendar>(
+            Ints(0) + Ints(0)
+            + Ints(0x6ACEFA23) + "EA58931A"
+            + Ints(0)
+            + Ints(0x43B237F0) + Ints(1) + Ints(631, 200000, 0)
+            + Ints(0),
+            _harness.Client.HandleCalendarSendCalendar);
+
+        // the next reset is the server's time and those seconds, a week apart from then on
+        Assert.Equal(new CalendarRaidReset(631, 3, 604800, 245747), Assert.Single(calendar.RaidResets));
+    }
+
+    [Fact]
+    public void HandleCalendarSendCalendar_AResetOfAMapTheClientDoesNotKnow_IsLeftOut()
+    {
+        var calendar = DeliverWithDifficulties<CalendarSendCalendar>(
+            Ints(0) + Ints(0)
+            + Ints(0x6ACEFA23) + "EA58931A"
+            + Ints(0)
+            + Ints(0x43B237F0) + Ints(2) + Ints(1, 604800, 0) + Ints(631, 0, 0)
+            + Ints(0),
+            _harness.Client.HandleCalendarSendCalendar);
+
+        Assert.Empty(calendar.RaidResets);
     }
 
     [Fact]
@@ -140,12 +174,14 @@ public sealed class CalendarTests
     {
         var calendar = new CalendarSendCalendar { ServerTime = 0x1A9358EA };
         calendar.RaidLockouts.Add(new CalendarRaidLockout { InstanceId = 0x17, MapId = 631, DifficultyId = 4, ExpireTime = 3600 });
+        calendar.RaidResets.Add(new CalendarRaidReset(631, 3, 604800, 57600));
         calendar.Invites.Add(new CalendarListInvite { EventId = 1, InviteId = 7, Status = 3, Moderator = 2, InviteType = 0, InviterGuid = WowGuid128.Empty });
         calendar.Events.Add(new CalendarListEvent { EventId = 1, EventType = 3, Date = EventDate, Flags = 1, TextureId = -1, OwnerGuid = WowGuid128.Empty, EventName = "Probe" });
 
         Assert.Equal(Convert.FromHexString(
-            "EA58931A" + Ints(1, 1, 1, 0)                           // the time; invitations, events, saved raids, resets
+            "EA58931A" + Ints(1, 1, 1, 1)                           // the time; invitations, events, saved raids, resets
             + Longs(0x17) + Ints(631, 4, 3600)                      // the saved raid
+            + Ints(631, 0, 604800, 57600, 3)                        // a reset: map, 0, period, offset, difficulty
             + Longs(1, 7) + "030200" + "0000" + "00"                // an invitation: no inviter, no flag
             + Longs(1) + "03" + "1EA5931A" + Ints(1) + Ints(-1)     // an event: type, date, 32-bit flags, texture
             + Longs(0) + "0000" + "05" + Convert.ToHexString(Encoding.UTF8.GetBytes("Probe"))),
