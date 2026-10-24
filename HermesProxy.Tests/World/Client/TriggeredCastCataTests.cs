@@ -14,7 +14,8 @@ namespace HermesProxy.Tests.World.Client;
 /// and leaves its CastFlagsEx 0. The 4.4.2 client starts the cooldown of every spell the player
 /// casts unless CAST_FLAG_EX_IGNORE_COOLDOWN says not to, as TrinityCore cata_classic does for
 /// triggered casts. From a capture of a level 55 death knight (player 5) casting Raise Dead, and
-/// of a level 1 rogue (player 7) casting Vanish.
+/// of a level 1 rogue (player 7) casting Vanish. Another 4.3.4 core leaves triggered casts
+/// unmarked; there a cast of the player's that the client did not ask for counts as triggered.
 /// </summary>
 /// <remarks>Runs only under a 4.3.4 legacy build (<c>HERMES_TEST_LEGACY_BUILD</c>).</remarks>
 public sealed class TriggeredCastCataTests
@@ -31,10 +32,17 @@ public sealed class TriggeredCastCataTests
     private const string VanishStealth =
         "166E0107010700F80600000109040000000000B8DD461201070000000000000000020000000000000000";
 
-    private static SpellCastData Go(string logged, uint player = 5)
+    // Raise Dead's guardian summon from another 4.3.4 core (player 0x2226), which leaves the
+    // triggered cast unmarked: flags 0x900, the same as Raise Dead's own.
+    private const string UnmarkedRaiseDeadSummon =
+        "166E03262203262200F9B500000009000000000000D5F775010000400000000026301345B7F9B0C598201A430000000000";
+
+    private static SpellCastData Go(string logged, uint player = 5, uint requested = 0)
     {
         var harness = new LegacyHandlerHarness(recordClientPackets: true);
         harness.SetActivePlayer(new WowGuid64(HighGuidTypeLegacy.Player, player));
+        if (requested != 0)
+            harness.Session.GameState.PendingNormalCasts.Enqueue(new ClientCastRequest { SpellId = requested });
         var shipped = GameData.CooldownOnEventSpells;
         GameData.LoadCooldownOnEventSpells();
         try
@@ -66,10 +74,24 @@ public sealed class TriggeredCastCataTests
         if (!WorldClient.IsCataLegacy)
             return;
 
-        var cast = Go(RaiseDead);
+        var cast = Go(RaiseDead, requested: 46584);
 
         Assert.Equal(46584, cast.SpellID);
         Assert.Equal(0u, cast.CastFlagsEx);
+    }
+
+    // The client asked for Raise Dead, not for its summon: a cast of the player's that no request
+    // of the client's is waiting for is the server's own.
+    [Fact]
+    public void UnmarkedTriggeredSummon_StartsNoCooldownOnTheClient()
+    {
+        if (!WorldClient.IsCataLegacy)
+            return;
+
+        var cast = Go(UnmarkedRaiseDeadSummon, player: 0x2226, requested: 46584);
+
+        Assert.Equal(46585, cast.SpellID);
+        Assert.Equal((uint)CastFlagEx.IgnoreCooldown, cast.CastFlagsEx);
     }
 
     // The client holds Stealth while it lasts and starts its six seconds on the server's
