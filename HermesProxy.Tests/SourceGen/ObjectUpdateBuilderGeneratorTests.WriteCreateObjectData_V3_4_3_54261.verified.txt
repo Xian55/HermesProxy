@@ -3967,9 +3967,9 @@ public partial class ObjectUpdateBuilder
         data.WriteUInt32(src.PetNextLevelExperience.GetValueOrDefault());
         data.WriteFloat(src.ModCastSpeed ?? 1f);
         data.WriteFloat(src.ModCastHaste ?? 1f);
-        data.WriteFloat(1f);
-        data.WriteFloat(1f);
-        data.WriteFloat(1f);
+        data.WriteFloat(src.ModHaste ?? 1f);
+        data.WriteFloat(src.ModRangedHaste ?? 1f);
+        data.WriteFloat(src.ModHasteRegen ?? 1f);
         data.WriteFloat(1f);
         data.WriteInt32(src.CreatedBySpell.GetValueOrDefault());
         data.WriteInt32(src.EmoteState.GetValueOrDefault());

@@ -2345,6 +2345,77 @@ public partial class WorldClient
         slots[2] = average;
     }
 
+    /// <summary>
+    /// The melee and ranged haste multipliers, which a 3.3.5a server keeps to itself: it sends the
+    /// attack times they make of the base ones, in whole milliseconds (it keeps them as floats and
+    /// converts them on the way out). The 3.4.3 and 4.4.2 clients show haste from the
+    /// multipliers (ModHaste, ModRangedHaste), so GetMeleeHaste() read 0% under any haste while the
+    /// swing itself was hasted. Each is the attack time over the base the server used
+    /// (<see cref="AttackHaste"/>). A base moves the attack time with it, so only an update that
+    /// carries the attack time needs them again.
+    /// </summary>
+    private void SetHasteFromAttackTimes(BitArray updateMaskArray, Dictionary<int, UpdateField> updates, ObjectUpdate updateData)
+    {
+        int baseAttackTime = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_BASEATTACKTIME);
+        int rangedAttackTime = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RANGEDATTACKTIME);
+        int invSlotHead = LegacyVersion.GetUpdateField(PlayerField.PLAYER_FIELD_INV_SLOT_HEAD);
+        if (baseAttackTime < 0 || rangedAttackTime < 0 || invSlotHead < 0)
+            return;
+
+        bool melee = updateMaskArray[baseAttackTime] && updates.ContainsKey(baseAttackTime);
+        bool ranged = updateMaskArray[rangedAttackTime] && updates.ContainsKey(rangedAttackTime);
+        if (!melee && !ranged)
+            return;
+
+        uint formTime = AttackHaste.FormAttackTime((byte)(FieldOrZero(updates, UnitField.UNIT_FIELD_BYTES_2) >> 24));
+        if (melee)
+        {
+            // In a feral form the form's speed stands whatever is in the hand.
+            uint baseTime = formTime != 0 ? formTime
+                : (FieldOrZero(updates, UnitField.UNIT_FIELD_FLAGS) & (uint)UnitFlags.Disarmed) != 0 ? AttackHaste.UnarmedAttackTime
+                : WeaponAttackTime(updates, invSlotHead, EquipmentSlot.MainHand);
+            if (baseTime != 0)
+                updateData.UnitData.ModHaste = (float)updates[baseAttackTime].UInt32Value / baseTime;
+        }
+        if (ranged)
+        {
+            uint baseTime = formTime != 0 || (FieldOrZero(updates, UnitField.UNIT_FIELD_FLAGS_2) & (uint)UnitFlags2.DisarmRanged) != 0
+                ? AttackHaste.UnarmedAttackTime
+                : WeaponAttackTime(updates, invSlotHead, EquipmentSlot.Ranged);
+            if (baseTime != 0)
+                updateData.UnitData.ModRangedHaste = (float)updates[rangedAttackTime].UInt32Value / baseTime;
+        }
+    }
+
+    private static uint FieldOrZero(Dictionary<int, UpdateField> updates, UnitField field)
+    {
+        int index = LegacyVersion.GetUpdateField(field);
+        return index >= 0 && updates.TryGetValue(index, out var value) ? value.UInt32Value : 0;
+    }
+
+    /// <summary>
+    /// The base attack time of the weapon in an equipment slot, 0 while its delay is not known.
+    /// </summary>
+    private uint WeaponAttackTime(Dictionary<int, UpdateField> updates, int invSlotHead, byte slot)
+    {
+        GameSessionData state = GetSession().GameState;
+        WowGuid128 item = GetSlotGuidValue(updates, invSlotHead + slot * 2);
+        if (item.IsEmpty() || IsBroken(state.GetCachedObjectFieldsLegacy(item)))
+            return AttackHaste.UnarmedAttackTime;
+        if (!GameData.TryGetItemDelay(state.GetItemId(item), out uint delay))
+            return 0;
+        return delay != 0 ? delay : AttackHaste.UnarmedAttackTime;
+    }
+
+    private static bool IsBroken(Dictionary<int, UpdateField>? item)
+    {
+        int durability = LegacyVersion.GetUpdateField(ItemField.ITEM_FIELD_DURABILITY);
+        int maxDurability = LegacyVersion.GetUpdateField(ItemField.ITEM_FIELD_MAXDURABILITY);
+        return item != null && durability >= 0 && maxDurability >= 0
+            && item.TryGetValue(durability, out var current) && current.UInt32Value == 0
+            && item.TryGetValue(maxDurability, out var max) && max.UInt32Value != 0;
+    }
+
     public QuestLog? ReadQuestLogEntry(int i, BitArray? updateMaskArray, Dictionary<int, UpdateField> updates, bool isActivePlayer)
     {
         int PLAYER_QUEST_LOG_1_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_QUEST_LOG_1_1);
@@ -4588,6 +4659,8 @@ public partial class WorldClient
                 if (MOD_HASTE_REGEN >= 0 && updateMaskArray[MOD_HASTE_REGEN])
                     updateData.UnitData.ModHasteRegen = updates[MOD_HASTE_REGEN].FloatValue;
             }
+            else if (ModernVersion.IsWotLKClassicOrLater && guid == GetSession().GameState.CurrentPlayerGuid)
+                SetHasteFromAttackTimes(updateMaskArray, updates, updateData);
 
             // A rune's recharge rate, the share of its cooldown it regains a second: 3.3.5 and
             // 4.3.4 keep one per rune type (0.1 at the base rate; 4.3.4 counts haste in, 3.3.5
