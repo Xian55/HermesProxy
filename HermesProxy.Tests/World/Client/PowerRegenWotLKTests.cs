@@ -12,11 +12,12 @@ namespace HermesProxy.Tests.World.Client;
 /// <summary>
 /// A 3.3.5a server keeps a power's regeneration modifiers by power type: mana's whole rate a second,
 /// and what an aura adds to the 10 energy a second (AzerothCore Player::UpdateManaRegen and
-/// UpdateEnergyRegen). The 3.4.3 client adds the same bases from its PowerType table and counts the
-/// power on its own between updates, from the modifiers of the class's power slot. Without them it
-/// counted a rogue's energy at 10 a second through Adrenaline Rush, where the server gave 20.
+/// UpdateEnergyRegen). The 3.4.3 and 4.4.2 clients add the same bases from their PowerType table and
+/// count the power on their own between updates, from the modifiers of the class's power slot. Without
+/// them the 3.4.3 client counted a rogue's energy at 10 a second through Adrenaline Rush, where the
+/// server gave 20, and the 4.4.2 client read a druid's mana regeneration as 0.
 /// </summary>
-/// <remarks>Runs only under a 3.4.3 modern build (<c>HERMES_TEST_MODERN_BUILD</c>).</remarks>
+/// <remarks>Runs only under a 3.4.3 or a 4.4.2 modern build with a 3.3.5a server (<c>HERMES_TEST_MODERN_BUILD</c>).</remarks>
 public sealed class PowerRegenWotLKTests
 {
     private static ObjectUpdate DeliverRegen(Class classId, PowerType power, float flat, float interrupted)
@@ -43,8 +44,8 @@ public sealed class PowerRegenWotLKTests
     }
 
     private static void SkipUnlessWotLK() =>
-        Assert.SkipUnless(ModernVersion.ExpansionVersion == 3 && LegacyVersion.ExpansionVersion == 3,
-            "3.4.3 client on a 3.3.5a server");
+        Assert.SkipUnless(ModernVersion.ExpansionVersion >= 3 && LegacyVersion.ExpansionVersion == 3,
+            "3.4.3 or 4.4.2 client on a 3.3.5a server");
 
     [Fact]
     public void RogueEnergy_AdrenalineRush_GoesToTheEnergySlot()
