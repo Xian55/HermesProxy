@@ -948,23 +948,63 @@ public sealed class PVPOptionsEnabled : ServerPacket
 }
 
 /// <summary>
-/// What a battleground or an arena pays, for the 4.4.2 PvP window (TrinityCore cata_classic
-/// RequestPvPRewardsResponse): eight rewards in this order, honor and conquest (390) in hundredths.
+/// What a battleground or an arena pays, for the PvP window's C_PvP.Get*BGRewards. Each client
+/// reads its own set of rewards. Honor is in whole points here; each layout writes it in the unit
+/// its client reads.
 /// </summary>
 public sealed class RequestPvpRewardsResponse : ServerPacket
 {
+    internal static readonly ServerPacketLayouts<ServerPacketLayout<RequestPvpRewardsResponse>> Layouts = new(
+        (ClientVersionBuild.Zero, ClientVersionBuild.V4_4_2_60895, new WotLKClassicLayout()),
+        (ClientVersionBuild.V4_4_2_60895, ClientVersionBuild.Zero, new CataClassicLayout(VersionChecker.GetClientExpansionLevel(LegacyVersion.Build))));
+
+    private static readonly ServerPacketLayout<RequestPvpRewardsResponse> Layout = Layouts.ForRunningClient();
+
     public RequestPvpRewardsResponse() : base(Opcode.SMSG_REQUEST_PVP_REWARDS_RESPONSE) { }
 
-    public override void Write()
+    public override void Write() => Layout.Write(this, _worldPacket);
+
+    /// <summary>
+    /// 3.4.3 (handler rva 19b45d0): four rewards, the random battleground's win and loss and then the
+    /// holiday battleground's. A random win is a first or a later one as the server chose. The
+    /// client shows a tenth of the honor, rounded, and at least 1.
+    /// </summary>
+    internal sealed class WotLKClassicLayout : ServerPacketLayout<RequestPvpRewardsResponse>
     {
-        FirstRandomBGWinReward.Write(_worldPacket);
-        FirstRandomBGLossReward.Write(_worldPacket);
-        NthRandomBGWinReward.Write(_worldPacket);
-        NthRandomBGLossReward.Write(_worldPacket);
-        RatedBGRewards.Write(_worldPacket);
-        Arena2v2Rewards.Write(_worldPacket);
-        Arena3v3Rewards.Write(_worldPacket);
-        Arena5v5Rewards.Write(_worldPacket);
+        private const int HonorScale = 10;
+
+        public override void Write(RequestPvpRewardsResponse packet, WorldPacket data)
+        {
+            packet.FirstRandomBGWinReward.Write(data, HonorScale);
+            packet.FirstRandomBGLossReward.Write(data, HonorScale);
+            packet.HolidayBGWinReward.Write(data, HonorScale);
+            packet.HolidayBGLossReward.Write(data, HonorScale);
+        }
+    }
+
+    /// <summary>
+    /// 4.4.2 (TrinityCore cata_classic RequestPvPRewardsResponse): eight rewards in this order,
+    /// conquest (390) in hundredths. The window shows a hundredth of the honor the getter gives it,
+    /// and the getter (rva 1e840c0) gives the honor as sent when the active expansion the proxy
+    /// announced is Cataclysm, but a tenth of it, rounded, below that: in front of a 3.3.5a server.
+    /// </summary>
+    internal sealed class CataClassicLayout(byte activeExpansionLevel) : ServerPacketLayout<RequestPvpRewardsResponse>
+    {
+        private const byte Cataclysm = 3;
+
+        private readonly int _honorScale = activeExpansionLevel < Cataclysm ? 1000 : 100;
+
+        public override void Write(RequestPvpRewardsResponse packet, WorldPacket data)
+        {
+            packet.FirstRandomBGWinReward.Write(data, _honorScale);
+            packet.FirstRandomBGLossReward.Write(data, _honorScale);
+            packet.NthRandomBGWinReward.Write(data, _honorScale);
+            packet.NthRandomBGLossReward.Write(data, _honorScale);
+            packet.RatedBGRewards.Write(data, _honorScale);
+            packet.Arena2v2Rewards.Write(data, _honorScale);
+            packet.Arena3v3Rewards.Write(data, _honorScale);
+            packet.Arena5v5Rewards.Write(data, _honorScale);
+        }
     }
 
     public LFGPlayerQuestReward FirstRandomBGWinReward;
@@ -975,4 +1015,6 @@ public sealed class RequestPvpRewardsResponse : ServerPacket
     public LFGPlayerQuestReward Arena2v2Rewards;
     public LFGPlayerQuestReward Arena3v3Rewards;
     public LFGPlayerQuestReward Arena5v5Rewards;
+    public LFGPlayerQuestReward HolidayBGWinReward;
+    public LFGPlayerQuestReward HolidayBGLossReward;
 }

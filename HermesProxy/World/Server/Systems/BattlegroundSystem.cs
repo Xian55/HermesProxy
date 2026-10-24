@@ -311,12 +311,17 @@ public static class BattlegroundSystem
     /// <summary>
     /// The PvP window asks what a battleground pays. Only a 4.x server knows the request
     /// (TrinityCore 4.3.4: CMSG_REQUEST_PVP_REWARDS, empty); WorldClient translates the answer.
+    /// A 3.3.5a server says it in its battlefield lists, and the proxy answers with the last one.
     /// </summary>
     [HandlesCmsg(Opcode.CMSG_REQUEST_PVP_REWARDS)]
     public static void HandleRequestPvpRewards(in EmptyClientPacket request, in SessionContext ctx)
     {
         if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            if (ctx.GameState.WotLKBattlegroundRewards is { } rewards)
+                ctx.SendPacketToClient(HermesProxy.World.Client.WorldClient.BuildPvpRewardsWotLK(rewards));
             return;
+        }
 
         ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_REQUEST_PVP_REWARDS));
     }

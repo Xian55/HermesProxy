@@ -66,17 +66,23 @@ public partial class WorldClient
         bglist.MaxLevel = packet.ReadUInt8();
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_3_11685))
         {
+            // Every list has the holiday battleground's rewards, the random battleground's list its
+            // own after them. The cores give both the same amounts; the later block is kept.
             packet.ReadBool(); // Has Win
-            packet.ReadInt32(); // Winner Honor Reward
-            packet.ReadInt32(); // Winner Arena Reward
-            packet.ReadInt32(); // Loser Honor Reward
+            var rewards = (WinHonor: packet.ReadInt32(), WinArena: packet.ReadInt32(), LossHonor: packet.ReadInt32());
 
             if (packet.ReadBool()) // Is random
             {
                 bglist.HasRandomWinToday = packet.ReadBool();
-                packet.ReadInt32(); // Random Winner Honor Reward
-                packet.ReadInt32(); // Random Winner Arena Reward
-                packet.ReadInt32(); // Random Loser Honor Reward
+                rewards = (packet.ReadInt32(), packet.ReadInt32(), packet.ReadInt32());
+            }
+
+            // The window asked for its rewards before this list came; new amounts go to it first,
+            // so that the list's own refresh already shows them.
+            if (GetSession().GameState.WotLKBattlegroundRewards != rewards)
+            {
+                GetSession().GameState.WotLKBattlegroundRewards = rewards;
+                SendPacketToClient(BuildPvpRewardsWotLK(rewards));
             }
         }
         var instancesCount = packet.ReadUInt32();
@@ -686,10 +692,10 @@ public partial class WorldClient
         if (GetSession().GameState.CataRandomBattlegroundRewards is not { } rewards)
             return response;
 
-        LFGPlayerQuestReward win = new LFGPlayerQuestReward { Honor = rewards.WinHonor * 100 };
+        LFGPlayerQuestReward win = new LFGPlayerQuestReward { Honor = rewards.WinHonor };
         if (rewards.WinConquest > 0)
             win.Currency = [new LFGPlayerQuestRewardCurrency { CurrencyID = ConquestCurrencyId, Quantity = rewards.WinConquest * 100 }];
-        LFGPlayerQuestReward loss = new LFGPlayerQuestReward { Honor = rewards.LossHonor * 100 };
+        LFGPlayerQuestReward loss = new LFGPlayerQuestReward { Honor = rewards.LossHonor };
         response.FirstRandomBGWinReward = win;
         response.NthRandomBGWinReward = win;
         response.FirstRandomBGLossReward = loss;
@@ -698,6 +704,26 @@ public partial class WorldClient
     }
 
     private const int ConquestCurrencyId = 390;
+
+    // The amounts of the last 3.3.5a list in every battleground slot the client reads: the server
+    // already chose between a first win of the day and a later one, and TrinityCore, AzerothCore and
+    // cMaNGOS pay a holiday battleground as they pay a random one.
+    internal static RequestPvpRewardsResponse BuildPvpRewardsWotLK((int WinHonor, int WinArena, int LossHonor) rewards)
+    {
+        LFGPlayerQuestReward win = new LFGPlayerQuestReward { Honor = rewards.WinHonor };
+        if (rewards.WinArena > 0)
+            win.Currency = [new LFGPlayerQuestRewardCurrency { CurrencyID = (int)Currency.ArenaPoints, Quantity = rewards.WinArena }];
+        LFGPlayerQuestReward loss = new LFGPlayerQuestReward { Honor = rewards.LossHonor };
+        return new RequestPvpRewardsResponse
+        {
+            FirstRandomBGWinReward = win,
+            NthRandomBGWinReward = win,
+            FirstRandomBGLossReward = loss,
+            NthRandomBGLossReward = loss,
+            HolidayBGWinReward = win,
+            HolidayBGLossReward = loss,
+        };
+    }
 
     // SMSG_BATTLEFIELD_STATUS on 4.3.4 is the "no longer in this queue" state alone.
     internal void HandleBattlefieldStatusNoneCata(WorldPacket packet)
