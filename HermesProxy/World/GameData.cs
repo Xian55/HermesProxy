@@ -2429,6 +2429,14 @@ public static partial class GameData
     public const uint HotfixChrCustomizationOptionBegin = 3_100_000;
     public const uint HotfixItemExtendedCostBegin = 3_200_000;
     public const uint HotfixCurrencyTypesBegin = 3_300_000;
+    public const uint HotfixGlobalStringsBegin = 3_400_000;
+    // Hotfixes of the client's own text, by locale; Hotfixes holds the enUS one of each.
+    public static ConcurrentDictionary<uint, FrozenDictionary<string, HotfixRecord>> LocalizedHotfixes = [];
+
+    /// <summary>The record to send a client of this locale: its own text where there is one.</summary>
+    internal static HotfixRecord HotfixForLocale(HotfixRecord record, string? locale)
+        => locale != null && LocalizedHotfixes.TryGetValue(record.HotfixId, out var byLocale)
+            && byLocale.TryGetValue(locale, out var localized) ? localized : record;
     // ConcurrentDictionary so LoadHotfixes can run its sub-loaders in parallel — each
     // sub-loader writes to a disjoint HotfixId key range (per the HotfixXxxBegin constants
     // above), so there's no actual contention on writes; we just need a thread-safe Add.
@@ -2461,6 +2469,7 @@ public static partial class GameData
             LoadItemEffectHotfixes,
             LoadItemExtendedCostHotfixes,
             LoadCurrencyTypesHotfixes,
+            LoadGlobalStringsHotfixes,
             LoadItemDisplayInfoHotfixes,
             LoadCreatureDisplayInfoHotfixes,
             LoadCreatureDisplayInfoExtraHotfixes,
@@ -5378,6 +5387,53 @@ public static partial class GameData
         record.HotfixContent.WriteFloat(float.Parse(row[13], CultureInfo.InvariantCulture));     // Unknown1154
         record.HotfixContent.WriteInt32(int.Parse(row[14], CultureInfo.InvariantCulture));       // Flags
         record.HotfixContent.WriteInt32(int.Parse(row[15], CultureInfo.InvariantCulture));       // FlagsB
+        return record;
+    }
+
+    /// <summary>
+    /// The honor chat lines of a 4.4.2 client in front of a server older than 4.3.4. Below
+    /// Cataclysm's expansion level the client passes an honor gain to its strings as a whole
+    /// number (rva 1e15220, and 1e15760 at the first expansion level), and its strings read a
+    /// "%.2f", so every line said 0.00 honor.
+    /// GlobalStrings4.csv has those strings in each of the client's locales with "%d" instead.
+    /// Built by scripts/build-global-strings-hotfix.py.
+    /// </summary>
+    public static void LoadGlobalStringsHotfixes()
+    {
+        var path = Path.Combine("CSV", "Hotfix", $"GlobalStrings{ModernVersion.ExpansionVersion}.csv");
+        if (LegacyVersion.ExpansionVersion >= 4 || !File.Exists(path))
+            return;
+
+        using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
+        string[] locales = [.. reader.Header.ColNames.Skip(3)];
+        uint counter = 0;
+        foreach (var row in reader)
+        {
+            counter++;
+            uint hotfixId = HotfixGlobalStringsBegin + counter;
+            uint id = row[0].Parse<uint>();
+            string tag = row[1].ToString();
+            byte flags = row[2].Parse<byte>();
+            var byLocale = new Dictionary<string, HotfixRecord>(locales.Length);
+            for (int i = 0; i < locales.Length; i++)
+                byLocale[locales[i]] = GlobalStringsHotfix(hotfixId, id, tag, row[3 + i].ToString(), flags);
+            Hotfixes[hotfixId] = byLocale["enUS"];
+            LocalizedHotfixes[hotfixId] = byLocale.ToFrozenDictionary();
+        }
+    }
+
+    /// <summary>One GlobalStrings row as the 4.4.2 client reads a hotfix of it (WoWDBDefs; the ID is not in the row).</summary>
+    internal static HotfixRecord GlobalStringsHotfix(uint hotfixId, uint id, string tag, string text, byte flags)
+    {
+        HotfixRecord record = new HotfixRecord();
+        record.Status = HotfixStatus.Valid;
+        record.TableHash = DB2Hash.GlobalStrings;
+        record.HotfixId = hotfixId;
+        record.UniqueId = hotfixId;
+        record.RecordId = id;
+        record.HotfixContent.WriteCString(tag);
+        record.HotfixContent.WriteCString(text);
+        record.HotfixContent.WriteUInt8(flags);
         return record;
     }
 

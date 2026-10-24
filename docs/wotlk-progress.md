@@ -9,9 +9,9 @@ A backend's column shows how the latest session there that touched the opcode we
 | Status | Count | Meaning |
 |---|---:|---|
 | ❌ failing | 0 | a backend's latest session that touched it threw or dropped it |
-| 🔁 retest | 351 | its file changed after the latest session that exercised it |
+| 🔁 retest | 352 | its file changed after the latest session that exercised it |
 | · unseen | 87 | no session on any backend exercised it yet |
-| ✅ seen ok | 371 | the latest session on each backend that touched it passed it cleanly |
+| ✅ seen ok | 370 | the latest session on each backend that touched it passed it cleanly |
 | ∅ not sent | 28 | a server packet TrinityCore 3.3.5 never sends, and no session saw |
 
 ## What's left
@@ -52,9 +52,9 @@ Per feature: how many of its opcodes each backend's latest session passed cleanl
 | Connection | 2 | 2 | 2 | 2 |  |  | 2 |  |
 | Combat | 18 | 17 | 18 | 13 |  |  | 1 |  |
 | Hotfix | 1 | 1 | 1 | 1 |  |  | 1 |  |
+| Objects | 6 | 6 | 6 | 5 |  |  | 1 |  |
 | BattlePet | 1 |  | 1 |  |  |  |  |  |
 | EquipmentSet | 6 | 1 | 6 | 1 |  |  |  |  |
-| Objects | 6 | 6 | 6 | 5 |  |  |  |  |
 | Other | 2 | 1 | 2 |  |  |  |  |  |
 | PhaseShift | 1 | 1 |  | 1 |  |  |  |  |
 | Social | 8 | 4 | 8 | 2 |  |  |  |  |
@@ -153,6 +153,7 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | 🔁 | C | `CMSG_GUILD_UPDATE_MOTD_TEXT` |  | ✅ 09-17 |  | 20260917_022354 | 1 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
 | 🔁 | C | `CMSG_INSPECT` | ✅ 08-30 | ✅ 10-24 |  | 20261024_004453 | 3 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | 🔁 | C | `CMSG_INSTANCE_LOCK_RESPONSE` | ✅ 09-02 |  |  | 20260902_231544 | 2 |  | HermesProxy/World/Server/Systems/InstanceSystem.cs |
+| 🔁 | C | `CMSG_ITEM_QUERY_SINGLE` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 261 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | 🔁 | C | `CMSG_ITEM_TEXT_QUERY` | ✅ 09-02 | ✅ 10-11 |  | 20261011_152733 | 2 |  | HermesProxy/World/Client/PacketHandlers/MailHandler.cs |
 | 🔁 | C | `CMSG_LEARN_TALENT` | ✅ 09-09 | ✅ 09-17 | ✅ 09-15 | 20260917_022354 | 7 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | 🔁 | C | `CMSG_LOGOUT_CANCEL` | ✅ 09-09 | ✅ 10-23 | ✅ 09-15 | 20261023_232737 | 5 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
@@ -599,7 +600,6 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | ✅ | C | `CMSG_GUILD_INFO` | ✅ 10-23 | ✅ 10-23 |  | 20261023_204800 | 2 |  | HermesProxy/World/GuildClub.cs |
 | ✅ | C | `CMSG_INITIATE_TRADE` | ✅ 09-02 | ✅ 10-22 |  | 20261022_182230 | 3 |  | HermesProxy/World/Server/Systems/TradeSystem.cs |
 | ✅ | C | `CMSG_ITEM_PURCHASE_REFUND` |  | ✅ 10-22 |  | 20261022_182230 | 1 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
-| ✅ | C | `CMSG_ITEM_QUERY_SINGLE` | ✅ 10-23 | ✅ 10-24 | ✅ 10-23 | 20261024_222618 | 261 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | ✅ | C | `CMSG_LFG_JOIN` |  | ✅ 10-24 | ✅ 10-23 | 20261024_011626 | 5 |  | HermesProxy/World/Server/Systems/LfgSystem.cs |
 | ✅ | C | `CMSG_LFG_LEAVE` |  | ✅ 10-24 | ✅ 10-23 | 20261024_004453 | 3 |  | HermesProxy/World/Server/Systems/LfgSystem.cs |
 | ✅ | C | `CMSG_LFG_PARTY_LOCK_INFO_REQUEST` | ✅ 09-08 | ✅ 10-24 | ✅ 10-23 | 20261024_011626 | 6 |  | HermesProxy/World/Server/Systems/LfgSystem.cs |
@@ -973,7 +973,7 @@ HermesProxy/World/Client/SeatGravity.cs 9d2a660de9366fd9
 HermesProxy/World/Client/WorldClient.cs aeb8d8e09785bfd3
 HermesProxy/World/Client/WorldClientCataHandshake.cs f73fe4895229ea0c
 HermesProxy/World/Dispatch/SessionContext.cs b74de2b3cc19f3c8
-HermesProxy/World/GameData.cs 2aaead127f94dcc8
+HermesProxy/World/GameData.cs d2811ce6e4261dfe
 HermesProxy/World/GuildClub.cs b1aa090972b200df
 HermesProxy/World/ItemRefund.cs ddc050973d0a0cdd
 HermesProxy/World/MaskedGuid.cs 38ad2baffdeef245
@@ -1079,7 +1079,7 @@ HermesProxy/World/Server/Systems/EquipmentSetSystem.cs cd86ba9ee2fa8a71
 HermesProxy/World/Server/Systems/GameObjectSystem.cs a4f3bb5a26debf9b
 HermesProxy/World/Server/Systems/GroupSystem.cs 72d5c1a6e0fcf69c
 HermesProxy/World/Server/Systems/GuildSystem.cs 3f4113220dc555bc
-HermesProxy/World/Server/Systems/HotfixSystem.cs a2b68db30249e7fa
+HermesProxy/World/Server/Systems/HotfixSystem.cs 8f0639f142c89158
 HermesProxy/World/Server/Systems/InstanceSystem.cs c7eadea06ae8cac6
 HermesProxy/World/Server/Systems/ItemSystem.cs e6457c86a0731f16
 HermesProxy/World/Server/Systems/LfgSystem.cs fc63f761f5b76f9b
@@ -1102,5 +1102,5 @@ HermesProxy/World/Server/Systems/SupportTicketSystem.cs 2d482e7ece41c7cc
 HermesProxy/World/Server/Systems/TalentSystem.cs ce4c81a39587d9aa
 HermesProxy/World/Server/Systems/TaxiSystem.cs 9760b0b210ed8645
 HermesProxy/World/Server/Systems/TradeSystem.cs bffc2fa6c7d6573a
-HermesProxy/World/Server/WorldSocket.cs b885855752bbe1df
+HermesProxy/World/Server/WorldSocket.cs 5a9fb692a8a95c67
 -->
