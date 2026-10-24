@@ -109,14 +109,15 @@ public static class SpellSystem
     [HandlesCmsg(Opcode.CMSG_CAST_SPELL)]
     public static void HandleCastSpell(in CastSpell cast, in SessionContext ctx)
     {
-        // Create Heirloom (160597). V3_4_3 Collections panel right-click "Add to Bag"
-        // casts this spell with Misc[0] = heirloom item ID. Legacy 3.3.5a server has
-        // no such spell ("unknown spell id 160597") and silently drops the cast —
-        // client then re-spams every frame. Block at proxy: reply with CastFailed
+        // Create Heirloom (160597). The 3.4.3 and 4.4.2 Collections panel's "Add to Bag"
+        // casts this spell with Misc[0] = heirloom item ID. Neither a 3.3.5a nor a 4.3.4
+        // server has the spell ("unknown spell id 160597"); it drops the cast without an
+        // answer. The 3.4.3 client then re-spams it every frame, and the 4.4.2 client kept
+        // it as its current spell until the next cast. Block at proxy: reply with CastFailed
         // so the client stops, and do NOT forward to legacy. Item creation is not
         // bridged (no clean legacy path that doesn't require GM rights).
         if (cast.Cast.SpellID == KnownSpellIds.CreateHeirloom
-            && ModernVersion.ExpansionVersion == 3
+            && ModernVersion.IsWotLKClassicOrLater
             && GameData.Heirlooms.Contains((int)cast.Cast.Misc[0]))
         {
             WowGuid128 serverCastId = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)ctx.GetSession().GameState.CurrentMapId!, cast.Cast.SpellID, cast.Cast.SpellID + ctx.GetSession().GameState.CurrentPlayerGuid.GetCounter());
