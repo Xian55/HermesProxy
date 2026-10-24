@@ -151,6 +151,11 @@ public partial class WorldClient
     {
         var state = GetSession().GameState;
         state.ResearchHistoryDirty = true;
+        // At login and after every far teleport the history comes before the player's create,
+        // which writes it. A Values update sent ahead of the create is for an object the client
+        // does not have yet: it answered CMSG_OBJECT_UPDATE_FAILED for its own player.
+        if (!state.ClientHasPlayerObject)
+            return;
         ObjectUpdate update = new ObjectUpdate(state.CurrentPlayerGuid, UpdateTypeModern.Values, GetSession());
         update.EnsureActivePlayerData();
         UpdateObject packet = new UpdateObject(state);
