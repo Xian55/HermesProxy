@@ -290,6 +290,7 @@ public static class LegacyMovementCata
     /// Reads a movement block a 4.3.4 server wrote in <paramref name="opcode"/>'s order: the
     /// inverse of <see cref="Write"/>, as TrinityCore 4.3.4's Unit::WriteMovementInfo produces it.
     /// <paramref name="extraFloat"/> is the sequence's extra element, the speed of a speed packet.
+    /// False, with a warning, when no order this opcode is written in ends where the packet ends.
     /// </summary>
     public static bool TryRead(WorldPacket packet, Opcode opcode, GameSessionData gameState, out ulong mover,
         out MovementInfo info, out uint movementCounter, out float extraFloat)
@@ -311,20 +312,13 @@ public static class LegacyMovementCata
             return false;
 
         bool withPresenceBits = WithPresenceBits.TryGetValue(opcode, out LegacyMovementElement[]? withBits);
-        if (!WrittenWithoutPresenceBits.Contains(opcode) && !withPresenceBits)
-        {
-            if (Read(packet, sequence, implicitPresence: false, hasFall: false, hasTransport: false, TwoBitExtraAt(opcode),
-                    out mover, out info, out movementCounter, out extraFloat, out extraBits, out ulong transportGuid))
-                SetTransportGuid(ref info, transportGuid, gameState);
-            return true;
-        }
-
         int start = packet.ReadPosition;
         int length = packet.Remaining();
         if (!WrittenWithoutPresenceBits.Contains(opcode))
         {
-            // The table's order has its presence bits, but another core writes the client's: the
-            // length tells them apart, as it tells the guesses below.
+            // A read that does not end where the packet ends took the wrong order, and its mover is
+            // made of other bytes. Where another core writes the client's order, the length tells
+            // the two apart, as it tells the guesses below.
             if (ReadsToTheEnd(packet, start, sequence, implicitPresence: false, hasFall: false, hasTransport: false,
                     TwoBitExtraAt(opcode), gameState, out mover, out info, out movementCounter, out extraFloat, out extraBits))
                 return true;
