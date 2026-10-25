@@ -1213,15 +1213,16 @@ public partial class WorldClient
 
             if (splineFlags == SplineFlagVanilla.Runmode) // Default spline flags used by Vanilla and TBC servers
             {
-                // Modern Classic spline decoration. Unknown5/Steering/Unknown10 are required across
-                // V1_14 / V2_5 / V3_4_3 — without them server-spawned creatures don't render
-                // (issue #74 reopen confirmed for V1_14, c730414 for V2_5).
+                // Modern Classic spline decoration (c730414: V2_5 doesn't render legacy creatures
+                // without it). No Steering: the client turns a steering unit gradually, the way a
+                // modern server moves a creature out of combat. A vanilla server sends a creature's
+                // chase before the values update that flags it InCombat, so a creature pulled from
+                // range swung round slowly instead of facing its target (#74). The 1.12 client
+                // turned every unit at once.
                 moveSpline.SplineFlags = SplineFlagModern.Unknown5;
                 UnitFlagsVanilla unitFlags = (UnitFlagsVanilla)GetSession().GameState.GetLegacyFieldValueUInt32(guid, UnitField.UNIT_FIELD_FLAGS);
                 if (unitFlags.HasFlag(UnitFlagsVanilla.CanSwim))
                     moveSpline.SplineFlags |= SplineFlagModern.CanSwim;
-                if (type == SplineTypeLegacy.Normal && !unitFlags.HasFlag(UnitFlagsVanilla.InCombat))
-                    moveSpline.SplineFlags |= SplineFlagModern.Steering | SplineFlagModern.Unknown10;
             }
             else
                 moveSpline.SplineFlags = splineFlags.CastFlags<SplineFlagVanilla, SplineFlagModern>();
@@ -1236,13 +1237,11 @@ public partial class WorldClient
 
             if (splineFlags == SplineFlagTBC.Runmode) // Default spline flags used by Vanilla and TBC servers
             {
-                // Same modern Classic decoration as the Vanilla branch — required for V1_14 / V2_5 / V3_4_3.
+                // Same decoration as the Vanilla branch, and no Steering for the same reason.
                 moveSpline.SplineFlags = SplineFlagModern.Unknown5;
                 UnitFlags unitFlags = (UnitFlags)GetSession().GameState.GetLegacyFieldValueUInt32(guid, UnitField.UNIT_FIELD_FLAGS);
                 if (unitFlags.HasFlag(UnitFlags.CanSwim))
                     moveSpline.SplineFlags |= SplineFlagModern.CanSwim;
-                if (type == SplineTypeLegacy.Normal && !unitFlags.HasFlag(UnitFlags.InCombat))
-                    moveSpline.SplineFlags |= SplineFlagModern.Steering | SplineFlagModern.Unknown10;
             }
             else
                 moveSpline.SplineFlags = splineFlags.CastFlags<SplineFlagTBC, SplineFlagModern>();
