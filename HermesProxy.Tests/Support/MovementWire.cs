@@ -302,7 +302,9 @@ internal sealed record LegacySpeeds(
     float Walk = 2.5f, float Run = 7f, float RunBack = 4.5f, float Swim = 4.722222f, float SwimBack = 2.5f,
     float Flight = 7f, float FlightBack = 4.5f, float Turn = 3.141594f, float Pitch = 3.141594f);
 
-internal sealed record LegacySpline(bool FinalOrientation, float Orientation, uint Time, uint TimeFull, uint Id, Vector3[] Points, Vector3 EndPoint);
+/// <summary>A create's spline; with <paramref name="JumpGravity"/> it is a leap (WotLK: Trajectory).</summary>
+internal sealed record LegacySpline(bool FinalOrientation, float Orientation, uint Time, uint TimeFull, uint Id, Vector3[] Points, Vector3 EndPoint,
+    float? JumpGravity = null, uint JumpStartTime = 0);
 internal sealed record LegacyGoPosition(WowGuid64 Transport, Vector3 Position, Vector3 Offset, float Orientation, float CorpseOrientation);
 internal sealed record LegacyStationary(Vector3 Position, float Orientation);
 internal sealed record LegacyVehicle(uint Id, float Orientation);
@@ -430,7 +432,10 @@ internal static class LegacyCreateWire
             _ => (uint)SplineFlagVanilla.FinalOrientation,
         };
 
-        packet.WriteUInt32(spline.FinalOrientation ? finalOrientation : 0u);
+        uint trajectory = spline.JumpGravity != null && LegacyMovementWire.Era == LegacyEra.WotLK
+            ? (uint)SplineFlagWotLK.Trajectory
+            : 0u;
+        packet.WriteUInt32((spline.FinalOrientation ? finalOrientation : 0u) | trajectory);
         if (spline.FinalOrientation)
             packet.WriteFloat(spline.Orientation);
 
@@ -442,8 +447,8 @@ internal static class LegacyCreateWire
         {
             packet.WriteFloat(1f);  // duration multiplier
             packet.WriteFloat(1f);  // duration multiplier next
-            packet.WriteInt32(0);   // vertical acceleration
-            packet.WriteInt32(0);   // start time
+            packet.WriteFloat(spline.JumpGravity ?? 0f);   // vertical acceleration
+            packet.WriteUInt32(spline.JumpStartTime);       // start time
         }
 
         packet.WriteUInt32((uint)spline.Points.Length);

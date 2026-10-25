@@ -323,6 +323,13 @@ internal static class MovementScenarios
 
         if (wotlk)
         {
+            // first seen 300 ms into a leap (a jump spell): the arc's gravity and start time
+            yield return ("creature-in-mid-leap", CreatureCreate with
+            {
+                Living = new LegacyMove { Flags = MovementFlagWotLK.Forward },
+                Spline = new LegacySpline(FinalOrientation: false, 0f, 300, 800, 79,
+                    [new Vector3(1210f, 1490f, 309f)], new Vector3(1210f, 1490f, 309f), JumpGravity: 19.29f, JumpStartTime: 0),
+            });
             yield return ("creature-vehicle", CreatureCreate with
             {
                 Guid = Vehicle, Entry = 28670,

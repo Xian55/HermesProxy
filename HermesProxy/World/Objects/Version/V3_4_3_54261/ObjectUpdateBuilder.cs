@@ -359,10 +359,10 @@ public partial class ObjectUpdateBuilder
         data.WriteBits((byte)moveSpline.SplineType, 2);
         var hasFadeObjectTime = data.WriteBit(false);
         data.WriteBits(moveSpline.SplineCount, 16);
-        data.WriteBit(false);
-        data.WriteBit(false);
-        data.WriteBit(false);
-        data.WriteBit(false);
+        data.WriteBit(false);                                       // HasSplineFilter
+        data.WriteBit(false);                                       // HasSpellEffectExtraData
+        var hasJumpExtraData = data.WriteBit(moveSpline.JumpGravity.HasValue);
+        data.WriteBit(false);                                       // HasAnimationTierTransition
         data.FlushBits();
 
         switch (moveSpline.SplineType)
@@ -390,6 +390,14 @@ public partial class ObjectUpdateBuilder
 
         foreach (var vec in moveSpline.SplinePoints)
             data.WriteVector3(vec);
+
+        // A leap's arc: without it the client draws a unit first seen in mid-leap on the ground.
+        if (hasJumpExtraData)
+        {
+            data.WriteFloat(moveSpline.JumpGravity!.Value);
+            data.WriteUInt32(moveSpline.JumpStartTime);
+            data.WriteUInt32(0);                                    // Duration (override)
+        }
     }
 
     // WriteCreateObjectData emitted by HermesProxy.SourceGen.ObjectUpdateBuilderGenerator

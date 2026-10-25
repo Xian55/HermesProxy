@@ -598,7 +598,7 @@ public class ObjectUpdateBuilder
             data.WriteBits(moveSpline.SplineCount, 16);
             data.WriteBit(false);                                                       // HasSplineFilter
             data.WriteBit(false);                                                       // HasSpellEffectExtraData
-            data.WriteBit(false);                                                       // HasJumpExtraData
+            bool hasJumpExtraData = data.WriteBit(moveSpline.JumpGravity.HasValue);    // HasJumpExtraData
             data.WriteBit(false);                                                       // HasAnimationTierTransition
             data.FlushBits();
 
@@ -642,14 +642,16 @@ public class ObjectUpdateBuilder
                 data.WriteUInt32(moveSpline.spell_effect_extra.Value.ProgressCurveId);
                 data.WriteUInt32(moveSpline.spell_effect_extra.Value.ParabolicCurveId);
             }
-            
-            if (moveSpline.splineflags.HasFlag(SplineFlag.Parabolic))
+            */
+
+            if (hasJumpExtraData)
             {
-                data.WriteFloat(moveSpline.vertical_acceleration);
-                data.WriteInt32(moveSpline.effect_start_time);
-                data.WriteUInt32(0);                                                  // Duration (override)
+                data.WriteFloat(moveSpline.JumpGravity!.Value);
+                data.WriteUInt32(moveSpline.JumpStartTime);
+                data.WriteUInt32(0);                                                    // Duration (override)
             }
 
+            /*
             if (moveSpline.anim_tier.HasValue)
             {
                 data.WriteUInt32(moveSpline.anim_tier.Value.TierTransitionId);

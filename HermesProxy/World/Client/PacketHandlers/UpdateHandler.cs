@@ -2030,6 +2030,7 @@ public partial class WorldClient
 
                 bool isFlyingSpline;
                 bool isSmoothSpline;
+                bool hasTrajectory = false;
                 monsterMove.SplineFlags = SplineFlagModern.None;
                 monsterMove.SplineType = SplineTypeModern.None;
                 if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
@@ -2039,6 +2040,7 @@ public partial class WorldClient
                                               | SplineFlagTranslation.SeatMoveFlags(splineFlags);
                     isFlyingSpline = SplineFlagTranslation.IsServerFlight(splineFlags);
                     isSmoothSpline = SplineFlagTranslation.IsSmoothPath(splineFlags);
+                    hasTrajectory = splineFlags.HasAnyFlag(SplineFlagWotLK.Trajectory);
 
                     if (splineFlags.HasAnyFlag(SplineFlagWotLK.FinalTarget))
                     {
@@ -2138,8 +2140,16 @@ public partial class WorldClient
                 {
                     packet.ReadFloat(); // Spline Duration Multiplier
                     packet.ReadFloat(); // Spline Duration Multiplier Next
-                    packet.ReadInt32(); // Spline Vertical Acceleration
-                    packet.ReadInt32(); // Spline Start Time
+                    float gravity = packet.ReadFloat();
+                    uint startTime = packet.ReadUInt32();
+                    // A unit seen first in mid-leap: the arc goes on with its jump data, as in a
+                    // monster move. Without Trajectory both numbers mean nothing.
+                    if (hasTrajectory)
+                    {
+                        monsterMove.JumpGravity = gravity;
+                        monsterMove.JumpStartTime = startTime;
+                        monsterMove.SplineFlags |= SplineFlagModern.Parabolic;
+                    }
                 }
 
                 var splineCount = packet.ReadUInt32();

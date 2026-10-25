@@ -34,8 +34,7 @@ public partial class WorldClient
     /// jump data (gravity, start time), and the 4.4.2 client reads that data without checking it
     /// is there: an access violation at null + 4 in its spline code, on the first leap in sight
     /// (Heroic Leap, a charge, a knockback; three crashes at a battleground's opening). The
-    /// monster-move reader puts the flag back together with the jump data; a create's spline,
-    /// whose writer has no jump data, goes without and is drawn as a move along the ground.
+    /// monster-move and create readers put the flag back together with the jump data.
     /// </remarks>
     internal static SplineFlagModern ConvertSplineFlagsCata(uint flags)
     {
@@ -364,7 +363,7 @@ public partial class WorldClient
     /// The spline of a create block (TrinityCore 4.3.4 MovementPacketBuilder::WriteCreateData).
     /// Points come as z, x, y; a stopped spline carries only its end point and id.
     /// </summary>
-    private ServerSideMovement ReadCreateSplineCata(WorldPacket packet, bool hasSplineMove, bool hasVerticalAcceleration,
+    internal ServerSideMovement ReadCreateSplineCata(WorldPacket packet, bool hasSplineMove, bool hasVerticalAcceleration,
         bool hasEffectStartTime, uint splineMode, uint pointCount, uint facing, uint flags, ReadOnlySpan<bool> facingMask)
     {
         var monsterMove = new ServerSideMovement
@@ -375,10 +374,11 @@ public partial class WorldClient
             TransportSeat = -1,
         };
 
+        float? gravity = null;
         if (hasSplineMove)
         {
             if (hasVerticalAcceleration)
-                packet.ReadFloat();
+                gravity = packet.ReadFloat();
             monsterMove.SplineTime = packet.ReadUInt32();
 
             if (facing == 0)
@@ -415,9 +415,18 @@ public partial class WorldClient
 
             packet.ReadFloat();                             // duration multiplier next
             monsterMove.SplineTimeFull = packet.ReadUInt32();
-            if (hasEffectStartTime)
-                packet.ReadUInt32();
+            uint effectStartTime = hasEffectStartTime ? packet.ReadUInt32() : 0;
             packet.ReadFloat();                             // duration multiplier
+
+            // A unit seen first in mid-leap: the arc goes on with its jump data, as in a monster move.
+            // The gravity is the sign of it: the 25 bits of flags a create carries stop below
+            // Parabolic, and the server sends a gravity only for a Parabolic spline.
+            if (gravity is { } jumpGravity)
+            {
+                monsterMove.JumpGravity = jumpGravity;
+                monsterMove.JumpStartTime = effectStartTime;
+                monsterMove.SplineFlags |= SplineFlagModern.Parabolic;
+            }
         }
 
         float ez = packet.ReadFloat();
