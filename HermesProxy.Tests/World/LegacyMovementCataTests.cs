@@ -142,6 +142,31 @@ public sealed class LegacyMovementCataTests
         Assert.Equal(0, read.GetRemainingSpan().Length);
     }
 
+    /// <summary>
+    /// A packet that does not end where its order does was written in another order, and its
+    /// mover would be made of other bytes (#405): it is dropped, not passed on.
+    /// </summary>
+    [Theory]
+    [InlineData(Opcode.SMSG_MOVE_UPDATE, 1)]
+    [InlineData(Opcode.SMSG_MOVE_UPDATE, -1)]
+    [InlineData(Opcode.SMSG_MOVE_SET_RUN_SPEED, 1)]
+    [InlineData(Opcode.SMSG_MOVE_SET_RUN_SPEED, -1)]
+    public void APacketThatDoesNotEndWithItsOrder_IsDropped(Opcode opcode, int extraBytes)
+    {
+        var info = new MovementInfo { Position = new Vector3(1f, 2f, 3f), Orientation = 0.5f, MoveTime = 99 };
+        using var packet = new WorldPacket(Opcode.MSG_MOVE_HEARTBEAT);
+        LegacyMovementCata.Write(packet, LegacyMovementSequencesCata.ByOpcode[opcode], new WowGuid64(0x0000000000C0FFEE), in info,
+            movementCounter: 42, extraFloat: 7.5f);
+        packet.FlushBits();
+        byte[] body = packet.GetDataSpan().ToArray();
+        byte[] framed = new byte[sizeof(ushort) + body.Length + extraBytes];
+        body.AsSpan(0, Math.Min(body.Length, framed.Length - sizeof(ushort))).CopyTo(framed.AsSpan(sizeof(ushort)));
+        using var read = new WorldPacket(framed);
+
+        Assert.False(LegacyMovementCata.TryRead(read, opcode, null!, out ulong mover, out _, out _, out _));
+        Assert.Equal(0ul, mover);
+    }
+
     [Fact]
     public void MoveUpdateTeleport_AsATrinityCore434ServerSentIt()
     {
