@@ -15,9 +15,10 @@ public sealed class CataSplineFlagTests
     private const uint ParabolicCata = 0x02000000;
 
     /// <summary>
-    /// A leap. The modern Parabolic flag makes the client read the spline's jump data, which no
-    /// writer here sends, and the 4.4.2 client crashes on the read (null + 4, three times at a
-    /// battleground's opening, when warriors leapt).
+    /// A leap. The modern Parabolic flag makes the client read the spline's jump data, and the
+    /// 4.4.2 client crashes on the read when it is missing (null + 4, three times at a
+    /// battleground's opening, when warriors leapt). The flag conversion leaves it out; the
+    /// readers set it only together with the jump data.
     /// </summary>
     [Theory]
     [InlineData(ParabolicCata)]
