@@ -84,7 +84,8 @@ Stable Downloads: [Releases](https://github.com/Xian55/HermesProxy/releases)
    - Vanilla `--staticseed --version=ClassicEra`
    - TBC `--staticseed --version=Classic`
    - WotLK `--staticseed --version=Classic` (Arctium reuses the same flag as TBC)
-   - Cataclysm Classic: the Arctium **Game** Launcher (tested with 1.5.0), `--version=Classic`. If arctium.io is down, the client closes a few seconds after it starts (ERROR #134): see [docs/arctium-down.md](docs/arctium-down.md)
+   - Cataclysm Classic: the Arctium **Game** Launcher (tested with 1.5.0), `--version=Classic`
+   - If arctium.io is down, the client closes a few seconds after it starts (on 4.4.2, ERROR #134): see [docs/arctium-down.md](docs/arctium-down.md)
 - Start the proxy app and login through the game with your usual credentials.
 - Cataclysm Classic 4.4.x logs in with SRP and never sends its password, so the proxy needs the legacy account's password to log in on your behalf: set the `HERMES_LegacyServerOptions__Password` environment variable, or leave it unset and type it when the proxy asks at startup. Don't put it in a config file.
 
