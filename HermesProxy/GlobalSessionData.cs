@@ -382,6 +382,9 @@ public sealed class GameSessionData
     // Set when the player's create goes to the client, cleared by the first movement packet the
     // client sends without Falling. See MovementHandler.SendOwnCanFlyChange.
     public bool OwnSpawnFallPending;
+    // Whether the player's last movement report to a vanilla server was falling. See
+    // MovementSystem.ReportLeftOutLanding.
+    public bool OwnMoverReportedFalling;
     public ConcurrentQueue<ClientCastRequest> PendingPetCasts = new();  // pet spell casts (queue for proper FIFO handling)
     public WowGuid64 LastLootTargetGuid;
     public List<WowGuid128>? MasterLootCandidates;

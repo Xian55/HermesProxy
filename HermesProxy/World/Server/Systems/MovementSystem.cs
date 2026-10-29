@@ -30,6 +30,8 @@ public static class MovementSystem
 {
     private static readonly Microsoft.Extensions.Logging.ILogger _melTransportRider =
         Log.CreateMelLogger(Log.CategoryServer);
+    private static readonly Microsoft.Extensions.Logging.ILogger _melLanding =
+        Log.CreateMelLogger(Log.CategoryServer);
 
     // CMSG_MOVE_* (universal, as the modern client sends it) -> MSG_MOVE_* (universal, the name
     // the 3.3.5a-era protocol uses for the same message). Built once from the enum names so it
@@ -149,6 +151,7 @@ public static class MovementSystem
             gameState.LastReportedTransportGuid = moveInfo.TransportGuid;
         }
 
+        ReportLeftOutLanding(universalOpcode, movement.Guid, in moveInfo, gameState, in ctx);
         WorldPacket packet = new WorldPacket(legacyOpcode);
         if (WorldClient.IsCataLegacy)
             LegacyMovementCata.TryWrite(packet, LegacyVersion.GetUniversalOpcode(legacyOpcode), movement.Guid.To64(), in moveInfo);
@@ -183,6 +186,40 @@ public static class MovementSystem
         SeatGravity.Applies &&
         previous.GetObjectType() == ObjectType.GameObject &&
         current.GetObjectType() is ObjectType.Player or ObjectType.Unit;
+
+    /// <summary>
+    /// Reports the landing the client left out, before a report of the player's that no longer
+    /// falls. Vanilla servers only.
+    /// </summary>
+    /// <remarks>
+    /// When a charm on the player ends (Hex of Jammal'an, #528) the client reports
+    /// CMSG_MOVE_SPLINE_DONE falling, with a fall time of 0. It mostly lands with
+    /// CMSG_MOVE_FALL_LAND right after, but not always: it can go on to its next report already
+    /// off the ground. VMaNGOS takes a report that stops falling with anything but a fall-end
+    /// opcode for a cheat (<c>MovementAnticheat::CheckFallStop</c>, Anticheat.BadFallStop: one is
+    /// enough, and the penalty is a kick).
+    /// <para>
+    /// The landing carries the report it comes before, so it lands where the client already is.
+    /// That report has no fall time, so the landing does no fall damage either
+    /// (<c>Player::HandleFall</c> wants 1229 ms or more).
+    /// </para>
+    /// </remarks>
+    private static void ReportLeftOutLanding(Opcode opcode, WowGuid128 mover, in MovementInfo moveInfo, GameSessionData gameState, in SessionContext ctx)
+    {
+        if (!LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180) || mover != gameState.CurrentPlayerGuid)
+            return;
+
+        bool falling = moveInfo.Flags.HasAnyFlag(MovementFlagModern.Falling | MovementFlagModern.FallingFar);
+        if (gameState.OwnMoverReportedFalling && !falling &&
+            opcode is not (Opcode.CMSG_MOVE_FALL_LAND or Opcode.CMSG_MOVE_START_SWIM))
+        {
+            WorldPacket landing = new WorldPacket(Opcode.MSG_MOVE_FALL_LAND);
+            SeatGravity.WriteClientMovement(landing, in moveInfo, gameState);
+            ctx.SendPacketToServer(landing);
+            MovementLogMessages.LeftOutLandingReported(_melLanding, opcode);
+        }
+        gameState.OwnMoverReportedFalling = falling;
+    }
 
     // Out of line so the per-packet path above stays as it was.
     private static void RepeatSeatReport(uint legacyOpcode, in ClientPlayerMovement movement, GameSessionData gameState, in SessionContext ctx)
@@ -316,6 +353,7 @@ public static class MovementSystem
             return;
         }
 
+        ReportLeftOutLanding(opcode, speed.MoverGUID, speed.Ack.MoveInfo, ctx.GetSession().GameState, in ctx);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(speed.MoverGUID.To64());
         else
@@ -341,6 +379,7 @@ public static class MovementSystem
             return;
         }
 
+        ReportLeftOutLanding(opcode, movementAck.MoverGUID, movementAck.Ack.MoveInfo, ctx.GetSession().GameState, in ctx);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(movementAck.MoverGUID.To64());
         else
@@ -371,6 +410,7 @@ public static class MovementSystem
             return;
         }
 
+        ReportLeftOutLanding(opcode, movementAck.MoverGUID, movementAck.Ack.MoveInfo, gameState, in ctx);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(movementAck.MoverGUID.To64());
         else
@@ -457,6 +497,7 @@ public static class MovementSystem
             return;
         }
 
+        ReportLeftOutLanding(Opcode.CMSG_MOVE_SPLINE_DONE, movement.Guid, movement.MoveInfo, ctx.GetSession().GameState, in ctx);
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
             packet.WritePackedGuid(movement.Guid.To64());
         SeatGravity.WriteClientMovement(packet, movement.MoveInfo, ctx.GetSession().GameState);
