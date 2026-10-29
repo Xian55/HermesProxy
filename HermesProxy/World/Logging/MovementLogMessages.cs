@@ -23,4 +23,10 @@ internal static partial class MovementLogMessages
         Level = LogLevel.Warning,
         Message = "{Opcode} ({Length} bytes) fits none of the shapes TrinityCore 4.3.4 writes it in; dropped.")]
     public static partial void LegacyMovementFitsNoShape(ILogger logger, Opcode opcode, int length);
+
+    [LoggerMessage(
+        EventId = 1612,
+        Level = LogLevel.Debug,
+        Message = "{Opcode} ends a fall the client reported no landing for; sent MSG_MOVE_FALL_LAND before it.")]
+    public static partial void LeftOutLandingReported(ILogger logger, Opcode opcode);
 }

@@ -10,10 +10,10 @@
 | 🚫 unmapped | 68 | not in the 4.3.4 table: renamed, split or removed in 4.x |
 | ⬜ todo | 0 | layout changed in 4.x, no 4.3.4 branch, not seen yet |
 | ⚠️ suspect | 0 | layout changed, no 4.3.4 branch, but passed without an error — likely misread |
-| 🔁 retest | 299 | its file changed after the latest session that exercised it |
+| 🔁 retest | 319 | its file changed after the latest session that exercised it |
 | 🔧 ported, unseen | 11 | has a 4.3.4 branch, waiting for a session to exercise it |
 | · unseen | 13 | same layout as 3.3.5a per WPP, not exercised yet |
-| ✅ seen ok | 523 | ported or unchanged, and the latest session passed it cleanly |
+| ✅ seen ok | 503 | ported or unchanged, and the latest session passed it cleanly |
 | ∅ not sent | 44 | a server packet TrinityCore 4.3.4 never sends: another opcode carries it there, or nothing calls its writer |
 
 ## What's left
@@ -22,9 +22,9 @@ The rows of the legacy table below that still ask for work, by feature. A sessio
 
 | Feature | ❌ | 🚫 | ⬜ | ⚠️ | 🔧 | · | 🔁 | To play or read |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| Movement |  |  |  |  | 9 | 1 | 121 | 🔧 `CMSG_DISMISS_CONTROLLED_VEHICLE`, `CMSG_MOVE_FALL_RESET`, `CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK`, `CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK`, `CMSG_MOVE_NOT_ACTIVE_MOVER`, `SMSG_MOVE_SET_PITCH_RATE`, `SMSG_MOVE_SET_TURN_RATE`, `SMSG_MOVE_SPLINE_SET_PITCH_RATE`, `SMSG_MOVE_SPLINE_SET_TURN_RATE`<br>· `MSG_MOVE_TELEPORT_ACK` |
+| Movement |  |  |  |  | 9 | 1 | 127 | 🔧 `CMSG_DISMISS_CONTROLLED_VEHICLE`, `CMSG_MOVE_FALL_RESET`, `CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK`, `CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK`, `CMSG_MOVE_NOT_ACTIVE_MOVER`, `SMSG_MOVE_SET_PITCH_RATE`, `SMSG_MOVE_SET_TURN_RATE`, `SMSG_MOVE_SPLINE_SET_PITCH_RATE`, `SMSG_MOVE_SPLINE_SET_TURN_RATE`<br>· `MSG_MOVE_TELEPORT_ACK` |
 | Character |  |  |  |  |  | 6 | 11 | · `CMSG_CHARACTER_RENAME_REQUEST`, `CMSG_SET_PLAYER_DECLINED_NAMES`, `SMSG_CHARACTER_LOGIN_FAILED`, `SMSG_CHARACTER_RENAME_RESULT`, `SMSG_PET_UPDATE_COMBO_POINTS`, `SMSG_SET_PLAYER_DECLINED_NAMES_RESULT` |
-| Misc |  |  |  |  |  | 2 | 19 | · `SMSG_INVALIDATE_PLAYER`, `SMSG_SPECIAL_MOUNT_ANIM` |
+| Misc |  |  |  |  |  | 2 | 20 | · `SMSG_INVALIDATE_PLAYER`, `SMSG_SPECIAL_MOUNT_ANIM` |
 | Quest |  |  |  |  |  | 2 | 7 | · `CMSG_QUEST_CONFIRM_ACCEPT`, `SMSG_QUEST_CONFIRM_ACCEPT` |
 | Pet |  |  |  |  |  | 1 | 17 | · `CMSG_PET_CANCEL_AURA` |
 | Calendar |  |  |  |  | 1 |  | 9 | 🔧 `CMSG_CALENDAR_COMPLAIN` |
@@ -32,13 +32,15 @@ The rows of the legacy table below that still ask for work, by feature. A sessio
 | Trade |  |  |  |  |  | 1 |  | · `CMSG_BUSY_TRADE` |
 | Spell |  |  |  |  |  |  | 36 |  |
 | Battleground |  |  |  |  |  |  | 20 |  |
+| Group |  |  |  |  |  |  | 16 |  |
 | Chat |  |  |  |  |  |  | 9 |  |
-| Group |  |  |  |  |  |  | 9 |  |
 | Guild |  |  |  |  |  |  | 7 |  |
 | LFG |  |  |  |  |  |  | 7 |  |
 | Item |  |  |  |  |  |  | 5 |  |
 | Auction |  |  |  |  |  |  | 4 |  |
+| Objects |  |  |  |  |  |  | 4 |  |
 | Mail |  |  |  |  |  |  | 3 |  |
+| Arena |  |  |  |  |  |  | 2 |  |
 | Battlefield |  |  |  |  |  |  | 2 |  |
 | Loot |  |  |  |  |  |  | 2 |  |
 | Talent |  |  |  |  |  |  | 2 |  |
@@ -46,7 +48,6 @@ The rows of the legacy table below that still ask for work, by feature. A sessio
 | Currency |  |  |  |  |  |  | 1 |  |
 | Hotfix |  |  |  |  |  |  | 1 |  |
 | NPC |  |  |  |  |  |  | 1 |  |
-| Objects |  |  |  |  |  |  | 1 |  |
 | Taxi |  |  |  |  |  |  | 1 |  |
 
 ## 4.4.2 client side
@@ -288,6 +289,9 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🚫 | S | `SMSG_MOVE_SET_COLLISION_HGT` |  | same |  |  |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🚫 | S | `SMSG_PET_UNLEARN_CONFIRM` |  | ? |  |  |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | 🚫 | S | `SMSG_QUEST_UPDATE_ADD_ITEM` |  | same |  |  |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
+| 🔁 | C | `CMSG_AREA_TRIGGER` |  | same | 20261025_023350 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
+| 🔁 | C | `CMSG_ARENA_TEAM_QUERY` |  | same | 20261025_023350 | 2 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
+| 🔁 | C | `CMSG_ARENA_TEAM_ROSTER` |  | same | 20261025_023350 | 2 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | 🔁 | C | `CMSG_ATTACK_SWING` | yes | same | 20261024_215336 | 1 |  | HermesProxy/World/Server/Systems/MeleeAttackOrder.cs |
 | 🔁 | C | `CMSG_AUCTION_LIST_ITEMS` | yes | changed | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
 | 🔁 | C | `CMSG_AUCTION_PLACE_BID` | yes | same | 20261022_161951 | 2 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
@@ -341,7 +345,9 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `CMSG_MOVE_SET_CAN_FLY_ACK` | yes | changed | 20261024_155804 | 10 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | 🔁 | C | `CMSG_MOVE_SET_COLLISION_HEIGHT_ACK` | yes | new in 4.x | 20261024_205718 | 2 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `CMSG_MOVE_SPLINE_DONE` | yes | changed | 20261025_023350 | 9 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
+| 🔁 | C | `CMSG_MOVE_TIME_SKIPPED` | yes | changed | 20261025_023350 | 3 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `CMSG_MOVE_WATER_WALK_ACK` | yes | changed | 20261024_205958 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
+| 🔁 | C | `CMSG_NAME_QUERY` |  | same | 20261025_023350 | 2 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | 🔁 | C | `CMSG_OPENING_CINEMATIC` |  | ? | 20261022_003546 | 2 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | 🔁 | C | `CMSG_PET_ABANDON` |  | same | 20261015_010820 | 1 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
 | 🔁 | C | `CMSG_PET_ACTION` | yes | changed | 20261021_180247 | 74 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
@@ -353,12 +359,16 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `CMSG_PET_STOP_ATTACK` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
 | 🔁 | C | `CMSG_PLAYER_VEHICLE_ENTER` |  | same | 20261021_135117 | 8 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `CMSG_PVP_LOG_DATA` | yes | new in 4.x | 20261024_155804 | 14 |  | HermesProxy/World/Server/Systems/BattlegroundSystem.cs |
+| 🔁 | C | `CMSG_QUERY_GAME_OBJECT` |  | same | 20261025_023350 | 4 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | 🔁 | C | `CMSG_QUERY_NPC_TEXT` |  | same | 20261024_155804 | 6 |  | HermesProxy/World/Server/Systems/HotfixSystem.cs |
 | 🔁 | C | `CMSG_REQUEST_HONOR_STATS` | yes | new in 4.x | 20261022_084148 | 1 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | 🔁 | C | `CMSG_REQUEST_PET_INFO` | yes | same | 20261024_040154 | 3 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
+| 🔁 | C | `CMSG_REQUEST_VEHICLE_EXIT` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
+| 🔁 | C | `CMSG_REQUEST_VEHICLE_SWITCH_SEAT` |  | same | 20261022_013438 | 1 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `CMSG_RESURRECT_RESPONSE` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | 🔁 | C | `CMSG_SELF_RES` |  | same | 20261017_225242 | 1 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | 🔁 | C | `CMSG_SET_ACTION_BAR_TOGGLES` |  | same | 20261024_024153 | 3 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
+| 🔁 | C | `CMSG_SET_ACTIVE_MOVER` | yes | changed | 20261025_023350 | 2 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `CMSG_SET_PET_SLOT` | yes | new in 4.x | 20261021_180247 | 2 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
 | 🔁 | C | `CMSG_SET_TITLE` |  | same | 20261017_225242 | 2 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | 🔁 | C | `CMSG_SUSPEND_TOKEN_RESPONSE` | yes | new in 4.x | 20261024_180424 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
@@ -372,7 +382,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `MSG_CORPSE_QUERY` |  | same | 20261022_053345 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | 🔁 | C | `MSG_INSPECT_ARENA_TEAMS` |  | same | 20261022_084148 | 1 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | 🔁 | C | `MSG_LIST_STABLED_PETS` |  | reviewed | 20261021_180247 | 4 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
-| 🔁 | C | `MSG_MOVE_FALL_LAND` | yes | changed | 20261025_023350 | 5 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
+| 🔁 | C | `MSG_MOVE_FALL_LAND` | yes | changed | 20261025_023350 | 5 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `MSG_MOVE_HEARTBEAT` | yes | changed | 20261025_023350 | 3 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | 🔁 | C | `MSG_MOVE_JUMP` | yes | changed | 20261025_021426 | 1 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | 🔁 | C | `MSG_MOVE_SET_FACING` | yes | changed | 20261025_021426 | 15 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
@@ -396,7 +406,10 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `MSG_MOVE_STOP_STRAFE` | yes | changed | 20261024_155804 | 593 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | 🔁 | C | `MSG_MOVE_STOP_SWIM` | yes | changed | 20261017_225242 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | 🔁 | C | `MSG_MOVE_STOP_TURN` | yes | changed | 20261024_155804 | 76 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
+| 🔁 | C | `MSG_MOVE_TELEPORT_ACK` | yes | changed | 20261025_023350 | 4 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
+| 🔁 | C | `MSG_MOVE_WORLDPORT_ACK` |  | same | 20261024_180424 | 2 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `MSG_QUEST_PUSH_RESULT` |  | same | 20261011_162223 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
+| 🔁 | C | `MSG_RAID_TARGET_UPDATE` |  | same | 20261025_023350 | 3 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | 🔁 | S | `MSG_CHANNEL_START` |  | reviewed | 20261024_174049 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `MSG_CHANNEL_UPDATE` |  | same | 20261024_155804 | 486 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `MSG_CORPSE_QUERY` |  | same | 20261022_053345 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
@@ -407,6 +420,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `MSG_QUEST_PUSH_RESULT` |  | same | 20261021_154642 | 1 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
 | 🔁 | S | `MSG_RAID_READY_CHECK` |  | same | 20261024_081947 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | 🔁 | S | `MSG_RAID_READY_CHECK_CONFIRM` |  | same | 20261024_081947 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
+| 🔁 | S | `MSG_RAID_TARGET_UPDATE` |  | same | 20261025_023350 | 3 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | 🔁 | S | `MSG_RANDOM_ROLL` |  | same | 20261024_205718 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | 🔁 | S | `SMSG_ADD_RUNE_POWER` | yes | same | 20261024_155804 | 16 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_AREA_SPIRIT_HEALER_TIME` |  | same | 20261024_155804 | 10 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
@@ -443,10 +457,13 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_CROSSED_INEBRIATION_THRESHOLD` |  | same | 20261024_070752 | 2 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_CURRENCY_LOOT_REMOVED` | yes | new in 4.x | 20261020_231647 | 2 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | 🔁 | S | `SMSG_DELETE_CHAR` |  | same | 20261021_025330 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
+| 🔁 | S | `SMSG_DESTROY_OBJECT` |  | same | 20261025_023350 | 5 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | 🔁 | S | `SMSG_DISPEL_FAILED` |  | same | 20261022_015111 | 3 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_EXPLORATION_EXPERIENCE` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_FLIGHT_SPLINE_SYNC` | yes | same | 20261021_215934 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_GROUP_DECLINE` |  | same | 20261021_154642 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
+| 🔁 | S | `SMSG_GROUP_DESTROYED` |  | same | 20261025_023350 | 3 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
+| 🔁 | S | `SMSG_GROUP_LIST` | yes | changed | 20261025_023350 | 6 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | 🔁 | S | `SMSG_GROUP_NEW_LEADER` |  | ? | 20261024_155804 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | 🔁 | S | `SMSG_GROUP_UNINVITE` |  | same | 20261022_165434 | 1 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | 🔁 | S | `SMSG_GUILD_BANK_LOG_QUERY_RESULTS` | yes | new in 4.x | 20261017_225242 | 2 |  | HermesProxy/World/Client/PacketHandlers/GuildHandler.cs |
@@ -530,6 +547,9 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_NEW_WORLD` | yes | changed | 20261024_180424 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA` |  | same | 20261024_040154 | 5 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔁 | S | `SMSG_ON_MONSTER_MOVE` | yes | changed | 20261025_023350 | 813 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| 🔁 | S | `SMSG_PARTY_COMMAND_RESULT` | yes | changed | 20261025_023350 | 3 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
+| 🔁 | S | `SMSG_PARTY_INVITE` | yes | ? | 20261025_023350 | 3 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
+| 🔁 | S | `SMSG_PARTY_MEMBER_FULL_STATE` | yes | ? | 20261025_023350 | 3 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | 🔁 | S | `SMSG_PARTY_MEMBER_PARTIAL_STATE` | yes | ? | 20261025_003247 | 2 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | 🔁 | S | `SMSG_PET_ACTION_SOUND` |  | same | 20261021_112409 | 6 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | 🔁 | S | `SMSG_PET_ADDED` | yes | new in 4.x | 20261021_112409 | 4 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
@@ -557,6 +577,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_QUEST_GIVER_REQUEST_ITEMS` | yes | changed | 20261024_024153 | 20 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
 | 🔁 | S | `SMSG_QUEST_LOG_FULL` |  | same | 20261021_023734 | 1 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
 | 🔁 | S | `SMSG_QUEST_UPDATE_FAILED_TIMER` |  | same | 20261021_201402 | 1 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
+| 🔁 | S | `SMSG_RAID_MARKERS_CHANGED` | yes | new in 4.x | 20261025_023350 | 6 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | 🔁 | S | `SMSG_READ_ITEM_RESULT_FAILED` |  | same | 20261021_180247 | 2 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
 | 🔁 | S | `SMSG_RESEARCH_COMPLETE` | yes | new in 4.x | 20261017_225242 | 2 |  | HermesProxy/World/Client/PacketHandlers/CurrencyHandler.cs |
 | 🔁 | S | `SMSG_RESURRECT_REQUEST` |  | reviewed | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
@@ -621,16 +642,13 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_ALTER_APPEARANCE` |  | same | 20261024_070752 | 5 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | ✅ | C | `CMSG_AREA_SPIRIT_HEALER_QUERY` |  | reviewed | 20261024_155804 | 9 |  | HermesProxy/World/Server/Systems/NpcSystem.cs |
 | ✅ | C | `CMSG_AREA_SPIRIT_HEALER_QUEUE` |  | reviewed | 20261024_155804 | 10 |  | HermesProxy/World/Server/Systems/NpcSystem.cs |
-| ✅ | C | `CMSG_AREA_TRIGGER` |  | same | 20261025_023350 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | ✅ | C | `CMSG_ARENA_TEAM_ACCEPT` |  | same | 20261024_101724 | 4 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | ✅ | C | `CMSG_ARENA_TEAM_DECLINE` |  | same | 20261024_101724 | 1 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | ✅ | C | `CMSG_ARENA_TEAM_DISBAND` |  | same | 20261024_101724 | 6 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | ✅ | C | `CMSG_ARENA_TEAM_INVITE` |  | same | 20261024_101724 | 6 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | ✅ | C | `CMSG_ARENA_TEAM_LEADER` |  | same | 20261022_015111 | 2 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | ✅ | C | `CMSG_ARENA_TEAM_LEAVE` |  | same | 20261021_234714 | 1 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
-| ✅ | C | `CMSG_ARENA_TEAM_QUERY` |  | same | 20261025_023350 | 2 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | ✅ | C | `CMSG_ARENA_TEAM_REMOVE` |  | same | 20261022_015111 | 1 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
-| ✅ | C | `CMSG_ARENA_TEAM_ROSTER` |  | same | 20261025_023350 | 2 |  | HermesProxy/World/Server/Systems/ArenaSystem.cs |
 | ✅ | C | `CMSG_ATTACK_STOP` |  | same | 20261024_215336 | 1 |  | HermesProxy/World/Server/Systems/MeleeAttackOrder.cs |
 | ✅ | C | `CMSG_AUCTION_LIST_BIDDED_ITEMS` |  | ? | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
 | ✅ | C | `CMSG_AUCTION_LIST_OWNED_ITEMS` |  | ? | 20261024_070752 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
@@ -783,8 +801,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_MAIL_RETURN_TO_SENDER` |  | same | 20261021_201402 | 4 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | ✅ | C | `CMSG_MAIL_TAKE_ITEM` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | ✅ | C | `CMSG_MAIL_TAKE_MONEY` | yes | changed | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
-| ✅ | C | `CMSG_MOVE_TIME_SKIPPED` | yes | changed | 20261025_023350 | 3 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
-| ✅ | C | `CMSG_NAME_QUERY` |  | same | 20261025_023350 | 2 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | ✅ | C | `CMSG_NEXT_CINEMATIC_CAMERA` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | ✅ | C | `CMSG_OFFER_PETITION` |  | same | 20261022_025027 | 2 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
 | ✅ | C | `CMSG_OPEN_ITEM` |  | same | 20261024_155804 | 1 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
@@ -798,7 +814,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_PLAYER_SHOWING_HELM` |  | ? | 20261024_205958 | 2 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | ✅ | C | `CMSG_PUSH_QUEST_TO_PARTY` |  | same | 20261021_154642 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
 | ✅ | C | `CMSG_QUERY_CREATURE` |  | same | 20261025_023350 | 2 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
-| ✅ | C | `CMSG_QUERY_GAME_OBJECT` |  | same | 20261025_023350 | 4 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | ✅ | C | `CMSG_QUERY_GUILD_INFO` | yes | changed | 20261025_015250 | 1 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
 | ✅ | C | `CMSG_QUERY_PAGE_TEXT` |  | same | 20261024_092150 | 2 |  | HermesProxy/World/Server/Systems/QuerySystem.cs |
 | ✅ | C | `CMSG_QUERY_PETITION` |  | ? | 20261022_025027 | 1 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
@@ -829,10 +844,8 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_REQUEST_PVP_REWARDS` | yes | new in 4.x | 20261024_230756 | 1 |  | HermesProxy/World/Server/Systems/BattlegroundSystem.cs |
 | ✅ | C | `CMSG_REQUEST_RAID_INFO` |  | same | 20261025_023350 | 1 |  | HermesProxy/World/Server/Systems/InstanceSystem.cs |
 | ✅ | C | `CMSG_REQUEST_RESEARCH_HISTORY` | yes | new in 4.x | 20261025_023350 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
-| ✅ | C | `CMSG_REQUEST_VEHICLE_EXIT` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | ✅ | C | `CMSG_REQUEST_VEHICLE_NEXT_SEAT` |  | ? | 20261022_013438 | 1 |  | (variable opcode) |
 | ✅ | C | `CMSG_REQUEST_VEHICLE_PREV_SEAT` |  | ? | 20261022_013438 | 1 |  | (variable opcode) |
-| ✅ | C | `CMSG_REQUEST_VEHICLE_SWITCH_SEAT` |  | same | 20261022_013438 | 1 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | ✅ | C | `CMSG_RESET_INSTANCES` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Server/Systems/InstanceSystem.cs |
 | ✅ | C | `CMSG_SAVE_CUF_PROFILES` | yes | new in 4.x | 20261024_024153 | 1 |  | HermesProxy/World/Server/Systems/ClientConfigSystem.cs |
 | ✅ | C | `CMSG_SAVE_EQUIPMENT_SET` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Server/Systems/EquipmentSetSystem.cs |
@@ -840,7 +853,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_SEND_MAIL` | yes | changed | 20261021_201402 | 7 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | ✅ | C | `CMSG_SEND_TEXT_EMOTE` |  | same | 20261024_205958 | 1 |  | HermesProxy/World/Server/Systems/ChatSystem.cs |
 | ✅ | C | `CMSG_SET_ACTION_BUTTON` |  | same | 20261024_155804 | 41 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
-| ✅ | C | `CMSG_SET_ACTIVE_MOVER` | yes | changed | 20261025_023350 | 2 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | ✅ | C | `CMSG_SET_ASSISTANT_LEADER` |  | same | 20261024_081947 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
 | ✅ | C | `CMSG_SET_CONTACT_NOTES` |  | same | 20261017_225242 | 1 |  | HermesProxy/World/Server/Systems/SocialSystem.cs |
 | ✅ | C | `CMSG_SET_CURRENCY_FLAGS` | yes | new in 4.x | 20261024_205958 | 2 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
@@ -876,13 +888,10 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_WRAP_ITEM` |  | ? | 20261021_154642 | 1 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `MSG_AUCTION_HELLO` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
 | ✅ | C | `MSG_MINIMAP_PING` |  | same | 20261024_081947 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
-| ✅ | C | `MSG_MOVE_TELEPORT_ACK` | yes | changed | 20261025_023350 | 4 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
-| ✅ | C | `MSG_MOVE_WORLDPORT_ACK` |  | same | 20261024_180424 | 2 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | ✅ | C | `MSG_PETITION_DECLINE` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
 | ✅ | C | `MSG_PETITION_RENAME` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
 | ✅ | C | `MSG_QUERY_NEXT_MAIL_TIME` |  | same | 20261025_023350 | 1 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | ✅ | C | `MSG_RAID_READY_CHECK` |  | same | 20261024_081947 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
-| ✅ | C | `MSG_RAID_TARGET_UPDATE` |  | same | 20261025_023350 | 3 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | C | `MSG_RANDOM_ROLL` |  | same | 20261024_205718 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
 | ✅ | C | `MSG_SAVE_GUILD_EMBLEM` |  | same | 20261022_012152 | 1 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
 | ✅ | C | `MSG_SET_DUNGEON_DIFFICULTY` |  | same | 20261024_092150 | 5 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
@@ -894,7 +903,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `MSG_PETITION_DECLINE` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs |
 | ✅ | S | `MSG_PETITION_RENAME` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs |
 | ✅ | S | `MSG_QUERY_NEXT_MAIL_TIME` |  | same | 20261025_023350 | 1 |  | HermesProxy/World/Client/PacketHandlers/MailHandler.cs |
-| ✅ | S | `MSG_RAID_TARGET_UPDATE` |  | same | 20261025_023350 | 3 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `MSG_SAVE_GUILD_EMBLEM` |  | same | 20261022_012152 | 1 |  | HermesProxy/World/Client/PacketHandlers/GuildHandler.cs |
 | ✅ | S | `MSG_SET_DUNGEON_DIFFICULTY` |  | same | 20261025_023350 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `MSG_SET_RAID_DIFFICULTY` |  | same | 20261025_023350 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
@@ -952,7 +960,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_CRITERIA_UPDATE` |  | same | 20261025_023350 | 4 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | ✅ | S | `SMSG_DEATH_RELEASE_LOC` |  | same | 20261024_183709 | 2 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_DEFENSE_MESSAGE` |  | same | 20261022_165434 | 1 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
-| ✅ | S | `SMSG_DESTROY_OBJECT` |  | same | 20261025_023350 | 5 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | ✅ | S | `SMSG_DESTRUCTIBLE_BUILDING_DAMAGE` |  | same | 20261022_015111 | 1 |  | HermesProxy/World/Client/PacketHandlers/GameObjectHandler.cs |
 | ✅ | S | `SMSG_DISMOUNT` |  | same | 20261025_021426 | 2 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_DUEL_COMPLETE` |  | same | 20261024_075821 | 1 |  | HermesProxy/World/Client/PacketHandlers/DuelHandler.cs |
@@ -980,8 +987,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_GOSSIP_COMPLETE` |  | same | 20261024_155804 | 3 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
 | ✅ | S | `SMSG_GOSSIP_MESSAGE` |  | reviewed | 20261024_155804 | 9 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
 | ✅ | S | `SMSG_GOSSIP_POI` |  | same | 20261024_155804 | 1 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
-| ✅ | S | `SMSG_GROUP_DESTROYED` |  | same | 20261025_023350 | 3 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
-| ✅ | S | `SMSG_GROUP_LIST` | yes | changed | 20261025_023350 | 6 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `SMSG_GUILD_ACHIEVEMENT_EARNED` | yes | new in 4.x | 20261022_012152 | 1 |  | HermesProxy/World/Client/PacketHandlers/GuildHandler.cs |
 | ✅ | S | `SMSG_GUILD_BANK_REMAINING_WITHDRAW_MONEY` | yes | new in 4.x | 20261025_015250 | 3 |  | HermesProxy/World/Client/PacketHandlers/GuildHandler.cs |
 | ✅ | S | `SMSG_GUILD_CHALLENGE_UPDATE` | yes | new in 4.x | 20261025_015250 | 1 |  | HermesProxy/World/Client/PacketHandlers/GuildHandler.cs |
@@ -1039,10 +1044,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_MAIL_LIST_RESULT` | yes | changed | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/MailHandler.cs |
 | ✅ | S | `SMSG_MOTD` |  | same | 20261025_023350 | 1 |  | HermesProxy/World/Client/PacketHandlers/SystemHandler.cs |
 | ✅ | S | `SMSG_NOTIFY_RECEIVED_MAIL` |  | ? | 20261024_070752 | 2 |  | HermesProxy/World/Client/PacketHandlers/MailHandler.cs |
-| ✅ | S | `SMSG_PARTY_COMMAND_RESULT` | yes | changed | 20261025_023350 | 3 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
-| ✅ | S | `SMSG_PARTY_INVITE` | yes | ? | 20261025_023350 | 3 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `SMSG_PARTY_KILL_LOG` |  | same | 20261024_155804 | 126 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
-| ✅ | S | `SMSG_PARTY_MEMBER_FULL_STATE` | yes | ? | 20261025_023350 | 3 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `SMSG_PETITION_SHOW_LIST` |  | same | 20261022_025027 | 2 |  | HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs |
 | ✅ | S | `SMSG_PETITION_SHOW_SIGNATURES` |  | same | 20261022_025027 | 2 |  | HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs |
 | ✅ | S | `SMSG_PETITION_SIGN_RESULTS` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs |
@@ -1075,7 +1077,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_RAID_GROUP_ONLY` |  | same | 20261021_180247 | 2 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
 | ✅ | S | `SMSG_RAID_INSTANCE_INFO` | yes | changed | 20261025_023350 | 1 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
 | ✅ | S | `SMSG_RAID_INSTANCE_MESSAGE` |  | same | 20261024_180424 | 1 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
-| ✅ | S | `SMSG_RAID_MARKERS_CHANGED` | yes | new in 4.x | 20261025_023350 | 6 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `SMSG_READ_ITEM_RESULT_OK` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
 | ✅ | S | `SMSG_REFORGE_RESULT` | yes | new in 4.x | 20261024_155804 | 10 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
 | ✅ | S | `SMSG_REQUEST_CEMETERY_LIST_RESPONSE` | yes | new in 4.x | 20261025_023350 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
@@ -1195,7 +1196,7 @@ HermesProxy/World/Client/PacketHandlers/CurrencyHandler.cs 220ca1fc91be8abf
 HermesProxy/World/Client/PacketHandlers/DuelHandler.cs b03465c7808e12be
 HermesProxy/World/Client/PacketHandlers/EquipmentSetHandler.cs fed692bdc29a5a53
 HermesProxy/World/Client/PacketHandlers/GameObjectHandler.cs 5d275013cfee5b51
-HermesProxy/World/Client/PacketHandlers/GroupHandler.cs c8797147833d0d5b
+HermesProxy/World/Client/PacketHandlers/GroupHandler.cs 193a3fb0dde744d2
 HermesProxy/World/Client/PacketHandlers/GuildHandler.cs c6ab90cd0c9805e4
 HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs aff58174ec73c96c
 HermesProxy/World/Client/PacketHandlers/ItemHandler.cs d7a6499b66e91298
@@ -1218,7 +1219,7 @@ HermesProxy/World/Client/PacketHandlers/SystemHandler.cs 806898d603ef9252
 HermesProxy/World/Client/PacketHandlers/TalentHandler.cs 44aefb28c8709d82
 HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs 8c9cc01c98e6100b
 HermesProxy/World/Client/PacketHandlers/TradeHandler.cs 27f0e60d0f199fdd
-HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs d9af83d2c8097128
+HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs 2d274f3ebe9e3069
 HermesProxy/World/Client/PacketHandlers/UpdateHandlerCata.cs d4dc5966d0496146
 HermesProxy/World/Client/PacketHandlers/WorldStateHandler.cs 7f47d3d9cac7b00e
 HermesProxy/World/Client/SeatGravity.cs 9d2a660de9366fd9
@@ -1315,7 +1316,7 @@ HermesProxy/World/Server/Systems/LootSystem.cs e37f080a971c511a
 HermesProxy/World/Server/Systems/MailSystem.cs c35f6da3ef36cec5
 HermesProxy/World/Server/Systems/MeleeAttackOrder.cs e76a452ae5e5f64c
 HermesProxy/World/Server/Systems/MiscSystem.cs 9c28c9adf36140eb
-HermesProxy/World/Server/Systems/MovementSystem.cs 1dac50a282d1e466
+HermesProxy/World/Server/Systems/MovementSystem.cs ba5c7c98a76748bf
 HermesProxy/World/Server/Systems/NpcSystem.cs 6ec1d7cdf6081084
 HermesProxy/World/Server/Systems/PartialStackAuctionPost.cs 5dd3a25ff4ed4b8b
 HermesProxy/World/Server/Systems/PetSystem.cs ed0413e5c047bccd
