@@ -1232,7 +1232,7 @@ HermesProxy/World/GuildClub.cs b1aa090972b200df
 HermesProxy/World/ItemRefund.cs ddc050973d0a0cdd
 HermesProxy/World/MaskedGuid.cs 38ad2baffdeef245
 HermesProxy/World/Objects/LegacyMovementCata.cs 16687842610b7322
-HermesProxy/World/Objects/LegacyMovementCodec.cs 2c051240a27eabd0
+HermesProxy/World/Objects/LegacyMovementCodec.cs 7a6fce1aa893fd1e
 HermesProxy/World/Objects/LegacyMovementSequencesCata.cs 17649fc68b17f313
 HermesProxy/World/Objects/ModernMovementCodec.cs 8820e35812db5c63
 HermesProxy/World/Objects/MovementSpeeds.cs 64ae90dad0838ef1

@@ -217,7 +217,14 @@ public static class LegacyMovementCodec
         }
         else
         {
-            flags = (uint)info.Flags.CastFlags<MovementFlagModern, MovementFlagVanilla>();
+            // A direction pressed in the air is only pending on the modern client until it lands;
+            // a vanilla client reports the direction itself, and VMaNGOS kicks a move start that
+            // lacks its own flag (MovementAnticheat::CheckMoveStart, Anticheat.BadMoveStart).
+            // PendingForward..PendingStrafeRight sit 15 bits above Forward..StrafeRight.
+            const MovementFlagModern pendingDirections = MovementFlagModern.PendingForward | MovementFlagModern.PendingBackward
+                | MovementFlagModern.PendingStrafeLeft | MovementFlagModern.PendingStrafeRight;
+            MovementFlagModern modern = info.Flags | (MovementFlagModern)((uint)(info.Flags & pendingDirections) >> 15);
+            flags = (uint)modern.CastFlags<MovementFlagModern, MovementFlagVanilla>();
             onTransport = (uint)MovementFlagVanilla.OnTransport;
             pitching = (uint)MovementFlagVanilla.Swimming;
             falling = (uint)MovementFlagVanilla.Falling;
