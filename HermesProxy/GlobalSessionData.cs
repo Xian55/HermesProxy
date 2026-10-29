@@ -826,11 +826,8 @@ public sealed class GameSessionData
     }
     public LootMethod GetCurrentLootMethod()
     {
-        var group = GetCurrentGroup();
-        if (group == null)
-            return LootMethod.FreeForAll;
-
-        return group.LootSettings.Method;
+        // a group of one has no loot settings: nobody to share with
+        return GetCurrentGroup()?.LootSettings?.Method ?? LootMethod.FreeForAll;
     }
     public WowGuid128 GetCurrentGroupGuid()
     {
