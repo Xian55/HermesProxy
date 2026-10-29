@@ -475,9 +475,8 @@ public partial class WorldClient
         var uniqueMembers = new HashSet<WowGuid128>();
         uint membersCount = packet.ReadUInt32();
         // A 4.3.4 server makes the group at the first invite and lists it at once, with nobody in
-        // it yet; earlier servers list a group once someone has joined, and one of none only to
-        // say it is gone. A list of none that still names a group is that group waiting for its
-        // first member: passed on as a group gone, the inviter was told they had been removed.
+        // it yet. A list of none that still names a group is that group waiting for its first
+        // member: passed on as a group gone, the inviter was told they had been removed.
         //
         // The one such list that must go through is the server taking the player out of the group
         // of the instance category. A battleground's raid ends with nothing else: no removal
@@ -487,7 +486,15 @@ public partial class WorldClient
         // And a battleground's raid begins the other way round: the player is put into it alone on
         // entering, the others follow one list at a time. That list of none is a raid of one, and
         // the client is in the battle's raid from the moment it is in the battle.
-        bool raidOfOne = membersCount == 0 && IsCataLegacy && isBattleground && !removed && !party.PartyGUID.IsEmpty();
+        //
+        // A 3.3.5a server lists every group of one: a party as it is formed (Group::Create adds
+        // the leader and lists the group before the one who accepted joins), the group of a
+        // dungeon finder queue of one (cMaNGOS in LFG testing mode), a battleground's raid on
+        // entry. Every 3.3.5a removal carries the mark, so a list of none without it is a group of
+        // one. Passed on as a group gone, the leader of every new party read "You have been
+        // removed from the group.".
+        bool raidOfOne = membersCount == 0 && !removed && !party.PartyGUID.IsEmpty()
+            && (IsCataLegacy ? isBattleground : LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_0_10958));
         //
         // The same list with the removal mark ends a party too. SMSG_GROUP_DESTROYED comes with it
         // and only says so in chat: without the list the client stayed in a party of two that the
@@ -588,7 +595,7 @@ public partial class WorldClient
             int difficultyId = 0;
             if (raidOfOne)
             {
-                // TrinityCore 4.3.4 Group::SendUpdateToPlayer writes loot and difficulty only for a
+                // TrinityCore 4.3.4 and the 3.3.5a servers write loot and difficulty only for a
                 // group of more than one; the list ends with the leader.
                 party.LootSettings.LootMaster = WowGuid128.Empty;
             }
@@ -622,6 +629,17 @@ public partial class WorldClient
                 party.DifficultySettings.RaidDifficultyID = DifficultyModern.Raid25N;
             else
                 party.DifficultySettings.RaidDifficultyID = DifficultyModern.Raid40;
+
+            if (raidOfOne && !IsCataLegacy)
+            {
+                // TrinityCore 3.4.3 Group::SendUpdateToPlayer leaves loot and difficulty out for a
+                // group of one, as the 3.3.5a list does, and the group kept here is re-sent when the
+                // difficulty changes. Made up instead, a dungeon finder group of one and a
+                // battleground's raid of one read "Looting changed to Free for All." and "Loot
+                // threshold set to Poor.".
+                party.LootSettings = null!;
+                party.DifficultySettings = null!;
+            }
 
             GetSession().GameState.WeWantToLeaveGroup = false;
             GetSession().GameState.LastAnnouncedPartyIndex = party.PartyIndex;
