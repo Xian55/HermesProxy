@@ -81,11 +81,6 @@ public class PlayerVehicleRecordTests
         harness.Session.GameState.ClientHasPlayerObject = false;
         harness.Session.GameState.ClientKnownGuids.Remove(guid);
         Deliver(harness, player, 313);
-        if (ModernVersion.Build != global::HermesProxy.Enums.ClientVersionBuild.V3_4_3_54261)
-        {
-            Assert.Equal(2, harness.ClientWire.Sent.Count);
-            return;
-        }
 
         Assert.Empty(harness.ClientWire.Sent);
         Assert.Equal(2, harness.Session.ToClient.PendingCount);
@@ -158,11 +153,6 @@ public class PlayerVehicleRecordTests
         Deliver(harness, player, 313);
         DeliverCancelExpectedRide(harness);
         DeliverSeatMove(harness, passenger, vehicle: player, seat: 1);
-        if (ModernVersion.Build != global::HermesProxy.Enums.ClientVersionBuild.V3_4_3_54261)
-        {
-            Assert.IsType<MonsterMove>(harness.ClientWire.Sent.Last().Packet);
-            return;
-        }
 
         Assert.Empty(harness.ClientWire.Sent);
         harness.Session.GameState.ClientHasPlayerObject = true;

@@ -991,6 +991,13 @@ public partial class WorldClient
                     session.ToClient.Notify(OutboxEvent.GuidKnown(currentPlayerGuid));
             }
         }
+        // The older clients have no world-ready handshake to wait for, so what was held for the
+        // player goes out right behind its create, in the order the server sent it: on a login
+        // in mid-flight, the resumed flight and the taxi flags (issue #325).
+        else if (session.GameState.ClientHasPlayerObject && session.ToClient.HasPending)
+        {
+            session.ToClient.Notify(OutboxEvent.GuidKnown(session.GameState.CurrentPlayerGuid));
+        }
     }
 
     void SendItemUpdatesIfNeeded(ItemTemplate item)

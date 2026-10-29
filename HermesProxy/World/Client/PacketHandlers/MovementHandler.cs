@@ -164,8 +164,7 @@ public partial class WorldClient
     void SendPlayerMovementPacket(ServerPacket packet, WowGuid128 moverGuid)
     {
         var session = GetSession();
-        if (!ModernVersion.IsWotLKClassicOrLater ||
-            moverGuid != session.GameState.CurrentPlayerGuid ||
+        if (moverGuid != session.GameState.CurrentPlayerGuid ||
             session.GameState.ClientHasPlayerObject)
         {
             SendPacketToClient(packet);
@@ -1351,26 +1350,31 @@ public partial class WorldClient
         {
             // Exact sequence of packets from sniff.
             // Client instantly teleports to destination if anything is left out.
+            //
+            // A flight resumed at login can arrive while the player's create is still held for
+            // item templates (a proxy that has just started knows none). The client drops all of
+            // it for a player it does not have, and drops the character mid-air (issue #325), so
+            // the whole sequence waits for the create, in this order.
 
             ServerSideMovement stopSpline = new();
             stopSpline.StartPosition = moveSpline.StartPosition;
             stopSpline.SplineId = moveSpline.SplineId - 2;
             MonsterMove moveStop = new MonsterMove(guid, stopSpline);
-            SendPacketToClient(moveStop);
+            SendPlayerMovementPacket(moveStop, guid);
 
             ControlUpdate update = new();
             update.Guid = guid;
             update.HasControl = false;
-            SendPacketToClient(update);
+            SendPlayerMovementPacket(update, guid);
 
             stopSpline.SplineId = moveSpline.SplineId - 1;
             moveStop = new MonsterMove(guid, stopSpline);
-            SendPacketToClient(moveStop);
+            SendPlayerMovementPacket(moveStop, guid);
 
             update = new();
             update.Guid = guid;
             update.HasControl = false;
-            SendPacketToClient(update);
+            SendPlayerMovementPacket(update, guid);
 
             // Taxi-flight spline decoration. Modern Classic flags universal across V1_14 / V2_5 / V3_4_3.
             moveSpline.SplineFlags = SplineFlagModern.Flying |
@@ -1419,7 +1423,7 @@ public partial class WorldClient
         if (moveSpline.TransportGuid != default)
             SendPlayerMovementPacket(monsterMove, moveSpline.TransportGuid);
         else
-            SendPacketToClient(monsterMove);
+            SendPlayerMovementPacket(monsterMove, guid);
 
         if (isTaxiFlight)
         {
