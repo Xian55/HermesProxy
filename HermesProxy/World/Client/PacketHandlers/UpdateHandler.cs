@@ -278,21 +278,28 @@ public partial class WorldClient
     /// MO_TRANSPORT (type 15: zeppelins, boats). The V1_14 and V2_5 targets forward both
     /// unconditionally; this filter exists only on the V3_4_3 path. Upstream issue #96.
     /// </summary>
-    private bool MayForwardTransport(HighGuidTypeLegacy legacyHigh, ObjectUpdate updateData)
+    private bool MayForwardTransport(HighGuidTypeLegacy legacyHigh, ObjectUpdate updateData) =>
+        GetSession().DiagnosticsOptions.ForwardTransportsV343 &&
+        HasUsableTransportPosition(updateData.GameObjectData?.TypeID, updateData.CreateData?.MoveInfo?.Position);
+
+    /// <summary>
+    /// Whether a transport create's position is one the client can place the transport from.
+    /// Testing the position rather than the backend keeps a placeholder create filtered
+    /// wherever it comes from.
+    /// </summary>
+    internal static bool HasUsableTransportPosition(sbyte? gameObjectType, Vector3? position)
     {
-        if (!GetSession().DiagnosticsOptions.ForwardTransportsV343)
+        if (position == null)
             return false;
 
-        // Gate on the condition the filter was actually written for. cMangos sends these
-        // creates with Position=(0,0,0) and defers the real position to GAMEOBJECT_POS_*
-        // deltas, and the client rejects a stationary GameObject at the origin with
-        // CMSG_OBJECT_UPDATE_FAILED, retrying forever and never finishing the loading
-        // screen. TrinityCore and AzerothCore use spawn-data position, so their creates
-        // carry a usable one. Testing the position rather than the backend keeps a
-        // placeholder create filtered wherever it comes from.
-        var position = updateData.CreateData?.MoveInfo?.Position;
-        if (position == null || (position.Value.X == 0f && position.Value.Y == 0f && position.Value.Z == 0f))
-            return false;
+        // cMaNGOS writes (0,0,0) for every MO_TRANSPORT (GameObject::GetStationaryX): a 3.3.5a
+        // client places those from their taxi path and the clock alone, and so does the 3.4.3
+        // client (#101: The Mighty Wind docked, took a rider on board and crossed to Northrend
+        // from such a create). A type 11 transport animates around the position its create
+        // carries, so one at the origin is still a placeholder. The type, not the guid: cMaNGOS
+        // gives some type 11 elevators an MO_TRANSPORT guid.
+        if (position.Value == Vector3.Zero)
+            return gameObjectType == (sbyte)GameObjectTypeModern.MOTransport;
 
         return true;
     }
@@ -683,14 +690,10 @@ public partial class WorldClient
 
                     if (updateData.CreateData.MoveInfo != null || !guid.IsWorldObject() )
                     {
-                        // V3_4_3-only filter: cMangos sends Transport/MOTransport
-                        // CreateObjects with Position=(0,0,0) (legacy server defers
-                        // position to subsequent update-field deltas; TC/AC use
-                        // spawn-data position). The V3_4_3 client rejects a Stationary
-                        // GameObject create with Position=(0,0,0) and Orientation!=0
-                        // with CMSG_OBJECT_UPDATE_FAILED, looping forever. Static
-                        // GameObjects forward fine. ItemContainer (0x4700) is also
-                        // forwarded (HighGuid mapping converts to a normal Item guid).
+                        // V3_4_3-only: a Transport/MOTransport create goes through
+                        // MayForwardTransport. Static GameObjects forward fine.
+                        // ItemContainer (0x4700) is also forwarded (HighGuid mapping
+                        // converts to a normal Item guid).
                         bool filtered = ShouldSkipV343CorpseRecreate(guid);
                         if (ModernVersion.IsWotLKClassicOrLater)
                         {
