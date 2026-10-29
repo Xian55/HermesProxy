@@ -74,8 +74,9 @@ migration moves them here one slice at a time. What has moved and what hasn't is
            ItemText(id) .......... MailHandler.HandleQueryItemTextResponse (pre-3.3.0)
            NpcText(id) ........... QueryHandler.HandleQueryNpcTextResponse, with texts or masked,
                                    after the response went to the client
-           GuidKnown(player) ..... UpdateHandler.SendUpdateBatch end, V3_4_3, at EVERY batch while the
-                                   client has the player (so a late hold still goes out next batch)
+           GuidKnown(player) ..... UpdateHandler.SendUpdateBatch end, every build, at EVERY batch while
+                                   the client has the player (so a late hold still goes out next
+                                   batch); QueryHandler.FlushDeferredUpdate right behind a held create
            Gate InWorld .......... CharacterHandler: opened on SMSG_LOGIN_VERIFY_WORLD,
                                    closed on login failure and ReplaceGameState
            Tick() / TickParks() .. same place (legacy receive thread) · timer thread for timer-safe

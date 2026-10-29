@@ -1055,8 +1055,7 @@ public partial class WorldClient
     {
         var session = GetSession();
         WowGuid128 playerGuid = session.GameState.CurrentPlayerGuid;
-        if (!ModernVersion.IsWotLKClassicOrLater ||
-            session.GameState.ClientHasPlayerObject)
+        if (session.GameState.ClientHasPlayerObject)
         {
             SendPacketToClient(playerValues);
             return;
@@ -1078,9 +1077,6 @@ public partial class WorldClient
 
     private void MarkPlayerCreateQueued(UpdateObject packet)
     {
-        if (!ModernVersion.IsWotLKClassicOrLater)
-            return;
-
         WowGuid128 playerGuid = GetSession().GameState.CurrentPlayerGuid;
         foreach (var update in packet.ObjectUpdates)
         {
@@ -1121,8 +1117,10 @@ public partial class WorldClient
         // changedMask cascade and triggers a reason-7 disconnect within ~4-10s of
         // the first auto-attack swing. Sending creature updates first preserves
         // the order legacy servers emit (target state arrives before owner deltas).
+        // The older clients only need it while the player's create is still on its way: their
+        // player Values have to wait for it as well (SendPlayerValuesUpdate, issue #325).
         List<ObjectUpdate>? playerValuesUpdates = null;
-        if (ModernVersion.IsWotLKClassicOrLater)
+        if (ModernVersion.IsWotLKClassicOrLater || !GetSession().GameState.ClientHasPlayerObject)
         {
             WowGuid128 playerGuidForSplit = GetSession().GameState.CurrentPlayerGuid;
             foreach (var upd in updateObject.ObjectUpdates)
@@ -1313,21 +1311,21 @@ public partial class WorldClient
                 Log.Print(LogType.Trace,
                     $"[PlayerEnterTrace] post-CreateObject AURA_UPDATE_ALL sent for player guid={currentPlayerGuid} populatedAuras={playerAuraSync.Auras.Count}");
             }
+        }
 
-            // Releases what waits for the client to have the player object: the toy box sync
-            // (CollectionSync.SendToys) and pet batches held above. Raised at every batch end
-            // after the player's create was queued, not once, so a hold registered late
-            // still goes out.
-            // This deliberately does not hang off playerCreateInBatch: the player's CreateObject
-            // is usually split out into its own per-create packet above, so by the time we get
-            // here it is no longer in updateObject.ObjectUpdates and that flag reads false on
-            // most logins. ClientHasPlayerObject is marked only after the create has been
-            // passed to the outbox; FilterV3_4_3Values marks ClientKnownGuids earlier.
-            if (GetSession().ToClient.HasPending &&
-                GetSession().GameState.ClientHasPlayerObject)
-            {
-                GetSession().ToClient.Notify(OutboxEvent.GuidKnown(currentPlayerGuid));
-            }
+        // Releases what waits for the client to have the player object: the toy box sync
+        // (CollectionSync.SendToys), pet batches held above, and the player's own Values and
+        // movement held while its create was on its way. Raised at every batch end after the
+        // player's create was queued, not once, so a hold registered late still goes out.
+        // This deliberately does not hang off playerCreateInBatch: the player's CreateObject
+        // is usually split out into its own per-create packet above, so by the time we get
+        // here it is no longer in updateObject.ObjectUpdates and that flag reads false on
+        // most logins. ClientHasPlayerObject is marked only after the create has been
+        // passed to the outbox; FilterV3_4_3Values marks ClientKnownGuids earlier.
+        if (GetSession().ToClient.HasPending &&
+            GetSession().GameState.ClientHasPlayerObject)
+        {
+            GetSession().ToClient.Notify(OutboxEvent.GuidKnown(GetSession().GameState.CurrentPlayerGuid));
         }
     }
 
