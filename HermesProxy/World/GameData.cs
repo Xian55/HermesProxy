@@ -72,6 +72,27 @@ public static partial class GameData
     /// the second add threw (issue #355). The loaders run before any session and take no lock.
     /// </remarks>
     public static readonly System.Threading.Lock ItemRecordLock = new();
+
+    /// <summary>
+    /// Per item, the records the Generate*UpdateIfNeeded family made for it, as a client is sent
+    /// them. The session whose query made them sends them at once; any other session's client is
+    /// sent the same when the item reaches it, since its own query, if it makes one, finds the
+    /// stores up to date (issue #535). Written under <see cref="ItemRecordLock"/>.
+    /// </summary>
+    public static ConcurrentDictionary<uint, ItemRecordDelivery> ItemRecordDeliveries = [];
+
+    /// <summary>One hotfix message of an item's records, and whether a DB reply goes with it.</summary>
+    public readonly record struct ItemRecordMessage(HotfixRecord[] Records, bool WithDbReply);
+
+    /// <summary>
+    /// What a client is sent for one item. Replaced, never changed, when a later answer about the
+    /// item changes a record, so a session can tell by reference whether it has had this one.
+    /// </summary>
+    public sealed class ItemRecordDelivery(ItemRecordMessage[] messages)
+    {
+        public ItemRecordMessage[] Messages { get; } = messages;
+    }
+
     public static FrozenDictionary<uint, Battleground> Battlegrounds = FrozenDictionary<uint, Battleground>.Empty;
     // Dungeon and raid map -> its lowest difficulty and that difficulty's MaxPlayers, from
     // CSV/MapDifficulty{expansion}.csv. Maps not listed are continents, battlegrounds and arenas,
@@ -4307,6 +4328,72 @@ public static partial class GameData
         {
             DoStuff((uint)modAppearance.Id, DB2Hash.ItemModifiedAppearance, remove ? null : (hotfixContentTargetBuffer) => WriteItemModifiedAppearanceHotfix(modAppearance, hotfixContentTargetBuffer));
         }
+    }
+
+    /// <summary>
+    /// Brings the item record stores up to date with what the server said about an item, and
+    /// returns what a client should have been sent for it: every record made for the item so far,
+    /// by this query or an earlier one of any session. Null when the item never needed one.
+    /// </summary>
+    public static ItemRecordDelivery? UpdateItemRecords(ItemTemplate item)
+    {
+        // Held across the generators and the delivery: a session whose query finds the stores up
+        // to date must find the records the query that brought them up to date made (issue #535).
+        using var held = ItemRecordLock.EnterScope();
+
+        List<ItemRecordMessage>? made = null;
+        AddMade(ref made, GenerateItemUpdateIfNeeded(item), withDbReply: false);
+
+        // The V3_4_3 ItemSparse layout has been brought into alignment with
+        // WPP's ItemSparseHandler341 expectations (StartQuestID/ItemRange split,
+        // MinReputation Int32, three new Int32 fields between FactionRelated and
+        // MaxDurability, no trailing MinReputation byte, removed duplicate
+        // StartQuestId UInt16). The HotFixMessage path is safe to send again.
+        AddMade(ref made, GenerateItemSparseUpdateIfNeeded(item), withDbReply: true);
+
+        // Mirror the ItemSparse path: a paired DBReply is needed for the modern client
+        // to actually apply the corrected ItemEffect record in the running session.
+        // Without this, SoM 1.14.1+ renumbered on-use spells (e.g. Diamond Flask) stay
+        // bound to their modern spell id even after the hotfix is sent.
+        for (byte slot = 0; slot < 5; slot++)
+            AddMade(ref made, GenerateItemEffectUpdateIfNeeded(item, slot), withDbReply: true);
+
+        if (ItemCanHaveModel(item))
+        {
+            AddMade(ref made, GenerateItemAppearanceUpdateIfNeeded(item), withDbReply: false);
+            AddMade(ref made, GenerateItemModifiedAppearanceUpdateIfNeeded(item), withDbReply: false);
+        }
+
+        ItemRecordDeliveries.TryGetValue(item.Entry, out var delivery);
+        if (made == null)
+            return delivery;
+
+        // A record made again replaces its earlier message. The new ones go last, in the order
+        // they were made, so an appearance still comes before the modified appearance naming it.
+        var messages = new List<ItemRecordMessage>();
+        if (delivery != null)
+        {
+            foreach (var earlier in delivery.Messages)
+            {
+                bool remade = false;
+                foreach (var now in made)
+                    remade |= now.Records[0].TableHash == earlier.Records[0].TableHash &&
+                              now.Records[0].RecordId == earlier.Records[0].RecordId;
+                if (!remade)
+                    messages.Add(earlier);
+            }
+        }
+        messages.AddRange(made);
+
+        delivery = new ItemRecordDelivery([.. messages]);
+        ItemRecordDeliveries[item.Entry] = delivery;
+        return delivery;
+    }
+
+    private static void AddMade(ref List<ItemRecordMessage>? made, Server.Packets.HotFixMessage? reply, bool withDbReply)
+    {
+        if (reply != null && reply.Hotfixes.Count != 0)
+            (made ??= []).Add(new ItemRecordMessage([.. reply.Hotfixes], withDbReply));
     }
 
     public static Server.Packets.HotFixMessage? GenerateItemUpdateIfNeeded(ItemTemplate item)

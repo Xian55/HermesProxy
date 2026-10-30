@@ -1,5 +1,7 @@
 using System;
+using System.Globalization;
 using System.IO;
+using System.Threading;
 using BenchmarkDotNet.Attributes;
 using HermesProxy.Enums;
 using HermesProxy.World;
@@ -38,6 +40,11 @@ public class GameDataAccessBenchmarks
             VersionBootstrap.LegacyBuild = ClientVersionBuild.V3_3_5a_12340;
         if (VersionBootstrap.ModernBuild == ClientVersionBuild.Zero)
             VersionBootstrap.ModernBuild = ClientVersionBuild.V3_4_3_54261;
+
+        // The loaders parse CSV numbers with the current culture, which Program pins to invariant;
+        // a comma-decimal one rejects "0.6".
+        CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+        Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
 
         // The loaders read CSV/ relative to the working directory, as the proxy does.
         string dir = AppContext.BaseDirectory;
@@ -175,4 +182,25 @@ public class GameDataAccessBenchmarks
     /// <summary>One item query's hotfix check for an item already up to date: nine generator calls.</summary>
     [Benchmark]
     public int ItemQuery_Generators_UpToDate() => RunGenerators(_upToDate);
+
+    /// <summary>
+    /// The same through <see cref="GameData.UpdateItemRecords"/>, which an item query's answer
+    /// calls since issue #535: the generators, and the item's records for the session.
+    /// </summary>
+    [Benchmark]
+    public int ItemQuery_UpdateItemRecords_UpToDate() => GameData.UpdateItemRecords(_upToDate)?.Messages.Length ?? 0;
+
+    /// <summary>
+    /// What an item create of an item the proxy already knows now costs on top (issue #535): a
+    /// look for records made for it, which most items have none of.
+    /// </summary>
+    [Benchmark(OperationsPerInvoke = Calls)]
+    public int ItemRecords_KnownItem()
+    {
+        int found = 0;
+        foreach (uint entry in _templateEntries)
+            if (GameData.ItemRecordDeliveries.TryGetValue(entry, out _))
+                found++;
+        return found;
+    }
 }

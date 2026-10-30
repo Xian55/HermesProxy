@@ -681,10 +681,15 @@ public partial class WorldClient
                         // re-read once the object it names actually exists.
                         GetSession().GameState.InventoryChangedSinceQuestResync = true;
 
-                        if (LegacyHasItemQuery && updateData.ObjectData.EntryID != null &&
-                            !GameData.ItemTemplates.ContainsKey((uint)updateData.ObjectData.EntryID))
+                        if (LegacyHasItemQuery && updateData.ObjectData.EntryID != null)
                         {
-                            (missingItemTemplates ??= []).Add((uint)updateData.ObjectData.EntryID);
+                            uint itemEntry = (uint)updateData.ObjectData.EntryID;
+                            if (!GameData.ItemTemplates.ContainsKey(itemEntry))
+                                (missingItemTemplates ??= []).Add(itemEntry);
+                            // Nothing is asked about a known item, so the records a query made
+                            // for it reach this client here (issue #535).
+                            else if (GameData.ItemRecordDeliveries.TryGetValue(itemEntry, out var records))
+                                SendItemRecords(itemEntry, records);
                         }
                     }
 
@@ -771,10 +776,15 @@ public partial class WorldClient
                         // re-read once the object it names actually exists.
                         GetSession().GameState.InventoryChangedSinceQuestResync = true;
 
-                        if (LegacyHasItemQuery && updateData.ObjectData.EntryID != null &&
-                            !GameData.ItemTemplates.ContainsKey((uint)updateData.ObjectData.EntryID))
+                        if (LegacyHasItemQuery && updateData.ObjectData.EntryID != null)
                         {
-                            (missingItemTemplates ??= []).Add((uint)updateData.ObjectData.EntryID);
+                            uint itemEntry = (uint)updateData.ObjectData.EntryID;
+                            if (!GameData.ItemTemplates.ContainsKey(itemEntry))
+                                (missingItemTemplates ??= []).Add(itemEntry);
+                            // Nothing is asked about a known item, so the records a query made
+                            // for it reach this client here (issue #535).
+                            else if (GameData.ItemRecordDeliveries.TryGetValue(itemEntry, out var records))
+                                SendItemRecords(itemEntry, records);
                         }
                     }
 

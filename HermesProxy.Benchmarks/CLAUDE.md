@@ -39,7 +39,7 @@ dotnet run --project HermesProxy.Benchmarks -c Release -- --list flat
 | `HighGuidBenchmarks.cs` | `HighGuid` high-guid type lookup and 64↔128 guid conversion vs the previous per-lookup `HighGuid` object (verbatim `Legacy*` copies) |
 | `AllocationHotSpotBenchmarks.cs` | The update-path hot spots from the 2026-09 Alterac Valley allocation traces — `GetUpdateField`, `HasAnyFlag`, update-mask reuse, packed GUIDs, `CastFlags` — each against a verbatim `Legacy*` copy, one baseline per category |
 | `GameDataStoreBenchmarks.cs` | A shared GameData store as `Dictionary`, `ConcurrentDictionary` and `Dictionary` under a `Lock`: lookup hit and miss, storing again, and the footprint of filling one |
-| `GameDataAccessBenchmarks.cs` | The real `GameData` API after `LoadEverything` (3.3.5a→3.4.3): template hits, aura remap miss, ItemSparse item level, appearance and item spell slot lookups, writes, and an up-to-date item through the five hotfix generators |
+| `GameDataAccessBenchmarks.cs` | The real `GameData` API after `LoadEverything` (3.3.5a→3.4.3): template hits, aura remap miss, ItemSparse item level, appearance and item spell slot lookups, writes, an up-to-date item through the five hotfix generators and through `UpdateItemRecords`, and the item-record look-up an item create makes |
 
 ## Conventions
 
