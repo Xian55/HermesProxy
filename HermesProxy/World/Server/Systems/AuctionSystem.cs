@@ -90,11 +90,12 @@ public static class AuctionSystem
 
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
-            // TrinityCore 4.3.4 HandleAuctionListItems reads a getAll byte before this one.
-            // Without it the sort count was read from the first sort and the search was dropped.
+            // getAll. Set, a server ignores the filters and sends its whole house in one packet.
+            packet.WriteBool(false);
+            // TrinityCore 4.3.4 reads one more byte here. Without it the sort count was read from
+            // the first sort and the search was dropped. 3.3.5a has no exact match to ask for.
             if (WorldClient.IsCataLegacy)
-                packet.WriteBool(false);
-            packet.WriteBool(auction.ExactMatch);
+                packet.WriteBool(auction.ExactMatch);
             packet.WriteUInt8((byte)auction.Sorts.Count);
 
             foreach (var sort in auction.Sorts)
@@ -104,6 +105,7 @@ public static class AuctionSystem
             }
         }
 
+        ctx.GameState.AuctionExactMatchName = auction.ExactMatch ? auction.Name : null;
         ctx.SendPacketToServer(packet);
     }
 

@@ -126,7 +126,25 @@ public partial class WorldClient
         if (GetSession().GameState.RetailAuctions.OnLegacyList(auction.Items, auction.TotalItemsCount, auction.DesiredDelay))
             return;
 
+        if (GetSession().GameState.AuctionExactMatchName is { } exactName)
+            KeepExactMatches(auction, exactName, GetSession().Locale);
+
         SendPacketToClient(auction);
+    }
+
+    /// <summary>
+    /// A legacy server has no exact match: its answer is every name that holds the text. The
+    /// client does not narrow it either, so that is done here, page by page. The total stays the
+    /// server's unless this page was all of it, as the other pages have not been seen.
+    /// </summary>
+    static void KeepExactMatches(AuctionListItemsResult result, string name, string? locale)
+    {
+        int found = result.Items.Count;
+        result.Items.RemoveAll(auction => !RetailAuctionShape.IsExactMatch(
+            auction, AuctionItemFacts.SearchNameOf(auction.Item?.ItemID ?? 0, locale), name));
+
+        if (found == result.TotalItemsCount)
+            result.TotalItemsCount = result.Items.Count;
     }
 
     [HandlesSmsg(Opcode.SMSG_AUCTION_COMMAND_RESULT)]

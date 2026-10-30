@@ -212,6 +212,9 @@ public sealed class GameSessionData
     public uint CurrentGuildNumAccounts;
     public WowGuid128 CurrentInteractedWithNPC;
 
+    /// <summary>The name of the exact-match auction search last sent; null after any other search.</summary>
+    public string? AuctionExactMatchName;
+
     private World.Server.Systems.RetailAuctionHouse? _retailAuctions;
 
     /// <summary>The 4.4.2 client's auction house searches. Created on its first request.</summary>
