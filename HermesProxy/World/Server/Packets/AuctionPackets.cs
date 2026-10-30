@@ -371,6 +371,19 @@ internal readonly record struct AuctionItemFacts(
     /// <summary>The client sells and buys anything that stacks by the piece.</summary>
     public bool IsCommodity => MaxStack > 1;
 
+    /// <summary>
+    /// An item's name in the words a client of this locale searches with, or empty. The server's
+    /// own name comes first; the item table is enUS, so it speaks for no other client.
+    /// </summary>
+    public static string SearchNameOf(uint itemId, string? locale)
+    {
+        string name = GameData.GetItemName(itemId);
+        if (name.Length == 0 && locale == "enUS" && GameData.ItemSparseRecordsStore.TryGetValue(itemId, out var sparse))
+            name = sparse.Name1;
+
+        return name;
+    }
+
     public static AuctionItemFacts Of(uint itemId)
     {
         GameData.ItemSparseRecordsStore.TryGetValue(itemId, out var sparse);
@@ -417,6 +430,27 @@ internal static class RetailAuctionShape
 
     public static bool HasName(in AuctionItemFacts facts, string name)
         => facts.Name.Length == 0 || string.Equals(facts.Name, name, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether an auction answers an exact-match search for <paramref name="name"/>. A random
+    /// suffix ("of the Whale") is the auction's, and no name is held for it, so a search that runs
+    /// on past the item's name counts: the server has matched the rest of it.
+    /// </summary>
+    /// <param name="itemName">From <see cref="AuctionItemFacts.SearchNameOf"/>. Empty, the name is
+    /// not known: the auction stays, since an extra row does less harm than an empty result.</param>
+    public static bool IsExactMatch(AuctionItem auction, string itemName, string name)
+    {
+        if (auction.Item is null)
+            return false;
+
+        if (itemName.Length == 0 || string.Equals(itemName, name, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return auction.Item.RandomPropertiesID != 0
+            && name.Length > itemName.Length
+            && name[itemName.Length] == ' '
+            && name.StartsWith(itemName, StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>Bit n set: quality n is wanted. None and all both mean no filter.</summary>
     public static uint QualityMask(AuctionHouseFilterMask filters) => ((uint)filters >> QualityShift) & AllQualities;
