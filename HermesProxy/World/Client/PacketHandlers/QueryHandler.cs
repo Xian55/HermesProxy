@@ -641,7 +641,9 @@ public partial class WorldClient
         ItemTemplate item = new ItemTemplate();
         item.ReadFromLegacyPacket((uint)entry.Key, packet);
 
-        SendItemUpdatesIfNeeded(item);
+        // The records go in before the template: a session that finds the template stored looks
+        // for them, and must find them.
+        SendItemRecords((uint)entry.Key, GameData.UpdateItemRecords(item));
         GameData.StoreItemTemplate((uint)entry.Key, item);
 
         // issue #34: any UpdateObject batch that was held back waiting on this
@@ -1000,64 +1002,38 @@ public partial class WorldClient
         }
     }
 
-    void SendItemUpdatesIfNeeded(ItemTemplate item)
+    /// <summary>
+    /// Sends this client the records the proxy made for an item, unless it has had them: the ones
+    /// its own query made, or the ones another session's query made first (issue #535).
+    /// </summary>
+    internal void SendItemRecords(uint entry, GameData.ItemRecordDelivery? delivery)
     {
-        Server.Packets.HotFixMessage? reply;
-
-        reply = GameData.GenerateItemUpdateIfNeeded(item);
-        if (reply != null)
-            SendPacketToClient(reply);
-
-        reply = GameData.GenerateItemSparseUpdateIfNeeded(item);
-        if (reply != null)
-        {
-            // The V3_4_3 ItemSparse layout has been brought into alignment with
-            // WPP's ItemSparseHandler341 expectations (StartQuestID/ItemRange split,
-            // MinReputation Int32, three new Int32 fields between FactionRelated and
-            // MaxDurability, no trailing MinReputation byte, removed duplicate
-            // StartQuestId UInt16). The HotFixMessage path is safe to send again.
-            SendPacketToClient(reply);
-
-            Server.Packets.DBReply replyA = new();
-            replyA.Status = HotfixStatus.Valid;
-            replyA.Timestamp = (uint)Time.UnixTime;
-            replyA.RecordID = reply.Hotfixes[0].RecordId;
-            replyA.TableHash = reply.Hotfixes[0].TableHash;
-            replyA.Data = reply.Hotfixes[0].HotfixContent;
-            SendPacketToClient(replyA);
-        }
-
-        for (byte i = 0; i < 5; i++)
-        {
-            reply = GameData.GenerateItemEffectUpdateIfNeeded(item, i);
-            if (reply != null)
-            {
-                SendPacketToClient(reply);
-
-                // Mirror the ItemSparse path: a paired DBReply is needed for the modern client
-                // to actually apply the corrected ItemEffect record in the running session.
-                // Without this, SoM 1.14.1+ renumbered on-use spells (e.g. Diamond Flask) stay
-                // bound to their modern spell id even after the hotfix is sent.
-                Server.Packets.DBReply replyA = new();
-                replyA.Status = HotfixStatus.Valid;
-                replyA.Timestamp = (uint)Time.UnixTime;
-                replyA.RecordID = reply.Hotfixes[0].RecordId;
-                replyA.TableHash = reply.Hotfixes[0].TableHash;
-                replyA.Data = reply.Hotfixes[0].HotfixContent;
-                SendPacketToClient(replyA);
-            }
-        }
-
-        if (!GameData.ItemCanHaveModel(item))
+        if (delivery == null)
             return;
 
-        reply = GameData.GenerateItemAppearanceUpdateIfNeeded(item);
-        if (reply != null)
+        var sent = GetSession().GameState.SentItemRecords;
+        if (sent.TryGetValue(entry, out var had) && ReferenceEquals(had, delivery))
+            return;
+        sent[entry] = delivery;
+
+        foreach (var message in delivery.Messages)
+        {
+            Server.Packets.HotFixMessage reply = new();
+            reply.Hotfixes.AddRange(message.Records);
             SendPacketToClient(reply);
 
-        reply = GameData.GenerateItemModifiedAppearanceUpdateIfNeeded(item);
-        if (reply != null)
-            SendPacketToClient(reply);
+            if (!message.WithDbReply)
+                continue;
+
+            HotfixRecord record = message.Records[0];
+            Server.Packets.DBReply dbReply = new();
+            dbReply.Status = HotfixStatus.Valid;
+            dbReply.Timestamp = (uint)Time.UnixTime;
+            dbReply.RecordID = record.RecordId;
+            dbReply.TableHash = record.TableHash;
+            dbReply.Data = record.HotfixContent;
+            SendPacketToClient(dbReply);
+        }
     }
 
     [HandlesSmsg(Opcode.SMSG_QUERY_PET_NAME_RESPONSE)]

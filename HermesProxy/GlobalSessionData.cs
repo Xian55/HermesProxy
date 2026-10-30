@@ -669,6 +669,8 @@ public sealed class GameSessionData
     public bool TradeJustCompleted;
     public HashSet<uint> RequestedItemHotfixes = [];
     public HashSet<uint> RequestedItemSparseHotfixes = [];
+    // Per item, the records (GameData.ItemRecordDeliveries) this client has been sent (#535).
+    public Dictionary<uint, GameData.ItemRecordDelivery> SentItemRecords = [];
 
     // Cache of the last SMSG_INIT_WORLD_STATES we sent to the modern client. TC reference
     // re-emits INIT_WORLD_STATES AFTER the player CreateObject (#146 in World_login_parsed.txt),
