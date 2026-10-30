@@ -44,13 +44,34 @@ public static partial class GameData
     public static FrozenDictionary<(uint itemId, byte slot), uint> V3_4_3ItemEffectRecordIdByItemSlot
         = FrozenDictionary<(uint itemId, byte slot), uint>.Empty;
     public static FrozenDictionary<uint, ItemSpellsData> ItemSpellsDataStore = FrozenDictionary<uint, ItemSpellsData>.Empty;
-    public static Dictionary<uint, ItemRecord> ItemRecordsStore = [];
-    public static Dictionary<uint, ItemSparseRecord> ItemSparseRecordsStore = [];
-    public static Dictionary<uint, ItemAppearance> ItemAppearanceStore = [];
-    public static Dictionary<uint, ItemModifiedAppearance> ItemModifiedAppearanceStore = [];
+
+    // The item record stores below are loaded from the CSVs, and the Generate*UpdateIfNeeded
+    // family changes and adds rows when an item query answers differently, on whichever
+    // session's legacy thread got the answer (issue #355). The four that sessions read on their
+    // own paths, some on every update batch, are concurrent: a lookup costs what a Dictionary's
+    // does, where a lock around it cost 3-9 ns more (GameDataAccessBenchmarks).
+    public static ConcurrentDictionary<uint, ItemRecord> ItemRecordsStore = [];
+    public static ConcurrentDictionary<uint, ItemSparseRecord> ItemSparseRecordsStore = [];
+    public static ConcurrentDictionary<uint, ItemModifiedAppearance> ItemModifiedAppearanceStore = [];
     // Item -> its first ItemModifiedAppearance row. Looked up for every item the player carries.
-    public static Dictionary<uint, ItemModifiedAppearance> ItemModifiedAppearanceByItemStore = [];
+    public static ConcurrentDictionary<uint, ItemModifiedAppearance> ItemModifiedAppearanceByItemStore = [];
+    // These two are walked whole, by display and by item and slot, and read almost only by the
+    // generators. A walk over a ConcurrentDictionary took the generators from 83 to 137 us an
+    // item, and is not in the order the rows were added, so they stay Dictionaries and every
+    // access holds ItemRecordLock.
+    public static Dictionary<uint, ItemAppearance> ItemAppearanceStore = [];
     public static Dictionary<uint, ItemEffect> ItemEffectStore = [];
+
+    /// <summary>
+    /// Held by the Generate*UpdateIfNeeded family for the whole of one generator, and for every
+    /// access to <see cref="ItemAppearanceStore"/> and <see cref="ItemEffectStore"/>.
+    /// </summary>
+    /// <remarks>
+    /// A generator checks a store, takes the first free record id and adds the record. Two
+    /// sessions in between each other's steps were handed the same id for different records, and
+    /// the second add threw (issue #355). The loaders run before any session and take no lock.
+    /// </remarks>
+    public static readonly System.Threading.Lock ItemRecordLock = new();
     public static FrozenDictionary<uint, Battleground> Battlegrounds = FrozenDictionary<uint, Battleground>.Empty;
     // Dungeon and raid map -> its lowest difficulty and that difficulty's MaxPlayers, from
     // CSV/MapDifficulty{expansion}.csv. Maps not listed are continents, battlegrounds and arenas,
@@ -109,11 +130,15 @@ public static partial class GameData
     public static FrozenDictionary<uint, ProximityAreaTrigger[]> AreaTriggerProximityByMap
         = FrozenDictionary<uint, ProximityAreaTrigger[]>.Empty;
     public static FrozenDictionary<uint, ChatChannel> ChatChannels = FrozenDictionary<uint, ChatChannel>.Empty;
-    public static Dictionary<uint, Dictionary<uint, byte>> ItemEffects = [];
+    // Item -> its on-use spells and their slots, from the item queries. An inner map is never
+    // changed once it is in the store (SaveItemEffectSlot replaces it), so a session can walk one
+    // while another session adds a slot.
+    public static ConcurrentDictionary<uint, Dictionary<uint, byte>> ItemEffects = [];
     // Maps a legacy (1.12) spell id to its modern client spell id, populated when an item-effect
     // divergence is detected (SoM 1.14.1+ renumbered some on-use spells like Diamond Flask).
     // Used to translate aura spell ids on the way out so the modern client recognizes the buff icon.
-    public static Dictionary<uint, uint> LegacyToModernSpellId = [];
+    // Written by any session, so concurrent like the template stores (issue #355).
+    public static ConcurrentDictionary<uint, uint> LegacyToModernSpellId = [];
     public static FrozenDictionary<uint, uint> ItemEnchantVisuals = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<uint, uint> SpellVisuals = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<uint, uint> SpellXSpellVisualToSpellVisual = FrozenDictionary<uint, uint>.Empty;
@@ -156,16 +181,18 @@ public static partial class GameData
     public static FrozenDictionary<uint /*questId*/, uint /*questBit*/> QuestBits = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<int /*worldMapAreaId (legacy 3.3.5a)*/, int /*uiMapId (modern build)*/> WorldMapAreaIDToUiMapID = FrozenDictionary<int, int>.Empty;
 
-    // From Server
-    public static Dictionary<uint, ItemTemplate> ItemTemplates = [];
-    public static Dictionary<uint, CreatureTemplate> CreatureTemplates = [];
-    public static Dictionary<uint, QuestTemplate> QuestTemplates = [];
-    public static Dictionary<uint, string> ItemNames = [];
+    // From Server. Written by whichever session's legacy thread gets the answer and read by every
+    // session, which a session's executor does not serialise: two clients loading the same area
+    // corrupted a plain Dictionary here (issue #355).
+    public static ConcurrentDictionary<uint, ItemTemplate> ItemTemplates = [];
+    public static ConcurrentDictionary<uint, CreatureTemplate> CreatureTemplates = [];
+    public static ConcurrentDictionary<uint, QuestTemplate> QuestTemplates = [];
+    public static ConcurrentDictionary<uint, string> ItemNames = [];
 
     #region GettersAndSetters
     public static void StoreItemName(uint entry, string name)
     {
-        CollectionsMarshal.GetValueRefOrAddDefault(ItemNames, entry, out _) = name;
+        ItemNames[entry] = name;
     }
 
     public static string GetItemName(uint entry)
@@ -182,7 +209,7 @@ public static partial class GameData
 
     public static void StoreItemTemplate(uint entry, ItemTemplate template)
     {
-        CollectionsMarshal.GetValueRefOrAddDefault(ItemTemplates, entry, out _) = template;
+        ItemTemplates[entry] = template;
     }
 
     public static ItemTemplate? GetItemTemplate(uint entry)
@@ -238,7 +265,7 @@ public static partial class GameData
 
     public static void StoreQuestTemplate(uint entry, QuestTemplate template)
     {
-        CollectionsMarshal.GetValueRefOrAddDefault(QuestTemplates, entry, out _) = template;
+        QuestTemplates[entry] = template;
     }
 
     public static QuestTemplate? GetQuestTemplate(uint entry)
@@ -272,7 +299,7 @@ public static partial class GameData
     }
     public static void StoreCreatureTemplate(uint entry, CreatureTemplate template)
     {
-        CollectionsMarshal.GetValueRefOrAddDefault(CreatureTemplates, entry, out _) = template;
+        CreatureTemplates[entry] = template;
     }
 
     public static CreatureTemplate? GetCreatureTemplate(uint entry)
@@ -302,10 +329,13 @@ public static partial class GameData
 
     public static ItemAppearance? GetItemAppearanceByDisplayId(uint displayId)
     {
-        foreach (var item in ItemAppearanceStore)
+        lock (ItemRecordLock)
         {
-            if (item.Value.ItemDisplayInfoID == (int)displayId)
-                return item.Value;
+            foreach (var item in ItemAppearanceStore)
+            {
+                if (item.Value.ItemDisplayInfoID == (int)displayId)
+                    return item.Value;
+            }
         }
         return null;
     }
@@ -317,8 +347,11 @@ public static partial class GameData
             return null;
 
         ItemAppearance? data;
-        if (ItemAppearanceStore.TryGetValue((uint)modAppearance.ItemAppearanceID, out data))
-            return data;
+        lock (ItemRecordLock)
+        {
+            if (ItemAppearanceStore.TryGetValue((uint)modAppearance.ItemAppearanceID, out data))
+                return data;
+        }
         return null;
     }
 
@@ -352,10 +385,13 @@ public static partial class GameData
 
     public static ItemEffect? GetItemEffectByItemId(uint itemId, byte slot)
     {
-        foreach (var item in ItemEffectStore)
+        lock (ItemRecordLock)
         {
-            if (item.Value.ParentItemID == itemId && item.Value.LegacySlotIndex == slot)
-                return item.Value;
+            foreach (var item in ItemEffectStore)
+            {
+                if (item.Value.ParentItemID == itemId && item.Value.LegacySlotIndex == slot)
+                    return item.Value;
+            }
         }
         return null;
     }
@@ -366,13 +402,16 @@ public static partial class GameData
     {
         spellId = 0;
         ItemEffect? best = null;
-        foreach (var item in ItemEffectStore)
+        lock (ItemRecordLock)
         {
-            var effect = item.Value;
-            if (effect.ParentItemID != (int)itemId || effect.TriggerType != 0 || effect.SpellID <= 0)
-                continue;
-            if (best == null || effect.LegacySlotIndex < best.LegacySlotIndex)
-                best = effect;
+            foreach (var item in ItemEffectStore)
+            {
+                var effect = item.Value;
+                if (effect.ParentItemID != (int)itemId || effect.TriggerType != 0 || effect.SpellID <= 0)
+                    continue;
+                if (best == null || effect.LegacySlotIndex < best.LegacySlotIndex)
+                    best = effect;
+            }
         }
         if (best == null)
             return false;
@@ -403,23 +442,23 @@ public static partial class GameData
 
     public static void SaveItemEffectSlot(uint itemId, uint spellId, byte slot)
     {
-        ref var innerDict = ref CollectionsMarshal.GetValueRefOrAddDefault(ItemEffects, itemId, out bool exists);
-        if (!exists)
-            innerDict = [];
-
-        var dict = innerDict!;
-        CollectionsMarshal.GetValueRefOrAddDefault(dict, spellId, out _) = slot;
+        // A slot goes into a copy of the item's map, never into the map in the store. The same
+        // answer again, which is what every later session's query gets, keeps the map as it is.
+        ItemEffects.AddOrUpdate(itemId,
+            static (_, added) => new Dictionary<uint, byte> { [added.SpellId] = added.Slot },
+            static (_, map, added) =>
+            {
+                if (map.TryGetValue(added.SpellId, out byte known) && known == added.Slot)
+                    return map;
+                return new Dictionary<uint, byte>(map) { [added.SpellId] = added.Slot };
+            },
+            (SpellId: spellId, Slot: slot));
     }
 
     public static byte GetItemEffectSlot(uint itemId, uint spellId)
     {
-        ref var innerDict = ref CollectionsMarshal.GetValueRefOrNullRef(ItemEffects, itemId);
-        if (!Unsafe.IsNullRef(ref innerDict))
-        {
-            ref var slot = ref CollectionsMarshal.GetValueRefOrNullRef(innerDict, spellId);
-            if (!Unsafe.IsNullRef(ref slot))
-                return slot;
-        }
+        if (ItemEffects.TryGetValue(itemId, out var slots) && slots.TryGetValue(spellId, out byte slot))
+            return slot;
         return 0;
     }
 
@@ -738,6 +777,11 @@ public static partial class GameData
 
     private static int EstimateRowCount<[DynamicallyAccessedMembers(RowMembers)] T>(string path) => EstimateRowCount(path, EstimateAvgBytesPerRow<T>());
 
+    // A concurrent item record store sized for its CSV. Grown row by row instead, it leaves about
+    // three times its final size behind as garbage (GameDataStoreBuildBenchmarks).
+    private static ConcurrentDictionary<uint, T> NewItemRecordStore<[DynamicallyAccessedMembers(RowMembers)] T>(string path)
+        => new(Environment.ProcessorCount, EstimateRowCount<T>(path));
+
     public static void LoadEverything()
     {
         long startTime = Stopwatch.GetTimestamp();
@@ -933,7 +977,7 @@ public static partial class GameData
         }
 
         using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
-        var dict = new Dictionary<uint, ItemRecord>(EstimateRowCount<ItemRecord>(path));
+        ItemRecordsStore = NewItemRecordStore<ItemRecord>(path);
 
         foreach (var row in reader)
         {
@@ -977,7 +1021,7 @@ public static partial class GameData
             item.MaxDamage[3] = ushort.Parse(row[36].Span);
             item.MaxDamage[4] = ushort.Parse(row[37].Span);
 
-            ItemRecordsStore.Add((uint)item.Id, item);
+            ItemRecordsStore.TryAdd((uint)item.Id, item);
         }
     }
 
@@ -994,6 +1038,7 @@ public static partial class GameData
         }
 
         using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
+        ItemSparseRecordsStore = NewItemRecordStore<ItemSparseRecord>(path);
         foreach (var row in reader)
         {
 
@@ -1125,7 +1170,7 @@ public static partial class GameData
             item.StatValue[8] = short.Parse(row[124].Span);
             item.StatValue[9] = short.Parse(row[125].Span);
             item.RequiredLevel = sbyte.Parse(row[126].Span);
-            ItemSparseRecordsStore.Add((uint)item.Id, item);
+            ItemSparseRecordsStore.TryAdd((uint)item.Id, item);
         }
     }
 
@@ -1168,8 +1213,8 @@ public static partial class GameData
         }
 
         using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
-        ItemModifiedAppearanceStore = new Dictionary<uint, ItemModifiedAppearance>(EstimateRowCount<ItemModifiedAppearance>(path));
-        ItemModifiedAppearanceByItemStore = new Dictionary<uint, ItemModifiedAppearance>(ItemModifiedAppearanceStore.Capacity);
+        ItemModifiedAppearanceStore = NewItemRecordStore<ItemModifiedAppearance>(path);
+        ItemModifiedAppearanceByItemStore = NewItemRecordStore<ItemModifiedAppearance>(path);
         foreach (var row in reader)
         {
             ItemModifiedAppearance modifiedAppearance = new ItemModifiedAppearance();
@@ -1179,7 +1224,7 @@ public static partial class GameData
             modifiedAppearance.ItemAppearanceID = int.Parse(row[3].Span);
             modifiedAppearance.OrderIndex = int.Parse(row[4].Span);
             modifiedAppearance.TransmogSourceTypeEnum = int.Parse(row[5].Span);
-            ItemModifiedAppearanceStore.Add((uint)modifiedAppearance.Id, modifiedAppearance);
+            ItemModifiedAppearanceStore.TryAdd((uint)modifiedAppearance.Id, modifiedAppearance);
             ItemModifiedAppearanceByItemStore.TryAdd((uint)modifiedAppearance.ItemID, modifiedAppearance);
         }
     }
@@ -4231,10 +4276,13 @@ public static partial class GameData
                     Log.Print(LogType.Storage, $"Got duplicate record for record {record.RecordId} in {record.TableHash}");
                 }
 
+                // Written in full before it replaces the old content: another session's client
+                // may be sent this record at the same moment, and must not get it half written.
                 HotfixRecord recordToOverwrite = oldRecords.Last();
+                ByteBuffer content = new();
+                writer?.Invoke(content);
+                recordToOverwrite.HotfixContent = content;
                 recordToOverwrite.Status = remove ? HotfixStatus.RecordRemoved : HotfixStatus.Valid;
-                recordToOverwrite.HotfixContent = new();
-                writer?.Invoke(recordToOverwrite.HotfixContent);
                 Hotfixes[recordToOverwrite.HotfixId] = recordToOverwrite;
             }
         }
@@ -4263,6 +4311,9 @@ public static partial class GameData
 
     public static Server.Packets.HotFixMessage? GenerateItemUpdateIfNeeded(ItemTemplate item)
     {
+        // The check, the record and its hotfix id are one step for every session (issue #355).
+        using var held = ItemRecordLock.EnterScope();
+
         // Skip proactive Item hotfix when our DisplayID -> FileDataID lookup fails.
         // The hotfix would set IconFileDataID=0 and OVERRIDE the client's baked-in
         // (correct) value — observed for item 38607 (Battle-worn Sword): TC's
@@ -4409,6 +4460,8 @@ public static partial class GameData
 
     public static Server.Packets.HotFixMessage? GenerateItemSparseUpdateIfNeeded(ItemTemplate item)
     {
+        using var held = ItemRecordLock.EnterScope();
+
         // Same skip heuristic as GenerateItemUpdateIfNeeded: if the V3_4_3 client has no
         // DisplayID -> FileDataID mapping for this item, it likely has no baked Item DBC
         // entry either. Sending an ItemSparse hotfix for a missing-from-baked-DBC item
@@ -4542,6 +4595,8 @@ public static partial class GameData
 
     public static Server.Packets.HotFixMessage? GenerateItemEffectUpdateIfNeeded(ItemTemplate item, byte slot)
     {
+        using var held = ItemRecordLock.EnterScope();
+
         // Same skip heuristic as GenerateItemUpdateIfNeeded / GenerateItemSparseUpdateIfNeeded:
         // unknown-to-V3_4_3-client items get NO hotfix updates. Sending an ItemEffect for an
         // item with no baked Item DBC entry is part of the .additem 45805 client-crash chain
@@ -4644,6 +4699,8 @@ public static partial class GameData
 
     public static Server.Packets.HotFixMessage? GenerateItemAppearanceUpdateIfNeeded(ItemTemplate item)
     {
+        using var held = ItemRecordLock.EnterScope();
+
         ItemAppearance? appearance = GetItemAppearanceByDisplayId(item.DisplayID);
         if (appearance != null)
         {
@@ -4676,6 +4733,8 @@ public static partial class GameData
 
     public static Server.Packets.HotFixMessage? GenerateItemModifiedAppearanceUpdateIfNeeded(ItemTemplate item)
     {
+        using var held = ItemRecordLock.EnterScope();
+
         ItemModifiedAppearance? modAppearance = GetItemModifiedAppearanceByItemId(item.Entry);
         if (modAppearance != null)
         {
@@ -4761,7 +4820,7 @@ public static partial class GameData
             Id = (int)item.Entry
         };
         UpdateItemRecord(record, item);
-        ItemRecordsStore.Add((uint)record.Id, record);
+        ItemRecordsStore.TryAdd((uint)record.Id, record);
         Log.Print(LogType.Storage, $"Item #{record.Id} created.");
         return record;
     }
@@ -4814,7 +4873,7 @@ public static partial class GameData
             Id = (int)item.Entry
         };
         UpdateItemSparseRecord(record, item);
-        ItemSparseRecordsStore.Add((uint)record.Id, record);
+        ItemSparseRecordsStore.TryAdd((uint)record.Id, record);
         Log.Print(LogType.Storage, $"ItemSparse #{record.Id} created.");
         return record;
     }
@@ -5011,7 +5070,7 @@ public static partial class GameData
             Log.Print(LogType.Error, $"ItemModifiedAppearance #{record.Id} create failed for item #{record.ItemID}.");
             return null;
         }
-        ItemModifiedAppearanceStore.Add((uint)record.Id, record);
+        ItemModifiedAppearanceStore.TryAdd((uint)record.Id, record);
         ItemModifiedAppearanceByItemStore.TryAdd((uint)record.ItemID, record);
         Log.Print(LogType.Storage, $"ItemModifiedAppearance #{record.Id} created for item #{record.ItemID}.");
         return record;

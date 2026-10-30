@@ -86,12 +86,6 @@ public static class QuerySystem
     [HandlesCmsg(Opcode.CMSG_QUERY_CREATURE)]
     public static void HandleQueryCreature(in QueryCreature queryCreature, in SessionContext ctx)
     {
-        // GameData stays static: it is load-once reference data, and a lookup here is a
-        // dictionary hit either way.
-        bool cached = GameData.GetCreatureTemplate(queryCreature.CreatureID) != null;
-        Log.Print(LogType.Trace,
-            $"[CreatureQueryTrace][req] entry={queryCreature.CreatureID} cached={cached}");
-
         WorldPacket packet = new WorldPacket(Opcode.CMSG_QUERY_CREATURE);
         packet.WriteUInt32(queryCreature.CreatureID);
         packet.WriteGuid(new WowGuid64(HighGuidTypeLegacy.Creature, queryCreature.CreatureID, 1));
