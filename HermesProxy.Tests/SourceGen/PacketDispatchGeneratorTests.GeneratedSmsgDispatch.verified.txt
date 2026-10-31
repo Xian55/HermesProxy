@@ -2457,6 +2457,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleSendUnlearnSpells(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleServerFirstAchievement_SMSG_SERVER_FIRST_ACHIEVEMENT(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleServerFirstAchievement(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleSetupCurrency_SMSG_SETUP_CURRENCY(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleSetupCurrency(packet);
@@ -3412,6 +3417,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SELL_RESPONSE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSellResponse_SMSG_SELL_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SEND_KNOWN_SPELLS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSendKnownSpells_SMSG_SEND_KNOWN_SPELLS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SEND_UNLEARN_SPELLS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSendUnlearnSpells_SMSG_SEND_UNLEARN_SPELLS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SERVER_FIRST_ACHIEVEMENT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleServerFirstAchievement_SMSG_SERVER_FIRST_ACHIEVEMENT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SETUP_CURRENCY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetupCurrency_SMSG_SETUP_CURRENCY;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SETUP_RESEARCH_HISTORY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetupResearchHistory_SMSG_SETUP_RESEARCH_HISTORY;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_SET_AI_ANIM_KIT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleSetAIAnimKit_SMSG_SET_AI_ANIM_KIT;
@@ -3974,6 +3980,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_SELL_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.SMSG_SEND_KNOWN_SPELLS,
             global::HermesProxy.World.Enums.Opcode.SMSG_SEND_UNLEARN_SPELLS,
+            global::HermesProxy.World.Enums.Opcode.SMSG_SERVER_FIRST_ACHIEVEMENT,
             global::HermesProxy.World.Enums.Opcode.SMSG_SETUP_CURRENCY,
             global::HermesProxy.World.Enums.Opcode.SMSG_SETUP_RESEARCH_HISTORY,
             global::HermesProxy.World.Enums.Opcode.SMSG_SET_AI_ANIM_KIT,

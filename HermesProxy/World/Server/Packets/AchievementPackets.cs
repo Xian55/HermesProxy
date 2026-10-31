@@ -1,6 +1,7 @@
 using Framework.Constants;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using System;
 using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets;
@@ -111,6 +112,28 @@ public class AchievementEarnedPkt : ServerPacket
         _worldPacket.WriteBit(Initial);
         _worldPacket.FlushBits();
     }
+}
+
+/// <summary>A realm first, for the whole realm to read in chat.</summary>
+public sealed class BroadcastAchievement : ServerPacket
+{
+    public BroadcastAchievement() : base(Opcode.SMSG_BROADCAST_ACHIEVEMENT) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteBits(Name.GetByteCount(), 7);
+        _worldPacket.WriteBit(GuildAchievement);
+        _worldPacket.FlushBits();
+        _worldPacket.WritePackedGuid128(PlayerGUID);
+        _worldPacket.WriteUInt32(AchievementID);
+        _worldPacket.WriteString(Name);
+    }
+
+    public string Name = string.Empty;
+    public WowGuid128 PlayerGUID;
+    public uint AchievementID;
+    // Picks the chat string: set, the name is plain text; clear, it links to the player.
+    public bool GuildAchievement;
 }
 
 /// <summary>An achievement taken away again.</summary>

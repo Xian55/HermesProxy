@@ -235,6 +235,17 @@ public partial class WorldClient
             Initial = false,
         });
     }
+    [HandlesSmsg(Opcode.SMSG_SERVER_FIRST_ACHIEVEMENT)]
+    internal void HandleServerFirstAchievement(WorldPacket packet)
+    {
+        BroadcastAchievement broadcast = new();
+        broadcast.Name = packet.ReadCString();
+        broadcast.PlayerGUID = packet.ReadGuid().To128(GetSession().GameState);
+        broadcast.AchievementID = packet.ReadUInt32();
+        broadcast.GuildAchievement = packet.ReadUInt32() == 0; // the server's says "the name is a link"
+        SendPacketToClient(broadcast);
+    }
+
     [HandlesSmsg(Opcode.SMSG_ACHIEVEMENT_DELETED)]
     internal void HandleAchievementDeleted(WorldPacket packet)
     {
