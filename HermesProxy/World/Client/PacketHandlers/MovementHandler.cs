@@ -1088,15 +1088,32 @@ public partial class WorldClient
         // Inflate hands back a pooled buffer; without the dispose the rental only comes back
         // via the finalizer.
         using WorldPacket pkt = packet.Inflate(uncompressedSize);
+        HandleMoves(pkt);
+    }
 
-        while (pkt.CanRead())
+    /// <summary>
+    /// The same list uncompressed: a 3.3.5a server tells a player at login that it is rooted, walks
+    /// on water, falls slowly or hovers, which both AzerothCore and CMaNGOS also send one by one.
+    /// Only here on CMaNGOS: the height order of a player who logs in mounted, whose ack finishes
+    /// the mount (<see cref="HandleMoveSetCollisionHgt"/>).
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_MULTIPLE_MOVES)]
+    internal void HandleMultipleMoves(WorldPacket packet)
+    {
+        packet.ReadUInt32(); // the size of what follows
+        HandleMoves(packet);
+    }
+
+    private void HandleMoves(WorldPacket moves)
+    {
+        while (moves.CanRead())
         {
-            var size = pkt.ReadUInt8();
-            var opc = pkt.ReadUInt16();
-            var data = pkt.ReadBytes((uint)(size - 2));
+            var size = moves.ReadUInt8();
+            var opc = moves.ReadUInt16();
+            var data = moves.ReadBytes((uint)(size - 2));
 
             var pkt2 = new WorldPacket(opc, data);
-            pkt2.SetReceiveTime(pkt.GetReceivedTime());
+            pkt2.SetReceiveTime(moves.GetReceivedTime());
             HandlePacket(pkt2);
         }
     }
