@@ -38,7 +38,9 @@ public partial class WorldClient
             petitions.Petitions.Add(petition);
         }
 
-        // 3.4.3 has no arena registrar; a non-guild SHOW_LIST opens GuildRegistrar.
+        // These clients cannot buy an arena charter. A list opens ArenaRegistrarFrame only for the
+        // client's Registrar interaction to close it and open GuildRegistrarFrame, whatever the
+        // rows say, which then sells a guild charter and leaves the NPC stuck.
         if (ModernVersion.IsWotLKClassicOrLater
             && PetitionShowListCompat.ShouldDropArenaList(petitions.Petitions))
         {
@@ -47,7 +49,7 @@ public partial class WorldClient
                 petitions.Petitions.Count, petitions.Petitions[0].CharterEntry);
             SendPacketToClient(new PrintNotification
             {
-                NotifyText = "Arena teams are no longer available."
+                NotifyText = "Arena charters cannot be bought with this client."
             });
             return;
         }
