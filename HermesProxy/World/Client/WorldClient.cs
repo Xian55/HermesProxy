@@ -33,15 +33,12 @@ public partial class WorldClient
     private static readonly string _netDirSend = Log.FormatDir(LogNetDir.P2S);
     private const string _netDirNone = "";
 
-    // Minimal WotLK 3.3.5a CMSG_AUTH_SESSION addon payload: [uncompressedSize=4][zlib(addonsCount=0)].
-    // Built once; mangos-wotlk accepts a zero-addon-list as valid.
-    private static readonly byte[] EmptyAddonInfoBlob = BuildAddonInfoBlob([0, 0, 0, 0]); // uint32 addonsCount = 0
-
-    // The 4.3.4 client ends its addon list with a uint32, the time of the last banned addon it
-    // knows of, and a server reads it after the addons. TrinityCore 4.3.4 parses the list inside
-    // a try block and so took the list without it; a 4.3.4 core without that guard read past
-    // the end, which ended its whole worldserver on the first CMSG_AUTH_SESSION.
-    private static readonly byte[] EmptyAddonInfoBlobCata = BuildAddonInfoBlob([0, 0, 0, 0, 0, 0, 0, 0]);
+    // CMSG_AUTH_SESSION's addon payload from 3.3.5a on: [uncompressedSize][zlib(addonsCount, time)].
+    // The client ends its list with a uint32, the time of the last banned addon it knows of, and a
+    // server reads it after the addons. AzerothCore and TrinityCore 4.3.4 parse the list inside a
+    // try block, so without it they only log a read error. A 4.3.4 core without that guard read
+    // past the end, which ended its whole worldserver on the first CMSG_AUTH_SESSION.
+    internal static readonly byte[] EmptyAddonInfoBlob = BuildAddonInfoBlob([0, 0, 0, 0, 0, 0, 0, 0]);
 
     private static byte[] BuildAddonInfoBlob(ReadOnlySpan<byte> uncompressed)
     {
