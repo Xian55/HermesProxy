@@ -1681,6 +1681,7 @@ public partial class WorldClient
     }
 
     [HandlesSmsg(Opcode.SMSG_PLAY_SPELL_VISUAL)]
+    [HandlesSmsg(Opcode.SMSG_PLAY_SPELL_IMPACT)]
     internal void HandlePlaySpellVisualKit(WorldPacket packet)
     {
         // On 4.3.4 this opcode is the missile visual between two units, a different packet;
