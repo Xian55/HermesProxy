@@ -2959,6 +2959,12 @@ internal static unsafe class GeneratedCmsgDispatch
         global::HermesProxy.World.Server.Systems.SupportTicketSystem.HandleSupportTicketSubmitComplaint(in packet, in ctx);
     }
 
+    private static void Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleMoveGuildBankItem_CMSG_SWAP_GUILD_BANK_ITEM_WITH_GUILD_BANK_ITEM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
+    {
+        global::HermesProxy.World.Server.Packets.MoveGuildBankItemCodec.Read(ref reader, out var packet);
+        global::HermesProxy.World.Server.Systems.GuildSystem.HandleMoveGuildBankItem(in packet, in ctx);
+    }
+
     private static void Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleSwapInvItem_CMSG_SWAP_INV_ITEM(ref global::Framework.IO.SpanPacketReader reader, in global::HermesProxy.World.Dispatch.SessionContext ctx)
     {
         global::HermesProxy.World.Server.Packets.SwapInvItemCodec.Read(ref reader, out var packet);
@@ -3839,6 +3845,7 @@ internal static unsafe class GeneratedCmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_STORE_GUILD_BANK_ITEM] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleStoreGuildBankItem_CMSG_STORE_GUILD_BANK_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SUMMON_RESPONSE] = &Thunk_HermesProxy_World_Server_Systems_GroupSystem_HandleSummonResponse_CMSG_SUMMON_RESPONSE;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SUPPORT_TICKET_SUBMIT_COMPLAINT] = &Thunk_HermesProxy_World_Server_Systems_SupportTicketSystem_HandleSupportTicketSubmitComplaint_CMSG_SUPPORT_TICKET_SUBMIT_COMPLAINT;
+        table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SWAP_GUILD_BANK_ITEM_WITH_GUILD_BANK_ITEM] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleMoveGuildBankItem_CMSG_SWAP_GUILD_BANK_ITEM_WITH_GUILD_BANK_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SWAP_INV_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleSwapInvItem_CMSG_SWAP_INV_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SWAP_ITEM] = &Thunk_HermesProxy_World_Server_Systems_ItemSystem_HandleSwapItem_CMSG_SWAP_ITEM;
         table[(int)global::HermesProxy.World.Enums.Opcode.CMSG_SWAP_ITEM_WITH_GUILD_BANK_ITEM] = &Thunk_HermesProxy_World_Server_Systems_GuildSystem_HandleGuildBankItem_CMSG_SWAP_ITEM_WITH_GUILD_BANK_ITEM;
@@ -4327,6 +4334,7 @@ internal static unsafe class GeneratedCmsgDispatch
             global::HermesProxy.World.Enums.Opcode.CMSG_STORE_GUILD_BANK_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_SUMMON_RESPONSE,
             global::HermesProxy.World.Enums.Opcode.CMSG_SUPPORT_TICKET_SUBMIT_COMPLAINT,
+            global::HermesProxy.World.Enums.Opcode.CMSG_SWAP_GUILD_BANK_ITEM_WITH_GUILD_BANK_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_SWAP_INV_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_SWAP_ITEM,
             global::HermesProxy.World.Enums.Opcode.CMSG_SWAP_ITEM_WITH_GUILD_BANK_ITEM,
