@@ -708,7 +708,7 @@ public sealed class CataSmallPacketTests
         Assert.Equal(Convert.FromHexString(Ints(3)), Written(Deliver<MountResult>(
             Opcode.SMSG_MOUNT_RESULT, Ints(3), _harness.Client.HandleMountResultCata)));
         Assert.Equal(Convert.FromHexString(Ints(4989)), Written(Deliver<AchievementDeleted>(
-            Opcode.SMSG_ACHIEVEMENT_DELETED, Ints(4989), _harness.Client.HandleAchievementDeletedCata)));
+            Opcode.SMSG_ACHIEVEMENT_DELETED, Ints(4989), _harness.Client.HandleAchievementDeleted)));
     }
 
     [Fact]
