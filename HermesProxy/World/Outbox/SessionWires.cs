@@ -19,6 +19,15 @@ internal sealed class SessionClientWire(GlobalSessionData session) : IClientWire
         socket.SendPacket(packet);
         return true;
     }
+
+    public WowGuid128 AwaitedObject
+    {
+        get
+        {
+            var state = session.GameState;
+            return state.ClientHasPlayerObject ? default : state.CurrentPlayerGuid;
+        }
+    }
 }
 
 /// <summary>Writes server-bound packets through the session's current world client.</summary>

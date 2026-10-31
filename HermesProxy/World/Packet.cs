@@ -107,6 +107,18 @@ public abstract class ServerPacket
 
     public abstract void Write();
 
+    /// <summary>
+    /// Whether the client needs <paramref name="guid"/>'s object to take this packet. Without the
+    /// object it drops the packet, with no error and no ack, so while the player's create is on
+    /// its way the client outbox asks every packet this and holds the ones that say yes.
+    /// </summary>
+    /// <remarks>
+    /// Declared on the packet, not at the call that sends it, so that every sender of the packet
+    /// is covered, the next one included. A packet that only mentions a guid stays false: a
+    /// whisper or a guild roster can name an object the client will never have.
+    /// </remarks>
+    public virtual bool NeedsObject(WowGuid128 guid) => false;
+
     /// <remarks>
     /// The bytes stay in the pooled array they were written into, and <see cref="ReleaseData"/>
     /// hands it back once they are on the wire. They used to be copied out into an exact-size

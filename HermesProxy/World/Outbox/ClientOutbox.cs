@@ -16,6 +16,12 @@ public interface IClientWire
     /// in which case the packet was not touched and the outbox keeps it.
     /// </summary>
     bool TryWrite(ConnectionType connection, ServerPacket packet);
+
+    /// <summary>
+    /// The object whose create the client is still waiting for, or empty when it has what it
+    /// needs. Read once per packet sent, so it has to be cheap.
+    /// </summary>
+    WowGuid128 AwaitedObject { get; }
 }
 
 /// <summary>
@@ -42,6 +48,12 @@ public interface IClientWire
 /// the same reason a held client packet is never written from the timer thread: one released by a
 /// deadline waits for <see cref="PacketOutbox{TPacket}.Tick"/>.
 /// </para>
+/// <para>
+/// <b>Awaited object.</b> While the client lacks the player's object, a packet that needs it
+/// (<see cref="ServerPacket.NeedsObject"/>) is held until <see cref="OutboxEvent.GuidKnown"/>. That
+/// window is the item-template hold at login and the gap after <c>SMSG_NEW_WORLD</c>. No sender
+/// has to know about it: a sender that opted in by hand was the whole of issue #314.
+/// </para>
 /// </remarks>
 public sealed class ClientOutbox : PacketOutbox<ServerPacket>
 {
@@ -57,12 +69,22 @@ public sealed class ClientOutbox : PacketOutbox<ServerPacket>
     private readonly record struct Parked(ServerPacket Packet, ConnectionType Connection, long ParkedAt);
 
     private static readonly Microsoft.Extensions.Logging.ILogger _log = Log.CreateMelLogger(Log.CategoryNetwork);
+    private static readonly Microsoft.Extensions.Logging.ILogger _melObjLife = Log.CreateMelLogger(Log.CategoryServer);
 
     /// <summary>A parked packet older than this is dropped: the connection it waits for isn't coming.</summary>
     public static readonly TimeSpan ParkTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>Most packets the parks may hold before new ones are dropped.</summary>
     public const int MaxParked = 8192;
+
+    /// <summary>The packets held for the awaited object. Cancelled when that object's map is left.</summary>
+    public static readonly HoldKey AwaitedObjectKey = new(HoldKeyKind.AwaitedObject);
+
+    // Discarded on timeout: nothing can apply a packet for an object whose create never came.
+    private static readonly HoldOptions AwaitedObjectHold = new(
+        Timeout: TimeSpan.FromSeconds(20),
+        OnTimeout: OutboxTimeoutAction.Discard,
+        Key: AwaitedObjectKey);
 
     private const int DrainBatch = 64;
     // A socket thread draining a long backlog hands the rest to the pool, so its own next read
@@ -100,9 +122,22 @@ public sealed class ClientOutbox : PacketOutbox<ServerPacket>
 
     /// <summary>
     /// Writes the packet to the connection its own type names, or parks it until that socket is
-    /// attached. Then releases anything held until this opcode was sent.
+    /// attached. Then releases anything held until this opcode was sent. A packet that needs the
+    /// object the client is waiting for waits with it.
     /// </summary>
-    public override void Send(ServerPacket packet) => Route(packet.GetConnection(), packet);
+    public override void Send(ServerPacket packet)
+    {
+        WowGuid128 awaited = _wire.AwaitedObject;
+        if (awaited != default && packet.NeedsObject(awaited))
+        {
+            ObjectLifecycleLogMessages.HeldForObject(
+                _melObjLife, awaited.Low, awaited.High, packet.GetUniversalOpcode().ToStringFast());
+            When(OutboxEvent.GuidKnown(awaited), packet, AwaitedObjectHold);
+            return;
+        }
+
+        Route(packet.GetConnection(), packet);
+    }
 
     /// <summary>
     /// Writes the packet to <paramref name="connection"/> regardless of the packet's own type, or

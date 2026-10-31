@@ -635,6 +635,20 @@ public class UpdateObject : ServerPacket
     }
 
     /// <summary>
+    /// A Values entry needs its object; a create brings it. The client applies a batch in wire
+    /// order, so the first entry for the guid decides.
+    /// </summary>
+    public override bool NeedsObject(WowGuid128 guid)
+    {
+        foreach (var update in ObjectUpdates)
+        {
+            if (update.Guid == guid)
+                return update.Type == UpdateTypeModern.Values;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// V3_4_3 Values-update filter. Drops Values entries that target an unknown guid
     /// (no prior CreateObject) or carry no concrete field changes — cMangos emits
     /// the latter as bookkeeping no-ops that materialize as a 13-byte garbage body
@@ -897,6 +911,7 @@ public class HealthUpdate : ServerPacket
     }
 
     public WowGuid128 Guid;
+    public override bool NeedsObject(WowGuid128 guid) => guid == Guid;
     public long Health;
 }
 
@@ -992,6 +1007,7 @@ public sealed class PowerUpdate : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 Guid;
+    public override bool NeedsObject(WowGuid128 guid) => guid == Guid;
     public List<PowerUpdatePower> Powers;
 }
 

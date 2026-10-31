@@ -52,6 +52,7 @@ public class TrimmedValuesMaskTests
         var harness = new LegacyHandlerHarness(recordClientPackets: true);
         var legacyGuid = new WowGuid64(HighGuidTypeLegacy.Player, 77);
         harness.Session.GameState.CurrentPlayerGuid = legacyGuid.To128(harness.Session.GameState);
+        harness.Session.GameState.ClientHasPlayerObject = true;
 
         harness.Deliver(Opcode.SMSG_UPDATE_OBJECT, OneBlock(legacyGuid, UnitField.UNIT_FIELD_POWER1, 1234),
             harness.Client.HandleUpdateObject);

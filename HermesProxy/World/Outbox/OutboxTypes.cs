@@ -124,8 +124,8 @@ public enum HoldKeyKind : ushort
     AttackStop = 10,
     /// <summary>V3_4_3 Values for the player's own guid, held until the client has the player.</summary>
     PlayerValuesBatch = 11,
-    /// <summary>V3_4_3 speed changes aimed at the player, held until the client has the player.</summary>
-    PlayerMoveSpeed = 12,
+    /// <summary>V3_4_3 can-fly changes aimed at the player, held until the client has the player.</summary>
+    PlayerCreateCanFly = 12,
     /// <summary>V3_4_3 can-fly changes aimed at the player, held while the client is in its spawn fall.</summary>
     PlayerSpawnCanFly = 13,
     /// <summary>A = guid low, B = guid high. V3_4_3 another player's collision height, held for its next movement.</summary>
@@ -134,8 +134,8 @@ public enum HoldKeyKind : ushort
     BattlegroundClock = 15,
     /// <summary>A = ticket id. A 4.3.4 battlefield entry invite the server lets run out without a word.</summary>
     BattlefieldInviteExpiry = 16,
-    /// <summary>V3_4_3 packets whose subject is the player, held until its create is queued.</summary>
-    PlayerGuidSubject = 17,
+    /// <summary>Packets that need the object the client is waiting for, see <c>ServerPacket.NeedsObject</c>.</summary>
+    AwaitedObject = 17,
 }
 
 /// <summary>How a hold behaves while it waits.</summary>

@@ -221,18 +221,18 @@ silently wrong wherever it does not. Check each against the 4.4.2 client
 (`docs/protocol/4.4.2.60895`) before 4.4.2 becomes a supported build; where it differs, the
 site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a narrower check.
 
-205 sites across 57 files.
+202 sites across 57 files.
 
 | file | sites |
 |---|---:|
-| `HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs` | 27 |
+| `HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs` | 26 |
 | `HermesProxy/World/GameData.cs` | 15 |
 | `HermesProxy/World/Server/Packets/NPCPackets.cs` | 11 |
 | `HermesProxy/World/Client/PacketHandlers/PetHandler.cs` | 9 |
-| `HermesProxy/World/Client/PacketHandlers/MovementHandler.cs` | 7 |
 | `HermesProxy/World/Client/PacketHandlers/QueryHandler.cs` | 7 |
 | `HermesProxy/World/Client/PacketHandlers/SpellHandler.cs` | 7 |
 | `HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs` | 6 |
+| `HermesProxy/World/Client/PacketHandlers/MovementHandler.cs` | 6 |
 | `HermesProxy/World/Server/Packets/SpellPackets.cs` | 6 |
 | `HermesProxy/World/Client/PacketHandlers/LootHandler.cs` | 5 |
 | `HermesProxy/World/Client/PacketHandlers/QuestHandler.cs` | 5 |
@@ -262,7 +262,6 @@ site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a n
 | `HermesProxy/World/Server/Packets/TaxiPackets.cs` | 2 |
 | `HermesProxy/World/Server/Systems/ItemSystem.cs` | 2 |
 | `HermesProxy/World/Server/Systems/MiscSystem.cs` | 2 |
-| `HermesProxy/World/Server/WorldSocket.cs` | 2 |
 | `HermesProxy/World/Client/PacketHandlers/NPCHandler.cs` | 1 |
 | `HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs` | 1 |
 | `HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs` | 1 |
@@ -282,4 +281,5 @@ site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a n
 | `HermesProxy/World/Server/Systems/LootSystem.cs` | 1 |
 | `HermesProxy/World/Server/Systems/MovementSystem.cs` | 1 |
 | `HermesProxy/World/Server/Systems/SupportTicketSystem.cs` | 1 |
+| `HermesProxy/World/Server/WorldSocket.cs` | 1 |
 

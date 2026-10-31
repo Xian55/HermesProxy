@@ -731,7 +731,7 @@ public partial class WorldClient
         }
 
         ApplyV343NativeCastPolicy(spell.Cast, isSpellGo: true);
-        SendGuidSubjectPacket(spell, spell.Cast.CasterUnit);
+        SendPacketToClient(spell);
 
         // TrinityCore 3.4.3 tells of runes a spell made ready at once (Blood Tap, Empower Rune
         // Weapon) with SMSG_ADD_RUNE_POWER after the cast; the 3.4.3 client goes by that alone.
@@ -2072,7 +2072,7 @@ public partial class WorldClient
 
         PowerUpdate update = new PowerUpdate(guid);
         update.Powers.Add(new PowerUpdatePower(power, powerType));
-        SendGuidSubjectPacket(update, guid);
+        SendPacketToClient(update);
         World.Logging.SpellLogMessages.PowerUpdate(_melSpellLog, guid.Low, (PowerType)powerType, power);
 
         var gameState = GetSession().GameState;
