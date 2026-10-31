@@ -28,7 +28,7 @@ public readonly record struct WowGuid128(ulong Low, ulong High)
         HighGuidType.Pet => Create(HighGuidType703.Pet, 0, gamestate.GetPetRealEntryFromLegacy(guid) ?? guid.GetEntry(), guid.GetCounter()),
         HighGuidType.Vehicle => Create(HighGuidType703.Vehicle, 0, guid.GetEntry(), guid.GetCounter()),
         HighGuidType.DynamicObject => Create(HighGuidType703.DynamicObject, 0, guid.GetEntry(), guid.GetCounter()),
-        HighGuidType.Corpse => Create(HighGuidType703.Corpse, 0, guid.GetEntry(), guid.GetCounter()),
+        HighGuidType.Corpse => CreateCorpse(guid),
         _ => WowGuid128.Empty,
     };
     // Every legacy item guid the backend sends reaches the modern side through here, which makes
@@ -38,6 +38,12 @@ public readonly record struct WowGuid128(ulong Low, ulong High)
     {
         LegacyItemGuidHigh.Observe(guid.GetHighGuidTypeLegacy());
         return Create(HighGuidType703.Item, guid.GetCounter());
+    }
+
+    static WowGuid128 CreateCorpse(WowGuid64 guid)
+    {
+        LegacyCorpseGuidHigh.Observe(guid.GetHighGuidTypeLegacy());
+        return Create(HighGuidType703.Corpse, 0, guid.GetEntry(), guid.GetCounter());
     }
 
     public static WowGuid128 Create(HighGuidType703 type, ulong counter)

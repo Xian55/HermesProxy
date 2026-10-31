@@ -146,6 +146,7 @@ public enum HighGuidTypeLegacy
     Vehicle                 = 0xF150,                       // blizz F15/F55
     DynamicObject           = 0xF100,                       // blizz F100
     Corpse                  = 0xF101,                       // blizz F100
+    CorpseMangos            = 0xF500,                       // cMaNGOS: LegacyCorpseGuidHigh
     MOTransport             = 0x1FC0,                       // blizz 1FC0 (for GAMEOBJECT_TYPE_MO_TRANSPORT)
     Group                   = 0x1F50,                       // blizz 1F5x
     Group2                  = 0x5000,                       // for outdated tbc cores

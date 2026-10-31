@@ -44,6 +44,7 @@ public static class HighGuid
         HighGuidTypeLegacy.Pet => HighGuidType.Pet,
         HighGuidTypeLegacy.Vehicle => HighGuidType.Vehicle,
         HighGuidTypeLegacy.Corpse => HighGuidType.Corpse,
+        HighGuidTypeLegacy.CorpseMangos => HighGuidType.Corpse,
         _ => UnknownLegacy(high),
     };
 
