@@ -31,12 +31,13 @@ public static class CollectionSync
         if (entry == 0 || !GameData.TryGetSpeciesByCreatureId(entry, out var species))
             return;
 
+        // The species alone proves nothing: Darnassus has ownerless owls of two pet species, and a
+        // city has other players' pets. Only the server's word counts, in the creature's owner
+        // fields or in the player's UNIT_FIELD_CRITTER.
         var player = state.CurrentPlayerGuid;
-        bool summonedByUs = update.UnitData.SummonedBy == player || update.UnitData.CreatedBy == player;
-        bool ownerMissing = (update.UnitData.SummonedBy == null || update.UnitData.SummonedBy.Value.IsEmpty())
-            && (update.UnitData.CreatedBy == null || update.UnitData.CreatedBy.Value.IsEmpty());
         bool ours = !player.IsEmpty()
-            && (summonedByUs || ownerMissing || !state.SummonedBattlePetGuid.IsEmpty());
+            && (update.UnitData.SummonedBy == player || update.UnitData.CreatedBy == player
+                || legacyGuid == state.SummonedCompanionLegacyGuid);
         if (!ours)
             return;
 
