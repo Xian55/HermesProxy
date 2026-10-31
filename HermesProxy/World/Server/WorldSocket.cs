@@ -110,6 +110,9 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     private readonly string _externalAddress;
     private readonly int _instancePort;
 
+    // Only the receive loop touches this.
+    private bool _helloReceived;
+
     // [SendHistory] Ring-buffered SMSG history for diagnosing client
     // disconnect-with-reason-7 events (the V3_4_3 client emits this when it
     // rejects a server packet but doesn't tell us which one). On every
@@ -199,7 +202,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
 
         _packetBuffer.Resize(ClientConnectionInitialize.Length + 1);
 
-        AsyncReadWithCallback(InitializeHandler);
+        BeginReceive();
 
         ByteBuffer packet = new();
         packet.WriteString(ServerConnectionInitialize);
@@ -207,74 +210,65 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         AsyncWrite(packet.GetData());
     }
 
-    void InitializeHandler(SocketAsyncEventArgs args)
+    /// <summary>
+    /// Takes as much of the client's hello as this read holds. True once it is complete and valid,
+    /// with <paramref name="consumed"/> saying where the frames behind it start.
+    /// </summary>
+    bool ReadHello(byte[] data, int length, out int consumed)
     {
-        if (args.SocketError != SocketError.Success)
+        consumed = Math.Min(length, _packetBuffer.GetRemainingSpace());
+        _packetBuffer.Write(data, 0, consumed);
+
+        // Couldn't receive the whole hello this time.
+        if (_packetBuffer.GetRemainingSpace() > 0)
+            return false;
+
+        ByteBuffer buffer = new(_packetBuffer.GetData());
+        string initializer = buffer.ReadString((uint)ClientConnectionInitialize.Length);
+        if (initializer != ClientConnectionInitialize)
         {
             CloseSocket();
-            return;
+            return false;
         }
 
-        if (args.BytesTransferred > 0)
+        byte terminator = buffer.ReadUInt8();
+        if (terminator != '\n')
         {
-            if (_packetBuffer.GetRemainingSpace() > 0)
-            {
-                // need to receive the header
-                int readHeaderSize = Math.Min(args.BytesTransferred, _packetBuffer.GetRemainingSpace());
-                _packetBuffer.Write(args.Buffer!,0, readHeaderSize);
-
-                if (_packetBuffer.GetRemainingSpace() > 0)
-                {
-                    // Couldn't receive the whole header this time.
-                    AsyncReadWithCallback(InitializeHandler);
-                    return;
-                }
-
-                ByteBuffer buffer = new(_packetBuffer.GetData());
-                string initializer = buffer.ReadString((uint)ClientConnectionInitialize.Length);
-                if (initializer != ClientConnectionInitialize)
-                {
-                    CloseSocket();
-                    return;
-                }
-
-                byte terminator = buffer.ReadUInt8();
-                if (terminator != '\n')
-                {
-                    CloseSocket();
-                    return;
-                }
-
-                // Per-session deflater. Raw-deflate (DeflateStream is no-header, matching
-                // the legacy windowBits=-15 setting). CompressionLevel.Fastest maps to
-                // zlib level 1 in zlib-ng on .NET 10. leaveOpen=true keeps the backing
-                // MemoryStream alive across packets so Flush() can drain a single
-                // sync-flushed packet at a time.
-                _compressBuffer = new MemoryStream();
-                _deflater = new DeflateStream(_compressBuffer, CompressionLevel.Fastest, leaveOpen: true);
-
-                _packetBuffer.Resize(0);
-                _packetBuffer.Reset();
-                HandleSendAuthSession();
-                AsyncRead();
-                return;
-            }
+            CloseSocket();
+            return false;
         }
+
+        // Per-session deflater. Raw-deflate (DeflateStream is no-header, matching
+        // the legacy windowBits=-15 setting). CompressionLevel.Fastest maps to
+        // zlib level 1 in zlib-ng on .NET 10. leaveOpen=true keeps the backing
+        // MemoryStream alive across packets so Flush() can drain a single
+        // sync-flushed packet at a time.
+        _compressBuffer = new MemoryStream();
+        _deflater = new DeflateStream(_compressBuffer, CompressionLevel.Fastest, leaveOpen: true);
+
+        _packetBuffer.Resize(0);
+        _packetBuffer.Reset();
+        _helloReceived = true;
+        HandleSendAuthSession();
+        return true;
     }
 
-    public override void ReadHandler(SocketAsyncEventArgs args)
+    public override void ReadHandler(byte[] data, int length)
     {
         if (!IsOpen())
             return;
 
         int currentReadIndex = 0;
-        while (currentReadIndex < args.BytesTransferred)
+        if (!_helloReceived && !ReadHello(data, length, out currentReadIndex))
+            return;
+
+        while (currentReadIndex < length)
         {
             if (_headerBuffer.GetRemainingSpace() > 0)
             {
                 // need to receive the header
-                int readHeaderSize = Math.Min(args.BytesTransferred - currentReadIndex, _headerBuffer.GetRemainingSpace());
-                _headerBuffer.Write(args.Buffer!,currentReadIndex, readHeaderSize);
+                int readHeaderSize = Math.Min(length - currentReadIndex, _headerBuffer.GetRemainingSpace());
+                _headerBuffer.Write(data, currentReadIndex, readHeaderSize);
                 currentReadIndex += readHeaderSize;
 
                 if (_headerBuffer.GetRemainingSpace() > 0)
@@ -292,8 +286,8 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             if (_packetBuffer.GetRemainingSpace() > 0)
             {
                 // need more data in the payload
-                int readDataSize = Math.Min(args.BytesTransferred - currentReadIndex, _packetBuffer.GetRemainingSpace());
-                _packetBuffer.Write(args.Buffer!,currentReadIndex, readDataSize);
+                int readDataSize = Math.Min(length - currentReadIndex, _packetBuffer.GetRemainingSpace());
+                _packetBuffer.Write(data, currentReadIndex, readDataSize);
                 currentReadIndex += readDataSize;
 
                 if (_packetBuffer.GetRemainingSpace() > 0)
@@ -301,9 +295,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             }
 
             // just received fresh new payload. ReadData's own switch handles the auth /
-            // connect-to / encrypted-mode cases inline, i.e. outside HandlePacket's guard,
-            // and this runs on a socket completion callback where an escaping exception
-            // takes the whole process down. Contain it here too.
+            // connect-to / encrypted-mode cases inline, i.e. outside HandlePacket's guard.
             ReadDataHandlerResult result;
             try
             {
@@ -321,8 +313,6 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
                 return;
             }
         }
-
-        AsyncRead();
     }
 
     bool ReadHeader()
@@ -809,8 +799,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     void HandleAuthSession(AuthSession authSession)
     {
         // A stale or replayed realm-join ticket (client retry after a proxy restart, say)
-        // must not take the process down with a KeyNotFoundException. This runs outside
-        // HandlePacket's guard, straight off the socket completion callback.
+        // gets a denial, not a KeyNotFoundException: this runs outside HandlePacket's guard.
         if (!BnetSessionTicketStorage.SessionsByName.TryGetValue(authSession.RealmJoinTicket, out var session))
         {
             Log.Print(LogType.Error,

@@ -335,7 +335,7 @@ public class BnetTcpSession : SSLSocket, BnetServices.INetwork
     {
         string ipAddress = GetRemoteIpEndPoint()!.ToString();
         BnetTcpSessionLogMessages.AcceptingConnection(_melServer, _sourceFile, _netDirNone, ipAddress);
-        AsyncHandshake(BnetServerCertificate.Certificate);
+        AsyncHandshake(BnetServerCertificate.Certificate).ObserveFaults(GetRemoteIpEndPoint());
     }
 
     public override bool Update()
@@ -367,17 +367,12 @@ public class BnetTcpSession : SSLSocket, BnetServices.INetwork
         }
         catch (Exception ex)
         {
-            // SSLSocket.AsyncRead cannot await this method, so anything escaping here would both
-            // go unlogged and skip the AsyncRead below, leaving the session open but permanently
-            // unreadable. Only buffer-level failures reach this far — the frame loop handles its
-            // own — so the stream state is unknown and the connection has to go.
+            // Only buffer-level failures reach this far — the frame loop handles its own — so the
+            // stream state is unknown and the connection has to go.
             BnetTcpSessionLogMessages.BufferProcessingFailed(_melServer, ex, _sourceFile, _netDirNone,
                 DescribeEndpoint(), ex.Message);
             CloseSocket();
-            return;
         }
-
-        await AsyncRead();
     }
 
     internal Task ProcessCurrentBuffer()
@@ -442,12 +437,12 @@ public class BnetTcpSession : SSLSocket, BnetServices.INetwork
         header.MethodId = methodId;
 
         var frame = RentRpcFrame(header, message, out int length);
-        _ = AsyncWrite(frame, length, returnToPool: true);
+        AsyncWrite(frame, length, returnToPool: true).ObserveFaults(GetRemoteIpEndPoint());
     }
 
     // RequestDisconnect sends a DisconnectNotification and then closes; closing on the spot could
     // cut that frame off mid-write. Error paths call SSLSocket.CloseSocket directly and stay immediate.
-    void BnetServices.INetwork.CloseSocket() => _ = CloseSocketAfterWrites(TimeSpan.FromSeconds(5));
+    void BnetServices.INetwork.CloseSocket() => CloseSocketAfterWrites(TimeSpan.FromSeconds(5)).ObserveFaults(GetRemoteIpEndPoint());
 
     /// <summary>
     /// Rents a buffer from <see cref="ArrayPool{T}.Shared"/> and writes the frame into it: big-endian

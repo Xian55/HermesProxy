@@ -30,8 +30,7 @@ public static class Time
     public static readonly DateTime ApplicationStartTime = DateTime.UtcNow;
 
     // Lock-free uptime baseline. Environment.TickCount64 reads an interlocked OS counter
-    // (~5 ns) versus DateTime.UtcNow which is a syscall (~50-150 ns). GetMSTime is called
-    // from the NetworkThread polling pump on every iteration, so the per-call cost matters.
+    // (~5 ns) versus DateTime.UtcNow which is a syscall (~50-150 ns).
     private static readonly long _startTickCount64 = Environment.TickCount64;
 
     /// <summary>

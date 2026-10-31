@@ -64,7 +64,7 @@ partial class Server
         Log.RegisterCallerMapping(nameof(BnetServices), Log.Network);
         Log.RegisterCallerMapping(nameof(BNetServer.LoginServiceManager), Log.Network);
         Log.RegisterCallerMapping(nameof(RealmSocket), Log.Network);
-        Log.RegisterCallerMapping("NetworkThread", Log.Network); // generic type, no clean nameof form
+        Log.RegisterCallerMapping("ConnectionSweeper", Log.Network); // generic type, no clean nameof form
         Log.RegisterCallerMapping(nameof(WorldClient), Log.Packet);
         Log.RegisterCallerMapping(nameof(WorldSocket), Log.Packet);
         Log.RegisterCallerMapping(nameof(WorldSocketManager), Log.Packet);

@@ -92,7 +92,7 @@ public partial class WorldClient
         if (authClient == null)
         {
             WorldClientLogMessages.AuthClientGoneBeforeWorldAuth(_melNet, _sourceFile, _netDirSend);
-            _isSuccessful = false;
+            _handshake.Refuse();
             return;
         }
 

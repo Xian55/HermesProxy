@@ -20,6 +20,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 
 namespace Framework.Networking;
 
@@ -32,89 +33,59 @@ public class SocketManager<[DynamicallyAccessedMembers(DynamicallyAccessedMember
 {
     private readonly IServiceProvider _services;
 
-    public AsyncAcceptor Acceptor = null!;
-    NetworkThread<TSocketType>[] _threads = null!;
-    int _threadCount;
+    AsyncAcceptor? _acceptor;
+    ConnectionSweeper<TSocketType>? _connections;
 
-    public bool IsListening => Acceptor.IsListening;
+    public bool IsListening => _acceptor is { IsListening: true };
 
     public SocketManager(IServiceProvider services)
     {
         _services = services;
     }
 
-    public virtual bool StartNetwork(string bindIp, int port, int threadCount = 1)
+    public virtual bool StartNetwork(string bindIp, int port)
     {
-        Cypher.Assert(threadCount > 0);
-
-        Acceptor = new AsyncAcceptor();
-        if (!Acceptor.Start(bindIp, port))
+        var acceptor = new AsyncAcceptor();
+        if (!acceptor.Start(bindIp, port))
         {
             Log.Print(LogType.Network, "StartNetwork failed to Start AsyncAcceptor");
             return false;
         }
 
-        _threadCount = threadCount;
-        _threads = new NetworkThread<TSocketType>[GetNetworkThreadCount()];
+        var connections = new ConnectionSweeper<TSocketType>(ConnectionSweeper<TSocketType>.DefaultInterval);
+        connections.Start();
 
-        for (int i = 0; i < _threadCount; ++i)
-        {
-            _threads[i] = new NetworkThread<TSocketType>();
-            _threads[i].Start();
-        }
+        _acceptor = acceptor;
+        _connections = connections;
 
-        _ = Acceptor.AsyncAcceptSocket(OnSocketOpen);
+        acceptor.BeginAccept(OnSocketOpen);
 
         return true;
     }
 
-    public virtual void StopNetwork()
+    /// <summary>
+    /// Safe to call on a listener that already ended or never started, so it does not depend on
+    /// <see cref="IsListening"/>: the connections of a listener that ended by itself still have to
+    /// be closed.
+    /// </summary>
+    public async Task StopNetworkAsync()
     {
-        Acceptor.Close();
+        if (_acceptor is null)
+            return;
 
-        if (_threadCount != 0)
-            for (int i = 0; i < _threadCount; ++i)
-                _threads[i].Stop();
+        // First, and awaited: once it returns no handler can add a connection behind the sweeper.
+        await _acceptor.DisposeAsync();
+        await _connections!.DisposeAsync();
 
-        Wait();
-
-        Acceptor = null!;
-        _threads = null!;
-        _threadCount = 0;
-    }
-
-    void Wait()
-    {
-        if (_threadCount != 0)
-            for (int i = 0; i < _threadCount; ++i)
-                _threads[i].Wait();
+        _acceptor = null;
+        _connections = null;
     }
 
     public virtual void OnSocketOpen(Socket sock)
     {
-        try
-        {
-            TSocketType newSocket = ActivatorUtilities.CreateInstance<TSocketType>(_services, sock);
-            newSocket.Accept();
+        TSocketType newSocket = ActivatorUtilities.CreateInstance<TSocketType>(_services, sock);
+        newSocket.Accept();
 
-            _threads[SelectThreadWithMinConnections()].AddSocket(newSocket);
-        }
-        catch (Exception err)
-        {
-            Log.outException(err);
-        }
-    }
-
-    public int GetNetworkThreadCount() { return _threadCount; }
-
-    uint SelectThreadWithMinConnections()
-    {
-        uint min = 0;
-
-        for (uint i = 1; i < _threadCount; ++i)
-            if (_threads[i].GetConnectionCount() < _threads[min].GetConnectionCount())
-                min = i;
-
-        return min;
+        _connections!.Add(newSocket);
     }
 }

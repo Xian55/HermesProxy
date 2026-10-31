@@ -31,10 +31,6 @@ namespace Framework.Networking;
 
 public abstract class SSLSocket : ISocket, IDisposable
 {
-    private static readonly Microsoft.Extensions.Logging.ILogger _melNet = Log.CreateMelLogger(Log.CategoryNetwork);
-    private static readonly string _sourceFile = nameof(SSLSocket).PadRight(15);
-    private const string _netDirNone = "";
-
     Socket _socket;
     internal SslStream _stream;
     // What reads and writes go through: _stream, or the bare NetworkStream on a plain socket.
@@ -79,48 +75,34 @@ public abstract class SSLSocket : ISocket, IDisposable
         return _remoteEndPoint;
     }
 
+    /// <summary>
+    /// Reads until the connection ends, one <see cref="ReadHandler"/> at a time. A handler that
+    /// faults closes this connection. Handlers don't read: the next read is this loop's.
+    /// </summary>
     public async Task AsyncRead()
     {
-        if (!IsOpen() || _receiveBuffer is null)
+        var receiveBuffer = _receiveBuffer;
+        if (receiveBuffer is null)
             return;
 
         try
         {
-            var receiveBuffer = _receiveBuffer;
-            var result = await _io.ReadAsync(receiveBuffer, 0, receiveBuffer.Length);
-            if (result == 0)
+            while (IsOpen())
             {
-                CloseSocket();
-                return;
-            }
+                var result = await _io.ReadAsync(receiveBuffer.AsMemory());
+                if (result == 0)
+                    break;
 
-            // ReadHandler re-arms the loop itself by awaiting AsyncRead again, so awaiting it here
-            // would chain every read into the previous one and never unwind. It has to stay fire
-            // and forget — but the task must still be observed: a fault that goes unwatched also
-            // skips ReadHandler's own AsyncRead, leaving the connection open and never reading.
-            var handlerTask = ReadHandler(receiveBuffer, result);
-            if (!handlerTask.IsCompletedSuccessfully)
-                ObserveFault(handlerTask, GetRemoteIpEndPoint());
+                await ReadHandler(receiveBuffer, result);
+            }
         }
         catch (Exception ex)
         {
             Log.outException(ex);
         }
-    }
 
-    private static void ObserveFault(Task handlerTask, IPEndPoint? endPoint)
-    {
-        handlerTask.ContinueWith(
-            static (task, state) =>
-            {
-                var ex = task.Exception!.GetBaseException();
-                SslSocketLogMessages.ReadHandlerFaulted(_melNet, ex, _sourceFile, _netDirNone,
-                    state?.ToString() ?? "<unknown>", ex.Message);
-            },
-            endPoint,
-            CancellationToken.None,
-            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
+        if (IsOpen())
+            CloseSocket();
     }
 
     public async Task AsyncHandshake(X509Certificate2 certificate)

@@ -186,10 +186,10 @@ internal sealed class ProxyHostedService : BackgroundService
         catch (OperationCanceledException) { /* normal shutdown */ }
         finally
         {
-            TryStop(_worldSocketManager);
-            TryStop(_realmSocketManager);
-            TryStop(_restSocketManager);
-            TryStop(_bnetSocketManager);
+            await TryStop(_worldSocketManager);
+            await TryStop(_realmSocketManager);
+            await TryStop(_restSocketManager);
+            await TryStop(_bnetSocketManager);
         }
     }
 
@@ -199,16 +199,13 @@ internal sealed class ProxyHostedService : BackgroundService
         Server.LogStartingService(serviceName, endpoint.ToString());
         if (!socketManager.StartNetwork(endpoint.Address.ToString(), endpoint.Port))
             throw new Exception($"Failed to start {serviceName} service");
-
-        Thread.Sleep(50); // Let the listener thread log before the next service starts.
     }
 
-    private static void TryStop<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] T>(SocketManager<T> socketManager) where T : ISocket
+    private static async Task TryStop<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] T>(SocketManager<T> socketManager) where T : ISocket
     {
         try
         {
-            if (socketManager.IsListening)
-                socketManager.StopNetwork();
+            await socketManager.StopNetworkAsync();
         }
         catch (Exception ex)
         {

@@ -17,8 +17,6 @@
 
 using Framework.Logging;
 using Framework.Networking;
-using HermesProxy.Configuration.Options;
-using Microsoft.Extensions.Options;
 using System;
 using System.Net.Sockets;
 
@@ -26,42 +24,19 @@ namespace HermesProxy.World.Server;
 
 public sealed class WorldSocketManager : SocketManager<WorldSocket>
 {
-    private readonly int _instancePort;
-
-    public WorldSocketManager(IServiceProvider services, IOptions<ProxyNetworkOptions> networkOptions)
+    public WorldSocketManager(IServiceProvider services)
         : base(services)
     {
-        _instancePort = networkOptions.Value.InstancePort;
     }
 
-    public override bool StartNetwork(string bindIp, int realmPort, int threadCount = 1)
+    public override bool StartNetwork(string bindIp, int port)
     {
         _tcpNoDelay = true;
 
         // -1 means use default
         _socketSendBufferSize = -1;
 
-        if (!base.StartNetwork(bindIp, realmPort, threadCount))
-            return false;
-
-        _instanceAcceptor = new AsyncAcceptor();
-        if (!_instanceAcceptor.Start(bindIp, _instancePort))
-        {
-            Log.Print(LogType.Error, "StartNetwork failed to start instance AsyncAcceptor");
-            return false;
-        }
-
-        _ = _instanceAcceptor.AsyncAcceptSocket(OnSocketOpen);
-
-        return true;
-    }
-
-    public override void StopNetwork()
-    {
-        _instanceAcceptor.Close();
-        base.StopNetwork();
-
-        _instanceAcceptor = null!;
+        return base.StartNetwork(bindIp, port);
     }
 
     public override void OnSocketOpen(Socket sock)
@@ -69,24 +44,15 @@ public sealed class WorldSocketManager : SocketManager<WorldSocket>
         Log.Print(LogType.Network, $"Instance socket open.");
 
         // set some options here
-        try
-        {
-            if (_socketSendBufferSize >= 0)
-                sock.SendBufferSize = _socketSendBufferSize;
+        if (_socketSendBufferSize >= 0)
+            sock.SendBufferSize = _socketSendBufferSize;
 
-            // Set TCP_NODELAY.
-            sock.NoDelay = _tcpNoDelay;
-        }
-        catch (SocketException ex)
-        {
-            Log.Print(LogType.Error, ex.ToString());
-            return;
-        }
+        // Set TCP_NODELAY.
+        sock.NoDelay = _tcpNoDelay;
 
         base.OnSocketOpen(sock);
     }
 
-    AsyncAcceptor _instanceAcceptor = null!;
     int _socketSendBufferSize;
     bool _tcpNoDelay;
 }
