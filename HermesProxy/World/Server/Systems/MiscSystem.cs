@@ -325,14 +325,18 @@ public static class MiscSystem
     }
 
     /// <summary>
-    /// Asked when the player dies and when the map opens on a dead player. Only a 4.x server knows
-    /// the request; the answer comes back as SMSG_REQUEST_CEMETERY_LIST_RESPONSE.
+    /// Asked at login, when the player dies and when the map opens on a dead player. Only a 4.x
+    /// server knows the request; the answer comes back as SMSG_REQUEST_CEMETERY_LIST_RESPONSE. An
+    /// older server has no such list, so the proxy answers that there is none.
     /// </summary>
     [HandlesCmsg(Opcode.CMSG_REQUEST_CEMETERY_LIST)]
     public static void HandleRequestCemeteryList(in EmptyClientPacket request, in SessionContext ctx)
     {
         if (!WorldClient.IsCataLegacy)
+        {
+            ctx.SendPacketToClient(new RequestCemeteryListResponse());
             return;
+        }
 
         ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_REQUEST_CEMETERY_LIST));
     }
