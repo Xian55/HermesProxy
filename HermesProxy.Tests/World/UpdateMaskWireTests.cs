@@ -383,8 +383,7 @@ public class UpdateMaskAllocationTests
     public void DynamicSetUpdateFieldGenericAndWrite_BufferRented_AllocatesNothing()
     {
         var guid = new WowGuid128(0x1122334455667788, 0xAABBCCDDEEFF0011);
-        // Builders pass the field index as a boxed enum; box it once, outside the measurement.
-        object channelIndex = 2;
+        const int channelIndex = 2;
         using var packet = new ByteBuffer();
         var warmup = new DynamicUpdateFieldsArray(18, UpdateTypeModern.Values);
         warmup.SetUpdateField(channelIndex, guid, DynamicFieldChangeType.ValueAndSizeChanged);

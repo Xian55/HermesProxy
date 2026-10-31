@@ -669,29 +669,29 @@ public class ObjectUpdateBuilder
 
         ObjectData objectData = m_updateData.ObjectData;
         if (objectData.Guid != default)
-            m_fields.SetUpdateField(ObjectField.OBJECT_FIELD_GUID, objectData.Guid);
+            m_fields.SetUpdateField((int)ObjectField.OBJECT_FIELD_GUID, objectData.Guid);
         if (objectData.EntryID != null)
-            m_fields.SetUpdateField<int>(ObjectField.OBJECT_FIELD_ENTRY, (int)objectData.EntryID);
+            m_fields.SetUpdateField<int>((int)ObjectField.OBJECT_FIELD_ENTRY, (int)objectData.EntryID);
         if (objectData.DynamicFlags != null)
-            m_fields.SetUpdateField<uint>(ObjectField.OBJECT_DYNAMIC_FLAGS, (uint)objectData.DynamicFlags);
+            m_fields.SetUpdateField<uint>((int)ObjectField.OBJECT_DYNAMIC_FLAGS, (uint)objectData.DynamicFlags);
         if (objectData.Scale != null)
-            m_fields.SetUpdateField<float>(ObjectField.OBJECT_FIELD_SCALE_X, (float)objectData.Scale);
+            m_fields.SetUpdateField<float>((int)ObjectField.OBJECT_FIELD_SCALE_X, (float)objectData.Scale);
 
         ItemData itemData = m_updateData.ItemData;
         if (itemData != null)
         {
             if (itemData.Owner != null)
-                m_fields.SetUpdateField(ItemField.ITEM_FIELD_OWNER, itemData.Owner.Value);
+                m_fields.SetUpdateField((int)ItemField.ITEM_FIELD_OWNER, itemData.Owner.Value);
             if (itemData.ContainedIn != null)
-                m_fields.SetUpdateField(ItemField.ITEM_FIELD_CONTAINED, itemData.ContainedIn.Value);
+                m_fields.SetUpdateField((int)ItemField.ITEM_FIELD_CONTAINED, itemData.ContainedIn.Value);
             if (itemData.Creator != null)
-                m_fields.SetUpdateField(ItemField.ITEM_FIELD_CREATOR, itemData.Creator.Value);
+                m_fields.SetUpdateField((int)ItemField.ITEM_FIELD_CREATOR, itemData.Creator.Value);
             if (itemData.GiftCreator != null)
-                m_fields.SetUpdateField(ItemField.ITEM_FIELD_GIFTCREATOR, itemData.GiftCreator.Value);
+                m_fields.SetUpdateField((int)ItemField.ITEM_FIELD_GIFTCREATOR, itemData.GiftCreator.Value);
             if (itemData.StackCount != null)
-                m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_STACK_COUNT, (uint)itemData.StackCount);
+                m_fields.SetUpdateField<uint>((int)ItemField.ITEM_FIELD_STACK_COUNT, (uint)itemData.StackCount);
             if (itemData.Duration != null)
-                m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_DURATION, (uint)itemData.Duration);
+                m_fields.SetUpdateField<uint>((int)ItemField.ITEM_FIELD_DURATION, (uint)itemData.Duration);
             for (int i = 0; i < 5; i++)
             {
                 int startIndex = (int)ItemField.ITEM_FIELD_SPELL_CHARGES;
@@ -699,7 +699,7 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<int>(startIndex + i, (int)itemData.SpellCharges[i]!);
             }
             if (itemData.Flags != null)
-                m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_FLAGS, (uint)itemData.Flags);
+                m_fields.SetUpdateField<uint>((int)ItemField.ITEM_FIELD_FLAGS, (uint)itemData.Flags);
             for (int i = 0; i < 13; i++)
             {
                 int startIndex = (int)ItemField.ITEM_FIELD_ENCHANTMENT;
@@ -717,23 +717,23 @@ public class ObjectUpdateBuilder
                 }
             }
             if (itemData.PropertySeed != null)
-                m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_PROPERTY_SEED, (uint)itemData.PropertySeed);
+                m_fields.SetUpdateField<uint>((int)ItemField.ITEM_FIELD_PROPERTY_SEED, (uint)itemData.PropertySeed);
             if (itemData.RandomProperty != null)
-                m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_RANDOM_PROPERTIES_ID, (uint)itemData.RandomProperty);
+                m_fields.SetUpdateField<uint>((int)ItemField.ITEM_FIELD_RANDOM_PROPERTIES_ID, (uint)itemData.RandomProperty);
             if (itemData.Durability != null)
-                m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_DURABILITY, (uint)itemData.Durability);
+                m_fields.SetUpdateField<uint>((int)ItemField.ITEM_FIELD_DURABILITY, (uint)itemData.Durability);
             if (itemData.MaxDurability != null)
-                m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_MAXDURABILITY, (uint)itemData.MaxDurability);
+                m_fields.SetUpdateField<uint>((int)ItemField.ITEM_FIELD_MAXDURABILITY, (uint)itemData.MaxDurability);
             if (itemData.CreatePlayedTime != null)
-                m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_CREATE_PLAYED_TIME, (uint)itemData.CreatePlayedTime);
+                m_fields.SetUpdateField<uint>((int)ItemField.ITEM_FIELD_CREATE_PLAYED_TIME, (uint)itemData.CreatePlayedTime);
             if (itemData.ModifiersMask != null)
-                m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_MODIFIERS_MASK, (uint)itemData.ModifiersMask);
+                m_fields.SetUpdateField<uint>((int)ItemField.ITEM_FIELD_MODIFIERS_MASK, (uint)itemData.ModifiersMask);
             if (itemData.Context != null)
-                m_fields.SetUpdateField<int>(ItemField.ITEM_FIELD_CONTEXT, (int)itemData.Context);
+                m_fields.SetUpdateField<int>((int)ItemField.ITEM_FIELD_CONTEXT, (int)itemData.Context);
             if (itemData.ArtifactXP != null)
-                m_fields.SetUpdateField<ulong>(ItemField.ITEM_FIELD_ARTIFACT_XP, (ulong)itemData.ArtifactXP);
+                m_fields.SetUpdateField<ulong>((int)ItemField.ITEM_FIELD_ARTIFACT_XP, (ulong)itemData.ArtifactXP);
             if (itemData.ItemAppearanceModID != null)
-                m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_APPEARANCE_MOD_ID, (uint)itemData.ItemAppearanceModID);
+                m_fields.SetUpdateField<uint>((int)ItemField.ITEM_FIELD_APPEARANCE_MOD_ID, (uint)itemData.ItemAppearanceModID);
 
             // Dynamic Fields
             if (itemData.HasGemsUpdate)
@@ -760,34 +760,34 @@ public class ObjectUpdateBuilder
                 }
             }
             if (containerData.NumSlots != null)
-                m_fields.SetUpdateField<uint>(ContainerField.CONTAINER_FIELD_NUM_SLOTS, (uint)containerData.NumSlots);
+                m_fields.SetUpdateField<uint>((int)ContainerField.CONTAINER_FIELD_NUM_SLOTS, (uint)containerData.NumSlots);
         }
 
         UnitData unitData = m_updateData.UnitData;
         if (unitData != null)
         {
             if (unitData.Charm != null)
-                m_fields.SetUpdateField(UnitField.UNIT_FIELD_CHARM, unitData.Charm.Value);
+                m_fields.SetUpdateField((int)UnitField.UNIT_FIELD_CHARM, unitData.Charm.Value);
             if (unitData.Summon != null)
-                m_fields.SetUpdateField(UnitField.UNIT_FIELD_SUMMON, unitData.Summon.Value);
+                m_fields.SetUpdateField((int)UnitField.UNIT_FIELD_SUMMON, unitData.Summon.Value);
             if (unitData.Critter != null)
-                m_fields.SetUpdateField(UnitField.UNIT_FIELD_CRITTER, unitData.Critter.Value);
+                m_fields.SetUpdateField((int)UnitField.UNIT_FIELD_CRITTER, unitData.Critter.Value);
             if (unitData.CharmedBy != null)
-                m_fields.SetUpdateField(UnitField.UNIT_FIELD_CHARMEDBY, unitData.CharmedBy.Value);
+                m_fields.SetUpdateField((int)UnitField.UNIT_FIELD_CHARMEDBY, unitData.CharmedBy.Value);
             if (unitData.SummonedBy != null)
-                m_fields.SetUpdateField(UnitField.UNIT_FIELD_SUMMONEDBY, unitData.SummonedBy.Value);
+                m_fields.SetUpdateField((int)UnitField.UNIT_FIELD_SUMMONEDBY, unitData.SummonedBy.Value);
             if (unitData.CreatedBy != null)
-                m_fields.SetUpdateField(UnitField.UNIT_FIELD_CREATEDBY, unitData.CreatedBy.Value);
+                m_fields.SetUpdateField((int)UnitField.UNIT_FIELD_CREATEDBY, unitData.CreatedBy.Value);
             if (unitData.DemonCreator != null)
-                m_fields.SetUpdateField(UnitField.UNIT_FIELD_DEMON_CREATOR, unitData.DemonCreator.Value);
+                m_fields.SetUpdateField((int)UnitField.UNIT_FIELD_DEMON_CREATOR, unitData.DemonCreator.Value);
             if (unitData.LookAtControllerTarget != null)
-                m_fields.SetUpdateField(UnitField.UNIT_FIELD_LOOK_AT_CONTROLLER_TARGET, unitData.LookAtControllerTarget.Value);
+                m_fields.SetUpdateField((int)UnitField.UNIT_FIELD_LOOK_AT_CONTROLLER_TARGET, unitData.LookAtControllerTarget.Value);
             if (unitData.Target != null)
-                m_fields.SetUpdateField(UnitField.UNIT_FIELD_TARGET, unitData.Target.Value);
+                m_fields.SetUpdateField((int)UnitField.UNIT_FIELD_TARGET, unitData.Target.Value);
             if (unitData.BattlePetCompanionGUID != null)
-                m_fields.SetUpdateField(UnitField.UNIT_FIELD_BATTLE_PET_COMPANION_GUID, unitData.BattlePetCompanionGUID.Value);
+                m_fields.SetUpdateField((int)UnitField.UNIT_FIELD_BATTLE_PET_COMPANION_GUID, unitData.BattlePetCompanionGUID.Value);
             if (unitData.BattlePetDBID != null)
-                m_fields.SetUpdateField<ulong>(UnitField.UNIT_FIELD_BATTLE_PET_DB_ID, (ulong)unitData.BattlePetDBID);
+                m_fields.SetUpdateField<ulong>((int)UnitField.UNIT_FIELD_BATTLE_PET_DB_ID, (ulong)unitData.BattlePetDBID);
             if (unitData.ChannelData != null)
             {
                 int startIndex = (int)UnitField.UNIT_FIELD_CHANNEL_DATA;
@@ -795,24 +795,24 @@ public class ObjectUpdateBuilder
                 m_fields.SetUpdateField<int>(startIndex + 1, unitData.ChannelData.Value.SpellXSpellVisualID);
             }
             if (unitData.SummonedByHomeRealm != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_SUMMONED_BY_HOME_REALM, (uint)unitData.SummonedByHomeRealm);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_SUMMONED_BY_HOME_REALM, (uint)unitData.SummonedByHomeRealm);
             if (unitData.RaceId != null || unitData.ClassId != null || unitData.PlayerClassId != null || unitData.SexId != null)
             {
                 if (unitData.RaceId != null)
-                    m_fields.SetUpdateField<byte>(UnitField.UNIT_FIELD_BYTES_0, (byte)unitData.RaceId, 0);
+                    m_fields.SetUpdateField<byte>((int)UnitField.UNIT_FIELD_BYTES_0, (byte)unitData.RaceId, 0);
                 if (unitData.ClassId != null)
-                    m_fields.SetUpdateField<byte>(UnitField.UNIT_FIELD_BYTES_0, (byte)unitData.ClassId, 1);
+                    m_fields.SetUpdateField<byte>((int)UnitField.UNIT_FIELD_BYTES_0, (byte)unitData.ClassId, 1);
                 if (unitData.PlayerClassId != null)
-                    m_fields.SetUpdateField<byte>(UnitField.UNIT_FIELD_BYTES_0, (byte)unitData.PlayerClassId, 2);
+                    m_fields.SetUpdateField<byte>((int)UnitField.UNIT_FIELD_BYTES_0, (byte)unitData.PlayerClassId, 2);
                 if (unitData.SexId != null)
-                    m_fields.SetUpdateField<byte>(UnitField.UNIT_FIELD_BYTES_0, (byte)unitData.SexId, 3);
+                    m_fields.SetUpdateField<byte>((int)UnitField.UNIT_FIELD_BYTES_0, (byte)unitData.SexId, 3);
             }
             if (unitData.DisplayPower != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_DISPLAY_POWER, (uint)unitData.DisplayPower);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_DISPLAY_POWER, (uint)unitData.DisplayPower);
             if (unitData.OverrideDisplayPowerID != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_OVERRIDE_DISPLAY_POWER_ID, (uint)unitData.OverrideDisplayPowerID);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_OVERRIDE_DISPLAY_POWER_ID, (uint)unitData.OverrideDisplayPowerID);
             if (unitData.Health != null)
-                m_fields.SetUpdateField<ulong>(UnitField.UNIT_FIELD_HEALTH, (ulong)unitData.Health);
+                m_fields.SetUpdateField<ulong>((int)UnitField.UNIT_FIELD_HEALTH, (ulong)unitData.Health);
             for (int i = 0; i < 6; i++)
             {
                 int startIndex = (int)UnitField.UNIT_FIELD_POWER;
@@ -820,7 +820,7 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.Power[i]!);
             }
             if (unitData.MaxHealth != null)
-                m_fields.SetUpdateField<ulong>(UnitField.UNIT_FIELD_MAXHEALTH, (ulong)unitData.MaxHealth);
+                m_fields.SetUpdateField<ulong>((int)UnitField.UNIT_FIELD_MAXHEALTH, (ulong)unitData.MaxHealth);
             for (int i = 0; i < 6; i++)
             {
                 int startIndex = (int)UnitField.UNIT_FIELD_MAXPOWER;
@@ -834,25 +834,25 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<float>(startIndex + i, (float)unitData.ModPowerRegen[i]!);
             }
             if (unitData.Level != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_LEVEL, (int)unitData.Level);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_LEVEL, (int)unitData.Level);
             if (unitData.EffectiveLevel != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_EFFECTIVE_LEVEL, (int)unitData.EffectiveLevel);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_EFFECTIVE_LEVEL, (int)unitData.EffectiveLevel);
             if (unitData.ContentTuningID != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_CONTENT_TUNING_ID, (int)unitData.ContentTuningID);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_CONTENT_TUNING_ID, (int)unitData.ContentTuningID);
             if (unitData.ScalingLevelMin != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_SCALING_LEVEL_MIN, (int)unitData.ScalingLevelMin);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_SCALING_LEVEL_MIN, (int)unitData.ScalingLevelMin);
             if (unitData.ScalingLevelMax != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_SCALING_LEVEL_MAX, (int)unitData.ScalingLevelMax);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_SCALING_LEVEL_MAX, (int)unitData.ScalingLevelMax);
             if (unitData.ScalingLevelDelta != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_SCALING_LEVEL_DELTA, (int)unitData.ScalingLevelDelta);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_SCALING_LEVEL_DELTA, (int)unitData.ScalingLevelDelta);
             if (unitData.ScalingFactionGroup != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_SCALING_FACTION_GROUP, (int)unitData.ScalingFactionGroup);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_SCALING_FACTION_GROUP, (int)unitData.ScalingFactionGroup);
             if (unitData.ScalingHealthItemLevelCurveID != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_SCALING_HEALTH_ITEM_LEVEL_CURVE_ID, (int)unitData.ScalingHealthItemLevelCurveID);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_SCALING_HEALTH_ITEM_LEVEL_CURVE_ID, (int)unitData.ScalingHealthItemLevelCurveID);
             if (unitData.ScalingDamageItemLevelCurveID != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_SCALING_DAMAGE_ITEM_LEVEL_CURVE_ID, (int)unitData.ScalingDamageItemLevelCurveID);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_SCALING_DAMAGE_ITEM_LEVEL_CURVE_ID, (int)unitData.ScalingDamageItemLevelCurveID);
             if (unitData.FactionTemplate != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_FACTIONTEMPLATE, (int)unitData.FactionTemplate);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_FACTIONTEMPLATE, (int)unitData.FactionTemplate);
             for (int i = 0; i < 3; i++)
             {
                 int startIndex = (int)UnitField.UNIT_VIRTUAL_ITEM_SLOT_ID;
@@ -865,13 +865,13 @@ public class ObjectUpdateBuilder
                 }
             }
             if (unitData.Flags != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_FLAGS, (uint)unitData.Flags);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_FLAGS, (uint)unitData.Flags);
             if (unitData.Flags2 != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_FLAGS_2, (uint)unitData.Flags2);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_FLAGS_2, (uint)unitData.Flags2);
             if (unitData.Flags3 != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_FLAGS_3, (uint)unitData.Flags3);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_FLAGS_3, (uint)unitData.Flags3);
             if (unitData.AuraState != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_AURASTATE, (uint)unitData.AuraState);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_AURASTATE, (uint)unitData.AuraState);
             for (int i = 0; i < 2; i++)
             {
                 int startIndex = (int)UnitField.UNIT_FIELD_BASEATTACKTIME;
@@ -879,62 +879,62 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<uint>(startIndex + i, (uint)unitData.AttackRoundBaseTime[i]!);
             }
             if (unitData.RangedAttackRoundBaseTime != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_RANGEDATTACKTIME, (uint)unitData.RangedAttackRoundBaseTime);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_RANGEDATTACKTIME, (uint)unitData.RangedAttackRoundBaseTime);
             if (unitData.BoundingRadius != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_BOUNDINGRADIUS, (float)unitData.BoundingRadius);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_BOUNDINGRADIUS, (float)unitData.BoundingRadius);
             if (unitData.CombatReach != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_COMBATREACH, (float)unitData.CombatReach);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_COMBATREACH, (float)unitData.CombatReach);
             if (unitData.DisplayID != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_DISPLAYID, (int)unitData.DisplayID);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_DISPLAYID, (int)unitData.DisplayID);
             if (unitData.DisplayScale != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_DISPLAY_SCALE, (float)unitData.DisplayScale);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_DISPLAY_SCALE, (float)unitData.DisplayScale);
             if (unitData.NativeDisplayID != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_NATIVEDISPLAYID, (int)unitData.NativeDisplayID);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_NATIVEDISPLAYID, (int)unitData.NativeDisplayID);
             if (unitData.NativeXDisplayScale != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_NATIVE_X_DISPLAY_SCALE, (float)unitData.NativeXDisplayScale);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_NATIVE_X_DISPLAY_SCALE, (float)unitData.NativeXDisplayScale);
             if (unitData.MountDisplayID != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_MOUNTDISPLAYID, (int)unitData.MountDisplayID);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_MOUNTDISPLAYID, (int)unitData.MountDisplayID);
             if (unitData.MinDamage != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_MINDAMAGE, (float)unitData.MinDamage);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_MINDAMAGE, (float)unitData.MinDamage);
             if (unitData.MaxDamage != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_MAXDAMAGE, (float)unitData.MaxDamage);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_MAXDAMAGE, (float)unitData.MaxDamage);
             if (unitData.MinOffHandDamage != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_MINOFFHANDDAMAGE, (float)unitData.MinOffHandDamage);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_MINOFFHANDDAMAGE, (float)unitData.MinOffHandDamage);
             if (unitData.MaxOffHandDamage != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_MAXOFFHANDDAMAGE, (float)unitData.MaxOffHandDamage);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_MAXOFFHANDDAMAGE, (float)unitData.MaxOffHandDamage);
             if (unitData.StandState != null || unitData.PetLoyaltyIndex != null || unitData.VisFlags != null || unitData.AnimTier != null)
             {
                 if (unitData.StandState != null)
-                    m_fields.SetUpdateField<byte>(UnitField.UNIT_FIELD_BYTES_1, (byte)unitData.StandState, 0);
+                    m_fields.SetUpdateField<byte>((int)UnitField.UNIT_FIELD_BYTES_1, (byte)unitData.StandState, 0);
                 if (unitData.PetLoyaltyIndex != null)
-                    m_fields.SetUpdateField<byte>(UnitField.UNIT_FIELD_BYTES_1, (byte)unitData.PetLoyaltyIndex, 1);
+                    m_fields.SetUpdateField<byte>((int)UnitField.UNIT_FIELD_BYTES_1, (byte)unitData.PetLoyaltyIndex, 1);
                 if (unitData.VisFlags != null)
-                    m_fields.SetUpdateField<byte>(UnitField.UNIT_FIELD_BYTES_1, (byte)unitData.VisFlags, 2);
+                    m_fields.SetUpdateField<byte>((int)UnitField.UNIT_FIELD_BYTES_1, (byte)unitData.VisFlags, 2);
                 if (unitData.AnimTier != null)
-                    m_fields.SetUpdateField<byte>(UnitField.UNIT_FIELD_BYTES_1, (byte)unitData.AnimTier, 3);
+                    m_fields.SetUpdateField<byte>((int)UnitField.UNIT_FIELD_BYTES_1, (byte)unitData.AnimTier, 3);
             }
             if (unitData.PetNumber != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_PETNUMBER, (uint)unitData.PetNumber);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_PETNUMBER, (uint)unitData.PetNumber);
             if (unitData.PetNameTimestamp != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_PET_NAME_TIMESTAMP, (uint)unitData.PetNameTimestamp);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_PET_NAME_TIMESTAMP, (uint)unitData.PetNameTimestamp);
             if (unitData.PetExperience != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_PETEXPERIENCE, (uint)unitData.PetExperience);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_PETEXPERIENCE, (uint)unitData.PetExperience);
             if (unitData.PetNextLevelExperience != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_PETNEXTLEVELXP, (uint)unitData.PetNextLevelExperience);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_PETNEXTLEVELXP, (uint)unitData.PetNextLevelExperience);
             if (unitData.ModCastSpeed != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_MOD_CAST_SPEED, (float)unitData.ModCastSpeed);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_MOD_CAST_SPEED, (float)unitData.ModCastSpeed);
             if (unitData.ModCastHaste != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_MOD_CAST_HASTE, (float)unitData.ModCastHaste);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_MOD_CAST_HASTE, (float)unitData.ModCastHaste);
             if (unitData.ModHaste != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_MOD_HASTE, (float)unitData.ModHaste);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_MOD_HASTE, (float)unitData.ModHaste);
             if (unitData.ModRangedHaste != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_MOD_RANGED_HASTE, (float)unitData.ModRangedHaste);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_MOD_RANGED_HASTE, (float)unitData.ModRangedHaste);
             if (unitData.ModHasteRegen != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_MOD_HASTE_REGEN, (float)unitData.ModHasteRegen);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_MOD_HASTE_REGEN, (float)unitData.ModHasteRegen);
             if (unitData.ModTimeRate != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_MOD_TIME_RATE, (float)unitData.ModTimeRate);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_MOD_TIME_RATE, (float)unitData.ModTimeRate);
             if (unitData.CreatedBySpell != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_CREATED_BY_SPELL, (int)unitData.CreatedBySpell);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_CREATED_BY_SPELL, (int)unitData.CreatedBySpell);
             for (int i = 0; i < 2; i++)
             {
                 int startIndex = (int)UnitField.UNIT_NPC_FLAGS;
@@ -942,11 +942,11 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<uint>(startIndex + i, (uint)unitData.NpcFlags[i]!);
             }
             if (unitData.EmoteState != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_NPC_EMOTESTATE, (int)unitData.EmoteState);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_NPC_EMOTESTATE, (int)unitData.EmoteState);
             if (unitData.TrainingPointsUsed != null && unitData.TrainingPointsTotal != null)
             {
-                m_fields.SetUpdateField<ushort>(UnitField.UNIT_FIELD_TRAINING_POINTS_TOTAL, (ushort)unitData.TrainingPointsUsed, 0);
-                m_fields.SetUpdateField<ushort>(UnitField.UNIT_FIELD_TRAINING_POINTS_TOTAL, (ushort)unitData.TrainingPointsTotal, 1);
+                m_fields.SetUpdateField<ushort>((int)UnitField.UNIT_FIELD_TRAINING_POINTS_TOTAL, (ushort)unitData.TrainingPointsUsed, 0);
+                m_fields.SetUpdateField<ushort>((int)UnitField.UNIT_FIELD_TRAINING_POINTS_TOTAL, (ushort)unitData.TrainingPointsTotal, 1);
             }
             for (int i = 0; i < 5; i++)
             {
@@ -985,44 +985,44 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.ResistanceBuffModsNegative[i]!);
             }
             if (unitData.BaseMana != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_BASE_MANA, (int)unitData.BaseMana);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_BASE_MANA, (int)unitData.BaseMana);
             if (unitData.BaseHealth != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_BASE_HEALTH, (int)unitData.BaseHealth);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_BASE_HEALTH, (int)unitData.BaseHealth);
             if (unitData.SheatheState != null || unitData.PvpFlags != null || unitData.PetFlags != null || unitData.ShapeshiftForm != null)
             {
                 if (unitData.SheatheState != null)
-                    m_fields.SetUpdateField<byte>(UnitField.UNIT_FIELD_BYTES_2, (byte)unitData.SheatheState, 0);
+                    m_fields.SetUpdateField<byte>((int)UnitField.UNIT_FIELD_BYTES_2, (byte)unitData.SheatheState, 0);
                 if (unitData.PvpFlags != null)
-                    m_fields.SetUpdateField<byte>(UnitField.UNIT_FIELD_BYTES_2, (byte)unitData.PvpFlags, 1);
+                    m_fields.SetUpdateField<byte>((int)UnitField.UNIT_FIELD_BYTES_2, (byte)unitData.PvpFlags, 1);
                 if (unitData.PetFlags != null)
-                    m_fields.SetUpdateField<byte>(UnitField.UNIT_FIELD_BYTES_2, (byte)unitData.PetFlags, 2);
+                    m_fields.SetUpdateField<byte>((int)UnitField.UNIT_FIELD_BYTES_2, (byte)unitData.PetFlags, 2);
                 if (unitData.ShapeshiftForm != null)
-                    m_fields.SetUpdateField<byte>(UnitField.UNIT_FIELD_BYTES_2, (byte)unitData.ShapeshiftForm, 3);
+                    m_fields.SetUpdateField<byte>((int)UnitField.UNIT_FIELD_BYTES_2, (byte)unitData.ShapeshiftForm, 3);
             }
             if (unitData.AttackPower != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_ATTACK_POWER, (int)unitData.AttackPower);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_ATTACK_POWER, (int)unitData.AttackPower);
             if (unitData.AttackPowerModPos != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_ATTACK_POWER_MOD_POS, (int)unitData.AttackPowerModPos);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_ATTACK_POWER_MOD_POS, (int)unitData.AttackPowerModPos);
             if (unitData.AttackPowerModNeg != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_ATTACK_POWER_MOD_NEG, (int)unitData.AttackPowerModNeg);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_ATTACK_POWER_MOD_NEG, (int)unitData.AttackPowerModNeg);
             if (unitData.AttackPowerMultiplier != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_ATTACK_POWER_MULTIPLIER, (float)unitData.AttackPowerMultiplier);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_ATTACK_POWER_MULTIPLIER, (float)unitData.AttackPowerMultiplier);
             if (unitData.RangedAttackPower != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_RANGED_ATTACK_POWER, (int)unitData.RangedAttackPower);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_RANGED_ATTACK_POWER, (int)unitData.RangedAttackPower);
             if (unitData.RangedAttackPowerModPos != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_RANGED_ATTACK_POWER_MOD_POS, (int)unitData.RangedAttackPowerModPos);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_RANGED_ATTACK_POWER_MOD_POS, (int)unitData.RangedAttackPowerModPos);
             if (unitData.RangedAttackPowerModNeg != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_RANGED_ATTACK_POWER_MOD_NEG, (int)unitData.RangedAttackPowerModNeg);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_RANGED_ATTACK_POWER_MOD_NEG, (int)unitData.RangedAttackPowerModNeg);
             if (unitData.RangedAttackPowerMultiplier != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER, (float)unitData.RangedAttackPowerMultiplier);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER, (float)unitData.RangedAttackPowerMultiplier);
             if (unitData.AttackSpeedAura != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_ATTACK_SPEED_AURA, (int)unitData.AttackSpeedAura);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_ATTACK_SPEED_AURA, (int)unitData.AttackSpeedAura);
             if (unitData.Lifesteal != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_LIFESTEAL, (float)unitData.Lifesteal);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_LIFESTEAL, (float)unitData.Lifesteal);
             if (unitData.MinRangedDamage != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_MINRANGEDDAMAGE, (float)unitData.MinRangedDamage);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_MINRANGEDDAMAGE, (float)unitData.MinRangedDamage);
             if (unitData.MaxRangedDamage != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_MAXRANGEDDAMAGE, (float)unitData.MaxRangedDamage);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_MAXRANGEDDAMAGE, (float)unitData.MaxRangedDamage);
             for (int i = 0; i < 7; i++)
             {
                 int startIndex = (int)UnitField.UNIT_FIELD_POWER_COST_MODIFIER;
@@ -1036,88 +1036,88 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<float>(startIndex + i, (float)unitData.PowerCostMultiplier[i]!);
             }
             if (unitData.MaxHealthModifier != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_MAXHEALTHMODIFIER, (float)unitData.MaxHealthModifier);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_MAXHEALTHMODIFIER, (float)unitData.MaxHealthModifier);
             if (unitData.HoverHeight != null)
-                m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_HOVERHEIGHT, (float)unitData.HoverHeight);
+                m_fields.SetUpdateField<float>((int)UnitField.UNIT_FIELD_HOVERHEIGHT, (float)unitData.HoverHeight);
             if (unitData.MinItemLevelCutoff != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_MIN_ITEM_LEVEL_CUTOFF, (int)unitData.MinItemLevelCutoff);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_MIN_ITEM_LEVEL_CUTOFF, (int)unitData.MinItemLevelCutoff);
             if (unitData.MinItemLevel != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_MIN_ITEM_LEVEL, (int)unitData.MinItemLevel);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_MIN_ITEM_LEVEL, (int)unitData.MinItemLevel);
             if (unitData.MaxItemLevel != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_MAXITEMLEVEL, (int)unitData.MaxItemLevel);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_MAXITEMLEVEL, (int)unitData.MaxItemLevel);
             if (unitData.WildBattlePetLevel != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_WILD_BATTLEPET_LEVEL, (int)unitData.WildBattlePetLevel);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_WILD_BATTLEPET_LEVEL, (int)unitData.WildBattlePetLevel);
             if (unitData.BattlePetCompanionNameTimestamp != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_BATTLEPET_COMPANION_NAME_TIMESTAMP, (uint)unitData.BattlePetCompanionNameTimestamp);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_BATTLEPET_COMPANION_NAME_TIMESTAMP, (uint)unitData.BattlePetCompanionNameTimestamp);
             if (unitData.InteractSpellID != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_INTERACT_SPELLID, (int)unitData.InteractSpellID);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_INTERACT_SPELLID, (int)unitData.InteractSpellID);
             if (unitData.StateSpellVisualID != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_STATE_SPELL_VISUAL_ID, (uint)unitData.StateSpellVisualID);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_STATE_SPELL_VISUAL_ID, (uint)unitData.StateSpellVisualID);
             if (unitData.StateAnimID != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_STATE_ANIM_ID, (uint)unitData.StateAnimID);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_STATE_ANIM_ID, (uint)unitData.StateAnimID);
             if (unitData.StateAnimKitID != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_STATE_ANIM_KIT_ID, (uint)unitData.StateAnimKitID);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_STATE_ANIM_KIT_ID, (uint)unitData.StateAnimKitID);
             if (unitData.StateWorldEffectsID != null)
-                m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_STATE_WORLD_EFFECT_ID, (uint)unitData.StateWorldEffectsID);
+                m_fields.SetUpdateField<uint>((int)UnitField.UNIT_FIELD_STATE_WORLD_EFFECT_ID, (uint)unitData.StateWorldEffectsID);
             if (unitData.ScaleDuration != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_SCALE_DURATION, (int)unitData.ScaleDuration);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_SCALE_DURATION, (int)unitData.ScaleDuration);
             if (unitData.LooksLikeMountID != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_LOOKS_LIKE_MOUNT_ID, (int)unitData.LooksLikeMountID);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_LOOKS_LIKE_MOUNT_ID, (int)unitData.LooksLikeMountID);
             if (unitData.LooksLikeCreatureID != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_LOOKS_LIKE_CREATURE_ID, (int)unitData.LooksLikeCreatureID);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_LOOKS_LIKE_CREATURE_ID, (int)unitData.LooksLikeCreatureID);
             if (unitData.LookAtControllerID != null)
-                m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_LOOK_AT_CONTROLLER_ID, (int)unitData.LookAtControllerID);
+                m_fields.SetUpdateField<int>((int)UnitField.UNIT_FIELD_LOOK_AT_CONTROLLER_ID, (int)unitData.LookAtControllerID);
             if (unitData.GuildGUID != null)
-                m_fields.SetUpdateField(UnitField.UNIT_FIELD_GUILD_GUID, unitData.GuildGUID.Value);
+                m_fields.SetUpdateField((int)UnitField.UNIT_FIELD_GUILD_GUID, unitData.GuildGUID.Value);
 
             // Dynamic Fields
             if (unitData.ChannelObject != null)
-                m_dynamicFields.SetUpdateField<WowGuid128>(UnitDynamicField.UNIT_DYNAMIC_FIELD_CHANNEL_OBJECTS, unitData.ChannelObject.Value, DynamicFieldChangeType.ValueAndSizeChanged);
+                m_dynamicFields.SetUpdateField<WowGuid128>((int)UnitDynamicField.UNIT_DYNAMIC_FIELD_CHANNEL_OBJECTS, unitData.ChannelObject.Value, DynamicFieldChangeType.ValueAndSizeChanged);
         }
 
         PlayerData? playerData = m_updateData.PlayerData;
         if (playerData != null)
         {
             if (playerData.DuelArbiter != null)
-                m_fields.SetUpdateField(PlayerField.PLAYER_DUEL_ARBITER, playerData.DuelArbiter.Value);
+                m_fields.SetUpdateField((int)PlayerField.PLAYER_DUEL_ARBITER, playerData.DuelArbiter.Value);
             if (playerData.WowAccount != null)
-                m_fields.SetUpdateField(PlayerField.PLAYER_WOW_ACCOUNT, playerData.WowAccount.Value);
+                m_fields.SetUpdateField((int)PlayerField.PLAYER_WOW_ACCOUNT, playerData.WowAccount.Value);
             if (playerData.LootTargetGUID != null)
-                m_fields.SetUpdateField(PlayerField.PLAYER_LOOT_TARGET_GUID, playerData.LootTargetGUID.Value);
+                m_fields.SetUpdateField((int)PlayerField.PLAYER_LOOT_TARGET_GUID, playerData.LootTargetGUID.Value);
             if (playerData.PlayerFlags != null)
-                m_fields.SetUpdateField<uint>(PlayerField.PLAYER_FLAGS, (uint)playerData.PlayerFlags);
+                m_fields.SetUpdateField<uint>((int)PlayerField.PLAYER_FLAGS, (uint)playerData.PlayerFlags);
             if (playerData.PlayerFlagsEx != null)
-                m_fields.SetUpdateField<uint>(PlayerField.PLAYER_FLAGS_EX, (uint)playerData.PlayerFlagsEx);
+                m_fields.SetUpdateField<uint>((int)PlayerField.PLAYER_FLAGS_EX, (uint)playerData.PlayerFlagsEx);
             if (playerData.GuildRankID != null)
-                m_fields.SetUpdateField<uint>(PlayerField.PLAYER_GUILDRANK, (uint)playerData.GuildRankID);
+                m_fields.SetUpdateField<uint>((int)PlayerField.PLAYER_GUILDRANK, (uint)playerData.GuildRankID);
             if (playerData.GuildDeleteDate != null)
-                m_fields.SetUpdateField<uint>(PlayerField.PLAYER_GUILDDELETE_DATE, (uint)playerData.GuildDeleteDate);
+                m_fields.SetUpdateField<uint>((int)PlayerField.PLAYER_GUILDDELETE_DATE, (uint)playerData.GuildDeleteDate);
             if (playerData.GuildLevel != null)
-                m_fields.SetUpdateField<int>(PlayerField.PLAYER_GUILDLEVEL, (int)playerData.GuildLevel);
+                m_fields.SetUpdateField<int>((int)PlayerField.PLAYER_GUILDLEVEL, (int)playerData.GuildLevel);
             if (playerData.PartyType != null || playerData.NumBankSlots != null || playerData.NativeSex != null || playerData.Inebriation != null)
             {
                 if (playerData.PartyType != null)
-                    m_fields.SetUpdateField<byte>(PlayerField.PLAYER_BYTES, (byte)playerData.PartyType, 0);
+                    m_fields.SetUpdateField<byte>((int)PlayerField.PLAYER_BYTES, (byte)playerData.PartyType, 0);
                 if (playerData.NumBankSlots != null)
-                    m_fields.SetUpdateField<byte>(PlayerField.PLAYER_BYTES, (byte)playerData.NumBankSlots, 1);
+                    m_fields.SetUpdateField<byte>((int)PlayerField.PLAYER_BYTES, (byte)playerData.NumBankSlots, 1);
                 if (playerData.NativeSex != null)
-                    m_fields.SetUpdateField<byte>(PlayerField.PLAYER_BYTES, (byte)playerData.NativeSex, 2);
+                    m_fields.SetUpdateField<byte>((int)PlayerField.PLAYER_BYTES, (byte)playerData.NativeSex, 2);
                 if (playerData.Inebriation != null)
-                    m_fields.SetUpdateField<byte>(PlayerField.PLAYER_BYTES, (byte)playerData.Inebriation, 3);
+                    m_fields.SetUpdateField<byte>((int)PlayerField.PLAYER_BYTES, (byte)playerData.Inebriation, 3);
             }
             if (playerData.PvpTitle != null || playerData.ArenaFaction != null || playerData.PvPRank != null)
             {
                 if (playerData.PvpTitle != null)
-                    m_fields.SetUpdateField<byte>(PlayerField.PLAYER_BYTES_2, (byte)playerData.PvpTitle, 0);
+                    m_fields.SetUpdateField<byte>((int)PlayerField.PLAYER_BYTES_2, (byte)playerData.PvpTitle, 0);
                 if (playerData.ArenaFaction != null)
-                    m_fields.SetUpdateField<byte>(PlayerField.PLAYER_BYTES_2, (byte)playerData.ArenaFaction, 1);
+                    m_fields.SetUpdateField<byte>((int)PlayerField.PLAYER_BYTES_2, (byte)playerData.ArenaFaction, 1);
                 if (playerData.PvPRank != null)
-                    m_fields.SetUpdateField<byte>(PlayerField.PLAYER_BYTES_2, (byte)playerData.PvPRank, 2);
+                    m_fields.SetUpdateField<byte>((int)PlayerField.PLAYER_BYTES_2, (byte)playerData.PvPRank, 2);
             }
             if (playerData.DuelTeam != null)
-                m_fields.SetUpdateField<uint>(PlayerField.PLAYER_DUEL_TEAM, (uint)playerData.DuelTeam);
+                m_fields.SetUpdateField<uint>((int)PlayerField.PLAYER_DUEL_TEAM, (uint)playerData.DuelTeam);
             if (playerData.GuildTimeStamp != null)
-                m_fields.SetUpdateField<int>(PlayerField.PLAYER_GUILD_TIMESTAMP, (int)playerData.GuildTimeStamp);
+                m_fields.SetUpdateField<int>((int)PlayerField.PLAYER_GUILD_TIMESTAMP, (int)playerData.GuildTimeStamp);
             for (int i = 0; i < HermesProxy.World.Enums.QuestConst.MaxQuestLogSize; i++)
             {
                 int startIndex = (int)PlayerField.PLAYER_QUEST_LOG;
@@ -1151,15 +1151,15 @@ public class ObjectUpdateBuilder
                 }
             }
             if (playerData.ChosenTitle != null)
-                m_fields.SetUpdateField<int>(PlayerField.PLAYER_CHOSEN_TITLE, (int)playerData.ChosenTitle);
+                m_fields.SetUpdateField<int>((int)PlayerField.PLAYER_CHOSEN_TITLE, (int)playerData.ChosenTitle);
             if (playerData.FakeInebriation != null)
-                m_fields.SetUpdateField<int>(PlayerField.PLAYER_FAKE_INEBRIATION, (int)playerData.FakeInebriation);
+                m_fields.SetUpdateField<int>((int)PlayerField.PLAYER_FAKE_INEBRIATION, (int)playerData.FakeInebriation);
             if (playerData.VirtualPlayerRealm != null)
-                m_fields.SetUpdateField<uint>(PlayerField.PLAYER_FIELD_VIRTUAL_PLAYER_REALM, (uint)playerData.VirtualPlayerRealm);
+                m_fields.SetUpdateField<uint>((int)PlayerField.PLAYER_FIELD_VIRTUAL_PLAYER_REALM, (uint)playerData.VirtualPlayerRealm);
             if (playerData.CurrentSpecID != null)
-                m_fields.SetUpdateField<uint>(PlayerField.PLAYER_FIELD_CURRENT_SPEC_ID, (uint)playerData.CurrentSpecID);
+                m_fields.SetUpdateField<uint>((int)PlayerField.PLAYER_FIELD_CURRENT_SPEC_ID, (uint)playerData.CurrentSpecID);
             if (playerData.TaxiMountAnimKitID != null)
-                m_fields.SetUpdateField<int>(PlayerField.PLAYER_FIELD_TAXI_MOUNT_ANIM_KIT_ID, (int)playerData.TaxiMountAnimKitID);
+                m_fields.SetUpdateField<int>((int)PlayerField.PLAYER_FIELD_TAXI_MOUNT_ANIM_KIT_ID, (int)playerData.TaxiMountAnimKitID);
             for (int i = 0; i < 6; i++)
             {
                 int startIndex = (int)PlayerField.PLAYER_FIELD_AVG_ITEM_LEVEL;
@@ -1167,9 +1167,9 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<float>(startIndex + i, (float)playerData.AvgItemLevel[i]!);
             }
             if (playerData.CurrentBattlePetBreedQuality != null)
-                m_fields.SetUpdateField<uint>(PlayerField.PLAYER_FIELD_CURRENT_BATTLE_PET_BREED_QUALITY, (uint)playerData.CurrentBattlePetBreedQuality);
+                m_fields.SetUpdateField<uint>((int)PlayerField.PLAYER_FIELD_CURRENT_BATTLE_PET_BREED_QUALITY, (uint)playerData.CurrentBattlePetBreedQuality);
             if (playerData.HonorLevel != null)
-                m_fields.SetUpdateField<int>(PlayerField.PLAYER_FIELD_HONOR_LEVEL, (int)playerData.HonorLevel);
+                m_fields.SetUpdateField<int>((int)PlayerField.PLAYER_FIELD_HONOR_LEVEL, (int)playerData.HonorLevel);
             for (int i = 0; i < 36; i++)
             {
                 int startIndex = (int)PlayerField.PLAYER_FIELD_CUSTOMIZATION_CHOICES;
@@ -1234,11 +1234,11 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField(startIndex + i * sizePerEntry, keyringSlots[i]!.Value);
             }
             if (activeData.FarsightObject != null)
-                m_fields.SetUpdateField(ActivePlayerField.ACTIVE_PLAYER_FIELD_FARSIGHT, activeData.FarsightObject.Value);
+                m_fields.SetUpdateField((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_FARSIGHT, activeData.FarsightObject.Value);
             if (activeData.ComboTarget != null)
-                m_fields.SetUpdateField(ActivePlayerField.ACTIVE_PLAYER_FIELD_COMBO_TARGET, activeData.ComboTarget.Value);
+                m_fields.SetUpdateField((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_COMBO_TARGET, activeData.ComboTarget.Value);
             if (activeData.SummonedBattlePetGUID != null)
-                m_fields.SetUpdateField(ActivePlayerField.ACTIVE_PLAYER_FIELD_SUMMONED_BATTLE_PET_ID, activeData.SummonedBattlePetGUID.Value);
+                m_fields.SetUpdateField((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SUMMONED_BATTLE_PET_ID, activeData.SummonedBattlePetGUID.Value);
             for (int i = 0; i < 12; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_KNOWN_TITLES;
@@ -1246,13 +1246,13 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.KnownTitles[i]!);
             }
             if (activeData.Coinage != null)
-                m_fields.SetUpdateField<ulong>(ActivePlayerField.ACTIVE_PLAYER_FIELD_COINAGE, (ulong)activeData.Coinage);
+                m_fields.SetUpdateField<ulong>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_COINAGE, (ulong)activeData.Coinage);
             if (activeData.XP != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_XP, (int)activeData.XP);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_XP, (int)activeData.XP);
             if (activeData.NextLevelXP != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_NEXT_LEVEL_XP, (int)activeData.NextLevelXP);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_NEXT_LEVEL_XP, (int)activeData.NextLevelXP);
             if (activeData.TrialXP != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_TRIAL_XP, (int)activeData.TrialXP);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_TRIAL_XP, (int)activeData.TrialXP);
             SkillInfo? skill = activeData.Skill;
             for (int i = 0; skill != null && i < SkillInfo.MaxSkills; i++)
             {
@@ -1293,11 +1293,11 @@ public class ObjectUpdateBuilder
                 }
             }
             if (activeData.CharacterPoints != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_CHARACTER_POINTS, (int)activeData.CharacterPoints);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_CHARACTER_POINTS, (int)activeData.CharacterPoints);
             if (activeData.MaxTalentTiers != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MAX_TALENT_TIERS, (int)activeData.MaxTalentTiers);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MAX_TALENT_TIERS, (int)activeData.MaxTalentTiers);
             if (activeData.TrackCreatureMask != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_TRACK_CREATURES, (uint)activeData.TrackCreatureMask);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_TRACK_CREATURES, (uint)activeData.TrackCreatureMask);
             for (int i = 0; i < 2; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_TRACK_RESOURCES;
@@ -1305,29 +1305,29 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.TrackResourceMask[i]!);
             }
             if (activeData.MainhandExpertise != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_EXPERTISE, (float)activeData.MainhandExpertise);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_EXPERTISE, (float)activeData.MainhandExpertise);
             if (activeData.OffhandExpertise != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_OFFHAND_EXPERTISE, (float)activeData.OffhandExpertise);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_OFFHAND_EXPERTISE, (float)activeData.OffhandExpertise);
             if (activeData.RangedExpertise != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_RANGED_EXPERTISE, (float)activeData.RangedExpertise);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_RANGED_EXPERTISE, (float)activeData.RangedExpertise);
             if (activeData.CombatRatingExpertise != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_COMBAT_RATING_EXPERTISE, (float)activeData.CombatRatingExpertise);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_COMBAT_RATING_EXPERTISE, (float)activeData.CombatRatingExpertise);
             if (activeData.BlockPercentage != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BLOCK_PERCENTAGE, (float)activeData.BlockPercentage);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BLOCK_PERCENTAGE, (float)activeData.BlockPercentage);
             if (activeData.DodgePercentage != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_DODGE_PERCENTAGE, (float)activeData.DodgePercentage);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_DODGE_PERCENTAGE, (float)activeData.DodgePercentage);
             if (activeData.DodgePercentageFromAttribute != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_DODGE_PERCENTAGE_FROM_ATTRIBUTE, (float)activeData.DodgePercentageFromAttribute);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_DODGE_PERCENTAGE_FROM_ATTRIBUTE, (float)activeData.DodgePercentageFromAttribute);
             if (activeData.ParryPercentage != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_PARRY_PERCENTAGE, (float)activeData.ParryPercentage);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_PARRY_PERCENTAGE, (float)activeData.ParryPercentage);
             if (activeData.ParryPercentageFromAttribute != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_PARRY_PERCENTAGE_FROM_ATTRIBUTE, (float)activeData.ParryPercentageFromAttribute);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_PARRY_PERCENTAGE_FROM_ATTRIBUTE, (float)activeData.ParryPercentageFromAttribute);
             if (activeData.CritPercentage != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_CRIT_PERCENTAGE, (float)activeData.CritPercentage);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_CRIT_PERCENTAGE, (float)activeData.CritPercentage);
             if (activeData.RangedCritPercentage != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_RANGED_CRIT_PERCENTAGE, (float)activeData.RangedCritPercentage);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_RANGED_CRIT_PERCENTAGE, (float)activeData.RangedCritPercentage);
             if (activeData.OffhandCritPercentage != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_OFFHAND_CRIT_PERCENTAGE, (float)activeData.OffhandCritPercentage);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_OFFHAND_CRIT_PERCENTAGE, (float)activeData.OffhandCritPercentage);
             for (int i = 0; i < 7; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SPELL_CRIT_PERCENTAGE1;
@@ -1335,23 +1335,23 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<float>(startIndex + i, (float)activeData.SpellCritPercentage[i]!);
             }
             if (activeData.ShieldBlock != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_SHIELD_BLOCK, (int)activeData.ShieldBlock);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SHIELD_BLOCK, (int)activeData.ShieldBlock);
             if (activeData.Mastery != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MASTERY, (float)activeData.Mastery);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MASTERY, (float)activeData.Mastery);
             if (activeData.Speed != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_SPEED, (float)activeData.Speed);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SPEED, (float)activeData.Speed);
             if (activeData.Avoidance != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_AVOIDANCE, (float)activeData.Avoidance);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_AVOIDANCE, (float)activeData.Avoidance);
             if (activeData.Sturdiness != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_STURDINESS, (float)activeData.Sturdiness);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_STURDINESS, (float)activeData.Sturdiness);
             if (activeData.Versatility != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_VERSATILITY, (int)activeData.Versatility);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_VERSATILITY, (int)activeData.Versatility);
             if (activeData.VersatilityBonus != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_VERSATILITY_BONUS, (float)activeData.VersatilityBonus);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_VERSATILITY_BONUS, (float)activeData.VersatilityBonus);
             if (activeData.PvpPowerDamage != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_PVP_POWER_DAMAGE, (float)activeData.PvpPowerDamage);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_PVP_POWER_DAMAGE, (float)activeData.PvpPowerDamage);
             if (activeData.PvpPowerHealing != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_PVP_POWER_HEALING, (float)activeData.PvpPowerHealing);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_PVP_POWER_HEALING, (float)activeData.PvpPowerHealing);
             ulong?[]? exploredZones = activeData.ExploredZones;
             for (int i = 0; exploredZones != null && i < ActivePlayerData.ExploredZoneWords; i++)
             {
@@ -1390,13 +1390,13 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<float>(startIndex + i, (float)activeData.ModDamageDonePercent[i]!);
             }
             if (activeData.ModHealingDonePos != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_HEALING_DONE_POS, (int)activeData.ModHealingDonePos);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_HEALING_DONE_POS, (int)activeData.ModHealingDonePos);
             if (activeData.ModHealingPercent != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_HEALING_PCT, (float)activeData.ModHealingPercent);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_HEALING_PCT, (float)activeData.ModHealingPercent);
             if (activeData.ModHealingDonePercent != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_HEALING_DONE_PCT, (float)activeData.ModHealingDonePercent);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_HEALING_DONE_PCT, (float)activeData.ModHealingDonePercent);
             if (activeData.ModPeriodicHealingDonePercent != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_PERIODIC_HEALING_DONE_PERCENT, (float)activeData.ModPeriodicHealingDonePercent);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_PERIODIC_HEALING_DONE_PERCENT, (float)activeData.ModPeriodicHealingDonePercent);
             for (int i = 0; i < 3; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_WEAPON_DMG_MULTIPLIERS;
@@ -1410,34 +1410,34 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<float>(startIndex + i, (float)activeData.WeaponAtkSpeedMultipliers[i]!);
             }
             if (activeData.ModSpellPowerPercent != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_SPELL_POWER_PCT, (float)activeData.ModSpellPowerPercent);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_SPELL_POWER_PCT, (float)activeData.ModSpellPowerPercent);
             if (activeData.ModResiliencePercent != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_RESILIENCE_PERCENT, (float)activeData.ModResiliencePercent);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_RESILIENCE_PERCENT, (float)activeData.ModResiliencePercent);
             if (activeData.OverrideSpellPowerByAPPercent != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_OVERRIDE_SPELL_POWER_BY_AP_PCT, (float)activeData.OverrideSpellPowerByAPPercent);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_OVERRIDE_SPELL_POWER_BY_AP_PCT, (float)activeData.OverrideSpellPowerByAPPercent);
             if (activeData.OverrideAPBySpellPowerPercent != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_OVERRIDE_AP_BY_SPELL_POWER_PERCENT, (float)activeData.OverrideAPBySpellPowerPercent);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_OVERRIDE_AP_BY_SPELL_POWER_PERCENT, (float)activeData.OverrideAPBySpellPowerPercent);
             if (activeData.ModTargetResistance != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_TARGET_RESISTANCE, (int)activeData.ModTargetResistance);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_TARGET_RESISTANCE, (int)activeData.ModTargetResistance);
             if (activeData.ModTargetPhysicalResistance != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_TARGET_PHYSICAL_RESISTANCE, (int)activeData.ModTargetPhysicalResistance);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_TARGET_PHYSICAL_RESISTANCE, (int)activeData.ModTargetPhysicalResistance);
             if (activeData.LocalFlags != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_LOCAL_FLAGS, (uint)activeData.LocalFlags);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_LOCAL_FLAGS, (uint)activeData.LocalFlags);
             if (activeData.GrantableLevels != null || activeData.MultiActionBars != null || activeData.LifetimeMaxRank != null || activeData.NumRespecs != null)
             {
                 if (activeData.GrantableLevels != null)
-                    m_fields.SetUpdateField<byte>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES, (byte)activeData.GrantableLevels, 0);
+                    m_fields.SetUpdateField<byte>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES, (byte)activeData.GrantableLevels, 0);
                 if (activeData.MultiActionBars != null)
-                    m_fields.SetUpdateField<byte>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES, (byte)activeData.MultiActionBars, 1);
+                    m_fields.SetUpdateField<byte>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES, (byte)activeData.MultiActionBars, 1);
                 if (activeData.LifetimeMaxRank != null)
-                    m_fields.SetUpdateField<byte>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES, (byte)activeData.LifetimeMaxRank, 2);
+                    m_fields.SetUpdateField<byte>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES, (byte)activeData.LifetimeMaxRank, 2);
                 if (activeData.NumRespecs != null)
-                    m_fields.SetUpdateField<byte>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES, (byte)activeData.NumRespecs, 3);
+                    m_fields.SetUpdateField<byte>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES, (byte)activeData.NumRespecs, 3);
             }
             if (activeData.AmmoID != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_AMMO_ID, (uint)activeData.AmmoID);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_AMMO_ID, (uint)activeData.AmmoID);
             if (activeData.PvpMedals != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_PVP_MEDALS, (uint)activeData.PvpMedals);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_PVP_MEDALS, (uint)activeData.PvpMedals);
             for (int i = 0; i < 12; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BUYBACK_PRICE;
@@ -1452,38 +1452,38 @@ public class ObjectUpdateBuilder
             }
             if (activeData.TodayHonorableKills != null && activeData.TodayDishonorableKills != null)
             {
-                m_fields.SetUpdateField<ushort>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_2, (ushort)activeData.TodayHonorableKills, 0);
-                m_fields.SetUpdateField<ushort>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_2, (ushort)activeData.TodayDishonorableKills, 1);
+                m_fields.SetUpdateField<ushort>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_2, (ushort)activeData.TodayHonorableKills, 0);
+                m_fields.SetUpdateField<ushort>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_2, (ushort)activeData.TodayDishonorableKills, 1);
             }
             if (activeData.YesterdayHonorableKills != null && activeData.YesterdayDishonorableKills != null)
             {
-                m_fields.SetUpdateField<ushort>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_3, (ushort)activeData.YesterdayHonorableKills, 0);
-                m_fields.SetUpdateField<ushort>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_3, (ushort)activeData.YesterdayDishonorableKills, 1);
+                m_fields.SetUpdateField<ushort>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_3, (ushort)activeData.YesterdayHonorableKills, 0);
+                m_fields.SetUpdateField<ushort>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_3, (ushort)activeData.YesterdayDishonorableKills, 1);
             }
             if (activeData.LastWeekHonorableKills != null && activeData.LastWeekDishonorableKills != null)
             {
-                m_fields.SetUpdateField<ushort>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_4, (ushort)activeData.LastWeekHonorableKills, 0);
-                m_fields.SetUpdateField<ushort>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_4, (ushort)activeData.LastWeekDishonorableKills, 1);
+                m_fields.SetUpdateField<ushort>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_4, (ushort)activeData.LastWeekHonorableKills, 0);
+                m_fields.SetUpdateField<ushort>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_4, (ushort)activeData.LastWeekDishonorableKills, 1);
             }
             if (activeData.ThisWeekHonorableKills != null && activeData.ThisWeekDishonorableKills != null)
             {
-                m_fields.SetUpdateField<ushort>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_5, (ushort)activeData.ThisWeekHonorableKills, 0);
-                m_fields.SetUpdateField<ushort>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_5, (ushort)activeData.ThisWeekDishonorableKills, 1);
+                m_fields.SetUpdateField<ushort>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_5, (ushort)activeData.ThisWeekHonorableKills, 0);
+                m_fields.SetUpdateField<ushort>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_5, (ushort)activeData.ThisWeekDishonorableKills, 1);
             }
             if (activeData.ThisWeekContribution != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_THIS_WEEK_CONTRIBUTION, (uint)activeData.ThisWeekContribution);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_THIS_WEEK_CONTRIBUTION, (uint)activeData.ThisWeekContribution);
             if (activeData.LifetimeHonorableKills != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_LIFETIME_HONORABLE_KILLS, (uint)activeData.LifetimeHonorableKills);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_LIFETIME_HONORABLE_KILLS, (uint)activeData.LifetimeHonorableKills);
             if (activeData.LifetimeDishonorableKills != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_LIFETIME_DISHONORABLE_KILLS, (uint)activeData.LifetimeDishonorableKills);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_LIFETIME_DISHONORABLE_KILLS, (uint)activeData.LifetimeDishonorableKills);
             if (activeData.YesterdayContribution != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_YESTERDAY_CONTRIBUTION, (uint)activeData.YesterdayContribution);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_YESTERDAY_CONTRIBUTION, (uint)activeData.YesterdayContribution);
             if (activeData.LastWeekContribution != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_LAST_WEEK_CONTRIBUTION, (uint)activeData.LastWeekContribution);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_LAST_WEEK_CONTRIBUTION, (uint)activeData.LastWeekContribution);
             if (activeData.LastWeekRank != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_LAST_WEEK_RANK, (uint)activeData.LastWeekRank);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_LAST_WEEK_RANK, (uint)activeData.LastWeekRank);
             if (activeData.WatchedFactionIndex != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_WATCHED_FACTION_INDEX, (int)activeData.WatchedFactionIndex);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_WATCHED_FACTION_INDEX, (int)activeData.WatchedFactionIndex);
             for (int i = 0; i < 32; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_COMBAT_RATING;
@@ -1511,11 +1511,11 @@ public class ObjectUpdateBuilder
                 }
             }
             if (activeData.MaxLevel != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MAX_LEVEL, (int)activeData.MaxLevel);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MAX_LEVEL, (int)activeData.MaxLevel);
             if (activeData.ScalingPlayerLevelDelta != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_SCALING_PLAYER_LEVEL_DELTA, (int)activeData.ScalingPlayerLevelDelta);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SCALING_PLAYER_LEVEL_DELTA, (int)activeData.ScalingPlayerLevelDelta);
             if (activeData.MaxCreatureScalingLevel != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MAX_CREATURE_SCALING_LEVEL, (int)activeData.MaxCreatureScalingLevel);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MAX_CREATURE_SCALING_LEVEL, (int)activeData.MaxCreatureScalingLevel);
             for (int i = 0; i < 4; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_NO_REAGENT_COST;
@@ -1523,7 +1523,7 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.NoReagentCostMask[i]!);
             }
             if (activeData.PetSpellPower != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_PET_SPELL_POWER, (int)activeData.PetSpellPower);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_PET_SPELL_POWER, (int)activeData.PetSpellPower);
             for (int i = 0; i < 2; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_PROFESSION_SKILL_LINE;
@@ -1531,30 +1531,30 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<int>(startIndex + i, (int)activeData.ProfessionSkillLine[i]!);
             }
             if (activeData.UiHitModifier != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_UI_HIT_MODIFIER, (float)activeData.UiHitModifier);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_UI_HIT_MODIFIER, (float)activeData.UiHitModifier);
             if (activeData.UiSpellHitModifier != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_UI_SPELL_HIT_MODIFIER, (float)activeData.UiSpellHitModifier);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_UI_SPELL_HIT_MODIFIER, (float)activeData.UiSpellHitModifier);
             if (activeData.HomeRealmTimeOffset != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_HOME_REALM_TIME_OFFSET, (int)activeData.HomeRealmTimeOffset);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_HOME_REALM_TIME_OFFSET, (int)activeData.HomeRealmTimeOffset);
             if (activeData.ModPetHaste != null)
-                m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_PET_HASTE, (float)activeData.ModPetHaste);
+                m_fields.SetUpdateField<float>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_PET_HASTE, (float)activeData.ModPetHaste);
             if (activeData.LocalRegenFlags != null || activeData.AuraVision != null || activeData.NumBackpackSlots != null)
             {
                 if (activeData.LocalRegenFlags != null)
-                    m_fields.SetUpdateField<byte>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_6, (byte)activeData.LocalRegenFlags, 0);
+                    m_fields.SetUpdateField<byte>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_6, (byte)activeData.LocalRegenFlags, 0);
                 if (activeData.AuraVision != null)
-                    m_fields.SetUpdateField<byte>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_6, (byte)activeData.AuraVision, 1);
+                    m_fields.SetUpdateField<byte>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_6, (byte)activeData.AuraVision, 1);
                 if (activeData.NumBackpackSlots != null)
-                    m_fields.SetUpdateField<byte>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_6, (byte)activeData.NumBackpackSlots, 2);
+                    m_fields.SetUpdateField<byte>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_6, (byte)activeData.NumBackpackSlots, 2);
             }
             if (activeData.OverrideSpellsID != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_OVERRIDE_SPELLS_ID, (int)activeData.OverrideSpellsID);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_OVERRIDE_SPELLS_ID, (int)activeData.OverrideSpellsID);
             if (activeData.LfgBonusFactionID != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_LFG_BONUS_FACTION_ID, (int)activeData.LfgBonusFactionID);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_LFG_BONUS_FACTION_ID, (int)activeData.LfgBonusFactionID);
             if (activeData.LootSpecID != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_LOOT_SPEC_ID, (uint)activeData.LootSpecID);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_LOOT_SPEC_ID, (uint)activeData.LootSpecID);
             if (activeData.OverrideZonePVPType != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_OVERRIDE_ZONE_PVP_TYPE, (uint)activeData.OverrideZonePVPType);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_OVERRIDE_ZONE_PVP_TYPE, (uint)activeData.OverrideZonePVPType);
             for (int i = 0; i < 4; i++)
             {
                 int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BAG_SLOT_FLAGS;
@@ -1575,19 +1575,19 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<ulong>(startIndex + i * 2, (ulong)questCompleted[i]!);
             }
             if (activeData.Honor != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_HONOR, (int)activeData.Honor);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_HONOR, (int)activeData.Honor);
             if (activeData.HonorNextLevel != null)
-                m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_HONOR_NEXT_LEVEL, (int)activeData.HonorNextLevel);
+                m_fields.SetUpdateField<int>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_HONOR_NEXT_LEVEL, (int)activeData.HonorNextLevel);
             if (activeData.PvPTierMaxFromWins != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_PVP_TIER_MAX_FROM_WINS, (uint)activeData.PvPTierMaxFromWins);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_PVP_TIER_MAX_FROM_WINS, (uint)activeData.PvPTierMaxFromWins);
             if (activeData.PvPLastWeeksTierMaxFromWins != null)
-                m_fields.SetUpdateField<uint>(ActivePlayerField.ACTIVE_PLAYER_FIELD_PVP_LAST_WEEKS_TIER_MAX_FROM_WINS, (uint)activeData.PvPLastWeeksTierMaxFromWins);
+                m_fields.SetUpdateField<uint>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_PVP_LAST_WEEKS_TIER_MAX_FROM_WINS, (uint)activeData.PvPLastWeeksTierMaxFromWins);
             if (activeData.InsertItemsLeftToRight != null || activeData.PvPRankProgress != null)
             {
                 if (activeData.InsertItemsLeftToRight != null)
-                    m_fields.SetUpdateField<byte>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_7, (byte)(activeData.InsertItemsLeftToRight == true ? 1 : 0), 0);
+                    m_fields.SetUpdateField<byte>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_7, (byte)(activeData.InsertItemsLeftToRight == true ? 1 : 0), 0);
                 if (activeData.PvPRankProgress != null)
-                    m_fields.SetUpdateField<byte>(ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_7, (byte)activeData.PvPRankProgress, 1);
+                    m_fields.SetUpdateField<byte>((int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BYTES_7, (byte)activeData.PvPRankProgress, 1);
             }
 
             // Dynamic Fields
@@ -1612,11 +1612,11 @@ public class ObjectUpdateBuilder
         if (goData != null)
         {
             if (goData.CreatedBy != null)
-                m_fields.SetUpdateField(GameObjectField.GAMEOBJECT_FIELD_CREATED_BY, goData.CreatedBy.Value);
+                m_fields.SetUpdateField((int)GameObjectField.GAMEOBJECT_FIELD_CREATED_BY, goData.CreatedBy.Value);
             if (goData.DisplayID != null)
-                m_fields.SetUpdateField<int>(GameObjectField.GAMEOBJECT_DISPLAYID, (int)goData.DisplayID);
+                m_fields.SetUpdateField<int>((int)GameObjectField.GAMEOBJECT_DISPLAYID, (int)goData.DisplayID);
             if (goData.Flags != null)
-                m_fields.SetUpdateField<uint>(GameObjectField.GAMEOBJECT_FLAGS, (uint)goData.Flags);
+                m_fields.SetUpdateField<uint>((int)GameObjectField.GAMEOBJECT_FLAGS, (uint)goData.Flags);
             for (int i = 0; i < 4; i++)
             {
                 int startIndex = (int)GameObjectField.GAMEOBJECT_PARENTROTATION;
@@ -1624,28 +1624,28 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<float>(startIndex + i, (float)goData.ParentRotation[i]!);
             }
             if (goData.FactionTemplate != null)
-                m_fields.SetUpdateField<int>(GameObjectField.GAMEOBJECT_FACTION, (int)goData.FactionTemplate);
+                m_fields.SetUpdateField<int>((int)GameObjectField.GAMEOBJECT_FACTION, (int)goData.FactionTemplate);
             if (goData.Level != null)
-                m_fields.SetUpdateField<int>(GameObjectField.GAMEOBJECT_LEVEL, (int)goData.Level);
+                m_fields.SetUpdateField<int>((int)GameObjectField.GAMEOBJECT_LEVEL, (int)goData.Level);
             if (goData.State != null || goData.TypeID != null || goData.ArtKit != null || goData.PercentHealth != null)
             {
                 if (goData.State != null)
-                    m_fields.SetUpdateField<byte>(GameObjectField.GAMEOBJECT_BYTES_1, (byte)goData.State, 0);
+                    m_fields.SetUpdateField<byte>((int)GameObjectField.GAMEOBJECT_BYTES_1, (byte)goData.State, 0);
                 if (goData.TypeID != null)
-                    m_fields.SetUpdateField<byte>(GameObjectField.GAMEOBJECT_BYTES_1, (byte)goData.TypeID, 1);
+                    m_fields.SetUpdateField<byte>((int)GameObjectField.GAMEOBJECT_BYTES_1, (byte)goData.TypeID, 1);
                 if (goData.ArtKit != null)
-                    m_fields.SetUpdateField<byte>(GameObjectField.GAMEOBJECT_BYTES_1, (byte)goData.ArtKit, 2);
+                    m_fields.SetUpdateField<byte>((int)GameObjectField.GAMEOBJECT_BYTES_1, (byte)goData.ArtKit, 2);
                 if (goData.PercentHealth != null)
-                    m_fields.SetUpdateField<byte>(GameObjectField.GAMEOBJECT_BYTES_1, (byte)goData.PercentHealth, 3);
+                    m_fields.SetUpdateField<byte>((int)GameObjectField.GAMEOBJECT_BYTES_1, (byte)goData.PercentHealth, 3);
             }
             if (goData.SpellVisualID != null)
-                m_fields.SetUpdateField<uint>(GameObjectField.GAMEOBJECT_SPELL_VISUAL_ID, (uint)goData.SpellVisualID);
+                m_fields.SetUpdateField<uint>((int)GameObjectField.GAMEOBJECT_SPELL_VISUAL_ID, (uint)goData.SpellVisualID);
             if (goData.StateSpellVisualID != null)
-                m_fields.SetUpdateField<uint>(GameObjectField.GAMEOBJECT_STATE_SPELL_VISUAL_ID, (uint)goData.StateSpellVisualID);
+                m_fields.SetUpdateField<uint>((int)GameObjectField.GAMEOBJECT_STATE_SPELL_VISUAL_ID, (uint)goData.StateSpellVisualID);
             if (goData.StateAnimID != null)
-                m_fields.SetUpdateField<uint>(GameObjectField.GAMEOBJECT_STATE_ANIM_ID, (uint)goData.StateAnimID);
+                m_fields.SetUpdateField<uint>((int)GameObjectField.GAMEOBJECT_STATE_ANIM_ID, (uint)goData.StateAnimID);
             if (goData.StateAnimKitID != null)
-                m_fields.SetUpdateField<uint>(GameObjectField.GAMEOBJECT_STATE_ANIM_KIT_ID, (uint)goData.StateAnimKitID);
+                m_fields.SetUpdateField<uint>((int)GameObjectField.GAMEOBJECT_STATE_ANIM_KIT_ID, (uint)goData.StateAnimKitID);
             for (int i = 0; i < 4; i++)
             {
                 int startIndex = (int)GameObjectField.GAMEOBJECT_STATE_WORLD_EFFECT_ID;
@@ -1653,37 +1653,37 @@ public class ObjectUpdateBuilder
                     m_fields.SetUpdateField<uint>(startIndex + i, (uint)goData.StateWorldEffectIDs[i]!);
             }
             if (goData.CustomParam != null)
-                m_fields.SetUpdateField<uint>(GameObjectField.GAMEOBJECT_FIELD_CUSTOM_PARAM, (uint)goData.CustomParam);
+                m_fields.SetUpdateField<uint>((int)GameObjectField.GAMEOBJECT_FIELD_CUSTOM_PARAM, (uint)goData.CustomParam);
         }
 
         DynamicObjectData dynData = m_updateData.DynamicObjectData;
         if (dynData != null)
         {
             if (dynData.Caster != null)
-                m_fields.SetUpdateField(DynamicObjectField.DYNAMICOBJECT_CASTER, dynData.Caster.Value);
+                m_fields.SetUpdateField((int)DynamicObjectField.DYNAMICOBJECT_CASTER, dynData.Caster.Value);
             if (dynData.Type != null)
-                m_fields.SetUpdateField<uint>(DynamicObjectField.DYNAMICOBJECT_TYPE, (uint)dynData.Type);
+                m_fields.SetUpdateField<uint>((int)DynamicObjectField.DYNAMICOBJECT_TYPE, (uint)dynData.Type);
             if (dynData.SpellXSpellVisualID != null)
-                m_fields.SetUpdateField<int>(DynamicObjectField.DYNAMICOBJECT_SPELL_X_SPELL_VISUAL_ID, (int)dynData.SpellXSpellVisualID);
+                m_fields.SetUpdateField<int>((int)DynamicObjectField.DYNAMICOBJECT_SPELL_X_SPELL_VISUAL_ID, (int)dynData.SpellXSpellVisualID);
             if (dynData.SpellID != null)
-                m_fields.SetUpdateField<int>(DynamicObjectField.DYNAMICOBJECT_SPELLID, (int)dynData.SpellID);
+                m_fields.SetUpdateField<int>((int)DynamicObjectField.DYNAMICOBJECT_SPELLID, (int)dynData.SpellID);
             if (dynData.Radius != null)
-                m_fields.SetUpdateField<float>(DynamicObjectField.DYNAMICOBJECT_RADIUS, (float)dynData.Radius);
+                m_fields.SetUpdateField<float>((int)DynamicObjectField.DYNAMICOBJECT_RADIUS, (float)dynData.Radius);
             if (dynData.CastTime != null)
-                m_fields.SetUpdateField<uint>(DynamicObjectField.DYNAMICOBJECT_CASTTIME, (uint)dynData.CastTime);
+                m_fields.SetUpdateField<uint>((int)DynamicObjectField.DYNAMICOBJECT_CASTTIME, (uint)dynData.CastTime);
         }
 
         CorpseData corpseData = m_updateData.CorpseData;
         if (corpseData != null)
         {
             if (corpseData.Owner != null)
-                m_fields.SetUpdateField(CorpseField.CORPSE_FIELD_OWNER, corpseData.Owner.Value);
+                m_fields.SetUpdateField((int)CorpseField.CORPSE_FIELD_OWNER, corpseData.Owner.Value);
             if (corpseData.PartyGUID != null)
-                m_fields.SetUpdateField(CorpseField.CORPSE_FIELD_PARTY_GUID, corpseData.PartyGUID.Value);
+                m_fields.SetUpdateField((int)CorpseField.CORPSE_FIELD_PARTY_GUID, corpseData.PartyGUID.Value);
             if (corpseData.GuildGUID != null)
-                m_fields.SetUpdateField(CorpseField.CORPSE_FIELD_GUILD_GUID, corpseData.GuildGUID.Value);
+                m_fields.SetUpdateField((int)CorpseField.CORPSE_FIELD_GUILD_GUID, corpseData.GuildGUID.Value);
             if (corpseData.DisplayID != null)
-                m_fields.SetUpdateField<uint>(CorpseField.CORPSE_FIELD_DISPLAY_ID, (uint)corpseData.DisplayID);
+                m_fields.SetUpdateField<uint>((int)CorpseField.CORPSE_FIELD_DISPLAY_ID, (uint)corpseData.DisplayID);
             for (int i = 0; i < 19; i++)
             {
                 int startIndex = (int)CorpseField.CORPSE_FIELD_ITEMS;
@@ -1693,18 +1693,18 @@ public class ObjectUpdateBuilder
             if (corpseData.RaceId != null || corpseData.SexId != null || corpseData.ClassId != null)
             {
                 if (corpseData.RaceId != null)
-                    m_fields.SetUpdateField<byte>(CorpseField.CORPSE_FIELD_BYTES_1, (byte)corpseData.RaceId, 0);
+                    m_fields.SetUpdateField<byte>((int)CorpseField.CORPSE_FIELD_BYTES_1, (byte)corpseData.RaceId, 0);
                 if (corpseData.SexId != null)
-                    m_fields.SetUpdateField<byte>(CorpseField.CORPSE_FIELD_BYTES_1, (byte)corpseData.SexId, 1);
+                    m_fields.SetUpdateField<byte>((int)CorpseField.CORPSE_FIELD_BYTES_1, (byte)corpseData.SexId, 1);
                 if (corpseData.ClassId != null)
-                    m_fields.SetUpdateField<byte>(CorpseField.CORPSE_FIELD_BYTES_1, (byte)corpseData.ClassId, 2);
+                    m_fields.SetUpdateField<byte>((int)CorpseField.CORPSE_FIELD_BYTES_1, (byte)corpseData.ClassId, 2);
             }
             if (corpseData.Flags != null)
-                m_fields.SetUpdateField<uint>(CorpseField.CORPSE_FIELD_FLAGS, (uint)corpseData.Flags);
+                m_fields.SetUpdateField<uint>((int)CorpseField.CORPSE_FIELD_FLAGS, (uint)corpseData.Flags);
             if (corpseData.DynamicFlags != null)
-                m_fields.SetUpdateField<uint>(CorpseField.CORPSE_FIELD_DYNAMIC_FLAGS, (uint)corpseData.DynamicFlags);
+                m_fields.SetUpdateField<uint>((int)CorpseField.CORPSE_FIELD_DYNAMIC_FLAGS, (uint)corpseData.DynamicFlags);
             if (corpseData.FactionTemplate != null)
-                m_fields.SetUpdateField<int>(CorpseField.CORPSE_FIELD_FACTION_TEMPLATE, (int)corpseData.FactionTemplate);
+                m_fields.SetUpdateField<int>((int)CorpseField.CORPSE_FIELD_FACTION_TEMPLATE, (int)corpseData.FactionTemplate);
             for (int i = 0; i < 36; i++)
             {
                 int startIndex = (int)CorpseField.CORPSE_FIELD_CUSTOMIZATION_CHOICES;

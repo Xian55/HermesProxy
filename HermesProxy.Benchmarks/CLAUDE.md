@@ -38,6 +38,7 @@ dotnet run --project HermesProxy.Benchmarks -c Release -- --list flat
 | `MovementHandlerPrologueBenchmarks.cs` | `HandlePlayerMove` opcode translation: string/reflection round trip vs the prebuilt map |
 | `MovementTranslationBenchmarks.cs` | Movement translation through the real handlers, both directions: legacy `MSG_MOVE_*`, knock-back and creates to the client; client movement to the legacy server; the modern read and write alone |
 | `UpdateMaskBenchmarks.cs` | V1_14/V2_5 `UpdateFieldsArray` / `DynamicUpdateFieldsArray` write path vs the previous `BitArray`-backed mask (verbatim `Legacy*` copies) |
+| `UpdateFieldsAccessBenchmarks.cs` | `UpdateFieldsArray` reads, writes, a 1000-field values block and a quest giver scan, addressed by `int` vs the previous `object` index (verbatim `Legacy*` copy) |
 | `HighGuidBenchmarks.cs` | `HighGuid` high-guid type lookup and 64↔128 guid conversion vs the previous per-lookup `HighGuid` object (verbatim `Legacy*` copies) |
 | `AllocationHotSpotBenchmarks.cs` | The update-path hot spots from the 2026-09 Alterac Valley allocation traces — `GetUpdateField`, `HasAnyFlag`, update-mask reuse, packed GUIDs, `CastFlags` — each against a verbatim `Legacy*` copy, one baseline per category |
 | `GameDataStoreBenchmarks.cs` | A shared GameData store as `Dictionary`, `ConcurrentDictionary` and `Dictionary` under a `Lock`: lookup hit and miss, storing again, and the footprint of filling one |
