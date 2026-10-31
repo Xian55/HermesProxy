@@ -35,7 +35,6 @@ Shared library providing core networking, cryptography, packet I/O, protocol buf
 |---|---|
 | `Constants/` | Enums, opcodes, protocol constants |
 | `Cryptography/` | SRP6, ARC4, HMAC, packet encryption/decryption |
-| `Debugging/` | Debug utilities |
 | `GameMath/` | Vectors, quaternions, game-specific math |
 | `IO/` | `ByteBuffer`, `SpanPacketReader`, `SpanPacketWriter`, packet base types |
 | `Logging/` | Logging infrastructure |
@@ -43,7 +42,6 @@ Shared library providing core networking, cryptography, packet I/O, protocol buf
 | `Networking/` | `SocketBase`, async socket I/O |
 | `Proto/` | Battle.net protocol `.proto` schema; Grpc.Tools runs protoc on build, C# lands in `obj/` (messages only, `GrpcServices="None"`) |
 | `Serialization/` | Serialization helpers |
-| `Singleton/` | Singleton pattern base |
 | `Util/` | Extension methods, helpers |
 | `Web/` | HTTP/web utilities |
 

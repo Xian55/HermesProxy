@@ -8,7 +8,6 @@ using HermesProxy.World.Objects;
 using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -401,24 +400,6 @@ public static class LegacyVersion
         => UpdateFields<T>.FieldsByValue.TryGetValue(field, out int fieldValue) ? fieldValue : -1;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static string GetUpdateFieldName<T>(int field) where T: System.Enum // C# 7.3
-    {
-        var keys = UpdateFields<T>.Keys;
-        var infos = UpdateFields<T>.Infos;
-        if (keys.Length == 0)
-            return field.ToString(CultureInfo.InvariantCulture);
-
-        int idx = Array.BinarySearch(keys, field);
-        if (idx >= 0)
-            return infos[idx].Name;
-
-        idx = ~idx - 1;
-        if (idx < 0) // field lower than every key
-            return field.ToString(CultureInfo.InvariantCulture);
-        return infos[idx].Name + " + " + (field - keys[idx]);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static UpdateFieldInfo? GetUpdateFieldInfo<T>(int field) where T: System.Enum // C# 7.3
     {
         var keys = UpdateFields<T>.Keys;
@@ -802,24 +783,6 @@ public static class ModernVersion
         => UpdateFields<T>.FieldsByValue.TryGetValue(field, out int fieldValue) ? fieldValue : -1;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static string GetUpdateFieldName<T>(int field) where T: System.Enum // C# 7.3
-    {
-        var keys = UpdateFields<T>.Keys;
-        var infos = UpdateFields<T>.Infos;
-        if (keys.Length == 0)
-            return field.ToString(CultureInfo.InvariantCulture);
-
-        int idx = Array.BinarySearch(keys, field);
-        if (idx >= 0)
-            return infos[idx].Name;
-
-        idx = ~idx - 1;
-        if (idx < 0) // field lower than every key
-            return field.ToString(CultureInfo.InvariantCulture);
-        return infos[idx].Name + " + " + (field - keys[idx]);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static UpdateFieldInfo? GetUpdateFieldInfo<T>(int field) where T: System.Enum // C# 7.3
     {
         var keys = UpdateFields<T>.Keys;
@@ -920,19 +883,9 @@ public static class ModernVersion
         };
     }
 
-    public static bool RemovedInClassicVersion(byte classicEraExpansion, byte classicEraMajor, byte classicEraMinor, byte classicExpansion, byte classicMajor, byte classicMinor)
-    {
-        return !AddedInClassicVersion(classicEraExpansion, classicEraMajor, classicEraMinor, classicExpansion, classicMajor, classicMinor);
-    }
-
     public static bool IsVersion(byte expansion, byte major, byte minor)
     {
         return ExpansionVersion == expansion && MajorVersion == major && MinorVersion == minor;
-    }
-
-    public static bool InVersion(ClientVersionBuild build1, ClientVersionBuild build2)
-    {
-        return AddedInVersion(build1) && RemovedInVersion(build2);
     }
 
     public static bool AddedInVersion(ClientVersionBuild build)
@@ -1222,15 +1175,6 @@ public static class ModernVersion
             0 => 2,
             1 => 3,
             2 => 5,
-            _ => 0,
-        };
-
-    public static uint GetArenaTeamIndexFromSize(uint size) =>
-        size switch
-        {
-            2 => 0,
-            3 => 1,
-            5 => 2,
             _ => 0,
         };
 

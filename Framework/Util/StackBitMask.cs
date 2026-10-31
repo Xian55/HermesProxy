@@ -16,8 +16,6 @@ public readonly ref struct StackBitMask
         _blocks.Clear();
     }
 
-    public int BlockCount => _blocks.Length;
-
     public uint this[int blockIndex] => _blocks[blockIndex];
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -25,6 +23,4 @@ public readonly ref struct StackBitMask
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool IsBitSet(int bit) => (_blocks[bit >> 5] & (1u << (bit & 31))) != 0;
-
-    public bool AnyBitSet => _blocks.ContainsAnyExcept(0u);
 }

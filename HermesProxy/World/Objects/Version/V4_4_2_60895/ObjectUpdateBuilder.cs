@@ -100,42 +100,6 @@ public partial class ObjectUpdateBuilder
     private FieldVisibility FieldVisibilityFlags =>
         IsOwner ? FieldVisibility.Owner | FieldVisibility.PartyMember : FieldVisibility.None;
 
-    private bool IsGameObjectOwner
-    {
-        get
-        {
-            if (_realObjectType != ObjectTypeBCC.GameObject)
-                return false;
-            var createdBy = _updateData.GameObjectData?.CreatedBy;
-            if (createdBy is null)
-                return false;
-            var playerGuid = _gameState.CurrentPlayerGuid;
-            return createdBy.Value.GetCounter() == playerGuid.GetCounter() &&
-                   createdBy.Value.GetHighType() == playerGuid.GetHighType();
-        }
-    }
-
-    // Wire-format type mask sent in the SMSG_UPDATE_OBJECT header. The bit
-    // positions here are the protocol values, not the in-memory ObjectTypeMask
-    // enum values — they intentionally differ.
-    private static uint ConvertTypeMask(ObjectTypeMask mask)
-    {
-        uint result = 0;
-        if (mask.HasAnyFlag(ObjectTypeMask.Object))        result |= 0x0001;
-        if (mask.HasAnyFlag(ObjectTypeMask.Item))          result |= 0x0002;
-        if (mask.HasAnyFlag(ObjectTypeMask.Container))     result |= 0x0004;
-        if (mask.HasAnyFlag(ObjectTypeMask.Unit))          result |= 0x0020;
-        if (mask.HasAnyFlag(ObjectTypeMask.Player))        result |= 0x0040;
-        if (mask.HasAnyFlag(ObjectTypeMask.ActivePlayer))  result |= 0x0080;
-        if (mask.HasAnyFlag(ObjectTypeMask.GameObject))    result |= 0x0100;
-        if (mask.HasAnyFlag(ObjectTypeMask.DynamicObject)) result |= 0x0200;
-        if (mask.HasAnyFlag(ObjectTypeMask.Corpse))        result |= 0x0400;
-        if (mask.HasAnyFlag(ObjectTypeMask.AreaTrigger))   result |= 0x0800;
-        if (mask.HasAnyFlag(ObjectTypeMask.Sceneobject))   result |= 0x1000;
-        if (mask.HasAnyFlag(ObjectTypeMask.Conversation))  result |= 0x2000;
-        return result;
-    }
-
     private static byte ConvertTypeId(ObjectTypeBCC type) => type switch
     {
         ObjectTypeBCC.Object        => 0,

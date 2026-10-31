@@ -542,11 +542,6 @@ public class ItemMod
     {
         Type = ItemModifier.Max;
     }
-    public ItemMod(uint value, ItemModifier type)
-    {
-        Value = value;
-        Type = type;
-    }
 
     public void Read(WorldPacket data)
     {

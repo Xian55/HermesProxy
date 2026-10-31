@@ -58,8 +58,8 @@ public sealed class ChannelCancelWotLKTests
 
         StopChannel(harness);
 
-        var failure = Assert.IsType<SpellFailure>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellFailure)).Packet);
-        var failedOther = Assert.IsType<SpellFailedOther>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellFailedOther)).Packet);
+        var failure = Assert.IsType<SpellFailure>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellFailure).Packet);
+        var failedOther = Assert.IsType<SpellFailedOther>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellFailedOther).Packet);
         Assert.Equal(CastId, failure.CastID);
         Assert.Equal(CastId, failedOther.CastID);
         Assert.Equal(EagleEye, failure.SpellID);
@@ -74,7 +74,7 @@ public sealed class ChannelCancelWotLKTests
 
         StopChannel(harness);
 
-        Assert.Equal(CastId, Assert.IsType<SpellFailure>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellFailure)).Packet).CastID);
-        Assert.Equal(CastId, Assert.IsType<SpellFailedOther>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellFailedOther)).Packet).CastID);
+        Assert.Equal(CastId, Assert.IsType<SpellFailure>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellFailure).Packet).CastID);
+        Assert.Equal(CastId, Assert.IsType<SpellFailedOther>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellFailedOther).Packet).CastID);
     }
 }

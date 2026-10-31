@@ -117,28 +117,6 @@ public static class Log
 
     public static bool IsLogging => _root is not null;
 
-    /// <summary>Back-compat. When set to true, bumps the global minimum level to Debug.</summary>
-    public static bool DebugLogEnabled
-    {
-        get => _globalSwitch.MinimumLevel <= LogEventLevel.Debug;
-        set
-        {
-            if (value && _globalSwitch.MinimumLevel > LogEventLevel.Debug)
-                _globalSwitch.MinimumLevel = LogEventLevel.Debug;
-        }
-    }
-
-    /// <summary>Back-compat. When set to true, bumps the Packet category to Verbose.</summary>
-    public static bool SpanStatsEnabled
-    {
-        get => _packetSwitch.MinimumLevel <= LogEventLevel.Verbose;
-        set
-        {
-            if (value && _packetSwitch.MinimumLevel > LogEventLevel.Verbose)
-                _packetSwitch.MinimumLevel = LogEventLevel.Verbose;
-        }
-    }
-
     /// <summary>No-op retained for API compatibility. The pipeline is built eagerly in the static ctor.</summary>
     public static void Start() { }
 

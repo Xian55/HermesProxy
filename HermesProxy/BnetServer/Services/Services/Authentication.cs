@@ -10,6 +10,7 @@ using Framework.Realm;
 using Google.Protobuf;
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using BNetServer.Networking;
 
 namespace BNetServer.Services;
@@ -121,7 +122,7 @@ public partial class BnetServices
             logonResult.GameAccountId.Add(gameAccountId);
         }
 
-        tmpSession.SessionKey = new byte[64].GenerateRandomKey(64);
+        tmpSession.SessionKey = RandomNumberGenerator.GetBytes(64);
         logonResult.SessionKey = ByteString.CopyFrom(tmpSession.SessionKey);
 
         _globalSession = tmpSession;

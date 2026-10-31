@@ -48,7 +48,7 @@ public sealed class DkRunesCataTests
     private static SpellCastData Go(LegacyHandlerHarness harness, string logged)
     {
         harness.Deliver(Opcode.SMSG_SPELL_GO, Convert.FromHexString(logged), harness.Client.HandleSpellGo);
-        return Assert.IsType<SpellGo>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellGo)).Packet).Cast;
+        return Assert.IsType<SpellGo>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellGo).Packet).Cast;
     }
 
     [Fact]

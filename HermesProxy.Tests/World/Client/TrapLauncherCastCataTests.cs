@@ -51,8 +51,8 @@ public sealed class TrapLauncherCastCataTests
         harness.Deliver(Opcode.SMSG_SPELL_START, Convert.FromHexString(ThrownStart), harness.Client.HandleSpellStart);
         harness.Deliver(Opcode.SMSG_SPELL_GO, Convert.FromHexString(ThrownGo), harness.Client.HandleSpellGo);
 
-        var start = Assert.IsType<SpellStart>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellStart)).Packet).Cast;
-        var go = Assert.IsType<SpellGo>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellGo)).Packet).Cast;
+        var start = Assert.IsType<SpellStart>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellStart).Packet).Cast;
+        var go = Assert.IsType<SpellGo>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellGo).Packet).Cast;
         Assert.Equal(IceTrapThrown, start.SpellID);
         Assert.Equal(CastId, start.CastID);
         Assert.Equal(CastId, go.CastID);

@@ -178,24 +178,6 @@ public class UpdateFieldsArray
         }
     }
 
-    public void _LoadIntoDataField(string data, uint startOffset, uint count)
-    {
-        if (string.IsNullOrEmpty(data))
-            return;
-
-        var lines = data.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (lines.Length != count)
-            return;
-
-        for (var index = 0; index < count; ++index)
-        {
-            if (uint.TryParse(lines[index], out uint value))
-            {
-                m_updateValues[(int)startOffset + index].UnsignedValue = value;
-                m_updateMask.SetBit((int)(startOffset + index));
-            }
-        }
-    }
     public bool HasFlag(object index, object flag)
     {
         if ((int)index >= ValuesCount)
@@ -230,62 +212,6 @@ public class UpdateFieldsArray
             AddFlag(index, flag!);
         else
             RemoveFlag(index, flag!);
-    }
-
-    public void AddFlag64(object index, object newFlag)
-    {
-        var oldValue = GetUpdateField<ulong>(index);
-        var newValue = oldValue | Convert.ToUInt64(newFlag);
-
-        if (oldValue != newValue)
-            SetUpdateField<ulong>(index, newValue);
-    }
-
-    public void RemoveFlag64(object index, object newFlag)
-    {
-        var oldValue = GetUpdateField<ulong>(index);
-        var newValue = oldValue & ~Convert.ToUInt64(newFlag);
-
-        if (oldValue != newValue)
-            SetUpdateField<ulong>(index, newValue);
-    }
-
-    public void ApplyFlag64<T>(object index, T flag, bool apply)
-    {
-        if (apply)
-            AddFlag(index, flag!);
-        else
-            RemoveFlag(index, flag!);
-    }
-
-    public void AddByteFlag(object index, byte offset, object newFlag)
-    {
-        if (offset > 4)
-        {
-            Log.Print(LogType.Error,  $"Object.SetByteFlag: Wrong offset {offset}");
-            return;
-        }
-
-        if (((byte)m_updateValues[(int)index].UnsignedValue >> (offset * 8) & (int)newFlag) == 0)
-        {
-            m_updateValues[(int)index].UnsignedValue |= (uint)newFlag << (offset * 8);
-            m_updateMask.SetBit((int)index);
-        }
-    }
-
-    public void RemoveByteFlag(object index, byte offset, object oldFlag)
-    {
-        if (offset > 4)
-        {
-            Log.Print(LogType.Error,  $"Object.RemoveByteFlag: Wrong offset {offset}");
-            return;
-        }
-
-        if (((byte)m_updateValues[(int)index].UnsignedValue >> (offset * 8) & (int)oldFlag) != 0)
-        {
-            m_updateValues[(int)index].UnsignedValue &= ~((uint)oldFlag << (offset * 8));
-            m_updateMask.SetBit((int)index);
-        }
     }
 }
 

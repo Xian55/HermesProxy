@@ -26,8 +26,6 @@ public sealed class Sha256 : IDisposable
 {
     private readonly IncrementalHash _hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
 
-    public void Process(ReadOnlySpan<byte> data) => _hash.AppendData(data);
-
     public void Process(byte[] data, int length) => _hash.AppendData(data.AsSpan(0, length));
 
     public void Process(uint data)
@@ -60,8 +58,6 @@ public sealed class HmacSha256 : IDisposable
     }
 
     public HmacSha256(byte[] key) : this(key.AsSpan()) { }
-
-    public void Process(ReadOnlySpan<byte> data) => _hash.AppendData(data);
 
     public void Process(byte[] data, int length) => _hash.AppendData(data.AsSpan(0, length));
 

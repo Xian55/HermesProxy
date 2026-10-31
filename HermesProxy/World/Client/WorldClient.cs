@@ -714,37 +714,6 @@ public partial class WorldClient
         }
     }
 
-    private unsafe void HandleGeneratedPacket(
-        delegate*<ref SpanPacketReader, in SessionContext, void> thunk,
-        WorldPacket packet,
-        Opcode universalOpcode)
-    {
-        System.Diagnostics.Debug.Assert(_sessionContext.IsBound, "generated dispatch reached before the session was bound");
-
-        try
-        {
-            // See WorldSocket.HandleGeneratedPacket: the reader must continue from where the
-            // WorldPacket left off, not from index 0.
-            var reader = new SpanPacketReader(packet.GetRemainingSpan());
-            thunk(ref reader, in _sessionContext);
-        }
-        catch (UnmappedOpcodeException unmapped)
-        {
-            Log.Print(LogType.Warn,
-                $"C P<S | Handling {universalOpcode} ({packet.GetOpcode()}): {unmapped.Message}");
-        }
-        catch (Exception handlerException)
-        {
-            byte[] raw = packet.GetData();
-            int size = (int)packet.GetSize();
-            int hexLen = System.Math.Min(1024, System.Math.Min(size, raw.Length));
-            string body = hexLen > 0 ? System.BitConverter.ToString(raw, 0, hexLen) : "<empty>";
-            Log.Print(LogType.Error,
-                $"C P<S | Unhandled exception in handler for {universalOpcode} ({packet.GetOpcode()}) " +
-                $"[size={size} dumped={hexLen}]{System.Environment.NewLine}bytes={body}{System.Environment.NewLine}{handlerException}");
-        }
-    }
-
     private void HandleAuthChallenge(WorldPacket packet)
     {
         if (LegacyVersion.Build >= ClientVersionBuild.V3_3_5a_12340)

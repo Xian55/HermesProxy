@@ -257,12 +257,6 @@ class AuthResponse : ServerPacket
 
     public struct CharacterTemplateClass
     {
-        public CharacterTemplateClass(FactionMasks factionGroup, byte classID)
-        {
-            FactionGroup = factionGroup;
-            ClassID = classID;
-        }
-
         public FactionMasks FactionGroup;
         public byte ClassID;
     }
@@ -273,7 +267,6 @@ class AuthResponse : ServerPacket
         public List<CharacterTemplateClass> Classes = new();
         public string Name = string.Empty;
         public string Description = string.Empty;
-        public byte Level;
     }
 
     public class AuthSuccessInfo

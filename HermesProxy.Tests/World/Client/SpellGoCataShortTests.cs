@@ -34,7 +34,7 @@ public class SpellGoCataShortTests
         using (var packet = new WorldPacket(buffer, Logged.Length, isPooled: false))
             harness.Client.HandleSpellGo(packet);
 
-        var go = Assert.IsType<SpellGo>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellGo)).Packet);
+        var go = Assert.IsType<SpellGo>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellGo).Packet);
         Assert.Equal(688, go.Cast.SpellID);
         Assert.Empty(go.Cast.HitTargets);
         Assert.Equal((SpellCastTargetFlags)0, go.Cast.Target.Flags);

@@ -53,7 +53,7 @@ public sealed class TriggeredCastCataTests
         {
             GameData.CooldownOnEventSpells = shipped;
         }
-        return Assert.IsType<SpellGo>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellGo)).Packet).Cast;
+        return Assert.IsType<SpellGo>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellGo).Packet).Cast;
     }
 
     [Fact]

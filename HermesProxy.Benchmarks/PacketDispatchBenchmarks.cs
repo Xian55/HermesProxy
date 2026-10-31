@@ -264,7 +264,7 @@ public class PacketDispatchBenchmarks
         return s_sink;
     }
 
-    private static SessionContext s_ctx;
+    private static readonly SessionContext s_ctx = default;
 
     private static void BuyBackItemThunk(ref SpanPacketReader r, in SessionContext ctx)
     {

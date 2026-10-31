@@ -87,7 +87,7 @@ public partial class BnetServices
         if (identity != null)
         {
             var realmListTicketIdentity = Json.CreateObject<RealmListTicketIdentity>(identity.BlobValue.ToStringUtf8(), true)!;
-            var gameAccount = GetSession().AccountInfo.GameAccounts.LookupByKey(realmListTicketIdentity.GameAccountId);
+            var gameAccount = GetSession().AccountInfo.GameAccounts.LookupByKey(checked((uint)realmListTicketIdentity.GameAccountId));
             if (gameAccount != null)
                 GetSession().GameAccountInfo = gameAccount;
         }

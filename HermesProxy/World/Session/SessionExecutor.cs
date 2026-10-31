@@ -145,9 +145,6 @@ public sealed class SessionExecutor : IThreadPoolWorkItem, IDisposable
         get { lock (_lock) return _queueWaitMs.GetStats(); }
     }
 
-    /// <summary>True while the calling thread is the one running this session's events.</summary>
-    public bool IsOwner => Volatile.Read(ref _ownerThreadId) == Environment.CurrentManagedThreadId;
-
     /// <summary>
     /// Debug-only check that nobody touches session state behind the owner's back. Costs nothing in
     /// Release. It fires only while an owner is actually running: a test that drives a handler

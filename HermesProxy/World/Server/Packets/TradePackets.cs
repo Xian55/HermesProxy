@@ -217,12 +217,6 @@ public class ItemGemData
         Item.Write(data);
     }
 
-    public void Read(WorldPacket data)
-    {
-        Slot = data.ReadUInt8();
-        Item.Read(data);
-    }
-
     public byte Slot;
     public ItemInstance Item = new();
 }

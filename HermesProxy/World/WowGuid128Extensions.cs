@@ -104,18 +104,5 @@ public static class WowGuid128Extensions
         }
 
         public WowGuid128 To128(GameSessionData gameState) => guid;
-
-        public string ToString()
-        {
-            if (guid.Low == 0 && guid.High == 0)
-                return "Full: 0x0";
-
-            if (guid.HasEntry())
-            {
-                return $"Full: 0x{guid.High:X16}{guid.Low:X16} {guid.GetHighType()}/{guid.GetSubType()} R{guid.GetRealmId()}/S{guid.GetServerId()} Map: {guid.GetMapId()} Entry: {guid.GetEntry()} Low: {guid.GetCounter()}";
-            }
-
-            return $"Full: 0x{guid.High:X16}{guid.Low:X16} {guid.GetHighType()}/{guid.GetSubType()} R{guid.GetRealmId()}/S{guid.GetServerId()} Map: {guid.GetMapId()} Low: {guid.GetCounter()}";
-        }
     }
 }

@@ -73,12 +73,12 @@ public class SessionExecutorTests
         // Usually the inner event runs inline before Post returns, but a drain that outlives
         // DrainSlice (2 ms, easy to exceed on a loaded test run) hands the rest to the thread pool.
         // The ordering is what this pins, not where it ran.
-        Assert.True(innerRan.Wait(TimeSpan.FromSeconds(5)));
+        Assert.True(innerRan.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.Equal(["outer start", "outer end", "inner"], order);
     }
 
     [Fact]
-    public void WhileTheOwnerIsBusy_APostFromAnotherThreadQueuesInsteadOfRunning()
+    public async Task WhileTheOwnerIsBusy_APostFromAnotherThreadQueuesInsteadOfRunning()
     {
         using var executor = new SessionExecutor("test");
         using var ownerInside = new ManualResetEventSlim();
@@ -94,9 +94,9 @@ public class SessionExecutorTests
             ran.Enqueue("owner");
             ownerInside.Set();
             letOwnerFinish.Wait();
-        }));
+        }), TestContext.Current.CancellationToken);
 
-        Assert.True(ownerInside.Wait(TimeSpan.FromSeconds(5)));
+        Assert.True(ownerInside.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
         bool posterReturnedFirst = false;
         var poster = Task.Run(() =>
@@ -107,18 +107,18 @@ public class SessionExecutorTests
                 otherFinished.Set();
             });
             posterReturnedFirst = !letOwnerFinish.IsSet;
-        });
+        }, TestContext.Current.CancellationToken);
 
-        Assert.True(poster.Wait(TimeSpan.FromSeconds(5)));
+        await poster.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.True(posterReturnedFirst);
         Assert.Equal<string>(["owner"], ran);
 
         letOwnerFinish.Set();
-        Assert.True(owner.Wait(TimeSpan.FromSeconds(5)));
+        await owner.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         // Wait for the callback to finish rather than merely to leave the queue. QueueDepth
         // reaches zero when the item is dequeued, which is before its body has appended
         // anything — that gap is the race, and SpinWait on it is what made this flaky.
-        Assert.True(otherFinished.Wait(TimeSpan.FromSeconds(5)));
+        Assert.True(otherFinished.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.Equal<string>(["owner", "other"], ran);
     }
 
@@ -152,7 +152,7 @@ public class SessionExecutorTests
     }
 
     [Fact]
-    public void ADrainLongerThanOneSlice_HandsTheRestToThePool_AndStillRunsEverything()
+    public async Task ADrainLongerThanOneSlice_HandsTheRestToThePool_AndStillRunsEverything()
     {
         using var executor = new SessionExecutor("test");
         using var ownerInside = new ManualResetEventSlim();
@@ -165,14 +165,14 @@ public class SessionExecutorTests
         {
             ownerInside.Set();
             letOwnerFinish.Wait();
-        }));
-        Assert.True(ownerInside.Wait(TimeSpan.FromSeconds(5)));
+        }), TestContext.Current.CancellationToken);
+        Assert.True(ownerInside.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
         for (int i = 0; i < queued; i++)
             executor.Post(_ => Interlocked.Increment(ref ran));
 
         letOwnerFinish.Set();
-        Assert.True(owner.Wait(TimeSpan.FromSeconds(5)));
+        await owner.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref ran) == queued, TimeSpan.FromSeconds(30)));
         Assert.Equal(0, executor.QueueDepth);
@@ -191,7 +191,7 @@ public class SessionExecutorTests
     }
 
     [Fact]
-    public void PastTheHighWaterMark_ReadsArePaused_AndResumedWhenItDrains()
+    public async Task PastTheHighWaterMark_ReadsArePaused_AndResumedWhenItDrains()
     {
         var host = new RecordingHost();
         using var executor = new SessionExecutor("test", host);
@@ -202,8 +202,8 @@ public class SessionExecutorTests
         {
             ownerInside.Set();
             letOwnerFinish.Wait();
-        }));
-        Assert.True(ownerInside.Wait(TimeSpan.FromSeconds(5)));
+        }), TestContext.Current.CancellationToken);
+        Assert.True(ownerInside.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
         for (int i = 0; i < SessionExecutor.HighWaterMark + 1; i++)
             executor.Post(_ => { });
@@ -212,14 +212,14 @@ public class SessionExecutorTests
         Assert.Equal(0, host.Resumes);
 
         letOwnerFinish.Set();
-        Assert.True(owner.Wait(TimeSpan.FromSeconds(5)));
+        await owner.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.True(SpinWait.SpinUntil(() => executor.QueueDepth == 0, TimeSpan.FromSeconds(30)));
         Assert.Equal(1, host.Resumes);
         Assert.Equal(0, host.Overflows);
     }
 
     [Fact]
-    public void PastTheHardCap_TheSessionIsToldToGo()
+    public async Task PastTheHardCap_TheSessionIsToldToGo()
     {
         var host = new RecordingHost();
         using var executor = new SessionExecutor("test", host);
@@ -230,8 +230,8 @@ public class SessionExecutorTests
         {
             ownerInside.Set();
             letOwnerFinish.Wait();
-        }));
-        Assert.True(ownerInside.Wait(TimeSpan.FromSeconds(5)));
+        }), TestContext.Current.CancellationToken);
+        Assert.True(ownerInside.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
         for (int i = 0; i < SessionExecutor.HardCap + 1; i++)
             executor.Post(_ => { });
@@ -239,7 +239,7 @@ public class SessionExecutorTests
         Assert.True(host.Overflows >= 1);
 
         letOwnerFinish.Set();
-        Assert.True(owner.Wait(TimeSpan.FromSeconds(5)));
+        await owner.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -255,7 +255,7 @@ public class SessionExecutorTests
     }
 
     [Fact]
-    public void QueuedEventsRecordHowLongTheyWaited()
+    public async Task QueuedEventsRecordHowLongTheyWaited()
     {
         using var executor = new SessionExecutor("test");
         using var ownerInside = new ManualResetEventSlim();
@@ -265,13 +265,13 @@ public class SessionExecutorTests
         {
             ownerInside.Set();
             letOwnerFinish.Wait();
-        }));
-        Assert.True(ownerInside.Wait(TimeSpan.FromSeconds(5)));
+        }), TestContext.Current.CancellationToken);
+        Assert.True(ownerInside.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
         executor.Post(_ => { });
         Thread.Sleep(20);
         letOwnerFinish.Set();
-        Assert.True(owner.Wait(TimeSpan.FromSeconds(5)));
+        await owner.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.True(SpinWait.SpinUntil(() => executor.QueueDepth == 0, TimeSpan.FromSeconds(5)));
 
         var stats = executor.QueueWaitMs;

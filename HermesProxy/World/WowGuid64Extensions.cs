@@ -81,20 +81,5 @@ public static class WowGuid64Extensions
         public WowGuid128 To128(GameSessionData gameState) => WowGuid128.Create(guid, gameState);
 
         public WowGuid128 ToLootGuid() => WowGuid128.CreateLootGuid(guid.GetHighGuidTypeLegacy(), guid.GetEntry(), guid.GetCounter());
-
-        public string ToString()
-        {
-            if (guid.Low == 0)
-                return "0x0";
-
-            if (guid.HasEntry())
-            {
-                return "Full: 0x" + guid.Low.ToString("X8") + " Type: " + guid.GetHighType()
-                    + " Entry: " + guid.GetEntry() + " Low: " + guid.GetCounter();
-            }
-
-            return "Full: 0x" + guid.Low.ToString("X8") + " Type: " + guid.GetHighType()
-                + " Low: " + guid.GetCounter();
-        }
     }
 }

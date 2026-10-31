@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Framework.IO;
-using HermesProxy.World.Client;
 
 namespace HermesProxy.World.Dispatch;
 
@@ -52,9 +51,4 @@ public static class SpanPacketReaderExtensions
         uint realEntry = entry & 0x7FFFFFFF;
         return new KeyValuePair<int, bool>((int)realEntry, realEntry != entry);
     }
-
-    /// <summary>Mirrors <c>WorldPacket.ReadUpdateField</c>.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static UpdateField ReadUpdateField(this ref SpanPacketReader reader)
-        => new(reader.ReadUInt32());
 }

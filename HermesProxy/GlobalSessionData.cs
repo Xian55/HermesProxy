@@ -1316,14 +1316,6 @@ public sealed class GameSessionData
 
         return null;
     }
-    public bool CanUseToy(uint itemId)
-    {
-        if (FindItemInInventoryById(itemId) != null)
-            return true;
-        return GameData.TryGetItemOnUseSpellId(itemId, out uint spellId)
-            && spellId != 0
-            && KnownSpells.Contains(spellId);
-    }
     public uint[] GetUsableToysOrdered()
     {
         var usable = new List<uint>();
@@ -1882,14 +1874,6 @@ public sealed class GameSessionData
     }
 
     /// <summary>
-    /// Clear all pending normal casts (used on timeout or disconnect).
-    /// </summary>
-    public void ClearPendingNormalCasts()
-    {
-        while (PendingNormalCasts.TryDequeue(out _)) { }
-    }
-
-    /// <summary>
     /// Check if there's a normal cast that has already started (is in progress).
     /// Used to reject new casts without forwarding to server.
     /// </summary>
@@ -2324,16 +2308,6 @@ public sealed class GameSessionData
         {
             ObjectCacheLegacy.TryGetValue(guid, out var dict);
             return dict;
-        }
-    }
-
-    public UpdateFieldsArray? GetCachedObjectFieldsModern(WowGuid128 guid)
-    {
-        AssertObjectCacheOwner();
-        lock (ObjectCacheLock)
-        {
-            ObjectCacheModern.TryGetValue(guid, out var array);
-            return array;
         }
     }
 

@@ -74,9 +74,6 @@ public sealed class ProxyMetrics
     public Dictionary<int, OpcodeStats> GetClientToServerStats()
         => _clientToServer.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.GetStats());
 
-    public Dictionary<int, OpcodeStats> GetServerToClientStats()
-        => _serverToClient.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.GetStats());
-
     public OpcodeStats? GetClientToServerStats(int opcode)
         => _clientToServer.TryGetValue(opcode, out var samples) ? samples.GetStats() : null;
 

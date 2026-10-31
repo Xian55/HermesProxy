@@ -81,59 +81,6 @@ public static class NumericsExtensions
 
     #region Vector3 Extensions
 
-    /// <summary>
-    /// Returns the primary axis of the vector (the axis with the largest absolute value).
-    /// </summary>
-    public static Axis PrimaryAxis(this Vector3 v)
-    {
-        double nx = Math.Abs(v.X);
-        double ny = Math.Abs(v.Y);
-        double nz = Math.Abs(v.Z);
-
-        if (nx > ny)
-            return nx > nz ? Axis.X : Axis.Z;
-        else
-            return ny > nz ? Axis.Y : Axis.Z;
-    }
-
-    /// <summary>
-    /// Returns a normalized vector, or Vector3.Zero if the magnitude is nearly zero.
-    /// </summary>
-    public static Vector3 DirectionOrZero(this Vector3 v)
-    {
-        float mag = v.Length();
-        if (mag < 0.0000001f)
-            return Vector3.Zero;
-        else if (mag < 1.00001f && mag > 0.99999f)
-            return v;
-        else
-            return v * (1.0f / mag);
-    }
-
-    /// <summary>
-    /// Linear interpolation between two vectors.
-    /// </summary>
-    public static Vector3 Lerp(this Vector3 v, Vector3 other, float alpha)
-    {
-        return v + (other - v) * alpha;
-    }
-
-    /// <summary>
-    /// Returns a new vector with the minimum components of both vectors.
-    /// </summary>
-    public static Vector3 Min(this Vector3 v, Vector3 other)
-    {
-        return new Vector3(Math.Min(v.X, other.X), Math.Min(v.Y, other.Y), Math.Min(v.Z, other.Z));
-    }
-
-    /// <summary>
-    /// Returns a new vector with the maximum components of both vectors.
-    /// </summary>
-    public static Vector3 Max(this Vector3 v, Vector3 other)
-    {
-        return new Vector3(Math.Max(v.X, other.X), Math.Max(v.Y, other.Y), Math.Max(v.Z, other.Z));
-    }
-
     #endregion
 }
 

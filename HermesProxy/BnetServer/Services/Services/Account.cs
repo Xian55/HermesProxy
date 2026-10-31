@@ -32,7 +32,7 @@ public partial class BnetServices
     {
         if (request.Options.FieldGameLevelInfo)
         {
-            var gameAccountInfo = GetSession().AccountInfo.GameAccounts.LookupByKey(request.GameAccountId.Low);
+            var gameAccountInfo = GetSession().AccountInfo.GameAccounts.LookupByKey(checked((uint)request.GameAccountId.Low));
             if (gameAccountInfo != null)
             {
                 response.State = new GameAccountState();
@@ -52,7 +52,7 @@ public partial class BnetServices
 
             response.State.GameStatus = new GameStatus();
 
-            var gameAccountInfo = GetSession().AccountInfo.GameAccounts.LookupByKey(request.GameAccountId.Low);
+            var gameAccountInfo = GetSession().AccountInfo.GameAccounts.LookupByKey(checked((uint)request.GameAccountId.Low));
             if (gameAccountInfo != null)
             {
                 response.State.GameStatus.IsSuspended = gameAccountInfo.IsBanned;

@@ -561,14 +561,6 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
             $"head={hex}{Environment.NewLine}{e}");
     }
 
-    private void SendPacketToServer(WorldPacket packet)
-    {
-        if (GetSession().WorldClient != null)
-            GetSession().WorldClient!.SendPacketToServer(packet);
-        else
-            Log.Print(LogType.Error, $"Attempt to send opcode {packet.GetUniversalOpcode(false)} ({packet.GetOpcode()}) while WorldClient is disconnected!");
-    }
-
     /// <summary>How long after a pet guid changes the no-pet-object window stays interesting.</summary>
     private const long PetSummonWindowMs = 10_000;
 
@@ -790,7 +782,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     {
         AuthChallenge challenge = new();
         challenge.Challenge = _serverChallenge;
-        challenge.DosChallenge = new byte[32].GenerateRandomKey(32);
+        challenge.DosChallenge = RandomNumberGenerator.GetBytes(32);
         challenge.DosZeroBits = 1;
 
         SendPacket(challenge);
@@ -980,7 +972,7 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         
         _instanceConnectKey.AccountId = GetSession().AccountInfo.Id;
         _instanceConnectKey.connectionType = ConnectionType.Instance;
-        _instanceConnectKey.Key = RandomHelper.URand(0, 0x7FFFFFFF);
+        _instanceConnectKey.Key = (uint)RandomNumberGenerator.GetInt32(0x7FFFFFFF);
 
         BnetSessionTicketStorage.AddNewSessionByKey(_instanceConnectKey.Raw, GetSession());
 

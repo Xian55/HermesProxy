@@ -194,9 +194,4 @@ public abstract class SSLSocket : ISocket, IDisposable
     public virtual void OnClose() { Dispose(); }
 
     public bool IsOpen() { return _socket.Connected; }
-
-    public void SetNoDelay(bool enable)
-    {
-        _socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, enable);
-    }
 }

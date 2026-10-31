@@ -1490,8 +1490,6 @@ public class TargetLocation
 
 public class SpellTargetData
 {
-    public void Read(WorldPacket data) => Read(data, SpellCastRequest.RunningClientShape);
-
     public void Read(WorldPacket data, SpellCastRequestShape shape)
     {
         // WPP V8_0_1 ReadSpellTargetData calls packet.ResetBitReader() FIRST, discarding
@@ -1538,9 +1536,6 @@ public class SpellTargetData
 
         Name = data.ReadString(nameLength);
     }
-
-    /// <inheritdoc cref="Read(WorldPacket)"/>
-    public void Read(ref SpanPacketReader data) => Read(ref data, SpellCastRequest.RunningClientShape);
 
     /// <inheritdoc cref="Read(WorldPacket, SpellCastRequestShape)"/>
     public void Read(ref SpanPacketReader data, SpellCastRequestShape shape)

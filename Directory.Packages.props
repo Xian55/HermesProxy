@@ -21,7 +21,6 @@
          Prerelease for its universal macOS protoc: 2.83.0 ships x86_64 only, which cannot run on Apple
          Silicon without Rosetta (MSB6003). Move to 2.84.0 once it is stable. -->
     <PackageVersion Include="Grpc.Tools" Version="2.84.0-pre1" />
-    <PackageVersion Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageVersion Include="Sep" Version="0.12.2" />
     <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
     <!-- Logging -->

@@ -58,13 +58,13 @@ public class LauncherLoginTests
                 AppendLogon(session, Request(ticket));
                 await session.ProcessCurrentBuffer();
                 Assert.Equal(2, session.Replies.Count);
-                var complete = Assert.Single(session.Replies.Where(r => r.Service == OriginalHash.AuthenticationListener));
+                var complete = Assert.Single(session.Replies, r => r.Service == OriginalHash.AuthenticationListener);
                 var result = Assert.IsType<LogonResult>(complete.Message);
                 Assert.Equal(5u, complete.MethodId);
                 Assert.Equal(0u, result.ErrorCode);
                 Assert.Single(result.GameAccountId);
                 Assert.Equal(64, result.SessionKey.Length);
-                var acknowledgement = Assert.Single(session.Replies.Where(r => r.Token == 42 && r.ServiceId == 0xFE));
+                var acknowledgement = Assert.Single(session.Replies, r => r.Token == 42 && r.ServiceId == 0xFE);
                 Assert.Equal(BattlenetRpcErrorCode.Ok, acknowledgement.Status);
                 Assert.IsType<NoData>(acknowledgement.Message);
             });

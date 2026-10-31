@@ -198,11 +198,6 @@ public class ByteBuffer : IDisposable
         return value;
     }
 
-    public T ReadByteEnum<T>() where T : Enum
-    {
-        return (T)(object)ReadUInt8();
-    }
-
     public string ReadCString()
     {
         ResetBitPos();
@@ -316,16 +311,6 @@ public class ByteBuffer : IDisposable
         return (uint)Time.GetUnixTimeFromPackedTime(ReadUInt32());
     }
 
-    public DateTime ReadTime()
-    {
-        return DateTimeOffset.FromUnixTimeSeconds(ReadUInt32()).DateTime;
-    }
-
-    public DateTime ReadTime64()
-    {
-        return DateTimeOffset.FromUnixTimeSeconds((int)ReadUInt64()).DateTime;
-    }
-
     public Vector2 ReadVector2()
     {
         return new Vector2(ReadFloat(), ReadFloat());
@@ -345,20 +330,10 @@ public class ByteBuffer : IDisposable
         return new Vector3(x, y, z);
     }
 
-    public Vector4 ReadVector4()
-    {
-        return new Vector4(ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat());
-    }
-
     public Quaternion ReadPackedQuaternion()
     {
         long packed = ReadInt64();
         return NumericsExtensions.FromPackedLong(packed);
-    }
-
-    public Quaternion ReadQuaternion()
-    {
-        return new Quaternion(ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat());
     }
 
     // BitPacking
@@ -837,14 +812,6 @@ public class ByteBuffer : IDisposable
     }
 
     /// <summary>
-    /// Legacy overload kept for source compatibility — boxes via
-    /// <see cref="Convert.ToUInt32(object)"/>. Prefer <c>WriteBits(uint,int)</c>
-    /// or <c>WriteBits(int,int)</c>.
-    /// </summary>
-    [Obsolete("Use WriteBits(uint, int) or WriteBits(int, int) — the (object, int) overload boxes its first argument.")]
-    public void WriteBits(object bit, int count) => WriteBits(Convert.ToUInt32(bit), count);
-
-    /// <summary>
     /// Original implementation for benchmarking comparison. DO NOT USE.
     /// </summary>
     internal void WriteBitsOriginal(uint bit, int count)
@@ -858,19 +825,9 @@ public class ByteBuffer : IDisposable
         WriteUInt32(Time.GetPackedTimeFromUnixTime(time));
     }
 
-    public void WritePackedTime()
-    {
-        WriteUInt32(Time.GetPackedTimeFromDateTime(DateTime.Now));
-    }
-
     public void WriteByteEnum<T>(T x) where T : Enum
     {
         WriteUInt8((byte)(object)x);
-    }
-
-    public void WriteUint32Enum<T>(T x) where T : Enum
-    {
-        WriteUInt32((uint)(object)x);
     }
 
     #endregion
@@ -1046,77 +1003,5 @@ public class ByteBuffer : IDisposable
         _position = 0;
         _length = 0;
         // Keep the existing buffer for reuse
-    }
-
-    // Hex Printer from WPP
-    // https://github.com/TrinityCore/WowPacketParser/blob/7edfda7e4daf9a5b9069083806a9a3c261dea8a7/WowPacketParser/Misc/Utilities.cs#L48
-    public void DebugPrintHex()
-    {
-        const bool shortVersion = false;
-        const int offset = 0;
-        const bool noOffsetFirstLine = false;
-
-        var data = GetData();
-
-        var n = Environment.NewLine;
-
-        var prefix = new string(' ', offset);
-
-        var hexDump = new StringBuilder(noOffsetFirstLine ? "" : prefix);
-
-        if (!shortVersion)
-        {
-            var header = "|-------------------------------------------------|---------------------------------|" + n +
-                         "| 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F | 0 1 2 3 4 5 6 7 8 9 A B C D E F |" + n +
-                         "|-------------------------------------------------|---------------------------------|" + n;
-
-            hexDump.Append(header);
-        }
-
-        for (var i = 0; i < data.Length; i += 16)
-        {
-            var text = new StringBuilder();
-            var hex = new StringBuilder(i == 0 ? "" : prefix);
-
-            if (!shortVersion)
-                hex.Append("| ");
-
-            for (var j = 0; j < 16; j++)
-            {
-                if (j + i < data.Length)
-                {
-                    var val = data[j + i];
-                    hex.Append(data[j + i].ToString("X2"));
-
-                    if (!shortVersion)
-                        hex.Append(" ");
-
-                    if (val >= 32 && val <= 127)
-                        text.Append((char)val);
-                    else
-                        text.Append(".");
-
-                    if (!shortVersion)
-                        text.Append(" ");
-                }
-                else
-                {
-                    hex.Append(shortVersion ? "  " : "   ");
-                    text.Append(shortVersion ? " " : "  ");
-                }
-            }
-
-            hex.Append(shortVersion ? "|" : "| ");
-            hex.Append(text);
-            if (!shortVersion)
-                hex.Append("|");
-            hex.Append(n);
-            hexDump.Append(hex);
-        }
-
-        if (!shortVersion)
-            hexDump.Append("|-------------------------------------------------|---------------------------------|");
-
-        Console.WriteLine(hexDump);
     }
 }

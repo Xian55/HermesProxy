@@ -38,8 +38,6 @@ public class CreateObjectData
     public MovementInfo? MoveInfo;
     public MovementSpeeds Speeds;
     public ServerSideMovement MoveSpline = null!;
-    public bool NoBirthAnim;
-    public bool EnablePortals;
     public bool PlayHoverAnim;
     public bool ThisIsYou;
     public WowGuid128? AutoAttackVictim;
@@ -176,25 +174,6 @@ public class ObjectUpdate
     private const sbyte LegacyGameObjectStateReady = 1;    // door closed / transport parked
     private const sbyte ModernTransportStateActive = 24;
     private const sbyte ModernTransportStateStopped = 25;
-
-    /// <summary>
-    /// GO_FLAG_MAP_OBJECT tells the client to load the display as a WMO map object
-    /// instead of an M2 doodad. Type 15 MO_TRANSPORT always is one. Type 11 TRANSPORT
-    /// is mixed, so it has to be split on the display: the Strand of the Ancients and
-    /// Isle of Conquest gunships are WMOs (displays 8409/8410/8587) and AV the V3_4_3
-    /// client without the flag, while Undercity elevators and Deeprun tram cars are
-    /// M2s that render as untextured placeholders *with* it.
-    /// </summary>
-    /// <summary>
-    /// True for the two GameObject types the client drives as transports: type 11
-    /// TRANSPORT and type 15 MO_TRANSPORT. A native 3.4.3 server gives both a
-    /// HighGuid::Transport and sets the ServerTime create bit
-    /// (GameObject.cpp `m_updateFlag.ServerTime = true`); 3.3.5a cores give type 11 a
-    /// plain HighGuid::GameObject instead, so guid high type cannot be used to spot one.
-    /// </summary>
-    internal static bool IsTransportGameObjectType(sbyte? typeId) =>
-        typeId is (sbyte)GameObjectTypeModern.MOTransport
-            or (sbyte)GameObjectTypeModern.Transport;
 
     internal static bool NeedsWmoMapObjectFlag(sbyte? typeId, int? displayId, ClientVersionBuild build) => typeId switch
     {
