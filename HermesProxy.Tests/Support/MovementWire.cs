@@ -333,18 +333,21 @@ internal static class LegacyCreateWire
 
     public static uint Bits(float value) => BitConverter.SingleToUInt32Bits(value);
 
-    /// <summary>A whole SMSG_UPDATE_OBJECT carrying this one create.</summary>
-    public static byte[] Build(LegacyCreate create) => LegacyPacketBuilder.Build(Opcode.SMSG_UPDATE_OBJECT, packet =>
+    /// <summary>A whole SMSG_UPDATE_OBJECT carrying these creates.</summary>
+    public static byte[] Build(params LegacyCreate[] creates) => LegacyPacketBuilder.Build(Opcode.SMSG_UPDATE_OBJECT, packet =>
     {
-        packet.WriteUInt32(1);
+        packet.WriteUInt32((uint)creates.Length);
         if (LegacyMovementWire.Era != LegacyEra.WotLK)
             packet.WriteBool(false); // has transport
 
-        packet.WriteUInt8((byte)create.UpdateType);
-        packet.WritePackedGuid(create.Guid);
-        packet.WriteUInt8((byte)create.Type);
-        WriteMovementBlock(packet, create);
-        WriteFields(packet, create);
+        foreach (var create in creates)
+        {
+            packet.WriteUInt8((byte)create.UpdateType);
+            packet.WritePackedGuid(create.Guid);
+            packet.WriteUInt8((byte)create.Type);
+            WriteMovementBlock(packet, create);
+            WriteFields(packet, create);
+        }
     });
 
     private static void WriteMovementBlock(WorldPacket packet, LegacyCreate create)
