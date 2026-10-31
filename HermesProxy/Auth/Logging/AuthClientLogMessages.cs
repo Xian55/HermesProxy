@@ -120,4 +120,17 @@ internal static partial class AuthClientLogMessages
         string Address,
         int Port,
         double Seconds);
+
+    [LoggerMessage(EventId = 317, Level = LogLevel.Information, Message = "Cores read this challenge differently, asking for another ({Attempt})")]
+    public static partial void AskingForAnotherChallenge(
+        ILogger logger,
+        string SourceFile,
+        string NetDir,
+        int Attempt);
+
+    [LoggerMessage(EventId = 318, Level = LogLevel.Error, Message = "The auth server's challenge allows no proof")]
+    public static partial void ChallengeAllowsNoProof(
+        ILogger logger,
+        string SourceFile,
+        string NetDir);
 }

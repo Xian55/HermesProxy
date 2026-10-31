@@ -25,6 +25,15 @@ public class AuthClientTests
     private static readonly byte[] Refusal =
         [(byte)AuthCommand.LOGON_CHALLENGE, 0, (byte)AuthResult.FAIL_UNKNOWN_ACCOUNT];
 
+    private static byte[] Challenge(byte topByteOfKey)
+    {
+        byte[] modulus = Convert.FromHexString("B79B3E2A87823CAB8F5EBFBF8EB10108535006298B5BADBD5B53E1895E644B89");
+        byte[] publicKey = new byte[32];
+        publicKey[0] = 5;
+        publicKey[^1] = topByteOfKey;
+        return [(byte)AuthCommand.LOGON_CHALLENGE, 0, 0, .. publicKey, 1, 7, 32, .. modulus, .. new byte[32], .. new byte[16], 0];
+    }
+
     private static GlobalSessionData Session(int port) => new(
         new ClientOptions(),
         new LegacyServerOptions { Address = "127.0.0.1", Port = port },
@@ -108,14 +117,9 @@ public class AuthClientTests
     [Fact]
     public async Task Login_ServerRefusesTheProof_ReturnsItsReason()
     {
-        byte[] modulus = Convert.FromHexString("B79B3E2A87823CAB8F5EBFBF8EB10108535006298B5BADBD5B53E1895E644B89");
-        byte[] publicKey = new byte[32];
-        publicKey[0] = 5;
-        byte[] challenge = [(byte)AuthCommand.LOGON_CHALLENGE, 0, 0, .. publicKey, 1, 7, 32, .. modulus, .. new byte[32], .. new byte[16], 0];
-
         var (result, _) = await Login(async (server, ct) =>
         {
-            await server.SendAsync(challenge, SocketFlags.None, ct);
+            await server.SendAsync(Challenge(topByteOfKey: 1), SocketFlags.None, ct);
 
             var proof = new byte[75];
             Assert.True(await server.ReceiveAsync(proof, SocketFlags.None, ct) > 0);
@@ -125,6 +129,60 @@ public class AuthClientTests
         });
 
         Assert.Equal(AuthResult.FAIL_INCORRECT_PASSWORD, result);
+    }
+
+    [Fact]
+    public async Task Login_ChallengeCoresReadDifferently_AsksAgainOnANewConnectionWithoutAProof()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+
+        var client = new AuthClient(Session(((IPEndPoint)listener.LocalEndpoint).Port));
+        var login = client.ConnectToAuthServerAsync("tester", "secret", "enUS");
+
+        using Socket first = await listener.AcceptSocketAsync(ct);
+        await first.ReceiveAsync(new byte[256], SocketFlags.None, ct);
+        await first.SendAsync(Challenge(topByteOfKey: 0), SocketFlags.None, ct);
+
+        using Socket second = await listener.AcceptSocketAsync(ct);
+        var challenge = new byte[256];
+        await second.ReceiveAsync(challenge, SocketFlags.None, ct);
+        Assert.Equal((byte)AuthCommand.LOGON_CHALLENGE, challenge[0]);
+
+        // The first connection ended there, with nothing behind the challenge it was given.
+        Assert.Equal(0, await first.ReceiveAsync(new byte[1], SocketFlags.None, ct));
+
+        await second.SendAsync(Refusal, SocketFlags.None, ct);
+        Assert.Equal(AuthResult.FAIL_UNKNOWN_ACCOUNT, await login.WaitAsync(Patience, ct));
+    }
+
+    [Fact]
+    public async Task Login_EveryChallengeCoresReadDifferently_UsesTheLastOne()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+
+        var client = new AuthClient(Session(((IPEndPoint)listener.LocalEndpoint).Port));
+        var login = client.ConnectToAuthServerAsync("tester", "secret", "enUS");
+
+        var proof = new byte[75];
+        int read = 0;
+        for (int connection = 0; read == 0 || proof[0] != (byte)AuthCommand.LOGON_PROOF; connection++)
+        {
+            Assert.InRange(connection, 0, 20);
+
+            using Socket server = await listener.AcceptSocketAsync(ct);
+            await server.ReceiveAsync(new byte[256], SocketFlags.None, ct);
+            await server.SendAsync(Challenge(topByteOfKey: 0), SocketFlags.None, ct);
+
+            read = await server.ReceiveAsync(proof, SocketFlags.None, ct);
+            if (read > 0 && proof[0] == (byte)AuthCommand.LOGON_PROOF)
+                await server.SendAsync(new byte[] { (byte)AuthCommand.LOGON_PROOF, (byte)AuthResult.FAIL_INCORRECT_PASSWORD, 0, 0 }, SocketFlags.None, ct);
+        }
+
+        Assert.Equal(AuthResult.FAIL_INCORRECT_PASSWORD, await login.WaitAsync(Patience, ct));
     }
 
     [Fact]
