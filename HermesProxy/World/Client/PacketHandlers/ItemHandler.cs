@@ -244,6 +244,15 @@ public partial class WorldClient
         SendPacketToClient(enchant);
     }
 
+    [HandlesSmsg(Opcode.SMSG_ITEM_TIME_UPDATE)]
+    internal void HandleItemTimeUpdate(WorldPacket packet)
+    {
+        ItemTimeUpdate time = new();
+        time.ItemGuid = packet.ReadGuid().To128(GetSession().GameState);
+        time.DurationLeft = packet.ReadUInt32();
+        SendPacketToClient(time);
+    }
+
     // The legacy packet is (owner, caster, item ENTRY, enchant id) — no item guid and no
     // enchantment slot (AzerothCore Item.cpp: SendEnchantmentLog(owner, caster, entry, id),
     // emitted for every slot below MAX_INSPECTED_ENCHANTMENT_SLOT). The modern packet needs

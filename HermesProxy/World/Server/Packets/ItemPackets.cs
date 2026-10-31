@@ -866,6 +866,24 @@ class ItemEnchantTimeUpdate : ServerPacket, ISpanWritable
     public WowGuid128 OwnerGuid;
 }
 
+/// <summary>The time a timed item has left. Every modern client reads a GUID and a uint32.</summary>
+public sealed class ItemTimeUpdate : ServerPacket
+{
+    public ItemTimeUpdate() : base(Opcode.SMSG_ITEM_TIME_UPDATE) { }
+
+    // At login a server sends this ahead of the player, whose items come with it.
+    public override bool NeedsObject(WowGuid128 guid) => true;
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(ItemGuid);
+        _worldPacket.WriteUInt32(DurationLeft);
+    }
+
+    public WowGuid128 ItemGuid;
+    public uint DurationLeft;
+}
+
 class EnchantmentLog : ServerPacket, ISpanWritable
 {
     public EnchantmentLog() : base(Opcode.SMSG_ENCHANTMENT_LOG) { }
