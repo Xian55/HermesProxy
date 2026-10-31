@@ -18,8 +18,8 @@ namespace HermesProxy.World.Client;
 public partial class WorldClient
 {
     // Who joins, changes in and leaves a channel that announces its members (the layout has been the
-    // same since 2.x). Only the 4.4.2 opcode table has the client's side of the three, so they are
-    // passed on for a 4.3.4 server and dropped for the others, as before.
+    // same since 2.x). The clients of a 3.3.5a or 4.3.4 server read what the packets below write;
+    // for the older ones they stay dropped.
     uint UserlistChannelId(string channelName)
         => GetSession().GameState.ChannelIds.TryGetValue(channelName, out int id)
             ? (uint)id
@@ -29,37 +29,42 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_USERLIST_UPDATE)]
     internal void HandleUserlistAdd(WorldPacket packet)
     {
-        if (IsCataLegacy)
-            HandleUserlistAddCata(packet);
-    }
+        if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V3_0_2_9056))
+            return;
 
-    internal void HandleUserlistAddCata(WorldPacket packet)
-    {
-        UserlistAdd user = new(update: packet.GetUniversalOpcode(false) == Opcode.SMSG_USERLIST_UPDATE);
-        user.UserGUID = packet.ReadGuid().To128(GetSession().GameState);
-        user.UserFlags = packet.ReadUInt8();
-        user.ChannelFlags = packet.ReadUInt8();
+        WowGuid128 guid = packet.ReadGuid().To128(GetSession().GameState);
+        byte userFlags = packet.ReadUInt8();
+        byte channelFlags = packet.ReadUInt8();
         packet.ReadUInt32(); // members now in the channel
-        user.ChannelName = packet.ReadCString();
-        user.ChannelID = UserlistChannelId(user.ChannelName);
+        string channelName = packet.ReadCString();
+
+        // A server reports a join to a channel of a player's own as an update, and the client
+        // ignores an update of a player it does not list.
+        var state = GetSession().GameState;
+        bool joined = channelName == state.ShownChannel && state.ShownChannelMembers.Add(guid);
+        UserlistAdd user = new(update: packet.GetUniversalOpcode(false) == Opcode.SMSG_USERLIST_UPDATE && !joined);
+        user.UserGUID = guid;
+        user.UserFlags = userFlags;
+        user.ChannelFlags = channelFlags;
+        user.ChannelName = channelName;
+        user.ChannelID = UserlistChannelId(channelName);
         SendPacketToClient(user);
     }
 
     [HandlesSmsg(Opcode.SMSG_USERLIST_REMOVE)]
     internal void HandleUserlistRemove(WorldPacket packet)
     {
-        if (IsCataLegacy)
-            HandleUserlistRemoveCata(packet);
-    }
+        if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V3_0_2_9056))
+            return;
 
-    internal void HandleUserlistRemoveCata(WorldPacket packet)
-    {
         UserlistRemove user = new();
         user.UserGUID = packet.ReadGuid().To128(GetSession().GameState);
         user.ChannelFlags = packet.ReadUInt8();
         packet.ReadUInt32(); // members now in the channel
         user.ChannelName = packet.ReadCString();
         user.ChannelID = UserlistChannelId(user.ChannelName);
+        if (user.ChannelName == GetSession().GameState.ShownChannel)
+            GetSession().GameState.ShownChannelMembers.Remove(user.UserGUID);
         SendPacketToClient(user);
     }
 
@@ -234,6 +239,15 @@ public partial class WorldClient
             member.VirtualRealmAddress = GetSession().RealmId.GetAddress();
             member.Flags = packet.ReadUInt8();
             list.Members.Add(member);
+        }
+
+        var state = GetSession().GameState;
+        if (state.ChannelDisplayList)
+        {
+            state.ShownChannel = list.ChannelName;
+            state.ShownChannelMembers.Clear();
+            foreach (ChannelPlayer member in list.Members)
+                state.ShownChannelMembers.Add(member.Guid);
         }
         SendPacketToClient(list);
     }
