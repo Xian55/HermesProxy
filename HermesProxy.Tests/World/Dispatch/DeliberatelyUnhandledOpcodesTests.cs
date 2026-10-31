@@ -32,7 +32,7 @@ public sealed unsafe class DeliberatelyUnhandledOpcodesTests
         foreach (Opcode opcode in DeliberatelyUnhandledOpcodes.FromClient)
             Assert.StartsWith("CMSG_", opcode.ToString());
         foreach (Opcode opcode in DeliberatelyUnhandledOpcodes.FromServer)
-            Assert.StartsWith("SMSG_", opcode.ToString());
+            Assert.Matches("^S?MSG_", opcode.ToString());
     }
 
     [Theory]

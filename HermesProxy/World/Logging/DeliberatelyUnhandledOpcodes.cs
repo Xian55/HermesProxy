@@ -75,6 +75,9 @@ internal static class DeliberatelyUnhandledOpcodes
         // The proxy tells the client these itself: its own cache version and its own hotfixes.
         Opcode.SMSG_CACHE_VERSION,
         Opcode.SMSG_HOTFIX_NOTIFY_BLOB,
+        // Another player's collision height once its order is acked: the proxy has it from that
+        // player's fields, and sends it with the next movement that player reports.
+        Opcode.MSG_MOVE_SET_COLLISION_HGT,
         // No modern client has an opcode for these: the dance studio that never shipped, the
         // guild reputation cap of the week and the guild finder's applicant count.
         Opcode.SMSG_LEARNED_DANCE_MOVES,

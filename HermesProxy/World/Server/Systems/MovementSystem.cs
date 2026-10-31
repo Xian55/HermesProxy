@@ -451,10 +451,17 @@ public static class MovementSystem
             return;
         }
 
-        // 3.3.5 does have CMSG_MOVE_SET_COLLISION_HGT_ACK (0x517), but Hermes
-        // already emits SMSG_MOVE_SET_COLLISION_HEIGHT from UNIT_FIELD_MOUNTDISPLAYID
-        // Values. Forwarding the ACK would make AC emit MSG 0x518 and we would
-        // double-send SET. Discard.
+        // The proxy also sends heights of its own, from the display and mount fields. No server
+        // knows those, and one more ack could resolve a mount that is not pending.
+        if ((collisionHeightAck.Ack.MoveCounter & MoveSetCollisionHeight.ServerOrderBit) == 0)
+            return;
+
+        WorldPacket orderAck = new WorldPacket(Opcode.CMSG_MOVE_SET_COLLISION_HGT_ACK);
+        orderAck.WritePackedGuid(collisionHeightAck.MoverGUID.To64());
+        orderAck.WriteUInt32(collisionHeightAck.Ack.MoveCounter & ~MoveSetCollisionHeight.ServerOrderBit);
+        SeatGravity.WriteClientMovement(orderAck, collisionHeightAck.Ack.MoveInfo, ctx.GetSession().GameState);
+        orderAck.WriteFloat(collisionHeightAck.Height);
+        ctx.SendPacketToServer(orderAck);
     }
 
     [HandlesCmsg(Opcode.CMSG_SET_ACTIVE_MOVER)]

@@ -942,13 +942,25 @@ public partial class WorldClient
         SendPacketToClient(new MoveUpdateCollisionHeight { MoverGUID = guid, MoveInfo = info, Height = height, Scale = ObjectScale(guid) });
     }
 
-    // A 3.3.5a server tells the player of its own collision height when it mounts or dismounts
-    // (AzerothCore Unit::Mount and Dismount). The proxy already sends the client one of its own,
-    // worked out from the display and mount fields of the same change, and discards the client's
-    // ack (MovementSystem.HandleMoveSetCollisionHeightAck), so this one is dropped on purpose.
+    // A 3.3.5a server orders the player's collision height when it mounts, dismounts or takes a
+    // flight, and CMaNGOS goes on only when the ack is back (Player::ResolvePendingMount): until
+    // then the player stays on foot and the flight does not leave. The height the client ends up
+    // with is still the proxy's own, worked out from the display and mount fields once they
+    // change. That one is answered too, so the bit tells MovementSystem which ack to pass on.
     [HandlesSmsg(Opcode.SMSG_MOVE_SET_COLLISION_HGT)]
     internal void HandleMoveSetCollisionHgt(WorldPacket packet)
     {
+        WowGuid128 guid = packet.ReadPackedGuid().To128(GetSession().GameState);
+        uint counter = packet.ReadUInt32();
+        float height = packet.ReadFloat();
+        SendPacketToClient(new MoveSetCollisionHeight
+        {
+            MoverGUID = guid,
+            SequenceIndex = counter | MoveSetCollisionHeight.ServerOrderBit,
+            Height = height,
+            Scale = ObjectScale(guid),
+            Reason = MoveSetCollisionHeight.UpdateCollisionHeightReason.Force,
+        });
     }
 
     private float ObjectScale(WowGuid128 guid)
