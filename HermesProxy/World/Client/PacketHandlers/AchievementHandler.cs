@@ -249,12 +249,9 @@ public partial class WorldClient
     [HandlesSmsg(Opcode.SMSG_ACHIEVEMENT_DELETED)]
     internal void HandleAchievementDeleted(WorldPacket packet)
     {
-        if (IsCataLegacy)
-            HandleAchievementDeletedCata(packet);
-    }
+        if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
+            return;
 
-    internal void HandleAchievementDeletedCata(WorldPacket packet)
-    {
         AchievementDeleted deleted = new();
         deleted.AchievementID = packet.ReadUInt32();
         SendPacketToClient(deleted);

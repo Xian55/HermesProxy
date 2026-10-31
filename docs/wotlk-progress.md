@@ -9,9 +9,9 @@ A backend's column shows how the latest session there that touched the opcode we
 | Status | Count | Meaning |
 |---|---:|---|
 | ❌ failing | 0 | a backend's latest session that touched it threw or dropped it |
-| 🔁 retest | 343 | its file changed after the latest session that exercised it |
+| 🔁 retest | 348 | its file changed after the latest session that exercised it |
 | · unseen | 74 | no session on any backend exercised it yet |
-| ✅ seen ok | 398 | the latest session on each backend that touched it passed it cleanly |
+| ✅ seen ok | 393 | the latest session on each backend that touched it passed it cleanly |
 | ∅ not sent | 28 | a server packet TrinityCore 3.3.5 never sends, and no session saw |
 
 ## What's left
@@ -41,6 +41,7 @@ Per feature: how many of its opcodes each backend's latest session passed cleanl
 | Query | 15 | 12 | 14 | 12 |  | 1 | 5 | · `SMSG_ITEM_NAME_QUERY_RESPONSE` |
 | Trade | 12 | 10 | 11 | 1 |  | 1 | 4 | · `CMSG_IGNORE_TRADE` |
 | Battleground | 17 | 12 | 14 | 1 |  |  | 10 |  |
+| Achievement | 6 | 4 | 5 | 6 |  |  | 6 |  |
 | Instance | 15 | 13 | 10 | 5 |  |  | 6 |  |
 | Auction | 13 |  | 13 |  |  |  | 5 |  |
 | Battlefield | 5 | 5 |  |  |  |  | 5 |  |
@@ -48,7 +49,6 @@ Per feature: how many of its opcodes each backend's latest session passed cleanl
 | GameObject | 6 | 6 | 2 | 1 |  |  | 4 |  |
 | SupportTicket | 4 | 4 | 2 |  |  |  | 4 |  |
 | Reputation | 7 | 7 | 5 | 3 |  |  | 3 |  |
-| Achievement | 6 | 4 | 5 | 6 |  |  | 1 |  |
 | Combat | 18 | 17 | 18 | 13 |  |  | 1 |  |
 | Hotfix | 1 | 1 | 1 | 1 |  |  | 1 |  |
 | BattlePet | 1 |  | 1 | 1 |  |  |  |  |
@@ -277,6 +277,9 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | 🔁 | S | `MSG_RANDOM_ROLL` |  | ✅ 10-23 |  | 20261023_055610 | 5 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | 🔁 | S | `MSG_TABARDVENDOR_ACTIVATE` |  | ✅ 09-13 |  | 20260913_012949 | 1 |  | HermesProxy/World/Client/PacketHandlers/GuildHandler.cs |
 | 🔁 | S | `MSG_TALENT_WIPE_CONFIRM` | ✅ 09-03 | ✅ 09-06 |  | 20260906_005030 | 3 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
+| 🔁 | S | `SMSG_ACHIEVEMENT_DELETED` |  |  | ✅ 10-31 | 20261031_220430 | 1 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
+| 🔁 | S | `SMSG_ACHIEVEMENT_EARNED` | ✅ 10-23 | ✅ 10-31 | ✅ 10-31 | 20261031_220430 | 5 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
+| 🔁 | S | `SMSG_ALL_ACHIEVEMENT_DATA` | ✅ 10-23 | ✅ 10-31 | ✅ 10-31 | 20261031_222132 | 18 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | 🔁 | S | `SMSG_AREA_SPIRIT_HEALER_TIME` |  | ✅ 10-06 |  | 20261006_001625 | 1 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
 | 🔁 | S | `SMSG_AREA_TRIGGER_MESSAGE` | ✅ 09-08 | ✅ 10-10 | ✅ 10-23 | 20261023_004307 | 6 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_AUCTION_BIDDER_NOTIFICATION` |  | ✅ 10-10 |  | 20261010_033357 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
@@ -315,6 +318,8 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | 🔁 | S | `SMSG_CLEAR_COOLDOWN` |  | ✅ 10-24 |  | 20261024_204721 | 75 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_CONVERT_RUNE` |  | ✅ 10-23 |  | 20261023_231552 | 6 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_COOLDOWN_EVENT` | ✅ 09-03 | ✅ 10-24 |  | 20261024_204721 | 7 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| 🔁 | S | `SMSG_CRITERIA_DELETED` | ✅ 09-01 | ✅ 10-31 | ✅ 10-31 | 20261031_220430 | 5 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
+| 🔁 | S | `SMSG_CRITERIA_UPDATE` | ✅ 10-23 | ✅ 10-31 | ✅ 10-31 | 20261031_221913 | 132 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | 🔁 | S | `SMSG_CROSSED_INEBRIATION_THRESHOLD` |  | ✅ 10-23 | ✅ 10-23 | 20261023_055610 | 4 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_DESTRUCTIBLE_BUILDING_DAMAGE` | ✅ 09-01 |  |  | 20260901_213634 | 10 |  | HermesProxy/World/Client/PacketHandlers/GameObjectHandler.cs |
 | 🔁 | S | `SMSG_DISPEL_FAILED` |  | ✅ 10-11 |  | 20261011_034644 | 7 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
@@ -708,11 +713,8 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | ✅ | S | `MSG_SET_DUNGEON_DIFFICULTY` | ✅ 10-23 | ✅ 10-31 | ✅ 10-31 | 20261031_222132 | 9 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `MSG_SET_RAID_DIFFICULTY` | ✅ 09-02 | ✅ 10-31 | ✅ 10-31 | 20261031_222132 | 9 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_ACCOUNT_DATA_TIMES` | ✅ 10-23 | ✅ 10-31 | ✅ 10-31 | 20261031_222132 | 9 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
-| ✅ | S | `SMSG_ACHIEVEMENT_DELETED` |  |  | ✅ 10-31 | 20261031_220430 | 1 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
-| ✅ | S | `SMSG_ACHIEVEMENT_EARNED` | ✅ 10-23 | ✅ 10-31 | ✅ 10-31 | 20261031_220430 | 5 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | ✅ | S | `SMSG_ACTIVATE_TAXI_REPLY` | ✅ 09-16 | ✅ 10-24 |  | 20261024_000209 | 5 |  | HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs |
 | ✅ | S | `SMSG_AI_REACTION` | ✅ 10-23 | ✅ 10-24 | ✅ 10-31 | 20261031_221913 | 12 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
-| ✅ | S | `SMSG_ALL_ACHIEVEMENT_DATA` | ✅ 10-23 | ✅ 10-31 | ✅ 10-31 | 20261031_222132 | 18 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | ✅ | S | `SMSG_ARENA_TEAM_COMMAND_RESULT` |  | ✅ 10-31 |  | 20261031_185034 | 1 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
 | ✅ | S | `SMSG_ARENA_TEAM_EVENT` |  | ✅ 10-31 |  | 20261031_185034 | 1 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
 | ✅ | S | `SMSG_ARENA_TEAM_INVITE` |  | ✅ 10-31 |  | 20261031_185034 | 1 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
@@ -746,8 +748,6 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 | ✅ | S | `SMSG_CONTROL_UPDATE` | ✅ 09-08 | ✅ 10-31 |  | 20261031_200653 | 15 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | S | `SMSG_CORPSE_RECLAIM_DELAY` | ✅ 09-11 | ✅ 10-31 | ✅ 10-23 | 20261031_200653 | 5 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_CREATE_CHAR` | ✅ 09-09 | ✅ 10-21 | ✅ 10-29 | 20261029_022636 | 7 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
-| ✅ | S | `SMSG_CRITERIA_DELETED` | ✅ 09-01 | ✅ 10-31 | ✅ 10-31 | 20261031_220430 | 5 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
-| ✅ | S | `SMSG_CRITERIA_UPDATE` | ✅ 10-23 | ✅ 10-31 | ✅ 10-31 | 20261031_221913 | 132 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | ✅ | S | `SMSG_DEATH_RELEASE_LOC` | ✅ 09-11 | ✅ 10-31 | ✅ 10-29 | 20261031_200653 | 5 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_DELETE_CHAR` | ✅ 08-31 | ✅ 10-21 | ✅ 10-29 | 20261029_022636 | 4 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_DESTROY_OBJECT` | ✅ 10-23 | ✅ 10-31 |  | 20261031_222132 | 355 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
@@ -936,7 +936,7 @@ What the 3.4.3 client sent and no handler took, most recent session per opcode; 
 <!-- sources
 HermesProxy/World/CalendarClock.cs f9b82043eaca9532
 HermesProxy/World/Client/LegacyStreamInflater.cs 7e8e84925d065503
-HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs b38c44134a074828
+HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs 6c0230cf41cbe430
 HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs dc26c029fc96af44
 HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs 5e12576004733805
 HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs 1559d99d16a647a5

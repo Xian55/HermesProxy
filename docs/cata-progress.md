@@ -10,10 +10,10 @@
 | 🚫 unmapped | 71 | not in the 4.3.4 table: renamed, split or removed in 4.x |
 | ⬜ todo | 0 | layout changed in 4.x, no 4.3.4 branch, not seen yet |
 | ⚠️ suspect | 0 | layout changed, no 4.3.4 branch, but passed without an error — likely misread |
-| 🔁 retest | 308 | its file changed after the latest session that exercised it |
-| 🔧 ported, unseen | 11 | has a 4.3.4 branch, waiting for a session to exercise it |
-| · unseen | 14 | same layout as 3.3.5a per WPP, not exercised yet |
-| ✅ seen ok | 515 | ported or unchanged, and the latest session passed it cleanly |
+| 🔁 retest | 310 | its file changed after the latest session that exercised it |
+| 🔧 ported, unseen | 10 | has a 4.3.4 branch, waiting for a session to exercise it |
+| · unseen | 15 | same layout as 3.3.5a per WPP, not exercised yet |
+| ✅ seen ok | 513 | ported or unchanged, and the latest session passed it cleanly |
 | ∅ not sent | 44 | a server packet TrinityCore 4.3.4 never sends: another opcode carries it there, or nothing calls its writer |
 
 ## What's left
@@ -29,7 +29,7 @@ The rows of the legacy table below that still ask for work, by feature. A sessio
 | Pet |  |  |  |  |  | 1 | 16 | · `CMSG_PET_CANCEL_AURA` |
 | Item |  |  |  |  |  | 1 | 13 | · `SMSG_ITEM_TIME_UPDATE` |
 | Calendar |  |  |  |  | 1 |  | 9 | 🔧 `CMSG_CALENDAR_COMPLAIN` |
-| Achievement |  |  |  |  | 1 |  | 3 | 🔧 `SMSG_ACHIEVEMENT_DELETED` |
+| Achievement |  |  |  |  |  | 1 | 5 | · `SMSG_ACHIEVEMENT_DELETED` |
 | Trade |  |  |  |  |  | 1 | 1 | · `CMSG_BUSY_TRADE` |
 | Spell |  |  |  |  |  |  | 43 |  |
 | Guild |  |  |  |  |  |  | 39 |  |
@@ -430,6 +430,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `MSG_TABARDVENDOR_ACTIVATE` |  | same | 20261022_012152 | 1 |  | HermesProxy/World/Client/PacketHandlers/GuildHandler.cs |
 | 🔁 | S | `SMSG_ACHIEVEMENT_EARNED` |  | same | 20261031_214714 | 11 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | 🔁 | S | `SMSG_ADD_RUNE_POWER` | yes | same | 20261024_155804 | 16 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| 🔁 | S | `SMSG_ALL_ACHIEVEMENT_DATA` | yes | changed | 20261031_222458 | 4 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | 🔁 | S | `SMSG_AREA_SPIRIT_HEALER_TIME` |  | same | 20261024_155804 | 10 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
 | 🔁 | S | `SMSG_AREA_TRIGGER_MESSAGE` |  | same | 20261022_015111 | 2 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_AUCTION_BIDDER_NOTIFICATION` | yes | same | 20261022_161951 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
@@ -465,6 +466,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_CONVERT_RUNE` |  | same | 20261025_021426 | 2 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_COOLDOWN_EVENT` |  | same | 20261024_155804 | 4 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_CRITERIA_DELETED` |  | same | 20261024_205958 | 1 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
+| 🔁 | S | `SMSG_CRITERIA_UPDATE` |  | same | 20261031_222458 | 20 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | 🔁 | S | `SMSG_CROSSED_INEBRIATION_THRESHOLD` |  | same | 20261024_070752 | 2 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_CURRENCY_LOOT_REMOVED` | yes | new in 4.x | 20261020_231647 | 2 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | 🔁 | S | `SMSG_DEFENSE_MESSAGE` |  | same | 20261022_165434 | 1 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
@@ -606,7 +608,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔧 | C | `CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK` | yes | ? |  |  |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔧 | C | `CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK` | yes | ? |  |  |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔧 | C | `CMSG_MOVE_NOT_ACTIVE_MOVER` | yes | changed |  |  |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
-| 🔧 | S | `SMSG_ACHIEVEMENT_DELETED` | yes | same |  |  |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | 🔧 | S | `SMSG_MOVE_SET_PITCH_RATE` | yes | new in 4.x |  |  |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔧 | S | `SMSG_MOVE_SET_TURN_RATE` | yes | new in 4.x |  |  |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | 🔧 | S | `SMSG_MOVE_SPLINE_SET_PITCH_RATE` | yes | changed |  |  |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
@@ -617,6 +618,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | · | C | `CMSG_QUEST_CONFIRM_ACCEPT` |  | same |  |  |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
 | · | C | `CMSG_SET_PLAYER_DECLINED_NAMES` |  | ? |  |  |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | · | S | `MSG_MOVE_TELEPORT_ACK` |  | reviewed |  |  |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
+| · | S | `SMSG_ACHIEVEMENT_DELETED` |  | same |  |  |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | · | S | `SMSG_CHARACTER_LOGIN_FAILED` |  | same |  |  |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | · | S | `SMSG_CHARACTER_RENAME_RESULT` |  | same |  |  |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | · | S | `SMSG_INVALIDATE_PLAYER` |  | same |  |  |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
@@ -901,7 +903,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_ACCOUNT_DATA_TIMES` |  | same | 20261031_222458 | 2 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_ACTIVATE_TAXI_REPLY` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs |
 | ✅ | S | `SMSG_AI_REACTION` |  | same | 20261024_215336 | 1 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
-| ✅ | S | `SMSG_ALL_ACHIEVEMENT_DATA` | yes | changed | 20261031_222458 | 4 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | ✅ | S | `SMSG_ALL_GUILD_ACHIEVEMENTS` | yes | new in 4.x | 20261031_222252 | 1 |  | HermesProxy/World/Client/PacketHandlers/GuildHandler.cs |
 | ✅ | S | `SMSG_ARENA_TEAM_COMMAND_RESULT` | yes | changed | 20261031_184130 | 4 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
 | ✅ | S | `SMSG_ARENA_TEAM_EVENT` | yes | same | 20261031_193607 | 1 |  | HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs |
@@ -942,7 +943,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_CONTROL_UPDATE` | yes | same | 20261031_222458 | 4 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | S | `SMSG_CORPSE_RECLAIM_DELAY` |  | same | 20261030_014259 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_CREATE_CHAR` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
-| ✅ | S | `SMSG_CRITERIA_UPDATE` |  | same | 20261031_222458 | 20 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
 | ✅ | S | `SMSG_DEATH_RELEASE_LOC` |  | same | 20261030_014844 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_DESTROY_OBJECT` |  | same | 20261031_222252 | 5 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | ✅ | S | `SMSG_DESTRUCTIBLE_BUILDING_DAMAGE` |  | same | 20261022_015111 | 1 |  | HermesProxy/World/Client/PacketHandlers/GameObjectHandler.cs |
@@ -1188,7 +1188,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 <!-- sources
 HermesProxy/World/CalendarClock.cs f9b82043eaca9532
 HermesProxy/World/Client/LegacyStreamInflater.cs 7e8e84925d065503
-HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs b38c44134a074828
+HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs 6c0230cf41cbe430
 HermesProxy/World/Client/PacketHandlers/ArenaHandler.cs dc26c029fc96af44
 HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs 5e12576004733805
 HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs 1559d99d16a647a5
