@@ -39,16 +39,6 @@ public partial class AuthClient
 #endif
     };
 
-    // Multi-buffer SHA1 used by SRP6 proofs. Avoids the per-call combined-buffer
-    // allocation the old HashHelper.Combine had — IncrementalHash streams each part.
-    private static byte[] Sha1Of(params ReadOnlySpan<byte[]> parts)
-    {
-        using var ih = IncrementalHash.CreateHash(HashAlgorithmName.SHA1);
-        foreach (var p in parts)
-            ih.AppendData(p);
-        return ih.GetHashAndReset();
-    }
-
     /// <summary>
     /// How long a login waits for the legacy auth server's answer before telling the modern client
     /// the login failed. Long enough to cover a slow or busy server, short enough that a dead one
@@ -61,14 +51,19 @@ public partial class AuthClient
     private const int RealmListHeaderSize = 3;
     private const int MaxMessageSize = RealmListHeaderSize + ushort.MaxValue;
 
+    // One challenge in over a hundred needs another, so this many in a row means something else is
+    // going on, and the challenge at hand is used as it is.
+    private const int MaxFreshChallenges = 8;
+
     GlobalSessionData _globalSession;
     TimeSpan _loginTimeout = LoginTimeout;
     Socket _clientSocket = null!;
     TaskCompletionSource<AuthResult> _response = null!;
     TaskCompletionSource _hasRealmlist = null!;
     bool _realmlistRequestIsPending;
+    int _freshChallenges;
     byte[] _passwordHash = null!;
-    BigInteger _key;
+    byte[] _sessionKey = null!;
     byte[] _m2 = null!;
     string _username = null!;
     string _locale = null!;
@@ -94,10 +89,18 @@ public partial class AuthClient
         _response = new(TaskCreationOptions.RunContinuationsAsynchronously);
         _hasRealmlist = new(TaskCreationOptions.RunContinuationsAsynchronously);
         _realmlistRequestIsPending = false;
+        _freshChallenges = 0;
 
         string authstring = $"{_username}:{password}";
         _passwordHash = SHA1.HashData(Encoding.ASCII.GetBytes(authstring.ToUpper()));
 
+        Connect();
+
+        return AwaitResponseAsync();
+    }
+
+    private void Connect()
+    {
         try
         {
             var serverIpAddress = NetworkUtils.ResolveOrDirectIPv4(_globalSession.LegacyServerOptions.Address);
@@ -111,10 +114,8 @@ public partial class AuthClient
         catch (Exception ex)
         {
             AuthClientLogMessages.SocketError(_melNet, ex, _sourceFile, _netDirP2S, ex.Message);
-            _response.SetResult(AuthResult.FAIL_INTERNAL_ERROR);
+            SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
         }
-
-        return AwaitResponseAsync();
     }
 
     /// <summary>
@@ -158,11 +159,11 @@ public partial class AuthClient
 
     public byte[] GetSessionKey()
     {
-        return _key.ToCleanByteArray();
+        return _sessionKey;
     }
 
-    // Takes the socket rather than the field: a second login replaces the field, and must not end
-    // up read by the first login's loop as well.
+    // Takes the socket rather than the field: asking for a fresh challenge replaces the field, and
+    // the loop of the connection it replaced ends there.
     private async Task ConnectAndReceive(Socket socket, IPEndPoint endPoint)
     {
         try
@@ -182,7 +183,7 @@ public partial class AuthClient
         try
         {
             int pending = 0;
-            while (true)
+            while (socket == _clientSocket)
             {
                 int received = await socket.ReceiveAsync(buffer.AsMemory(pending, MaxMessageSize - pending), SocketFlags.None);
                 if (received == 0)
@@ -317,139 +318,29 @@ public partial class AuthClient
         byte[] challenge_version = packet.ReadBytes(16);
         byte challenge_securityFlags = packet.ReadUInt8();
 
-        //Console.WriteLine("Received logon challenge");
-
-        BigInteger N, A, B, a, u, x, S, salt, versionChallenge, g, k;
-        k = new BigInteger(3);
-
-        #region Receive and initialize
-
-        B = challenge_B.ToBigInteger();            // server public key
-        g = challenge_g.ToBigInteger();
-        N = challenge_N.ToBigInteger();            // modulus
-        salt = challenge_salt.ToBigInteger();
-        versionChallenge = challenge_version.ToBigInteger();
-
-        //Console.WriteLine("---====== Received from server: ======---");
-        //Console.WriteLine($"B={B.ToCleanByteArray().ToHexString()}");
-        //Console.WriteLine($"N={N.ToCleanByteArray().ToHexString()}");
-        //Console.WriteLine($"salt={challenge_salt.ToHexString()}");
-        //Console.WriteLine($"versionChallenge={challenge_version.ToHexString()}");
-        #endregion
-
-        #region Hash password
-
-        x = Sha1Of(challenge_salt, _passwordHash).ToBigInteger();
-
-        //Console.WriteLine("---====== shared password hash ======---");
-        //Console.WriteLine($"g={g.ToCleanByteArray().ToHexString()}");
-        //Console.WriteLine($"x={x.ToCleanByteArray().ToHexString()}");
-        //Console.WriteLine($"N={N.ToCleanByteArray().ToHexString()}");
-
-        #endregion
-
-        #region Create random key pair
-
-        var rand = System.Security.Cryptography.RandomNumberGenerator.Create();
-
-        do
+        if (!LegacySrp6.IsUnambiguous(challenge_B) && _freshChallenges < MaxFreshChallenges)
         {
-            byte[] randBytes = new byte[19];
-            rand.GetBytes(randBytes);
-            a = randBytes.ToBigInteger();
-
-            A = g.ModPow(a, N);
-        } while (A.ModPow(1, N) == 0);
-
-        //Console.WriteLine("---====== Send data to server: ======---");
-        //Console.WriteLine($"A={A.ToCleanByteArray().ToHexString()}");
-
-        #endregion
-
-        #region Compute session key
-
-        u = Sha1Of(A.ToCleanByteArray(), B.ToCleanByteArray()).ToBigInteger();
-
-        // compute session key
-        S = ((B + k * (N - g.ModPow(x, N))) % N).ModPow(a + (u * x), N);
-        byte[] keyHash;
-        byte[] sData = S.ToCleanByteArray();
-        if (sData.Length < 32)
-        {
-            var tmpBuffer = new byte[32];
-            Buffer.BlockCopy(sData, 0, tmpBuffer, 32 - sData.Length, sData.Length);
-            sData = tmpBuffer;
+            // No proof has gone out yet, so this costs the account nothing on the server.
+            ++_freshChallenges;
+            AuthClientLogMessages.AskingForAnotherChallenge(_melNet, _sourceFile, _netDirNone, _freshChallenges);
+            Socket replaced = _clientSocket;
+            Connect();
+            replaced.Dispose();
+            return;
         }
-        byte[] keyData = new byte[40];
-        byte[] temp = new byte[16];
 
-        // take every even indices byte, hash, store in even indices
-        for (int i = 0; i < 16; ++i)
-            temp[i] = sData[i * 2];
-        keyHash = SHA1.HashData(temp);
-        for (int i = 0; i < 20; ++i)
-            keyData[i * 2] = keyHash[i];
+        LegacySrp6.Proof? proof = LegacySrp6.Compute(_username, _passwordHash, challenge_B, challenge_g, challenge_N, challenge_salt);
+        if (proof == null)
+        {
+            AuthClientLogMessages.ChallengeAllowsNoProof(_melNet, _sourceFile, _netDirNone);
+            SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
+            return;
+        }
 
-        // do the same for odd indices
-        for (int i = 0; i < 16; ++i)
-            temp[i] = sData[i * 2 + 1];
-        keyHash = SHA1.HashData(temp);
-        for (int i = 0; i < 20; ++i)
-            keyData[i * 2 + 1] = keyHash[i];
+        _sessionKey = proof.SessionKey;
+        _m2 = proof.ServerEvidence;
 
-        _key = keyData.ToBigInteger();
-
-        //Console.WriteLine("---====== Compute session key ======---");
-        //Console.WriteLine($"u={u.ToCleanByteArray().ToHexString()}");
-        //Console.WriteLine($"S={S.ToCleanByteArray().ToHexString()}");
-        //Console.WriteLine($"K={_key.ToCleanByteArray().ToHexString()}");
-
-        #endregion
-
-        #region Generate crypto proof
-
-        // XOR the hashes of N and g together
-        byte[] gNHash = new byte[20];
-
-        byte[] nHash = SHA1.HashData(N.ToCleanByteArray());
-        for (int i = 0; i < 20; ++i)
-            gNHash[i] = nHash[i];
-        //Console.WriteLine($"nHash={nHash.ToHexString()}");
-
-        byte[] gHash = SHA1.HashData(g.ToCleanByteArray());
-        for (int i = 0; i < 20; ++i)
-            gNHash[i] ^= gHash[i];
-        //Console.WriteLine($"gHash={gHash.ToHexString()}");
-
-        // hash username
-        byte[] userHash = SHA1.HashData(Encoding.ASCII.GetBytes(_username.ToUpper()));
-
-        // our proof
-        byte[] m1Hash = Sha1Of(
-            gNHash,
-            userHash,
-            challenge_salt,
-            A.ToCleanByteArray(),
-            B.ToCleanByteArray(),
-            _key.ToCleanByteArray());
-
-        //Console.WriteLine("---====== Client proof: ======---");
-        //Console.WriteLine($"gNHash={gNHash.ToHexString()}");
-        //Console.WriteLine($"userHash={userHash.ToHexString()}");
-        //Console.WriteLine($"salt={challenge_salt.ToHexString()}");
-        //Console.WriteLine($"A={A.ToCleanByteArray().ToHexString()}");
-        //Console.WriteLine($"B={B.ToCleanByteArray().ToHexString()}");
-        //Console.WriteLine($"key={_key.ToCleanByteArray().ToHexString()}");
-
-        //Console.WriteLine("---====== Send proof to server: ======---");
-        //Console.WriteLine($"M={m1Hash.ToHexString()}");
-
-        // expected proof for server
-        _m2 = Sha1Of(A.ToCleanByteArray(), m1Hash, keyData);
-
-        #endregion
-
-        SendLogonProof(A.ToCleanByteArray(), m1Hash, new byte[20]);
+        SendLogonProof(proof.PublicKey, proof.ClientEvidence, new byte[20]);
     }
 
     private void SendLogonProof(byte[] A, byte[] M1, byte[] crc)
