@@ -1131,6 +1131,7 @@ public class SpellFailure : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 CasterUnit;
+    public override bool NeedsObject(WowGuid128 guid) => guid == CasterUnit;
     public WowGuid128 CastID;
     public uint SpellID;
     public uint SpellXSpellVisualID;
@@ -1164,6 +1165,7 @@ public class SpellFailedOther : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 CasterUnit;
+    public override bool NeedsObject(WowGuid128 guid) => guid == CasterUnit;
     public WowGuid128 CastID;
     public uint SpellID;
     public uint SpellXSpellVisualID;
@@ -1217,6 +1219,8 @@ public sealed class SpellStart : ServerPacket
     {
     }
 
+    public override bool NeedsObject(WowGuid128 guid) => guid == Cast.CasterUnit;
+
     public override void Write() => Layout.Write(this, _worldPacket);
 }
 
@@ -1260,6 +1264,8 @@ sealed class SpellGo : ServerPacket
     }
 
     public SpellGo() : base(Opcode.SMSG_SPELL_GO, ConnectionType.Instance) { }
+
+    public override bool NeedsObject(WowGuid128 guid) => guid == Cast.CasterUnit;
 
     public override void Write() => Layout.Write(this, _worldPacket);
 
@@ -2167,6 +2173,7 @@ public class SpellDelayed : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 CasterGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == CasterGUID;
     public int Delay;
 }
 
@@ -2224,6 +2231,7 @@ public class SpellChannelStart : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 CasterGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == CasterGUID;
     public uint SpellID;
     public uint SpellXSpellVisualID;
     public uint Duration;
@@ -2276,6 +2284,7 @@ public class SpellChannelUpdate : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 CasterGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == CasterGUID;
     public int TimeRemaining;
 }
 

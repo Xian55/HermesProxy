@@ -86,16 +86,16 @@ internal static partial class ObjectLifecycleLogMessages
     [LoggerMessage(
         EventId = 909,
         Level = LogLevel.Trace,
-        Message = "[ObjLife] player movement held guidLow={GuidLow} guidHigh={GuidHigh} opcode={Opcode} reason={Reason}")]
-    public static partial void PlayerMovementHeld(
-        ILogger logger, ulong guidLow, ulong guidHigh, string opcode, string reason);
+        Message = "[ObjLife] held for its object guidLow={GuidLow} guidHigh={GuidHigh} opcode={Opcode}")]
+    public static partial void HeldForObject(
+        ILogger logger, ulong guidLow, ulong guidHigh, string opcode);
 
     [LoggerMessage(
         EventId = 910,
         Level = LogLevel.Trace,
-        Message = "[ObjLife] sent while client has no player object opcode={Opcode} playerLow={PlayerLow}")]
+        Message = "[ObjLife] sent while client has no player object opcode={Opcode} playerLow={PlayerLow} namesPlayer={NamesPlayer}")]
     public static partial void SentWhileClientHasNoPlayer(
-        ILogger logger, string opcode, ulong playerLow);
+        ILogger logger, string opcode, ulong playerLow, bool namesPlayer);
 
     [LoggerMessage(
         EventId = 911,

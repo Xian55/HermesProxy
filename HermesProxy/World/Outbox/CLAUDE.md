@@ -139,6 +139,7 @@ they stay domain logic.
 | Situation | Call | Example |
 |---|---|---|
 | Send now | `SendPacketToClient(p)` / `SendPacketToServer(p)` (or `ToClient.Send` / `ToServer.Send`) | almost everything |
+| The client drops the packet without a certain object | Override `NeedsObject` on the packet class. Senders do nothing | a speed change waiting for the player's create, whoever sends it |
 | Reply on a named socket, whatever the packet's type says | `ToClient.SendOn(conn, p)` | |
 | Send right after the client got packet X | `ToClient.After(opcode, p)` | spell history after `SMSG_SEND_UNLEARN_SPELLS` |
 | Send after the legacy update batch being handled is fully out | `ToClient.AfterBatch(p)` | collision height after the mount Values |
@@ -158,6 +159,30 @@ they stay domain logic.
 
 Keys need a `HoldKeyKind`. Add one per feature to `OutboxTypes.cs`, so two features can't collide on
 the same number.
+
+## The awaited object
+
+The client drops a packet about an object it does not have, with no error and no ack. It answers
+`CMSG_OBJECT_UPDATE_FAILED` for a Values update and nothing at all for the rest. So `ClientOutbox.Send`
+asks every packet `NeedsObject(awaited)` while the client lacks the player: during the item-template
+hold at login, and after `SMSG_NEW_WORLD` until the re-create. Packets that say yes go into a hold on
+`GuidKnown(player)` under `AwaitedObjectKey`. Outside those windows the cost is one interface call
+and one volatile read per packet.
+
+- **The state lives in one place.** `IClientWire.AwaitedObject` reads `ClientHasPlayerObject`, so the
+  outbox has no copy of it to fall out of step at a relog.
+- **Timeout.** 20 s, then discarded. `SMSG_NEW_WORLD` cancels what waited for the old map.
+- **Why on the packet.** Issue #314 listed nine hand-written holds, one per sender. `SMSG_POWER_UPDATE`
+  had a hold in `HandlePowerUpdate` while two more senders of the same packet had none.
+- **`AuraUpdate` is left out on purpose.** `BuildPlayerAuraSync` sends the whole list after the create.
+- **`SendPlayerValuesUpdate` keeps its own hold.** `FlushDeferredUpdate` claims those updates inline,
+  ahead of the world-ready handshake.
+- **`ToClient.SendOn` and `ctx.SendPacket` do not ask.** They answer on a named socket.
+
+To find the next packet that should declare it, read `[ObjLife] sent while client has no player
+object ... namesPlayer=true` in a Verbose log. Naming the player is not needing it: a roster or an
+achievement list names the player and is fine. Own-guid `CMSG_OBJECT_UPDATE_FAILED` in a log is
+always a bug of this kind.
 
 ## Guarantees
 
@@ -211,6 +236,8 @@ the same number.
 
 - **A new `Pending*` / `Deferred*` / `Delayed*` field on the session.** Add an event, gate, key or lane
   here.
+- **`if (!ClientHasPlayerObject) When(GuidKnown(...))` around a send.** It covers one sender. Override
+  `NeedsObject` on the packet.
 - **`Thread.Sleep` in a handler to space packets or wait for the other thread.** Use `Paced`, `Delay`, or
   a continuation on the event you were waiting for.
 - **Writing to `session.RealmSocket` / `InstanceSocket` directly from a legacy handler.** It throws while

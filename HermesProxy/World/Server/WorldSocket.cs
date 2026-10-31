@@ -570,11 +570,12 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     /// <summary>
     /// Records a packet written to the client while it has no player object. Diagnostic only:
     /// Trace-gated, so the guid test and the opcode name cost nothing unless Verbose is on.
+    /// Its bytes say whether it names the player: a packet that does and got this far declares no
+    /// <see cref="ServerPacket.NeedsObject"/>, so namesPlayer=True is where to look for the next
+    /// packet the client drops. Naming is not needing, though, so it only marks a candidate.
     /// </summary>
     private void LogIfClientHasNoPlayerObject(ServerPacket packet)
     {
-        if (!ModernVersion.IsWotLKClassicOrLater)
-            return;
         if (!_melNoPlayerYet.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Trace))
             return;
 
@@ -587,8 +588,11 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         // and this runs on a socket thread.
         if (!state.ClientHasPlayerObject && !state.CurrentPlayerGuid.IsEmpty())
         {
+            Span<byte> packed = stackalloc byte[PackedGuidHelper.MaxPackedGuid128Size];
+            int length = PackedGuidHelper.WritePackedGuid128(packed, state.CurrentPlayerGuid.Low, state.CurrentPlayerGuid.High);
             World.Logging.ObjectLifecycleLogMessages.SentWhileClientHasNoPlayer(
-                _melNoPlayerYet, packet.GetUniversalOpcode().ToString(), state.CurrentPlayerGuid.Low);
+                _melNoPlayerYet, packet.GetUniversalOpcode().ToString(), state.CurrentPlayerGuid.Low,
+                packet.GetDataSpan().IndexOf(packed[..length]) >= 0);
             return;
         }
 
@@ -643,9 +647,8 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
         // so an undeclared one is invisible by construction. This names them instead of waiting
         // for the third. The window -- the item-template hold at login, the SMSG_NEW_WORLD gap at
         // a teleport -- opens once per login, so the list is short.
-        LogIfClientHasNoPlayerObject(packet);
-
         packet.WritePacketData();
+        LogIfClientHasNoPlayerObject(packet);
 
         lock (_sendLock)
         {

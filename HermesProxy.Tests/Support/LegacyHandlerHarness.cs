@@ -40,7 +40,7 @@ internal sealed class LegacyHandlerHarness
             new DiagnosticsOptions { PacketsLog = false },
             new ThrottlingOptions());
 
-        ClientWire = new SinkClientWire(recordClientPackets);
+        ClientWire = new SinkClientWire(recordClientPackets) { Session = Session };
         var toClient = new ClientOutbox(ClientWire);
         toClient.Attach(ConnectionType.Realm);
         toClient.Attach(ConnectionType.Instance);
@@ -111,6 +111,12 @@ internal sealed class SinkClientWire(bool record) : IClientWire
 {
     public List<SentClientPacket> Sent { get; } = [];
     public int Count { get; private set; }
+
+    /// <summary>The session whose state answers <see cref="AwaitedObject"/>, as in production.</summary>
+    public GlobalSessionData? Session { get; set; }
+
+    public WowGuid128 AwaitedObject =>
+        Session == null || Session.GameState.ClientHasPlayerObject ? default : Session.GameState.CurrentPlayerGuid;
 
     public bool TryWrite(ConnectionType connection, ServerPacket packet)
     {

@@ -4,6 +4,21 @@
 [Codecs/](Codecs/CLAUDE.md). A field written in the wrong place compiles, passes review and makes
 the client drop the packet without a word, so treat every edit here as a wire-format change.
 
+## Packets about an object
+
+A packet about one object overrides `NeedsObject`, so the client outbox can hold it until the client
+has that object (see [Outbox/CLAUDE.md](../../Outbox/CLAUDE.md)):
+
+```csharp
+public WowGuid128 MoverGUID;
+public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
+```
+
+Declare it for a guid the packet acts on, not one it mentions: a whisper or a guild roster can name an
+object the client will never have, and holding those would wait for nothing.
+`PacketsNeedingAnObjectTests` fails for a packet with a `MoverGUID` or `CasterUnit` field that has no
+override.
+
 ## Build-dependent layouts
 
 When a packet's layout differs between client builds, give each shape **its own sealed layout

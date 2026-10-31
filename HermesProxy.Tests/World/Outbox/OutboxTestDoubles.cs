@@ -17,6 +17,11 @@ internal sealed class TestServerPacket(Opcode opcode, int id, ConnectionType con
 {
     public int Id { get; } = id;
 
+    /// <summary>The object this packet says it needs. Empty for none.</summary>
+    public WowGuid128 Needed { get; init; }
+
+    public override bool NeedsObject(WowGuid128 guid) => guid == Needed;
+
     /// <summary>Thread that serialized the packet, or 0 if it never was.</summary>
     public int SerializedOnThread { get; private set; }
 
@@ -35,6 +40,8 @@ internal sealed class RecordingClientWire : IClientWire
 
     public volatile bool RealmOpen = true;
     public volatile bool InstanceOpen = true;
+
+    public WowGuid128 AwaitedObject { get; set; }
 
     /// <summary>Runs after each write is recorded, on the writing thread.</summary>
     public Action<TestServerPacket>? OnWrite { get; set; }

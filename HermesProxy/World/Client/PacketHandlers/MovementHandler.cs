@@ -26,27 +26,26 @@ public partial class WorldClient
         // update the client cannot resolve passengers' seat indices to attachments.
         if (guid == GetSession().GameState.CurrentPlayerGuid)
         {
-            SendPlayerMovementPacket(new MoveSetVehicleRecID
+            SendPacketToClient(new MoveSetVehicleRecID
             {
                 MoverGUID = guid,
                 SequenceIndex = _playerVehicleSequence++,
                 VehicleRecID = vehicleId,
-            }, guid);
+            });
         }
-        SendPlayerMovementPacket(new SetVehicleRecID
+        SendPacketToClient(new SetVehicleRecID
         {
             VehicleGUID = guid,
             VehicleRecID = vehicleId,
-        }, guid);
+        });
     }
 
     [HandlesSmsg(Opcode.SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA)]
     internal void HandleOnCancelExpectedRideVehicleAura(WorldPacket packet)
     {
         // Sent only to the player it concerns, right behind its vehicle record or its boarding
-        // request. It takes the same hold as the record so a login while mounted keeps that order.
-        SendPlayerMovementPacket(new OnCancelExpectedRideVehicleAura(),
-            GetSession().GameState.CurrentPlayerGuid);
+        // request. It declares the same need as the record, so a login while mounted keeps that order.
+        SendPacketToClient(new OnCancelExpectedRideVehicleAura());
     }
 
     /// <summary>
@@ -65,11 +64,11 @@ public partial class WorldClient
             gameState.LastReportedTransportGuid.Low, gameState.LastReportedTransportGuid.High);
 
         // Takes the seat move's own path so the two cannot change places.
-        SendPlayerMovementPacket(new MoveSetFlag(Opcode.SMSG_MOVE_DISABLE_GRAVITY)
+        SendPacketToClient(new MoveSetFlag(Opcode.SMSG_MOVE_DISABLE_GRAVITY)
         {
             MoverGUID = gameState.CurrentPlayerGuid,
             MoveCounter = SeatGravity.SequenceIndex,
-        }, vehicleGuid);
+        });
     }
 
     /// <summary>Gives the player its gravity back once the server takes it out of the seat.</summary>
@@ -112,70 +111,14 @@ public partial class WorldClient
         }
     }
 
-    /// <summary>
-    /// A speed or movement-flag change (can fly, water walk, hover, gravity, feather fall) aimed at
-    /// the player's own guid, held until the client has the player object.
-    /// </summary>
-    /// <remarks>
-    /// Same window as the held player Values (issue #300), one packet class further out. The server
-    /// applies the mount's speed while the player's create is still waiting on item templates; the
-    /// client cannot apply a speed change for an object it does not have, drops it, and nothing
-    /// re-sends it — so a character who logged in mounted rode at walking speed. The dropped
-    /// packet is visible in a capture as the one SMSG_MOVE_SET_RUN_SPEED with no
-    /// CMSG_MOVE_FORCE_RUN_SPEED_CHANGE_ACK behind it.
-    /// </remarks>
-    private static readonly HoldKey PlayerMoveSpeedKey = new(HoldKeyKind.PlayerMoveSpeed);
+    private static readonly HoldKey PlayerCreateCanFlyKey = new(HoldKeyKind.PlayerCreateCanFly);
 
-    // Discarded rather than released on timeout: a speed for a guid the client never got is
+    // Discarded rather than released on timeout: a change for a guid the client never got is
     // answered with nothing at best, and the create it belongs to is long gone.
-    private static readonly HoldOptions PlayerMoveSpeedHold = new(
+    private static readonly HoldOptions PlayerCreateCanFlyHold = new(
         Timeout: TimeSpan.FromSeconds(20),
         OnTimeout: OutboxTimeoutAction.Discard,
-        Key: PlayerMoveSpeedKey);
-
-    private static readonly HoldKey PlayerGuidSubjectKey = new(HoldKeyKind.PlayerGuidSubject);
-    private static readonly HoldOptions PlayerGuidSubjectHold = new(
-        Timeout: TimeSpan.FromSeconds(20),
-        OnTimeout: OutboxTimeoutAction.Discard,
-        Key: PlayerGuidSubjectKey);
-
-    internal static bool? ForceV343GuidSubjectHoldForTests;
-
-    /// <summary>Keep a packet about the player behind its pending CreateObject.</summary>
-    internal void SendGuidSubjectPacket(ServerPacket packet, WowGuid128 subjectGuid)
-    {
-        var session = GetSession();
-        if (!(ForceV343GuidSubjectHoldForTests ?? ModernVersion.IsWotLKClassicOrLater) ||
-            subjectGuid.IsEmpty() ||
-            subjectGuid != session.GameState.CurrentPlayerGuid ||
-            session.GameState.ClientHasPlayerObject)
-        {
-            SendPacketToClient(packet);
-            return;
-        }
-
-        session.ToClient.When(OutboxEvent.GuidKnown(subjectGuid), packet, PlayerGuidSubjectHold);
-    }
-
-    /// <summary>
-    /// Sends a movement packet aimed at <paramref name="moverGuid"/>, or holds it when that is the
-    /// player and the client does not have the player object yet.
-    /// </summary>
-    void SendPlayerMovementPacket(ServerPacket packet, WowGuid128 moverGuid)
-    {
-        var session = GetSession();
-        if (moverGuid != session.GameState.CurrentPlayerGuid ||
-            session.GameState.ClientHasPlayerObject)
-        {
-            SendPacketToClient(packet);
-            return;
-        }
-
-        World.Logging.ObjectLifecycleLogMessages.PlayerMovementHeld(
-            _melObjLifeClient, moverGuid.Low, moverGuid.High,
-            packet.GetUniversalOpcode().ToString(), "player-create-pending");
-        session.ToClient.When(OutboxEvent.GuidKnown(moverGuid), packet, PlayerMoveSpeedHold);
-    }
+        Key: PlayerCreateCanFlyKey);
 
     /// <summary>
     /// The player's can-fly changes, held while the client is in its spawn fall.
@@ -201,7 +144,7 @@ public partial class WorldClient
         if (!session.GameState.ClientKnownGuids.Contains(flag.MoverGUID))
         {
             // The create is still held; the spawn fall starts when it goes out.
-            session.ToClient.When(OutboxEvent.GuidKnown(flag.MoverGUID), () => HoldUntilLanded(flag), PlayerMoveSpeedHold);
+            session.ToClient.When(OutboxEvent.GuidKnown(flag.MoverGUID), () => HoldUntilLanded(flag), PlayerCreateCanFlyHold);
             return;
         }
         HoldUntilLanded(flag);
@@ -768,8 +711,8 @@ public partial class WorldClient
                 GetSession().GameState.SeatGravity = SeatGravityState.None;
                 GetSession().ToClient.Cancel(HeldPetUpdateBatch.Key);
                 GetSession().ToClient.Cancel(HeldPlayerValues.Key);
-                GetSession().ToClient.Cancel(PlayerMoveSpeedKey);
-                GetSession().ToClient.Cancel(PlayerGuidSubjectKey);
+                GetSession().ToClient.Cancel(PlayerCreateCanFlyKey);
+                GetSession().ToClient.Cancel(ClientOutbox.AwaitedObjectKey);
             }
 
             // No legacy NEW_WORLD carries the count, so the proxy keeps it the way TrinityCore
@@ -922,7 +865,7 @@ public partial class WorldClient
         }
 
         speed.Speed = packet.ReadFloat();
-        SendPlayerMovementPacket(speed, speed.MoverGUID);
+        SendPacketToClient(speed);
 
         // Convenience in vanilla to use SwimSpeed as FlySpeed
         if (universalOpcode is Opcode.SMSG_MOVE_SET_SWIM_SPEED
@@ -934,7 +877,7 @@ public partial class WorldClient
             flySpeed.MoverGUID = speed.MoverGUID;
             flySpeed.MoveCounter = speed.MoveCounter;
             flySpeed.Speed = speed.Speed;
-            SendPlayerMovementPacket(flySpeed, flySpeed.MoverGUID);
+            SendPacketToClient(flySpeed);
         }
     }
 
@@ -960,7 +903,7 @@ public partial class WorldClient
         speed.MoverGUID = new WowGuid64(mover).To128(GetSession().GameState);
         speed.MoveCounter = counter;
         speed.Speed = value;
-        SendPlayerMovementPacket(speed, speed.MoverGUID);
+        SendPacketToClient(speed);
     }
 
     // 4.3.4 tells the player of its own new collision height (a mount, a scale aura) with the move
@@ -1115,14 +1058,14 @@ public partial class WorldClient
         }
         if (flag.MoverGUID == GetSession().GameState.CurrentPlayerGuid)
             TrackOwnMoveFlagChange(opcode);
-        // Held like a speed change: logging in on a flying mount sends SET_CAN_FLY before the
-        // player's create, and a dropped one left the mount unable to take off until remounted.
+        // Logging in on a flying mount sends SET_CAN_FLY before the player's create, and a dropped
+        // one left the mount unable to take off until remounted.
         if (opcode is Opcode.SMSG_MOVE_SET_CAN_FLY or Opcode.SMSG_MOVE_UNSET_CAN_FLY &&
             ModernVersion.IsWotLKClassicOrLater &&
             flag.MoverGUID == GetSession().GameState.CurrentPlayerGuid)
             SendOwnCanFlyChange(flag);
         else
-            SendPlayerMovementPacket(flag, flag.MoverGUID);
+            SendPacketToClient(flag);
     }
 
     [HandlesSmsg(Opcode.SMSG_COMPRESSED_MOVES)]
@@ -1360,21 +1303,21 @@ public partial class WorldClient
             stopSpline.StartPosition = moveSpline.StartPosition;
             stopSpline.SplineId = moveSpline.SplineId - 2;
             MonsterMove moveStop = new MonsterMove(guid, stopSpline);
-            SendPlayerMovementPacket(moveStop, guid);
+            SendPacketToClient(moveStop);
 
             ControlUpdate update = new();
             update.Guid = guid;
             update.HasControl = false;
-            SendPlayerMovementPacket(update, guid);
+            SendPacketToClient(update);
 
             stopSpline.SplineId = moveSpline.SplineId - 1;
             moveStop = new MonsterMove(guid, stopSpline);
-            SendPlayerMovementPacket(moveStop, guid);
+            SendPacketToClient(moveStop);
 
             update = new();
             update.Guid = guid;
             update.HasControl = false;
-            SendPlayerMovementPacket(update, guid);
+            SendPacketToClient(update);
 
             // Taxi-flight spline decoration. Modern Classic flags universal across V1_14 / V2_5 / V3_4_3.
             moveSpline.SplineFlags = SplineFlagModern.Flying |
@@ -1420,10 +1363,7 @@ public partial class WorldClient
                 ReleaseSeatGravity();
         }
 
-        if (moveSpline.TransportGuid != default)
-            SendPlayerMovementPacket(monsterMove, moveSpline.TransportGuid);
-        else
-            SendPlayerMovementPacket(monsterMove, guid);
+        SendPacketToClient(monsterMove);
 
         if (isTaxiFlight)
         {

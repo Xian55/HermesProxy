@@ -56,6 +56,7 @@ public class MoveUpdate : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
     public MovementInfo MoveInfo;
 }
 
@@ -314,6 +315,8 @@ public sealed class MonsterMove : ServerPacket, ISpanWritable
 
     public WowGuid128 MoverGUID;
     public ServerSideMovement MoveSpline;
+
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID || guid == MoveSpline.TransportGuid;
 }
 
 public readonly record struct MoveTeleportAck(WowGuid128 MoverGUID, uint MoveCounter, uint MoveTime);
@@ -380,6 +383,7 @@ public class MoveTeleport : ServerPacket, ISpanWritable
     public VehicleTeleport Vehicle = null!;
     public uint MoveCounter;
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
     public WowGuid128 TransportGUID;
     public float Orientation;
     public byte PreloadWorld;
@@ -587,6 +591,7 @@ public class MoveSplineSetSpeed : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
     public float Speed = 1.0f;
 }
 
@@ -614,6 +619,7 @@ public class MoveSetSpeed : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
     public uint MoveCounter = 0;
     public float Speed = 1.0f;
 }
@@ -651,6 +657,7 @@ public class MoveUpdateSpeed : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
     public MovementInfo MoveInfo;
     public float Speed = 1.0f;
 }
@@ -674,6 +681,7 @@ public class MoveSplineSetFlag : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
 }
 
 public class MoveSetFlag : ServerPacket, ISpanWritable
@@ -697,6 +705,7 @@ public class MoveSetFlag : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
     public uint MoveCounter = 0;
 }
 
@@ -712,6 +721,9 @@ public sealed class OnCancelExpectedRideVehicleAura : ServerPacket, ISpanWritabl
     public int MaxSize => 0;
 
     public int WriteToSpan(Span<byte> buffer) => 0;
+
+    // Sent only to the player it concerns, so it needs whichever object the client is waiting for.
+    public override bool NeedsObject(WowGuid128 guid) => true;
 }
 
 public sealed class FlightSplineSync : ServerPacket, ISpanWritable
@@ -735,6 +747,7 @@ public sealed class FlightSplineSync : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 Guid;
+    public override bool NeedsObject(WowGuid128 guid) => guid == Guid;
     public float SplineDist;
 }
 
@@ -749,6 +762,7 @@ public sealed class SetVehicleRecID : ServerPacket
     }
 
     public WowGuid128 VehicleGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == VehicleGUID;
     public uint VehicleRecID;
 }
 
@@ -764,6 +778,7 @@ public sealed class MoveSetVehicleRecID : ServerPacket
     }
 
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
     public uint SequenceIndex;
     public uint VehicleRecID;
 }
@@ -803,6 +818,7 @@ class MoveSetCollisionHeight : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
     public uint SequenceIndex = 1;
     public float Height = 1.0f;
     public float Scale = 1.0f;
@@ -845,6 +861,7 @@ class MoveKnockBack : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
     public uint MoveCounter;
     public Vector2 Direction;
     public float HorizontalSpeed;
@@ -868,6 +885,7 @@ public class MoveUpdateKnockBack : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
     public MovementInfo MoveInfo;
 }
 
@@ -895,6 +913,7 @@ public sealed class MoveUpdateCollisionHeight : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
     public MovementInfo MoveInfo;
     public float Height = 1.0f;
     public float Scale = 1.0f;
@@ -975,6 +994,7 @@ public class ControlUpdate : ServerPacket, ISpanWritable
     }
 
     public WowGuid128 Guid;
+    public override bool NeedsObject(WowGuid128 guid) => guid == Guid;
     public bool HasControl;
 }
 
@@ -990,6 +1010,7 @@ public class MoveSetActiveMover : ServerPacket
     }
 
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
 }
 
 public sealed class PhaseShiftChange : ServerPacket
@@ -1089,6 +1110,7 @@ public sealed class MoveSkipTime : ServerPacket
     }
 
     public WowGuid128 MoverGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == MoverGUID;
     public uint TimeSkipped;
 }
 
@@ -1108,6 +1130,7 @@ public sealed class SetPlayHoverAnim : ServerPacket
     }
 
     public WowGuid128 UnitGUID;
+    public override bool NeedsObject(WowGuid128 guid) => guid == UnitGUID;
     public bool PlayHoverAnim;
 }
 
@@ -1124,5 +1147,6 @@ public sealed class SetAnimTier : ServerPacket
     }
 
     public WowGuid128 Unit;
+    public override bool NeedsObject(WowGuid128 guid) => guid == Unit;
     public uint Tier;
 }
