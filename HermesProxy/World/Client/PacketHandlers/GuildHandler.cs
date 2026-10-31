@@ -1317,6 +1317,35 @@ public partial class WorldClient
     }
 
     /// <summary>
+    /// A 3.3.5a server answers under the question's own opcode: a byte of count, then each entry's
+    /// kind, its player, a second player unless the player joined or left, a rank for a promotion
+    /// or a demotion, and its age in seconds (AzerothCore <c>GuildEventLogQueryResults::Write</c>).
+    /// The kinds are the ones the modern clients read.
+    /// </summary>
+    [HandlesSmsg(Opcode.MSG_GUILD_EVENT_LOG_QUERY)]
+    internal void HandleGuildEventLogQuery(WorldPacket packet)
+    {
+        const byte promoted = 3, demoted = 4, joined = 2, left = 6;
+
+        int count = packet.ReadUInt8();
+        GuildEventLogQueryResults log = new();
+        for (int i = 0; i < count; i++)
+        {
+            GuildEventEntry entry = new();
+            entry.TransactionType = packet.ReadUInt8();
+            entry.PlayerGUID = packet.ReadGuid().To128(GetSession().GameState);
+            entry.OtherGUID = entry.TransactionType is joined or left
+                ? WowGuid128.Empty
+                : packet.ReadGuid().To128(GetSession().GameState);
+            if (entry.TransactionType is promoted or demoted)
+                entry.RankID = packet.ReadUInt8();
+            entry.TransactionDate = packet.ReadUInt32();
+            log.Entries.Add(entry);
+        }
+        SendPacketToClient(log);
+    }
+
+    /// <summary>
     /// TrinityCore 4.3.4 <c>GuildRewardList::Write</c>: 21 bits of count, six numbers an item, the
     /// time of the list last. A 4.3.4 item asks for one achievement or none and for no guild
     /// level; its race mask is 32 bits wide.

@@ -107,6 +107,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleGuildBankMoneyWithdrawn(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleGuildEventLogQuery_MSG_GUILD_EVENT_LOG_QUERY(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleGuildEventLogQuery(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleGuildPermissions_MSG_GUILD_PERMISSIONS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleGuildPermissions(packet);
@@ -2873,6 +2878,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.MSG_CORPSE_QUERY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleCorpseQuery_MSG_CORPSE_QUERY;
         table[(int)global::HermesProxy.World.Enums.Opcode.MSG_GUILD_BANK_LOG_QUERY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildBankLongQuery_MSG_GUILD_BANK_LOG_QUERY;
         table[(int)global::HermesProxy.World.Enums.Opcode.MSG_GUILD_BANK_MONEY_WITHDRAWN] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildBankMoneyWithdrawn_MSG_GUILD_BANK_MONEY_WITHDRAWN;
+        table[(int)global::HermesProxy.World.Enums.Opcode.MSG_GUILD_EVENT_LOG_QUERY] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildEventLogQuery_MSG_GUILD_EVENT_LOG_QUERY;
         table[(int)global::HermesProxy.World.Enums.Opcode.MSG_GUILD_PERMISSIONS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleGuildPermissions_MSG_GUILD_PERMISSIONS;
         table[(int)global::HermesProxy.World.Enums.Opcode.MSG_INSPECT_ARENA_TEAMS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInspectArenaTeams_MSG_INSPECT_ARENA_TEAMS;
         {
@@ -3498,6 +3504,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.MSG_CORPSE_QUERY,
             global::HermesProxy.World.Enums.Opcode.MSG_GUILD_BANK_LOG_QUERY,
             global::HermesProxy.World.Enums.Opcode.MSG_GUILD_BANK_MONEY_WITHDRAWN,
+            global::HermesProxy.World.Enums.Opcode.MSG_GUILD_EVENT_LOG_QUERY,
             global::HermesProxy.World.Enums.Opcode.MSG_GUILD_PERMISSIONS,
             global::HermesProxy.World.Enums.Opcode.MSG_INSPECT_ARENA_TEAMS,
             global::HermesProxy.World.Enums.Opcode.MSG_INSPECT_HONOR_STATS,
