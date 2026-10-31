@@ -1764,6 +1764,14 @@ public class SpellHealPrediction
 
 public readonly record struct LearnTalent(uint TalentID, ushort Rank);
 
+/// <summary>Spell categories with a changed cooldown: a count and that many pairs. Always none.</summary>
+public sealed class CategoryCooldown : ServerPacket
+{
+    public CategoryCooldown() : base(Opcode.SMSG_CATEGORY_COOLDOWN, ConnectionType.Instance) { }
+
+    public override void Write() => _worldPacket.WriteUInt32(0);
+}
+
 public class SpellCooldownPkt : ServerPacket, ISpanWritable
 {
     // Practical cap for cooldowns at login

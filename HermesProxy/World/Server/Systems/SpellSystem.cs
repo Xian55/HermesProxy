@@ -343,6 +343,14 @@ public static class SpellSystem
     }
 
     /// <summary>
+    /// The 1.14 and 2.5 clients ask which spell categories have their cooldown changed. No legacy
+    /// server has that request, so the proxy says none.
+    /// </summary>
+    [HandlesCmsg(Opcode.CMSG_REQUEST_CATEGORY_COOLDOWNS)]
+    public static void HandleRequestCategoryCooldowns(in EmptyClientPacket request, in SessionContext ctx)
+        => ctx.SendPacketToClient(new CategoryCooldown());
+
+    /// <summary>
     /// A mirror image asks what it looks like. TrinityCore 4.3.4 reads the display id after the
     /// GUID and skips it; 3.3.5a takes the GUID alone.
     /// </summary>

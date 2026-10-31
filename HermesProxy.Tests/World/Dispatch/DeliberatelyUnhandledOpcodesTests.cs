@@ -38,6 +38,7 @@ public sealed unsafe class DeliberatelyUnhandledOpcodesTests
     [Theory]
     [InlineData(Opcode.CMSG_QUERY_REALM_NAME)]          // the proxy knows its realm's name
     [InlineData(Opcode.CMSG_GET_ITEM_PURCHASE_DATA)]    // a legacy server has the refund data
+    [InlineData(Opcode.CMSG_REQUEST_CATEGORY_COOLDOWNS)] // the proxy answers that there are none
     public void ARequestThatCouldBeAnswered_StaysAWarning(Opcode opcode)
     {
         Assert.False(DeliberatelyUnhandledOpcodes.IsFromClient(opcode));

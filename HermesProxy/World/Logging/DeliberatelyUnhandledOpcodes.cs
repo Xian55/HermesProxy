@@ -87,6 +87,13 @@ internal static class DeliberatelyUnhandledOpcodes
         // The answer to buying a bank bag slot, which TrinityCore sends on success too: no modern
         // client has an opcode for it, and the new slot count arrives in the player's fields.
         Opcode.SMSG_BUY_BANK_SLOT_RESULT,
+        // Gone from every modern client's table, and from TrinityCore wotlk_classic: the 3.3.5a raid
+        // browser's word that a search is on, an arena opponent's unit, and from 1.12 and 2.4.3 the
+        // rest timer (resting arrives in the player's flags) and a channelled spell's targets.
+        Opcode.SMSG_LFG_UPDATE_SEARCH,
+        Opcode.SMSG_ARENA_OPPONENT_UPDATE,
+        Opcode.SMSG_SET_REST_START,
+        Opcode.SMSG_SPELL_UPDATE_CHAIN_TARGETS,
     }.ToFrozenSet();
 
     public static bool IsFromClient(Opcode opcode) => FromClient.Contains(opcode);
