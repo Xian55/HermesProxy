@@ -776,6 +776,28 @@ class DefenseMessage : ServerPacket, ISpanWritable
     public string MessageText = "";
 }
 
+/// <summary>
+/// The texts the client's spam filter looks for. Each is 9 bits of length, flushed, then the text
+/// (the 3.4.3 client's reader for this opcode; 1.14, 2.5 and 4.4.2 read the same).
+/// </summary>
+sealed class ExpectedSpamRecords : ServerPacket
+{
+    public ExpectedSpamRecords() : base(Opcode.SMSG_EXPECTED_SPAM_RECORDS) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt32(SpamRecords.Count);
+        foreach (string record in SpamRecords)
+        {
+            _worldPacket.WriteBits(record.GetByteCount(), 9);
+            _worldPacket.FlushBits();
+            _worldPacket.WriteString(record);
+        }
+    }
+
+    public List<string> SpamRecords = [];
+}
+
 class ChatServerMessage : ServerPacket, ISpanWritable
 {
     public ChatServerMessage() : base(Opcode.SMSG_CHAT_SERVER_MESSAGE) { }

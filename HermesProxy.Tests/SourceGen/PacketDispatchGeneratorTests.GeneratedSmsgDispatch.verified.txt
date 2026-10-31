@@ -1067,6 +1067,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleEquipmentSetId(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleExpectedSpamRecords_SMSG_EXPECTED_SPAM_RECORDS(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleExpectedSpamRecords(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleExplorationExperience_SMSG_EXPLORATION_EXPERIENCE(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleExplorationExperience(packet);
@@ -3121,6 +3126,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_ENUM_CHARACTERS_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleEnumCharactersResult_SMSG_ENUM_CHARACTERS_RESULT;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_ENVIRONMENTAL_DAMAGE_LOG] = &Thunk_HermesProxy_World_Client_WorldClient_HandleEnvironmentalDamageLog_SMSG_ENVIRONMENTAL_DAMAGE_LOG;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_EQUIPMENT_SET_ID] = &Thunk_HermesProxy_World_Client_WorldClient_HandleEquipmentSetId_SMSG_EQUIPMENT_SET_ID;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_EXPECTED_SPAM_RECORDS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleExpectedSpamRecords_SMSG_EXPECTED_SPAM_RECORDS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_EXPLORATION_EXPERIENCE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleExplorationExperience_SMSG_EXPLORATION_EXPERIENCE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_FEATURE_SYSTEM_STATUS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleFeatureSystemStatus_SMSG_FEATURE_SYSTEM_STATUS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_FISH_ESCAPED] = &Thunk_HermesProxy_World_Client_WorldClient_HandleFishEscaped_SMSG_FISH_ESCAPED;
@@ -3713,6 +3719,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_ENUM_CHARACTERS_RESULT,
             global::HermesProxy.World.Enums.Opcode.SMSG_ENVIRONMENTAL_DAMAGE_LOG,
             global::HermesProxy.World.Enums.Opcode.SMSG_EQUIPMENT_SET_ID,
+            global::HermesProxy.World.Enums.Opcode.SMSG_EXPECTED_SPAM_RECORDS,
             global::HermesProxy.World.Enums.Opcode.SMSG_EXPLORATION_EXPERIENCE,
             global::HermesProxy.World.Enums.Opcode.SMSG_FEATURE_SYSTEM_STATUS,
             global::HermesProxy.World.Enums.Opcode.SMSG_FISH_ESCAPED,

@@ -917,6 +917,18 @@ public partial class WorldClient
         SendPacketToClient(message);
     }
 
+    // CMaNGOS, at login and when the list is reloaded: its spam_records table, for the client's
+    // spam filter. The table ships empty.
+    [HandlesSmsg(Opcode.SMSG_EXPECTED_SPAM_RECORDS)]
+    internal void HandleExpectedSpamRecords(WorldPacket packet)
+    {
+        ExpectedSpamRecords records = new ExpectedSpamRecords();
+        uint count = packet.ReadUInt32();
+        for (uint i = 0; i < count; i++)
+            records.SpamRecords.Add(packet.ReadCString());
+        SendPacketToClient(records);
+    }
+
     public void SendChatJoinChannel(int channelId, string channelName, string password)
     {
         WorldPacket packet = new WorldPacket(Opcode.CMSG_CHAT_JOIN_CHANNEL);
