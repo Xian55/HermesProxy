@@ -826,6 +826,12 @@ class MoveSetCollisionHeight : ServerPacket, ISpanWritable
     public uint MountDisplayID;
     public int ScaleDuration = 2000; // time it takes for "scale"-animation
 
+    /// <summary>
+    /// Marks the sequence index of a height a 3.3.5a server ordered, which the client hands back in
+    /// its ack. A server's own counter does not get this far in a session.
+    /// </summary>
+    public const uint ServerOrderBit = 0x80000000;
+
     public enum UpdateCollisionHeightReason : byte
     {
         Scale = 0,

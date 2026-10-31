@@ -64,10 +64,10 @@ public class RemoteCollisionHeightTests
         Assert.Empty(Sent<MoveUpdateCollisionHeight>(harness));
     }
 
-    // A 3.3.5a server also sends the player its own height on a mount (AzerothCore Unit::Mount); the
-    // one made from the fields is already out, so the client gets one, not two.
+    // A 3.3.5a server also orders the player's height on a mount (AzerothCore Unit::Mount), and that
+    // one needs its ack, so the client gets both. Only the order is marked for its ack to go back.
     [Fact]
-    public void OwnMount_TheServersOwnHeightIsNotSentAgain()
+    public void OwnMount_TheServersOrderGoesOutBesideTheHeightFromTheFields()
     {
         if (LegacyVersion.ExpansionVersion != 3) return;
         var harness = NewHarness();
@@ -81,7 +81,10 @@ public class RemoteCollisionHeightTests
         });
         harness.Deliver(Opcode.SMSG_MOVE_SET_COLLISION_HGT, wire, harness.Client.HandleMoveSetCollisionHgt);
 
-        Assert.Single(Sent<MoveSetCollisionHeight>(harness));
+        var heights = Sent<MoveSetCollisionHeight>(harness).Select(s => (MoveSetCollisionHeight)s.Packet).ToArray();
+        Assert.Equal(2, heights.Length);
+        Assert.Equal(new MoveSetCollisionHeight().SequenceIndex, heights[0].SequenceIndex);
+        Assert.Equal(53u | MoveSetCollisionHeight.ServerOrderBit, heights[1].SequenceIndex);
     }
 
     [Fact]
