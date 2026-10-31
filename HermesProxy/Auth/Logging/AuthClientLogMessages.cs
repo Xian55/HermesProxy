@@ -5,7 +5,7 @@ namespace HermesProxy.Auth.Logging;
 
 /// <summary>
 /// Source-generated logging methods for <see cref="AuthClient"/>. Covers the SRP6 login flow,
-/// realmlist request, and the auth socket's receive/send callbacks. <c>SourceFile</c> and
+/// realmlist request, and the auth socket's receive loop and sends. <c>SourceFile</c> and
 /// <c>NetDir</c> are intentional overflow properties — the Serilog output template renders them
 /// in their own columns.
 /// </summary>
@@ -19,18 +19,6 @@ internal static partial class AuthClientLogMessages
         Level = LogLevel.Information,
         Message = "Connecting to auth server... (realmlist addr: {Address}:{Port}) (resolved as: {ResolvedAddress}:{Port})")]
     public static partial void ConnectingToAuthServer(
-        ILogger logger,
-        string SourceFile,
-        string NetDir,
-        string Address,
-        int Port,
-        string ResolvedAddress);
-
-    [LoggerMessage(
-        EventId = 301,
-        Level = LogLevel.Information,
-        Message = "Reconnecting to auth server... (realmlist addr: {Address}:{Port}) (resolved as: {ResolvedAddress}:{Port})")]
-    public static partial void ReconnectingToAuthServer(
         ILogger logger,
         string SourceFile,
         string NetDir,
@@ -62,14 +50,6 @@ internal static partial class AuthClientLogMessages
 
     [LoggerMessage(EventId = 305, Level = LogLevel.Error, Message = "Packet Read Error: {Message}")]
     public static partial void PacketReadError(
-        ILogger logger,
-        Exception ex,
-        string SourceFile,
-        string NetDir,
-        string Message);
-
-    [LoggerMessage(EventId = 306, Level = LogLevel.Error, Message = "Packet Send Error: {Message}")]
-    public static partial void PacketSendError(
         ILogger logger,
         Exception ex,
         string SourceFile,
@@ -117,13 +97,6 @@ internal static partial class AuthClientLogMessages
         ILogger logger,
         string SourceFile,
         string NetDir);
-
-    [LoggerMessage(EventId = 313, Level = LogLevel.Error, Message = "Reconnect failed. Reason: {Reason}")]
-    public static partial void ReconnectFailed(
-        ILogger logger,
-        string SourceFile,
-        string NetDir,
-        AuthResult Reason);
 
     [LoggerMessage(EventId = 314, Level = LogLevel.Information, Message = "Requesting RealmList update for {Username}")]
     public static partial void RequestingRealmListUpdate(

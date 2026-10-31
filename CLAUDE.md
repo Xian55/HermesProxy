@@ -10,6 +10,7 @@ WoW protocol translation proxy — allows modern retail clients to connect to le
 | `HermesProxy` | Main proxy executable (console app) |
 | `HermesProxy.Tests` | xUnit test suite |
 | `HermesProxy.Benchmarks` | BenchmarkDotNet performance benchmarks |
+| `HermesProxy.Analyzers` | Roslyn rules that fail the build, for `Framework` and `HermesProxy`. No generators: those emit into whatever loads them |
 
 ## Build & Run
 
@@ -132,3 +133,8 @@ Modern Client <---TCP-----> WorldServer ──┘                   WorldClient 
   posted and what deliberately isn't (the legacy handshake and the connection-level opcodes).
   Cross-socket send order still comes from synchronous writes on the calling thread. Don't introduce
   a per-socket send queue (see the outbox handbook for the reverted attempt).
+- **Work that isn't awaited** goes through `ObserveFaults`. `HPA001` fails the build on a dropped
+  `Task`, `_ =` included, and `HPA002` on `async void`. A dropped task's exception stays hidden until
+  a GC finalizes it, which may be never, and a loop that dies that way dies without a word (#540).
+  A long-lived loop needs an owner instead: `AsyncAcceptor` keeps its task, handles every failure
+  inside it, and awaits it on the way out.

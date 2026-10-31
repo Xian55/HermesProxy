@@ -57,7 +57,7 @@ public partial class WorldClient
     }
 
     Socket _clientSocket = null!;
-    bool? _isSuccessful;
+    LegacyHandshake _handshake = new();
     bool _closing;
     uint _queuePosition;
     string _username = null!;
@@ -126,7 +126,7 @@ public partial class WorldClient
         _globalSession = globalSession;
         _sessionContext = new SessionContext(globalSession, globalSession.RealmSocket, this);
         _username = globalSession.Username;
-        _isSuccessful = null;
+        _handshake = new LegacyHandshake();
         LastAuthResult = null;
 
         WorldClientLogMessages.ConnectingToWorldServer(_melNet, _sourceFile, _netDirNone);
@@ -141,33 +141,26 @@ public partial class WorldClient
             NetworkUtils.EnableKeepAlive(_clientSocket, idleSeconds: 30, intervalSeconds: 5, retryCount: 3);
             // Connect to the specified host.
             var endPoint = new IPEndPoint(ip, realm.Port);
-            _clientSocket.BeginConnect(endPoint, ConnectCallback, null);
+            ConnectAndReceive(endPoint).ObserveFaults(endPoint);
         }
         catch (Exception ex)
         {
             Log.Print(LogType.Error, $"Socket Error: {ex.Message}");
-            _isSuccessful = false;
+            _handshake.Refuse();
         }
 
         // Covers the TCP connect and the legacy handshake behind it. A server that accepts and
         // then says nothing used to hold this thread — the modern client's realm socket thread —
         // for as long as it stayed up.
-        long deadline = Environment.TickCount64 + (long)WorldServerHandshakeTimeout.TotalMilliseconds;
-        while (_isSuccessful == null)
+        if (!_handshake.Wait(WorldServerHandshakeTimeout))
         {
-            if (Environment.TickCount64 >= deadline)
-            {
-                Log.Print(LogType.Error,
-                    $"Legacy world server {realm.ExternalAddress}:{realm.Port} did not complete the handshake within {WorldServerHandshakeTimeout.TotalSeconds:F0} s");
-                _isSuccessful = false;
-                CloseClientSocket();
-                break;
-            }
-
-            Thread.Sleep(1);
+            Log.Print(LogType.Error,
+                $"Legacy world server {realm.ExternalAddress}:{realm.Port} did not complete the handshake within {WorldServerHandshakeTimeout.TotalSeconds:F0} s");
+            _handshake.TryRefuse();
+            CloseClientSocket();
         }
 
-        return (bool)_isSuccessful;
+        return _handshake.IsAccepted;
     }
 
     private void CloseClientSocket()
@@ -182,7 +175,7 @@ public partial class WorldClient
 
     public bool IsAuthenticated()
     {
-        return _isSuccessful == true;
+        return _handshake.IsAccepted;
     }
 
     private void InitializeEncryption(byte[] sessionKey)
@@ -240,24 +233,27 @@ public partial class WorldClient
         return _queuePosition;
     }
 
-    private void ConnectCallback(IAsyncResult AR)
+    private async Task ConnectAndReceive(IPEndPoint endPoint)
     {
         try
         {
+            await _clientSocket.ConnectAsync(endPoint);
+
             WorldClientLogMessages.ConnectionEstablished(_melNet, _sourceFile, _netDirNone);
 
-            _clientSocket.EndConnect(AR);
             _clientSocket.ReceiveBufferSize = 65535;
             _clientSocket.NoDelay = true;
-
-            _ = Task.Run(ReceiveLoop);
         }
         catch (Exception ex)
         {
             Log.Print(LogType.Error, $"Connect Error: {ex.Message}");
-            if (_isSuccessful == null)
-                _isSuccessful = false;
+            _handshake.TryRefuse();
+            return;
         }
+
+        // A connect can finish at once, and the caller has the handshake to wait for.
+        await Task.Yield();
+        await ReceiveLoop();
     }
 
     // Pooled: the receive loop awaits this three times per legacy packet, and every await that
@@ -289,11 +285,8 @@ public partial class WorldClient
     private void HandleDisconnect(string reason)
     {
         Log.PrintNet(LogType.Error, LogNetDir.S2P, $"Socket Closed By GameWorldServer ({reason})");
-        if (_isSuccessful == null)
-        {
-            _isSuccessful = false;
+        if (_handshake.TryRefuse())
             return;
-        }
 
         if (_closing || GetSession().WorldClient != this)
             return;
@@ -417,9 +410,7 @@ public partial class WorldClient
         catch(Exception e)
         {
             WorldClientLogMessages.PacketReadError(_melLog, e, _sourceFile, _netDirRecv, e.Message);
-            if (_isSuccessful == null)
-                _isSuccessful = false;
-            else if (!_closing && GetSession().WorldClient == this)
+            if (!_handshake.TryRefuse() && !_closing && GetSession().WorldClient == this)
             {
                 Disconnect();
                 GetSession().OnDisconnect();
@@ -521,8 +512,7 @@ public partial class WorldClient
             catch (Exception ex)
             {
                 Log.PrintNet(LogType.Error, LogNetDir.P2S, $"Packet Write Error: {ex.Message}");
-                if (_isSuccessful == null)
-                    _isSuccessful = false;
+                _handshake.TryRefuse();
             }
             finally
             {
@@ -542,14 +532,14 @@ public partial class WorldClient
 
     // Opcodes the legacy server may legitimately send before SMSG_AUTH_RESPONSE
     // that we don't translate. Without this allow-list the default arm below
-    // flips _isSuccessful to false on the unknown packet and kills the
+    // refuses the handshake on the unknown packet and kills it
     // handshake before AuthResponse arrives — e.g. Kronos / VMaNGOS / cMaNGOS
     // 1.12 sending SMSG_WARDEN_DATA mid-auth (issue #62).
     private static bool IsIgnorableDuringHandshake(Opcode op)
     {
         // SMSG_CACHE_VERSION is pushed unprompted right after connect by TC-derived cores
         // (AzerothCore included); if it lands before SMSG_AUTH_RESPONSE it would otherwise
-        // flip _isSuccessful to false and abort an otherwise healthy handshake.
+        // refuse and abort an otherwise healthy handshake.
         return op == Opcode.SMSG_WARDEN_DATA
             || op == Opcode.SMSG_CACHE_VERSION;
     }
@@ -567,7 +557,7 @@ public partial class WorldClient
     /// </remarks>
     private void DispatchPacket(WorldPacket packet)
     {
-        if (_isSuccessful == null || _globalSession == null)
+        if (_handshake.IsPending || _globalSession == null)
         {
             using (packet)
                 HandlePacket(packet);
@@ -635,8 +625,8 @@ public partial class WorldClient
                         WorldClientLogMessages.LeftUnhandledOnPurpose(_melLog, _sourceFile, _netDirRecv, universalOpcode, packet.GetOpcode());
                     else
                         WorldClientLogMessages.NoHandlerForOpcode(_melLog, _sourceFile, _netDirRecv, universalOpcode.ToStringFast(), packet.GetOpcode());
-                    if (_isSuccessful == null && !IsIgnorableDuringHandshake(universalOpcode))
-                        _isSuccessful = false;
+                    if (_handshake.IsPending && !IsIgnorableDuringHandshake(universalOpcode))
+                        _handshake.TryRefuse();
                 }
                 break;
         }
@@ -785,7 +775,7 @@ public partial class WorldClient
         if (authClient == null)
         {
             Log.Print(LogType.Error, "WorldClient.SendAuthResponse: AuthClient was torn down before world auth.");
-            _isSuccessful = false;
+            _handshake.Refuse();
             return;
         }
 
@@ -845,7 +835,7 @@ public partial class WorldClient
     {
         AuthResult result = (AuthResult)packet.ReadUInt8();
 
-        if (_isSuccessful == null)
+        if (_handshake.IsPending)
         {
             uint billingTimeRemaining = packet.ReadUInt32();
             byte billingFlags = packet.ReadUInt8();
@@ -873,27 +863,27 @@ public partial class WorldClient
                 _queuePosition = 0;
                 GetSession().RealmSocket.SendAuthWaitQue(_queuePosition);
             }
-            _isSuccessful = true;
+            _handshake.Accept();
             StartKeepAliveTimer();
         }
         else if (result == AuthResult.AUTH_WAIT_QUEUE)
         {
             _queuePosition = queuePosition;
             WorldClientLogMessages.QueuePosition(_melNet, _sourceFile, _netDirNone, _queuePosition);
-            if (_isSuccessful != null && GetSession().RealmSocket != null)
+            if (!_handshake.IsPending && GetSession().RealmSocket != null)
                 GetSession().RealmSocket.SendAuthWaitQue(_queuePosition);
-            _isSuccessful = true;
+            _handshake.Accept();
         }
         else
         {
             WorldClientLogMessages.AuthenticationFailed(_melNet, _sourceFile, _netDirNone, result, (byte)result);
-            _isSuccessful = false;
+            _handshake.Refuse();
         }
     }
 
     public void SendPing(uint ping, uint latency)
     {
-        if (!IsConnected() || _isSuccessful == false)
+        if (!IsConnected() || _handshake.IsRefused)
             return;
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PING);

@@ -28,6 +28,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\HermesProxy.Analyzers\HermesProxy.Analyzers.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Battle.net RPC schema. Recovered from the descriptors embedded in the old checked-in C#,
          so wire behaviour is unchanged; protoc regenerates the C# into obj/ on every build.
          Messages only: service dispatch is hand-written in HermesProxy/BnetServer/Services. -->

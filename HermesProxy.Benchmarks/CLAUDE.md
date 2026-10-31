@@ -30,6 +30,8 @@ dotnet run --project HermesProxy.Benchmarks -c Release -- --list flat
 | `BnetPacketParserBenchmarks.cs` | BNet packet parsing performance |
 | `BnetRpcCodecBenchmarks.cs` | BNet RPC request parse (span `MergeFrom`) and response framing (`RentRpcFrame`) on login-shaped messages |
 | `ExtensionsBenchmarks.cs` | Extension method performance |
+| `AcceptorBenchmarks.cs` | One loopback connection from connect to handler: `AsyncAcceptor` against a bare accept loop as the floor |
+| `SocketReceiveBenchmarks.cs` | One read from a connected loopback peer through `SocketBase` to `ReadHandler`, against a bare `ReceiveAsync` as the floor |
 | `PacketDispatchBenchmarks.cs` | Inbound dispatch on real `ClientPacket`s: Activator path vs direct vs `SpanPacketReader` floor |
 | `SendPipelineBenchmarks.cs` | `ServerPacket` construct → `WritePacketData` → framed + encrypted wire bytes, per stage |
 | `PackedGuidBenchmarks.cs` | `WorldPacket` vs `PackedGuidHelper` packed-GUID encode/decode |

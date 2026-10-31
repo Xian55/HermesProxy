@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -48,13 +50,19 @@ public partial class AuthClient
     }
 
     /// <summary>
-    /// How long a login or a reconnect waits for the legacy auth server's answer before telling the
-    /// modern client the login failed. Long enough to cover a slow or busy server, short enough that
-    /// a dead one doesn't hold the thread that is serving this player.
+    /// How long a login waits for the legacy auth server's answer before telling the modern client
+    /// the login failed. Long enough to cover a slow or busy server, short enough that a dead one
+    /// doesn't leave the player at the login screen.
     /// </summary>
     internal static readonly TimeSpan LoginTimeout = TimeSpan.FromSeconds(30);
 
+    // The realm list is the one message that outgrows a read, and it says how long it is: the
+    // command, then a u16 size of what follows. Everything else is a short answer to one request.
+    private const int RealmListHeaderSize = 3;
+    private const int MaxMessageSize = RealmListHeaderSize + ushort.MaxValue;
+
     GlobalSessionData _globalSession;
+    TimeSpan _loginTimeout = LoginTimeout;
     Socket _clientSocket = null!;
     TaskCompletionSource<AuthResult> _response = null!;
     TaskCompletionSource _hasRealmlist = null!;
@@ -75,7 +83,10 @@ public partial class AuthClient
         return _globalSession;
     }
 
-    public AuthResult ConnectToAuthServer(string username, string password, string locale)
+    /// <summary>Shortens the wait, so a test for a silent server doesn't take 30 seconds.</summary>
+    internal void SetLoginTimeout(TimeSpan timeout) => _loginTimeout = timeout;
+
+    public Task<AuthResult> ConnectToAuthServerAsync(string username, string password, string locale)
     {
         _username = username;
         _locale = locale;
@@ -92,9 +103,10 @@ public partial class AuthClient
             var serverIpAddress = NetworkUtils.ResolveOrDirectIPv4(_globalSession.LegacyServerOptions.Address);
             AuthClientLogMessages.ConnectingToAuthServer(_melNet, _sourceFile, _netDirP2S, _globalSession.LegacyServerOptions.Address, _globalSession.LegacyServerOptions.Port, serverIpAddress.ToString());
             _clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            _clientSocket.SendTimeout = (int)SocketBase.SendTimeout.TotalMilliseconds;
             // Connect to the specified host.
             var endPoint = new IPEndPoint(serverIpAddress, _globalSession.LegacyServerOptions.Port);
-            _clientSocket.BeginConnect(endPoint, ConnectCallback, null);
+            ConnectAndReceive(_clientSocket, endPoint).ObserveFaults(endPoint);
         }
         catch (Exception ex)
         {
@@ -102,48 +114,27 @@ public partial class AuthClient
             _response.SetResult(AuthResult.FAIL_INTERNAL_ERROR);
         }
 
-        return AwaitResponse();
-    }
-
-    public AuthResult Reconnect()
-    {
-        _response = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        _hasRealmlist = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        _realmlistRequestIsPending = false;
-
-        try
-        {
-            var serverIpAddress = NetworkUtils.ResolveOrDirectIPv4(_globalSession.LegacyServerOptions.Address);
-            AuthClientLogMessages.ReconnectingToAuthServer(_melNet, _sourceFile, _netDirP2S, _globalSession.LegacyServerOptions.Address, _globalSession.LegacyServerOptions.Port, serverIpAddress.ToString());
-            _clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            // Connect to the specified host.
-            var endPoint = new IPEndPoint(serverIpAddress, _globalSession.LegacyServerOptions.Port);
-            _clientSocket.BeginConnect(endPoint, ConnectCallback, null);
-        }
-        catch (Exception ex)
-        {
-            AuthClientLogMessages.SocketError(_melNet, ex, _sourceFile, _netDirP2S, ex.Message);
-            _response.SetResult(AuthResult.FAIL_INTERNAL_ERROR);
-        }
-
-        return AwaitResponse();
+        return AwaitResponseAsync();
     }
 
     /// <summary>
-    /// Waits for the legacy auth server's verdict. The caller is the BNet REST thread handling the
-    /// client's login, and a server that accepts the connection and then says nothing used to hold
-    /// it for the lifetime of the process.
+    /// Waits for the legacy auth server's verdict. A server that accepts the connection and then
+    /// says nothing would otherwise leave this login unanswered for the lifetime of the process.
     /// </summary>
-    private AuthResult AwaitResponse()
+    private async Task<AuthResult> AwaitResponseAsync()
     {
-        if (_response.Task.Wait(LoginTimeout))
-            return _response.Task.Result;
-
-        AuthClientLogMessages.LoginTimedOut(_melNet, _sourceFile, _netDirP2S,
-            _globalSession.LegacyServerOptions.Address, _globalSession.LegacyServerOptions.Port,
-            LoginTimeout.TotalSeconds);
-        Disconnect();
-        return AuthResult.FAIL_INTERNAL_ERROR;
+        try
+        {
+            return await _response.Task.WaitAsync(_loginTimeout);
+        }
+        catch (TimeoutException)
+        {
+            AuthClientLogMessages.LoginTimedOut(_melNet, _sourceFile, _netDirP2S,
+                _globalSession.LegacyServerOptions.Address, _globalSession.LegacyServerOptions.Port,
+                _loginTimeout.TotalSeconds);
+            Disconnect();
+            return AuthResult.FAIL_INTERNAL_ERROR;
+        }
     }
 
     private void SetAuthResponse(AuthResult response)
@@ -170,83 +161,78 @@ public partial class AuthClient
         return _key.ToCleanByteArray();
     }
 
-    private void ConnectCallback(IAsyncResult AR)
+    // Takes the socket rather than the field: a second login replaces the field, and must not end
+    // up read by the first login's loop as well.
+    private async Task ConnectAndReceive(Socket socket, IPEndPoint endPoint)
     {
         try
         {
-            _clientSocket.EndConnect(AR);
-            _clientSocket.ReceiveBufferSize = 65535;
-            byte[] buffer = new byte[_clientSocket.ReceiveBufferSize];
-            _clientSocket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, ReceiveCallback, buffer);
-            SendLogonChallenge(false);
+            await socket.ConnectAsync(endPoint);
+            socket.ReceiveBufferSize = 65535;
+            SendLogonChallenge();
         }
         catch (Exception ex)
         {
             AuthClientLogMessages.ConnectError(_melNet, ex, _sourceFile, _netDirNone, ex.Message);
             SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
+            return;
         }
-    }
 
-    private void ReconnectCallback(IAsyncResult AR)
-    {
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(MaxMessageSize);
         try
         {
-            _clientSocket.EndConnect(AR);
-            _clientSocket.ReceiveBufferSize = 65535;
-            byte[] buffer = new byte[_clientSocket.ReceiveBufferSize];
-            _clientSocket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, ReceiveCallback, buffer);
-            SendLogonChallenge(true);
-        }
-        catch (Exception ex)
-        {
-            AuthClientLogMessages.ConnectError(_melNet, ex, _sourceFile, _netDirP2S, ex.Message);
-            SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
-        }
-    }
-
-    private void ReceiveCallback(IAsyncResult AR)
-    {
-        try
-        {
-            int received = _clientSocket.EndReceive(AR);
-
-            if (received == 0)
+            int pending = 0;
+            while (true)
             {
-                SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
+                int received = await socket.ReceiveAsync(buffer.AsMemory(pending, MaxMessageSize - pending), SocketFlags.None);
+                if (received == 0)
+                {
+                    SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
 
-                AuthClientLogMessages.SocketClosedByServer(_melNet, _sourceFile, _netDirS2P);
-                return;
+                    AuthClientLogMessages.SocketClosedByServer(_melNet, _sourceFile, _netDirS2P);
+                    return;
+                }
+
+                pending += received;
+
+                int length;
+                while (pending > 0 && (length = MessageLength(buffer.AsSpan(0, pending))) > 0)
+                {
+                    // A server's message can be shorter than what the parsers read, and they get
+                    // zeros for the rest, not whatever this buffer last held.
+                    Array.Clear(buffer, pending, buffer.Length - pending);
+                    HandlePacket(buffer, length);
+
+                    pending -= length;
+                    buffer.AsSpan(length, pending).CopyTo(buffer);
+                }
             }
-
-            byte[] oldBuffer = (byte[])AR.AsyncState!;
-
-            HandlePacket(oldBuffer, received);
-
-            byte[] newBuffer = new byte[_clientSocket.ReceiveBufferSize];
-
-            // Start receiving data again.
-            _clientSocket.BeginReceive(newBuffer, 0, newBuffer.Length, SocketFlags.None, ReceiveCallback, newBuffer);
-
-
         }
         catch (Exception ex)
         {
             AuthClientLogMessages.PacketReadError(_melNet, ex, _sourceFile, _netDirNone, ex.Message);
             SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
         }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
-    private void SendCallback(IAsyncResult AR)
+    /// <summary>
+    /// How much of <paramref name="pending"/> is the next message, or 0 if the rest of it has yet
+    /// to arrive.
+    /// </summary>
+    internal static int MessageLength(ReadOnlySpan<byte> pending)
     {
-        try
-        {
-            _clientSocket.EndSend(AR);
-        }
-        catch (Exception ex)
-        {
-            AuthClientLogMessages.PacketSendError(_melNet, ex, _sourceFile, _netDirP2S, ex.Message);
-            SetAuthResponse(AuthResult.FAIL_INTERNAL_ERROR);
-        }
+        if ((AuthCommand)pending[0] != AuthCommand.REALM_LIST)
+            return pending.Length;
+
+        if (pending.Length < RealmListHeaderSize)
+            return 0;
+
+        int length = RealmListHeaderSize + BinaryPrimitives.ReadUInt16LittleEndian(pending[1..]);
+        return pending.Length >= length ? length : 0;
     }
 
     // C P>R: Sends data to realm server
@@ -254,7 +240,7 @@ public partial class AuthClient
     {
         try
         {
-            _clientSocket.BeginSend(packet.GetData(), 0, (int)packet.GetSize(), SocketFlags.None, SendCallback, null);
+            _clientSocket.Send(packet.GetData(), 0, (int)packet.GetSize(), SocketFlags.None);
         }
         catch (Exception ex)
         {
@@ -277,12 +263,6 @@ public partial class AuthClient
             case AuthCommand.LOGON_PROOF:
                 HandleLogonProof(packet);
                 break;
-            case AuthCommand.RECONNECT_CHALLENGE:
-                HandleReconnectChallenge(packet);
-                break;
-            case AuthCommand.RECONNECT_PROOF:
-                HandleReconnectProof(packet);
-                break;
             case AuthCommand.REALM_LIST:
                 HandleRealmList(packet);
                 break;
@@ -293,10 +273,10 @@ public partial class AuthClient
         }
     }
 
-    private void SendLogonChallenge(bool reconnect)
+    private void SendLogonChallenge()
     {
         ByteBuffer buffer = new ByteBuffer();
-        buffer.WriteUInt8((byte)(reconnect ? AuthCommand.RECONNECT_CHALLENGE : AuthCommand.LOGON_CHALLENGE));
+        buffer.WriteUInt8((byte)AuthCommand.LOGON_CHALLENGE);
         buffer.WriteUInt8((byte)(LegacyVersion.ExpansionVersion > 1 ? 8 : 3));
         buffer.WriteUInt16((UInt16)(_username.Length + 30));
         buffer.WriteBytes(Encoding.ASCII.GetBytes("WoW"));
@@ -535,45 +515,6 @@ public partial class AuthClient
         }
     }
 
-    public void HandleReconnectChallenge(ByteBuffer packet)
-    {
-        packet.ReadUInt8(); // always 0
-        byte[] reconnectProof = packet.ReadBytes(16);
-        packet.ReadBytes(16); // version challenge
-
-        var rand = System.Security.Cryptography.RandomNumberGenerator.Create();
-        byte[] R1 = new byte[16];
-        rand.GetBytes(R1);
-        byte[] R2 = Sha1Of(Encoding.ASCII.GetBytes(_username), R1, reconnectProof, GetSessionKey());
-        byte[] R3 = Sha1Of(R1, new byte[20]); // version challenge not actually used on reconnect
-
-        SendReconnectProof(R1, R2, R3);
-    }
-
-    private void SendReconnectProof(byte[] R1, byte[] R2, byte[] R3)
-    {
-        ByteBuffer buffer = new ByteBuffer();
-        buffer.WriteUInt8((byte)AuthCommand.RECONNECT_PROOF);
-        buffer.WriteBytes(R1); // size 16
-        buffer.WriteBytes(R2); // size 20
-        buffer.WriteBytes(R3); // size 20
-        buffer.WriteUInt8(0);
-        SendPacket(buffer);
-    }
-
-    public void HandleReconnectProof(ByteBuffer packet)
-    {
-        AuthResult error = (AuthResult)packet.ReadUInt8();
-        if (error != AuthResult.SUCCESS)
-        {
-            AuthClientLogMessages.ReconnectFailed(_melNet, _sourceFile, _netDirNone, error);
-            SetAuthResponse(error);
-            return;
-        }
-
-        SetAuthResponse(AuthResult.SUCCESS);
-    }
-
     public void SendRealmListUpdateRequest()
     {
         AuthClientLogMessages.RequestingRealmListUpdate(_melServer, _sourceFile, _netDirNone, _username);
@@ -644,7 +585,7 @@ public partial class AuthClient
         }
 
         GetSession().RealmManager.UpdateRealms(realmList);
-        _hasRealmlist.SetResult();
+        _hasRealmlist.TrySetResult();
     }
 
     public void WaitOrRequestRealmList()

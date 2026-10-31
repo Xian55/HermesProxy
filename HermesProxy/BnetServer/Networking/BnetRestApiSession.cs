@@ -67,9 +67,9 @@ public sealed class BnetRestApiSession : SSLSocket
     public override void Accept()
     {
         if (LoginServiceManager.UsesPlainHttp)
-            _ = AsyncRead();
+            AsyncRead().ObserveFaults(GetRemoteIpEndPoint());
         else
-            _ = AsyncHandshake(BnetServerCertificate.Certificate);
+            AsyncHandshake(BnetServerCertificate.Certificate).ObserveFaults(GetRemoteIpEndPoint());
     }
 
     public override async Task ReadHandler(byte[] data, int receivedLength)
@@ -86,26 +86,18 @@ public sealed class BnetRestApiSession : SSLSocket
                 CloseSocket();
                 return;
             }
-            if (!RequestRouter(httpRequest))
-            {
+            if (!await RequestRouter(httpRequest))
                 CloseSocket();
-                return;
-            }
         }
         catch (Exception ex)
         {
-            // SSLSocket.AsyncRead cannot await this method, so an escaping exception would go
-            // unlogged and skip the AsyncRead below, leaving the session silently unreadable.
             BnetRestApiSessionLogMessages.RequestHandlingFailed(_melServer, ex, _sourceFile, _netDirNone,
                 GetRemoteIpEndPoint()?.ToString() ?? "<unknown>", ex.Message);
             CloseSocket();
-            return;
         }
-
-        await AsyncRead(); // Read next request
     }
 
-    public bool RequestRouter(HttpHeader httpRequest)
+    public async Task<bool> RequestRouter(HttpHeader httpRequest)
     {
         if (_melServer.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
             BnetRestApiSessionLogMessages.RequestReceived(_melServer, _sourceFile, _netDirNone,
@@ -114,7 +106,7 @@ public sealed class BnetRestApiSession : SSLSocket
         if (!httpRequest.Path!.StartsWith(BNET_SERVER_BASE_PATH))
         {
             BnetRestApiSessionLogMessages.RouteNotFound(_melServer, _sourceFile, _netDirNone, httpRequest.Method ?? "", httpRequest.Path);
-            _ = SendEmptyResponse(HttpCode.NotFound);
+            await SendEmptyResponse(HttpCode.NotFound);
             return false;
         }
 
@@ -124,26 +116,29 @@ public sealed class BnetRestApiSession : SSLSocket
         switch (pathElements[0], httpRequest.Method)
         {
             case ("login", "GET"):
-                _ = SendResponse(HttpCode.Ok, LoginServiceManager.Instance.GetFormInput(GetRemoteIpEndPoint()?.Address ?? System.Net.IPAddress.None));
+                await SendResponse(HttpCode.Ok, LoginServiceManager.Instance.GetFormInput(GetRemoteIpEndPoint()?.Address ?? System.Net.IPAddress.None));
                 return true;
             case ("login", "POST") when pathElements.Length > 1 && pathElements[1] == "srp":
-                _ = HandleSrpChallengeRequest(httpRequest);
+                await HandleSrpChallengeRequest(httpRequest);
                 return true;
             case ("login", "POST"):
-                _ = HandleLoginRequest(pathElements, httpRequest);
+                await HandleLoginRequest(pathElements, httpRequest);
                 return true;
             default:
                 BnetRestApiSessionLogMessages.RouteNotFound(_melServer, _sourceFile, _netDirNone, httpRequest.Method ?? "", httpRequest.Path);
-                _ = SendEmptyResponse(HttpCode.NotFound);
+                await SendEmptyResponse(HttpCode.NotFound);
                 return false;
         };
     }
 
-    public Task HandleLoginRequest(string[] pathElements, HttpHeader request)
+    public async Task HandleLoginRequest(string[] pathElements, HttpHeader request)
     {
         LogonData? loginForm = Json.CreateObject<LogonData>(request.Content!);
         if (loginForm == null)
-            return SendEmptyResponse(HttpCode.InternalServerError);
+        {
+            await SendEmptyResponse(HttpCode.InternalServerError);
+            return;
+        }
 
         HermesProxy.GlobalSessionData globalSession = new(_clientOptions.Value, _legacyServerOptions.Value, _networkOptions.Value, _diagnosticsOptions.Value, _throttlingOptions.Value);
 
@@ -154,7 +149,10 @@ public sealed class BnetRestApiSession : SSLSocket
 
         // Should never happen. Session.HandleLogon checks version already
         if (ModernVersion.Build != (ClientVersionBuild) globalSession.Build)
-            return SendAuthError(AuthResult.FAIL_WRONG_MODERN_VER);
+        {
+            await SendAuthError(AuthResult.FAIL_WRONG_MODERN_VER);
+            return;
+        }
 
         string login = "";
         string password = "";
@@ -175,7 +173,8 @@ public sealed class BnetRestApiSession : SSLSocket
                 || Stopwatch.GetElapsedTime(pending.StartedTimestamp) > SrpChallengeLifetime)
             {
                 BnetRestApiSessionLogMessages.SrpProofWithoutChallenge(_melServer, _sourceFile, _netDirNone, login);
-                return SendAuthError(AuthResult.FAIL_INTERNAL_ERROR);
+                await SendAuthError(AuthResult.FAIL_INTERNAL_ERROR);
+                return;
             }
 
             if (!BnetSrp6.TryParseHex(publicA, out BigInteger a)
@@ -183,7 +182,8 @@ public sealed class BnetRestApiSession : SSLSocket
                 || pending.Srp.VerifyClientEvidence(a, clientM1) is not { } sessionKey)
             {
                 BnetRestApiSessionLogMessages.SrpProofRejected(_melServer, _sourceFile, _netDirNone, login);
-                return SendAuthError(AuthResult.FAIL_INCORRECT_PASSWORD);
+                await SendAuthError(AuthResult.FAIL_INCORRECT_PASSWORD);
+                return;
             }
 
             serverEvidenceM2 = BnetSrp6.ToHex(BnetSrp6.CalculateServerEvidence(a, clientM1, sessionKey));
@@ -191,10 +191,10 @@ public sealed class BnetRestApiSession : SSLSocket
         }
 
         globalSession.AuthClient = new(globalSession);
-        AuthResult response = globalSession.AuthClient.ConnectToAuthServer(login, password, globalSession.Locale);
+        AuthResult response = await globalSession.AuthClient.ConnectToAuthServerAsync(login, password, globalSession.Locale);
         if (response != AuthResult.SUCCESS)
         { // Error handling
-            return SendAuthError(response);
+            await SendAuthError(response);
         }
         else
         {
@@ -215,7 +215,7 @@ public sealed class BnetRestApiSession : SSLSocket
             loginResult.LoginTicket = loginTicket;
             loginResult.AuthenticationState = "DONE";
             loginResult.ServerEvidenceM2 = serverEvidenceM2;
-            return SendResponse(HttpCode.Ok, loginResult);
+            await SendResponse(HttpCode.Ok, loginResult);
         }
     }
 

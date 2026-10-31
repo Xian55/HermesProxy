@@ -20,6 +20,8 @@ using System;
 using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Framework.Networking;
 
@@ -33,17 +35,17 @@ public interface ISocket
 
 public abstract class SocketBase : ISocket, IDisposable
 {
+    private static readonly Microsoft.Extensions.Logging.ILogger _melNet = Log.CreateMelLogger(Log.CategoryNetwork);
+    private static readonly string _sourceFile = nameof(SocketBase).PadRight(15);
+    private const string _netDirNone = "";
+
     Socket _socket;
     IPEndPoint? _remoteIPEndPoint;
-
-    SocketAsyncEventArgs receiveSocketAsyncEventArgsWithCallback;
-    SocketAsyncEventArgs receiveSocketAsyncEventArgs;
-
-    byte[]? _callbackBuffer;
-    byte[]? _asyncBuffer;
+    Task _receiveLoop = Task.CompletedTask;
+    int _closed;
     const int BufferSize = 0x4000;
 
-    public delegate void SocketReadCallback(SocketAsyncEventArgs args);
+    internal Task ReceiveLoop => _receiveLoop;
 
     /// <summary>
     /// How long a blocking send may sit unacknowledged before the connection is given up on.
@@ -62,16 +64,6 @@ public abstract class SocketBase : ISocket, IDisposable
         // nothing here checks that they keep arriving.
         NetworkUtils.EnableKeepAlive(socket, idleSeconds: 60, intervalSeconds: 10, retryCount: 3);
         _remoteIPEndPoint = _socket.RemoteEndPoint as IPEndPoint;
-
-        _callbackBuffer = ArrayPool<byte>.Shared.Rent(BufferSize);
-        _asyncBuffer = ArrayPool<byte>.Shared.Rent(BufferSize);
-
-        receiveSocketAsyncEventArgsWithCallback = new SocketAsyncEventArgs();
-        receiveSocketAsyncEventArgsWithCallback.SetBuffer(_callbackBuffer, 0, BufferSize);
-
-        receiveSocketAsyncEventArgs = new SocketAsyncEventArgs();
-        receiveSocketAsyncEventArgs.SetBuffer(_asyncBuffer, 0, BufferSize);
-        receiveSocketAsyncEventArgs.Completed += (sender, args) => ProcessReadAsync(args);
     }
 
     /// <summary>Shortens the send deadline, so a test for a stalled peer doesn't take 30 seconds.</summary>
@@ -80,21 +72,6 @@ public abstract class SocketBase : ISocket, IDisposable
     public virtual void Dispose()
     {
         _socket.Dispose();
-
-        if (_callbackBuffer != null)
-        {
-            ArrayPool<byte>.Shared.Return(_callbackBuffer);
-            _callbackBuffer = null;
-        }
-
-        if (_asyncBuffer != null)
-        {
-            ArrayPool<byte>.Shared.Return(_asyncBuffer);
-            _asyncBuffer = null;
-        }
-
-        receiveSocketAsyncEventArgsWithCallback?.Dispose();
-        receiveSocketAsyncEventArgs?.Dispose();
     }
 
     public abstract void Accept();
@@ -109,45 +86,58 @@ public abstract class SocketBase : ISocket, IDisposable
         return _remoteIPEndPoint;
     }
 
-    public void AsyncReadWithCallback(SocketReadCallback callback)
+    /// <summary>Starts reading. <see cref="ReadHandler"/> then gets every read, one at a time.</summary>
+    protected void BeginReceive() => _receiveLoop = ReceiveLoopAsync();
+
+    // One loop per connection, so that everything a connection can end with ends here.
+    private async Task ReceiveLoopAsync()
     {
-        if (!IsOpen())
-            return;
+        // Accept runs on the listener's loop, which must not end up reading this connection.
+        await Task.Yield();
 
-        receiveSocketAsyncEventArgsWithCallback.Completed += (sender, args) => callback(args);
-        receiveSocketAsyncEventArgsWithCallback.SetBuffer(0, BufferSize);
-        if (!_socket.ReceiveAsync(receiveSocketAsyncEventArgsWithCallback))
-            callback(receiveSocketAsyncEventArgsWithCallback);
-    }
-
-    public void AsyncRead()
-    {
-        if (!IsOpen())
-            return;
-
-        receiveSocketAsyncEventArgs.SetBuffer(0, BufferSize);
-        if (!_socket.ReceiveAsync(receiveSocketAsyncEventArgs))
-            ProcessReadAsync(receiveSocketAsyncEventArgs);
-    }
-
-    void ProcessReadAsync(SocketAsyncEventArgs args)
-    {
-        if (args.SocketError != SocketError.Success)
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(BufferSize);
+        try
         {
-            CloseSocket();
-            return;
+            while (IsOpen())
+            {
+                int received = await _socket.ReceiveAsync(buffer.AsMemory(0, BufferSize), SocketFlags.None);
+                if (received == 0)
+                    break;
+
+                ReadHandler(buffer, received);
+            }
+        }
+        catch (Exception ex) when (ex is SocketException or ObjectDisposedException)
+        {
+            // The peer reset the connection, or CloseSocket closed it under this read.
+        }
+        catch (Exception ex)
+        {
+            SocketBaseLogMessages.ReadFailed(_melNet, ex, _sourceFile, _netDirNone,
+                GetRemoteIpAddress()?.ToString() ?? "<unknown>", ex.Message);
+        }
+        finally
+        {
+            // Here and not in Dispose: only now is no read using it.
+            ArrayPool<byte>.Shared.Return(buffer);
         }
 
-        if (args.BytesTransferred == 0)
+        try
         {
             CloseSocket();
-            return;
         }
-
-        ReadHandler(args);
+        catch (Exception ex)
+        {
+            SocketBaseLogMessages.CloseFailed(_melNet, ex, _sourceFile, _netDirNone,
+                GetRemoteIpAddress()?.ToString() ?? "<unknown>", ex.Message);
+        }
     }
 
-    public abstract void ReadHandler(SocketAsyncEventArgs args);
+    /// <summary>
+    /// Takes one read: the first <paramref name="length"/> bytes of <paramref name="data"/>, which
+    /// are only valid during the call. Throwing closes this connection and no other.
+    /// </summary>
+    public abstract void ReadHandler(byte[] data, int length);
 
     public void AsyncWrite(byte[] data) => AsyncWrite(data.AsSpan());
 
@@ -177,12 +167,15 @@ public abstract class SocketBase : ISocket, IDisposable
 
     public void CloseSocket()
     {
-        if (_socket == null || !_socket.Connected)
+        // Once, and not only while Connected: a reset leaves that false, which used to skip OnClose.
+        if (Interlocked.Exchange(ref _closed, 1) != 0)
             return;
 
         try
         {
-            _socket.Shutdown(SocketShutdown.Both);
+            if (_socket.Connected)
+                _socket.Shutdown(SocketShutdown.Both);
+
             _socket.Close();
         }
         catch (Exception ex)

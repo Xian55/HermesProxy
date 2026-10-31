@@ -10,7 +10,7 @@ internal sealed class TestSocket(Socket socket) : SocketBase(socket)
 {
     public override void Accept() { }
 
-    public override void ReadHandler(SocketAsyncEventArgs args) { }
+    public override void ReadHandler(byte[] data, int length) { }
 }
 
 public class SocketSendTimeoutTests

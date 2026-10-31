@@ -19,18 +19,39 @@ using Framework.Logging;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Framework.Networking;
 
 public delegate void SocketAcceptDelegate(Socket newSocket);
 
-public class AsyncAcceptor
+/// <summary>
+/// Owns one listening socket and the one task that accepts on it, from <see cref="BeginAccept"/>
+/// to <see cref="DisposeAsync"/>.
+/// </summary>
+/// <remarks>
+/// That task handles every failure it can meet, so it never faults, and <see cref="DisposeAsync"/>
+/// waits for it, so it is never abandoned. A fire-and-forget chain of accepts did neither: stopping
+/// the listener faulted the pending one, and nobody saw that until a GC reported it (#540).
+/// </remarks>
+public sealed class AsyncAcceptor : IAsyncDisposable
 {
-    TcpListener _listener = null!;
-    volatile bool _closed;
+    private static readonly Microsoft.Extensions.Logging.ILogger _melNet = Log.CreateMelLogger(Log.CategoryNetwork);
+    private static readonly string _sourceFile = nameof(AsyncAcceptor).PadRight(15);
+    private const string _netDirNone = "";
 
-    public bool IsListening => !_closed;
+    private static readonly TimeSpan AcceptRetryDelay = TimeSpan.FromSeconds(1);
+
+    readonly CancellationTokenSource _stopping = new();
+    TcpListener _listener = null!;
+    Task _acceptLoop = Task.CompletedTask;
+
+    public bool IsListening => !_acceptLoop.IsCompleted;
+
+    internal Task AcceptLoop => _acceptLoop;
+
+    internal IPEndPoint LocalEndPoint => (IPEndPoint)_listener.LocalEndpoint;
 
     public bool Start(string ip, int port)
     {
@@ -74,60 +95,77 @@ public class AsyncAcceptor
         return true;
     }
 
-    public async Task AsyncAcceptSocket(SocketAcceptDelegate mgrHandler)
+    public void BeginAccept(SocketAcceptDelegate onAccept) =>
+        _acceptLoop = AcceptLoopAsync(_listener.AcceptSocketAsync, onAccept, AcceptRetryDelay, _stopping.Token);
+
+    internal static async Task AcceptLoopAsync(
+        Func<CancellationToken, ValueTask<Socket>> accept, SocketAcceptDelegate onAccept, TimeSpan retryDelay, CancellationToken stopping)
     {
         try
         {
-            var _socket = await _listener.AcceptSocketAsync();
-            if (_socket != null)
+            while (true)
             {
-                mgrHandler(_socket);
+                Socket socket;
+                try
+                {
+                    socket = await accept(stopping);
+                }
+                catch (SocketException ex) when (ex.SocketErrorCode is SocketError.ConnectionReset or SocketError.ConnectionAborted)
+                {
+                    // The peer gave up in the backlog. That costs this one connection, and waiting
+                    // here would let a peer that keeps doing it stall everybody else's accept.
+                    AsyncAcceptorLogMessages.ConnectionLostInBacklog(_melNet, _sourceFile, _netDirNone, ex.SocketErrorCode);
+                    continue;
+                }
+                catch (SocketException ex)
+                {
+                    // Out of file descriptors, say. Those come back, so the listener has to outlive
+                    // this, but accepting again at once would spin and flood the log.
+                    AsyncAcceptorLogMessages.AcceptFailed(_melNet, ex, _sourceFile, _netDirNone, ex.SocketErrorCode, retryDelay);
+                    await Task.Delay(retryDelay, stopping).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                    continue;
+                }
 
-                if (!_closed)
-                    _ = AsyncAcceptSocket(mgrHandler);
+                Dispatch(socket, onAccept);
             }
         }
-        catch (ObjectDisposedException ex)
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested)
         {
-            Log.outException(ex);
-        }
-    }
-
-    public async Task AsyncAccept<T>() where T : ISocket
-    {
-        try
-        {
-            var socket = await _listener.AcceptSocketAsync();
-            if (socket != null)
-            {
-                T newSocket = (T)Activator.CreateInstance(typeof(T), socket)!;
-                newSocket.Accept();
-
-                if (!_closed)
-                    _ = AsyncAccept<T>();
-            }
-        }
-        catch (ObjectDisposedException)
-        { }
-    }
-
-    public void Close()
-    {
-        if (_closed)
-            return;
-
-        _closed = true;
-
-        // Without this the TcpListener stays bound and any in-flight AcceptSocketAsync keeps
-        // running until the next inbound connection. Stopping it triggers ObjectDisposedException
-        // in AsyncAcceptSocket (already handled) and releases the listening port immediately.
-        try
-        {
-            _listener?.Stop();
+            // DisposeAsync asked for this.
         }
         catch (Exception ex)
         {
-            Log.outException(ex);
+            AsyncAcceptorLogMessages.AcceptLoopEnded(_melNet, ex, _sourceFile, _netDirNone, ex.Message);
         }
+    }
+
+    // The one failure boundary of the accept path: a connection that cannot be set up is lost
+    // alone, and the listener goes on.
+    private static void Dispatch(Socket socket, SocketAcceptDelegate onAccept)
+    {
+        try
+        {
+            onAccept(socket);
+        }
+        catch (Exception ex)
+        {
+            AsyncAcceptorLogMessages.ConnectionSetupFailed(_melNet, ex, _sourceFile, _netDirNone, ex.Message);
+            socket.Dispose();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_stopping.IsCancellationRequested)
+            return;
+
+        // Cancelling first means no accept ever runs into a closed socket, so stopping has one
+        // outcome on every platform. Waiting means no handler is still running once this returns.
+        await _stopping.CancelAsync();
+        await _acceptLoop;
+
+        // Without this the listener stays bound and the port stays taken.
+        _listener?.Dispose();
+        _stopping.Dispose();
     }
 }
