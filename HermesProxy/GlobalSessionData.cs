@@ -509,6 +509,9 @@ public sealed class GameSessionData
 
     public Dictionary<string, int> ChannelIds = [];
     public Dictionary<int, string> ChannelNamesById = [];
+    // The member list in the client's channel window, which only the channel it shows keeps.
+    public string? ShownChannel;
+    public HashSet<WowGuid128> ShownChannelMembers = [];
     public Dictionary<uint, uint> ItemBuyCount = [];
     public Dictionary<uint, uint> RealSpellToLearnSpell = [];
     public Dictionary<uint, ArenaTeamData> ArenaTeams = [];

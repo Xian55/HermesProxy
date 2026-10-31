@@ -55,7 +55,7 @@ public sealed class CataSmallPacketTests
     {
         // GUID 0x21, member flags 2, channel flags 0x18, three members, the name
         var joined = Deliver<UserlistAdd>(Opcode.SMSG_USERLIST_ADD,
-            "21 00 00 00 00 00 00 00 02 18 03 00 00 00" + Text("Trade - City"), _harness.Client.HandleUserlistAddCata);
+            "21 00 00 00 00 00 00 00 02 18 03 00 00 00" + Text("Trade - City"), _harness.Client.HandleUserlistAdd);
 
         Assert.Equal(_other, joined.UserGUID);
         Assert.Equal(2, joined.UserFlags);
@@ -69,7 +69,7 @@ public sealed class CataSmallPacketTests
         _harness.Session.GameState.SetChannelId("Trade - City", 2);
 
         var joined = Deliver<UserlistAdd>(Opcode.SMSG_USERLIST_ADD,
-            "21 00 00 00 00 00 00 00 00 18 03 00 00 00" + Text("Trade - City"), _harness.Client.HandleUserlistAddCata);
+            "21 00 00 00 00 00 00 00 00 18 03 00 00 00" + Text("Trade - City"), _harness.Client.HandleUserlistAdd);
 
         Assert.Equal(2u, joined.ChannelID);
     }
@@ -78,7 +78,7 @@ public sealed class CataSmallPacketTests
     public void HandleUserlistRemove_HasNoMemberFlags()
     {
         var left = Deliver<UserlistRemove>(Opcode.SMSG_USERLIST_REMOVE,
-            "21 00 00 00 00 00 00 00 18 02 00 00 00" + Text("Trade - City"), _harness.Client.HandleUserlistRemoveCata);
+            "21 00 00 00 00 00 00 00 18 02 00 00 00" + Text("Trade - City"), _harness.Client.HandleUserlistRemove);
 
         Assert.Equal(_other, left.UserGUID);
         Assert.Equal(0x18u, left.ChannelFlags);
@@ -104,6 +104,48 @@ public sealed class CataSmallPacketTests
                 0x54, 0x72, 0x61, 0x64, 0x65,   // Trade
             ],
             Written(packet));
+    }
+
+    [Fact]
+    public void HandleUserlistAdd_MakesAnAddOfAJoinReportedAsAnUpdate()
+    {
+        UserlistAdd Update(string channel)
+        {
+            byte[] wire = LegacyPacketBuilder.Build(Opcode.SMSG_USERLIST_UPDATE, packet =>
+            {
+                packet.WriteGuid(new WowGuid64(0x21));
+                packet.WriteUInt8(0);
+                packet.WriteUInt8(0x18);
+                packet.WriteUInt32(2);
+                packet.WriteCString(channel);
+            });
+            _harness.Deliver(Opcode.SMSG_USERLIST_UPDATE, wire, _harness.Client.HandleUserlistAdd);
+            return Assert.IsType<UserlistAdd>(_harness.ClientWire.Sent[^1].Packet);
+        }
+
+        _harness.Session.GameState.ChannelDisplayList = true;
+        Deliver<ChannelListResponse>(Opcode.SMSG_CHANNEL_LIST,
+            "01" + Text("mine") + "18 01 00 00 00 02 00 00 00 00 00 00 00 00", _harness.Client.HandleChannelList);
+
+        var joined = Update("mine");
+        var changed = Update("mine");
+        Deliver<UserlistRemove>(Opcode.SMSG_USERLIST_REMOVE,
+            "21 00 00 00 00 00 00 00 18 01 00 00 00" + Text("mine"), _harness.Client.HandleUserlistRemove);
+        var back = Update("mine");
+        var elsewhere = Update("other");
+
+        Assert.Equal(Opcode.SMSG_USERLIST_ADD, joined.GetUniversalOpcode());
+        Assert.Equal(Opcode.SMSG_USERLIST_UPDATE, changed.GetUniversalOpcode());
+        Assert.Equal(Opcode.SMSG_USERLIST_ADD, back.GetUniversalOpcode());
+        Assert.Equal(Opcode.SMSG_USERLIST_UPDATE, elsewhere.GetUniversalOpcode());
+    }
+
+    [Fact]
+    public void Userlist_HasTheOpcodesThe343ClientReads()
+    {
+        Assert.Equal(0x2BB9u, (uint)global::HermesProxy.World.Enums.V3_4_3_54261.Opcode.SMSG_USERLIST_ADD);
+        Assert.Equal(0x2BBAu, (uint)global::HermesProxy.World.Enums.V3_4_3_54261.Opcode.SMSG_USERLIST_REMOVE);
+        Assert.Equal(0x2BBBu, (uint)global::HermesProxy.World.Enums.V3_4_3_54261.Opcode.SMSG_USERLIST_UPDATE);
     }
 
     [Fact]

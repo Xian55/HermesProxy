@@ -814,7 +814,7 @@ public readonly record struct ChatRegisterAddonPrefixes(List<string> Prefixes);
 
 /// <summary>
 /// A player joined a channel whose members are announced, or changed in it: the two packets have
-/// one layout and differ in the opcode. 4.4.2 only; no older client's table here has them.
+/// one layout and differ in the opcode. 3.4.3 and 4.4.2 only: their readers are the ones checked.
 /// </summary>
 public sealed class UserlistAdd : ServerPacket
 {
@@ -838,7 +838,7 @@ public sealed class UserlistAdd : ServerPacket
     public string ChannelName = string.Empty;
 }
 
-/// <summary>A player left a channel whose members are announced. 4.4.2 only.</summary>
+/// <summary>A player left a channel whose members are announced. 3.4.3 and 4.4.2 only.</summary>
 public sealed class UserlistRemove : ServerPacket
 {
     public UserlistRemove() : base(Opcode.SMSG_USERLIST_REMOVE) { }
