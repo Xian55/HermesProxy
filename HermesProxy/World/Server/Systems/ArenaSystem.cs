@@ -115,12 +115,9 @@ public static class ArenaSystem
     [HandlesCmsg(Opcode.CMSG_BATTLEMASTER_JOIN_ARENA)]
     public static void HandleBattlematerJoinArena(in BattlemasterJoinArena join, in SessionContext ctx)
     {
-        // 3.4.3 has no invite opcode, so rated Join as Group injects CMSG_ARENA_TEAM_INVITE.
         uint teamId = join.TeamIndex < ctx.GetSession().GameState.CurrentArenaTeamIds.Length
             ? ctx.GetSession().GameState.CurrentArenaTeamIds[join.TeamIndex]
             : 0;
-        if (teamId != 0)
-            InvitePartyToArenaTeam(in ctx, teamId);
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_BATTLEMASTER_JOIN_ARENA);
         if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
@@ -139,33 +136,6 @@ public static class ArenaSystem
         WorldSocketLogMessages.BattlemasterJoinArena(
             _melLog, _sourceFile, _netDirSend, join.TeamIndex, teamId);
         ctx.SendPacketToServer(packet);
-    }
-
-    static void InvitePartyToArenaTeam(in SessionContext ctx, uint teamId)
-    {
-        var group = ctx.GetSession().GameState.GetCurrentGroup();
-        if (group == null)
-            return;
-
-        var self = ctx.GetSession().GameState.CurrentPlayerGuid;
-        foreach (var member in group.PlayerList)
-        {
-            if (member.GUID == self)
-                continue;
-
-            string name = member.Name;
-            if (string.IsNullOrEmpty(name))
-                name = ctx.GetSession().GameState.GetPlayerName(member.GUID);
-            if (string.IsNullOrEmpty(name))
-                continue;
-
-            WorldPacket invite = new WorldPacket(Opcode.CMSG_ARENA_TEAM_INVITE);
-            invite.WriteUInt32(teamId);
-            invite.WriteCString(name);
-            ctx.SendPacketToServer(invite);
-            WorldSocketLogMessages.ArenaTeamPartyInvite(
-                _melLog, _sourceFile, _netDirSend, teamId, name);
-        }
     }
 
     [HandlesCmsg(Opcode.CMSG_BATTLEMASTER_JOIN_SKIRMISH)]

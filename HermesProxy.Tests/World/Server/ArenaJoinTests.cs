@@ -52,6 +52,30 @@ public class ArenaJoinTests
         Assert.Equal(expected.GetDataSpan().ToArray(), sent.Bytes);
     }
 
+    // An invite sent with a join stayed pending on the server for a player already on the team, and
+    // the next real invite of that player was refused until a relog (#484). The clients invite by
+    // themselves: ArenaTeamInviteByName reaches the server through CMSG_GUILD_INVITE_BY_NAME.
+    [Fact]
+    public void RatedJoin_InvitesNobodyToTheTeam()
+    {
+        var (harness, ctx) = NewSession();
+        var state = harness.Session.GameState;
+        state.CurrentArenaTeamIds[1] = 7;
+        state.CurrentGroups[0] = new PartyUpdate
+        {
+            PlayerList =
+            [
+                new PartyPlayerInfo { GUID = state.CurrentPlayerGuid, Name = "Captain" },
+                new PartyPlayerInfo { GUID = new WowGuid64(HighGuidTypeLegacy.Player, 2).To128(state), Name = "Member" },
+            ],
+        };
+        var join = new BattlemasterJoinArena(Battlemaster.To128(state), 1, 0);
+
+        ArenaSystem.HandleBattlematerJoinArena(in join, in ctx);
+
+        Assert.Single(harness.ServerWire.Sent);
+    }
+
     [Fact]
     public void Skirmish_IsNotSentToA434Server()
     {

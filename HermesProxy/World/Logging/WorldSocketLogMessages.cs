@@ -136,17 +136,6 @@ internal static partial class WorldSocketLogMessages
         string Action);
 
     [LoggerMessage(
-        EventId = 113,
-        Level = LogLevel.Debug,
-        Message = "Arena team invite team={TeamId} name={Name}")]
-    public static partial void ArenaTeamPartyInvite(
-        ILogger logger,
-        string SourceFile,
-        string NetDir,
-        uint TeamId,
-        string Name);
-
-    [LoggerMessage(
         EventId = 114,
         Level = LogLevel.Debug,
         Message = "CMSG_BATTLEMASTER_JOIN_ARENA teamIndex={TeamIndex} teamId={TeamId}")]
