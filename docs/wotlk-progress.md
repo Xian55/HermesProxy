@@ -954,7 +954,7 @@ HermesProxy/World/Client/PacketHandlers/MiscHandler.cs dcc2c5ab77bd27f8
 HermesProxy/World/Client/PacketHandlers/MovementHandler.cs 90a08b432590c887
 HermesProxy/World/Client/PacketHandlers/NPCHandler.cs d747fbf0d80f5412
 HermesProxy/World/Client/PacketHandlers/PetHandler.cs df17c1d1b8eedba0
-HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs 30f9d81d90910759
+HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs 5efd8bf5a12cefce
 HermesProxy/World/Client/PacketHandlers/PhaseShiftHandler.cs f4211b5f6dd08eac
 HermesProxy/World/Client/PacketHandlers/QueryHandler.cs adcc99affcbaf6a5
 HermesProxy/World/Client/PacketHandlers/QuestHandler.cs 926c9b9b6ca11c48
