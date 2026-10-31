@@ -1087,16 +1087,20 @@ public partial class WorldClient
 
     private void MarkPlayerCreateQueued(UpdateObject packet)
     {
+        if (ContainsPlayerCreate(packet.ObjectUpdates))
+            GetSession().GameState.ClientHasPlayerObject = true;
+    }
+
+    private bool ContainsPlayerCreate(List<ObjectUpdate> updates)
+    {
         WowGuid128 playerGuid = GetSession().GameState.CurrentPlayerGuid;
-        foreach (var update in packet.ObjectUpdates)
+        foreach (var update in updates)
         {
             if (update.Guid == playerGuid && update.CreateData != null &&
                 (update.Type == UpdateTypeModern.CreateObject1 || update.Type == UpdateTypeModern.CreateObject2))
-            {
-                GetSession().GameState.ClientHasPlayerObject = true;
-                return;
-            }
+                return true;
         }
+        return false;
     }
 
     /// <summary>
@@ -1282,29 +1286,24 @@ public partial class WorldClient
 
         // V3_4_3-only: when this batch contained any CreateObject for the player
         // (matched by GUID, not just ThisIsYou — cmangos doesn't always set
-        // UpdateFlag.Self), immediately follow it with an empty
+        // UpdateFlag.Self), immediately follow it with an
         // SMSG_AURA_UPDATE_ALL for the player.
         // TC reference packet #148 sends a 329-byte player UpdateAll right after the
         // CreateObject and before SMSG_UPDATE_ACTION_BUTTONS — it's part of the
         // sequence the V3_4_3 client expects before triggering
         // CMSG_MOVE_INIT_ACTIVE_MOVER_COMPLETE. cmangos sends per-aura updates
-        // BEFORE the create, so we need to synthesize the post-create UpdateAll
-        // ourselves. Empty list is fine for a fresh / unbuffed character; any real
-        // auras already arrived via the legacy SMSG_AURA_UPDATE flow.
+        // BEFORE the create and the client drops those, so we need to synthesize the
+        // post-create UpdateAll ourselves from what they tracked. Empty list is fine
+        // for a fresh / unbuffed character.
         if (ModernVersion.IsWotLKClassicOrLater)
         {
             WowGuid128 currentPlayerGuid = GetSession().GameState.CurrentPlayerGuid;
-            bool playerCreateInBatch = false;
             int objectsAfterFilter = updateObject.ObjectUpdates.Count;
-            foreach (var u in updateObject.ObjectUpdates)
-            {
-                if (u.CreateData != null && u.Guid == currentPlayerGuid &&
-                    (u.Type == UpdateTypeModern.CreateObject1 || u.Type == UpdateTypeModern.CreateObject2))
-                {
-                    playerCreateInBatch = true;
-                    break;
-                }
-            }
+            // Both lists, as for the pet above: a login whose items are all known is not held,
+            // and the player's create is one of many, so it has left updateObject by now. Missed,
+            // the server's own list after the create reads as a repeat of what was tracked.
+            bool playerCreateInBatch = ContainsPlayerCreate(updateObject.ObjectUpdates)
+                                       || (createsToSplit != null && ContainsPlayerCreate(createsToSplit));
 
             // Trace at end-of-batch so we can see whether the player CreateObject is
             // reaching this code path at all. Gated: it runs on every batch.
