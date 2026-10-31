@@ -9,6 +9,7 @@ using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Logging;
 using HermesProxy.World.Objects;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server.Packets;
 
 namespace HermesProxy.World.Server.Systems;
@@ -461,8 +462,20 @@ public static class MovementSystem
         orderAck.WriteUInt32(collisionHeightAck.Ack.MoveCounter & ~MoveSetCollisionHeight.ServerOrderBit);
         SeatGravity.WriteClientMovement(orderAck, collisionHeightAck.Ack.MoveInfo, ctx.GetSession().GameState);
         orderAck.WriteFloat(collisionHeightAck.Height);
-        ctx.SendPacketToServer(orderAck);
+
+        // CMaNGOS does not act on an ack that beats the world port ack: left by far teleport, a
+        // flight's dismount never finished, and the client stayed on the taxi's mount, unable to
+        // jump (#561). Behind the player's create on the new map it does.
+        var session = ctx.GetSession();
+        if (session.GameState.ClientHasPlayerObject)
+            ctx.SendPacketToServer(orderAck);
+        else
+            session.ToClient.When(OutboxEvent.GuidKnown(session.GameState.CurrentPlayerGuid), orderAck,
+                session.ToServer.Send, HeightAckBetweenMapsHold);
     }
+
+    private static readonly HoldOptions HeightAckBetweenMapsHold = new(
+        Timeout: TimeSpan.FromSeconds(60), OnTimeout: OutboxTimeoutAction.Release);
 
     [HandlesCmsg(Opcode.CMSG_SET_ACTIVE_MOVER)]
     public static void HandleMoveSetActiveMover(in SetActiveMover move, in SessionContext ctx)

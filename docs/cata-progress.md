@@ -10,10 +10,10 @@
 | 🚫 unmapped | 73 | not in the 4.3.4 table: renamed, split or removed in 4.x |
 | ⬜ todo | 0 | layout changed in 4.x, no 4.3.4 branch, not seen yet |
 | ⚠️ suspect | 0 | layout changed, no 4.3.4 branch, but passed without an error — likely misread |
-| 🔁 retest | 330 | its file changed after the latest session that exercised it |
+| 🔁 retest | 336 | its file changed after the latest session that exercised it |
 | 🔧 ported, unseen | 10 | has a 4.3.4 branch, waiting for a session to exercise it |
 | · unseen | 15 | same layout as 3.3.5a per WPP, not exercised yet |
-| ✅ seen ok | 493 | ported or unchanged, and the latest session passed it cleanly |
+| ✅ seen ok | 487 | ported or unchanged, and the latest session passed it cleanly |
 | ∅ not sent | 44 | a server packet TrinityCore 4.3.4 never sends: another opcode carries it there, or nothing calls its writer |
 
 ## What's left
@@ -22,7 +22,7 @@ The rows of the legacy table below that still ask for work, by feature. A sessio
 
 | Feature | ❌ | 🚫 | ⬜ | ⚠️ | 🔧 | · | 🔁 | To play or read |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| Movement |  |  |  |  | 9 | 1 | 82 | 🔧 `CMSG_DISMISS_CONTROLLED_VEHICLE`, `CMSG_MOVE_FALL_RESET`, `CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK`, `CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK`, `CMSG_MOVE_NOT_ACTIVE_MOVER`, `SMSG_MOVE_SET_PITCH_RATE`, `SMSG_MOVE_SET_TURN_RATE`, `SMSG_MOVE_SPLINE_SET_PITCH_RATE`, `SMSG_MOVE_SPLINE_SET_TURN_RATE`<br>· `MSG_MOVE_TELEPORT_ACK` |
+| Movement |  |  |  |  | 9 | 1 | 88 | 🔧 `CMSG_DISMISS_CONTROLLED_VEHICLE`, `CMSG_MOVE_FALL_RESET`, `CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK`, `CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK`, `CMSG_MOVE_NOT_ACTIVE_MOVER`, `SMSG_MOVE_SET_PITCH_RATE`, `SMSG_MOVE_SET_TURN_RATE`, `SMSG_MOVE_SPLINE_SET_PITCH_RATE`, `SMSG_MOVE_SPLINE_SET_TURN_RATE`<br>· `MSG_MOVE_TELEPORT_ACK` |
 | Character |  |  |  |  |  | 6 | 11 | · `CMSG_CHARACTER_RENAME_REQUEST`, `CMSG_SET_PLAYER_DECLINED_NAMES`, `SMSG_CHARACTER_LOGIN_FAILED`, `SMSG_CHARACTER_RENAME_RESULT`, `SMSG_PET_UPDATE_COMBO_POINTS`, `SMSG_SET_PLAYER_DECLINED_NAMES_RESULT` |
 | Misc |  |  |  |  |  | 2 | 17 | · `SMSG_INVALIDATE_PLAYER`, `SMSG_SPECIAL_MOUNT_ANIM` |
 | Quest |  |  |  |  |  | 2 | 7 | · `CMSG_QUEST_CONFIRM_ACCEPT`, `SMSG_QUEST_CONFIRM_ACCEPT` |
@@ -376,6 +376,9 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `CMSG_MOVE_GRAVITY_DISABLE_ACK` | yes | changed | 20261024_040154 | 5 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | 🔁 | C | `CMSG_MOVE_GRAVITY_ENABLE_ACK` | yes | changed | 20261024_180424 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | 🔁 | C | `CMSG_MOVE_KNOCK_BACK_ACK` | yes | changed | 20261024_155804 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
+| 🔁 | C | `CMSG_MOVE_SET_COLLISION_HEIGHT_ACK` | yes | new in 4.x | 20261031_232017 | 2 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
+| 🔁 | C | `CMSG_MOVE_SPLINE_DONE` | yes | changed | 20261031_232017 | 1 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
+| 🔁 | C | `CMSG_MOVE_TIME_SKIPPED` | yes | changed | 20261031_232017 | 2 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `CMSG_OPENING_CINEMATIC` |  | ? | 20261022_003546 | 2 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | 🔁 | C | `CMSG_PET_ABANDON` |  | same | 20261015_010820 | 1 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
 | 🔁 | C | `CMSG_PET_ACTION` | yes | changed | 20261021_180247 | 74 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
@@ -395,6 +398,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `CMSG_RESURRECT_RESPONSE` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | 🔁 | C | `CMSG_SELF_RES` |  | same | 20261017_225242 | 1 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | 🔁 | C | `CMSG_SET_ACTION_BAR_TOGGLES` |  | same | 20261024_024153 | 3 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
+| 🔁 | C | `CMSG_SET_ACTIVE_MOVER` | yes | changed | 20261031_232017 | 1 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `CMSG_SET_PET_SLOT` | yes | new in 4.x | 20261021_180247 | 2 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
 | 🔁 | C | `CMSG_SET_TITLE` |  | same | 20261017_225242 | 2 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | 🔁 | C | `CMSG_SUSPEND_TOKEN_RESPONSE` | yes | new in 4.x | 20261031_222458 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
@@ -408,6 +412,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `MSG_AUCTION_HELLO` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
 | 🔁 | C | `MSG_INSPECT_ARENA_TEAMS` |  | same | 20261022_084148 | 1 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | 🔁 | C | `MSG_LIST_STABLED_PETS` |  | reviewed | 20261021_180247 | 4 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
+| 🔁 | C | `MSG_MOVE_FALL_LAND` | yes | changed | 20261031_232017 | 7 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `MSG_MOVE_SET_FACING` | yes | changed | 20261030_014844 | 24 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `MSG_MOVE_START_BACKWARD` | yes | changed | 20261024_155804 | 102 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | 🔁 | C | `MSG_MOVE_START_DESCEND` | yes | changed | 20261024_024153 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
@@ -418,6 +423,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `MSG_MOVE_START_TURN_RIGHT` | yes | changed | 20261024_155804 | 39 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | 🔁 | C | `MSG_MOVE_STOP_SWIM` | yes | changed | 20261017_225242 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | 🔁 | C | `MSG_MOVE_STOP_TURN` | yes | changed | 20261024_155804 | 76 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
+| 🔁 | C | `MSG_MOVE_TELEPORT_ACK` | yes | changed | 20261031_232017 | 3 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `MSG_MOVE_WORLDPORT_ACK` |  | same | 20261031_222458 | 2 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `MSG_QUEST_PUSH_RESULT` |  | same | 20261011_162223 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
 | 🔁 | C | `MSG_SAVE_GUILD_EMBLEM` |  | same | 20261022_012152 | 1 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
@@ -790,9 +796,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_MOVE_HOVER_ACK` | yes | changed | 20261031_232017 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_SET_CAN_FLY` | yes | new in 4.x | 20261031_172248 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_MOVE_SET_CAN_FLY_ACK` | yes | changed | 20261031_172248 | 4 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
-| ✅ | C | `CMSG_MOVE_SET_COLLISION_HEIGHT_ACK` | yes | new in 4.x | 20261031_232017 | 2 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
-| ✅ | C | `CMSG_MOVE_SPLINE_DONE` | yes | changed | 20261031_232017 | 1 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
-| ✅ | C | `CMSG_MOVE_TIME_SKIPPED` | yes | changed | 20261031_232017 | 2 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | ✅ | C | `CMSG_MOVE_WATER_WALK_ACK` | yes | changed | 20261031_232017 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `CMSG_NAME_QUERY` |  | same | 20261031_232017 | 1 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | ✅ | C | `CMSG_NEXT_CINEMATIC_CAMERA` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
@@ -848,7 +851,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_SEND_MAIL` | yes | changed | 20261021_201402 | 7 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | ✅ | C | `CMSG_SEND_TEXT_EMOTE` |  | same | 20261031_232017 | 1 |  | HermesProxy/World/Server/Systems/ChatSystem.cs |
 | ✅ | C | `CMSG_SET_ACTION_BUTTON` |  | same | 20261024_155804 | 41 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
-| ✅ | C | `CMSG_SET_ACTIVE_MOVER` | yes | changed | 20261031_232017 | 1 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | ✅ | C | `CMSG_SET_ASSISTANT_LEADER` |  | same | 20261024_081947 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
 | ✅ | C | `CMSG_SET_CONTACT_NOTES` |  | same | 20261017_225242 | 1 |  | HermesProxy/World/Server/Systems/SocialSystem.cs |
 | ✅ | C | `CMSG_SET_CURRENCY_FLAGS` | yes | new in 4.x | 20261031_232017 | 2 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
@@ -884,7 +886,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_WRAP_ITEM` |  | ? | 20261021_154642 | 1 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `MSG_CORPSE_QUERY` |  | same | 20261030_014844 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | ✅ | C | `MSG_MINIMAP_PING` |  | same | 20261024_081947 | 1 |  | HermesProxy/World/Server/Systems/GroupSystem.cs |
-| ✅ | C | `MSG_MOVE_FALL_LAND` | yes | changed | 20261031_232017 | 7 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | ✅ | C | `MSG_MOVE_HEARTBEAT` | yes | changed | 20261031_232017 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `MSG_MOVE_JUMP` | yes | changed | 20261031_232017 | 1 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `MSG_MOVE_SET_PITCH` | yes | changed | 20261030_013609 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
@@ -898,7 +899,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `MSG_MOVE_STOP_ASCEND` | yes | changed | 20261031_172248 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `MSG_MOVE_STOP_PITCH` | yes | changed | 20261031_172248 | 2 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
 | ✅ | C | `MSG_MOVE_STOP_STRAFE` | yes | changed | 20261030_013233 | 1 |  | HermesProxy/World/Objects/LegacyMovementCata.cs |
-| ✅ | C | `MSG_MOVE_TELEPORT_ACK` | yes | changed | 20261031_232017 | 3 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | ✅ | C | `MSG_PETITION_DECLINE` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
 | ✅ | C | `MSG_PETITION_RENAME` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
 | ✅ | C | `MSG_QUERY_NEXT_MAIL_TIME` |  | same | 20261031_232017 | 1 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
@@ -1323,7 +1323,7 @@ HermesProxy/World/Server/Systems/LootSystem.cs e37f080a971c511a
 HermesProxy/World/Server/Systems/MailSystem.cs c35f6da3ef36cec5
 HermesProxy/World/Server/Systems/MeleeAttackOrder.cs e76a452ae5e5f64c
 HermesProxy/World/Server/Systems/MiscSystem.cs 9c28c9adf36140eb
-HermesProxy/World/Server/Systems/MovementSystem.cs e03e46946e8c3fc4
+HermesProxy/World/Server/Systems/MovementSystem.cs b54167562bf41e4e
 HermesProxy/World/Server/Systems/NpcSystem.cs 6ec1d7cdf6081084
 HermesProxy/World/Server/Systems/PartialStackAuctionPost.cs 5dd3a25ff4ed4b8b
 HermesProxy/World/Server/Systems/PetSystem.cs ed0413e5c047bccd

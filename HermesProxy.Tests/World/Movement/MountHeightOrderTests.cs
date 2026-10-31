@@ -4,6 +4,7 @@ using HermesProxy.Tests.Support;
 using HermesProxy.World;
 using HermesProxy.World.Dispatch;
 using HermesProxy.World.Enums;
+using HermesProxy.World.Outbox;
 using HermesProxy.World.Server.Packets;
 using HermesProxy.World.Server.Systems;
 using Xunit;
@@ -68,6 +69,26 @@ public sealed class MountHeightOrderTests
         // The packed guid of a low player guid takes two bytes.
         Assert.Equal(Counter, BitConverter.ToUInt32(sent.Bytes, 2));
         Assert.Equal(Height, BitConverter.ToSingle(sent.Bytes, sent.Bytes.Length - 4));
+    }
+
+    // A far teleport out of a flight: CMaNGOS does not act on an ack ahead of the world port ack (#561).
+    [Fact]
+    public void AckOfAnOrder_BetweenMaps_WaitsForThePlayersCreate()
+    {
+        SkipUnlessLegacyOrdersTheHeight();
+        var (harness, ctx, player) = InTheWorld();
+        harness.Session.GameState.ClientHasPlayerObject = false;
+
+        var ack = new MoveSetCollisionHeightAck(player,
+            new MovementAck { MoveCounter = Counter | MoveSetCollisionHeight.ServerOrderBit }, Height, 0, 2);
+        MovementSystem.HandleMoveSetCollisionHeightAck(in ack, in ctx);
+        Assert.Empty(harness.ServerWire.Sent);
+
+        harness.Session.GameState.ClientHasPlayerObject = true;
+        harness.Session.ToClient.Notify(OutboxEvent.GuidKnown(player));
+
+        var sent = Assert.Single(harness.ServerWire.Sent);
+        Assert.Equal(LegacyVersion.GetCurrentOpcode(Opcode.CMSG_MOVE_SET_COLLISION_HGT_ACK), sent.Opcode);
     }
 
     [Fact]
