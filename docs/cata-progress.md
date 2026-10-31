@@ -10,10 +10,10 @@
 | 🚫 unmapped | 71 | not in the 4.3.4 table: renamed, split or removed in 4.x |
 | ⬜ todo | 0 | layout changed in 4.x, no 4.3.4 branch, not seen yet |
 | ⚠️ suspect | 0 | layout changed, no 4.3.4 branch, but passed without an error — likely misread |
-| 🔁 retest | 309 | its file changed after the latest session that exercised it |
+| 🔁 retest | 314 | its file changed after the latest session that exercised it |
 | 🔧 ported, unseen | 11 | has a 4.3.4 branch, waiting for a session to exercise it |
 | · unseen | 14 | same layout as 3.3.5a per WPP, not exercised yet |
-| ✅ seen ok | 514 | ported or unchanged, and the latest session passed it cleanly |
+| ✅ seen ok | 509 | ported or unchanged, and the latest session passed it cleanly |
 | ∅ not sent | 44 | a server packet TrinityCore 4.3.4 never sends: another opcode carries it there, or nothing calls its writer |
 
 ## What's left
@@ -31,7 +31,7 @@ The rows of the legacy table below that still ask for work, by feature. A sessio
 | Calendar |  |  |  |  | 1 |  | 9 | 🔧 `CMSG_CALENDAR_COMPLAIN` |
 | Achievement |  |  |  |  | 1 |  | 5 | 🔧 `SMSG_ACHIEVEMENT_DELETED` |
 | Trade |  |  |  |  |  | 1 | 1 | · `CMSG_BUSY_TRADE` |
-| Spell |  |  |  |  |  |  | 40 |  |
+| Spell |  |  |  |  |  |  | 45 |  |
 | Guild |  |  |  |  |  |  | 39 |  |
 | Battleground |  |  |  |  |  |  | 16 |  |
 | Auction |  |  |  |  |  |  | 13 |  |
@@ -312,8 +312,12 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `CMSG_BF_MGR_ENTRY_INVITE_RESPONSE` | yes | changed | 20261021_180247 | 2 |  | HermesProxy/World/Server/Systems/BattlegroundSystem.cs |
 | 🔁 | C | `CMSG_BF_MGR_QUEUE_EXIT_REQUEST` | yes | changed | 20261022_145205 | 3 |  | HermesProxy/World/Server/Systems/BattlegroundSystem.cs |
 | 🔁 | C | `CMSG_BF_MGR_QUEUE_INVITE_RESPONSE` | yes | changed | 20261022_145205 | 8 |  | HermesProxy/World/Server/Systems/BattlegroundSystem.cs |
+| 🔁 | C | `CMSG_CANCEL_AURA` |  | same | 20261024_155804 | 19 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | 🔁 | C | `CMSG_CANCEL_AUTO_REPEAT_SPELL` |  | same | 20261021_180247 | 14 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
+| 🔁 | C | `CMSG_CANCEL_CAST` |  | same | 20261024_155804 | 1 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | 🔁 | C | `CMSG_CANCEL_CHANNELLING` |  | same | 20261021_180247 | 2 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
+| 🔁 | C | `CMSG_CANCEL_MOUNT_AURA` |  | same | 20261024_155804 | 6 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
+| 🔁 | C | `CMSG_CAST_SPELL` | yes | changed | 20261031_214840 | 2 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | C | `CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE` | yes | same | 20261031_200416 | 3 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `CMSG_CHAR_DELETE` |  | same | 20261021_025330 | 1 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | 🔁 | C | `CMSG_CHAT_ADDON_MESSAGE_BATTLEGROUND` | yes | new in 4.x | 20261021_231435 | 1 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
@@ -397,6 +401,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `CMSG_TUTORIAL_CLEAR` |  | same | 20261022_165434 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | 🔁 | C | `CMSG_TUTORIAL_RESET` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | 🔁 | C | `CMSG_UNLEARN_SKILL` |  | ? | 20261022_151132 | 37 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
+| 🔁 | C | `CMSG_USE_ITEM` | yes | same | 20261031_214840 | 1 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | 🔁 | C | `CMSG_WHO` |  | same | 20261024_070752 | 2 |  | HermesProxy/World/Server/Systems/QuerySystem.cs |
 | 🔁 | C | `MSG_AUCTION_HELLO` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/AuctionSystem.cs |
 | 🔁 | C | `MSG_INSPECT_ARENA_TEAMS` |  | same | 20261022_084148 | 1 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
@@ -672,12 +677,8 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_CALENDAR_GUILD_FILTER` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/CalendarSystem.cs |
 | ✅ | C | `CMSG_CALENDAR_REMOVE_EVENT` |  | same | 20261021_180247 | 4 |  | HermesProxy/World/Server/Systems/CalendarSystem.cs |
 | ✅ | C | `CMSG_CALENDAR_UPDATE_EVENT` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/CalendarSystem.cs |
-| ✅ | C | `CMSG_CANCEL_AURA` |  | same | 20261024_155804 | 19 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
-| ✅ | C | `CMSG_CANCEL_CAST` |  | same | 20261024_155804 | 1 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
-| ✅ | C | `CMSG_CANCEL_MOUNT_AURA` |  | same | 20261024_155804 | 6 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | ✅ | C | `CMSG_CANCEL_TEMP_ENCHANTMENT` |  | same | 20261021_112409 | 5 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `CMSG_CANCEL_TRADE` |  | same | 20261031_214840 | 2 |  | HermesProxy/World/Server/Systems/TradeSystem.cs |
-| ✅ | C | `CMSG_CAST_SPELL` | yes | changed | 20261031_214840 | 2 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | C | `CMSG_CHAT_ADDON_MESSAGE_WHISPER` | yes | new in 4.x | 20261031_214840 | 443 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | ✅ | C | `CMSG_CHAT_CHANNEL_ANNOUNCEMENTS` | yes | same | 20261031_214840 | 2 |  | HermesProxy/World/Server/Systems/ChatSystem.cs |
 | ✅ | C | `CMSG_CHAT_CHANNEL_BAN` | yes | same | 20261031_211345 | 1 |  | HermesProxy/World/Server/Systems/ChatSystem.cs |
@@ -861,7 +862,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_TURN_IN_PETITION` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
 | ✅ | C | `CMSG_TUTORIAL_FLAG` |  | same | 20261031_184130 | 2 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | ✅ | C | `CMSG_UNACCEPT_TRADE` |  | same | 20261021_154642 | 2 |  | HermesProxy/World/Server/Systems/TradeSystem.cs |
-| ✅ | C | `CMSG_USE_ITEM` | yes | same | 20261031_214840 | 1 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | ✅ | C | `CMSG_VIOLENCE_LEVEL` | yes | new in 4.x | 20261031_214840 | 2 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | ✅ | C | `CMSG_WRAP_ITEM` |  | ? | 20261021_154642 | 1 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `MSG_CORPSE_QUERY` |  | same | 20261030_014844 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
@@ -1291,7 +1291,7 @@ HermesProxy/World/Server/Packets/QuestPackets.cs cc4604b9cede90be
 HermesProxy/World/Server/Packets/ReputationPackets.cs e34c6c2589a93d36
 HermesProxy/World/Server/Packets/SessionPackets.cs 42add97ee432dd80
 HermesProxy/World/Server/Packets/SocialPackets.cs 3cb59544ceaf9e11
-HermesProxy/World/Server/Packets/SpellPackets.cs 296f8ac9c525f4c8
+HermesProxy/World/Server/Packets/SpellPackets.cs cd611fbe4a6c1fdd
 HermesProxy/World/Server/Packets/SupportTicketPackets.cs 8a60b9d239df6733
 HermesProxy/World/Server/Packets/SystemPackets.cs 4f6491fd9e219bdc
 HermesProxy/World/Server/Packets/TalentPackets.cs 2e67cc9aad895d57
@@ -1331,7 +1331,7 @@ HermesProxy/World/Server/Systems/QuestSystem.cs 143c7d2657cc07b8
 HermesProxy/World/Server/Systems/ReputationSystem.cs 5b29236710e156eb
 HermesProxy/World/Server/Systems/RetailAuctionHouse.cs 02fc9342249c1f15
 HermesProxy/World/Server/Systems/SocialSystem.cs 804c45a7067fb9ec
-HermesProxy/World/Server/Systems/SpellSystem.cs 3670891ef8e74aed
+HermesProxy/World/Server/Systems/SpellSystem.cs d29911002c72e9d9
 HermesProxy/World/Server/Systems/SupportTicketSystem.cs 2d482e7ece41c7cc
 HermesProxy/World/Server/Systems/TalentSystem.cs ce4c81a39587d9aa
 HermesProxy/World/Server/Systems/TaxiSystem.cs 9760b0b210ed8645
