@@ -908,15 +908,16 @@ public static class GuildSystem
         ctx.SendPacketToServer(packet);
     }
     /// <summary>
-    /// The guild window's log tab. Empty on both sides; only a 4.3.4 server is asked.
+    /// The guild window's log tab. Empty on both sides. A 3.3.5a server has one opcode for the
+    /// question and its answer; a 4.3.4 server has one of each.
     /// </summary>
     [HandlesCmsg(Opcode.CMSG_GUILD_EVENT_LOG_QUERY)]
     public static void HandleGuildEventLogQuery(in EmptyClientPacket query, in SessionContext ctx)
     {
-        if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
-            return;
-
-        ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_GUILD_EVENT_LOG_QUERY));
+        if (HermesProxy.World.Client.WorldClient.IsCataLegacy)
+            ctx.SendPacketToServer(new WorldPacket(Opcode.CMSG_GUILD_EVENT_LOG_QUERY));
+        else if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
+            ctx.SendPacketToServer(new WorldPacket(Opcode.MSG_GUILD_EVENT_LOG_QUERY));
     }
 
     /// <summary>
