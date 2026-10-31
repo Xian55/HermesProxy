@@ -766,7 +766,10 @@ public static class GuildSystem
         ctx.SendPacketToServer(packet);
     }
 
+    // Dropping an item on another one is the client's swap, with the layout of a move. A legacy
+    // server has one bank to bank packet and swaps by itself when the target slot holds an item.
     [HandlesCmsg(Opcode.CMSG_MOVE_GUILD_BANK_ITEM)]
+    [HandlesCmsg(Opcode.CMSG_SWAP_GUILD_BANK_ITEM_WITH_GUILD_BANK_ITEM)]
     public static void HandleMoveGuildBankItem(in MoveGuildBankItem item, in SessionContext ctx)
     {
         // moves an item from the bank to the bank
