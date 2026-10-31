@@ -168,7 +168,7 @@ public class ClientOutboxOrderTests
     }
 
     [Fact]
-    public void ConcurrentHoldsAndTriggers_EveryHoldReleasedExactlyOnce()
+    public async Task ConcurrentHoldsAndTriggers_EveryHoldReleasedExactlyOnce()
     {
         const int producers = 4;
         const int holdsPerProducer = 500;
@@ -181,7 +181,7 @@ public class ClientOutboxOrderTests
             int id = 1_000_000;
             while (Volatile.Read(ref registered) < producers * holdsPerProducer)
                 outbox.Send(new TestServerPacket(Unlearn, id++));
-        });
+        }, TestContext.Current.CancellationToken);
 
         Parallel.For(0, producers, p =>
         {
@@ -192,7 +192,7 @@ public class ClientOutboxOrderTests
             }
         });
 
-        trigger.Wait(TimeSpan.FromSeconds(30));
+        await trigger.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         outbox.Send(new TestServerPacket(Unlearn, 2_000_000));
 
         int[] released = wire.Writes.Where(w => w.Packet.GetUniversalOpcode() == Failed).Select(w => w.Packet.Id).ToArray();
@@ -233,7 +233,7 @@ public class OutboxGateAndEventTests
     }
 
     [Fact]
-    public void Gate_CheckAndHold_IsAtomicAgainstAConcurrentOpen()
+    public async Task Gate_CheckAndHold_IsAtomicAgainstAConcurrentOpen()
     {
         // The IsInWorld race this replaces: check on one thread, flip on another, and the hold
         // lands after the flip and waits forever. Here it must always go out.
@@ -248,15 +248,15 @@ public class OutboxGateAndEventTests
                 start.Wait();
                 for (int i = 0; i < 20; i++)
                     outbox.When(OutboxGate.InWorld, OutboxTestExtensions.Legacy(0x50));
-            });
+            }, TestContext.Current.CancellationToken);
             var opener = Task.Run(() =>
             {
                 start.Wait();
                 outbox.SetGate(OutboxGate.InWorld, open: true);
-            });
+            }, TestContext.Current.CancellationToken);
 
             start.Set();
-            Task.WaitAll([holder, opener], TimeSpan.FromSeconds(10));
+            await Task.WhenAll(holder, opener).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             Assert.Equal(20, wire.Writes.Length);
             Assert.Equal(0, outbox.PendingCount);

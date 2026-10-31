@@ -72,11 +72,6 @@ public class InitWorldStates : ServerPacket, ISpanWritable
         Worldstates.Add(new WorldStateInfo(variableID, value));
     }
 
-    public void AddState(uint variableID, bool value)
-    {
-        Worldstates.Add(new WorldStateInfo(variableID, value ? 1 : 0));
-    }
-
     public void AddMissingState(uint variableID, int value)
     {
         foreach (var state in Worldstates)

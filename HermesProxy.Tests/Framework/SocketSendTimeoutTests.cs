@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 using Framework.Networking;
 using Xunit;
 
@@ -63,7 +64,7 @@ public class SocketSendTimeoutTests
     }
 
     [Fact]
-    public void SendToAPeerThatReads_IsUnaffectedByTheTimeout()
+    public async Task SendToAPeerThatReads_IsUnaffectedByTheTimeout()
     {
         var (sender, peer, listener) = StalledPeer(unbuffered: false);
         try
@@ -86,8 +87,8 @@ public class SocketSendTimeoutTests
 
             sender.AsyncWrite(payload);
 
-            Assert.True(reader.Wait(TimeSpan.FromSeconds(10)));
-            Assert.Equal(payload.Length, reader.Result);
+            int received = await reader.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.Equal(payload.Length, received);
             Assert.True(sender.IsOpen());
         }
         finally

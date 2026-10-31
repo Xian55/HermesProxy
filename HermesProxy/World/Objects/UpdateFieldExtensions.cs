@@ -3,8 +3,6 @@ using HermesProxy.Enums;
 using HermesProxy.World.Client;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -40,70 +38,6 @@ public static class UpdateFieldExtensions
             }
         }
         throw new ArgumentException($"Type must be one of int, uint, float or its nullable counterpart but was {type.Name}");
-    }
-
-    /// <summary>
-    /// Grabs a value from a dictionary of UpdateFields
-    /// </summary>
-    /// <typeparam name="T">The type of UpdateField (ObjectField, UnitField, ...)</typeparam>
-    /// <typeparam name="TK">The type of the value (int, uint or float and their nullable counterparts)</typeparam>
-    /// <param name="dict">The dictionary</param>
-    /// <param name="updateField">The update field we want</param>
-    /// <returns></returns>
-    public static TK GetValue<T, TK>(this Dictionary<int, UpdateField> dict, T updateField)  where T: System.Enum // C# 7.3
-    {
-        UpdateField uf;
-        if (dict != null && dict.TryGetValue(LegacyVersion.GetUpdateField(updateField), out uf))
-        {
-            var type = GetTypeCodeOfReturnValue<TK>();
-            switch (type)
-            {
-                case TypeCode.UInt32:
-                    return (TK)(object)uf.UInt32Value;
-                case TypeCode.Int32:
-                    return (TK)(object)(int)uf.UInt32Value;
-                case TypeCode.Single:
-                    return (TK)(object)uf.FloatValue;
-                case TypeCode.Double:
-                    return (TK)(object)(double)uf.FloatValue;
-                default:
-                    break;
-            }
-        }
-
-        return default(TK)!;
-    }
-
-    /// <summary>
-    /// Grabs a value list from a dictionary of dynamic UpdateFields
-    /// </summary>
-    /// <typeparam name="T">The type of UpdateField (UnitDynamicField, ...)</typeparam>
-    /// <typeparam name="TK">The type of the value (int, uint or float and their nullable counterparts)</typeparam>
-    /// <param name="dict">The dictionary</param>
-    /// <param name="updateField">The update field we want</param>
-    /// <returns></returns>
-    public static IEnumerable<TK> GetValue<T, TK>(this Dictionary<int, List<UpdateField>> dict, T updateField)  where T: System.Enum // C# 7.3
-    {
-        List<UpdateField>? ufs;
-        if (dict != null && dict.TryGetValue(LegacyVersion.GetUpdateField(updateField), out ufs))
-        {
-            var type = GetTypeCodeOfReturnValue<TK>();
-            switch (type)
-            {
-                case TypeCode.UInt32:
-                    return ufs.Select(uf => (TK)(object)uf.UInt32Value);
-                case TypeCode.Int32:
-                    return ufs.Select(uf => (TK)(object)(int)uf.UInt32Value);
-                case TypeCode.Single:
-                    return ufs.Select(uf => (TK)(object)uf.FloatValue);
-                case TypeCode.Double:
-                    return ufs.Select(uf => (TK)(object)(double)uf.FloatValue);
-                default:
-                    break;
-            }
-        }
-
-        return Enumerable.Empty<TK>();
     }
 
     /// <summary>
@@ -169,33 +103,5 @@ public static class UpdateFieldExtensions
             return GetGuidValue64(UpdateFields, field);
         else
             return GetGuidValue128(UpdateFields, field).To64();
-    }
-
-    /// <summary>
-    /// Grabs a value from a dictionary of UpdateFields and converts it to an enum val
-    /// </summary>
-    /// <typeparam name="T">The type of UpdateField (ObjectField, UnitField, ...)</typeparam>
-    /// <typeparam name="TK">The type of the value (a NULLABLE enum)</typeparam>
-    /// <param name="dict">The dictionary</param>
-    /// <param name="updateField">The update field we want</param>
-    /// <returns></returns>
-    public static TK GetEnum<T, TK>(this Dictionary<int, UpdateField> dict, T updateField) where T: System.Enum // C# 7.3
-    {
-        // typeof (TK) is a nullable type (ObjectField?)
-        // typeof (TK).GetGenericArguments()[0] is the non nullable equivalent (ObjectField)
-        // we need to convert our int from UpdateFields to the enum type
-
-        try
-        {
-            UpdateField uf;
-            if (dict != null && dict.TryGetValue(LegacyVersion.GetUpdateField(updateField), out uf))
-                return (TK)Enum.Parse(typeof(TK).GetGenericArguments()[0], uf.UInt32Value.ToString(CultureInfo.InvariantCulture));
-        }
-        catch (OverflowException) // Data wrongly parsed can result in very wtfy values
-        {
-            return default(TK)!;
-        }
-
-        return default(TK)!;
     }
 }

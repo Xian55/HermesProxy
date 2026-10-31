@@ -122,26 +122,6 @@ public static class Opcodes
 
         return Opcode.MSG_NULL_ACTION;
     }
-
-    private static uint FindOpcodeValueInEnum<T>(string name) where T : System.Enum
-    {
-        foreach (var item in Enum.GetValues(typeof(T)))
-        {
-            if (Enum.GetName(typeof(T), item) == name)
-                return (uint)item;
-        }
-        return 0;
-    }
-
-    private static string FindOpcodeNameInEnum<T>(uint value) where T : System.Enum
-    {
-        foreach (var item in Enum.GetValues(typeof(T)))
-        {
-            if ((uint)item == value)
-                return Enum.GetName(typeof(T), item)!;
-        }
-        return "UNKNOWN";
-    }
 }
 
 [ToStringFast]

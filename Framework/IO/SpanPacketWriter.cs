@@ -48,7 +48,6 @@ public ref struct SpanPacketWriter
     // packet that ends in bits — or in bits followed by an empty WriteString, which does not
     // flush — would otherwise lose its last byte. ByteBuffer.GetData flushes for the same reason.
     public readonly int Position => _bitPosition == 8 ? _position : _position + 1;
-    public readonly int Remaining => _buffer.Length - Position;
 
     #region Integer Write Methods
 
@@ -171,25 +170,6 @@ public ref struct SpanPacketWriter
             BinaryPrimitives.WriteSingleLittleEndian(dst.Slice(8), value.Z);
         }
         _position += 12;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void WriteVector4(Vector4 value)
-    {
-        FlushBits();
-        var dst = _buffer.Slice(_position);
-        if (BitConverter.IsLittleEndian)
-        {
-            MemoryMarshal.Write(dst, in value);
-        }
-        else
-        {
-            BinaryPrimitives.WriteSingleLittleEndian(dst, value.X);
-            BinaryPrimitives.WriteSingleLittleEndian(dst.Slice(4), value.Y);
-            BinaryPrimitives.WriteSingleLittleEndian(dst.Slice(8), value.Z);
-            BinaryPrimitives.WriteSingleLittleEndian(dst.Slice(12), value.W);
-        }
-        _position += 16;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -325,8 +305,6 @@ public ref struct SpanPacketWriter
         _bitPosition = 8;
     }
 
-    public readonly bool HasUnfinishedBitPack => _bitPosition != 8;
-
     #endregion
 
     #region Packed GUID Methods
@@ -338,16 +316,6 @@ public ref struct SpanPacketWriter
     {
         FlushBits();
         int written = PackedGuidHelper.WritePackedGuid128(_buffer.Slice(_position), low, high);
-        _position += written;
-    }
-
-    /// <summary>
-    /// Writes a packed UInt64.
-    /// </summary>
-    public void WritePackedUInt64(ulong value)
-    {
-        FlushBits();
-        int written = PackedGuidHelper.WritePackedUInt64(_buffer.Slice(_position), value);
         _position += written;
     }
 

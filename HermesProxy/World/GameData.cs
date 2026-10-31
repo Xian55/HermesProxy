@@ -297,20 +297,6 @@ public static partial class GameData
         return null;
     }
 
-    public static QuestObjective? GetQuestObjectiveForItem(uint entry)
-    {
-        foreach (var quest in QuestTemplates)
-        {
-            foreach (var objective in quest.Value.Objectives)
-            {
-                if (objective.ObjectID == entry &&
-                    objective.Type == QuestObjectiveType.Item)
-                    return objective;
-            }
-        }
-        return null;
-    }
-
     public static uint? GetUniqueQuestBit(uint questId)
     {
         if (!QuestBits.TryGetValue(questId, out var result))
@@ -361,41 +347,12 @@ public static partial class GameData
         return null;
     }
 
-    public static ItemAppearance? GetItemAppearanceByItemId(uint itemId)
-    {
-        ItemModifiedAppearance? modAppearance = GetItemModifiedAppearanceByItemId(itemId);
-        if (modAppearance == null)
-            return null;
-
-        ItemAppearance? data;
-        lock (ItemRecordLock)
-        {
-            if (ItemAppearanceStore.TryGetValue((uint)modAppearance.ItemAppearanceID, out data))
-                return data;
-        }
-        return null;
-    }
-
     public static uint GetItemIconFileDataIdByDisplayId(uint displayId)
     {
         uint fileDataId;
         if (ItemDisplayIdToFileDataIdStore.TryGetValue(displayId, out fileDataId))
             return fileDataId;
         return 0;
-    }
-
-    public static ItemModifiedAppearance? GetItemModifiedAppearanceByDisplayId(uint displayId)
-    {
-        ItemAppearance? appearance = GetItemAppearanceByDisplayId(displayId);
-        if (appearance != null)
-        {
-            foreach (var item in ItemModifiedAppearanceStore)
-            {
-                if (item.Value.ItemAppearanceID == appearance.Id)
-                    return item.Value;
-            }
-        }
-        return null;
     }
 
     public static ItemModifiedAppearance? GetItemModifiedAppearance(uint id)
@@ -591,16 +548,6 @@ public static partial class GameData
         return 0;
     }
 
-    public static uint GetEnchantIdFromGem(uint itemId)
-    {
-        foreach (var itr in Gems)
-        {
-            if (itr.Value == itemId)
-                return itr.Key;
-        }
-        return 0;
-    }
-
     public static float GetUnitCompleteDisplayScale(uint displayId)
     {
         var displayData = GetDisplayInfo(displayId);
@@ -725,16 +672,6 @@ public static partial class GameData
                 return true;
         }
         return false;
-    }
-
-    /// returns 0 when unknown
-    public static int GetFactionByRace(Race race)
-    {
-        if (IsAllianceRace(race))
-            return 1;
-        if (IsHordeRace(race))
-            return 2;
-        return 0;
     }
 
     public static BroadcastText? GetBroadcastText(uint entry)
@@ -5963,15 +5900,6 @@ public static partial class GameData
         public int Category;
         public int RecoveryTime;
         public int CategoryRecoveryTime;
-    }
-    public sealed class ItemDisplayData
-    {
-        public int Id;
-        public int IconFileDataId;
-        public int ModelResourcesId_1;
-        public int ModelResourcesId_2;
-        public int ModelMaterialResourcesId_1;
-        public int ModelMaterialResourcesId_2;
     }
     public sealed class Battleground
     {

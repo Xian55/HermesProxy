@@ -58,8 +58,8 @@ public sealed class StoppedCastWotLKTests
         harness.Deliver(Opcode.SMSG_SPELL_FAILURE, Convert.FromHexString(Failure), harness.Client.HandleSpellFailedOther);
         harness.Deliver(Opcode.SMSG_SPELL_FAILED_OTHER, Convert.FromHexString(FailedOther), harness.Client.HandleSpellFailedOther);
 
-        Assert.Equal(SecondCastId, Assert.IsType<CastFailed>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is CastFailed)).Packet).CastID);
-        Assert.Equal(SecondCastId, Assert.IsType<SpellFailure>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellFailure)).Packet).CastID);
-        Assert.Equal(SecondCastId, Assert.IsType<SpellFailedOther>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellFailedOther)).Packet).CastID);
+        Assert.Equal(SecondCastId, Assert.IsType<CastFailed>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is CastFailed).Packet).CastID);
+        Assert.Equal(SecondCastId, Assert.IsType<SpellFailure>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellFailure).Packet).CastID);
+        Assert.Equal(SecondCastId, Assert.IsType<SpellFailedOther>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellFailedOther).Packet).CastID);
     }
 }

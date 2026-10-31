@@ -93,18 +93,6 @@ public class EmptyTalentData : ServerPacket
     }
 }
 
-public class EmptyActiveGlyphs : ServerPacket
-{
-    public EmptyActiveGlyphs() : base(Opcode.SMSG_ACTIVE_GLYPHS, ConnectionType.Instance) { }
-
-    public override void Write()
-    {
-        _worldPacket.WriteUInt32(0u);
-        _worldPacket.WriteBit(true);
-        _worldPacket.FlushBits();
-    }
-}
-
 public class EmptyEquipmentSetList : ServerPacket
 {
     public EmptyEquipmentSetList() : base(Opcode.SMSG_LOAD_EQUIPMENT_SET, ConnectionType.Instance) { }
@@ -124,20 +112,6 @@ public class EmptyAccountMountUpdate : ServerPacket
         _worldPacket.WriteBit(true);
         _worldPacket.WriteUInt32(0u);
         _worldPacket.FlushBits();
-    }
-}
-
-public class EmptyAccountToyUpdate : ServerPacket
-{
-    public EmptyAccountToyUpdate() : base(Opcode.SMSG_ACCOUNT_TOY_UPDATE, ConnectionType.Instance) { }
-
-    public override void Write()
-    {
-        _worldPacket.WriteBit(true);
-        _worldPacket.FlushBits();
-        _worldPacket.WriteInt32(0);
-        _worldPacket.WriteInt32(0);
-        _worldPacket.WriteInt32(0);
     }
 }
 

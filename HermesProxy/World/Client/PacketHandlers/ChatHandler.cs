@@ -286,7 +286,7 @@ public partial class WorldClient
         {
             case ChatMessageTypeVanilla.BattlegroundAlliance:
             case ChatMessageTypeVanilla.BattlegroundHorde:
-                Utility.Swap(ref sender, ref receiver);
+                (sender, receiver) = (receiver, sender);
                 break;
         }
 
@@ -419,7 +419,7 @@ public partial class WorldClient
             case ChatMessageTypeWotLK.BattlegroundAlliance:
             case ChatMessageTypeWotLK.BattlegroundHorde:
                 if (!ModernVersion.BattlegroundAnnouncementNamesTarget)
-                    Utility.Swap(ref sender, ref receiver);
+                    (sender, receiver) = (receiver, sender);
                 break;
         }
 

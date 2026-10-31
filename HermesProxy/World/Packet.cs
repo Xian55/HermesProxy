@@ -36,7 +36,6 @@ namespace HermesProxy.World;
 /// </summary>
 public readonly record struct PacketLogContext(bool PacketsLog, HermesProxy.Enums.ClientVersionBuild ClientBuild)
 {
-    public static readonly PacketLogContext Disabled = new(false, HermesProxy.Enums.ClientVersionBuild.Zero);
 }
 
 public abstract class ClientPacket : IDisposable
@@ -52,15 +51,6 @@ public abstract class ClientPacket : IDisposable
     {
         _worldPacket.Dispose();
     }
-
-    public uint GetOpcode() { return _worldPacket.GetOpcode(); }
-    public Opcode GetUniversalOpcode()
-    {
-        return ModernVersion.GetUniversalOpcode(GetOpcode());
-    }
-
-    public void LogPacket(ref SniffFile sniffFile, in PacketLogContext context)
-        => _worldPacket.LogPacket(ref sniffFile, in context);
 
     protected WorldPacket _worldPacket;
 }
@@ -89,12 +79,6 @@ public abstract class ServerPacket
         opcode = ModernVersion.GetCurrentOpcode(universalOpcode);
         if (opcode == 0)
             throw new UnmappedOpcodeException(universalOpcode, isModern: true);
-    }
-
-    public void Clear()
-    {
-        worldPacket?.Clear();
-        ReleaseData();
     }
 
     public uint GetOpcode()
@@ -478,8 +462,6 @@ public struct LegacyServerPacketHeader
 
     public static bool IsLargePacket(byte firstSizeByte) => (firstSizeByte & 0x80) != 0;
 
-    public void Read(byte[] buffer) => Read(buffer, large: false);
-
     public void Read(byte[] buffer, bool large)
     {
         if (large)
@@ -493,23 +475,6 @@ public struct LegacyServerPacketHeader
             Opcode = BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(sizeof(ushort)));
         }
     }
-
-    public void Write(ByteBuffer byteBuffer)
-    {
-        if (Size > 0x7FFF)
-        {
-            byteBuffer.WriteUInt8((byte)(0x80 | ((Size >> 16) & 0xFF)));
-            byteBuffer.WriteUInt8((byte)((Size >> 8) & 0xFF));
-            byteBuffer.WriteUInt8((byte)(Size & 0xFF));
-        }
-        else
-        {
-            // Big-endian, to mirror Read.
-            byteBuffer.WriteUInt8((byte)((Size >> 8) & 0xFF));
-            byteBuffer.WriteUInt8((byte)(Size & 0xFF));
-        }
-        byteBuffer.WriteUInt16(Opcode);
-    }
 };
 
 public class LegacyClientPacketHeader
@@ -517,11 +482,6 @@ public class LegacyClientPacketHeader
     public const int StructSize = sizeof(ushort) + sizeof(uint);
     public ushort Size;
     public uint Opcode;
-    public void Read(byte[] buffer)
-    {
-        Size = BinaryPrimitives.ReadUInt16LittleEndian(buffer);
-        Opcode = BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(sizeof(ushort)));
-    }
     public void Write(ByteBuffer byteBuffer)
     {
         byteBuffer.WriteUInt16(Framework.Util.NetworkUtility.EndianConvert(Size));

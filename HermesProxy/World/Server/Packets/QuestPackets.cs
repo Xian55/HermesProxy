@@ -1504,33 +1504,6 @@ public class QuestUpdateAddCredit : ServerPacket, ISpanWritable
     public QuestObjectiveType ObjectiveType;
 }
 
-class QuestUpdateAddCreditSimple : ServerPacket, ISpanWritable
-{
-    public QuestUpdateAddCreditSimple() : base(Opcode.SMSG_QUEST_UPDATE_ADD_CREDIT_SIMPLE, ConnectionType.Instance) { }
-
-    public override void Write()
-    {
-        _worldPacket.WriteUInt32(QuestID);
-        _worldPacket.WriteInt32(ObjectID);
-        _worldPacket.WriteUInt8((byte)ObjectiveType);
-    }
-
-    public int MaxSize => 9; // uint + int + byte
-
-    public int WriteToSpan(Span<byte> buffer)
-    {
-        var writer = new SpanPacketWriter(buffer);
-        writer.WriteUInt32(QuestID);
-        writer.WriteInt32(ObjectID);
-        writer.WriteUInt8((byte)ObjectiveType);
-        return writer.Position;
-    }
-
-    public uint QuestID;
-    public int ObjectID;
-    public QuestObjectiveType ObjectiveType;
-}
-
 class QuestConfirmAccept : ServerPacket, ISpanWritable
 {
     public QuestConfirmAccept() : base(Opcode.SMSG_QUEST_CONFIRM_ACCEPT) { }

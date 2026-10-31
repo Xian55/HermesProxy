@@ -203,7 +203,7 @@ public sealed class BnetRestApiSession : SSLSocket
 
             // Ticket creation
             LogonResult loginResult = new();
-            byte[] ticket = Array.Empty<byte>().GenerateRandomKey(20);
+            byte[] ticket = RandomNumberGenerator.GetBytes(20);
             string loginTicket = TICKET_PREFIX + ticket.ToHexString();
 
             globalSession.LoginTicket = loginTicket;

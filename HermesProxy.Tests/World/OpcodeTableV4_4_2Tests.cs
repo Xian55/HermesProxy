@@ -57,7 +57,7 @@ public class OpcodeTableV4_4_2Tests
     {
         var names = Enum.GetNames<global::HermesProxy.World.Enums.V4_4_2_60895.Opcode>().ToHashSet();
 
-        Assert.Empty(Enum.GetNames<global::HermesProxy.World.Enums.V3_4_3_54261.Opcode>().Where(name => !names.Contains(name)));
+        Assert.DoesNotContain(Enum.GetNames<global::HermesProxy.World.Enums.V3_4_3_54261.Opcode>(), name => !names.Contains(name));
     }
 
     /// <summary>

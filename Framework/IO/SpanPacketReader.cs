@@ -20,7 +20,6 @@ using System.Buffers.Binary;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Framework.GameMath;
 
 namespace Framework.IO;
 
@@ -45,7 +44,6 @@ public ref struct SpanPacketReader
     }
 
     public readonly int Position => _position;
-    public readonly int Length => _buffer.Length;
     public readonly int Remaining => _buffer.Length - _position;
     public readonly bool CanRead => _position < _buffer.Length;
 
@@ -155,12 +153,6 @@ public ref struct SpanPacketReader
     public Vector3 ReadVector3()
     {
         return new Vector3(ReadFloat(), ReadFloat(), ReadFloat());
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Vector4 ReadVector4()
-    {
-        return new Vector4(ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat());
     }
 
     #endregion
@@ -360,10 +352,6 @@ public ref struct SpanPacketReader
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool HasBit() => ReadBit();
 
-    /// <summary>True when at least <paramref name="count"/> more bytes can be read.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public readonly bool CanReadCount(int count) => Remaining >= count;
-
     /// <summary>
     /// Copies <paramref name="count"/> bytes into a new array. The copy is deliberate: the
     /// span overload aliases a pooled rental that is reused on the next packet, so anything
@@ -383,12 +371,6 @@ public ref struct SpanPacketReader
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public uint ReadPackedTime() => (uint)Time.GetUnixTimeFromPackedTime(ReadUInt32());
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public DateTime ReadTime() => DateTimeOffset.FromUnixTimeSeconds(ReadUInt32()).DateTime;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public DateTime ReadTime64() => DateTimeOffset.FromUnixTimeSeconds((int)ReadUInt64()).DateTime;
 
     public Vector3 ReadPackedVector3()
@@ -400,20 +382,5 @@ public ref struct SpanPacketReader
         return new Vector3(x, y, z);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Quaternion ReadPackedQuaternion() => NumericsExtensions.FromPackedLong(ReadInt64());
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Quaternion ReadQuaternion() => new(ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat());
-
     #endregion
-
-    /// <summary>
-    /// Resets position to beginning of buffer.
-    /// </summary>
-    public void ResetReadPos()
-    {
-        _position = 0;
-        ResetBitPos();
-    }
 }

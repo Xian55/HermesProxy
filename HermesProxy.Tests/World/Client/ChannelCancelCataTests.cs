@@ -61,9 +61,9 @@ public sealed class ChannelCancelCataTests
 
         StopChannel(harness);
 
-        var failure = Assert.IsType<SpellFailure>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellFailure)).Packet);
-        var failedOther = Assert.IsType<SpellFailedOther>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellFailedOther)).Packet);
-        var castFailed = Assert.IsType<CastFailed>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is CastFailed)).Packet);
+        var failure = Assert.IsType<SpellFailure>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellFailure).Packet);
+        var failedOther = Assert.IsType<SpellFailedOther>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellFailedOther).Packet);
+        var castFailed = Assert.IsType<CastFailed>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is CastFailed).Packet);
         Assert.Equal(CastId, failure.CastID);
         Assert.Equal(CastId, failedOther.CastID);
         Assert.Equal(CastId, castFailed.CastID);
@@ -81,7 +81,7 @@ public sealed class ChannelCancelCataTests
         harness.Deliver(Opcode.SMSG_SPELL_FAILURE, Convert.FromHexString(Failure), harness.Client.HandleSpellFailedOther);
         harness.Deliver(Opcode.SMSG_SPELL_FAILED_OTHER, Convert.FromHexString(FailedOther), harness.Client.HandleSpellFailedOther);
 
-        Assert.Equal(CastId, Assert.IsType<SpellFailure>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellFailure)).Packet).CastID);
-        Assert.Equal(CastId, Assert.IsType<SpellFailedOther>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is SpellFailedOther)).Packet).CastID);
+        Assert.Equal(CastId, Assert.IsType<SpellFailure>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellFailure).Packet).CastID);
+        Assert.Equal(CastId, Assert.IsType<SpellFailedOther>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is SpellFailedOther).Packet).CastID);
     }
 }

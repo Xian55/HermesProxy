@@ -20,9 +20,9 @@ using Framework.Web;
 using Framework.Serialization;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Text;
 using Framework.Realm;
 using Framework.Logging;
@@ -136,24 +136,6 @@ public sealed class RealmManager
         }
     }
 
-    /// <summary>
-    /// Prints the <see cref="RealmInfo"/> from the <see cref="Realms"/> instance.
-    /// </summary>
-    public void PrintRealmList()
-    {
-        if (_realms.Count == 0)
-            return;
-
-        RealmManagerLogMessages.RealmListLine(_melServer, _sourceFile, _netDirNone, string.Empty);
-        RealmManagerLogMessages.RealmListLine(_melServer, _sourceFile, _netDirNone,
-            $"{"Type",-5} {"Type",-5} {"Locked",-8} {"Flags",-10} {"Name",-15} {"Address",-15} {"Port",-10} {"Build",-10}");
-
-        foreach (var realm in _realms)
-            RealmManagerLogMessages.RealmListLine(_melServer, _sourceFile, _netDirNone, realm.ToString());
-
-        RealmManagerLogMessages.RealmListLine(_melServer, _sourceFile, _netDirNone, string.Empty);
-    }
-
     public Realm? GetRealm(RealmId id)
     {
         return _realms.LookupByKey(id);
@@ -166,12 +148,6 @@ public sealed class RealmManager
                 return clientBuild;
 
         return null;
-    }
-
-    public uint GetMinorMajorBugfixVersionForBuild(uint build)
-    {
-        RealmBuildInfo? buildInfo = _builds.FirstOrDefault(p => p.Build < build);
-        return buildInfo != null ? (buildInfo.MajorVersion * 10000 + buildInfo.MinorVersion * 100 + buildInfo.BugfixVersion) : 0;
     }
 
     public void WriteSubRegions(Bgs.Protocol.GameUtilities.V1.GetAllValuesForAttributeResponse response)
@@ -297,7 +273,7 @@ public sealed class RealmManager
 
             byte[] compressed = Json.Deflate("JSONRealmListServerIPAddresses", serverAddresses);
 
-            byte[] serverSecret = new byte[0].GenerateRandomKey(32);
+            byte[] serverSecret = RandomNumberGenerator.GetBytes(32);
             byte[] keyData = new byte[clientSecret.Length + serverSecret.Length];
             clientSecret.CopyTo(keyData);
             serverSecret.CopyTo(keyData.AsSpan(clientSecret.Length));

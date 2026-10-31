@@ -31,7 +31,7 @@ public sealed class ArenaTeamEventCataTests
         var harness = new LegacyHandlerHarness(recordClientPackets: true);
         harness.SetActivePlayer(new WowGuid64(HighGuidTypeLegacy.Player, 0x2225));
         harness.Deliver(Opcode.SMSG_ARENA_TEAM_EVENT, Convert.FromHexString(logged), harness.Client.HandleArenaTeamEvent);
-        return Assert.IsType<ArenaTeamEvent>(Assert.Single(harness.ClientWire.Sent.Where(s => s.Packet is ArenaTeamEvent)).Packet);
+        return Assert.IsType<ArenaTeamEvent>(Assert.Single(harness.ClientWire.Sent, s => s.Packet is ArenaTeamEvent).Packet);
     }
 
     [Fact]

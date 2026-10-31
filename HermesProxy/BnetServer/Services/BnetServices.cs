@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Net;
@@ -22,7 +21,6 @@ public partial class BnetServices
     internal const string _netDirNone = "";
 
     private static uint _serverInvokedRequestToken = 0;
-    private Dictionary<uint /*requestId*/, Action<CodedInputStream> /*callbackHandler*/> _callbackHandlers = new();
 
     private GlobalSessionData _globalSession = null!;
     private readonly byte[] _clientSecret = new byte[32];
@@ -45,8 +43,6 @@ public partial class BnetServices
     {
         return _globalSession;
     }
-
-    public GlobalSessionData Session => _globalSession;
 
     private void SendRequest(OriginalHash service, uint methodId, IMessage? data)
     {

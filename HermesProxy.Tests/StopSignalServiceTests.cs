@@ -24,6 +24,7 @@ public class StopSignalServiceTests
 
     // ExecuteAsync runs on a background thread (.NET 10), so the event appears shortly after
     // StartAsync returns rather than before it.
+    [SupportedOSPlatform("windows")]
     private static async Task<EventWaitHandle> WaitForEvent(string name)
     {
         var deadline = DateTime.UtcNow.AddSeconds(5);

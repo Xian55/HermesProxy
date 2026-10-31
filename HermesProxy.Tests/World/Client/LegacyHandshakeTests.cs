@@ -99,7 +99,7 @@ public class LegacyHandshakeTests
     }
 
     [Fact]
-    public void TryRefuse_RacingAccept_AlwaysEndsTheWait()
+    public async Task TryRefuse_RacingAccept_AlwaysEndsTheWait()
     {
         for (int i = 0; i < 2_000; i++)
         {
@@ -114,7 +114,7 @@ public class LegacyHandshakeTests
 
             start.SignalAndWait(TestContext.Current.CancellationToken);
             handshake.TryRefuse();
-            accept.GetAwaiter().GetResult();
+            await accept;
 
             Assert.False(handshake.IsPending);
             Assert.True(handshake.Wait(Patience));

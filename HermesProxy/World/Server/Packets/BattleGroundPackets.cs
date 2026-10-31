@@ -295,7 +295,6 @@ public class BattlefieldStatusFailed : ServerPacket, ISpanWritable
     }
 
     public RideTicket Ticket = new();
-    public byte Unk;
     public ulong BattlefieldListId;
     public WowGuid128 ClientID = WowGuid128.Empty;
     public int Reason;

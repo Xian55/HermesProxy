@@ -67,8 +67,8 @@
            Server.cs JsonSerializer for update check; BnetServices.ServiceManager.cs Assembly.GetTypes()
            + Activator.CreateInstance on request/response types; GameData.cs
            Type.GetFields/GetProperties for EstimateAvgBytesPerRow<T>.
-         Framework — Framework.Serialization.Json and Framework.Util.RandomHelper
-           use reflection over app types passed in by the caller.
+         Framework — Framework.Serialization.Json uses reflection over app types
+           passed in by the caller.
          Serilog — internal reflection paths flagged as IL2104 at assembly
            level; root so Serilog's configuration/enrichment surface stays intact. -->
   <ItemGroup>

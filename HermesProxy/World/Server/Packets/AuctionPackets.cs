@@ -705,26 +705,6 @@ public class AuctionBucketKey
 {
     public AuctionBucketKey() { }
 
-    public AuctionBucketKey(WorldPacket data)
-    {
-        data.ResetBitPos();
-        ItemID = data.ReadBits<uint>(20);
-
-        if (data.HasBit())
-            BattlePetSpeciesID = new();
-
-        ItemLevel = data.ReadBits<ushort>(11);
-
-        if (data.HasBit())
-            SuffixItemNameDescriptionID = new();
-
-        if (BattlePetSpeciesID.HasValue)
-            BattlePetSpeciesID = data.ReadUInt16();
-
-        if (SuffixItemNameDescriptionID.HasValue)
-            SuffixItemNameDescriptionID = data.ReadUInt16();
-    }
-
     /// <summary>Span-reader twin of the <see cref="WorldPacket"/> constructor.</summary>
     public static AuctionBucketKey Read(ref SpanPacketReader data)
     {
@@ -799,26 +779,6 @@ public class AddOnInfo
     public void Read(ref Framework.IO.SpanPacketReader data)
     {
         data.ResetBitReader();
-
-        uint nameLength = data.ReadBits<uint>(10);
-        uint versionLength = data.ReadBits<uint>(10);
-        Loaded = data.HasBit();
-        Disabled = data.HasBit();
-        if (nameLength > 1)
-        {
-            Name = data.ReadString(nameLength - 1);
-            data.ReadUInt8(); // null terminator
-        }
-        if (versionLength > 1)
-        {
-            Version = data.ReadString(versionLength - 1);
-            data.ReadUInt8(); // null terminator
-        }
-    }
-
-    public void Read(WorldPacket data)
-    {
-        data.ResetBitPos();
 
         uint nameLength = data.ReadBits<uint>(10);
         uint versionLength = data.ReadBits<uint>(10);

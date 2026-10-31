@@ -10,13 +10,6 @@ public struct EulerAngles
     public float Pitch;    // y
     public float Yaw;      // z
 
-    public EulerAngles(float roll, float pitch, float yaw)
-    {
-        Roll = roll;
-        Pitch = pitch;
-        Yaw = yaw;
-    }
-
     public Quaternion AsQuaternion()
     {
         (float sy, float cy) = MathF.SinCos(Yaw * 0.5f);

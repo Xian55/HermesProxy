@@ -213,11 +213,9 @@ public sealed class EnumCharactersResult : ServerPacket
     public int MaxCharacterLevel = 1;
     public uint? DisabledClassesMask = new();
 
-    // 3.4.3+ envelope size fields. We never populate these; they exist purely to satisfy
-    // the modern client's expected packet length. All counts will be zero on the wire.
-    public int RegionwideCharactersCount;
+    // 3.4.3+ envelope size field. We never populate it; it exists purely to satisfy
+    // the modern client's expected packet length. The count will be zero on the wire.
     public int RaceLimitDisablesCount;
-    public int WarbandGroupsCount;
 
     public List<CharacterInfo> Characters = new(); // all characters on the list
     public List<RaceUnlock> RaceUnlockData = new(); //
@@ -586,13 +584,6 @@ public sealed class EnumCharactersResult : ServerPacket
                 data.WriteInt32(BackgroundColor);
             }
         }
-
-        public struct PetInfo
-        {
-            public uint CreatureDisplayId; // PetCreatureDisplayID
-            public uint Level; // PetExperienceLevel
-            public uint CreatureFamily; // PetCreatureFamilyID
-        }
     }
 
     public struct RaceUnlock
@@ -743,18 +734,6 @@ public class ChrCustomizationChoice : IComparable<ChrCustomizationChoice>
         ChrCustomizationChoiceID = chocieId;
     }
 
-    public void WriteCreate(WorldPacket data)
-    {
-        data.WriteUInt32(ChrCustomizationOptionID);
-        data.WriteUInt32(ChrCustomizationChoiceID);
-    }
-
-    public void WriteUpdate(WorldPacket data)
-    {
-        data.WriteUInt32(ChrCustomizationOptionID);
-        data.WriteUInt32(ChrCustomizationChoiceID);
-    }
-
     public int CompareTo(ChrCustomizationChoice? other)
     {
         if (other is null) return 1;
@@ -779,9 +758,6 @@ public class CharacterCreateInfo
     public bool IsTrialBoost;
     public bool UseNPE;
     public string Name = string.Empty;
-
-    // Server side data
-    public byte CharCount = 0;
 }
 
 public class CreateChar : ServerPacket, ISpanWritable

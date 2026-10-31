@@ -92,7 +92,7 @@ public class ClientOutboxParkTests
     }
 
     [Fact]
-    public void ParkedPacket_IsSerializedOnTheThreadThatParksIt()
+    public async Task ParkedPacket_IsSerializedOnTheThreadThatParksIt()
     {
         var wire = new RecordingClientWire();
         var outbox = new ClientOutbox(wire);
@@ -100,20 +100,20 @@ public class ClientOutboxParkTests
         outbox.BeginInstanceConnect();
         var packet = Instance(1);
 
-        int producer = Task.Run(() =>
+        int producer = await Task.Run(() =>
         {
             outbox.Send(packet);
             return Environment.CurrentManagedThreadId;
-        }).Result;
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(producer, packet.SerializedOnThread);
-        Task.Run(() => outbox.Attach(ConnectionType.Instance)).Wait();
+        await Task.Run(() => outbox.Attach(ConnectionType.Instance), TestContext.Current.CancellationToken);
         Assert.Equal(producer, packet.SerializedOnThread);
         Assert.Equal([1], wire.Ids);
     }
 
     [Fact]
-    public void PacketSentDuringADrain_QueuesBehindIt()
+    public async Task PacketSentDuringADrain_QueuesBehindIt()
     {
         var wire = new RecordingClientWire();
         var outbox = new ClientOutbox(wire);
@@ -132,13 +132,13 @@ public class ClientOutboxParkTests
             lateSent.Wait(TimeSpan.FromSeconds(10));
         };
 
-        var drainer = Task.Run(() => outbox.Attach(ConnectionType.Instance));
-        drainingFirst.Wait(TimeSpan.FromSeconds(10));
-        var late = Task.Run(() => outbox.Send(Realm(3)));
+        var drainer = Task.Run(() => outbox.Attach(ConnectionType.Instance), TestContext.Current.CancellationToken);
+        drainingFirst.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var late = Task.Run(() => outbox.Send(Realm(3)), TestContext.Current.CancellationToken);
         // The late send parks rather than writing past the drain; give it the chance to be wrong.
-        late.Wait(TimeSpan.FromMilliseconds(200));
+        await Task.WhenAny(late, Task.Delay(200, TestContext.Current.CancellationToken));
         lateSent.Set();
-        Task.WaitAll([drainer, late], TimeSpan.FromSeconds(10));
+        await Task.WhenAll(drainer, late).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.Equal([1, 2, 3], wire.Ids);
     }
