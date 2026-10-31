@@ -49,7 +49,7 @@ public readonly record struct WowGuid64(ulong Low)
         HighGuidType.Pet => new WowGuid64(HighGuidTypeLegacy.Pet, guid.GetEntry(), (uint)guid.GetCounter()),
         HighGuidType.Vehicle => new WowGuid64(HighGuidTypeLegacy.Vehicle, guid.GetEntry(), (uint)guid.GetCounter()),
         HighGuidType.DynamicObject => new WowGuid64(HighGuidTypeLegacy.DynamicObject, guid.GetEntry(), (uint)guid.GetCounter()),
-        HighGuidType.Corpse => new WowGuid64(HighGuidTypeLegacy.Corpse, guid.GetEntry(), (uint)guid.GetCounter()),
+        HighGuidType.Corpse => new WowGuid64(LegacyCorpseGuidHigh.Current, guid.GetEntry(), (uint)guid.GetCounter()),
         HighGuidType.LootObject => new WowGuid64((HighGuidTypeLegacy)guid.GetServerId(), guid.GetEntry(), (uint)guid.GetCounter()),
         _ => WowGuid64.Empty,
     };
