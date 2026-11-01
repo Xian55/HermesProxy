@@ -4,7 +4,7 @@ Roslyn source generators. They emit code that lands directly on the wire, so a m
 does not throw — it produces a subtly malformed packet that the client silently drops or
 mis-renders. Treat every change as a wire-format change.
 
-## The five generators
+## The six generators
 
 | Generator | Emits | Driven by |
 |---|---|---|
@@ -13,6 +13,7 @@ mis-renders. Treat every change as a wire-format change.
 | `UpdateFieldTableGenerator` | Legacy update-field tables | per-version update-field enums |
 | `PacketDispatchGenerator` | `GeneratedCmsgDispatch` / `GeneratedSmsgDispatch` function-pointer tables | `[HandlesCmsg]` / `[HandlesSmsg]` / `[PacketCodec]` — see `HermesProxy/World/Dispatch/CLAUDE.md` |
 | `EnumNameGenerator` | `{Enum}Names.ToStringFast()` — member → string literal switch, `ToString()` fallback | `[ToStringFast]` on the enum. Use it for any enum named in a log message at Information or above: `Enum.ToString` rebuilds the whole name table after every GC |
+| `ConfigReferenceGenerator` | `ConfigReference.CreateSettings()`: the table `--help` and docs/configuration.md are rendered from | `[ConfigSection]` classes in `Configuration/Options`, `[Setting]` on their properties |
 
 This handbook covers the descriptor generator. The dispatch generator's contract, diagnostics
 (HPSG004–007) and snapshot rules are in the `World/Dispatch` and `HermesProxy.Tests/World/Dispatch`
@@ -110,6 +111,8 @@ writer *as well*, so it would compile there and break only in the static.
 Those are the only structural checks. `HPSG004`–`HPSG007` belong to the dispatch generator.
 `HPSG009` (error) is not a generator check: `SealedLayoutAnalyzer` fails the build for a class
 deriving from `ServerPacketLayout<>` that is not sealed (see `World/Server/Packets/CLAUDE.md`).
+`HPSG010` (error) belongs to `ConfigReferenceGenerator`: a property the binder can set in a
+`[ConfigSection]` class has no `[Setting]` description, so no setting ships unlisted.
 
 There is no diagnostic for the failure mode that actually costs a debugging session: a field in
 the *wrong position*. Nothing in the generator knows the wire layout, so nothing can. That is

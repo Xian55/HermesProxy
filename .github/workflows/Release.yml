@@ -48,6 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.next.outputs.tag }}
+      semver: ${{ steps.next.outputs.semver }}
     steps:
       - name: Checkout repository content
         uses: actions/checkout@v7
@@ -109,6 +110,7 @@ jobs:
             exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "semver=${tag#v}" >> "$GITHUB_OUTPUT"
 
   test:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
@@ -293,7 +295,7 @@ jobs:
           tar -xzf "$tarball"
           dir=$(find . -maxdepth 1 -name "HermesProxy-Ubuntu-v*" -type d | head -1)
           chmod +x "$dir/HermesProxy"
-          "$dir/HermesProxy" --help || true
+          "$dir/HermesProxy" --help
           echo "OK: Linux x64 binary executes"
 
   release:
@@ -346,3 +348,15 @@ jobs:
             --title "Release $tag ($date)" \
             --generate-notes \
             release-assets/*
+
+  # After `release`, so the build sees the tag and reports the plain version. A manual run can name
+  # any version from any branch, so only an automatic release on master moves `latest`.
+  docker:
+    needs: [version, release]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/docker-image.yml
+    with:
+      tag: ${{ needs.version.outputs.semver }}
+      latest: ${{ github.ref == 'refs/heads/master' && inputs.version == '' }}

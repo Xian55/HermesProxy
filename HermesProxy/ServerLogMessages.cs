@@ -55,4 +55,16 @@ internal static partial class ServerLogMessages
         Message = "Hot reload #{Number} patched {Types}; dispatch tables rebuilt")]
     public static partial void HotReloadApplied(
         ILogger logger, string SourceFile, string NetDir, int Number, string Types);
+
+    // Fine for a client on the same host, and what a container starts with. Any other client gets
+    // through the login, then is told to connect to itself.
+    [LoggerMessage(EventId = 610, Level = LogLevel.Warning, Message =
+        "ExternalAddress is {ExternalAddress} but the proxy listens on {BindAddress}: a client on another machine " +
+        "will be told to connect to itself. Set ExternalAddress to the IP address clients use to reach this host.")]
+    public static partial void ExternalAddressLoopback(
+        ILogger logger, string SourceFile, string NetDir, string ExternalAddress, string BindAddress);
+
+    [LoggerMessage(EventId = 611, Level = LogLevel.Information, Message = "Removed {Count} {Kind} older than {Days} days ({Megabytes} MB)")]
+    public static partial void OldFilesSwept(
+        ILogger logger, string SourceFile, string NetDir, int Count, string Kind, int Days, long Megabytes);
 }

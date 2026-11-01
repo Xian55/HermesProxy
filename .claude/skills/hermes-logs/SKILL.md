@@ -168,7 +168,7 @@ This picks the newest `hermes-*.log` across **both** `bin/Release/Logs/` and `bi
 - **Active-write file lock** — if HermesProxy is still running and writing to the log, scripts open with `FileShare.ReadWrite`. Don't use plain `Get-Content` in a loop without `-ReadCount 0` (it can race).
 - **Variable source-file column width** — split on `\|` (with surrounding spaces); never fixed-width slice.
 - **`.pkt` basenames diverge from log basenames** — `.pkt` filename pattern is `{modern|legacy}_BUILD_UNIXTIME_SEQ.pkt`. Use `resolve.ps1 -Mode pkt`, don't try basename equality.
-- **Two filename styles** — older logs are `hermes-YYYYMMDD.log` (date-only), newer are `hermes-YYYYMMDD_HHmmss.log`. Both are `hermes-*.log`. Optional `_label` suffix (`hermes-20260501_new_char_create.log`) is preserved.
+- **Two filename styles** — older logs are `hermes-YYYYMMDD.log` (date-only), newer are `hermes-YYYYMMDD_HHmmss.log`. Both are `hermes-*.log`. Optional `_label` suffix (`hermes-20260501_new_char_create.log`) is preserved. A run over 256 MB continues in `hermes-<stamp>_001.log` and so on, and keeps its newest 4 files.
 - **Color codes** — file logs are plain text, no ANSI. Console logs (when running interactively) have ANSI; that's not what's on disk.
 
 ## WoW client logs (`client` subcommands) — optional

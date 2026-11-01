@@ -112,7 +112,7 @@ public partial class WorldClient
             return;
 
         // Legacy server opcodes are 2 bytes on every build.
-        var sniff = SniffFile.EnsureOpen(ref session.LegacySniff, "legacy", (uint)LegacyVersion.Build, sizeof(ushort));
+        var sniff = SniffFile.EnsureOpen(ref session.LegacySniff, SniffFile.LegacyName, (uint)LegacyVersion.Build, sizeof(ushort));
 
         // GetDataSpan, not GetData: received packets sit in an ArrayPool rental rounded up to a
         // bucket, so GetData would staple that slack onto every captured server packet and make

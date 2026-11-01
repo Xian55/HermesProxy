@@ -13,17 +13,18 @@ dotnet run --project HermesProxy -- --metrics
 
 ## Entry Point
 
-`Program.cs` → parses CLI args via `System.CommandLine` → calls `Server.ServerMain()`
+`Program.cs` → `PreprocessArgs` → the Generic Host → `ProxyHostedService`
 
-### CLI Options
+### Settings
 
-| Flag | Description |
-|---|---|
-| `--config <path>` | Config file path (default: `HermesProxy.config`) |
-| `--set Key=Value` | Override config values (repeatable) |
-| `--no-version-check` | Skip update check on startup |
-| `--metrics` | Per-opcode latency + allocated-bytes metrics and a GC delta line every 60 s |
-| `--metrics-interval <seconds>` | Metrics on, summary every `<seconds>` (1-3600). Rates, GC line and the `Int`/`IntMax` columns cover one interval; `Max`/`Total`/allocation tables are since startup |
+Arguments and settings are listed in [docs/configuration.md](../docs/configuration.md), which is
+generated. A new setting is a public settable property in a `[ConfigSection]` class under
+`Configuration/Options`, with a `[Setting("...")]` description: `HPSG010` fails the build without
+one. A value the proxy derives gets an internal setter instead. Then refresh the page:
+
+```bash
+UPDATE_CONFIG_REFERENCE=1 dotnet test HermesProxy.Tests --filter ConfigReferenceTests
+```
 
 ## Directories
 
@@ -58,5 +59,4 @@ dotnet run --project HermesProxy -- --metrics
 
 - **Framework** (project reference)
 - **Sep** — high-performance CSV parsing
-- **System.CommandLine** — CLI argument parsing
 - **GitVersion.MsBuild** — automatic semantic versioning

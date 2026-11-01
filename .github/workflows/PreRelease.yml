@@ -315,3 +315,13 @@ jobs:
         run: |
           echo "Prerelease publish failed"
           exit 1
+
+  # Tagged with the branch, so a branch keeps one image and never touches `latest`.
+  docker:
+    needs: [version, prerelease]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/docker-image.yml
+    with:
+      tag: ${{ needs.version.outputs.slug }}
