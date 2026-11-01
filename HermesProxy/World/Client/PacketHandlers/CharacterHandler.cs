@@ -928,14 +928,16 @@ public partial class WorldClient
                 byte offset = (byte)(LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180) ? 16 : 12);
                 for (byte i = 0; i < 19; i++)
                 {
-                    if (updates.ContainsKey(PLAYER_VISIBLE_ITEM_1_0 + i * offset))
+                    int itemIdIndex = PLAYER_VISIBLE_ITEM_1_0 + i * offset;
+                    if (updates.ContainsKey(itemIdIndex))
                     {
-                        uint itemId = updates[PLAYER_VISIBLE_ITEM_1_0 + i * offset].UInt32Value;
+                        uint itemId = updates[itemIdIndex].UInt32Value;
                         if (itemId != 0)
                         {
                             InspectItemData itemData = new InspectItemData();
                             itemData.Index = i;
                             itemData.Item.ItemID = itemId;
+                            ReadVisibleItemGear(updates, itemIdIndex, offset, itemData);
                             inspect.DisplayInfo.Items.Add(itemData);
                         }
                     }
@@ -1056,6 +1058,49 @@ public partial class WorldClient
         }
 
         inspect.ItemLevel = (int)AverageItemLevel.OfEquipped(inspect.DisplayInfo.ClassId, worn[..count]);
+    }
+
+    /// <summary>
+    /// Fills an item's enchantments, gems and random properties from a vanilla/TBC player update's
+    /// visible-item block. Those builds have no inspect gear packet: the fields the server writes
+    /// in <c>Player::SetVisibleItemSlot</c> are the only copy of the item's instance data.
+    /// </summary>
+    private static void ReadVisibleItemGear(Dictionary<int, UpdateField> updates, int itemIdIndex,
+        int offset, InspectItemData itemData)
+    {
+        int enchantSlots = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180)
+            ? Enums.TBC.EnchantmentSlot.MaxInspected
+            : Enums.Vanilla.EnchantmentSlot.MaxInspected;
+        for (int slot = 0; slot < enchantSlots; slot++)
+        {
+            if (!updates.TryGetValue(itemIdIndex + 1 + slot, out UpdateField enchantField) ||
+                enchantField.UInt32Value == 0)
+                continue;
+
+            uint enchantId = enchantField.UInt32Value;
+            int modernSlot = ModernEnchantmentSlot(slot);
+            if (modernSlot < 0)
+                continue;
+
+            itemData.Enchants.Add(new InspectEnchantData(enchantId, (byte)modernSlot));
+
+            int socket = slot - Enums.Classic.EnchantmentSlot.Sock1;
+            uint gem = socket is >= 0 and < ItemConst.MaxGemSockets
+                ? GameData.GetGemFromEnchantId(enchantId)
+                : 0;
+            if (gem != 0)
+                itemData.Gems.Add(new ItemGemData { Slot = (byte)socket, Item = new ItemInstance { ItemID = gem } });
+        }
+
+        // The block is [creator(2)][entry][enchants and spare slots][properties][suffix factor].
+        int propertiesIndex = itemIdIndex + offset - 4;
+        if (updates.TryGetValue(propertiesIndex, out UpdateField properties) && properties.UInt32Value != 0)
+        {
+            // The field is two shorts; the server stores the signed random-property id in the low one.
+            itemData.Item.RandomPropertiesID = (uint)(int)(short)properties.UInt32Value;
+            if (updates.TryGetValue(propertiesIndex + 1, out UpdateField suffixFactor))
+                itemData.Item.RandomPropertiesSeed = suffixFactor.UInt32Value;
+        }
     }
 
     // A legacy enchantment slot as the modern client numbers it. 4.3.4's reforge and
