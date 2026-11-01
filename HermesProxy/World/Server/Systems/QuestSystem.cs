@@ -382,7 +382,15 @@ public static class QuestSystem
     public static void HandleQueryQuestCompletionNPCs(in QueryQuestCompletionNPCs query, in SessionContext ctx)
     {
         if (!HermesProxy.World.Client.WorldClient.IsCataLegacy)
+        {
+            // An older server has no such list, and 3.3.5a's opcode of this name is another
+            // request in the cores, so the answer is the proxy's: nobody known for any of them.
+            QuestCompletionNPCResponse response = new();
+            foreach (int questId in query.QuestIds)
+                response.Quests.Add((questId, []));
+            ctx.SendPacketToClient(response);
             return;
+        }
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_QUERY_QUEST_COMPLETION_NPCS);
         packet.WriteBits(query.QuestIds.Length, 24);
