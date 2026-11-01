@@ -52,6 +52,24 @@ public partial class WorldClient
     }
 
     // Handlers for SMSG opcodes coming the legacy world server
+    /// <summary>
+    /// A pet's orders on their own, in the u32 of SMSG_PET_SPELLS: react state, command state, a byte
+    /// nobody uses, flag (CMaNGOS <c>Player::ResolvePendingUnmount</c>: <c>GetReactState() |
+    /// GetCommandState() * 0x100</c>). It goes out when the owner mounts and the pet stays, with
+    /// PET_MODE_DISABLE_ACTIONS (0x8000000), and again on dismount.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_PET_MODE)]
+    internal void HandlePetMode(WorldPacket packet)
+    {
+        PetMode mode = new();
+        mode.PetGUID = packet.ReadGuid().To128(GetSession().GameState);
+        mode.ReactState = (ReactStates)packet.ReadUInt8();
+        mode.CommandState = (CommandStates)packet.ReadUInt8();
+        packet.ReadUInt8(); // unused
+        mode.Flag = packet.ReadUInt8();
+        SendPacketToClient(mode);
+    }
+
     [HandlesSmsg(Opcode.SMSG_PET_SPELLS_MESSAGE)]
     internal void HandlePetSpellsMessage(WorldPacket packet)
     {
