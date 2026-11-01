@@ -10,10 +10,10 @@
 | 🚫 unmapped | 73 | not in the 4.3.4 table: renamed, split or removed in 4.x |
 | ⬜ todo | 0 | layout changed in 4.x, no 4.3.4 branch, not seen yet |
 | ⚠️ suspect | 0 | layout changed, no 4.3.4 branch, but passed without an error — likely misread |
-| 🔁 retest | 334 | its file changed after the latest session that exercised it |
+| 🔁 retest | 345 | its file changed after the latest session that exercised it |
 | 🔧 ported, unseen | 10 | has a 4.3.4 branch, waiting for a session to exercise it |
 | · unseen | 15 | same layout as 3.3.5a per WPP, not exercised yet |
-| ✅ seen ok | 489 | ported or unchanged, and the latest session passed it cleanly |
+| ✅ seen ok | 478 | ported or unchanged, and the latest session passed it cleanly |
 | ∅ not sent | 45 | a server packet TrinityCore 4.3.4 never sends: another opcode carries it there, or nothing calls its writer |
 
 ## What's left
@@ -36,6 +36,7 @@ The rows of the legacy table below that still ask for work, by feature. A sessio
 | Battleground |  |  |  |  |  |  | 22 |  |
 | Auction |  |  |  |  |  |  | 13 |  |
 | Chat |  |  |  |  |  |  | 13 |  |
+| Loot |  |  |  |  |  |  | 13 |  |
 | Group |  |  |  |  |  |  | 7 |  |
 | LFG |  |  |  |  |  |  | 7 |  |
 | Petition |  |  |  |  |  |  | 7 |  |
@@ -43,7 +44,6 @@ The rows of the legacy table below that still ask for work, by feature. A sessio
 | Query |  |  |  |  |  |  | 4 |  |
 | Mail |  |  |  |  |  |  | 3 |  |
 | Battlefield |  |  |  |  |  |  | 2 |  |
-| Loot |  |  |  |  |  |  | 2 |  |
 | Talent |  |  |  |  |  |  | 2 |  |
 | Combat |  |  |  |  |  |  | 1 |  |
 | Currency |  |  |  |  |  |  | 1 |  |
@@ -365,6 +365,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `CMSG_LEARN_TALENT` |  | same | 20261021_160516 | 2 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | 🔁 | C | `CMSG_LFG_SET_BOOT_VOTE` |  | same | 20261022_060848 | 2 |  | HermesProxy/World/Server/Systems/LfgSystem.cs |
 | 🔁 | C | `CMSG_LFG_SET_ROLES` | yes | changed | 20261022_060848 | 3 |  | HermesProxy/World/Server/Systems/LfgSystem.cs |
+| 🔁 | C | `CMSG_LOOT_ROLL` |  | same | 20261024_081947 | 4 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | 🔁 | C | `CMSG_MAIL_CREATE_TEXT_ITEM` |  | changed | 20261011_033542 | 1 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | 🔁 | C | `CMSG_MOUNT_SPECIAL_ANIM` |  | same | 20261012_232508 | 1 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | 🔁 | C | `CMSG_MOVE_ENABLE_SWIM_TO_FLY_TRANS_ACK` | yes | ? | 20261022_002335 | 6 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
@@ -506,7 +507,17 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_LFG_ROLE_CHECK_UPDATE` |  | same | 20261022_060848 | 6 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
 | 🔁 | S | `SMSG_LFG_ROLE_CHOSEN` |  | same | 20261022_060848 | 6 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
 | 🔁 | S | `SMSG_LFG_TELEPORT_DENIED` |  | same | 20261021_180247 | 2 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
+| 🔁 | S | `SMSG_LOOT_ALL_PASSED` |  | same | 20261024_081947 | 3 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
+| 🔁 | S | `SMSG_LOOT_CLEAR_MONEY` |  | same | 20261024_155804 | 2 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
+| 🔁 | S | `SMSG_LOOT_LIST` |  | same | 20261024_155804 | 31 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | 🔁 | S | `SMSG_LOOT_MASTER_LIST` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
+| 🔁 | S | `SMSG_LOOT_MONEY_NOTIFY` |  | reviewed | 20261024_155804 | 2 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
+| 🔁 | S | `SMSG_LOOT_RELEASE` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
+| 🔁 | S | `SMSG_LOOT_REMOVED` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
+| 🔁 | S | `SMSG_LOOT_RESPONSE` | yes | changed | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
+| 🔁 | S | `SMSG_LOOT_ROLL` | yes | changed | 20261024_081947 | 9 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
+| 🔁 | S | `SMSG_LOOT_ROLL_WON` | yes | changed | 20261024_081947 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
+| 🔁 | S | `SMSG_LOOT_START_ROLL` |  | reviewed | 20261024_081947 | 4 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | 🔁 | S | `SMSG_MIRROR_IMAGE_COMPONENTED_DATA` | yes | changed | 20261021_074624 | 12 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_MODIFY_COOLDOWN` | yes | same | 20261024_101724 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_MOUNT_RESULT` | yes | changed | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
@@ -777,7 +788,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_LOOT_MASTER_GIVE` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/LootSystem.cs |
 | ✅ | C | `CMSG_LOOT_MONEY` |  | same | 20261024_155804 | 2 |  | HermesProxy/World/Server/Systems/LootSystem.cs |
 | ✅ | C | `CMSG_LOOT_RELEASE` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Server/Systems/LootSystem.cs |
-| ✅ | C | `CMSG_LOOT_ROLL` |  | same | 20261024_081947 | 4 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | ✅ | C | `CMSG_LOOT_UNIT` |  | same | 20261024_155804 | 2 |  | HermesProxy/World/Server/Systems/LootSystem.cs |
 | ✅ | C | `CMSG_MAIL_DELETE` |  | same | 20261024_070752 | 2 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
 | ✅ | C | `CMSG_MAIL_GET_LIST` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Server/Systems/MailSystem.cs |
@@ -1030,16 +1040,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_LOGOUT_COMPLETE` |  | same | 20261031_222458 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_LOGOUT_RESPONSE` |  | same | 20261031_222458 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_LOG_XP_GAIN` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
-| ✅ | S | `SMSG_LOOT_ALL_PASSED` |  | same | 20261024_081947 | 3 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
-| ✅ | S | `SMSG_LOOT_CLEAR_MONEY` |  | same | 20261024_155804 | 2 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
-| ✅ | S | `SMSG_LOOT_LIST` |  | same | 20261024_155804 | 31 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
-| ✅ | S | `SMSG_LOOT_MONEY_NOTIFY` |  | reviewed | 20261024_155804 | 2 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
-| ✅ | S | `SMSG_LOOT_RELEASE` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
-| ✅ | S | `SMSG_LOOT_REMOVED` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
-| ✅ | S | `SMSG_LOOT_RESPONSE` | yes | changed | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
-| ✅ | S | `SMSG_LOOT_ROLL` | yes | changed | 20261024_081947 | 9 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
-| ✅ | S | `SMSG_LOOT_ROLL_WON` | yes | changed | 20261024_081947 | 1 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
-| ✅ | S | `SMSG_LOOT_START_ROLL` |  | reviewed | 20261024_081947 | 4 |  | HermesProxy/World/Client/PacketHandlers/LootHandler.cs |
 | ✅ | S | `SMSG_MAIL_COMMAND_RESULT` |  | same | 20261024_070752 | 4 |  | HermesProxy/World/Client/PacketHandlers/MailHandler.cs |
 | ✅ | S | `SMSG_MAIL_LIST_RESULT` | yes | changed | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/MailHandler.cs |
 | ✅ | S | `SMSG_MONSTER_MOVE_TRANSPORT` | yes | changed | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
@@ -1209,7 +1209,7 @@ HermesProxy/World/Client/PacketHandlers/GuildHandler.cs a481d944c1aaf91b
 HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs aff58174ec73c96c
 HermesProxy/World/Client/PacketHandlers/ItemHandler.cs f1cbb36c54667d0c
 HermesProxy/World/Client/PacketHandlers/LFGHandler.cs 555f3b38bee404a2
-HermesProxy/World/Client/PacketHandlers/LootHandler.cs 213f1600c7976d11
+HermesProxy/World/Client/PacketHandlers/LootHandler.cs a92d17f33b70d980
 HermesProxy/World/Client/PacketHandlers/MailHandler.cs c3a9d82228f08161
 HermesProxy/World/Client/PacketHandlers/MiscHandler.cs dcc2c5ab77bd27f8
 HermesProxy/World/Client/PacketHandlers/MovementHandler.cs 35fd96b61071e0d8
