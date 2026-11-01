@@ -66,9 +66,15 @@ public partial class WorldClient
     // Built alongside _globalSession in ConnectToWorldServer; the ctor runs before a session exists.
     SessionContext _sessionContext;
     readonly Lock _sendLock = new();
-    Timer? _keepAliveTimer;
+    ITimer? _keepAliveTimer;
     uint _keepAlivePingSerial;
-    const int KeepAliveIntervalMs = 30_000;
+    long _lastPingAt;
+    const int KeepAliveCheckMs = 5_000;
+    // Past the client's 30 s between pings, well inside the 60 s TrinityCore's SocketTimeOutTimeActive
+    // gives a player.
+    const int KeepAliveSilenceMs = 32_000;
+    // Tests put a fake clock here.
+    internal TimeProvider Clock = TimeProvider.System;
 
     // One delegate for the life of the connection, so posting a packet to the executor allocates
     // nothing per packet.
@@ -852,6 +858,8 @@ public partial class WorldClient
         if (!IsConnected() || _handshake.IsRefused)
             return;
 
+        Volatile.Write(ref _lastPingAt, Clock.GetTimestamp());
+
         WorldPacket packet = new WorldPacket(Opcode.CMSG_PING);
         if (IsCataLegacy)
         {
@@ -870,12 +878,14 @@ public partial class WorldClient
         SendPacket(packet);
     }
 
-    private void StartKeepAliveTimer()
+    internal void StartKeepAliveTimer()
     {
-        _keepAliveTimer = new Timer(SendKeepAlivePing, null, KeepAliveIntervalMs, KeepAliveIntervalMs);
+        Volatile.Write(ref _lastPingAt, Clock.GetTimestamp());
+        var interval = TimeSpan.FromMilliseconds(KeepAliveCheckMs);
+        _keepAliveTimer = Clock.CreateTimer(SendKeepAlivePing, null, interval, interval);
     }
 
-    private void StopKeepAliveTimer()
+    internal void StopKeepAliveTimer()
     {
         _keepAliveTimer?.Dispose();
         _keepAliveTimer = null;
@@ -883,6 +893,13 @@ public partial class WorldClient
 
     private void SendKeepAlivePing(object? state)
     {
+        // Legacy cores kick a player on the third gap in a row under 27 s between pings, and the
+        // client pings this connection every 30 s on a clock of its own (#575). A second 30 s series
+        // out of step with it makes every gap short, so this one only fills a silence. A gap that
+        // long resets the server's count, and while the client pings there is no such gap.
+        if (Clock.GetElapsedTime(Volatile.Read(ref _lastPingAt)).TotalMilliseconds < KeepAliveSilenceMs)
+            return;
+
         // Through the executor like any other work: a ping written from the timer thread would
         // interleave with whatever the owner is sending.
         var session = _globalSession;
