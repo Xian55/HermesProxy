@@ -60,14 +60,6 @@ internal sealed class ProxyHostedService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-#if !DEBUG
-        if (_diagnosticsOptions.Value.EnableVersionCheck)
-        {
-            try { await Server.CheckForUpdate().WaitAsync(TimeSpan.FromSeconds(15), stoppingToken); }
-            catch { /* ignore */ }
-        }
-#endif
-
         Server.MetricsEnabled = _diagnosticsOptions.Value.EnableMetrics;
 
         Log.Print(LogType.Server, "Starting Hermes Proxy...");
@@ -89,6 +81,14 @@ internal sealed class ProxyHostedService : BackgroundService
         Log.Print(LogType.Debug, "Debug logging enabled");
 
         Server.LogClientAndServerBuild(_clientOptions.Value.ClientBuild, _legacyServerOptions.Value.ResolvedBuild);
+
+#if !DEBUG
+        if (_diagnosticsOptions.Value.EnableVersionCheck)
+        {
+            try { await Server.CheckForUpdate().WaitAsync(TimeSpan.FromSeconds(15), stoppingToken); }
+            catch { /* ignore */ }
+        }
+#endif
 
         // Must run before GameData.LoadEverything and before any code path accesses
         // ModernVersion / LegacyVersion. Those two classes are pure static-readonly shells
