@@ -10,10 +10,10 @@
 | 🚫 unmapped | 73 | not in the 4.3.4 table: renamed, split or removed in 4.x |
 | ⬜ todo | 0 | layout changed in 4.x, no 4.3.4 branch, not seen yet |
 | ⚠️ suspect | 0 | layout changed, no 4.3.4 branch, but passed without an error — likely misread |
-| 🔁 retest | 376 | its file changed after the latest session that exercised it |
+| 🔁 retest | 391 | its file changed after the latest session that exercised it |
 | 🔧 ported, unseen | 10 | has a 4.3.4 branch, waiting for a session to exercise it |
 | · unseen | 15 | same layout as 3.3.5a per WPP, not exercised yet |
-| ✅ seen ok | 447 | ported or unchanged, and the latest session passed it cleanly |
+| ✅ seen ok | 432 | ported or unchanged, and the latest session passed it cleanly |
 | ∅ not sent | 45 | a server packet TrinityCore 4.3.4 never sends: another opcode carries it there, or nothing calls its writer |
 
 ## What's left
@@ -31,7 +31,7 @@ The rows of the legacy table below that still ask for work, by feature. A sessio
 | Calendar |  |  |  |  | 1 |  | 9 | 🔧 `CMSG_CALENDAR_COMPLAIN` |
 | Achievement |  |  |  |  |  | 1 | 3 | · `SMSG_ACHIEVEMENT_DELETED` |
 | Trade |  |  |  |  |  | 1 | 1 | · `CMSG_BUSY_TRADE` |
-| Spell |  |  |  |  |  |  | 43 |  |
+| Spell |  |  |  |  |  |  | 58 |  |
 | Guild |  |  |  |  |  |  | 39 |  |
 | Battleground |  |  |  |  |  |  | 22 |  |
 | Auction |  |  |  |  |  |  | 13 |  |
@@ -320,6 +320,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `CMSG_CANCEL_CAST` |  | same | 20261024_155804 | 1 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | 🔁 | C | `CMSG_CANCEL_CHANNELLING` |  | same | 20261021_180247 | 2 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
 | 🔁 | C | `CMSG_CANCEL_MOUNT_AURA` |  | same | 20261024_155804 | 6 |  | HermesProxy/World/Server/Systems/SpellSystem.cs |
+| 🔁 | C | `CMSG_CAST_SPELL` | yes | changed | 20261101_001613 | 2 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | C | `CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE` | yes | same | 20261031_200416 | 3 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
 | 🔁 | C | `CMSG_CHAR_DELETE` |  | same | 20261021_025330 | 1 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | 🔁 | C | `CMSG_CHAT_ADDON_MESSAGE_BATTLEGROUND` | yes | new in 4.x | 20261021_231435 | 1 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
@@ -477,6 +478,8 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_AUCTION_LIST_ITEMS_RESULT` | yes | ? | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | 🔁 | S | `SMSG_AUCTION_LIST_OWNED_ITEMS_RESULT` | yes | ? | 20261024_070752 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
 | 🔁 | S | `SMSG_AUCTION_OWNER_NOTIFICATION` | yes | same | 20261022_161951 | 2 |  | HermesProxy/World/Client/PacketHandlers/AuctionHandler.cs |
+| 🔁 | S | `SMSG_AURA_UPDATE` | yes | same | 20261101_001613 | 32 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| 🔁 | S | `SMSG_AURA_UPDATE_ALL` | yes | same | 20261101_001613 | 11 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_BATTLEFIELD_LIST` | yes | changed | 20261031_184130 | 4 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
 | 🔁 | S | `SMSG_BATTLEFIELD_MGR_EJECTED` | yes | changed | 20261021_180247 | 2 |  | HermesProxy/World/Client/PacketHandlers/BattlefieldMgrHandler.cs |
 | 🔁 | S | `SMSG_BATTLEFIELD_MGR_ENTERING` | yes | changed | 20261021_180247 | 2 |  | HermesProxy/World/Client/PacketHandlers/BattlefieldMgrHandler.cs |
@@ -505,6 +508,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_CHAT_PLAYER_NOTFOUND` |  | same | 20261011_175006 | 1 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | 🔁 | S | `SMSG_CHAT_SERVER_MESSAGE` |  | same | 20261021_160516 | 1 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | 🔁 | S | `SMSG_CLEAR_COOLDOWN` |  | same | 20261024_155804 | 12 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| 🔁 | S | `SMSG_CLEAR_COOLDOWNS` | yes | new in 4.x | 20261101_001613 | 2 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_CONVERT_RUNE` |  | same | 20261025_021426 | 2 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_COOLDOWN_EVENT` |  | same | 20261024_155804 | 4 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_CRITERIA_DELETED` |  | same | 20261024_205958 | 1 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
@@ -533,6 +537,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_ITEM_COOLDOWN` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
 | 🔁 | S | `SMSG_ITEM_PURCHASE_REFUND_RESULT` | yes | changed | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
 | 🔁 | S | `SMSG_ITEM_REFUND_INFO_RESPONSE` | yes | changed | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
+| 🔁 | S | `SMSG_LEARNED_SPELL` |  | reviewed | 20261101_001613 | 4 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_LFG_BOOT_PROPOSAL_UPDATE` | yes | changed | 20261022_060848 | 6 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
 | 🔁 | S | `SMSG_LFG_PLAYER_REWARD` | yes | changed | 20261022_053345 | 6 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
 | 🔁 | S | `SMSG_LFG_ROLE_CHECK_UPDATE` |  | same | 20261022_060848 | 6 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
@@ -618,6 +623,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_PLAY_OBJECT_SOUND` | yes | changed | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_PLAY_ONE_SHOT_ANIM_KIT` | yes | new in 4.x | 20261024_174049 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_PLAY_SPELL_VISUAL_KIT` | yes | new in 4.x | 20261024_155804 | 54 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| 🔁 | S | `SMSG_POWER_UPDATE` | yes | changed | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_PRE_RESSURECT` |  | same | 20261024_155804 | 12 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_PVP_CREDIT` |  | same | 20261024_191244 | 1 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
 | 🔁 | S | `SMSG_PVP_LOG_DATA` | yes | new in 4.x | 20261024_155804 | 15 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
@@ -639,20 +645,28 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_RESURRECT_REQUEST` |  | reviewed | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_RESYNC_RUNES` |  | same | 20261031_193607 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SELL_RESPONSE` |  | ? | 20261024_024153 | 3 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
+| 🔁 | S | `SMSG_SEND_KNOWN_SPELLS` | yes | changed | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| 🔁 | S | `SMSG_SEND_UNLEARN_SPELLS` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SERVER_FIRST_ACHIEVEMENT` |  | same | 20261031_214714 | 3 |  | HermesProxy/World/Client/PacketHandlers/AchievementHandler.cs |
+| 🔁 | S | `SMSG_SET_FLAT_SPELL_MODIFIER` | yes | changed | 20261101_001613 | 7 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| 🔁 | S | `SMSG_SET_PCT_SPELL_MODIFIER` | yes | changed | 20261101_001613 | 3 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SOCKET_GEMS` |  | same | 20261024_155804 | 19 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
 | 🔁 | S | `SMSG_SPELL_COOLDOWN` |  | same | 20261024_155804 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_DAMAGE_SHIELD` | yes | changed | 20261024_215336 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_DELAYED` |  | same | 20261021_180247 | 6 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_DISPELL_LOG` |  | same | 20261022_015111 | 6 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_ENERGIZE_LOG` |  | same | 20261030_013233 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| 🔁 | S | `SMSG_SPELL_EXECUTE_LOG` |  | same | 20261101_001613 | 2 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_FAILED_OTHER` |  | same | 20261024_155804 | 301 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_FAILURE` |  | same | 20261024_155804 | 301 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| 🔁 | S | `SMSG_SPELL_GO` | yes | changed | 20261101_001613 | 59 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_HEAL_LOG` |  | same | 20261024_155804 | 1273 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_INSTAKILL_LOG` |  | same | 20261024_024153 | 13 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_INTERRUPT_LOG` | yes | new in 4.x | 20261024_155804 | 45 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_MISS_LOG` |  | same | 20261024_155804 | 13 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| 🔁 | S | `SMSG_SPELL_NON_MELEE_DAMAGE_LOG` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_PERIODIC_AURA_LOG` |  | same | 20261031_182322 | 4 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
+| 🔁 | S | `SMSG_SPELL_START` | yes | changed | 20261101_001613 | 54 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_SPELL_STEAL_LOG` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_START_MIRROR_TIMER` |  | same | 20261022_090935 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_START_TIMER` | yes | new in 4.x | 20261024_155804 | 12 |  | HermesProxy/World/Client/PacketHandlers/BattleGroundHandler.cs |
@@ -665,6 +679,7 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | S | `SMSG_TRIGGER_CINEMATIC` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_TRIGGER_MOVIE` |  | same | 20261017_225242 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | 🔁 | S | `SMSG_TURN_IN_PETITION_RESULT` |  | same | 20261022_025027 | 1 |  | HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs |
+| 🔁 | S | `SMSG_UNLEARNED_SPELLS` |  | same | 20261101_001613 | 4 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | 🔁 | S | `SMSG_UPDATE_COMBO_POINTS` |  | same | 20261021_112409 | 95 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | 🔁 | S | `SMSG_USERLIST_ADD` |  | same | 20261031_193607 | 2 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | 🔁 | S | `SMSG_USERLIST_REMOVE` |  | same | 20261031_211345 | 3 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
@@ -742,7 +757,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_CALENDAR_UPDATE_EVENT` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/CalendarSystem.cs |
 | ✅ | C | `CMSG_CANCEL_TEMP_ENCHANTMENT` |  | same | 20261021_112409 | 5 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `CMSG_CANCEL_TRADE` |  | same | 20261031_222458 | 4 |  | HermesProxy/World/Server/Systems/TradeSystem.cs |
-| ✅ | C | `CMSG_CAST_SPELL` | yes | changed | 20261101_001613 | 2 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | C | `CMSG_CHAT_ADDON_MESSAGE_WHISPER` | yes | new in 4.x | 20261101_001613 | 422 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | ✅ | C | `CMSG_CHAT_CHANNEL_ANNOUNCEMENTS` | yes | same | 20261101_001613 | 2 |  | HermesProxy/World/Server/Systems/ChatSystem.cs |
 | ✅ | C | `CMSG_CHAT_CHANNEL_BAN` | yes | same | 20261031_211345 | 1 |  | HermesProxy/World/Server/Systems/ChatSystem.cs |
@@ -947,8 +961,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_ATTACKSWING_NOTINRANGE` |  | same | 20261024_155804 | 34 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_ATTACK_START` |  | same | 20261031_195640 | 16 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_ATTACK_STOP` |  | same | 20261024_215336 | 1 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
-| ✅ | S | `SMSG_AURA_UPDATE` | yes | same | 20261101_001613 | 32 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| ✅ | S | `SMSG_AURA_UPDATE_ALL` | yes | same | 20261101_001613 | 11 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_BARBER_SHOP_RESULT` |  | same | 20261024_070752 | 5 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_BATTLEFIELD_MGR_ENTRY_INVITE` | yes | changed | 20261022_145205 | 7 |  | HermesProxy/World/Client/PacketHandlers/BattlefieldMgrHandler.cs |
 | ✅ | S | `SMSG_BATTLEFIELD_MGR_QUEUE_INVITE` | yes | changed | 20261022_145205 | 10 |  | HermesProxy/World/Client/PacketHandlers/BattlefieldMgrHandler.cs |
@@ -966,7 +978,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_CANCEL_COMBAT` |  | same | 20261101_001613 | 4 |  | HermesProxy/World/Client/PacketHandlers/CombatHandler.cs |
 | ✅ | S | `SMSG_CHANNEL_NOTIFY` |  | same | 20261101_001613 | 10 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | ✅ | S | `SMSG_CHAT` | yes | changed | 20261101_001613 | 28 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
-| ✅ | S | `SMSG_CLEAR_COOLDOWNS` | yes | new in 4.x | 20261101_001613 | 2 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_CONTACT_LIST` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/SocialHandler.cs |
 | ✅ | S | `SMSG_CONTROL_UPDATE` | yes | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | S | `SMSG_CORPSE_RECLAIM_DELAY` |  | same | 20261030_014259 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
@@ -1023,7 +1034,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_INSTANCE_SAVE_CREATED` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
 | ✅ | S | `SMSG_ITEM_ENCHANT_TIME_UPDATE` |  | same | 20261101_001613 | 4 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
 | ✅ | S | `SMSG_ITEM_PUSH_RESULT` |  | same | 20261101_001613 | 2 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
-| ✅ | S | `SMSG_LEARNED_SPELL` |  | reviewed | 20261101_001613 | 4 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_LEVEL_UP_INFO` | yes | changed | 20261031_214714 | 2 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_LFG_JOIN_RESULT` | yes | changed | 20261024_180424 | 1 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
 | ✅ | S | `SMSG_LFG_OFFER_CONTINUE` |  | reviewed | 20261024_180424 | 1 |  | HermesProxy/World/Client/PacketHandlers/LFGHandler.cs |
@@ -1069,7 +1079,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_PLAYED_TIME` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_PLAY_SOUND` | yes | changed | 20261031_172248 | 2 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_PONG` |  | same | 20261101_001613 | 4 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
-| ✅ | S | `SMSG_POWER_UPDATE` | yes | changed | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_PRINT_NOTIFICATION` | yes | ? | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/ChatHandler.cs |
 | ✅ | S | `SMSG_QUERY_CREATURE_RESPONSE` | yes | changed | 20261031_222458 | 26 |  | HermesProxy/World/Client/PacketHandlers/QueryHandler.cs |
 | ✅ | S | `SMSG_QUERY_GAME_OBJECT_RESPONSE` | yes | changed | 20261101_001613 | 18 |  | HermesProxy/World/Client/PacketHandlers/QueryHandler.cs |
@@ -1094,25 +1103,17 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_RAID_MARKERS_CHANGED` | yes | new in 4.x | 20261031_201804 | 6 |  | HermesProxy/World/Client/PacketHandlers/GroupHandler.cs |
 | ✅ | S | `SMSG_REQUEST_CEMETERY_LIST_RESPONSE` | yes | new in 4.x | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_RESET_FAILED_NOTIFY` |  | same | 20261021_160516 | 1 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
-| ✅ | S | `SMSG_SEND_KNOWN_SPELLS` | yes | changed | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| ✅ | S | `SMSG_SEND_UNLEARN_SPELLS` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_SETUP_CURRENCY` | yes | new in 4.x | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/CurrencyHandler.cs |
 | ✅ | S | `SMSG_SETUP_RESEARCH_HISTORY` | yes | new in 4.x | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/CurrencyHandler.cs |
 | ✅ | S | `SMSG_SET_AI_ANIM_KIT` | yes | new in 4.x | 20261024_180424 | 59 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_SET_ANIM_TIER` | yes | new in 4.x | 20261101_001613 | 2 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | S | `SMSG_SET_FACTION_STANDING` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/ReputationHandler.cs |
 | ✅ | S | `SMSG_SET_FACTION_VISIBLE` |  | same | 20261024_155804 | 2 |  | HermesProxy/World/Client/PacketHandlers/ReputationHandler.cs |
-| ✅ | S | `SMSG_SET_FLAT_SPELL_MODIFIER` | yes | changed | 20261101_001613 | 7 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_SET_FORCED_REACTIONS` |  | same | 20261101_001613 | 3 |  | HermesProxy/World/Client/PacketHandlers/ReputationHandler.cs |
-| ✅ | S | `SMSG_SET_PCT_SPELL_MODIFIER` | yes | changed | 20261101_001613 | 3 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_SET_PLAY_HOVER_ANIM` | yes | new in 4.x | 20261101_001613 | 4 |  | HermesProxy/World/Client/PacketHandlers/MovementHandler.cs |
 | ✅ | S | `SMSG_SET_PROFICIENCY` |  | same | 20261101_001613 | 2 |  | HermesProxy/World/Client/PacketHandlers/ItemHandler.cs |
 | ✅ | S | `SMSG_SHOW_BANK` |  | same | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
 | ✅ | S | `SMSG_SHOW_TAXI_NODES` | yes | changed | 20261024_070752 | 1 |  | HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs |
-| ✅ | S | `SMSG_SPELL_EXECUTE_LOG` |  | same | 20261101_001613 | 2 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| ✅ | S | `SMSG_SPELL_GO` | yes | changed | 20261101_001613 | 59 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| ✅ | S | `SMSG_SPELL_NON_MELEE_DAMAGE_LOG` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
-| ✅ | S | `SMSG_SPELL_START` | yes | changed | 20261101_001613 | 54 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_SPIRIT_HEALER_CONFIRM` |  | same | 20261021_180247 | 2 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
 | ✅ | S | `SMSG_STAND_STATE_UPDATE` |  | same | 20261030_013609 | 2 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
 | ✅ | S | `SMSG_STOP_MIRROR_TIMER` |  | same | 20261030_014259 | 3 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
@@ -1128,7 +1129,6 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | S | `SMSG_TRAINER_BUY_FAILED` |  | reviewed | 20261024_155804 | 2 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
 | ✅ | S | `SMSG_TRAINER_LIST` | yes | changed | 20261024_155804 | 3 |  | HermesProxy/World/Client/PacketHandlers/NPCHandler.cs |
 | ✅ | S | `SMSG_TUTORIAL_FLAGS` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/MiscHandler.cs |
-| ✅ | S | `SMSG_UNLEARNED_SPELLS` |  | same | 20261101_001613 | 4 |  | HermesProxy/World/Client/PacketHandlers/SpellHandler.cs |
 | ✅ | S | `SMSG_UPDATE_ACTION_BUTTONS` | yes | changed | 20261101_001613 | 1 |  | HermesProxy/World/Client/PacketHandlers/CharacterHandler.cs |
 | ✅ | S | `SMSG_UPDATE_CURRENCY` | yes | new in 4.x | 20261101_001613 | 2 |  | HermesProxy/World/Client/PacketHandlers/CurrencyHandler.cs |
 | ✅ | S | `SMSG_UPDATE_INSTANCE_ENCOUNTER_UNIT` | yes | changed | 20261024_155804 | 1 |  | HermesProxy/World/Client/PacketHandlers/InstanceHandler.cs |
@@ -1221,7 +1221,7 @@ HermesProxy/World/Client/PacketHandlers/QueryHandler.cs adcc99affcbaf6a5
 HermesProxy/World/Client/PacketHandlers/QuestHandler.cs 926c9b9b6ca11c48
 HermesProxy/World/Client/PacketHandlers/ReputationHandler.cs 8779f67cd63844c7
 HermesProxy/World/Client/PacketHandlers/SocialHandler.cs 82df06fafc59f62c
-HermesProxy/World/Client/PacketHandlers/SpellHandler.cs cd9ef97a90eadc6a
+HermesProxy/World/Client/PacketHandlers/SpellHandler.cs 5044494a4b0be2e7
 HermesProxy/World/Client/PacketHandlers/SupportTicketHandler.cs 2a0596ae281fb06f
 HermesProxy/World/Client/PacketHandlers/SystemHandler.cs 806898d603ef9252
 HermesProxy/World/Client/PacketHandlers/TalentHandler.cs 44aefb28c8709d82
