@@ -154,6 +154,7 @@ public class Program
     {
         [nameof(ClientOptions.ClientBuild)]        = $"{nameof(ClientOptions)}:{nameof(ClientOptions.ClientBuild)}",
         ["ClientSeed"]                             = $"{nameof(ClientOptions)}:{nameof(ClientOptions.SeedHex)}",
+        [nameof(ClientOptions.SeedHex)]            = $"{nameof(ClientOptions)}:{nameof(ClientOptions.SeedHex)}",
         [nameof(ClientOptions.ReportedOS)]         = $"{nameof(ClientOptions)}:{nameof(ClientOptions.ReportedOS)}",
         [nameof(ClientOptions.ReportedPlatform)]   = $"{nameof(ClientOptions)}:{nameof(ClientOptions.ReportedPlatform)}",
 

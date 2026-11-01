@@ -134,6 +134,10 @@ HermesProxy --LegacyServerOptions:Address=logon.example.com --LegacyServerOption
 # Legacy --set form still works
 HermesProxy --set ServerAddress=logon.example.com --set ServerPort=3725
 
+# Override the client seed, in either form
+HermesProxy --ClientOptions:SeedHex=179D3DC3235629D07113A9B3867F97A7
+HermesProxy --set SeedHex=179D3DC3235629D07113A9B3867F97A7
+
 # Run with latency metrics enabled (a summary is written to the log every 60 seconds)
 HermesProxy --metrics
 
