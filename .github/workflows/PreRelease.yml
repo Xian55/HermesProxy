@@ -43,6 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.next.outputs.tag }}
+      semver: ${{ steps.next.outputs.semver }}
       floor: ${{ steps.next.outputs.floor }}
       slug: ${{ steps.next.outputs.slug }}
     steps:
@@ -72,6 +73,7 @@ jobs:
           echo "Prerelease tag: $tag"
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "semver=${tag#v}" >> "$GITHUB_OUTPUT"
           echo "floor=$floor" >> "$GITHUB_OUTPUT"
           echo "slug=$slug" >> "$GITHUB_OUTPUT"
 
@@ -287,6 +289,7 @@ jobs:
             --title "Pre-release: ${{ github.ref_name }} @ ${GITHUB_SHA::7} — ${subject}" \
             --notes "Branch: \`${{ github.ref_name }}\`
           Commit: \`${GITHUB_SHA}\`
+          Image: \`ghcr.io/xian55/hermesproxy:${tag#v}\`, published once its smoke test passes
 
           ---
 
@@ -316,7 +319,8 @@ jobs:
           echo "Prerelease publish failed"
           exit 1
 
-  # Tagged with the branch, so a branch keeps one image and never touches `latest`.
+  # The version names this one build, as the prerelease does, so a report can say which it ran.
+  # The branch tag follows the newest. Neither touches `latest`.
   docker:
     needs: [version, prerelease]
     permissions:
@@ -324,4 +328,5 @@ jobs:
       packages: write
     uses: ./.github/workflows/docker-image.yml
     with:
-      tag: ${{ needs.version.outputs.slug }}
+      version: ${{ needs.version.outputs.semver }}
+      moving-tag: ${{ needs.version.outputs.slug }}

@@ -358,5 +358,5 @@ jobs:
       packages: write
     uses: ./.github/workflows/docker-image.yml
     with:
-      tag: ${{ needs.version.outputs.semver }}
-      latest: ${{ github.ref == 'refs/heads/master' && inputs.version == '' }}
+      version: ${{ needs.version.outputs.semver }}
+      moving-tag: ${{ github.ref == 'refs/heads/master' && inputs.version == '' && 'latest' || '' }}

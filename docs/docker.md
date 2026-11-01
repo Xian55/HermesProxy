@@ -1,6 +1,6 @@
 # Running HermesProxy in Docker
 
-The image is `ghcr.io/xian55/hermesproxy`, for amd64 and arm64. `latest` is the newest release, and each release also has its version as a tag, such as `4.7.0`. Everything is configured from outside: nothing in the image needs changing.
+The image is `ghcr.io/xian55/hermesproxy`, for amd64 and arm64. `latest` is the newest release, and each release also has its version as a tag, such as `4.7.0`. A prerelease has its version too, such as `4.7.0-feature-x-abc1234`, and `feature-x` follows the newest build of that branch. Everything is configured from outside: nothing in the image needs changing.
 
 ```bash
 docker run -d --name hermes \

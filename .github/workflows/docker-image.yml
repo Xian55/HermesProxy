@@ -9,15 +9,15 @@ name: Docker image
 on:
   workflow_call:
     inputs:
-      tag:
-        description: 'Image tag, e.g. 4.7.0 or feature-x'
+      version:
+        description: 'The tag of this one build, which no later build reuses, e.g. 4.7.0'
         required: true
         type: string
-      latest:
-        description: 'Also move the latest tag'
+      moving-tag:
+        description: 'A tag that follows the newest build, e.g. latest or feature-x'
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: ''
 
 env:
   IMAGE: ghcr.io/xian55/hermesproxy
@@ -63,6 +63,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.IMAGE }}:${{ inputs.tag }}
-            ${{ inputs.latest && format('{0}:latest', env.IMAGE) || '' }}
-          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            ${{ env.IMAGE }}:${{ inputs.version }}
+            ${{ inputs.moving-tag && format('{0}:{1}', env.IMAGE, inputs.moving-tag) || '' }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ inputs.version }}
