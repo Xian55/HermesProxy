@@ -83,6 +83,30 @@ public class PetSpells : ServerPacket
     public List<PetSpellHistory> SpellHistory = new();
 }
 
+/// <summary>
+/// The owner's pet changed its orders, or may no longer take any (<see cref="Flag"/> 0x08). The
+/// client greys the pet's bar on a mounted owner without this packet.
+/// </summary>
+public sealed class PetMode : ServerPacket
+{
+    public PetMode() : base(Opcode.SMSG_PET_MODE) { }
+
+    public override bool NeedsObject(WowGuid128 guid) => guid == PetGUID;
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(PetGUID);
+        _worldPacket.WriteUInt8((byte)CommandState);
+        _worldPacket.WriteUInt8(Flag);
+        _worldPacket.WriteUInt8((byte)ReactState);
+    }
+
+    public WowGuid128 PetGUID;
+    public CommandStates CommandState;
+    public byte Flag;
+    public ReactStates ReactState;
+}
+
 public class PetSpellCooldown
 {
     public uint SpellID;
