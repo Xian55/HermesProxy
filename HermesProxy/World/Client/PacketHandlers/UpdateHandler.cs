@@ -1336,6 +1336,17 @@ public partial class WorldClient
         {
             GetSession().ToClient.Notify(OutboxEvent.GuidKnown(GetSession().GameState.CurrentPlayerGuid));
         }
+        NotifyPetKnown();
+    }
+
+    /// <summary>
+    /// Releases what waited for the pet's create. ClientHasPetObject is set when that create is
+    /// written, so this goes behind every path that sends one, the deferred player batch included.
+    /// </summary>
+    internal void NotifyPetKnown()
+    {
+        if (GetSession().ToClient.HasPending && GetSession().GameState.ClientHasPetObject)
+            GetSession().ToClient.Notify(OutboxEvent.GuidKnown(GetSession().GameState.CurrentPetGuid));
     }
 
     public void ReadNearObjectsBlock(WorldPacket packet, int index)
@@ -3068,6 +3079,11 @@ public partial class WorldClient
                 var corrected = WowGuid128.Create(HighGuidType703.Pet, 0, realEntry, counter);
 
                 GetSession().GameState.RegisterPet(legacyGuid, corrected, realEntry, petNumber);
+
+                // The spell bar came first and named the pet by its number. Every packet about the
+                // pet from here on carries this guid, and each is compared with the current pet.
+                if (GetSession().GameState.CurrentPetGuid == guid)
+                    GetSession().GameState.CurrentPetGuid = corrected;
 
                 updateData.Guid = corrected;
                 updateData.ObjectData.Guid = corrected;

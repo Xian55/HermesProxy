@@ -28,6 +28,19 @@ internal sealed class SessionClientWire(GlobalSessionData session) : IClientWire
             return state.ClientHasPlayerObject ? default : state.CurrentPlayerGuid;
         }
     }
+
+    public WowGuid128 AwaitedPet
+    {
+        get
+        {
+            // The older clients skip FilterV3_4_3Values, which is what notes the pet's create.
+            if (!ModernVersion.IsWotLKClassicOrLater)
+                return default;
+
+            var state = session.GameState;
+            return state.ClientHasPetObject ? default : state.CurrentPetGuid;
+        }
+    }
 }
 
 /// <summary>Writes server-bound packets through the session's current world client.</summary>

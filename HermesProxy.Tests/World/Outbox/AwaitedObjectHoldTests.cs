@@ -16,6 +16,7 @@ public class AwaitedObjectHoldTests
 {
     private static readonly WowGuid128 Player = WowGuid128.Create(HighGuidType703.Player, 1);
     private static readonly WowGuid128 Other = WowGuid128.Create(HighGuidType703.Player, 2);
+    private static readonly WowGuid128 Pet = WowGuid128.Create(HighGuidType703.Pet, 0, 416, 3);
     private static readonly OutboxEvent PlayerKnown = OutboxEvent.GuidKnown(Player);
 
     private static TestServerPacket Needing(WowGuid128 guid, int id) =>
@@ -42,6 +43,59 @@ public class AwaitedObjectHoldTests
 
         Assert.Equal([2, 3, 1, 4], Written(wire));
         Assert.Equal(0, outbox.PendingCount);
+    }
+
+    [Fact]
+    public void PacketNeedingTheAwaitedPet_WaitsForItsCreate_AndTheRestKeepsFlowing()
+    {
+        var wire = new RecordingClientWire { AwaitedPet = Pet };
+        var outbox = OutboxTestExtensions.InWorld(wire);
+
+        outbox.Send(Needing(Pet, 1));
+        outbox.Send(Needing(Player, 2));
+        outbox.Send(Needing(Pet, 3));
+
+        Assert.Equal([2], Written(wire));
+
+        wire.AwaitedPet = default;
+        outbox.Notify(OutboxEvent.GuidKnown(Pet));
+
+        Assert.Equal([2, 1, 3], Written(wire));
+        Assert.Equal(0, outbox.PendingCount);
+    }
+
+    /// <summary>A pet's create can come while the player's is still held, and each waits for its own.</summary>
+    [Fact]
+    public void PlayerAndPetAwaited_EachWaitsForItsOwn()
+    {
+        var wire = new RecordingClientWire { AwaitedObject = Player, AwaitedPet = Pet };
+        var outbox = OutboxTestExtensions.InWorld(wire);
+
+        outbox.Send(Needing(Player, 1));
+        outbox.Send(Needing(Pet, 2));
+
+        wire.AwaitedObject = default;
+        outbox.Notify(PlayerKnown);
+        Assert.Equal([1], Written(wire));
+
+        wire.AwaitedPet = default;
+        outbox.Notify(OutboxEvent.GuidKnown(Pet));
+        Assert.Equal([1, 2], Written(wire));
+    }
+
+    /// <summary>A map change cancels the holds under this key, so the pet's go with the player's.</summary>
+    [Fact]
+    public void PacketHeldForThePet_IsCancelledWithTheAwaitedObjectKey()
+    {
+        var wire = new RecordingClientWire { AwaitedPet = Pet };
+        var outbox = OutboxTestExtensions.InWorld(wire);
+
+        outbox.Send(Needing(Pet, 1));
+        outbox.Cancel(ClientOutbox.AwaitedObjectKey);
+        wire.AwaitedPet = default;
+        outbox.Notify(OutboxEvent.GuidKnown(Pet));
+
+        Assert.Empty(Written(wire));
     }
 
     [Fact]

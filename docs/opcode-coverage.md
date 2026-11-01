@@ -221,7 +221,7 @@ silently wrong wherever it does not. Check each against the 4.4.2 client
 (`docs/protocol/4.4.2.60895`) before 4.4.2 becomes a supported build; where it differs, the
 site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a narrower check.
 
-202 sites across 57 files.
+203 sites across 58 files.
 
 | file | sites |
 |---|---:|
@@ -268,6 +268,7 @@ site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a n
 | `HermesProxy/World/Client/PacketHandlers/TradeHandler.cs` | 1 |
 | `HermesProxy/World/Client/PacketHandlers/UpdateHandlerCata.cs` | 1 |
 | `HermesProxy/World/Client/SeatGravity.cs` | 1 |
+| `HermesProxy/World/Outbox/SessionWires.cs` | 1 |
 | `HermesProxy/World/Server/Packets/ArenaPackets.cs` | 1 |
 | `HermesProxy/World/Server/Packets/ChatPackets.cs` | 1 |
 | `HermesProxy/World/Server/Packets/Codecs/SupportTicketCodecs.cs` | 1 |
