@@ -47,6 +47,9 @@ internal static class DeliberatelyUnhandledOpcodes
         Opcode.CMSG_USED_FOLLOW,
         Opcode.CMSG_REQUEST_CROWD_CONTROL_SPELL,
         Opcode.CMSG_QUERY_PLAYER_NAME_BY_COMMUNITY_ID,
+        // The client's word that it cancelled a growth aura: the handler of it is empty in
+        // AzerothCore, CMaNGOS and TrinityCore 4.3.4, so forwarding it would do nothing.
+        Opcode.CMSG_CANCEL_GROWTH_AURA,
         // The auction sales waiting for their money, asked whenever the auction house opens:
         // TrinityCore wotlk_classic and cata_classic do not register the opcode, and every 3.3.5a
         // server answers it with an empty list.
@@ -91,12 +94,14 @@ internal static class DeliberatelyUnhandledOpcodes
         // client has an opcode for it, and the new slot count arrives in the player's fields.
         Opcode.SMSG_BUY_BANK_SLOT_RESULT,
         // Gone from every modern client's table, and from TrinityCore wotlk_classic: the 3.3.5a raid
-        // browser's word that a search is on, an arena opponent's unit, and from 1.12 and 2.4.3 the
-        // rest timer (resting arrives in the player's flags) and a channelled spell's targets.
+        // browser's word that a search is on, an arena opponent's unit, from 1.12 and 2.4.3 the
+        // rest timer (resting arrives in the player's flags) and a channelled spell's targets, and
+        // from 2.4.3 the state of the old looking for group window.
         Opcode.SMSG_LFG_UPDATE_SEARCH,
         Opcode.SMSG_ARENA_OPPONENT_UPDATE,
         Opcode.SMSG_SET_REST_START,
         Opcode.SMSG_SPELL_UPDATE_CHAIN_TARGETS,
+        Opcode.SMSG_LFG_UPDATE,
     }.ToFrozenSet();
 
     public static bool IsFromClient(Opcode opcode) => FromClient.Contains(opcode);
