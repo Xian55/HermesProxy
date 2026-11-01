@@ -39,7 +39,17 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build for the smoke test
+      # Both at once: a dotnet publish takes over a minute, and one after the other was most of this
+      # job. The two steps that use the result find it in the builder's cache.
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          outputs: type=cacheonly
+          provenance: false
+
+      - name: Load for the smoke test
         uses: docker/build-push-action@v7
         with:
           context: .
