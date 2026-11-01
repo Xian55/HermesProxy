@@ -8,6 +8,7 @@ namespace HermesProxy.Configuration.Options;
 ///
 /// Every value is in milliseconds and can be set to 0 to disable that throttle entirely.
 /// </summary>
+[ConfigSection(6)]
 public sealed class ThrottlingOptions
 {
     /// <summary>
@@ -19,5 +20,6 @@ public sealed class ThrottlingOptions
     /// Measured on AzerothCore with mod-playerbots: a 15v15 battleground produced 1,608
     /// SMSG_PARTY_MEMBER_PARTIAL_STATE per second, roughly 107 per raid member per second.
     /// </summary>
+    [Setting("Minimum milliseconds between forwarded party-member updates that carry only health, power or position. 0 turns the throttle off.")]
     public int PartyMemberStateMinIntervalMs { get; set; } = 200;
 }

@@ -2,3 +2,6 @@
 # for byte with what the legacy server sends. core.autocrlf=true would rewrite those to
 # CRLF on checkout and the rows would stop matching on Windows only.
 HermesProxy/CSV/BroadcastTexts3.csv text eol=lf
+
+# Run by bash on Windows too, where a CRLF checkout would break it.
+scripts/docker-smoke.sh text eol=lf

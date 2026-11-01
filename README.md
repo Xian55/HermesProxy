@@ -76,6 +76,8 @@ The proxy automatically selects the best legacy version based on your client:
 
 Stable Downloads: [Releases](https://github.com/Xian55/HermesProxy/releases)
 
+Docker: `ghcr.io/xian55/hermesproxy`, for amd64 and arm64. See [docs/docker.md](docs/docker.md).
+
 ## Usage Instructions
 
 - Edit `appsettings.json` next to the proxy executable — set `ClientOptions:ClientBuild` for your game client, and `LegacyServerOptions:Build` / `:Address` / `:Port` for the remote realmd. Anything in the file can also be overridden at launch via `--Section:Key=Value` or the legacy `--set Key=Value`.
@@ -107,167 +109,14 @@ HermesProxy provides some internal chat commands:
 | `!qcomplete <questId>`     | Manually marks a quest as already completed (useful for quest helper addons) |
 | `!quncomplete <questId>`   | Unmarks a quest as completed                                                 |
 
-## Command Line Arguments
+## Configuration
 
-| Argument                                | Description                                                                                     |
-|-----------------------------------------|-------------------------------------------------------------------------------------------------|
-| `--config <path>`                       | Use an alternate `appsettings.json` (default: `appsettings.json` in the working directory)      |
-| `--Section:Key=Value`                   | Native override of any appsettings key (repeatable). Section = `ClientOptions`, `LegacyServerOptions`, `ProxyNetworkOptions`, `LoggingOptions`, `DiagnosticsOptions`. |
-| `--set <Key>=<Value>`                   | Legacy override syntax — flat keys translated to their section-qualified equivalents.           |
-| `--no-version-check`                    | Disable the check for newer versions on startup                                                 |
-| `--metrics`                             | Enable per-opcode latency metrics collection. A top-20 summary is logged every 60 s (see below) |
-| `--metrics-interval <seconds>`          | Enable metrics and log the summary every `<seconds>` instead of 60 (1-3600)                    |
+Every setting, with its `appsettings.json` key, environment variable and command-line form, is in [docs/configuration.md](docs/configuration.md). `HermesProxy --help` prints the same list.
 
-Environment variables prefixed with `HERMES_` are also picked up — e.g. `HERMES_LegacyServerOptions__Address=logon.example.com`.
-
-**Examples:**
-```bash
-# Use a custom appsettings file
-HermesProxy --config MyServer.json
-
-# Override server address (native section:key syntax)
-HermesProxy --LegacyServerOptions:Address=logon.example.com
-
-# Override multiple values
-HermesProxy --LegacyServerOptions:Address=logon.example.com --LegacyServerOptions:Port=3725
-
-# Legacy --set form still works
-HermesProxy --set ServerAddress=logon.example.com --set ServerPort=3725
-
-# Override the client seed, in either form
-HermesProxy --ClientOptions:SeedHex=179D3DC3235629D07113A9B3867F97A7
-HermesProxy --set SeedHex=179D3DC3235629D07113A9B3867F97A7
-
-# Run with latency metrics enabled (a summary is written to the log every 60 seconds)
-HermesProxy --metrics
-
-# Same, but summarise every 15 seconds to isolate short bursts
-HermesProxy --metrics-interval 15
-
-# Metrics + verbose packet capture, handy when profiling a suspicious opcode
-HermesProxy --metrics --LoggingOptions:PacketLevel=Debug
-```
-
-### `--metrics` Details
-
-When enabled, HermesProxy tracks per-opcode handler latency **and managed bytes allocated per packet** for both directions (Client → Server and Server → Client), plus process-wide GC counters, and emits a summary every minute (or every `--metrics-interval` seconds) through the `Server` logging category. The GC line is printed even when idle; the per-opcode tables only once traffic has been observed.
-
-Each summary covers one interval. The packet rates, the GC line and the latency table's `Int` (packets) and `IntMax` (slowest packet) columns reset every summary; the latency table lists only opcodes seen in that interval, slowest first. `P50`/`P95`/`P99` are over each opcode's last 1000 packets, and `Max`, `Total` and the allocation table are totals since startup.
-
-```
-17:42:14 | I | S | Server          | Proxy Metrics: 842 C->S opcodes, 1203 S->C opcodes tracked
-17:42:14 | I | S | Server          | Proxy Metrics (Uptime: 00:12:03) | C->S 18422 pkts (31.2/s) | S->C 90311 pkts (150.8/s)
-17:42:14 | I | S | Server          | GC over 60s: gen0 +14 gen1 +2 gen2 +0 | allocated 118.4 MB (1.97 MB/s) | heap 61.2 MB | pause 0.31%
-17:42:14 | I | S | Server          | <per direction: top 20 opcodes by max latency this interval with avg/max/total bytes, then top 20 by total allocated bytes>
-```
-
-Useful for: identifying slow-dispatching opcodes, finding which opcodes drive allocation and GC pressure, spotting regressions after a packet-handler change, and validating that hot-path migrations didn't shift the profile. Leave it off in normal play — it costs a timestamp and an allocation-counter read per packet.
-
-## Configuration Reference
-
-Primary config is `appsettings.json` (loaded from the working directory, required). Layered overrides applied in order:
-
-1. `appsettings.json` — base.
-2. `appsettings.{Environment}.json` — environment-specific overlay (e.g. `appsettings.Development.json`), optional.
-3. `HERMES_*` environment variables — `HERMES_Section__Key=Value` (`__` doubles as the section separator).
-4. CLI args — `--Section:Key=Value` native or `--set Key=Value` legacy.
-
-### ClientOptions
-
-| Key                | Default                            | Description                                                                                |
-|--------------------|------------------------------------|--------------------------------------------------------------------------------------------|
-| `ClientBuild`      | `V2_5_2_40892`                     | `ClientVersionBuild` enum value: `V1_14_0_40618`, `V1_14_1_41794`, `V1_14_2_42597`, `V2_5_2_40892`, `V2_5_3_42328`, `V3_4_3_54261` (beta), `V4_4_2_60895` (preview). |
-| `SeedHex`          | `179D3DC3235629D07113A9B3867F97A7` | 32-character hex string (16 bytes).                                                        |
-| `ReportedOS`       | `OSX`                              | OS identifier sent to the legacy server (`OSX`, `Win`, etc.).                              |
-| `ReportedPlatform` | `x86`                              | Platform identifier sent to legacy server (`x86`, `x64`).                                  |
-
-### LegacyServerOptions
-
-| Key       | Default     | Description                                                                                       |
-|-----------|-------------|---------------------------------------------------------------------------------------------------|
-| `Build`   | `auto`      | Legacy server build to target. `auto`, `V1_12_1_5875`, `V2_4_3_8606`, `V3_3_5a_12340`, `V4_3_4_15595`. |
-| `Address` | `127.0.0.1` | Address of the legacy realmd (what you'd use in `SET REALMLIST`).                                 |
-| `Port`    | `3724`      | Port of the legacy authentication server.                                                         |
-| `Password` | *(empty)*  | Legacy account password, needed only by clients that log in with SRP (Cataclysm Classic 4.4.x). Set it through `HERMES_LegacyServerOptions__Password`, never in a file; empty means the proxy asks at startup. |
-
-### ProxyNetworkOptions
-
-All ports must be in the range `1-65535`.
-
-| Key               | Default     | Description                                                              |
-|-------------------|-------------|--------------------------------------------------------------------------|
-| `ExternalAddress` | `127.0.0.1` | Your IP address for others to connect (for hosting).                     |
-| `BNetPort`        | `1119`      | BNet/Portal server (use this in your `Config.wtf`).                      |
-| `RestPort`        | `8081`      | REST API server.                                                         |
-| `RealmPort`       | `8084`      | Realm server.                                                            |
-| `InstancePort`    | `8086`      | Instance server.                                                         |
-| `CertificatePfxPath`     | *(none)* | Optional path to a custom PKCS#12 (.pfx) certificate served on the BNet TLS endpoints (`BNetPort`/`RestPort`). When unset, the embedded TrinityCore-compatible certificate is used. |
-| `CertificatePfxPassword` | *(none)* | Password for `CertificatePfxPath`; omit for a passwordless pfx.          |
-
-#### TLS certificate
-
-By default the proxy serves the well-known TrinityCore development certificate (`CN=*.*`, issued by the TrinityCore Battle.net Aurora CA). This is what virtually every patched modern client expects: Arctium-launched clients skip certificate validation entirely, and clients patched with a TrinityCore-style connection patcher are pinned to exactly this CA chain. **Leave the default alone unless you know you need something else.** The startup log prints the active certificate's subject, issuer and expiry.
-
-`CertificatePfxPath` exists for setups that validate against the **system trust store** instead (e.g. [wowpatch](https://github.com/motivewc/wowpatch)). Those need a certificate that chains to a trusted root CA plus a hostname (not an IP) in the `portal` CVar:
-
-- **Hosted proxy (recommended for server operators):** run HermesProxy on a host with a real domain name and point `CertificatePfxPath` at a publicly trusted certificate for that domain (e.g. Let's Encrypt). Players set `portal "yourdomain.com"` and need no client-side certificate setup at all.
-- **Local proxy with a custom CA:** generate your own CA and a `localhost` leaf certificate, install the CA into the local trust store, and point `CertificatePfxPath` at the leaf pfx. Never distribute a CA's **private key** — anyone holding it can forge trusted certificates for every user who installed that CA.
-
-### LoggingOptions
-
-Serilog-backed pipe-delimited logger. Per-category levels (`Server` / `Network` / `Storage` / `Packet`), color-coded console + plain rolling file at `Logs/hermes-YYYYMMDD.log`. Override at runtime via `--LoggingOptions:PacketLevel=Debug`. Optional movement trace via `HERMES_TRACE_MOVEMENT=1`.
-
-Full reference (line format, severity/category letters, settings table, CLI examples, movement trace): [docs/logging.md](docs/logging.md).
-
-### DiagnosticsOptions
-
-| Key                  | Default | Description                                                                  |
-|----------------------|---------|------------------------------------------------------------------------------|
-| `PacketsLog`         | `true`  | Dump each session's raw packets to `PacketsLog/*.pkt` for replay/inspection. |
-| `EnableMetrics`      | `false` | Same as `--metrics` flag; per-opcode latency summary every 60 s.             |
-| `MetricsIntervalSeconds` | `60` | Seconds between metrics summaries (1-3600). Same as `--metrics-interval`. |
-| `EnableVersionCheck` | `true`  | Check for newer HermesProxy versions on startup.                             |
-
-### Example Configuration
-
-```json
-{
-  "ClientOptions": {
-    "ClientBuild": "V2_5_2_40892",
-    "SeedHex": "179D3DC3235629D07113A9B3867F97A7",
-    "ReportedOS": "OSX",
-    "ReportedPlatform": "x86"
-  },
-  "LegacyServerOptions": {
-    "Build": "auto",
-    "Address": "127.0.0.1",
-    "Port": 3724
-  },
-  "ProxyNetworkOptions": {
-    "ExternalAddress": "127.0.0.1",
-    "RestPort": 8081,
-    "BNetPort": 1119,
-    "RealmPort": 8084,
-    "InstancePort": 8086
-  },
-  "LoggingOptions": {
-    "MinimumLevel": "Information",
-    "ServerLevel": "Information",
-    "NetworkLevel": "Information",
-    "StorageLevel": "Information",
-    "PacketLevel": "Warning",
-    "ConsoleLevel": "Information",
-    "ToFile": true,
-    "Directory": "Logs"
-  },
-  "DiagnosticsOptions": {
-    "PacketsLog": true,
-    "EnableMetrics": false,
-    "MetricsIntervalSeconds": 60,
-    "EnableVersionCheck": true
-  }
-}
-```
+- [docs/docker.md](docs/docker.md): running the proxy in a container.
+- [docs/logging.md](docs/logging.md): reading a log line, levels and categories.
+- [docs/metrics.md](docs/metrics.md): what `--metrics` measures.
+- [docs/tls-certificate.md](docs/tls-certificate.md): when the default certificate is not enough.
 
 ## Diagnostics
 

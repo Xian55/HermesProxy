@@ -52,6 +52,12 @@ partial class Server
     internal static void LogExternalIp(string address)
         => ServerLogMessages.ExternalIp(_melNetwork, _sourceFile, _netDirNone, address);
 
+    internal static void LogExternalAddressLoopback(string externalAddress, string bindAddress)
+        => ServerLogMessages.ExternalAddressLoopback(_melNetwork, _sourceFile, _netDirNone, externalAddress, bindAddress);
+
+    internal static void LogOldFilesSwept(int count, string kind, int days, long megabytes)
+        => ServerLogMessages.OldFilesSwept(_melServer, _sourceFile, _netDirNone, count, kind, days, megabytes);
+
     internal static void LogStartingService(string serviceName, string endpoint)
         => ServerLogMessages.StartingService(_melServer, _sourceFile, _netDirNone, serviceName, endpoint);
 

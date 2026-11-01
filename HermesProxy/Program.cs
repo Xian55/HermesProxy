@@ -10,6 +10,7 @@ using BNetServer;
 using BNetServer.Networking;
 using Framework.Logging;
 using Framework.Networking;
+using HermesProxy.Configuration;
 using HermesProxy.Configuration.Options;
 using HermesProxy.World.Server;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +24,12 @@ public class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        if (args.Any(static arg => arg is "--help" or "-h"))
+        {
+            Console.Write(ConfigReference.ToHelp());
+            return 0;
+        }
+
         // Enable .NET createdump on native crashes / FailFast / stack overflow /
         // GC corruption — managed exceptions are already covered by the handlers
         // below, but native-side faults terminate the process *without* firing
@@ -129,6 +136,7 @@ public class Program
         builder.Services.AddSingleton<IValidateOptions<ClientOptions>, ClientOptionsValidator>();
         builder.Services.AddSingleton<IValidateOptions<LegacyServerOptions>, LegacyServerOptionsValidator>();
         builder.Services.AddSingleton<IValidateOptions<ProxyNetworkOptions>, ProxyNetworkOptionsValidator>();
+        builder.Services.AddSingleton<IValidateOptions<LoggingOptions>, LoggingOptionsValidator>();
         builder.Services.AddSingleton<IValidateOptions<DiagnosticsOptions>, DiagnosticsOptionsValidator>();
 
         builder.Services.AddSingleton<LoginServiceManager>();
@@ -141,8 +149,12 @@ public class Program
         builder.Services.AddHostedService<StopSignalService>();
 
         using var host = builder.Build();
+
+        // The host only logs a faulted service and stops, so a proxy that could not bind would exit
+        // 0 and `restart: on-failure` would never retry it. Fetched first: RunAsync disposes the host.
+        var proxy = host.Services.GetServices<IHostedService>().OfType<ProxyHostedService>().Single();
         await host.RunAsync();
-        return 0;
+        return proxy.ExecuteTask is { IsFaulted: true } ? 1 : 0;
     }
 
     // Back-compat translation table: maps the flat pre-modernization config keys (as used by
@@ -150,7 +162,7 @@ public class Program
     // equivalents under the five Options DTOs. Both sides use nameof where the legacy key
     // happens to match the current property name; the remaining LHS entries are frozen
     // historical strings (Settings.cs is deleted so they have no live symbol).
-    private static readonly Dictionary<string, string> LegacySetKeyMap = new(StringComparer.OrdinalIgnoreCase)
+    internal static readonly Dictionary<string, string> LegacySetKeyMap = new(StringComparer.OrdinalIgnoreCase)
     {
         [nameof(ClientOptions.ClientBuild)]        = $"{nameof(ClientOptions)}:{nameof(ClientOptions.ClientBuild)}",
         ["ClientSeed"]                             = $"{nameof(ClientOptions)}:{nameof(ClientOptions.SeedHex)}",
@@ -163,6 +175,7 @@ public class Program
         ["ServerBuild"]                            = $"{nameof(LegacyServerOptions)}:{nameof(LegacyServerOptions.Build)}",
 
         [nameof(ProxyNetworkOptions.ExternalAddress)] = $"{nameof(ProxyNetworkOptions)}:{nameof(ProxyNetworkOptions.ExternalAddress)}",
+        [nameof(ProxyNetworkOptions.BindAddress)]  = $"{nameof(ProxyNetworkOptions)}:{nameof(ProxyNetworkOptions.BindAddress)}",
         [nameof(ProxyNetworkOptions.RestPort)]     = $"{nameof(ProxyNetworkOptions)}:{nameof(ProxyNetworkOptions.RestPort)}",
         [nameof(ProxyNetworkOptions.BNetPort)]     = $"{nameof(ProxyNetworkOptions)}:{nameof(ProxyNetworkOptions.BNetPort)}",
         [nameof(ProxyNetworkOptions.RealmPort)]    = $"{nameof(ProxyNetworkOptions)}:{nameof(ProxyNetworkOptions.RealmPort)}",
@@ -171,6 +184,7 @@ public class Program
         [nameof(ProxyNetworkOptions.CertificatePfxPassword)] = $"{nameof(ProxyNetworkOptions)}:{nameof(ProxyNetworkOptions.CertificatePfxPassword)}",
 
         [nameof(DiagnosticsOptions.PacketsLog)]    = $"{nameof(DiagnosticsOptions)}:{nameof(DiagnosticsOptions.PacketsLog)}",
+        [nameof(DiagnosticsOptions.PacketsLogRetentionDays)] = $"{nameof(DiagnosticsOptions)}:{nameof(DiagnosticsOptions.PacketsLogRetentionDays)}",
         [nameof(ThrottlingOptions.PartyMemberStateMinIntervalMs)] = $"{nameof(ThrottlingOptions)}:{nameof(ThrottlingOptions.PartyMemberStateMinIntervalMs)}",
 
         [nameof(LoggingOptions.DebugOutput)]       = $"{nameof(LoggingOptions)}:{nameof(LoggingOptions.DebugOutput)}",
@@ -183,6 +197,7 @@ public class Program
         ["Log.Console.MinimumLevel"]               = $"{nameof(LoggingOptions)}:{nameof(LoggingOptions.ConsoleLevel)}",
         ["Log.ToFile"]                             = $"{nameof(LoggingOptions)}:{nameof(LoggingOptions.ToFile)}",
         ["Log.Directory"]                          = $"{nameof(LoggingOptions)}:{nameof(LoggingOptions.Directory)}",
+        ["Log.RetentionDays"]                      = $"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RetentionDays)}",
     };
 
     /// Pre-scans raw args and:
@@ -310,7 +325,9 @@ internal static class OsSpecific
             var weAreTheOwner = (consoleWindowProcess == Environment.ProcessId);
             return weAreTheOwner;
 #else
-            return true;
+            // Only Windows has a window to keep open. Elsewhere the prompt only holds up the exit:
+            // with it, `docker stop` took 3.4 s and ended in 137, without it 0.4 s and 0.
+            return false;
 #endif
         }
         catch

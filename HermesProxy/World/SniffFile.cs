@@ -16,6 +16,10 @@ namespace HermesProxy.World;
 /// </remarks>
 public abstract class SniffFile
 {
+    internal const string DirectoryName = "PacketsLog";
+    internal const string LegacyName = "legacy";
+    internal const string ModernName = "modern";
+
     // Monotonic counter suffixed to filenames so multiple captures within a single proxy
     // process (e.g. realm-switch, reconnect) get distinct paths even though they share the
     // process-wide StartupStamp.
@@ -29,7 +33,7 @@ public abstract class SniffFile
 
     private SniffFile(string fileName, uint build)
     {
-        string dir = "PacketsLog";
+        string dir = DirectoryName;
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);
 

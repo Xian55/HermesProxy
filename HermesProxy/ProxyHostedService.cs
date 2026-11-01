@@ -108,11 +108,12 @@ internal sealed class ProxyHostedService : BackgroundService
         GameData.LoadEverything();
 
         var net = _networkOptions.Value;
-        var bindIp = NetworkUtils.ResolveOrDirectIPv64(net.ExternalAddress);
-        if (!IPAddress.IsLoopback(bindIp))
-            bindIp = IPAddress.Any;
+        var bindIp = net.ResolveBindAddress();
 
         Server.LogExternalIp(net.ExternalAddress);
+        if (IPAddress.IsLoopback(IPAddress.Parse(net.ExternalAddress)) && !IPAddress.IsLoopback(bindIp))
+            Server.LogExternalAddressLoopback(net.ExternalAddress, bindIp.ToString());
+
         // Service-locator shim for the 2 call sites that still access LoginServiceManager.Instance
         // directly. Removed in Phase 4 when those call sites move to ctor injection.
         LoginServiceManager.Instance = _loginServiceManager;
@@ -136,6 +137,9 @@ internal sealed class ProxyHostedService : BackgroundService
             long lastMetricsTimestamp = Stopwatch.GetTimestamp();
             const int displayMetricCount = 20;
 
+            await SweepOldFiles();
+            long lastSweepTimestamp = Stopwatch.GetTimestamp();
+
             while (!stoppingToken.IsCancellationRequested &&
                    (_bnetSocketManager.IsListening || _restSocketManager.IsListening
                     || _realmSocketManager.IsListening || _worldSocketManager.IsListening))
@@ -148,6 +152,12 @@ internal sealed class ProxyHostedService : BackgroundService
                         delay = untilSummary > TimeSpan.Zero ? untilSummary : TimeSpan.Zero;
                 }
                 await Task.Delay(delay, stoppingToken);
+
+                if (Stopwatch.GetElapsedTime(lastSweepTimestamp) >= FileRetention.SweepInterval)
+                {
+                    await SweepOldFiles();
+                    lastSweepTimestamp = Stopwatch.GetTimestamp();
+                }
 
                 if (Server.MetricsEnabled)
                 {
@@ -191,6 +201,22 @@ internal sealed class ProxyHostedService : BackgroundService
             await TryStop(_restSocketManager);
             await TryStop(_bnetSocketManager);
         }
+    }
+
+    private async Task SweepOldFiles()
+    {
+        await Sweep("packet captures", SniffFile.DirectoryName, FileRetention.Captures, _diagnosticsOptions.Value.PacketsLogRetentionDays);
+        await Sweep("log files", _loggingOptions.Value.Directory, FileRetention.Logs, _loggingOptions.Value.RetentionDays);
+    }
+
+    private static async Task Sweep(string kind, string directory, string[] patterns, int retentionDays)
+    {
+        if (retentionDays == 0)
+            return;
+
+        var removed = await Task.Run(() => FileRetention.Sweep(directory, patterns, DateTime.UtcNow.AddDays(-retentionDays)));
+        if (removed.Files != 0)
+            Server.LogOldFilesSwept(removed.Files, kind, retentionDays, removed.Bytes / (1024 * 1024));
     }
 
     private static void StartListener<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] T>(SocketManager<T> socketManager, string serviceName, IPEndPoint endpoint)

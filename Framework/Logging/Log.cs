@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
 using Serilog;
+using Serilog.Configuration;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
@@ -54,6 +55,10 @@ public static class Log
     // share the same token as the log file — enables exact-match correlation between
     // hermes-*.log and PacketsLog/*.pkt instead of fuzzy unix-time proximity matching.
     public static readonly string StartupStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+    // One run keeps its newest 1 GB. A file this size stays comfortable to open and grep.
+    internal const long MaxLogFileBytes = 256 * 1024 * 1024;
+    internal const int MaxLogFilesPerRun = 4;
 
     // Console template uses the ANSI-pre-colored category letter so each category keeps its own color
     // (Server=Blue, Network=Green, Storage=Cyan, Packet=Magenta). The level letter is colored by the
@@ -137,6 +142,24 @@ public static class Log
         _root?.Dispose();
     }
 
+    /// <summary>
+    /// Each application start gets its own log file (hermes-&lt;yyyyMMdd_HHmmss&gt;.log), which shares
+    /// its stamp with that run's captures, so successive runs don't append into a shared daily file.
+    /// RollingInterval is Infinite because the stamp already separates runs. Rolling on size is what
+    /// a host that runs for months needs: without it the sink stops writing for good at its limit.
+    /// The retained count only reaches this run's own parts, as the sink matches files by the run's
+    /// name. Earlier runs are FileRetention's to remove.
+    /// </summary>
+    internal static void WriteToFile(LoggerSinkConfiguration sink, string path, long fileSizeLimitBytes = MaxLogFileBytes)
+        => sink.File(
+            path: path,
+            rollingInterval: RollingInterval.Infinite,
+            fileSizeLimitBytes: fileSizeLimitBytes,
+            rollOnFileSizeLimit: true,
+            retainedFileCountLimit: MaxLogFilesPerRun,
+            outputTemplate: FileOutputTemplate,
+            shared: false);
+
     private static void BuildPipeline(bool toFile, string directory)
     {
         var config = new LoggerConfiguration()
@@ -169,18 +192,9 @@ public static class Log
                     {
                         // If the directory can't be created we still want console logging to work.
                     }
-                    // Each application start gets its own log file (hermes-<yyyyMMdd_HHmmss>.log)
-                    // so successive runs don't append into a shared daily file. RollingInterval is
-                    // Infinite because the timestamp in the filename already gives us per-run
-                    // separation; retainedFileCountLimit caps disk usage at the latest 30 runs.
                     // File sink has no additional filter — it captures whatever passes the
                     // per-category switches, which is typically the more verbose view.
-                    a.File(
-                        path: Path.Combine(directory, $"hermes-{StartupStamp}.log"),
-                        rollingInterval: RollingInterval.Infinite,
-                        retainedFileCountLimit: 30,
-                        outputTemplate: FileOutputTemplate,
-                        shared: false);
+                    WriteToFile(a, Path.Combine(directory, $"hermes-{StartupStamp}.log"));
                 }
             });
 

@@ -75,7 +75,7 @@ Lines without this tag are not packet-flow events (startup, config, etc.).
 
 Everything after the final `|` is the human-readable message. The literal text stays at the terminal default color; property values substituted into the message are colored by type — strings go bright cyan (`CMSG_BATTLE_PAY_GET_PURCHASE_LIST`, `PROTONOX`, `192.168.88.55`), numbers go bright yellow (`14019`, `8085`, `42597`). When you're scanning for a specific opcode or account, you can spot it on color alone.
 
-In the rolling file (`Logs/hermes-YYYYMMDD.log`) the same layout is used but without ANSI codes, so it stays grep-friendly and safe to paste into a bug report.
+In the log file (`Logs/hermes-<yyyyMMdd_HHmmss>.log`) the same layout is used but without ANSI codes, so it stays grep-friendly and safe to paste into a bug report.
 
 ## Logging Settings
 
@@ -87,8 +87,9 @@ In the rolling file (`Logs/hermes-YYYYMMDD.log`) the same layout is used but wit
 | `Log.Storage.MinimumLevel`    | `Information` | Category override for `Storage` (GameData, CSV/DB2, hotfixes). Rendered as `T`.                                      |
 | `Log.Packet.MinimumLevel`     | `Warning`     | Category override for `Packet` (opcode dispatch, span fallback/stats). Rendered as `P`. `Verbose` enables SpanStats. |
 | `Log.Console.MinimumLevel`    | `Information` | Additional floor applied ONLY to the console. File sink captures everything the categories allow.                    |
-| `Log.ToFile`                  | `true`        | Write a daily rolling log file to `Log.Directory/hermes-YYYY-MM-DD.log`. Last 30 days are retained automatically.    |
-| `Log.Directory`               | `Logs`        | Directory (relative to the working directory) where rolling log files are placed.                                    |
+| `Log.ToFile`                  | `true`        | Write one log file per run, `Log.Directory/hermes-<yyyyMMdd_HHmmss>.log`, sharing its stamp with that run's captures. At 256 MB it rolls to `hermes-<stamp>_001.log` and so on, and a run keeps its newest 4 files, so the very start of a long run ages out. |
+| `Log.Directory`               | `Logs`        | Directory (relative to the proxy's own directory) where log files are placed.                                        |
+| `Log.RetentionDays`           | `30`          | Days to keep log files. Older ones are deleted at startup and every hour. `0` keeps them forever.                    |
 | `PacketsLog`                  | `true`        | Dump each session's raw packets to a `.pkt` file in `PacketsLog/` for replay / inspection (unrelated to text logs).  |
 | `DebugOutput` *(legacy)*      | `false`       | Back-compat shortcut — lowers `Log.MinimumLevel` and `Log.Console.MinimumLevel` to `Debug`.                          |
 | `SpanStatsLog` *(legacy)*     | `false`       | Back-compat shortcut — lowers `Log.Packet.MinimumLevel` to `Verbose`.                                                |
@@ -102,7 +103,7 @@ All logging settings can be overridden at runtime with `--set key=value` (repeat
 ```bash
 # Capture packet-level debug detail in the log file while keeping the console quiet.
 # Ideal default for "always-on" logging — when a user reports an issue, ask for
-# Logs/hermes-YYYYMMDD.log and you already have the Debug-level context.
+# that run's Logs/hermes-*.log and you already have the Debug-level context.
 HermesProxy --set Log.Packet.MinimumLevel=Debug --set Log.Console.MinimumLevel=Information
 
 # Crank everything to maximum verbosity (console included) for interactive debugging.

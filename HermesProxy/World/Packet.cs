@@ -101,7 +101,7 @@ public abstract class ServerPacket
         if (!context.PacketsLog)
             return;
 
-        var sniff = SniffFile.EnsureOpen(ref sniffFile, "modern", (uint)context.ClientBuild, ModernVersion.OpcodeSize);
+        var sniff = SniffFile.EnsureOpen(ref sniffFile, SniffFile.ModernName, (uint)context.ClientBuild, ModernVersion.OpcodeSize);
         sniff.WritePacket(GetOpcode(), false, GetDataSpan());
     }
 
@@ -385,7 +385,7 @@ public class WorldPacket : ByteBuffer
         if (!context.PacketsLog)
             return;
 
-        var sniff = SniffFile.EnsureOpen(ref sniffFile, "modern", (uint)context.ClientBuild, ModernVersion.OpcodeSize);
+        var sniff = SniffFile.EnsureOpen(ref sniffFile, SniffFile.ModernName, (uint)context.ClientBuild, ModernVersion.OpcodeSize);
         // GetDataSpan: this packet was received into a pooled rental, and GetData would hand back
         // the whole bucket-rounded buffer rather than the payload (issue #248). It starts at the
         // opcode the constructor read.
