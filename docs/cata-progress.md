@@ -10,10 +10,10 @@
 | 🚫 unmapped | 73 | not in the 4.3.4 table: renamed, split or removed in 4.x |
 | ⬜ todo | 0 | layout changed in 4.x, no 4.3.4 branch, not seen yet |
 | ⚠️ suspect | 0 | layout changed, no 4.3.4 branch, but passed without an error — likely misread |
-| 🔁 retest | 363 | its file changed after the latest session that exercised it |
+| 🔁 retest | 376 | its file changed after the latest session that exercised it |
 | 🔧 ported, unseen | 10 | has a 4.3.4 branch, waiting for a session to exercise it |
 | · unseen | 15 | same layout as 3.3.5a per WPP, not exercised yet |
-| ✅ seen ok | 460 | ported or unchanged, and the latest session passed it cleanly |
+| ✅ seen ok | 447 | ported or unchanged, and the latest session passed it cleanly |
 | ∅ not sent | 45 | a server packet TrinityCore 4.3.4 never sends: another opcode carries it there, or nothing calls its writer |
 
 ## What's left
@@ -25,7 +25,7 @@ The rows of the legacy table below that still ask for work, by feature. A sessio
 | Movement |  |  |  |  | 9 | 1 | 81 | 🔧 `CMSG_DISMISS_CONTROLLED_VEHICLE`, `CMSG_MOVE_FALL_RESET`, `CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK`, `CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK`, `CMSG_MOVE_NOT_ACTIVE_MOVER`, `SMSG_MOVE_SET_PITCH_RATE`, `SMSG_MOVE_SET_TURN_RATE`, `SMSG_MOVE_SPLINE_SET_PITCH_RATE`, `SMSG_MOVE_SPLINE_SET_TURN_RATE`<br>· `MSG_MOVE_TELEPORT_ACK` |
 | Character |  |  |  |  |  | 6 | 11 | · `CMSG_CHARACTER_RENAME_REQUEST`, `CMSG_SET_PLAYER_DECLINED_NAMES`, `SMSG_CHARACTER_LOGIN_FAILED`, `SMSG_CHARACTER_RENAME_RESULT`, `SMSG_PET_UPDATE_COMBO_POINTS`, `SMSG_SET_PLAYER_DECLINED_NAMES_RESULT` |
 | Misc |  |  |  |  |  | 2 | 33 | · `SMSG_INVALIDATE_PLAYER`, `SMSG_SPECIAL_MOUNT_ANIM` |
-| Quest |  |  |  |  |  | 2 | 7 | · `CMSG_QUEST_CONFIRM_ACCEPT`, `SMSG_QUEST_CONFIRM_ACCEPT` |
+| Quest |  |  |  |  |  | 2 | 19 | · `CMSG_QUEST_CONFIRM_ACCEPT`, `SMSG_QUEST_CONFIRM_ACCEPT` |
 | Pet |  |  |  |  |  | 1 | 16 | · `CMSG_PET_CANCEL_AURA` |
 | Item |  |  |  |  |  | 1 | 13 | · `SMSG_ITEM_TIME_UPDATE` |
 | Calendar |  |  |  |  | 1 |  | 9 | 🔧 `CMSG_CALENDAR_COMPLAIN` |
@@ -41,7 +41,7 @@ The rows of the legacy table below that still ask for work, by feature. A sessio
 | LFG |  |  |  |  |  |  | 7 |  |
 | Petition |  |  |  |  |  |  | 7 |  |
 | Arena |  |  |  |  |  |  | 5 |  |
-| Query |  |  |  |  |  |  | 4 |  |
+| Query |  |  |  |  |  |  | 5 |  |
 | Mail |  |  |  |  |  |  | 3 |  |
 | Battlefield |  |  |  |  |  |  | 2 |  |
 | Talent |  |  |  |  |  |  | 2 |  |
@@ -393,8 +393,21 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | 🔁 | C | `CMSG_PET_SPELL_AUTOCAST` |  | same | 20261021_112409 | 38 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
 | 🔁 | C | `CMSG_PET_STOP_ATTACK` |  | same | 20261021_180247 | 1 |  | HermesProxy/World/Server/Systems/PetSystem.cs |
 | 🔁 | C | `CMSG_PLAYER_VEHICLE_ENTER` |  | same | 20261021_135117 | 8 |  | HermesProxy/World/Server/Systems/MovementSystem.cs |
+| 🔁 | C | `CMSG_PUSH_QUEST_TO_PARTY` |  | same | 20261021_154642 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
 | 🔁 | C | `CMSG_PVP_LOG_DATA` | yes | new in 4.x | 20261024_155804 | 14 |  | HermesProxy/World/Server/Systems/BattlegroundSystem.cs |
 | 🔁 | C | `CMSG_QUERY_PAGE_TEXT` |  | same | 20261024_092150 | 2 |  | HermesProxy/World/Server/Systems/QuerySystem.cs |
+| 🔁 | C | `CMSG_QUERY_QUEST_COMPLETION_NPCS` |  | reviewed | 20261101_001613 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
+| 🔁 | C | `CMSG_QUERY_QUEST_INFO` |  | same | 20261101_001613 | 2 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
+| 🔁 | C | `CMSG_QUEST_GIVER_ACCEPT_QUEST` |  | same | 20261024_024153 | 45 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
+| 🔁 | C | `CMSG_QUEST_GIVER_CHOOSE_REWARD` |  | same | 20261024_155804 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
+| 🔁 | C | `CMSG_QUEST_GIVER_COMPLETE_QUEST` | yes | changed | 20261024_024153 | 20 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
+| 🔁 | C | `CMSG_QUEST_GIVER_HELLO` |  | same | 20261024_024153 | 38 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
+| 🔁 | C | `CMSG_QUEST_GIVER_QUERY_QUEST` |  | same | 20261024_024153 | 12 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
+| 🔁 | C | `CMSG_QUEST_GIVER_REQUEST_REWARD` |  | reviewed | 20261024_024153 | 16 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
+| 🔁 | C | `CMSG_QUEST_GIVER_STATUS_MULTIPLE_QUERY` |  | same | 20261101_001613 | 2 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
+| 🔁 | C | `CMSG_QUEST_GIVER_STATUS_QUERY` |  | same | 20261101_001613 | 17 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
+| 🔁 | C | `CMSG_QUEST_LOG_REMOVE_QUEST` |  | same | 20261022_161951 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
+| 🔁 | C | `CMSG_QUEST_POI_QUERY` |  | reviewed | 20261101_001613 | 3 |  | HermesProxy/World/Client/PacketHandlers/QueryHandler.cs |
 | 🔁 | C | `CMSG_RECLAIM_CORPSE` |  | same | 20261024_155804 | 3 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
 | 🔁 | C | `CMSG_REFORGE_ITEM` | yes | new in 4.x | 20261024_155804 | 10 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | 🔁 | C | `CMSG_REPOP_REQUEST` |  | same | 20261024_155804 | 12 |  | HermesProxy/World/Server/Systems/MiscSystem.cs |
@@ -832,26 +845,13 @@ Not compared, one side unresolved in the docs (10): `SMSG_BIND_POINT_UPDATE`, `S
 | ✅ | C | `CMSG_PLAYER_LOGIN` | yes | changed | 20261101_001613 | 1 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | ✅ | C | `CMSG_PLAYER_SHOWING_CLOAK` |  | ? | 20261101_001613 | 2 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
 | ✅ | C | `CMSG_PLAYER_SHOWING_HELM` |  | ? | 20261101_001613 | 2 |  | HermesProxy/World/Server/Systems/CharacterSystem.cs |
-| ✅ | C | `CMSG_PUSH_QUEST_TO_PARTY` |  | same | 20261021_154642 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
 | ✅ | C | `CMSG_QUERY_CREATURE` |  | same | 20261031_222458 | 26 |  | HermesProxy/World/Client/PacketHandlers/PetHandler.cs |
 | ✅ | C | `CMSG_QUERY_GAME_OBJECT` |  | same | 20261101_001613 | 18 |  | HermesProxy/World/Client/PacketHandlers/UpdateHandler.cs |
 | ✅ | C | `CMSG_QUERY_GUILD_INFO` | yes | changed | 20261101_001613 | 1 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
 | ✅ | C | `CMSG_QUERY_NPC_TEXT` |  | same | 20261031_190425 | 1 |  | HermesProxy/World/Server/Systems/HotfixSystem.cs |
 | ✅ | C | `CMSG_QUERY_PETITION` |  | ? | 20261022_025027 | 1 |  | HermesProxy/World/Server/Systems/PetitionSystem.cs |
 | ✅ | C | `CMSG_QUERY_PET_NAME` |  | same | 20261031_182322 | 7 |  | HermesProxy/World/Server/Systems/QuerySystem.cs |
-| ✅ | C | `CMSG_QUERY_QUEST_COMPLETION_NPCS` |  | reviewed | 20261101_001613 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
-| ✅ | C | `CMSG_QUERY_QUEST_INFO` |  | same | 20261101_001613 | 2 |  | HermesProxy/World/Client/PacketHandlers/QuestHandler.cs |
 | ✅ | C | `CMSG_QUERY_TIME` |  | same | 20261101_001613 | 1 |  | HermesProxy/World/Server/Systems/QuerySystem.cs |
-| ✅ | C | `CMSG_QUEST_GIVER_ACCEPT_QUEST` |  | same | 20261024_024153 | 45 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
-| ✅ | C | `CMSG_QUEST_GIVER_CHOOSE_REWARD` |  | same | 20261024_155804 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
-| ✅ | C | `CMSG_QUEST_GIVER_COMPLETE_QUEST` | yes | changed | 20261024_024153 | 20 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
-| ✅ | C | `CMSG_QUEST_GIVER_HELLO` |  | same | 20261024_024153 | 38 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
-| ✅ | C | `CMSG_QUEST_GIVER_QUERY_QUEST` |  | same | 20261024_024153 | 12 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
-| ✅ | C | `CMSG_QUEST_GIVER_REQUEST_REWARD` |  | reviewed | 20261024_024153 | 16 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
-| ✅ | C | `CMSG_QUEST_GIVER_STATUS_MULTIPLE_QUERY` |  | same | 20261101_001613 | 2 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
-| ✅ | C | `CMSG_QUEST_GIVER_STATUS_QUERY` |  | same | 20261101_001613 | 17 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
-| ✅ | C | `CMSG_QUEST_LOG_REMOVE_QUEST` |  | same | 20261022_161951 | 1 |  | HermesProxy/World/Server/Systems/QuestSystem.cs |
-| ✅ | C | `CMSG_QUEST_POI_QUERY` |  | reviewed | 20261101_001613 | 3 |  | HermesProxy/World/Client/PacketHandlers/QueryHandler.cs |
 | ✅ | C | `CMSG_READ_ITEM` |  | same | 20261024_092150 | 1 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `CMSG_REPAIR_ITEM` |  | same | 20261024_024153 | 1 |  | HermesProxy/World/Server/Systems/ItemSystem.cs |
 | ✅ | C | `CMSG_REQUEST_GUILD_PARTY_STATE` | yes | new in 4.x | 20261101_001613 | 3 |  | HermesProxy/World/Server/Systems/GuildSystem.cs |
@@ -1330,7 +1330,7 @@ HermesProxy/World/Server/Systems/PartialStackAuctionPost.cs 5dd3a25ff4ed4b8b
 HermesProxy/World/Server/Systems/PetSystem.cs ed0413e5c047bccd
 HermesProxy/World/Server/Systems/PetitionSystem.cs cd46100faec6c4ac
 HermesProxy/World/Server/Systems/QuerySystem.cs 7b34321fb84a833e
-HermesProxy/World/Server/Systems/QuestSystem.cs 143c7d2657cc07b8
+HermesProxy/World/Server/Systems/QuestSystem.cs 8fbd9c1428537d60
 HermesProxy/World/Server/Systems/ReputationSystem.cs 5b29236710e156eb
 HermesProxy/World/Server/Systems/RetailAuctionHouse.cs 02fc9342249c1f15
 HermesProxy/World/Server/Systems/SocialSystem.cs 804c45a7067fb9ec
