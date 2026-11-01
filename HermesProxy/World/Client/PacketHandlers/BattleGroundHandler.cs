@@ -546,14 +546,15 @@ public partial class WorldClient
             SendPacketToClient(notify);
         }
 
+        // The client drops the queue a failure's ticket names, so a refused join names none: id 0
+        // and no join time, as TrinityCore 3.4.3 sends it. Ticket 1 with its time was the player's
+        // first queue, which vanished from the client while the server kept it.
         BattlefieldStatusFailed failed = new BattlefieldStatusFailed();
-        failed.Ticket.Id = 1;
+        failed.Ticket.Id = 0;
         failed.Ticket.RequesterGuid = GetSession().GameState.CurrentPlayerGuid;
-        failed.Ticket.Time = GetSession().GameState.GetBattleFieldQueueTime(failed.Ticket.Id);
+        failed.Ticket.Time = 0;
         failed.Ticket.Type = RideType.Battlegrounds;
-        failed.BattlefieldListId = GetSession().GameState.GetBattleFieldQueueType(failed.Ticket.Id);
-        if (failed.BattlefieldListId == 0)
-            failed.BattlefieldListId = 6; // BATTLEGROUND_AA
+        failed.BattlefieldListId = 6; // BATTLEGROUND_AA
         failed.Reason = BattlefieldQueueArenaType.ToModernJoinError(result);
         if (playerGuid.HasValue)
             failed.ClientID = playerGuid.Value;
