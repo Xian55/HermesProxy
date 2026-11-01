@@ -23,6 +23,9 @@ public class LegacyKeepAliveTests
     /// </summary>
     private sealed class Connection : IDisposable
     {
+        private static readonly FieldInfo LastPingAt =
+            typeof(WorldClient).GetField("_lastPingAt", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
         private readonly Socket _proxySide = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         private readonly Socket _serverSide;
@@ -38,6 +41,7 @@ public class LegacyKeepAliveTests
         {
             _listener.Start();
             _proxySide.Connect((IPEndPoint)_listener.LocalEndpoint);
+            _proxySide.NoDelay = true;
             _serverSide = _listener.AcceptSocket();
 
             _client = new LegacyHandlerHarness(recordClientPackets: false).Client;
@@ -54,6 +58,7 @@ public class LegacyKeepAliveTests
             double? nextClientPing = firstClientPing;
             while (_now < until)
             {
+                long lastPing = (long)LastPingAt.GetValue(_client)!;
                 _now += StepSeconds;
                 _time.Advance(TimeSpan.FromSeconds(StepSeconds));
 
@@ -62,6 +67,11 @@ public class LegacyKeepAliveTests
                     _client.SendPing(++_serial, 0);
                     nextClientPing += 30;
                 }
+
+                // A step of this clock is a microsecond of real time, so a ping that is still in the
+                // socket would get a time seconds after the one it left at.
+                if ((long)LastPingAt.GetValue(_client)! != lastPing)
+                    _serverSide.Poll(TimeSpan.FromSeconds(5), SelectMode.SelectRead);
 
                 DrainTheServersEnd();
             }
