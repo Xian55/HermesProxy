@@ -39,30 +39,36 @@ public partial class WorldClient
     /// <summary>
     /// Reads the server's greeting and answers with the client's. Each is a big-endian uint16 length
     /// and the text, with no opcode and no encryption; the server sends its auth challenge only
-    /// after the answer.
+    /// after the answer. TrinityCore 4.3.4 sends the text alone, other 4.3.4 realms count and send
+    /// its terminating NUL as well (#575). Such a server gets its answer in the same form, which
+    /// TrinityCore would take too: it compares only the length of the text.
     /// </summary>
-    private async ValueTask<bool> ExchangeConnectionGreeting()
+    internal async ValueTask<bool> ExchangeConnectionGreeting()
     {
         byte[] sizeBytes = new byte[sizeof(ushort)];
         if (!await ReceiveBufferFully(sizeBytes))
             return false;
 
         ushort size = BinaryPrimitives.ReadUInt16BigEndian(sizeBytes);
-        if (size != ServerConnectionGreeting.Length)
+        bool nulTerminated = size == ServerConnectionGreeting.Length + 1;
+        if (size != ServerConnectionGreeting.Length && !nulTerminated)
         {
             WorldClientLogMessages.UnexpectedConnectionGreeting(_melNet, _sourceFile, _netDirRecv, size);
             return false;
         }
 
         byte[] text = new byte[size];
-        if (!await ReceiveBufferFully(text) || Encoding.ASCII.GetString(text) != ServerConnectionGreeting)
+        if (!await ReceiveBufferFully(text)
+            || Encoding.ASCII.GetString(text, 0, ServerConnectionGreeting.Length) != ServerConnectionGreeting
+            || (nulTerminated && text[^1] != 0))
         {
             WorldClientLogMessages.UnexpectedConnectionGreeting(_melNet, _sourceFile, _netDirRecv, size);
             return false;
         }
 
-        byte[] answer = new byte[sizeof(ushort) + ClientConnectionGreeting.Length];
-        BinaryPrimitives.WriteUInt16BigEndian(answer, (ushort)ClientConnectionGreeting.Length);
+        ushort answerSize = (ushort)(ClientConnectionGreeting.Length + (nulTerminated ? 1 : 0));
+        byte[] answer = new byte[sizeof(ushort) + answerSize];
+        BinaryPrimitives.WriteUInt16BigEndian(answer, answerSize);
         Encoding.ASCII.GetBytes(ClientConnectionGreeting, answer.AsSpan(sizeof(ushort)));
         lock (_sendLock)
             _clientSocket.Send(answer, SocketFlags.None);
