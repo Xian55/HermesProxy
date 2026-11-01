@@ -111,6 +111,9 @@ public class RatedBracketInfo
     public uint SeasonWon;
 }
 
+/// <summary>One open group-loot roll, as SMSG_LOOT_START_ROLL announced it.</summary>
+public readonly record struct LootRollEntry(byte LootListID, uint ItemID, WowGuid128 LootObj, long ExpiresAt);
+
 public sealed class GameSessionData
 {
     // Back-reference to the owning session. Set by CreateNewGameSessionData. Used by writers
@@ -448,7 +451,7 @@ public sealed class GameSessionData
     public HashSet<uint> KnownSpells = [];
 
     /// <summary>
-    /// LootObj per open group-loot roll, keyed by item slot (LootListID).
+    /// The open group-loot rolls, in the order they started.
     ///
     /// 3.3.5a only sends the loot object in SMSG_LOOT_START_ROLL and SMSG_LOOT_ALL_PASSED
     /// (both use <c>roll.itemGUID</c>). The result packets pass <c>ObjectGuid::Empty</c> —
@@ -456,8 +459,16 @@ public sealed class GameSessionData
     /// wire carries gave the modern client a roll for a loot object it had never been told
     /// about, and it could not tie the roll back to the open dialog. Native 3.4.3 repeats
     /// the same guid in every packet of the roll. Issue #162.
+    ///
+    /// The slot alone does not find a roll: it counts within one corpse, so two corpses looted
+    /// together each have a slot 0, and the item tells those apart. The same item in the same slot
+    /// twice cannot be told apart on the wire, and the older roll is taken.
+    ///
+    /// A roll can end without a word, when the server drops it with its corpse, and an entry left
+    /// behind would take the votes of the next roll of that item. So an entry expires, at twice the
+    /// roll's time: AzerothCore overruns it (89 s for a 60 s roll on a live session).
     /// </summary>
-    public Dictionary<byte, WowGuid128> LootRollObjects = [];
+    public List<LootRollEntry> LootRolls = [];
 
     /// <summary>
     /// Whether the legacy server still has us subscribed to guild-bank delta updates.

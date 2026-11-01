@@ -256,7 +256,10 @@ public partial class WorldClient
 
         // Only this packet and SMSG_LOOT_ALL_PASSED carry the loot object on 3.3.5a; the
         // result packets send an empty guid. Remember it so they can be given the same one.
-        GetSession().GameState.LootRollObjects[loot.Item.LootListID] = loot.LootObj;
+        var rolls = GetSession().GameState.LootRolls;
+        long now = Environment.TickCount64;
+        rolls.RemoveAll(roll => roll.ExpiresAt <= now);
+        rolls.Add(new(loot.Item.LootListID, loot.Item.Loot.ItemID, loot.LootObj, now + 2L * loot.RollTime));
 
         SendPacketToClient(loot);
 
@@ -278,14 +281,26 @@ public partial class WorldClient
     /// Falls back to whatever the packet carried when the slot was never announced, which
     /// keeps behaviour unchanged on a backend that does populate it.
     /// </summary>
-    private WowGuid128 ResolveLootRollObject(byte lootListId, WowGuid64 legacyOwner, WowGuid128 converted)
+    private WowGuid128 ResolveLootRollObject(byte lootListId, uint itemId, WowGuid64 legacyOwner, WowGuid128 converted)
     {
         if (!legacyOwner.IsEmpty())
             return converted;
 
-        return GetSession().GameState.LootRollObjects.TryGetValue(lootListId, out var remembered)
-            ? remembered
-            : converted;
+        foreach (LootRollEntry roll in GetSession().GameState.LootRolls)
+        {
+            if (roll.LootListID == lootListId && roll.ItemID == itemId)
+                return roll.LootObj;
+        }
+
+        return converted;
+    }
+
+    private void ForgetLootRoll(byte lootListId, uint itemId, WowGuid128 lootObj)
+    {
+        var rolls = GetSession().GameState.LootRolls;
+        int index = rolls.FindIndex(roll => roll.LootListID == lootListId && roll.ItemID == itemId && roll.LootObj == lootObj);
+        if (index >= 0)
+            rolls.RemoveAt(index);
     }
 
     [HandlesSmsg(Opcode.SMSG_LOOT_ROLL)]
@@ -295,9 +310,9 @@ public partial class WorldClient
         WowGuid64 owner = packet.ReadGuid();
         loot.LootObj = owner.ToLootGuid();
         loot.Item.LootListID = (byte)packet.ReadUInt32();
-        loot.LootObj = ResolveLootRollObject(loot.Item.LootListID, owner, loot.LootObj);
         loot.Player = packet.ReadGuid().To128(GetSession().GameState);
         loot.Item.Loot.ItemID = packet.ReadUInt32();
+        loot.LootObj = ResolveLootRollObject(loot.Item.LootListID, loot.Item.Loot.ItemID, owner, loot.LootObj);
         loot.Item.Loot.RandomPropertiesSeed = packet.ReadUInt32();
         loot.Item.Loot.RandomPropertiesID = packet.ReadUInt32();
         loot.Item.Quantity = 1;
@@ -346,8 +361,8 @@ public partial class WorldClient
         WowGuid64 wonOwner = packet.ReadGuid();
         loot.LootObj = wonOwner.ToLootGuid();
         loot.Item.LootListID = (byte)packet.ReadUInt32();
-        loot.LootObj = ResolveLootRollObject(loot.Item.LootListID, wonOwner, loot.LootObj);
         loot.Item.Loot.ItemID = packet.ReadUInt32();
+        loot.LootObj = ResolveLootRollObject(loot.Item.LootListID, loot.Item.Loot.ItemID, wonOwner, loot.LootObj);
         loot.Item.Loot.RandomPropertiesSeed = packet.ReadUInt32();
         loot.Item.Loot.RandomPropertiesID = packet.ReadUInt32();
         loot.Item.Quantity = 1;
@@ -364,8 +379,7 @@ public partial class WorldClient
         complete.LootListID = loot.Item.LootListID;
         SendPacketToClient(complete);
 
-        // The roll is over; drop the remembered loot object so the slot can be reused.
-        GetSession().GameState.LootRollObjects.Remove(loot.Item.LootListID);
+        ForgetLootRoll(loot.Item.LootListID, loot.Item.Loot.ItemID, loot.LootObj);
     }
 
     [HandlesSmsg(Opcode.SMSG_LOOT_ALL_PASSED)]
@@ -385,8 +399,7 @@ public partial class WorldClient
         complete.LootListID = loot.Item.LootListID;
         SendPacketToClient(complete);
 
-        // The roll is over; drop the remembered loot object so the slot can be reused.
-        GetSession().GameState.LootRollObjects.Remove(loot.Item.LootListID);
+        ForgetLootRoll(loot.Item.LootListID, loot.Item.Loot.ItemID, loot.LootObj);
     }
 
     /// <summary>
