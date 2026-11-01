@@ -1362,6 +1362,11 @@ internal static unsafe class GeneratedSmsgDispatch
         client.HandleInitializeFactions(packet);
     }
 
+    private static void Thunk_HermesProxy_World_Client_WorldClient_HandleInitExtraAuraInfo_SMSG_INIT_EXTRA_AURA_INFO(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
+    {
+        client.HandleInitExtraAuraInfo(packet);
+    }
+
     private static void Thunk_HermesProxy_World_Client_WorldClient_HandleInitWorldStates_SMSG_INIT_WORLD_STATES(global::HermesProxy.World.Client.WorldClient client, global::HermesProxy.World.WorldPacket packet)
     {
         client.HandleInitWorldStates(packet);
@@ -3192,6 +3197,7 @@ internal static unsafe class GeneratedSmsgDispatch
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_HIGHEST_THREAT_UPDATE] = &Thunk_HermesProxy_World_Client_WorldClient_HandleHighestThreatUpdate_SMSG_HIGHEST_THREAT_UPDATE;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_IGNORE_LIST] = &Thunk_HermesProxy_World_Client_WorldClient_HandleIgnoreList_SMSG_IGNORE_LIST;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INITIALIZE_FACTIONS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInitializeFactions_SMSG_INITIALIZE_FACTIONS;
+        table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INIT_EXTRA_AURA_INFO] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInitExtraAuraInfo_SMSG_INIT_EXTRA_AURA_INFO;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INIT_WORLD_STATES] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInitWorldStates_SMSG_INIT_WORLD_STATES;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_HONOR_STATS] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInspectHonorStatsCata_SMSG_INSPECT_HONOR_STATS;
         table[(int)global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_RESULT] = &Thunk_HermesProxy_World_Client_WorldClient_HandleInspectResult_SMSG_INSPECT_RESULT;
@@ -3777,6 +3783,7 @@ internal static unsafe class GeneratedSmsgDispatch
             global::HermesProxy.World.Enums.Opcode.SMSG_HIGHEST_THREAT_UPDATE,
             global::HermesProxy.World.Enums.Opcode.SMSG_IGNORE_LIST,
             global::HermesProxy.World.Enums.Opcode.SMSG_INITIALIZE_FACTIONS,
+            global::HermesProxy.World.Enums.Opcode.SMSG_INIT_EXTRA_AURA_INFO,
             global::HermesProxy.World.Enums.Opcode.SMSG_INIT_WORLD_STATES,
             global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_HONOR_STATS,
             global::HermesProxy.World.Enums.Opcode.SMSG_INSPECT_RESULT,

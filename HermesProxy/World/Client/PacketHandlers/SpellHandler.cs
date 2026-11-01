@@ -1754,6 +1754,23 @@ public partial class WorldClient
         if (!packet.CanRead())
             return;
 
+        ReadExtraAuraInfo(packet, guid, castByPlayer: packet.GetUniversalOpcode(false) == Opcode.SMSG_SET_EXTRA_AURA_INFO_NEED_UPDATE);
+    }
+
+    /// <summary>
+    /// 2.4.3: the same record as <see cref="HandleSetExtraAuraInfo"/>, once for every timed aura a
+    /// unit has, sent at login. The list is empty when it has none.
+    /// </summary>
+    [HandlesSmsg(Opcode.SMSG_INIT_EXTRA_AURA_INFO)]
+    internal void HandleInitExtraAuraInfo(WorldPacket packet)
+    {
+        WowGuid128 guid = packet.ReadPackedGuid().To128(GetSession().GameState);
+        while (packet.CanRead())
+            ReadExtraAuraInfo(packet, guid, castByPlayer: false);
+    }
+
+    private void ReadExtraAuraInfo(WorldPacket packet, WowGuid128 guid, bool castByPlayer)
+    {
         byte slot = packet.ReadUInt8();
         uint spellId = packet.ReadUInt32();
         int durationFull = packet.ReadInt32();
@@ -1762,7 +1779,7 @@ public partial class WorldClient
         GetSession().GameState.StoreAuraDurationFull(guid, slot, durationFull);
         GetSession().GameState.StoreAuraDurationLeft(guid, slot, durationLeft, (int)packet.GetReceivedTime());
 
-        if (packet.GetUniversalOpcode(false) == Opcode.SMSG_SET_EXTRA_AURA_INFO_NEED_UPDATE)
+        if (castByPlayer)
             GetSession().GameState.StoreAuraCaster(guid, slot, GetSession().GameState.CurrentPlayerGuid);
 
         if (durationFull <= 0 && durationLeft <= 0)
