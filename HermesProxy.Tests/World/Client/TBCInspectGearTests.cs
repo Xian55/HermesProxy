@@ -25,10 +25,15 @@ public sealed class TBCInspectGearTests
     private const uint SocketTwoGemEnchant = 2687;     // Gems2.csv -> item 23234
     private const int HelmRandomProperty = 696;
     private const int CloakRandomSuffix = -39;
+    private const int TalentBitArrayLength = 0x3D;
+
+    // The start of a level 61 rogue's array off a cMaNGOS TBC server. Read as 3.3.5a specs, 0x14 is
+    // a count of 20 specs.
+    private static readonly byte[] RogueTalentBits = [0x14, 0x24, 0x18, 0x50, 0x00, 0x0D, 0x40, 0x06, 0x60, 0x14, 0x00, 0x10];
 
     private static bool IsTBC => LegacyVersion.ExpansionVersion == 2;
 
-    private static InspectResult Inspect()
+    private static InspectResult Inspect(byte[]? talentBits = null)
     {
         if (!GameData.Gems.ContainsKey(SocketOneGemEnchant))
             GameData.Gems = GameData.ReadGems(Path.Combine("CSV", "Gems2.csv")).ToFrozenDictionary();
@@ -62,12 +67,23 @@ public sealed class TBCInspectGearTests
         byte[] wire = LegacyPacketBuilder.Build(Opcode.SMSG_INSPECT_TALENT, packet =>
         {
             packet.WritePackedGuid(inspected);
-            packet.WriteUInt32(0);                  // unspent talent points
-            for (int i = 0; i < 0x3D; i++)          // the 2.4.3 talent bit array
-                packet.WriteUInt8(0);
+            packet.WriteUInt32(TalentBitArrayLength);
+            for (int i = 0; i < TalentBitArrayLength; i++)
+                packet.WriteUInt8(talentBits != null && i < talentBits.Length ? talentBits[i] : (byte)0);
         });
         harness.Deliver(Opcode.SMSG_INSPECT_TALENT, wire, harness.Client.HandleInspectResult);
         return Assert.Single(harness.ClientWire.Sent.Select(s => s.Packet).OfType<InspectResult>());
+    }
+
+    [Fact]
+    public void ATalentedPlayer_IsInspectedLikeAnyOther()
+    {
+        if (!IsTBC)
+            return;
+
+        var items = Inspect(RogueTalentBits).DisplayInfo.Items;
+
+        Assert.Equal([Helm, Cloak], items.Select(i => i.Item.ItemID));
     }
 
     [Fact]
