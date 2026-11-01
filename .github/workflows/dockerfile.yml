@@ -1,0 +1,41 @@
+name: Dockerfile
+
+# Published images come from the release archives, so only this builds what `docker build .` does,
+# the path people use for an image of their own. It takes minutes, so it runs when something that
+# path depends on changes.
+
+on:
+  push:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - Directory.Packages.props
+      - scripts/docker-smoke.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  from-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository content
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          # .git is the build context, so the token must not stay in its config.
+          persist-credentials: false
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: hermesproxy:smoke
+
+      - name: Smoke test
+        run: bash scripts/docker-smoke.sh hermesproxy:smoke
