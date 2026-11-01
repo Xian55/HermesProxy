@@ -957,7 +957,10 @@ public partial class WorldClient
             }
         }
 
-        if (packet.GetUniversalOpcode(false) == Opcode.SMSG_INSPECT_TALENT)
+        // 2.4.3 has a layout of its own here, a length and a talent bit array. Read as the specs
+        // below, a set bit made a spec count that ran off the end of the packet, and the throw
+        // cost the client the whole inspect.
+        if (packet.GetUniversalOpcode(false) == Opcode.SMSG_INSPECT_TALENT && LegacyVersion.ExpansionVersion >= 3)
         {
             // BuildPlayerTalentsInfoData (no isPet prefix). Unspent points are
             // not a rank-byte count — treating them as one emptied the tree.
