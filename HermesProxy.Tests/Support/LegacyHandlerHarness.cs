@@ -118,6 +118,11 @@ internal sealed class SinkClientWire(bool record) : IClientWire
     public WowGuid128 AwaitedObject =>
         Session == null || Session.GameState.ClientHasPlayerObject ? default : Session.GameState.CurrentPlayerGuid;
 
+    public WowGuid128 AwaitedPet =>
+        Session == null || !ModernVersion.IsWotLKClassicOrLater || Session.GameState.ClientHasPetObject
+            ? default
+            : Session.GameState.CurrentPetGuid;
+
     public bool TryWrite(ConnectionType connection, ServerPacket packet)
     {
         packet.WritePacketData();

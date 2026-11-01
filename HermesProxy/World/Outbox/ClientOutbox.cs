@@ -22,6 +22,12 @@ public interface IClientWire
     /// needs. Read once per packet sent, so it has to be cheap.
     /// </summary>
     WowGuid128 AwaitedObject { get; }
+
+    /// <summary>
+    /// The pet whose create the client is still waiting for, or empty when it has it or there is
+    /// none. Read once per packet sent, like <see cref="AwaitedObject"/>.
+    /// </summary>
+    WowGuid128 AwaitedPet { get; }
 }
 
 /// <summary>
@@ -52,7 +58,8 @@ public interface IClientWire
 /// <b>Awaited object.</b> While the client lacks the player's object, a packet that needs it
 /// (<see cref="ServerPacket.NeedsObject"/>) is held until <see cref="OutboxEvent.GuidKnown"/>. That
 /// window is the item-template hold at login and the gap after <c>SMSG_NEW_WORLD</c>. No sender
-/// has to know about it: a sender that opted in by hand was the whole of issue #314.
+/// has to know about it: a sender that opted in by hand was the whole of issue #314. The same goes
+/// for the pet, between the spell bar that names it and its create.
 /// </para>
 /// </remarks>
 public sealed class ClientOutbox : PacketOutbox<ServerPacket>
@@ -127,16 +134,21 @@ public sealed class ClientOutbox : PacketOutbox<ServerPacket>
     /// </summary>
     public override void Send(ServerPacket packet)
     {
-        WowGuid128 awaited = _wire.AwaitedObject;
-        if (awaited != default && packet.NeedsObject(awaited))
-        {
-            ObjectLifecycleLogMessages.HeldForObject(
-                _melObjLife, awaited.Low, awaited.High, packet.GetUniversalOpcode().ToStringFast());
-            When(OutboxEvent.GuidKnown(awaited), packet, AwaitedObjectHold);
+        if (HoldFor(_wire.AwaitedObject, packet) || HoldFor(_wire.AwaitedPet, packet))
             return;
-        }
 
         Route(packet.GetConnection(), packet);
+    }
+
+    private bool HoldFor(WowGuid128 awaited, ServerPacket packet)
+    {
+        if (awaited == default || !packet.NeedsObject(awaited))
+            return false;
+
+        ObjectLifecycleLogMessages.HeldForObject(
+            _melObjLife, awaited.Low, awaited.High, packet.GetUniversalOpcode().ToStringFast());
+        When(OutboxEvent.GuidKnown(awaited), packet, AwaitedObjectHold);
+        return true;
     }
 
     /// <summary>

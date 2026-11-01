@@ -43,6 +43,8 @@ internal sealed class RecordingClientWire : IClientWire
 
     public WowGuid128 AwaitedObject { get; set; }
 
+    public WowGuid128 AwaitedPet { get; set; }
+
     /// <summary>Runs after each write is recorded, on the writing thread.</summary>
     public Action<TestServerPacket>? OnWrite { get; set; }
 

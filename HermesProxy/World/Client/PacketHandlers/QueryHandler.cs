@@ -1000,6 +1000,7 @@ public partial class WorldClient
         {
             session.ToClient.Notify(OutboxEvent.GuidKnown(session.GameState.CurrentPlayerGuid));
         }
+        NotifyPetKnown();
     }
 
     /// <summary>

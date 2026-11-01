@@ -77,6 +77,7 @@ migration moves them here one slice at a time. What has moved and what hasn't is
            GuidKnown(player) ..... UpdateHandler.SendUpdateBatch end, every build, at EVERY batch while
                                    the client has the player (so a late hold still goes out next
                                    batch); QueryHandler.FlushDeferredUpdate right behind a held create
+           GuidKnown(pet) ........ UpdateHandler.NotifyPetKnown, at the same two places
            Gate InWorld .......... CharacterHandler: opened on SMSG_LOGIN_VERIFY_WORLD,
                                    closed on login failure and ReplaceGameState
            Tick() / TickParks() .. same place (legacy receive thread) · timer thread for timer-safe
@@ -174,6 +175,13 @@ and one volatile read per packet.
 - **Timeout.** 20 s, then discarded. `SMSG_NEW_WORLD` cancels what waited for the old map.
 - **Why on the packet.** Issue #314 listed nine hand-written holds, one per sender. `SMSG_POWER_UPDATE`
   had a hold in `HandlePowerUpdate` while two more senders of the same packet had none.
+- **The pet is awaited the same way.** `IClientWire.AwaitedPet` reads `ClientHasPetObject`: from the
+  `SMSG_PET_SPELLS_MESSAGE` that names a pet until its create is written, and again after the client
+  loses it. The hold is the same one, on `GuidKnown(pet)` under `AwaitedObjectKey`, so a map change
+  cancels both. Clients from 3.4.3 on only: the older ones skip `FilterV3_4_3Values`, which sets the
+  flag. A MaNGOS-style pet guid has the pet number in its entry slot until the create tells the
+  creature entry, and `CurrentPetGuid` moves to the real guid there. A packet that named the number
+  can't be made right by waiting, so it goes with the 20 s timeout.
 - **`AuraUpdate` is left out on purpose.** `BuildPlayerAuraSync` sends the whole list after the create.
 - **`SendPlayerValuesUpdate` keeps its own hold.** `FlushDeferredUpdate` claims those updates inline,
   ahead of the world-ready handshake.
