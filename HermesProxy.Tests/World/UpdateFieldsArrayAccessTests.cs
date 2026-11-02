@@ -194,6 +194,10 @@ public class UpdateFieldsArrayAllocationTests
 {
     private static long AllocatedBy(Action action)
     {
+        // A first call is JIT and type loading, which now and then lands on a runtime table that
+        // has to grow, and the tens of KB for it count against this thread. A box costs every call.
+        action();
+
         var before = GC.GetAllocatedBytesForCurrentThread();
         action();
         return GC.GetAllocatedBytesForCurrentThread() - before;
