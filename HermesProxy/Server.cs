@@ -11,7 +11,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Net.Http;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 using HermesProxy.World.Enums;
 using HermesProxy.Enums;
@@ -79,13 +78,15 @@ partial class Server
 
     internal static async Task CheckForUpdate()
     {
-        const string hermesGitHubRepo = "WowLegacyCore/HermesProxy";
+        const string hermesGitHubRepo = "Xian55/HermesProxy";
 
         try
         {
             #pragma warning disable CS0162 // GitVersion constants vary per build environment
-            if (GitVersionInformation.CommitsSinceVersionSource != "0" || GitVersionInformation.UncommittedChanges != "0")
-                return; // we are probably in a test branch
+            // Releases are built from master, before their tag exists, so the commits since the
+            // last tag can't tell one from a test branch. A branch is not behind a release anyway.
+            if (GitVersionInformation.BranchName != "master" || GitVersionInformation.UncommittedChanges != "0")
+                return;
 
             using var client = new HttpClient();
             #pragma warning restore CS0162
@@ -97,22 +98,11 @@ partial class Server
             string rawJson = await response.Content.ReadAsStringAsync();
             var parsedJson = JsonSerializer.Deserialize(rawJson, HermesJsonContext.Default.DictionaryStringObject);
 
-            string? commitDateStr = parsedJson!["created_at"].ToString();
-            DateTime commitDate = DateTime.Parse(commitDateStr!, CultureInfo.InvariantCulture).ToUniversalTime();
-
-            string myCommitDateStr = GitVersionInformation.CommitDate;
-            DateTime myCommitDate = DateTime.Parse(myCommitDateStr, CultureInfo.InvariantCulture).ToUniversalTime();
-
-            if (commitDate > myCommitDate)
+            string? latest = parsedJson!["tag_name"].ToString();
+            if (IsNewerRelease(latest, GitVersionInformation.MajorMinorPatch))
             {
-                Console.WriteLine("------------------------");
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"HermesProxy update available v{GitVersionInformation.Major}.{GitVersionInformation.Minor} => {parsedJson!["tag_name"]} ({commitDate:yyyy-MM-dd})");
-                Console.WriteLine("Please download new version from https://github.com/WowLegacyCore/HermesProxy/releases/latest");
-                Console.ResetColor();
-                Console.WriteLine("------------------------");
-                Console.WriteLine();
-                Thread.Sleep(10_000);
+                ServerLogMessages.UpdateAvailable(_melServer, _sourceFile, _netDirNone,
+                    latest!, GitVersionInformation.MajorMinorPatch, $"https://github.com/{hermesGitHubRepo}/releases/latest");
             }
         }
         catch
@@ -120,6 +110,11 @@ partial class Server
             // ignore
         }
     }
+
+    internal static bool IsNewerRelease(string? latestTag, string current)
+        => Version.TryParse(latestTag?.TrimStart('v'), out var latest)
+        && Version.TryParse(current, out var mine)
+        && latest > mine;
 
     // Every metrics summary names each of its opcode rows, and a value's name never changes, so
     // each is resolved once. Enum.IsDefined boxed the value, and the name table ToString reads

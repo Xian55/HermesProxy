@@ -67,4 +67,8 @@ internal static partial class ServerLogMessages
     [LoggerMessage(EventId = 611, Level = LogLevel.Information, Message = "Removed {Count} {Kind} older than {Days} days ({Megabytes} MB)")]
     public static partial void OldFilesSwept(
         ILogger logger, string SourceFile, string NetDir, int Count, string Kind, int Days, long Megabytes);
+
+    [LoggerMessage(EventId = 612, Level = LogLevel.Warning, Message = "HermesProxy {Latest} is out and this is {Current}. Get it from {Url}")]
+    public static partial void UpdateAvailable(
+        ILogger logger, string SourceFile, string NetDir, string Latest, string Current, string Url);
 }

@@ -138,6 +138,7 @@ internal static partial class ConfigReference
             }
         }
 
-        return page.ToString();
+        // A raw string has the line endings of this file's checkout, which are CRLF on Windows.
+        return page.ToString().ReplaceLineEndings("\n");
     }
 }
