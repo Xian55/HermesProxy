@@ -1282,7 +1282,10 @@ public partial class WorldClient
         }
 
         foreach (var auraUpdate in auraUpdates)
+        {
+            AuraDurationRefresh.Apply(auraUpdate, GetSession().GameState);
             SendPacketToClient(auraUpdate);
+        }
 
         // V3_4_3-only: when this batch contained any CreateObject for the player
         // (matched by GUID, not just ThisIsYou — cmangos doesn't always set
