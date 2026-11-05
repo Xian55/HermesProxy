@@ -87,6 +87,21 @@ public sealed class TBCInspectGearTests
     }
 
     [Fact]
+    public void ATalentedPlayer_KeepsTheirTalents()
+    {
+        if (!IsTBC)
+            return;
+
+        var talents = Inspect(RogueTalentBits).Talents;
+
+        // The same positions, eight to a byte, as the 2.5.3 client reads them.
+        byte[] expected = new byte[InspectTalentBits.ModernLength];
+        byte[] start = [0x14, 0x12, 0x06, 0x0A, 0x68, 0x00, 0x0D, 0x60, 0x0A, 0x00, 0x02];
+        start.CopyTo(expected, 0);
+        Assert.Equal(expected, talents);
+    }
+
+    [Fact]
     public void TheItemsAreTheOnesInTheVisibleItemBlock()
     {
         if (!IsTBC)
