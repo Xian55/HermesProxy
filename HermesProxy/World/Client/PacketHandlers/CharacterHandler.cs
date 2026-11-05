@@ -1005,6 +1005,15 @@ public partial class WorldClient
             if (LegacyVersion.ExpansionVersion >= 3)
                 ReadInspectedEquipment(packet, inspect);
         }
+        else if (packet.GetUniversalOpcode(false) == Opcode.SMSG_INSPECT_TALENT)
+        {
+            uint length = packet.ReadUInt32();
+            ReadOnlySpan<byte> legacyBits = packet.GetRemainingSpan();
+            legacyBits = legacyBits[..(int)Math.Min(length, (uint)legacyBits.Length)];
+            Span<byte> talentBits = stackalloc byte[InspectTalentBits.ModernLength];
+            InspectTalentBits.FromLegacy(legacyBits, talentBits);
+            inspect.Talents.AddRange(talentBits);
+        }
 
         SendPacketToClient(inspect);
     }
