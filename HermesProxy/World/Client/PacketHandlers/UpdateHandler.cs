@@ -4063,15 +4063,7 @@ public partial class WorldClient
                         aura.AuraData = ReadAuraSlot(i, guid, updates)!;
                         if (aura.AuraData != null)
                         {
-                            int durationLeft;
-                            int durationFull;
-                            GetSession().GameState.GetAuraDuration(guid, i, out durationLeft, out durationFull);
-                            if (durationLeft > 0 && durationFull > 0)
-                            {
-                                aura.AuraData.Flags |= AuraFlagsModern.Duration;
-                                aura.AuraData.Duration = durationFull;
-                                aura.AuraData.Remaining = durationLeft;
-                            }
+                            AuraDurationRefresh.Apply(aura.AuraData, guid, i, GetSession().GameState);
                             aura.AuraData.CastUnit = GetSession().GameState.GetAuraCaster(guid, i, aura.AuraData.SpellID);
                         }
                         else if (updateMaskArray[UNIT_FIELD_AURA + i])

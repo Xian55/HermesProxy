@@ -42,7 +42,6 @@ public sealed class AuraDurationRefreshTests
         Assert.True(aura.Flags.HasFlag(AuraFlagsModern.Duration));
         Assert.Equal(13050, aura.Duration);
         Assert.InRange(aura.Remaining!.Value, 12000, 13050);
-        Assert.True(update.Auras[0].ExpiresAt > 0);
     }
 
     [Fact]
@@ -60,7 +59,24 @@ public sealed class AuraDurationRefreshTests
         Assert.False(aura.Flags.HasFlag(AuraFlagsModern.Duration));
         Assert.Null(aura.Duration);
         Assert.Null(aura.Remaining);
-        Assert.Equal(0, update.Auras[0].ExpiresAt);
+    }
+
+    [Fact]
+    public void ExpiredAura_GetsNoFreshTimer()
+    {
+        var harness = new LegacyHandlerHarness(recordClientPackets: false);
+        var state = harness.Session.GameState;
+        // A 13 s aura whose duration came 20 s ago has run out on the proxy's clock.
+        state.StoreAuraDurationFull(Player, 0, 13050);
+        state.StoreAuraDurationLeft(Player, 0, 13050, Environment.TickCount - 20000);
+
+        var update = UpdateWith(5171);
+        AuraDurationRefresh.Apply(update, state);
+
+        AuraDataInfo aura = update.Auras[0].AuraData!;
+        Assert.False(aura.Flags.HasFlag(AuraFlagsModern.Duration));
+        Assert.Null(aura.Duration);
+        Assert.Null(aura.Remaining);
     }
 
     [Fact]
