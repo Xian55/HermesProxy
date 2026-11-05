@@ -80,14 +80,14 @@ public sealed class AuraDurationRefreshTests
     }
 
     [Fact]
-    public void SendingAnAuraList_RefreshesItsDurations()
+    public void SendingAHeldAuraList_RefreshesItsDurations()
     {
         var harness = new LegacyHandlerHarness(recordClientPackets: true);
         var state = harness.Session.GameState;
         state.StoreAuraDurationFull(Player, 0, 13050);
         state.StoreAuraDurationLeft(Player, 0, 13050, Environment.TickCount);
 
-        harness.Client.SendAuraUpdates([UpdateWith(5171)]);
+        harness.Client.SendHeldAuraUpdates([UpdateWith(5171)]);
 
         var sent = Assert.IsType<AuraUpdate>(Assert.Single(harness.ClientWire.Sent).Packet);
         AuraDataInfo aura = sent.Auras[0].AuraData!;
@@ -97,23 +97,23 @@ public sealed class AuraDurationRefreshTests
     }
 
     [Fact]
-    public void SendingAnAuraList_AllocatesNothingBeyondItsPackets()
+    public void SendingAHeldAuraList_AllocatesNothingBeyondItsPackets()
     {
         var harness = new LegacyHandlerHarness(recordClientPackets: false);
         AuraUpdate update = UpdateWith(5171);
         List<AuraUpdate> list = [update];
 
-        // Every update batch with an aura change comes through here. A first call allocates for
-        // the JIT and lazy statics, so both paths are warmed before they are measured.
+        // A first call allocates for the JIT and lazy statics, so both paths are warmed before
+        // they are measured.
         harness.Client.SendPacketToClient(update);
-        harness.Client.SendAuraUpdates(list);
+        harness.Client.SendHeldAuraUpdates(list);
 
         long before = GC.GetAllocatedBytesForCurrentThread();
         harness.Client.SendPacketToClient(update);
         long packetAlone = GC.GetAllocatedBytesForCurrentThread() - before;
 
         before = GC.GetAllocatedBytesForCurrentThread();
-        harness.Client.SendAuraUpdates(list);
+        harness.Client.SendHeldAuraUpdates(list);
         long throughTheList = GC.GetAllocatedBytesForCurrentThread() - before;
 
         Assert.Equal(packetAlone, throughTheList);

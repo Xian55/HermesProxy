@@ -884,7 +884,7 @@ public partial class WorldClient
             }
         }
 
-        SendAuraUpdates(entry.AuraUpdates);
+        SendHeldAuraUpdates(entry.AuraUpdates);
 
         // V3_4_3-only: when this deferred batch contained any CreateObject for
         // the player, immediately follow it with an empty SMSG_AURA_UPDATE_ALL.
@@ -1000,6 +1000,20 @@ public partial class WorldClient
             session.ToClient.Notify(OutboxEvent.GuidKnown(session.GameState.CurrentPlayerGuid));
         }
         NotifyPetKnown();
+    }
+
+    /// <summary>
+    /// Sends the aura list of a batch held for item templates with the durations that came in while
+    /// it waited. Those followed the create, and the client dropped them: it had no player yet. A
+    /// batch sent as it is read has nothing to pick up, so only the held one comes through here.
+    /// </summary>
+    internal void SendHeldAuraUpdates(List<AuraUpdate> auraUpdates)
+    {
+        foreach (var auraUpdate in auraUpdates)
+        {
+            AuraDurationRefresh.Apply(auraUpdate, GetSession().GameState);
+            SendPacketToClient(auraUpdate);
+        }
     }
 
     /// <summary>
