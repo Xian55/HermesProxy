@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using HermesProxy.Tests.Support;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
@@ -77,5 +78,28 @@ public sealed class AuraDurationRefreshTests
         Assert.True(aura.Flags.HasFlag(AuraFlagsModern.Duration));
         Assert.Equal(13050, aura.Duration);
         Assert.InRange(aura.Remaining!.Value, 12000, 13050);
+    }
+
+    [Fact]
+    public void SendingAnAuraList_AllocatesNothingBeyondItsPackets()
+    {
+        var harness = new LegacyHandlerHarness(recordClientPackets: false);
+        AuraUpdate update = UpdateWith(5171);
+        List<AuraUpdate> list = [update];
+
+        // Every update batch with an aura change comes through here. A first call allocates for
+        // the JIT and lazy statics, so both paths are warmed before they are measured.
+        harness.Client.SendPacketToClient(update);
+        harness.Client.SendAuraUpdates(list);
+
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        harness.Client.SendPacketToClient(update);
+        long packetAlone = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        before = GC.GetAllocatedBytesForCurrentThread();
+        harness.Client.SendAuraUpdates(list);
+        long throughTheList = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(packetAlone, throughTheList);
     }
 }

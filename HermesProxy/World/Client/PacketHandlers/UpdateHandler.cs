@@ -1107,7 +1107,7 @@ public partial class WorldClient
     /// Sends an aura list after refreshing the durations that arrived while its batch was held.
     /// Both the inline and the deferred login paths go through here.
     /// </summary>
-    internal void SendAuraUpdates(IEnumerable<AuraUpdate> auraUpdates)
+    internal void SendAuraUpdates(List<AuraUpdate> auraUpdates)
     {
         foreach (var auraUpdate in auraUpdates)
         {
