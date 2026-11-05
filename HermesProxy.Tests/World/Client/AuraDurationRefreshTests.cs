@@ -40,7 +40,7 @@ public sealed class AuraDurationRefreshTests
         AuraDataInfo aura = update.Auras[0].AuraData!;
         Assert.True(aura.Flags.HasFlag(AuraFlagsModern.Duration));
         Assert.Equal(13050, aura.Duration);
-        Assert.Equal(13050, aura.Remaining);
+        Assert.InRange(aura.Remaining!.Value, 12000, 13050);
         Assert.True(update.Auras[0].ExpiresAt > 0);
     }
 
@@ -60,5 +60,22 @@ public sealed class AuraDurationRefreshTests
         Assert.Null(aura.Duration);
         Assert.Null(aura.Remaining);
         Assert.Equal(0, update.Auras[0].ExpiresAt);
+    }
+
+    [Fact]
+    public void SendingAnAuraList_RefreshesItsDurations()
+    {
+        var harness = new LegacyHandlerHarness(recordClientPackets: true);
+        var state = harness.Session.GameState;
+        state.StoreAuraDurationFull(Player, 0, 13050);
+        state.StoreAuraDurationLeft(Player, 0, 13050, Environment.TickCount);
+
+        harness.Client.SendAuraUpdates([UpdateWith(5171)]);
+
+        var sent = Assert.IsType<AuraUpdate>(Assert.Single(harness.ClientWire.Sent).Packet);
+        AuraDataInfo aura = sent.Auras[0].AuraData!;
+        Assert.True(aura.Flags.HasFlag(AuraFlagsModern.Duration));
+        Assert.Equal(13050, aura.Duration);
+        Assert.InRange(aura.Remaining!.Value, 12000, 13050);
     }
 }

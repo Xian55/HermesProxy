@@ -884,8 +884,7 @@ public partial class WorldClient
             }
         }
 
-        foreach (var auraUpdate in entry.AuraUpdates)
-            SendPacketToClient(auraUpdate);
+        SendAuraUpdates(entry.AuraUpdates);
 
         // V3_4_3-only: when this deferred batch contained any CreateObject for
         // the player, immediately follow it with an empty SMSG_AURA_UPDATE_ALL.

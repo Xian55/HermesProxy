@@ -1104,6 +1104,19 @@ public partial class WorldClient
     }
 
     /// <summary>
+    /// Sends an aura list after refreshing the durations that arrived while its batch was held.
+    /// Both the inline and the deferred login paths go through here.
+    /// </summary>
+    internal void SendAuraUpdates(IEnumerable<AuraUpdate> auraUpdates)
+    {
+        foreach (var auraUpdate in auraUpdates)
+        {
+            AuraDurationRefresh.Apply(auraUpdate, GetSession().GameState);
+            SendPacketToClient(auraUpdate);
+        }
+    }
+
+    /// <summary>
     /// The half of <see cref="HandleUpdateObject"/> after the batch is read and any hold decided:
     /// filters, splits and sends it, then whatever has to follow it. Also sends a held pet batch.
     /// </summary>
@@ -1281,11 +1294,7 @@ public partial class WorldClient
             SendPlayerValuesUpdate(playerUpdateObject);
         }
 
-        foreach (var auraUpdate in auraUpdates)
-        {
-            AuraDurationRefresh.Apply(auraUpdate, GetSession().GameState);
-            SendPacketToClient(auraUpdate);
-        }
+        SendAuraUpdates(auraUpdates);
 
         // V3_4_3-only: when this batch contained any CreateObject for the player
         // (matched by GUID, not just ThisIsYou — cmangos doesn't always set
