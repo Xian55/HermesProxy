@@ -840,6 +840,11 @@ class ItemEnchantTimeUpdate : ServerPacket, ISpanWritable
 {
     public ItemEnchantTimeUpdate() : base(Opcode.SMSG_ITEM_ENCHANT_TIME_UPDATE, ConnectionType.Instance) { }
 
+    // At login a server sends this ahead of the player, whose items come with it. The
+    // modern client drops a timer for an item it does not have yet, so wait for the
+    // player's create the same way ItemTimeUpdate does.
+    public override bool NeedsObject(WowGuid128 guid) => true;
+
     public override void Write()
     {
         _worldPacket.WritePackedGuid128(ItemGuid);
