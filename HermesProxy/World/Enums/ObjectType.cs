@@ -148,6 +148,7 @@ public enum HighGuidTypeLegacy
     Corpse                  = 0xF101,                       // blizz F100
     CorpseMangos            = 0xF500,                       // cMaNGOS: LegacyCorpseGuidHigh
     MOTransport             = 0x1FC0,                       // blizz 1FC0 (for GAMEOBJECT_TYPE_MO_TRANSPORT)
+    MOTransportMangos       = 0x8000,                       // cMaNGOS classic from 2026-11: LegacyMoTransportGuidHigh
     Group                   = 0x1F50,                       // blizz 1F5x
     Group2                  = 0x5000,                       // for outdated tbc cores
 }
