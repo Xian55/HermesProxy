@@ -67,7 +67,7 @@ session). Then repeat the action in game.
 
 ## Target Framework & Global Settings
 
-- **.NET 10.0** — set centrally in `Directory.Packages.props`
+- **.NET 11.0** — set centrally in `Directory.Packages.props`
 - **Central package management** — all versions in `Directory.Packages.props`; projects use `<PackageReference>` without version attributes
 - **Nullable** enabled solution-wide
 - **Global using**: `System.Numerics`

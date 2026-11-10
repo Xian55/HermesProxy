@@ -3,7 +3,7 @@
 # from a full clone with BuildKit: GitVersion needs the history, and $BUILDPLATFORM needs BuildKit.
 ARG BINARIES=from-source
 
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0-noble AS from-source
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:11.0-resolute AS from-source
 ARG TARGETARCH
 WORKDIR /src
 COPY .git .git
@@ -25,7 +25,7 @@ WORKDIR /state/Logs
 WORKDIR /state/AccountData
 WORKDIR /state/PacketsLog
 
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled
+FROM mcr.microsoft.com/dotnet/runtime-deps:11.0-resolute-chiseled
 WORKDIR /app
 COPY --from=published /app .
 COPY --from=state --chown=$APP_UID:$APP_UID /state .

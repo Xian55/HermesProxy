@@ -16,7 +16,7 @@ set -u
 cd "$(dirname "$0")/../../.." || exit 1
 
 config="${1:-Debug}"
-dll="HermesProxy.Tests/bin/$config/net10.0/HermesProxy.Tests.dll"
+dll="HermesProxy.Tests/bin/$config/net11.0/HermesProxy.Tests.dll"
 
 dotnet build HermesProxy.Tests -c "$config" -v q --nologo || exit 1
 

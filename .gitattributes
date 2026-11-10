@@ -5,3 +5,6 @@ HermesProxy/CSV/BroadcastTexts3.csv text eol=lf
 
 # Run by bash on Windows too, where a CRLF checkout would break it.
 scripts/docker-smoke.sh text eol=lf
+
+# Verify 32 fails a snapshot that holds a CR, which is what core.autocrlf=true checks out.
+*.verified.txt text eol=lf
