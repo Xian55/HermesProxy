@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <Nullable>enable</Nullable>
     <WarningsAsErrors>nullable</WarningsAsErrors>
     <!-- SYSLIB1015: "argument is not referenced from the logging message". Every [LoggerMessage]
@@ -16,26 +16,24 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Framework project packages -->
-    <PackageVersion Include="Google.Protobuf" Version="3.36.1" />
+    <PackageVersion Include="Google.Protobuf" Version="3.36.2" />
     <!-- Build-time only: bundles protoc (35.1). Generated code must not be newer than the runtime above.
-         Prerelease for its universal macOS protoc: 2.83.0 ships x86_64 only, which cannot run on Apple
-         Silicon without Rosetta (MSB6003). Move to 2.84.0 once it is stable. -->
-    <PackageVersion Include="Grpc.Tools" Version="2.84.0-pre1" />
-    <PackageVersion Include="Sep" Version="0.12.2" />
+         Not below 2.84: 2.83.0 ships an x86_64-only macOS protoc, which cannot run on Apple Silicon
+         without Rosetta (MSB6003). -->
+    <PackageVersion Include="Grpc.Tools" Version="2.85.0" />
+    <PackageVersion Include="Sep" Version="0.17.1" />
     <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
     <!-- Logging -->
-    <PackageVersion Include="Serilog" Version="4.3.0" />
-    <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageVersion Include="Serilog" Version="4.4.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageVersion Include="Serilog.Sinks.Async" Version="2.1.0" />
-    <PackageVersion Include="Serilog.Extensions.Logging" Version="9.0.2" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.2" />
+    <PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0" />
     <!-- Hosting / DI / Options -->
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.2" />
-    <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.2" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="11.0.0" />
     <!-- HermesProxy project packages -->
-    <PackageVersion Include="GitVersion.MsBuild" Version="6.5.1" />
+    <PackageVersion Include="GitVersion.MsBuild" Version="6.8.2" />
     <!-- BouncyCastle — two consumers:
          1. Ed25519ctx signer for SMSG_ENTER_ENCRYPTED_MODE on WotLK Classic 3.4.3+ clients,
             which switched from RSA to Ed25519 signatures. .NET's built-in crypto doesn't
@@ -43,18 +41,23 @@
          2. AES-GCM fallback in Framework.Cryptography.WorldCrypt for platforms where
             System.Security.Cryptography.AesGcm rejects the 12-byte (96-bit) tag the WoW
             protocol uses (notably macOS / Apple's CommonCrypto backend). -->
-    <PackageVersion Include="BouncyCastle.Cryptography" Version="2.4.0" />
+    <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
     <!-- Test packages -->
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.1" />
+    <!-- Held at the last 3.x: xunit.v3 4 brings Microsoft.Testing.Platform 2, which fails
+         `dotnet test` in VSTest mode. Moving means opting in through global.json and rewriting
+         every `filter` argument in CI, the docs and the scripts. -->
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
-    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
-    <PackageVersion Include="Moq" Version="4.20.72" />
-    <PackageVersion Include="Verify.XunitV3" Version="29.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
+    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
+    <PackageVersion Include="Moq" Version="4.21.0" />
+    <!-- Held at the last 32.x: from 33.0.0 the build fails (SC021) until a sponsorship or an
+         exemption is declared in MSBuild, and an exemption runs out after at most 12 months. -->
+    <PackageVersion Include="Verify.XunitV3" Version="32.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
     <!-- Benchmark packages -->
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
     <!-- Source generator packages -->
-    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
   </ItemGroup>
 </Project>

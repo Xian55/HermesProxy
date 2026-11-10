@@ -44,7 +44,7 @@ Then load the set through the proxy's own loaders, for the build it is for:
 ```bash
 dotnet build
 HERMES_TEST_CSV_LOAD=1 HERMES_TEST_MODERN_BUILD=V4_4_2_60895 \
-    dotnet HermesProxy.Tests/bin/Debug/net10.0/HermesProxy.Tests.dll \
+    dotnet HermesProxy.Tests/bin/Debug/net11.0/HermesProxy.Tests.dll \
     --filter-class HermesProxy.Tests.World.GameDataCsvLoadTests
 ```
 
