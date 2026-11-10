@@ -45,4 +45,11 @@ internal static partial class GuidLogMessages
         Level = LogLevel.Information,
         Message = "[MoTransportGuid] Backend uses high-guid 0x{High:X4} for ships and zeppelins; rebuilding their guids with it.")]
     public static partial void LearnedLegacyMoTransportHigh(ILogger logger, uint high);
+
+    // Once per backend: it changes the guid every later packet about an elevator or tram carries.
+    [LoggerMessage(
+        EventId = 1304,
+        Level = LogLevel.Information,
+        Message = "[TransportGuid] Backend uses high-guid 0x{High:X4} for elevators and trams; rebuilding their guids with it.")]
+    public static partial void LearnedLegacyTransportHigh(ILogger logger, uint high);
 }

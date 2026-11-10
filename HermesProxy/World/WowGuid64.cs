@@ -40,11 +40,12 @@ public readonly record struct WowGuid64(ulong Low)
         // Not hard-coded to 0x4000: cMaNGOS WotLK uses 0x4700 for items, and an item guid sent
         // back under the wrong high finds nothing on that backend (#278). See LegacyItemGuidHigh.
         HighGuidType.Item => new WowGuid64(LegacyItemGuidHigh.Current, (uint)guid.GetCounter()),
-        // A ship or zeppelin goes back under the high it came with: 0x1FC0, or 0x8000 on a
-        // cMaNGOS classic built after 2026-11-06 (#590). See LegacyMoTransportGuidHigh.
+        // A transport goes back under the high it came with. A ship or zeppelin: 0x1FC0, or
+        // 0x8000 on a cMaNGOS classic built after 2026-11-06 (#590), see LegacyMoTransportGuidHigh.
+        // An elevator or tram: 0xF120, or 0x6000 on that same server, see LegacyTransportGuidHigh.
         HighGuidType.Transport => (guid.GetCounter() & WowGuid128.MoTransportCounterFlag) != 0
                             ? new WowGuid64(LegacyMoTransportGuidHigh.Current, (uint)(guid.GetCounter() & ~WowGuid128.MoTransportCounterFlag))
-                            : new WowGuid64(HighGuidTypeLegacy.Transport, guid.GetEntry(), (uint)guid.GetCounter()),
+                            : new WowGuid64(LegacyTransportGuidHigh.Current, guid.GetEntry(), (uint)guid.GetCounter()),
         HighGuidType.RaidGroup => new WowGuid64(HighGuidTypeLegacy.Group, (uint)guid.GetCounter()),
         HighGuidType.GameObject => new WowGuid64(HighGuidTypeLegacy.GameObject, guid.GetEntry(), (uint)guid.GetCounter()),
         HighGuidType.Creature => new WowGuid64(HighGuidTypeLegacy.Creature, guid.GetEntry(), (uint)guid.GetCounter()),

@@ -41,6 +41,7 @@ public static class HighGuid
         HighGuidTypeLegacy.DynamicObject => HighGuidType.DynamicObject,
         HighGuidTypeLegacy.GameObject => HighGuidType.GameObject,
         HighGuidTypeLegacy.Transport => HighGuidType.Transport,
+        HighGuidTypeLegacy.TransportMangos => HighGuidType.Transport,
         HighGuidTypeLegacy.Creature => HighGuidType.Creature,
         HighGuidTypeLegacy.Pet => HighGuidType.Pet,
         HighGuidTypeLegacy.Vehicle => HighGuidType.Vehicle,

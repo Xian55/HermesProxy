@@ -141,6 +141,7 @@ public enum HighGuidTypeLegacy
     Player                  = 0x0000,                       // blizz 0000
     GameObject              = 0xF110,                       // blizz F110
     Transport               = 0xF120,                       // blizz F120 (for GAMEOBJECT_TYPE_TRANSPORT)
+    TransportMangos         = 0x6000,                       // cMaNGOS classic from 2026-11: LegacyTransportGuidHigh
     Creature                = 0xF130,                       // blizz F130
     Pet                     = 0xF140,                       // blizz F140
     Vehicle                 = 0xF150,                       // blizz F15/F55

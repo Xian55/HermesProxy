@@ -23,6 +23,7 @@ public class HighGuidTests
     [InlineData(HighGuidTypeLegacy.MOTransport, HighGuidType.MOTransport)]
     [InlineData(HighGuidTypeLegacy.MOTransportMangos, HighGuidType.MOTransport)]
     [InlineData(HighGuidTypeLegacy.Transport, HighGuidType.Transport)]
+    [InlineData(HighGuidTypeLegacy.TransportMangos, HighGuidType.Transport)]
     [InlineData(HighGuidTypeLegacy.GameObject, HighGuidType.GameObject)]
     [InlineData(HighGuidTypeLegacy.DynamicObject, HighGuidType.DynamicObject)]
     [InlineData(HighGuidTypeLegacy.Creature, HighGuidType.Creature)]
