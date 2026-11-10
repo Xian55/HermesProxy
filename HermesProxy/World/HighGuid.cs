@@ -35,6 +35,7 @@ public static class HighGuid
         HighGuidTypeLegacy.Group => HighGuidType.RaidGroup,
         HighGuidTypeLegacy.Group2 => HighGuidType.RaidGroup,
         HighGuidTypeLegacy.MOTransport => HighGuidType.MOTransport, // ?? unused in wpp
+        HighGuidTypeLegacy.MOTransportMangos => HighGuidType.MOTransport,
         HighGuidTypeLegacy.Item => HighGuidType.Item,
         HighGuidTypeLegacy.ItemContainer => HighGuidType.Item, // cmangos 0x4700 → treat as Item
         HighGuidTypeLegacy.DynamicObject => HighGuidType.DynamicObject,

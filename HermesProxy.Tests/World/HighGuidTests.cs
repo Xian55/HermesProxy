@@ -21,6 +21,7 @@ public class HighGuidTests
     [InlineData(HighGuidTypeLegacy.Group, HighGuidType.RaidGroup)]
     [InlineData(HighGuidTypeLegacy.Group2, HighGuidType.RaidGroup)]
     [InlineData(HighGuidTypeLegacy.MOTransport, HighGuidType.MOTransport)]
+    [InlineData(HighGuidTypeLegacy.MOTransportMangos, HighGuidType.MOTransport)]
     [InlineData(HighGuidTypeLegacy.Transport, HighGuidType.Transport)]
     [InlineData(HighGuidTypeLegacy.GameObject, HighGuidType.GameObject)]
     [InlineData(HighGuidTypeLegacy.DynamicObject, HighGuidType.DynamicObject)]

@@ -21,7 +21,7 @@ public readonly record struct WowGuid128(ulong Low, ulong High)
         HighGuidType.Player => Create(HighGuidType703.Player, guid.GetCounter()),
         HighGuidType.Item => CreateItem(guid),
         HighGuidType.Transport => TransportCreate(guid.GetCounter(), guid.GetEntry()),
-        HighGuidType.MOTransport => TransportCreate(guid.GetCounter() | MoTransportCounterFlag, guid.GetEntry()),
+        HighGuidType.MOTransport => CreateMoTransport(guid),
         HighGuidType.RaidGroup => Create(HighGuidType703.RaidGroup, guid.GetCounter()),
         HighGuidType.GameObject => Create(HighGuidType703.GameObject, gamestate.GetObjectSpawnCounter(guid), guid.GetEntry(), guid.GetCounter()),
         HighGuidType.Creature => Create(HighGuidType703.Creature, gamestate.GetObjectSpawnCounter(guid), guid.GetEntry(), guid.GetCounter()),
@@ -44,6 +44,12 @@ public readonly record struct WowGuid128(ulong Low, ulong High)
     {
         LegacyCorpseGuidHigh.Observe(guid.GetHighGuidTypeLegacy());
         return Create(HighGuidType703.Corpse, 0, guid.GetEntry(), guid.GetCounter());
+    }
+
+    static WowGuid128 CreateMoTransport(WowGuid64 guid)
+    {
+        LegacyMoTransportGuidHigh.Observe(guid.GetHighGuidTypeLegacy());
+        return TransportCreate(guid.GetCounter() | MoTransportCounterFlag, guid.GetEntry());
     }
 
     public static WowGuid128 Create(HighGuidType703 type, ulong counter)

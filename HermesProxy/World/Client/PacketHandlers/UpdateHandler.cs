@@ -703,11 +703,13 @@ public partial class WorldClient
                         if (ModernVersion.IsWotLKClassicOrLater)
                         {
                             var legacyHigh = oldGuid.GetHighGuidTypeLegacy();
-                            if (legacyHigh == HighGuidTypeLegacy.Transport ||
-                                legacyHigh == HighGuidTypeLegacy.MOTransport)
+                            // By kind, not by legacy value: an MO transport has two (#590).
+                            var highType = HighGuid.FromLegacy(legacyHigh);
+                            if (highType == HighGuidType.Transport ||
+                                highType == HighGuidType.MOTransport)
                             {
                                 filtered = !MayForwardTransport(legacyHigh, updateData);
-                                if (!filtered && legacyHigh == HighGuidTypeLegacy.MOTransport)
+                                if (!filtered && highType == HighGuidType.MOTransport)
                                     RequestTransportTemplate((uint)(updateData.ObjectData.EntryID ?? 0));
                                 UpdateHandlerLogMessages.TransportCreate(_melUpdateValues,
                                     filtered ? "Skipping" : "Forwarding", "CreateObject1", legacyHigh,
@@ -795,11 +797,12 @@ public partial class WorldClient
                         if (ModernVersion.IsWotLKClassicOrLater)
                         {
                             var legacyHigh = oldGuid.GetHighGuidTypeLegacy();
-                            if (legacyHigh == HighGuidTypeLegacy.Transport ||
-                                legacyHigh == HighGuidTypeLegacy.MOTransport)
+                            var highType = HighGuid.FromLegacy(legacyHigh);
+                            if (highType == HighGuidType.Transport ||
+                                highType == HighGuidType.MOTransport)
                             {
                                 filtered = !MayForwardTransport(legacyHigh, updateData);
-                                if (!filtered && legacyHigh == HighGuidTypeLegacy.MOTransport)
+                                if (!filtered && highType == HighGuidType.MOTransport)
                                     RequestTransportTemplate((uint)(updateData.ObjectData.EntryID ?? 0));
                                 UpdateHandlerLogMessages.TransportCreate(_melUpdateValues,
                                     filtered ? "Skipping" : "Forwarding", "CreateObject2", legacyHigh,
