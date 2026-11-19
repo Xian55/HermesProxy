@@ -3132,9 +3132,43 @@ public static partial class GameData
             return;
         }
 
+        // 3.4.3 and later never advertise SpellXSpellVisual, so its records are unreachable there:
+        // the only readers are the advertised index and CMSG_HOTFIX_REQUEST, which asks for
+        // advertised ids. The two lookups below are still needed on every build (#187).
+        var table = ParseSpellXSpellVisual(path, SpellVisuals,
+            buildHotfixRecords: AdvertisedHotfixTables.IsAdvertised(DB2Hash.SpellXSpellVisual, ModernVersion.Build));
+
+        foreach (var record in table.HotfixRecords)
+            Hotfixes[record.HotfixId] = record;
+
+        SpellVisuals = table.SpellVisuals;
+        SpellXSpellVisualToSpellVisual = table.SpellXSpellVisualToSpellVisual;
+    }
+
+    /// <summary>What one SpellXSpellVisual CSV loads into; see <see cref="ParseSpellXSpellVisual"/>.</summary>
+    internal sealed record SpellXSpellVisualTable(
+        FrozenDictionary<uint, uint> SpellVisuals,
+        FrozenDictionary<uint, uint> SpellXSpellVisualToSpellVisual,
+        List<HotfixRecord> HotfixRecords);
+
+    /// <summary>
+    /// Reads one SpellXSpellVisual CSV. Split from <see cref="LoadSpellXSpellVisualHotfixes"/> so a
+    /// test can read any expansion's file without the process being built for it, and without
+    /// touching the global stores.
+    /// </summary>
+    /// <param name="spellVisuals">The spell → SpellXSpellVisual map loaded so far; rows here override it.</param>
+    /// <param name="buildHotfixRecords">
+    /// When false only the two lookups are built: the record columns are not parsed and no
+    /// <see cref="HotfixRecord"/> is allocated. Hotfix ids are numbered by row either way.
+    /// </param>
+    internal static SpellXSpellVisualTable ParseSpellXSpellVisual(
+        string path, FrozenDictionary<uint, uint> spellVisuals, bool buildHotfixRecords)
+    {
         using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromFile(path);
-        var dict = new Dictionary<uint, uint>(SpellVisuals);
-        var sxsvToVisual = new Dictionary<uint, uint>(EstimateRowCount(path, 20));
+        int estimatedRows = EstimateRowCount(path, 20);
+        var dict = new Dictionary<uint, uint>(spellVisuals);
+        var sxsvToVisual = new Dictionary<uint, uint>(estimatedRows);
+        var records = buildHotfixRecords ? new List<HotfixRecord>(estimatedRows) : [];
 
         uint counter = 0;
         foreach (var row in reader)
@@ -3142,9 +3176,15 @@ public static partial class GameData
             counter++;
 
             uint id = uint.Parse(row[0].Span);
-            byte difficultyId = byte.Parse(row[1].Span);
             uint spellVisualId = uint.Parse(row[2].Span);
+            uint spellId = uint.Parse(row[12].Span);
             sxsvToVisual[id] = spellVisualId;
+            dict[spellId] = id;
+
+            if (!buildHotfixRecords)
+                continue;
+
+            byte difficultyId = byte.Parse(row[1].Span);
             float probability = float.Parse(row[3].Span);
             byte flags = byte.Parse(row[4].Span);
             byte priority = byte.Parse(row[5].Span);
@@ -3154,12 +3194,6 @@ public static partial class GameData
             uint viewerPlayerConditionId = uint.Parse(row[9].Span);
             ushort casterUnitConditionId = ushort.Parse(row[10].Span);
             uint casterPlayerConditionId = uint.Parse(row[11].Span);
-            uint spellId = uint.Parse(row[12].Span);
-
-            if (dict.ContainsKey(spellId))
-                dict[spellId] = id;
-            else
-                dict.Add(spellId, id);
 
             HotfixRecord record = new HotfixRecord();
             record.TableHash = DB2Hash.SpellXSpellVisual;
@@ -3180,11 +3214,10 @@ public static partial class GameData
             record.HotfixContent.WriteUInt16(casterUnitConditionId);
             record.HotfixContent.WriteUInt32(casterPlayerConditionId);
             record.HotfixContent.WriteUInt32(spellId);
-            Hotfixes[record.HotfixId] = record;
+            records.Add(record);
         }
 
-        SpellVisuals = dict.ToFrozenDictionary();
-        SpellXSpellVisualToSpellVisual = sxsvToVisual.ToFrozenDictionary();
+        return new SpellXSpellVisualTable(dict.ToFrozenDictionary(), sxsvToVisual.ToFrozenDictionary(), records);
     }
 
     public static void LoadSpellVisualMissileFlags()

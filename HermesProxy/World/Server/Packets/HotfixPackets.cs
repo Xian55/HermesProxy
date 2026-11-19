@@ -21,6 +21,7 @@ using Framework.GameMath;
 using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets;
@@ -77,7 +78,8 @@ class AvailableHotfixes : ServerPacket
     }
 
     public uint VirtualRealmAddress;
-    public HashSet<DB2Hash>? TableFilter;
+    /// <summary><c>null</c> advertises every record; see <see cref="AdvertisedHotfixTables"/>.</summary>
+    public FrozenSet<DB2Hash>? TableFilter;
 }
 
 public readonly record struct HotfixRequest(uint ClientBuild, uint DataBuild, List<uint> Hotfixes);

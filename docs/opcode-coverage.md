@@ -262,6 +262,7 @@ site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a n
 | `HermesProxy/World/Server/Packets/TaxiPackets.cs` | 2 |
 | `HermesProxy/World/Server/Systems/ItemSystem.cs` | 2 |
 | `HermesProxy/World/Server/Systems/MiscSystem.cs` | 2 |
+| `HermesProxy/World/AdvertisedHotfixTables.cs` | 1 |
 | `HermesProxy/World/Client/PacketHandlers/NPCHandler.cs` | 1 |
 | `HermesProxy/World/Client/PacketHandlers/PetitionHandler.cs` | 1 |
 | `HermesProxy/World/Client/PacketHandlers/TaxiHandler.cs` | 1 |
@@ -282,5 +283,4 @@ site gets a layout of its own (`World/Server/Packets/CLAUDE.md`) rather than a n
 | `HermesProxy/World/Server/Systems/LootSystem.cs` | 1 |
 | `HermesProxy/World/Server/Systems/MovementSystem.cs` | 1 |
 | `HermesProxy/World/Server/Systems/SupportTicketSystem.cs` | 1 |
-| `HermesProxy/World/Server/WorldSocket.cs` | 1 |
 

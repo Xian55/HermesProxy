@@ -1402,28 +1402,8 @@ public partial class WorldSocket : SocketBase, BnetServices.INetwork
     {
         AvailableHotfixes hotfixes = new AvailableHotfixes();
         hotfixes.VirtualRealmAddress = GetSession().RealmId.GetAddress();
-        // V3_4_3: advertise only tables where we actually override the client's own data.
-        // Hotfixes are an override channel — a record identical to the baked-in DB2 costs a
-        // round trip and changes nothing.
-        //
-        // ChrCustomizationChoice (1064 rows) and ChrCustomizationOption (190) used to be
-        // advertised here. Both were verified byte-identical to the client's 3.4.3.54261
-        // DB2s (1064/1064 and 190/190, zero differing, zero new), i.e. 1254 wasted records
-        // per login. Neither store is read anywhere else in the proxy.
-        //
-        // ItemExtendedCost holds only the rows where the server's vendor prices differ from the
-        // client's, CurrencyTypes a 4.3.4 server's weekly caps, GlobalStrings the 4.4.2 client's
-        // honor lines in front of a 3.3.5a server.
-        if (ModernVersion.IsWotLKClassicOrLater)
-        {
-            hotfixes.TableFilter = new HashSet<DB2Hash>
-            {
-                DB2Hash.AreaTrigger,
-                DB2Hash.ItemExtendedCost,
-                DB2Hash.CurrencyTypes,
-                DB2Hash.GlobalStrings,
-            };
-        }
+        // V3_4_3 and later advertise only the tables the proxy overrides; see AdvertisedHotfixTables.
+        hotfixes.TableFilter = AdvertisedHotfixTables.For(ModernVersion.Build);
         SendPacket(hotfixes);
     }
 
