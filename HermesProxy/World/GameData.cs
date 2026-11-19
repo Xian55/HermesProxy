@@ -764,7 +764,6 @@ public static partial class GameData
             LoadCurrencyTypes,
             LoadChatChannels,
             LoadItemEnchantVisuals,
-            LoadSpellVisuals,
             LoadLearnSpells,
             LoadTotemSpells,
             LoadGems,
@@ -1531,16 +1530,18 @@ public static partial class GameData
         ItemEnchantVisuals = dict.ToFrozenDictionary();
     }
 
-    public static void LoadSpellVisuals()
+    /// <summary>
+    /// Reads one SpellVisuals CSV: spell → SpellXSpellVisual. Returns it rather than storing it,
+    /// because <see cref="LoadSpellVisuals"/> is the only writer of <see cref="SpellVisuals"/>.
+    /// </summary>
+    internal static FrozenDictionary<uint, uint> ParseSpellVisuals(string path)
     {
-        var path = Path.Combine("CSV", $"SpellVisuals{ModernVersion.ExpansionVersion}.csv");
-
         if (!File.Exists(path))
         {
             // Not shipped for this build: either the client's own DB2 already carries these
             // rows, or the table has no overrides for this expansion. Nothing to load.
             // See scripts/compare-hotfix-csv.py.
-            return;
+            return FrozenDictionary<uint, uint>.Empty;
         }
 
         using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
@@ -1552,7 +1553,7 @@ public static partial class GameData
             uint visualId = uint.Parse(row[1].Span);
             dict.Add(spellId, visualId);
         }
-        SpellVisuals = dict.ToFrozenDictionary();
+        return dict.ToFrozenDictionary();
     }
 
     public static void LoadLearnSpells()
@@ -2495,7 +2496,7 @@ public static partial class GameData
             LoadSpellAuraOptionsHotfixes,
             LoadSpellMiscHotfixes,
             LoadSpellEffectHotfixes,
-            LoadSpellXSpellVisualHotfixes,
+            LoadSpellVisuals,
             LoadSpellVisualMissileFlags,
             LoadItemSparseHotfixes,
             LoadItemHotfixes,
@@ -3120,22 +3121,25 @@ public static partial class GameData
             Hotfixes[record.HotfixId] = record;
         }
     }
-    public static void LoadSpellXSpellVisualHotfixes()
+    /// <summary>
+    /// Loads the spell visual stores from both of their files, and the SpellXSpellVisual hotfix
+    /// records where the client is told about them.
+    /// </summary>
+    /// <remarks>
+    /// The only writer of <see cref="SpellVisuals"/>. The SpellVisuals CSV used to be a job of its
+    /// own in <see cref="LoadEverything"/>, running beside this one, and both assigned the field:
+    /// whichever finished last won. Where the two files differ (1.14) that lost either the hotfix
+    /// rows or every row of the base file. A job here, not there, because it writes
+    /// <see cref="Hotfixes"/>.
+    /// </remarks>
+    public static void LoadSpellVisuals()
     {
-        var path = Path.Combine("CSV", "Hotfix", $"SpellXSpellVisual{ModernVersion.ExpansionVersion}.csv");
-
-        if (!File.Exists(path))
-        {
-            // Not shipped for this build: either the client's own DB2 already carries these
-            // rows, or the table has no overrides for this expansion. Nothing to load.
-            // See scripts/compare-hotfix-csv.py.
-            return;
-        }
-
         // 3.4.3 and later never advertise SpellXSpellVisual, so its records are unreachable there:
         // the only readers are the advertised index and CMSG_HOTFIX_REQUEST, which asks for
-        // advertised ids. The two lookups below are still needed on every build (#187).
-        var table = ParseSpellXSpellVisual(path, SpellVisuals,
+        // advertised ids. The two lookups are still needed on every build (#187).
+        var table = ReadSpellVisuals(
+            Path.Combine("CSV", $"SpellVisuals{ModernVersion.ExpansionVersion}.csv"),
+            Path.Combine("CSV", "Hotfix", $"SpellXSpellVisual{ModernVersion.ExpansionVersion}.csv"),
             buildHotfixRecords: AdvertisedHotfixTables.IsAdvertised(DB2Hash.SpellXSpellVisual, ModernVersion.Build));
 
         foreach (var record in table.HotfixRecords)
@@ -3145,14 +3149,33 @@ public static partial class GameData
         SpellXSpellVisualToSpellVisual = table.SpellXSpellVisualToSpellVisual;
     }
 
-    /// <summary>What one SpellXSpellVisual CSV loads into; see <see cref="ParseSpellXSpellVisual"/>.</summary>
+    /// <summary>
+    /// The SpellVisuals CSV with the SpellXSpellVisual hotfix CSV laid over it, in that order.
+    /// Either file may be missing.
+    /// </summary>
+    internal static SpellXSpellVisualTable ReadSpellVisuals(string spellVisualsPath, string hotfixPath, bool buildHotfixRecords)
+    {
+        var spellVisuals = ParseSpellVisuals(spellVisualsPath);
+
+        if (!File.Exists(hotfixPath))
+        {
+            // Not shipped for this build: either the client's own DB2 already carries these
+            // rows, or the table has no overrides for this expansion. Nothing to load.
+            // See scripts/compare-hotfix-csv.py.
+            return new SpellXSpellVisualTable(spellVisuals, FrozenDictionary<uint, uint>.Empty, []);
+        }
+
+        return ParseSpellXSpellVisual(hotfixPath, spellVisuals, buildHotfixRecords);
+    }
+
+    /// <summary>What the spell visual files load into; see <see cref="ReadSpellVisuals"/>.</summary>
     internal sealed record SpellXSpellVisualTable(
         FrozenDictionary<uint, uint> SpellVisuals,
         FrozenDictionary<uint, uint> SpellXSpellVisualToSpellVisual,
         List<HotfixRecord> HotfixRecords);
 
     /// <summary>
-    /// Reads one SpellXSpellVisual CSV. Split from <see cref="LoadSpellXSpellVisualHotfixes"/> so a
+    /// Reads one SpellXSpellVisual CSV. Split from <see cref="LoadSpellVisuals"/> so a
     /// test can read any expansion's file without the process being built for it, and without
     /// touching the global stores.
     /// </summary>
