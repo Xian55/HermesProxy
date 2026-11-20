@@ -50,6 +50,14 @@ public sealed class AdvertisedHotfixTablesTests
         Assert.True(AdvertisedHotfixTables.IsAdvertised(DB2Hash.AreaTrigger, build));
     }
 
+    [Theory]
+    [InlineData(ClientVersionBuild.V3_4_3_54261)]
+    [InlineData(ClientVersionBuild.V4_4_2_60895)]
+    public void IsAdvertised_ItemEffect_IsFalseFromWotLKClassicOn(ClientVersionBuild build)
+    {
+        Assert.False(AdvertisedHotfixTables.IsAdvertised(DB2Hash.ItemEffect, build));
+    }
+
     private static string SpellXSpellVisualCsv(int expansion)
         => Path.Combine("CSV", "Hotfix", $"SpellXSpellVisual{expansion}.csv");
 

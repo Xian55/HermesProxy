@@ -5385,6 +5385,14 @@ public static partial class GameData
     }
     public static void LoadItemEffectHotfixes()
     {
+        // 3.4.3 and later never advertise ItemEffect, so no client asks for these records by id.
+        // The one other path to them is UpdateHotfix, which finds a record by its record id and
+        // rewrites its content before GenerateHotFixMessage sends it: what such a record keeps
+        // from this CSV is its hotfix id alone, and without it UpdateHotfix makes a new record
+        // with the same content (#187).
+        if (!AdvertisedHotfixTables.IsAdvertised(DB2Hash.ItemEffect, ModernVersion.Build))
+            return;
+
         var path = Path.Combine("CSV", "Hotfix", $"ItemEffect{ModernVersion.ExpansionVersion}.csv");
 
         if (!File.Exists(path))
