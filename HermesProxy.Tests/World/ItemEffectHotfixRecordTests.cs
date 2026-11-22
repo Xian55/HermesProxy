@@ -9,8 +9,8 @@ using Xunit;
 namespace HermesProxy.Tests.World;
 
 /// <summary>
-/// Issue #187: from 3.4.3 on the proxy no longer builds the ItemEffect records of
-/// <c>CSV/Hotfix/ItemEffect{3,4}.csv</c>. Those records were reachable only through
+/// Issue #187: the proxy no longer builds ItemEffect hotfix records from CSV. The ones
+/// <c>CSV/Hotfix/ItemEffect{3,4}.csv</c> used to give it were reachable only through
 /// <see cref="GameData.UpdateHotfix"/>, which rewrites a record's content before
 /// <see cref="GameData.GenerateHotFixMessage"/> sends it. These tests pin that down: the client is
 /// sent the same record whether or not a CSV record was under it, apart from the hotfix id.

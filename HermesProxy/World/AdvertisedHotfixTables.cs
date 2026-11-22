@@ -32,10 +32,10 @@ namespace HermesProxy.World;
 /// Not being advertised is not the same as being unreachable. <c>GameData.UpdateHotfix</c> finds
 /// item records by record id from <c>HotfixItemBegin</c> on, and
 /// <c>GameData.GenerateHotFixMessage</c> pushes what it finds in <c>SMSG_HOTFIX_MESSAGE</c>
-/// without consulting this filter. <c>ItemEffect</c> is skipped anyway because that path always
-/// rewrites a record's content before sending it, so a record loaded from CSV gave it nothing but
-/// a hotfix id. Only skip a table's records once every reader of <c>GameData.Hotfixes</c> that
-/// can reach it has been ruled out.
+/// without consulting this filter. <c>ItemEffect</c> records are no longer loaded from CSV at all,
+/// because that path always rewrites a record's content before sending it: a loaded record gave
+/// it nothing but a hotfix id (#596). Only skip a table's records once every reader of
+/// <c>GameData.Hotfixes</c> that can reach it has been ruled out.
 /// </para>
 /// </remarks>
 public static class AdvertisedHotfixTables

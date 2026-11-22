@@ -158,12 +158,6 @@ LOADER_TYPES: dict[str, dict[str, str]] = {
 LOADER_TYPES["ItemSparse2.csv"] = LOADER_TYPES["ItemSparse3.csv"]
 for _family in ("ItemSparse", "ItemEffect", "Item", "ItemAppearance"):
     LOADER_TYPES[f"{_family}4.csv"] = LOADER_TYPES[f"{_family}3.csv"]
-# LoadItemEffectHotfixes reads TriggerType as a byte where LoadItemEffect reads an sbyte, and 4.4.2
-# is the first export with a TriggerType of -1 in it.
-LOADER_TYPES["Hotfix/ItemEffect4.csv"] = {
-    "LegacySlotIndex": "byte", "TriggerType": "byte", "Charges": "short",
-    "SpellCategoryID": "short", "ChrSpecializationID": "short",
-}
 
 INT_WIDTHS = {"sbyte": (8, True), "byte": (8, False), "short": (16, True), "ushort": (16, False),
               "uint": (32, False), "ulong": (64, False)}
@@ -517,13 +511,11 @@ RECIPES: dict[str, Recipe] = {
                  ("LocZ", "Loc_2"), "Flags", "Delay"],
         quote_all=True,
     ),
-    # Already a correct 3.4.3 export in the repo -- reuse it rather than re-deriving.
     "ItemEffect3.csv": Recipe(
-        local="Hotfix/ItemEffect3.csv",
+        source="ItemEffect",
         columns=["ID", "LegacySlotIndex", "TriggerType", "Charges", "CoolDownMSec",
                  "CategoryCoolDownMSec", "SpellCategoryID", "SpellID", "ChrSpecializationID",
                  "ParentItemID"],
-        note="copied from CSV/Hotfix/ItemEffect3.csv",
     ),
     # Same source LoadSpellXSpellVisualHotfixes reads, so the two agree regardless
     # of which of the two parallel loaders assigns SpellVisuals last.
@@ -618,7 +610,6 @@ HOTFIX_EXPORTS: dict[str, Recipe] = {
     "Toy": Recipe(source="Toy", columns=committed_header("Hotfix/Toy3.csv")),
     "SpellXSpellVisual": Recipe(source="SpellXSpellVisual",
                                 columns=committed_header("Hotfix/SpellXSpellVisual3.csv")),
-    "ItemEffect": Recipe(source="ItemEffect", columns=committed_header("Hotfix/ItemEffect3.csv")),
     "BattlePetSpecies": Recipe(
         source="BattlePetSpecies",
         columns=[("SpeciesId", "ID"), ("SummonSpellId", "SummonSpellID"), ("CreatureId", "CreatureID"),
@@ -657,8 +648,8 @@ RECIPES.update({
         builder=build_cooldown_on_event_spells,
         note="SpellMisc COOLDOWN_ON_EVENT + SpellCategory COOLDOWN_STARTS_ON_EVENT",
     ),
-    # The *3 recipes read these from committed 3.4.3 exports; for 4.4.2 they come from wago.
-    "ItemEffect4.csv": Recipe(source="ItemEffect", columns=RECIPES["ItemEffect3.csv"].columns),
+    "ItemEffect4.csv": RECIPES["ItemEffect3.csv"],
+    # The *3 recipe reads it from a committed 3.4.3 export; for 4.4.2 it comes from wago.
     "SpellVisuals4.csv": Recipe(
         source="SpellXSpellVisual",
         columns=[("SpellId", "SpellID"), ("SpellXSpellVisualId", "ID")],

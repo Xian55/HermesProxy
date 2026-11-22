@@ -2541,7 +2541,6 @@ public static partial class GameData
             LoadSpellVisualMissileFlags,
             LoadItemSparseHotfixes,
             LoadItemHotfixes,
-            LoadItemEffectHotfixes,
             LoadItemExtendedCostHotfixes,
             LoadCurrencyTypesHotfixes,
             LoadGlobalStringsHotfixes,
@@ -5425,62 +5424,6 @@ public static partial class GameData
             Hotfixes[record.HotfixId] = record;
         }
     }
-    public static void LoadItemEffectHotfixes()
-    {
-        // 3.4.3 and later never advertise ItemEffect, so no client asks for these records by id.
-        // The one other path to them is UpdateHotfix, which finds a record by its record id and
-        // rewrites its content before GenerateHotFixMessage sends it: what such a record keeps
-        // from this CSV is its hotfix id alone, and without it UpdateHotfix makes a new record
-        // with the same content (#187).
-        if (!AdvertisedHotfixTables.IsAdvertised(DB2Hash.ItemEffect, ModernVersion.Build))
-            return;
-
-        var path = Path.Combine("CSV", "Hotfix", $"ItemEffect{ModernVersion.ExpansionVersion}.csv");
-
-        if (!File.Exists(path))
-        {
-            // Not shipped for this build: either the client's own DB2 already carries these
-            // rows, or the table has no overrides for this expansion. Nothing to load.
-            // See scripts/compare-hotfix-csv.py.
-            return;
-        }
-
-        using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
-        uint counter = 0;
-        foreach (var row in reader)
-        {
-            counter++;
-
-            uint id = row[0].Parse<uint>();
-            byte legacySlotIndex = row[1].Parse<byte>();
-            byte triggerType = row[2].Parse<byte>();
-            short charges = row[3].Parse<short>();
-            int coolDownMSec = row[4].Parse<int>();
-            int categoryCoolDownMSec = row[5].Parse<int>();
-            short spellCategoryId = row[6].Parse<short>();
-            int spellId = row[7].Parse<int>();
-            short chrSpecializationId = row[8].Parse<short>();
-            int parentItemId = row[9].Parse<int>();
-
-            HotfixRecord record = new HotfixRecord();
-            record.Status = HotfixStatus.Valid;
-            record.TableHash = DB2Hash.ItemEffect;
-            record.HotfixId = HotfixItemEffectBegin + counter;
-            record.UniqueId = record.HotfixId;
-            record.RecordId = id;
-            record.HotfixContent.WriteUInt8(legacySlotIndex);
-            record.HotfixContent.WriteUInt8(triggerType);
-            record.HotfixContent.WriteInt16(charges);
-            record.HotfixContent.WriteInt32(coolDownMSec);
-            record.HotfixContent.WriteInt32(categoryCoolDownMSec);
-            record.HotfixContent.WriteInt16(spellCategoryId);
-            record.HotfixContent.WriteInt32(spellId);
-            record.HotfixContent.WriteInt16(chrSpecializationId);
-            record.HotfixContent.WriteInt32(parentItemId);
-            Hotfixes[record.HotfixId] = record;
-        }
-    }
-
     /// <summary>
     /// The server's vendor prices, where the client's own ItemExtendedCost rows differ. A vendor
     /// list names a price by its id alone, and Wrath Classic and Cataclysm Classic changed many of
