@@ -36,12 +36,16 @@ public static partial class GameData
     private static BroadcastTextRegistry _broadcastTextRegistry = new([]);
     public static FrozenDictionary<uint, uint> ItemDisplayIdStore = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<uint, uint> ItemDisplayIdToFileDataIdStore = FrozenDictionary<uint, uint>.Empty;
-    // (itemId, slot) -> the running client's baked-in ItemEffect.RecordID, from its own
-    // CSV/ItemEffect{expansion}.csv; empty before 3.4.3. When AddItemEffectRecord is asked to
-    // create a hotfix for an item already present in this lookup, it must reuse the baked-in
-    // RecordID so the client's pre-built ItemEffect-by-ParentItemID index points at our row.
+    // (itemId, slot) -> the ItemEffect.RecordID AddItemEffectRecord gives it, built by
+    // BuildItemEffectRecordIds; empty before 3.4.3. For an item and slot the running client's own
+    // table has, it is that row's id, so the client's pre-built ItemEffect-by-ParentItemID index
+    // points at our row. Every id in it is the same on every proxy run.
     public static FrozenDictionary<(uint itemId, byte slot), uint> ItemEffectRecordIdByItemSlot
         = FrozenDictionary<(uint itemId, byte slot), uint>.Empty;
+    // Added to a 3.4.3 record id that a later client's own table uses for another row. The ids
+    // this gives are above every id of the client tables and below HotfixItemBegin, where
+    // AddItemEffectRecord starts the free ids for items neither table has.
+    internal const uint ItemEffectMovedRecordIdOffset = 1_000_000;
     public static FrozenDictionary<uint, ItemSpellsData> ItemSpellsDataStore = FrozenDictionary<uint, ItemSpellsData>.Empty;
 
     // The item record stores below are loaded from the CSVs, and the Generate*UpdateIfNeeded
@@ -1265,17 +1269,49 @@ public static partial class GameData
         ItemDisplayIdToFileDataIdStore = dict.ToFrozenDictionary();
     }
 
-    // Builds the (itemId, slot) -> ItemEffect.RecordID lookup of the running client's own
-    // ItemEffect table. Used by AddItemEffectRecord to keep our hotfix RecordID aligned with
-    // the slot the client's pre-built ItemEffect-by-ParentItemID index already points at —
-    // INSERT at a fresh ID (whether 1 or HotfixItemBegin+) does not extend that index, so the
-    // tooltip "Use:" line stays blank even when the hotfix bytes are byte-perfect (observed
-    // on 3.4.3 for items 38607 and 41751).
+    // Builds the (itemId, slot) -> ItemEffect.RecordID lookup AddItemEffectRecord uses. It keeps
+    // our hotfix RecordID aligned with the slot the client's pre-built ItemEffect-by-ParentItemID
+    // index already points at — INSERT at a fresh ID (whether 1 or HotfixItemBegin+) does not
+    // extend that index, so the tooltip "Use:" line stays blank even when the hotfix bytes are
+    // byte-perfect (observed on 3.4.3 for items 38607 and 41751).
     public static void LoadItemEffectRecordIds()
     {
-        ItemEffectRecordIdByItemSlot = ParseItemEffectRecordIds(ModernVersion.ExpansionVersion);
+        ItemEffectRecordIdByItemSlot = BuildItemEffectRecordIds(ModernVersion.ExpansionVersion);
         Log.Print(LogType.Server,
             $"LoadItemEffectRecordIds: loaded {ItemEffectRecordIdByItemSlot.Count} (itemId, slot) -> RecordID entries.");
+    }
+
+    /// <summary>
+    /// The record id <see cref="AddItemEffectRecord"/> gives an item and slot on a client of
+    /// <paramref name="expansion"/>. A client keeps the records it is sent in its hotfix cache, so
+    /// every id here is the same on every proxy run, whatever order the items come in:
+    /// <list type="number">
+    /// <item>the client's own row for the item and slot;</item>
+    /// <item>otherwise 3.4.3's id for it, when the client's table has no row with that id;</item>
+    /// <item>otherwise 3.4.3's id plus <see cref="ItemEffectMovedRecordIdOffset"/>, since the
+    /// client has that id for another row (on 4.4.2, often another slot of the same item).</item>
+    /// </list>
+    /// An item and slot that neither table has is left out, and gets a free id.
+    /// </summary>
+    internal static FrozenDictionary<(uint itemId, byte slot), uint> BuildItemEffectRecordIds(byte expansion)
+    {
+        const byte wotlkClassic = 3;
+
+        var own = ParseItemEffectRecordIds(expansion);
+        if (expansion <= wotlkClassic)
+            return own;
+
+        var ownRecordIds = own.Values.ToHashSet();
+        var ids = new Dictionary<(uint, byte), uint>(own);
+        foreach (var (itemSlot, wotlkRecordId) in ParseItemEffectRecordIds(wotlkClassic))
+        {
+            if (ids.ContainsKey(itemSlot))
+                continue;
+            ids[itemSlot] = ownRecordIds.Contains(wotlkRecordId)
+                ? ItemEffectMovedRecordIdOffset + wotlkRecordId
+                : wotlkRecordId;
+        }
+        return ids.ToFrozenDictionary();
     }
 
     /// <summary>
@@ -5076,8 +5112,9 @@ public static partial class GameData
         // 141239 / 142989 should re-route the existing index entry to our row.
         // For items genuinely missing from the baked-in lookup, fall back to
         // HotfixItemBegin+ so we don't collide with anything else.
-        // The lookup is the running client's own table (3.4.3 and later): record ids are
-        // build-specific, and another build's id can name a different row of this client's.
+        // The lookup starts from the running client's own table (3.4.3 and later): record ids
+        // are build-specific, and another build's id can name a different row of this client's.
+        // See BuildItemEffectRecordIds for the ids it gives the rest.
         int id;
         if (ModernVersion.IsWotLKClassicOrLater
             && ItemEffectRecordIdByItemSlot.TryGetValue(((uint)item.Entry, slot), out var bakedRecordId))
