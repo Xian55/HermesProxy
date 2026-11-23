@@ -44,6 +44,19 @@ public class CreateObjectData
     public uint VehicleId;
     public float VehicleOrientation;
     public uint TransportPathTimer; // only set for transports
+    /// <summary>
+    /// The legacy create carried UPDATEFLAG_TRANSPORT, so <see cref="TransportPathTimer"/> is the
+    /// server's own path progress rather than "not sent" (0 is a valid progress).
+    /// </summary>
+    public bool HasTransportPathTimer;
+    /// <summary>
+    /// The ServerTime of a 1.14 or 2.5 create: the server's path progress whenever its create
+    /// carried one, 0 included. cMaNGOS sends 0 for an elevator or tram whose map or grid has only
+    /// just loaded, and the wall clock in its place started the client's car at an arbitrary point
+    /// of its path. Only a transport that came without a timer still gets the wall clock.
+    /// </summary>
+    internal uint ClientPathTimer =>
+        HasTransportPathTimer || TransportPathTimer != 0 ? TransportPathTimer : (uint)Time.UnixTime;
     // The AnimKits a 4.3.4 server's create gives the object: the one it idles in, moves in and
     // fights in, 0 for none.
     public ushort AIAnimKitID;
@@ -199,6 +212,21 @@ public class ObjectUpdate
     /// refs/native-captures/wrathion_343_sota_attacker_boat_20260830.pkt.
     /// </summary>
     internal static bool? ForceTransportV343ForTests;
+
+    /// <summary>
+    /// An elevator or tram whose create gives a 1.14 or 2.5 client the path timer it runs the
+    /// object's animation from. Most cores give these a transport guid. cMaNGOS classic before
+    /// mangos-classic 85e06ac9d, and cMaNGOS TBC before mangos-tbc 52568b667, sent them as plain
+    /// gameobjects (0xF110), still with UPDATEFLAG_TRANSPORT and the path progress. Without the
+    /// timer the client runs the car on a clock of its own while the server carries its rider
+    /// down the tunnel (issue #593). 3.4.3 and later decide this in their own builders.
+    /// </summary>
+    internal bool IsPathTimedTransport =>
+        CreateData is { MoveInfo: not null }
+        && (Guid.GetHighType() == HighGuidType.Transport
+            || (CreateData.HasTransportPathTimer
+                && GameObjectData?.TypeID == (sbyte)GameObjectTypeModern.Transport
+                && !(ForceTransportV343ForTests ?? ModernVersion.IsWotLKClassicOrLater)));
 
     internal void ApplyTransportGameObjectFixups()
     {
@@ -475,7 +503,7 @@ public class ObjectUpdate
             if (GameObjectData.StateAnimID == null)
                 GameObjectData.StateAnimID = ModernVersion.GetGameObjectStateAnimId();
 
-            if (Guid.GetHighType() == HighGuidType.Transport)
+            if (Guid.GetHighType() == HighGuidType.Transport || IsPathTimedTransport)
             {
                 var transportTimer = CreateData.TransportPathTimer;
                 // A 3.3.5a backend puts the real loop period in GAMEOBJECT_LEVEL

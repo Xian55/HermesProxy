@@ -2274,6 +2274,7 @@ public partial class WorldClient
             create.Speeds = speeds;
             create.PlayHoverAnim = playHoverAnim;
             create.TransportPathTimer = transportPathTimer;
+            create.HasTransportPathTimer = flags.HasAnyFlag(UpdateFlag.Transport);
             create.VehicleId = vehicleId;
             create.VehicleOrientation = vehicleOrientation;
             if (rotation is { } sentRotation)

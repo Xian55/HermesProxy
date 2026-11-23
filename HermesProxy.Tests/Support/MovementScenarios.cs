@@ -263,6 +263,32 @@ internal static class MovementScenarios
     /// <summary>An item has no position, so its create has no movement block at all.</summary>
     public static readonly LegacyCreate ItemCreate = new() { Guid = Sword, Type = ObjectTypeLegacy.Item, Entry = 2488 };
 
+    private const uint TramCarEntry = 176081;
+    private static readonly LegacyStationary TramPlatform = new(new Vector3(-45.4f, 8.4f, -4.3f), 3.14f);
+
+    /// <summary>
+    /// A Deeprun Tram car (entry 176081, spawn 18803) as most cores send it: type 11 under a
+    /// transport guid, with its path progress (UPDATEFLAG_TRANSPORT).
+    /// </summary>
+    public static readonly LegacyCreate TramCreate = new()
+    {
+        Guid = new WowGuid64(HighGuidTypeLegacy.Transport, TramCarEntry, 18803),
+        Type = ObjectTypeLegacy.GameObject, Entry = TramCarEntry,
+        Stationary = TramPlatform,
+        TransportPathTimer = 29470,
+        Rotation = LegacyMovementWire.Era == LegacyEra.WotLK ? Quaternion.CreateFromAxisAngle(Vector3.UnitZ, 3.14f) : null,
+        Fields = GameObjectFields(type: 11),
+    };
+
+    /// <summary>
+    /// The same car from cMaNGOS classic before mangos-classic 85e06ac9d: a plain gameobject guid,
+    /// 0xF110, still with the path progress (issue #593).
+    /// </summary>
+    public static readonly LegacyCreate TramAsGameObjectCreate = TramCreate with
+    {
+        Guid = new WowGuid64(HighGuidTypeLegacy.GameObject, TramCarEntry, 18803),
+    };
+
     public static IEnumerable<(string Name, LegacyCreate Create)> Creates()
     {
         bool wotlk = LegacyMovementWire.Era == LegacyEra.WotLK;
@@ -320,6 +346,9 @@ internal static class MovementScenarios
             TransportPathTimer = 1,
             Fields = GameObjectFields(type: 15),
         });
+        yield return ("tram-transport-guid", TramCreate);
+        yield return ("tram-gameobject-guid", TramAsGameObjectCreate);
+        yield return ("tram-gameobject-guid-without-path-timer", TramAsGameObjectCreate with { TransportPathTimer = null });
 
         if (wotlk)
         {

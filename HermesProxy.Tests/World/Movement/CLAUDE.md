@@ -55,5 +55,6 @@ One set per pair, in `Golden/`, named `<Test>_<legacy>.<modern>.verified.txt`.
 - Give each optional part of the block one scenario with it and one without.
 - A combination that trips a sanitising rule logs at Error. Keep those to a handful of named
   scenarios.
-- A create must not reach a clock: give a transport a non-zero path timer, or `ServerTime` is read
-  from the wall clock and the snapshot is not reproducible. `Creates_AreDeterministic` catches it.
+- A create must not reach a clock: give a transport a path timer (0 is one), or `ServerTime` is
+  read from the wall clock and the snapshot is not reproducible. `Creates_AreDeterministic` catches
+  it.
