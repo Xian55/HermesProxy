@@ -140,7 +140,7 @@ public class ObjectUpdateBuilder
             (moveInfo != null && isUnit                                          ? CreateObjectBits.MovementUpdate    : 0) |
             (moveInfo != null && moveInfo.Value.TransportGuid != default && isGameObject ? CreateObjectBits.MovementTransport : 0) |
             (moveInfo != null && !isUnit                                         ? CreateObjectBits.Stationary        : 0) |
-            (moveInfo != null && m_updateData.Guid.GetHighType() == Enums.HighGuidType.Transport ? CreateObjectBits.ServerTime : 0) |
+            (m_updateData.IsPathTimedTransport                                   ? CreateObjectBits.ServerTime        : 0) |
             (createData?.AutoAttackVictim != null                                ? CreateObjectBits.CombatVictim      : 0) |
             (createData is { VehicleId: not 0 }                                  ? CreateObjectBits.Vehicle           : 0) |
             (moveInfo != null && isGameObject                                    ? CreateObjectBits.Rotation          : 0) |
@@ -212,11 +212,8 @@ public class ObjectUpdateBuilder
 
         if (m_createBits.HasFlag(CreateObjectBits.ServerTime))
         {
-            /** @TODO Use IsTransport() to also handle type 11 (TRANSPORT)
-                Currently grid objects are not updated if there are no nearby players,
-                this causes clients to receive different PathProgress
-                resulting in players seeing the object in a different position
-            */
+            // The legacy path progress, for a transport guid or a type-11 elevator or tram sent
+            // as a plain gameobject (ObjectUpdate.IsPathTimedTransport, issue #593).
             if (m_updateData.CreateData.TransportPathTimer != 0) // ServerTime
                 data.WriteUInt32(m_updateData.CreateData.TransportPathTimer);
             else
