@@ -36,13 +36,16 @@ public static partial class GameData
     private static BroadcastTextRegistry _broadcastTextRegistry = new([]);
     public static FrozenDictionary<uint, uint> ItemDisplayIdStore = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<uint, uint> ItemDisplayIdToFileDataIdStore = FrozenDictionary<uint, uint>.Empty;
-    // (itemId, slot) -> baked-in V3_4_3.54261 ItemEffect.RecordID. Populated from
-    // CSV/Hotfix/ItemEffect3.csv (extracted from wago build 3.4.3.54261).
-    // When AddItemEffectRecord is asked to create a hotfix for an item already
-    // present in this lookup, it must reuse the baked-in RecordID so the V3_4_3
-    // client's pre-built ItemEffect-by-ParentItemID index points at our row.
-    public static FrozenDictionary<(uint itemId, byte slot), uint> V3_4_3ItemEffectRecordIdByItemSlot
+    // (itemId, slot) -> the ItemEffect.RecordID AddItemEffectRecord gives it, built by
+    // BuildItemEffectRecordIds; empty before 3.4.3. For an item and slot the running client's own
+    // table has, it is that row's id, so the client's pre-built ItemEffect-by-ParentItemID index
+    // points at our row. Every id in it is the same on every proxy run.
+    public static FrozenDictionary<(uint itemId, byte slot), uint> ItemEffectRecordIdByItemSlot
         = FrozenDictionary<(uint itemId, byte slot), uint>.Empty;
+    // Added to a 3.4.3 record id that a later client's own table uses for another row. The ids
+    // this gives are above every id of the client tables and below HotfixItemBegin, where
+    // AddItemEffectRecord starts the free ids for items neither table has.
+    internal const uint ItemEffectMovedRecordIdOffset = 1_000_000;
     public static FrozenDictionary<uint, ItemSpellsData> ItemSpellsDataStore = FrozenDictionary<uint, ItemSpellsData>.Empty;
 
     // The item record stores below are loaded from the CSVs, and the Generate*UpdateIfNeeded
@@ -1266,22 +1269,62 @@ public static partial class GameData
         ItemDisplayIdToFileDataIdStore = dict.ToFrozenDictionary();
     }
 
-    // Builds a (itemId, slot) -> baked-in V3_4_3.54261 ItemEffect.RecordID lookup
-    // from CSV/Hotfix/ItemEffect3.csv (extracted directly from wago.tools for build
-    // 3.4.3.54261). Used by AddItemEffectRecord to keep our hotfix RecordID aligned
-    // with the slot the V3_4_3 client's pre-built ItemEffect-by-ParentItemID index
-    // already points at — INSERT at a fresh ID (whether 1 or HotfixItemBegin+) does
-    // not extend that index, so the tooltip "Use:" line stays blank even when the
-    // hotfix bytes are byte-perfect (observed for items 38607 and 41751).
-    public static void LoadV3_4_3ItemEffectLookup()
+    // Builds the (itemId, slot) -> ItemEffect.RecordID lookup AddItemEffectRecord uses. It keeps
+    // our hotfix RecordID aligned with the slot the client's pre-built ItemEffect-by-ParentItemID
+    // index already points at — INSERT at a fresh ID (whether 1 or HotfixItemBegin+) does not
+    // extend that index, so the tooltip "Use:" line stays blank even when the hotfix bytes are
+    // byte-perfect (observed on 3.4.3 for items 38607 and 41751).
+    public static void LoadItemEffectRecordIds()
     {
-        var path = Path.Combine("CSV", "Hotfix", "ItemEffect3.csv");
-        if (!File.Exists(path))
+        ItemEffectRecordIdByItemSlot = BuildItemEffectRecordIds(ModernVersion.ExpansionVersion);
+        Log.Print(LogType.Server,
+            $"LoadItemEffectRecordIds: loaded {ItemEffectRecordIdByItemSlot.Count} (itemId, slot) -> RecordID entries.");
+    }
+
+    /// <summary>
+    /// The record id <see cref="AddItemEffectRecord"/> gives an item and slot on a client of
+    /// <paramref name="expansion"/>. A client keeps the records it is sent in its hotfix cache, so
+    /// every id here is the same on every proxy run, whatever order the items come in:
+    /// <list type="number">
+    /// <item>the client's own row for the item and slot;</item>
+    /// <item>otherwise 3.4.3's id for it, when the client's table has no row with that id;</item>
+    /// <item>otherwise 3.4.3's id plus <see cref="ItemEffectMovedRecordIdOffset"/>, since the
+    /// client has that id for another row (on 4.4.2, often another slot of the same item).</item>
+    /// </list>
+    /// An item and slot that neither table has is left out, and gets a free id.
+    /// </summary>
+    internal static FrozenDictionary<(uint itemId, byte slot), uint> BuildItemEffectRecordIds(byte expansion)
+    {
+        const byte wotlkClassic = 3;
+
+        var own = ParseItemEffectRecordIds(expansion);
+        if (expansion <= wotlkClassic)
+            return own;
+
+        var ownRecordIds = own.Values.ToHashSet();
+        var ids = new Dictionary<(uint, byte), uint>(own);
+        foreach (var (itemSlot, wotlkRecordId) in ParseItemEffectRecordIds(wotlkClassic))
         {
-            Log.Print(LogType.Server,
-                $"LoadV3_4_3ItemEffectLookup: {path} not found — Item* hotfix RecordID alignment disabled.");
-            return;
+            if (ids.ContainsKey(itemSlot))
+                continue;
+            ids[itemSlot] = ownRecordIds.Contains(wotlkRecordId)
+                ? ItemEffectMovedRecordIdOffset + wotlkRecordId
+                : wotlkRecordId;
         }
+        return ids.ToFrozenDictionary();
+    }
+
+    /// <summary>
+    /// The (itemId, slot) -> record id lookup of one expansion's client, from the same
+    /// <c>CSV/ItemEffect{expansion}.csv</c> that <see cref="LoadItemEffect"/> loads. Record ids
+    /// are build-specific: the 4.4.2 client uses many of 3.4.3's ids for another slot of the same
+    /// item, so a lookup from another build's table would overwrite that row (#187).
+    /// </summary>
+    internal static FrozenDictionary<(uint itemId, byte slot), uint> ParseItemEffectRecordIds(byte expansion)
+    {
+        var path = Path.Combine("CSV", $"ItemEffect{expansion}.csv");
+        if (!File.Exists(path))
+            return FrozenDictionary<(uint itemId, byte slot), uint>.Empty;
 
         using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
         var dict = new Dictionary<(uint, byte), uint>(EstimateRowCount(path, 50));
@@ -1292,9 +1335,7 @@ public static partial class GameData
             uint itemId   = uint.Parse(row[9].Span);   // ParentItemID
             dict[(itemId, slot)] = recordId;
         }
-        V3_4_3ItemEffectRecordIdByItemSlot = dict.ToFrozenDictionary();
-        Log.Print(LogType.Server,
-            $"LoadV3_4_3ItemEffectLookup: loaded {V3_4_3ItemEffectRecordIdByItemSlot.Count} (itemId, slot) -> RecordID entries.");
+        return dict.ToFrozenDictionary();
     }
 
     public static void LoadAreaTriggerRemap()
@@ -2479,7 +2520,7 @@ public static partial class GameData
     public static ConcurrentDictionary<uint, HotfixRecord> Hotfixes = [];
     public static void LoadHotfixes()
     {
-        // ChrCustomizationChoice / ChrCustomizationOption / V3_4_3ItemEffectLookup CSVs
+        // ChrCustomizationChoice / ChrCustomizationOption / ItemEffectRecordIds CSVs
         // only exist for V3_4_3 (WotLK Classic, expansion=3). The DB2 tables don't exist
         // in TBC / Vanilla hotfix data, and the V3_4_3 client is the only modern build
         // that consults them for character-enum rendering. Skip those for older
@@ -2513,7 +2554,7 @@ public static partial class GameData
         {
             jobs.Add(LoadChrCustomizationChoiceHotfixes);
             jobs.Add(LoadChrCustomizationOptionHotfixes);
-            jobs.Add(LoadV3_4_3ItemEffectLookup);
+            jobs.Add(LoadItemEffectRecordIds);
         }
         Parallel.Invoke(jobs.ToArray());
     }
@@ -5061,7 +5102,7 @@ public static partial class GameData
 
     public static ItemEffect AddItemEffectRecord(ItemTemplate item, byte slot)
     {
-        // Prefer the V3_4_3.54261 baked-in DBC RecordID for this (item, slot) when
+        // Prefer the client's baked-in DBC RecordID for this (item, slot) when
         // we have it. Pushing the hotfix at the same RecordID lands it in the slot
         // the client's pre-built ItemEffect-by-ParentItemID index already points at,
         // turning the wire packet into an UPDATE (which the client re-reads) rather
@@ -5071,15 +5112,16 @@ public static partial class GameData
         // 141239 / 142989 should re-route the existing index entry to our row.
         // For items genuinely missing from the baked-in lookup, fall back to
         // HotfixItemBegin+ so we don't collide with anything else.
-        // Gated to V3_4_3_54261: V1_14 / V2_5 have different baked-in DBC RecordIDs;
-        // applying this lookup there would map V3_4_3 IDs onto the wrong client.
+        // The lookup starts from the running client's own table (3.4.3 and later): record ids
+        // are build-specific, and another build's id can name a different row of this client's.
+        // See BuildItemEffectRecordIds for the ids it gives the rest.
         int id;
         if (ModernVersion.IsWotLKClassicOrLater
-            && V3_4_3ItemEffectRecordIdByItemSlot.TryGetValue(((uint)item.Entry, slot), out var bakedRecordId))
+            && ItemEffectRecordIdByItemSlot.TryGetValue(((uint)item.Entry, slot), out var bakedRecordId))
         {
             id = (int)bakedRecordId;
             Log.Print(LogType.Storage,
-                $"AddItemEffect: item={item.Entry} slot={slot} -> using BAKED-IN V3_4_3.54261 RecordID={id}.");
+                $"AddItemEffect: item={item.Entry} slot={slot} -> using BAKED-IN RecordID={id}.");
         }
         else
         {
