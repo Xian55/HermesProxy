@@ -214,10 +214,7 @@ public class ObjectUpdateBuilder
         {
             // The legacy path progress, for a transport guid or a type-11 elevator or tram sent
             // as a plain gameobject (ObjectUpdate.IsPathTimedTransport, issue #593).
-            if (m_updateData.CreateData.TransportPathTimer != 0) // ServerTime
-                data.WriteUInt32(m_updateData.CreateData.TransportPathTimer);
-            else
-                data.WriteUInt32((uint)Time.UnixTime);
+            data.WriteUInt32(m_updateData.CreateData.ClientPathTimer); // ServerTime
         }
 
         if (m_createBits.HasFlag(CreateObjectBits.Vehicle))

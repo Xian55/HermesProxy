@@ -49,6 +49,14 @@ public class CreateObjectData
     /// server's own path progress rather than "not sent" (0 is a valid progress).
     /// </summary>
     public bool HasTransportPathTimer;
+    /// <summary>
+    /// The ServerTime of a 1.14 or 2.5 create: the server's path progress whenever its create
+    /// carried one, 0 included. cMaNGOS sends 0 for an elevator or tram whose map or grid has only
+    /// just loaded, and the wall clock in its place started the client's car at an arbitrary point
+    /// of its path. Only a transport that came without a timer still gets the wall clock.
+    /// </summary>
+    internal uint ClientPathTimer =>
+        HasTransportPathTimer || TransportPathTimer != 0 ? TransportPathTimer : (uint)Time.UnixTime;
     // The AnimKits a 4.3.4 server's create gives the object: the one it idles in, moves in and
     // fights in, 0 for none.
     public ushort AIAnimKitID;

@@ -78,6 +78,39 @@ public sealed class TramPathTimerTests
         Assert.Contains(Convert.ToHexString(BitConverter.GetBytes(timer)), Convert.ToHexString(withTimer));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PathTimerOfZero_ReachesTheClientAsZero(bool underTransportGuid)
+    {
+        // cMaNGOS sends 0 for a car whose map has only just loaded. It used to go out as the wall
+        // clock, which put the client's car somewhere else on its path.
+        SkipFromWotLKClassicOn();
+        var tram = underTransportGuid ? MovementScenarios.TramCreate : MovementScenarios.TramAsGameObjectCreate;
+
+        byte[] atZero = MovementBlock(Deliver(tram with { TransportPathTimer = 0 }));
+        byte[] atOne = MovementBlock(Deliver(tram with { TransportPathTimer = 1 }));
+
+        // The two blocks differ in the timer alone, and a timer of 1 is the bytes 01 00 00 00.
+        Assert.Equal(atOne.Length, atZero.Length);
+        int[] differing = [.. Enumerable.Range(0, atOne.Length).Where(i => atOne[i] != atZero[i])];
+        int at = Assert.Single(differing);
+        Assert.Equal(0u, BitConverter.ToUInt32(atZero, at));
+        Assert.Equal(1u, BitConverter.ToUInt32(atOne, at));
+    }
+
+    [Fact]
+    public void TransportThatCameWithoutAPathTimer_StillGetsAClock()
+    {
+        SkipFromWotLKClassicOn();
+
+        var update = Deliver(MovementScenarios.TramCreate with { TransportPathTimer = null });
+
+        Assert.True(update.IsPathTimedTransport);
+        Assert.False(update.CreateData!.HasTransportPathTimer);
+        Assert.NotEqual(0u, update.CreateData.ClientPathTimer);
+    }
+
     [Fact]
     public void TramUnderGameObjectGuid_GetsTheSamePathProgressAndPeriodAsUnderATransportGuid()
     {
