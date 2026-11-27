@@ -597,6 +597,11 @@ public sealed class GameSessionData
     // only sends CMSG_QUERY_GAME_OBJECT on a cold Cache/WDB, so the lock ids above cannot
     // depend on it having asked. Issue #269.
     public readonly ConcurrentDictionary<uint, byte> GoLockTemplateRequested = new();
+
+    // Transport and destructible building entries the proxy has asked the legacy server about:
+    // the client learns a transport's path id from the relayed answer, and the model id lands in
+    // DestructibleModelIdByEntry above. Written and read only by the update handler.
+    public readonly HashSet<uint> TransportTemplateRequested = [];
     public HashSet<WowGuid64> DespawnedGameObjects = [];
     public HashSet<WowGuid128> HunterPetGuids = [];
     // NPCs whose window a 4.3.4 client opened from an NPC flag alone and the 4.4.2 client opens
