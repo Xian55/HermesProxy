@@ -27,11 +27,11 @@ public sealed class CurrencyTypesHotfixTests
     {
         string[] row = ["396", "Valor", "Points", "22", "463447", "3", "4", "5", "100000", "-1", "6", "7", "8", "1.5", "456", "1"];
 
-        var record = GameData.CurrencyTypesHotfix(3_300_001, row);
+        var record = GameData.CurrencyTypesHotfix(row);
 
         Assert.Equal(DB2Hash.CurrencyTypes, record.TableHash);
         Assert.Equal(396u, record.RecordId);
-        Assert.Equal(3_300_001u, record.HotfixId);
+        Assert.Equal(3_300_396u, record.HotfixId); // HotfixCurrencyTypesBegin + record id
         Assert.Equal(
             "56616C6F7200" + "506F696E747300"          // Name, Description
             + "16" + "57120700" + "03000000" + "04"     // CategoryID, InventoryIconFileID, SpellWeight, SpellCategory

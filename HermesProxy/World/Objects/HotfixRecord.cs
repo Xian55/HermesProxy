@@ -23,9 +23,10 @@ public class HotfixRecord
     // has stored in Cache/WDB/HotfixCache.bin for this PushID, the client trusts its cached
     // body and skips re-requesting via CMSG_HOTFIX_REQUEST. Previously we shipped TableHash
     // here, which the client read as "version mismatch" and re-downloaded the full ~82 KB
-    // hotfix payload every login. UniqueId is set equal to HotfixId at load time
-    // (deterministic across proxy restarts, since HotfixId is built from compile-time
-    // Hotfix*Begin constants + CSV-row counters), so warm-cache logins now validate.
+    // hotfix payload every login. A record loaded from CSV gets a UniqueId made from its
+    // content (GameData.AssignContentUniqueIds), the same on every proxy start, so warm-cache
+    // logins validate and a push id that comes to name other content is asked for again.
+    // Records made at runtime keep UniqueId equal to HotfixId.
     public void WriteAvailable(WorldPacket data)
     {
         data.WriteUInt32(HotfixId);
