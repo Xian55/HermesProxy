@@ -304,25 +304,22 @@ public partial class WorldClient
         return true;
     }
 
-    // The modern client never sends CMSG_QUERY_GAME_OBJECT for a transport it is merely
-    // looking at, so it never learns gameobject_template.Data0 — the taxi path id a
-    // MO_TRANSPORT flies along. Ask the legacy server ourselves the first time we forward
-    // one; SMSG_QUERY_GAME_OBJECT_RESPONSE is relayed to the client unconditionally.
-    private static readonly HashSet<uint> _queriedTransportTemplates = [];
-
     // Enum.GetValues is reflection and allocates a new array on every call. The GameObject
     // ingest trace walks this list per object per update batch, so it is materialised once.
     private static readonly GameObjectField[] _goFieldsForTrace = Enum.GetValues<GameObjectField>();
 
-    private void RequestTransportTemplate(uint entry)
+    // The modern client never sends CMSG_QUERY_GAME_OBJECT for a transport it is merely
+    // looking at, so it never learns gameobject_template.Data0 — the taxi path id a
+    // MO_TRANSPORT flies along. Ask the legacy server ourselves the first time we forward
+    // one; SMSG_QUERY_GAME_OBJECT_RESPONSE is relayed to the client unconditionally.
+    // Once per GameState, as for lock templates below: another client on this proxy, or this
+    // one after a relog, needs the answer again.
+    internal void RequestTransportTemplate(uint entry)
     {
         if (entry == 0)
             return;
-        lock (_queriedTransportTemplates)
-        {
-            if (!_queriedTransportTemplates.Add(entry))
-                return;
-        }
+        if (!GetSession().GameState.TransportTemplateRequested.Add(entry))
+            return;
 
         var query = new WorldPacket(Opcode.CMSG_QUERY_GAME_OBJECT);
         query.WriteUInt32(entry);
