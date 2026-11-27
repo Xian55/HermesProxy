@@ -22,11 +22,11 @@ public sealed class GlobalStringsHotfixTests
     [Fact]
     public void Hotfix_IsWrittenInTheClientsFieldOrder()
     {
-        var record = GameData.GlobalStringsHotfix(3_400_002, 16021, "TAG", "%d x", 1);
+        var record = GameData.GlobalStringsHotfix(16021, "TAG", "%d x", 1);
 
         Assert.Equal(DB2Hash.GlobalStrings, record.TableHash);
         Assert.Equal(16021u, record.RecordId);
-        Assert.Equal(3_400_002u, record.HotfixId);
+        Assert.Equal(3_416_021u, record.HotfixId); // HotfixGlobalStringsBegin + record id
         Assert.Equal(
             "54414700" + "25642078" + "00" + "01",   // BaseTag, TagText, Flags
             Convert.ToHexString(record.HotfixContent.GetData()));
@@ -58,9 +58,11 @@ public sealed class GlobalStringsHotfixTests
     [Fact]
     public void Client_GetsTheTextOfItsLocale()
     {
-        const uint hotfixId = 3_499_999;
-        var enUS = GameData.GlobalStringsHotfix(hotfixId, 16021, "TAG", "You have been awarded %d honor points.", 1);
-        var deDE = GameData.GlobalStringsHotfix(hotfixId, 16021, "TAG", "Ihr werdet mit %d Ehrenpunkten belohnt.", 1);
+        // Clear of the shipped GlobalStrings ids, so no loaded record is replaced.
+        const uint id = 99_999;
+        var enUS = GameData.GlobalStringsHotfix(id, "TAG", "You have been awarded %d honor points.", 1);
+        var deDE = GameData.GlobalStringsHotfix(id, "TAG", "Ihr werdet mit %d Ehrenpunkten belohnt.", 1);
+        uint hotfixId = enUS.HotfixId;
         GameData.LocalizedHotfixes[hotfixId] = new Dictionary<string, HotfixRecord> { ["enUS"] = enUS, ["deDE"] = deDE }.ToFrozenDictionary();
         try
         {

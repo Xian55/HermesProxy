@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using HermesProxy.World;
+using HermesProxy.World.Enums;
 using Xunit;
 
 namespace HermesProxy.Tests.World;
@@ -39,10 +40,34 @@ public class GameDataCsvLoadTests
             string item = Path.Combine("CSV", $"Item{ModernVersion.ExpansionVersion}.csv");
             Assert.True(File.Exists(item), $"{item} is not in the build output; build HermesProxy first.");
             GameData.LoadEverything();
+            AssertLoadedHotfixIds();
         }
         finally
         {
             Environment.CurrentDirectory = previous;
+        }
+    }
+
+    // Every loaded record carries the unique id of its content, and the tables keyed by record id
+    // have the push id of it (HotfixPushIdTests).
+    private static void AssertLoadedHotfixIds()
+    {
+        foreach (var (hotfixId, record) in GameData.Hotfixes)
+        {
+            uint expected = GameData.LocalizedHotfixes.TryGetValue(hotfixId, out var byLocale)
+                ? GameData.ContentUniqueId(byLocale)
+                : GameData.ContentUniqueId(record);
+            Assert.Equal(expected, record.UniqueId);
+
+            uint? begin = record.TableHash switch
+            {
+                DB2Hash.ItemExtendedCost => GameData.HotfixItemExtendedCostBegin,
+                DB2Hash.CurrencyTypes => GameData.HotfixCurrencyTypesBegin,
+                DB2Hash.GlobalStrings => GameData.HotfixGlobalStringsBegin,
+                _ => null,
+            };
+            if (begin is { } b)
+                Assert.Equal(b + record.RecordId, hotfixId);
         }
     }
 }

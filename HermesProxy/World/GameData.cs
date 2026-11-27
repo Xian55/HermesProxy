@@ -2505,6 +2505,98 @@ public static partial class GameData
     public const uint HotfixItemExtendedCostBegin = 3_200_000;
     public const uint HotfixCurrencyTypesBegin = 3_300_000;
     public const uint HotfixGlobalStringsBegin = 3_400_000;
+
+    // Each table's push ids lie in a window of this size from its Hotfix*Begin.
+    internal const uint HotfixIdRangeSize = 100_000;
+
+    /// <summary>
+    /// The push id of a table's record, from the record's own id. A client keeps the hotfixes it
+    /// was sent under their push ids and asks again only for ids it lacks or whose unique id has
+    /// changed, so a record keeps its push id whatever rows the CSV around it has or which server
+    /// the client plays on. A row's position in the CSV gave the same push id to another record
+    /// whenever the shipped rows changed, or a 4.4.2 client moved between a 3.3.5a and a 4.3.4
+    /// server, which ship different ItemExtendedCost rows.
+    /// </summary>
+    internal static uint HotfixIdForRecord(uint begin, uint recordId, DB2Hash table)
+    {
+        if (recordId >= HotfixIdRangeSize)
+            throw new InvalidDataException(
+                $"{table} record {recordId} does not fit the {HotfixIdRangeSize} push ids from {begin}.");
+        return begin + recordId;
+    }
+
+    /// <summary>
+    /// Gives every record loaded from CSV a unique id made from its content, the value the
+    /// client checks its cached copy against. It used to be the push id, so a push id that came
+    /// to name other content left the client on its cached copy without asking. Run once the
+    /// loaders are done; records made at runtime keep their push id.
+    /// </summary>
+    internal static void AssignContentUniqueIds(
+        ConcurrentDictionary<uint, HotfixRecord> hotfixes,
+        ConcurrentDictionary<uint, FrozenDictionary<string, HotfixRecord>> localized)
+    {
+        foreach (var (hotfixId, record) in hotfixes)
+        {
+            if (localized.TryGetValue(hotfixId, out var byLocale))
+            {
+                // One value for every locale's text: SMSG_AVAILABLE_HOTFIXES carries the enUS
+                // record's, and the client of any locale must find it equal to what it was sent.
+                uint uniqueId = ContentUniqueId(byLocale);
+                foreach (var (_, text) in byLocale)
+                    text.UniqueId = uniqueId;
+                record.UniqueId = uniqueId;
+            }
+            else
+            {
+                record.UniqueId = ContentUniqueId(record);
+            }
+        }
+    }
+
+    // 32-bit FNV-1a: the same value in every process, unlike string.GetHashCode or HashCode.
+    private const uint FnvOffsetBasis = 2_166_136_261;
+    private const uint FnvPrime = 16_777_619;
+
+    /// <summary>A unique id from a record's table, record id, status and content.</summary>
+    internal static uint ContentUniqueId(HotfixRecord record)
+        => NonZero(HashRecord(FnvOffsetBasis, record));
+
+    /// <summary>A unique id from every locale's version of a record, in locale order.</summary>
+    internal static uint ContentUniqueId(FrozenDictionary<string, HotfixRecord> byLocale)
+    {
+        uint hash = FnvOffsetBasis;
+        foreach (string locale in byLocale.Keys.Order(StringComparer.Ordinal))
+        {
+            foreach (char c in locale)
+                hash = Fnv(hash, (byte)c);
+            hash = HashRecord(hash, byLocale[locale]);
+        }
+        return NonZero(hash);
+    }
+
+    private static uint HashRecord(uint hash, HotfixRecord record)
+    {
+        hash = Fnv(hash, (uint)record.TableHash);
+        hash = Fnv(hash, record.RecordId);
+        hash = Fnv(hash, (byte)record.Status);
+        ReadOnlySpan<byte> content = record.HotfixContent.GetDataSpan();
+        hash = Fnv(hash, (uint)content.Length);
+        foreach (byte b in content)
+            hash = Fnv(hash, b);
+        return hash;
+    }
+
+    private static uint Fnv(uint hash, byte value) => (hash ^ value) * FnvPrime;
+
+    private static uint Fnv(uint hash, uint value)
+    {
+        for (int shift = 0; shift < 32; shift += 8)
+            hash = Fnv(hash, (byte)(value >> shift));
+        return hash;
+    }
+
+    private static uint NonZero(uint hash) => hash == 0 ? 1 : hash;
+
     // Hotfixes of the client's own text, by locale; Hotfixes holds the enUS one of each.
     public static ConcurrentDictionary<uint, FrozenDictionary<string, HotfixRecord>> LocalizedHotfixes = [];
 
@@ -2556,6 +2648,7 @@ public static partial class GameData
             jobs.Add(LoadItemEffectRecordIds);
         }
         Parallel.Invoke(jobs.ToArray());
+        AssignContentUniqueIds(Hotfixes, LocalizedHotfixes);
     }
 
     public static void LoadAreaTriggerHotfixes()
@@ -5446,14 +5539,12 @@ public static partial class GameData
             return;
 
         using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
-        uint counter = 0;
         Span<int> values = stackalloc int[ItemExtendedCostColumns];
         foreach (var row in reader)
         {
-            counter++;
             for (int i = 0; i < values.Length; i++)
                 values[i] = row[i].Parse<int>();
-            HotfixRecord record = ItemExtendedCostHotfix(HotfixItemExtendedCostBegin + counter, values);
+            HotfixRecord record = ItemExtendedCostHotfix(values);
             Hotfixes[record.HotfixId] = record;
         }
     }
@@ -5467,14 +5558,14 @@ public static partial class GameData
     /// wotlk_classic / cata_classic ItemExtendedCostLoadInfo), from the columns of
     /// CSV/Hotfix/ItemExtendedCost*.csv.
     /// </summary>
-    internal static HotfixRecord ItemExtendedCostHotfix(uint hotfixId, ReadOnlySpan<int> row)
+    internal static HotfixRecord ItemExtendedCostHotfix(ReadOnlySpan<int> row)
     {
         HotfixRecord record = new HotfixRecord();
         record.Status = HotfixStatus.Valid;
         record.TableHash = DB2Hash.ItemExtendedCost;
-        record.HotfixId = hotfixId;
-        record.UniqueId = hotfixId;
         record.RecordId = (uint)row[0];
+        record.HotfixId = HotfixIdForRecord(HotfixItemExtendedCostBegin, record.RecordId, record.TableHash);
+        record.UniqueId = record.HotfixId;
         record.HotfixContent.WriteUInt16((ushort)row[1]); // RequiredArenaRating
         record.HotfixContent.WriteInt8((sbyte)row[2]);    // ArenaBracket
         record.HotfixContent.WriteUInt8((byte)row[3]);    // Flags
@@ -5506,14 +5597,12 @@ public static partial class GameData
             return;
 
         using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
-        uint counter = 0;
         var columns = new string[CurrencyTypesColumns];
         foreach (var row in reader)
         {
-            counter++;
             for (int i = 0; i < columns.Length; i++)
                 columns[i] = row[i].ToString();
-            HotfixRecord record = CurrencyTypesHotfix(HotfixCurrencyTypesBegin + counter, columns);
+            HotfixRecord record = CurrencyTypesHotfix(columns);
             Hotfixes[record.HotfixId] = record;
         }
     }
@@ -5526,14 +5615,14 @@ public static partial class GameData
     /// One CurrencyTypes row as the 4.4.2 client reads a hotfix of it (TrinityCore cata_classic
     /// CurrencyTypesLoadInfo; the ID is not in the row), from the columns of CurrencyTypesCata4.csv.
     /// </summary>
-    internal static HotfixRecord CurrencyTypesHotfix(uint hotfixId, ReadOnlySpan<string> row)
+    internal static HotfixRecord CurrencyTypesHotfix(ReadOnlySpan<string> row)
     {
         HotfixRecord record = new HotfixRecord();
         record.Status = HotfixStatus.Valid;
         record.TableHash = DB2Hash.CurrencyTypes;
-        record.HotfixId = hotfixId;
-        record.UniqueId = hotfixId;
         record.RecordId = uint.Parse(row[0], CultureInfo.InvariantCulture);
+        record.HotfixId = HotfixIdForRecord(HotfixCurrencyTypesBegin, record.RecordId, record.TableHash);
+        record.UniqueId = record.HotfixId;
         record.HotfixContent.WriteCString(row[1]);                                                // Name
         record.HotfixContent.WriteCString(row[2]);                                                // Description
         record.HotfixContent.WriteUInt8(byte.Parse(row[3], CultureInfo.InvariantCulture));       // CategoryID
@@ -5568,31 +5657,29 @@ public static partial class GameData
 
         using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
         string[] locales = [.. reader.Header.ColNames.Skip(3)];
-        uint counter = 0;
         foreach (var row in reader)
         {
-            counter++;
-            uint hotfixId = HotfixGlobalStringsBegin + counter;
             uint id = row[0].Parse<uint>();
+            uint hotfixId = HotfixIdForRecord(HotfixGlobalStringsBegin, id, DB2Hash.GlobalStrings);
             string tag = row[1].ToString();
             byte flags = row[2].Parse<byte>();
             var byLocale = new Dictionary<string, HotfixRecord>(locales.Length);
             for (int i = 0; i < locales.Length; i++)
-                byLocale[locales[i]] = GlobalStringsHotfix(hotfixId, id, tag, row[3 + i].ToString(), flags);
+                byLocale[locales[i]] = GlobalStringsHotfix(id, tag, row[3 + i].ToString(), flags);
             Hotfixes[hotfixId] = byLocale["enUS"];
             LocalizedHotfixes[hotfixId] = byLocale.ToFrozenDictionary();
         }
     }
 
     /// <summary>One GlobalStrings row as the 4.4.2 client reads a hotfix of it (WoWDBDefs; the ID is not in the row).</summary>
-    internal static HotfixRecord GlobalStringsHotfix(uint hotfixId, uint id, string tag, string text, byte flags)
+    internal static HotfixRecord GlobalStringsHotfix(uint id, string tag, string text, byte flags)
     {
         HotfixRecord record = new HotfixRecord();
         record.Status = HotfixStatus.Valid;
         record.TableHash = DB2Hash.GlobalStrings;
-        record.HotfixId = hotfixId;
-        record.UniqueId = hotfixId;
         record.RecordId = id;
+        record.HotfixId = HotfixIdForRecord(HotfixGlobalStringsBegin, id, record.TableHash);
+        record.UniqueId = record.HotfixId;
         record.HotfixContent.WriteCString(tag);
         record.HotfixContent.WriteCString(text);
         record.HotfixContent.WriteUInt8(flags);

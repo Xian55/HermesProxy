@@ -21,11 +21,11 @@ public sealed class ItemExtendedCostHotfixTests
         int[] row = [386, 0x0102, 3, 4, 5, 0x06070809, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
             21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
 
-        var record = GameData.ItemExtendedCostHotfix(3_200_001, row);
+        var record = GameData.ItemExtendedCostHotfix(row);
 
         Assert.Equal(DB2Hash.ItemExtendedCost, record.TableHash);
         Assert.Equal(386u, record.RecordId);
-        Assert.Equal(3_200_001u, record.HotfixId);
+        Assert.Equal(3_200_386u, record.HotfixId); // HotfixItemExtendedCostBegin + record id
         Assert.Equal(
             "0201" + "03" + "04" + "05" + "09080706" + "0A"           // rating, bracket, flags, faction, reputation, achievement
             + "0B000000" + "0C000000" + "0D000000" + "0E000000" + "0F000000" // ItemID, i32
